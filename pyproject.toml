@@ -5,7 +5,7 @@ description = "Planar Inductor Generator"
 readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.13"
-dependencies = ["click"]
+dependencies = ["click", "gerbonara"]
 authors = [{ name = "jaseg" }]
 maintainers = [
   { name = "Kicoil maintainers", email = "kicoil@jaseg.de" },
