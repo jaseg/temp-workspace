@@ -39,3 +39,10 @@ def make_via(x, y, layers):
                      clearance=clearance, 
                      zone_connect=0)
 
+
+def footprint_to_board(footprint):
+    return kicad_pcb.Board.empty_board(
+            zones=zones,
+            track_segments=[kicad_pcb.TrackSegment.from_footprint_line(line) for line in lines],
+            vias=[kicad_pcb.Via.from_pad(pad) for pad in pads if pad.type == kicad_pcb.Atom.thru_hole])
+
