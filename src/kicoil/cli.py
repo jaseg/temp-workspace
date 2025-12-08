@@ -11,7 +11,7 @@ import warnings
 import click
 from gerbonara.layers import LayerStack
 
-from .geometry import PlanarInductor
+from .geometry import PlanarInductor, divisors
 from .kicad import footprint_to_board
 from .svg import make_transparent_svg
 
@@ -20,11 +20,10 @@ def print_valid_twists(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
 
-    print(f'Valid twist counts for {value} turns:', file=sys.stderr)
+    click.echo(f'Valid twist counts for {value} turns:', file=sys.stderr)
     for d in divisors(value, value):
-        print(f'  {d}', file=sys.stderr)
+        click.echo(f'  {d}', file=sys.stderr)
 
-    click.echo()
     ctx.exit()
 
 

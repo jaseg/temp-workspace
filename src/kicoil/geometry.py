@@ -56,9 +56,9 @@ def farey_sequence(n: int, descending: bool = False) -> None:
 
 def divisors(n, max_b=10):
     for a, b in farey_sequence(n):
-        if a == n and b < max_b:
+        if a != 0 and a == n and b < max_b:
             yield b
-        if b == n and a < max_b:
+        if b != 1 and b == n and a < max_b:
             yield a
 
 
@@ -161,7 +161,7 @@ class PlanarInductor():
         if gcd(self.twists, self.turns) != 1:
             raise ValueError(f'For the geometry to work out, the twists parameter must be co-prime to turns, i.e. the two must have 1 as their greatest common divisor. You can print valid values for twists by running the kicoil CLI with --show-twists [turns number].\n\n'
                                        f'Right now, both are divisible by {gcd(self.twists, self.turns)}.\n'
-                                       f'Valid twist counts for n={self.turns} turns are: {list(divisors(self.turns, max(self.turns, 25)))}'
+                                       f'Valid twist counts for n={self.turns} turns are: {list(divisors(self.turns, max(self.turns, 25)))}\n'
                                        f'Valid turn counts for k={self.twists} twists are: {list(divisors(self.twists, max(self.twists, 25)))}')
 
         if (self.stagger_inner_vias or self.stagger_outer_vias) and self.twists%2 != 0:
