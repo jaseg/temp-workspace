@@ -1,34 +1,16 @@
-#!/usr/bin/env python3
-
 import warnings
-import subprocess
+import logging
+from dataclasses import dataclass, field
 import sys
-import math
-import multiprocessing
-import os
 from math import *
-from pathlib import Path
-from itertools import cycle
-from contextlib import contextmanager
 
-from scipy.constants import mu_0
-import numpy as np
-import click
-import matplotlib as mpl
+from gerbonara.cad.kicad.footprints import Footprint
+from gerbonara.cad.kicad.primitives import Zone, Hatch, ZoneKeepout, ZonePolygon, XYCoord
 
-from gerbonara.cad.kicad import pcb as kicad_pcb
-from gerbonara.cad.kicad import footprints as kicad_fp
-from gerbonara.cad.kicad import graphical_primitives as kicad_gr
-from gerbonara.cad.kicad import primitives as kicad_pr
-from gerbonara.utils import Tag
-from gerbonara import graphic_primitives as gp
-from gerbonara import graphic_objects as go
-
-from . import svg
 from . import kicad
 
 
-__version__ = '1.0.0'
+mu_0 = 1.25663706127e-06 # from scipy.constants
 
 
 def point_line_distance(p, l1, l2):
@@ -64,13 +46,11 @@ def farey_sequence(n: int, descending: bool = False) -> None:
     a, b, c, d = 0, 1, 1, n
     if descending:
         a, c = 1, n - 1
-    #print(f"{a}/{b}")
     yield a, b
 
     while c <= n and not descending or a > 0 and descending:
         k = (n + b) // d
         a, b, c, d = c, d, k * c - a, k * d - b
-        #print(f"{a}/{b}")
         yield a, b
 
 
@@ -82,19 +62,7 @@ def divisors(n, max_b=10):
             yield a
 
 
-def print_valid_twists(ctx, param, value):
-    if not value or ctx.resilient_parsing:
-        return
-
-    print(f'Valid twist counts for {value} turns:', file=sys.stderr)
-    for d in divisors(value, value):
-        print(f'  {d}', file=sys.stderr)
-
-    click.echo()
-    ctx.exit()
-
-
-def arc_approximate(points, layer, tolerance=0.02, level=0):
+def arc_approximate(points, trace_width, layer, tolerance=0.02, level=0):
     """ Approximate spiral arm using circular arcs. This results in a smoother output using less segments than if we
     approximate the arc using straight line segments.
 
@@ -111,7 +79,7 @@ def arc_approximate(points, layer, tolerance=0.02, level=0):
     x2, y2 = points[-1]
 
     if len(points) < 5:
-        yield make_arc(x0, y0, x2, y2, x1, y1, layer)
+        yield kicad.make_arc(x0, y0, x2, y2, x1, y1, trace_width, layer)
 
     # https://stackoverflow.com/questions/56224824/how-do-i-find-the-circumcenter-of-the-triangle-using-python-without-external-lib
     d = 2 * (x0 * (y2 - y1) + x2 * (y1 - y0) + x1 * (y0 - y2))
@@ -119,14 +87,14 @@ def arc_approximate(points, layer, tolerance=0.02, level=0):
     cy = ((x0 * x0 + y0 * y0) * (x1 - x2) + (x2 * x2 + y2 * y2) * (x0 - x1) + (x1 * x1 + y1 * y1) * (x2 - x0)) / d
     r = dist((cx, cy), (x1, y1))
     if any(abs(dist((px, py), (cx, cy)) - r) > tolerance for px, py in points):
-        yield from arc_approximate(points[:i_mid+1], layer, tolerance, level+1)
-        yield from arc_approximate(points[i_mid:], layer, tolerance, level+1)
+        yield from arc_approximate(points[:i_mid+1], trace_width, layer, tolerance, level+1)
+        yield from arc_approximate(points[i_mid:], trace_width, layer, tolerance, level+1)
 
     else:
-        yield make_arc(x0, y0, x2, y2, x1, y1, layer)
+        yield kicad.make_arc(x0, y0, x2, y2, x1, y1, trace_width, layer)
 
 
-def compute_spiral(r1, r2, a1, a2, start_frac, end_frac, fn=64):
+def compute_spiral(r1, r2, a1, a2, fn=64):
     fn = ceil(fn * (a2-a1)/(2*pi))
     x0, y0 = cos(a1)*r1, sin(a1)*r1
     dr = 3 if r2 < r1 else -3
@@ -144,250 +112,242 @@ def compute_spiral(r1, r2, a1, a2, start_frac, end_frac, fn=64):
 
     return points, sum(dists)
 
-@click.command()
-@click.argument('outfile', required=False, type=click.Path(writable=True, dir_okay=False, path_type=Path))
-@click.option('--footprint-name', help="Name for the generated footprint. Default: Output file name sans extension.")
-@click.option('--layer-pair', default='F.Cu,B.Cu', help="Target KiCad layer pair for the generated footprint, comma-separated. Default: F.Cu/B.Cu.")
-@click.option('--turns', type=int, default=5, help='Number of turns')
-@click.option('--outer-diameter', type=float, default=50, help='Outer diameter [mm]')
-@click.option('--inner-diameter', type=float, default=25, help='Inner diameter [mm]')
-@click.option('--stagger-inner-vias/--no-stagger-inner-vias', default=False, help='Stagger inner via ring')
-@click.option('--stagger-outer-vias/--no-stagger-outer-vias', default=False, help='Stagger outer via ring')
-@click.option('--trace-width', type=float, default=None)
-@click.option('--via-diameter', type=float, default=0.6)
-@click.option('--two-layer/--single-layer', default=True)
-@click.option('--via-drill', type=float, default=0.3)
-@click.option('--via-offset', type=float, default=None, help='Radially offset vias from trace endpoints [mm]')
-@click.option('--keepout-zone/--no-keepout-zone', default=True, help='Add a keepout are to the footprint (default: yes)')
-@click.option('--keepout-margin', type=float, default=5, help='Margin between outside of coil and keepout area (mm, default: 5)')
-@click.option('--copper-thickness', type=float, default=0.035, help='Copper thickness for resistance calculation, in mm. Default: 0.035mm ^= 1 Oz')
-@click.option('--twists', type=int, default=1, help='Number of twists per revolution. Note that this number must be co-prime to the number of turns. Run with --show-twists to list valid values. (default: 1)')
-@click.option('--circle-segments', type=int, default=64, help='When not using arcs, the number of points to use for arc interpolation per 360 degrees.')
-@click.option('--show-twists', callback=print_valid_twists, expose_value=False, type=int, is_eager=True, help='Calculate and show valid --twists counts for the given number of turns. Takes the number of turns as a value.')
-@click.option('--clearance', type=float, default=None)
-@click.option('--arc-tolerance', type=float, default=0.02)
-@click.option('--format', type=click.Choice(['svg', 'gerber', 'kicad-footprint', 'kicad-pcb', 'show']), default='kicad-footprint')
-@click.option('--clipboard/--no-clipboard', help='Use clipboard integration (requires wl-clipboard)')
-@click.option('--counter-clockwise/--clockwise', help='Direction of generated spiral. Default: clockwise when wound from the inside.')
-@click.version_option()
-def generate(outfile, turns, outer_diameter, inner_diameter, via_diameter, via_drill, via_offset, trace_width,
-             clearance, footprint_name, layer_pair, twists, clipboard, counter_clockwise, keepout_zone, keepout_margin,
-             arc_tolerance, circle_segments, copper_thickness, format, two_layer, stagger_inner_vias,
-             stagger_outer_vias):
 
-    if 'WAYLAND_DISPLAY' in os.environ:
-        copy, paste, cliputil = ['wl-copy'], ['wl-paste'], 'xclip'
-    else:
-        copy, paste, cliputil = ['xclip', '-i', '-sel', 'clipboard'], ['xclip', '-o', '-sel' 'clipboard'], 'wl-clipboard'
+@dataclass
+class PlanarInductor():
+    outer_diameter: float
+    inner_diameter: float
+    turns: int
+    twists: int
+    trace_width: float
+    clearance: float = None
+    layers: int = 2
+    via_diameter: float = 0.6
+    via_drill: float = None
+    via_offset: float = None
+    stagger_inner_vias: bool = False
+    stagger_outer_vias: bool = False
+    keepout_zone: bool = True
+    keepout_margin: float = 0.0
+    copper_thickness: float = 0.035
+    layer_pair: str = 'F.Cu,B.Cu'
+    clockwise: bool = False
 
-    if gcd(twists, turns) != 1:
-        raise click.ClickException(f'For the geometry to work out, the --twists parameter must be co-prime to --turns, i.e. the two must have 1 as their greatest common divisor. You can print valid values for --twists by running this command with --show-twists [turns number].\n\n'
-                                   f'Right now, both are divisible by {gcd(twists, turns)}.\n'
-                                   f'Valid twist counts for n={turns} turns are: {list(divisors(turns, max(turns, 25)))}'
-                                   f'Valid turn counts for k={twists} twists are: {list(divisors(twists, max(twists, 25)))}')
+    def __post_init__(self):
+        self.logger = logging.getLogger('kicoil')
+        self.outer_radius = self.outer_diameter/2
+        self.inner_radius = self.inner_diameter/2
+        self.turns_per_layer = self.turns/self.layers
+        self.sector_angle = 2*pi / self.twists
+        self.sweeping_angle = self.sector_angle * self.turns_per_layer
+        self.spiral_pitch = (self.outer_radius-self.inner_radius) / self.turns_per_layer
+        self.layers = 2 if self.twists > 0 else 1
+        self.R = None # will be calculated during render
 
-    if (stagger_inner_vias or stagger_outer_vias) and twists%2 != 0:
-        raise click.ClickException('For --stagger-inner/outer-vias to work, --twists must be even and --turns must be odd.')
+        c1 = self.inner_radius
+        c2 = self.inner_radius + self.spiral_pitch
+        alpha1 = atan((self.outer_radius - self.inner_radius) / self.sweeping_angle / c1)
+        alpha2 = atan((self.outer_radius - self.inner_radius) / self.sweeping_angle / c2)
+        alpha = (alpha1+alpha2)/2
+        self.projected_spiral_pitch = self.spiral_pitch*cos(alpha)
 
-    outer_radius = outer_diameter/2
-    inner_radius = inner_diameter/2
-    turns_per_layer = turns/2 if two_layer else turns
 
-    sweeping_angle = 2*pi * turns_per_layer / twists
-    spiral_pitch = (outer_radius-inner_radius) / turns_per_layer
-    c1 = inner_radius
-    c2 = inner_radius + spiral_pitch
-    alpha1 = atan((outer_radius - inner_radius) / sweeping_angle / c1)
-    alpha2 = atan((outer_radius - inner_radius) / sweeping_angle / c2)
-    alpha = (alpha1+alpha2)/2
-    projected_spiral_pitch = spiral_pitch*cos(alpha)
+        if self.turns < 1:
+            raise ValueError(f'Error: PlanarInductor.turns must be 1 or more')
 
-    if trace_width is None and clearance is None:
-        trace_width = 0.15
-        print(f'Warning: Defaulting to {trace_width:.2f} mm trace width.', file=sys.stderr)
+        if self.twists < 0:
+            raise ValueError(f'Error: PlanarInductor.turns must be 0 or more')
 
-    if trace_width is None:
-        if round(clearance, 3) > round(projected_spiral_pitch, 3):
-            raise click.ClickException(f'Error: Given clearance of {clearance:.2f} mm is larger than the projected spiral pitch of {projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
-        trace_width = projected_spiral_pitch - clearance
-        print(f'Calculated trace width for {clearance:.2f} mm clearance is {trace_width:.2f} mm.', file=sys.stderr)
+        if gcd(self.twists, self.turns) != 1:
+            raise ValueError(f'For the geometry to work out, the twists parameter must be co-prime to turns, i.e. the two must have 1 as their greatest common divisor. You can print valid values for twists by running the kicoil CLI with --show-twists [turns number].\n\n'
+                                       f'Right now, both are divisible by {gcd(self.twists, self.turns)}.\n'
+                                       f'Valid twist counts for n={self.turns} turns are: {list(divisors(self.turns, max(self.turns, 25)))}'
+                                       f'Valid turn counts for k={self.twists} twists are: {list(divisors(self.twists, max(self.twists, 25)))}')
 
-    elif clearance is None:
-        if round(trace_width, 2) > round(projected_spiral_pitch, 2):
-            raise click.ClickException(f'Error: Given trace width of {trace_width:.2f} mm is larger than the projected spiral pitch of {projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
-        clearance = projected_spiral_pitch - trace_width
-        print(f'Calculated clearance for {trace_width:.2f} mm trace width is {clearance:.2f} mm.', file=sys.stderr)
+        if (self.stagger_inner_vias or self.stagger_outer_vias) and self.twists%2 != 0:
+            raise ValueError('For via staggering to work, twists must be even and turns must be odd.')
 
-    else:
-        if round(trace_width, 2) > round(projected_spiral_pitch, 2):
-            raise click.ClickException(f'Error: Given trace width of {trace_width:.2f} mm is larger than the projected spiral pitch of {projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
-        clearance_actual = projected_spiral_pitch - trace_width
-        if round(clearance_actual, 3) < round(clearance, 3):
-            raise click.ClickException(f'Error: Actual clearance for {trace_width:.2f} mm trace is {clearance_actual:.2f} mm, which is lower than the given clearance of {clearance:.2f} mm.')
+        if self.trace_width is None and self.clearance is None:
+            self.clearance = 0.15
+            warnings.warn(f'Warning: Neither trace width nor clearance given. Defaulting to {self.clearance:.2f} mm clearance.')
 
-    if round(via_diameter, 2) < round(trace_width, 2):
-        print(f'Clipping via diameter from {via_diameter:.2f} mm to trace width of {trace_width:.2f} mm.', file=sys.stderr)
-        via_diameter = trace_width
+        if self.trace_width is None:
+            if round(self.clearance, 3) > round(self.projected_spiral_pitch, 3):
+                raise ValueError(f'Error: Given clearance of {clearance:.2f} mm is larger than the projected spiral pitch of {projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
+            self.trace_width = self.projected_spiral_pitch - self.clearance
+            self.logger.info(f'Calculated trace width for {self.clearance:.2f} mm clearance is {self.trace_width:.2f} mm.')
 
-    if via_offset is None:
-        via_offset = max(0, (via_diameter-trace_width)/2)
-        print(f'Autocalculated via offset {via_offset:.2f} mm', file=sys.stderr)
-
-    inner_via_ring_radius = inner_radius - via_offset
-    #print(f'{inner_radius=} {via_offset=} {via_diameter=}', file=sys.stderr)
-    inner_via_angle = 2*asin((via_diameter + clearance)/2 / inner_via_ring_radius)
-
-    outer_via_ring_radius = outer_radius + via_offset
-    outer_via_angle = 2*asin((via_diameter + clearance)/2 / outer_via_ring_radius)
-
-    print(f'Inner via ring @r={inner_via_ring_radius:.2f} mm (from {inner_radius:.2f} mm)', file=sys.stderr)
-    print(f'    {degrees(inner_via_angle):.1f} deg / via', file=sys.stderr)
-    print(f'Outer via ring @r={outer_via_ring_radius:.2f} mm (from {outer_radius:.2f} mm)', file=sys.stderr)
-    print(f'    {degrees(outer_via_angle):.1f} deg / via', file=sys.stderr)
-
-    # Check if the vias of the inner ring are so large that they would overlap
-    if inner_via_angle*twists > (4*pi if stagger_inner_vias else 2*pi):
-        min_dia = 2*((via_diameter + clearance) / (2*sin(pi / twists * (2 if stagger_inner_vias else 1))) + via_offset)
-        warnings.warn(f'Overlapping vias in inner via ring. Calculated minimum inner diameter is {min_dia:.2f} mm.')
-
-    pitch = clearance + trace_width
-    t, _, b = layer_pair.partition(',')
-    layer_pair = (t.strip(), b.strip())
-    rainbow = '#817 #a35 #c66 #e94 #ed0 #9d5 #4d8 #2cb #0bc #09c #36b #639'.split()
-    rainbow = rainbow[2::3] + rainbow[1::3] + rainbow[0::3]
-    n = 5
-    rainbow = rainbow[n:] + rainbow[:n]
-    out_paths = []
-    svg_stuff = [*out_paths]
-
-    # For fill factor & inductance formulas, See https://coil32.net/pcb-coil.html for details
-    d_avg = (outer_diameter + inner_diameter)/2
-    phi = (outer_diameter - inner_diameter) / (outer_diameter + inner_diameter)
-    c1, c2, c3, c4 = 1.00, 2.46, 0.00, 0.20
-    L = mu_0 * turns**2 * d_avg*1e3 * c1 / 2 * (log(c2/phi) + c3*phi + c4*phi**2)
-    print(f'Outer diameter: {outer_diameter:g} mm', file=sys.stderr)
-    print(f'Average diameter: {d_avg:g} mm', file=sys.stderr)
-    print(f'Inner diameter: {inner_diameter:g} mm', file=sys.stderr)
-    print(f'Fill factor: {phi:g}', file=sys.stderr)
-    print(f'Approximate inductance: {L:g} µH', file=sys.stderr)
-
-    if footprint_name:
-        name = footprint_name
-    elif outfile:
-        name = outfile.stem,
-    else:
-        name = f'generated-coil-{outer_diameter:.2f}x{inner_diameter:.2f}-n{turns}-k{twists}'
-
-    footprint = kicad_fp.Footprint(
-            name=name,
-            generator=kicad_fp.Atom('KicoilV1'),
-            layer='F.Cu',
-            descr=f"{turns} turn {outer_diameter:.2f} mm diameter twisted coil footprint, inductance approximately {L:.6f} µH. Generated by gerbonara'c Twisted Coil generator, version {__version__}.",
-            clearance=clearance,
-            zone_connect=0)
-
-    sector_angle = 2*pi / twists
-    total_angle = twists*2*sweeping_angle if two_layer else twists*sweeping_angle
-
-    inverse = {}
-    for i in range(twists):
-        inverse[i*turns%twists] = i
-
-    # Array where we collect all gerbonara kicad line and arc objects
-    for i in range(twists):
-        start_angle = i*sector_angle
-        fold_angle = start_angle + sweeping_angle
-        end_angle = fold_angle + sweeping_angle
-
-        # Handle the spiral arm
-        x = inverse[i]*floor(2*sweeping_angle / (2*pi)) * 2*pi
-        points_layer0, arm_length = compute_spiral(outer_radius, inner_radius, start_angle, fold_angle, (x + start_angle)/total_angle, (x + fold_angle)/total_angle, circle_segments)
-        x0, y0 = points_layer0[0]
-        xn, yn = points_layer0[-1]
-
-        if two_layer:
-            # Handle the returning arm on the bottom layer
-            points_layer1, _ = compute_spiral(inner_radius, outer_radius, fold_angle, end_angle, (x + fold_angle)/total_angle, (x + end_angle)/total_angle, circle_segments)
+        elif self.clearance is None:
+            if round(self.trace_width, 2) > round(self.projected_spiral_pitch, 2):
+                raise ValueError(f'Error: Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
+            self.clearance = self.projected_spiral_pitch - self.trace_width
+            self.logger.info(f'Calculated clearance for {self.trace_width:.2f} mm trace width is {self.clearance:.2f} mm.')
 
         else:
-            # Add a straight connecting segment connecting the inner point to the outside of the spiral.
-            dr = outer_radius - inner_radius
-            xq = xn + cos(fold_angle) * dr
-            yq = yn - sin(fold_angle) * dr
-            points_layer1 = [(xn, yn), (xq, yq)]
+            if round(self.trace_width, 2) > round(self.projected_spiral_pitch, 2):
+                raise click.ClickException(f'Error: Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
+            clearance_actual = self.projected_spiral_pitch - self.trace_width
+            if round(clearance_actual, 3) < round(self.clearance, 3):
+                raise click.ClickException(f'Error: Actual clearance for {self.trace_width:.2f} mm trace is {clearance_actual:.2f} mm, which is lower than the given clearance of {self.clearance:.2f} mm.')
 
-        footprint.arcs.extend(arc_approximate(points_layer0, layer_pair[0], arc_tolerance))
-        footprint.arcs.extend(arc_approximate(points_layer1, layer_pair[1], arc_tolerance))
+        if round(self.via_diameter, 2) < round(self.trace_width, 2):
+            self.logger.warning(f'Clipping via diameter from {self.via_diameter:.2f} mm to trace width of {self.trace_width:.2f} mm.')
+            self.via_diameter = self.trace_width
 
-        # Handle inner via ring and process staggering if enabled
-        r = inner_via_ring_radius
-        if stagger_inner_vias:
-            if i%2 != 0:
-                r -= 2*via_offset
+        if self.via_drill is None:
+            self.via_drill = max(self.via_diameter / 2, self.via_diameter - 1.2)
+            self.logger.warning(f'No via drill given, defaulting to {self.via_drill:.2f} mm based on via diameter.')
 
-        xv, yv = r*cos(fold_angle), r*sin(fold_angle)
+        if self.via_offset is None:
+            self.via_offset = max(0, (self.via_diameter - self.trace_width)/2)
+            self.logger.info(f'Autocalculated via offset {self.via_offset:.2f} mm')
 
-        if not isclose(via_offset, 0, abs_tol=1e-6):
-            footprint.lines.append(make_line(*points_layer0[-1], xv, yv, layer_pair[0]))
-            footprint.lines.append(make_line(xv, yv, *points_layer1[0], layer_pair[1]))
+        if isclose(self.via_offset, 0, abs_tol=1e-6):
+            self.via_offset = 0
 
-        # Handle outer via ring and process staggering if enabled unless we are at the start of the coil, where we will
-        # place pads below.
-        if i > 0:
-            r = outer_via_ring_radius
+        self.inner_via_ring_radius = self.inner_radius - self.via_offset
+        inner_via_angle = 2*asin((self.via_diameter + self.clearance)/2 / self.inner_via_ring_radius)
 
-            if stagger_outer_vias:
+        self.outer_via_ring_radius = self.outer_radius + self.via_offset
+        outer_via_angle = 2*asin((self.via_diameter + self.clearance)/2 / self.outer_via_ring_radius)
+
+        self.logger.info(f'Inner via ring @r={self.inner_via_ring_radius:.2f} mm (from {self.inner_radius:.2f} mm)')
+        self.logger.info(f'    {degrees(inner_via_angle):.1f} deg / via')
+        self.logger.info(f'Outer via ring @r={self.outer_via_ring_radius:.2f} mm (from {self.outer_radius:.2f} mm)')
+        self.logger.info(f'    {degrees(outer_via_angle):.1f} deg / via')
+
+        # Check if the vias of the inner ring are so large that they would overlap
+        if inner_via_angle*self.twists > (4*pi if self.stagger_inner_vias else 2*pi):
+            min_dia = 2*((self.via_diameter + self.clearance) / (2*sin(pi / self.twists * (2 if self.stagger_inner_vias else 1))) + self.via_offset)
+            warnings.warn(f'Overlapping vias in inner via ring. Calculated minimum inner diameter is {min_dia:.2f} mm.')
+
+        t, _, b = self.layer_pair.partition(',')
+        self.layer_pair = (t.strip(), b.strip())
+
+        # For fill factor & inductance formulas, See https://coil32.net/pcb-coil.html for details
+        d_avg = (self.outer_diameter + self.inner_diameter)/2
+        phi = (self.outer_diameter - self.inner_diameter) / (self.outer_diameter + self.inner_diameter)
+        c1, c2, c3, c4 = 1.00, 2.46, 0.00, 0.20
+        self.L = mu_0 * self.turns**2 * d_avg*1e3 * c1 / 2 * (log(c2/phi) + c3*phi + c4*phi**2)
+        self.logger.info(f'Outer diameter: {self.outer_diameter:g} mm')
+        self.logger.info(f'Average diameter: {d_avg:g} mm')
+        self.logger.info(f'Inner diameter: {self.inner_diameter:g} mm')
+        self.logger.info(f'Fill factor: {phi:g}')
+        self.logger.info(f'Approximate inductance: {self.L:g} µH')
+
+        _points, arm_length = compute_spiral(r1=self.outer_radius, r2=self.inner_radius,
+                                                   a1=0, a2=self.sector_angle,
+                                                   fn=256)
+
+        self.track_length = arm_length*self.twists*self.layers
+        self.logger.info(f'Approximate track length: {self.track_length:.2f} mm')
+
+        A = self.copper_thickness/1e3 * self.trace_width/1e3 # trace cross-section area
+        rho = 1.68e-8 # specific resistivity of copper
+        self.R = self.track_length/1e3 * rho / A
+        self.logger.info(f'Approximate resistance: {self.R:g} Ω')
+
+
+    def render_footprint(self, name=None, arc_tolerance=0.02, circle_segments=64):
+        if name is None:
+            name = f'generated-coil-{self.outer_diameter:.2f}x{self.inner_diameter:.2f}-n{self.turns}-k{self.twists}'
+
+        from . import __version__
+        footprint = Footprint(
+                name=name,
+                generator=kicad.Atom('kicoil'),
+                generator_version=__version__,
+                layer='F.Cu',
+                descr=f"{self.turns} turn {self.outer_diameter:.2f} mm diameter twisted coil footprint, inductance approximately {self.L:.6f} µH. Generated by kicoil, version {__version__}.",
+                clearance=self.clearance,
+                zone_connect=0)
+
+        total_angle = self.twists*2*self.sweeping_angle*self.layers
+
+        inverse = {}
+        for i in range(self.twists):
+            inverse[i*self.turns%self.twists] = i
+
+        # Array where we collect all gerbonara kicad line and arc objects
+        for i in range(self.twists):
+            start_angle = i*self.sector_angle
+            fold_angle = start_angle + self.sweeping_angle
+            end_angle = fold_angle + self.sweeping_angle
+
+            # Handle the spiral arm
+            x = inverse[i]*floor(2*self.sweeping_angle / (2*pi)) * 2*pi
+            points_layer0, arm_length = compute_spiral(r1=self.outer_radius, r2=self.inner_radius,
+                                                       a1=start_angle, a2=fold_angle,
+                                                       fn=circle_segments)
+            x0, y0 = points_layer0[0]
+            xn, yn = points_layer0[-1]
+
+            if self.twists > 0:
+                # Handle the returning arm on the bottom layer
+                points_layer1, _ = compute_spiral(r1=self.inner_radius, r2=self.outer_radius,
+                                                  a1=fold_angle, a2=end_angle,
+                                                  fn=circle_segments)
+
+            else:
+                # Add a straight connecting segment connecting the inner point to the outside of the spiral.
+                dr = self.outer_radius - self.inner_radius
+                xq = xn + cos(fold_angle) * dr
+                yq = yn - sin(fold_angle) * dr
+                points_layer1 = [(xn, yn), (xq, yq)]
+
+            footprint.arcs.extend(arc_approximate(points_layer0, self.trace_width, self.layer_pair[0], arc_tolerance))
+            footprint.arcs.extend(arc_approximate(points_layer1, self.trace_width, self.layer_pair[1], arc_tolerance))
+
+            # Handle inner via ring and process staggering if enabled
+            r = self.inner_via_ring_radius
+            if self.stagger_inner_vias:
                 if i%2 != 0:
-                    r += 2*via_offset
+                    r -= 2*self.via_offset
 
-            xv, yv = r*cos(start_angle), r*sin(start_angle)
+            xv, yv = r*cos(fold_angle), r*sin(fold_angle)
 
-            if not isclose(via_offset, 0, abs_tol=1e-6):
-                footprint.lines.append(make_line(x0, y0, xv, yv, layer_pair[0]))
-                footprint.lines.append(make_line(x0, y0, xv, yv, layer_pair[1]))
+            if self.via_offset:
+                footprint.lines.append(kicad.make_line(*points_layer0[-1], xv, yv, self.trace_width, self.layer_pair[0]))
+                footprint.lines.append(kicad.make_line(xv, yv, *points_layer1[0], self.trace_width, self.layer_pair[1]))
 
-    l_total = arm_length*twists*(2 if two_layer else 1)
-    print(f'Approximate track length: {l_total:.2f} mm', file=sys.stderr)
+            footprint.pads.append(kicad.make_via(xv, yv,
+                                                 self.via_diameter, self.via_drill, self.clearance,
+                                                 self.layer_pair))
 
-    A = copper_thickness/1e3 * trace_width/1e3
-    rho = 1.68e-8
-    R = l_total/1e3 * rho / A
-    print(f'Approximate resistance: {R:g} Ω', file=sys.stderr)
+            # Handle outer via ring and process staggering if enabled unless we are at the start of the coil, where we will
+            # place pads below.
+            if i > 0:
+                r = self.outer_via_ring_radius
 
-    # Place the pads on the outer radius
-    top_pad = make_pad(1, [layer_pair[0]], outer_radius, 0)
-    pads.append(top_pad)
-    bottom_pad = make_pad(2, [layer_pair[1]], outer_radius, 0)
-    pads.append(bottom_pad)
+                if self.stagger_outer_vias:
+                    if i%2 != 0:
+                        r += 2*self.via_offset
 
-    if keepout_zone:
-        r = outer_diameter/2 + keepout_margin
-        tol = 0.05 # mm
-        n = ceil(pi / acos(1 - tol/r))
-        pts = [(r*cos(a*2*pi/n), r*sin(a*2*pi/n)) for a in range(n)]
-        footprint.zones.append(kicad_pr.Zone(layers=['*.Cu'],
-            hatch=kicad_pr.Hatch(),
-            filled_areas_thickness=False,
-            keepout=kicad_pr.ZoneKeepout(copperpour_allowed=False),
-            polygon=kicad_pr.ZonePolygon(pts=[kicad_pr.XYCoord(x=x, y=y) for x, y in pts])))
+                xv, yv = r*cos(start_angle), r*sin(start_angle)
 
-    if format == 'kicad-footprint':
-        data = footprint.serialize()
-    elif format == 'kicad-pcb':
-        data = footprint_to_board(footprint).serialize()
-    elif format == 'gerber':
+                if self.via_offset:
+                    footprint.lines.append(kicad.make_line(x0, y0, xv, yv, self.trace_width, self.layer_pair[0]))
+                    footprint.lines.append(kicad.make_line(x0, y0, xv, yv, self.trace_width, self.layer_pair[1]))
 
-    if clipboard:
-        try:
-            print(f'Running {copy[0]}.', file=sys.stderr)
-            proc = subprocess.Popen(copy, stdin=subprocess.PIPE, text=True)
-            proc.communicate(data)
-        except FileNotFoundError:
-            print(f'Error: --clipboard requires the {copy[0]} and {paste[0]} utilities from {cliputil} to be installed.', file=sys.stderr)
-    elif not outfile:
-        print(data)
-    else:
-        outfile.write_text(data)
+                footprint.pads.append(kicad.make_via(xv, yv,
+                                                     self.via_diameter, self.via_drill, self.clearance,
+                                                     self.layer_pair))
 
-if __name__ == '__main__':
-    generate()
+        # Place the pads on the outer radius
+        footprint.pads.extend([
+                kicad.make_pad(1, [self.layer_pair[0]], self.outer_radius, 0, self.trace_width, self.clearance),
+                kicad.make_pad(2, [self.layer_pair[1]], self.outer_radius, 0, self.trace_width, self.clearance)])
+
+        if self.keepout_zone:
+            r = self.outer_diameter/2 + self.keepout_margin
+            tol = 0.05 # mm
+            n = ceil(pi / acos(1 - tol/r))
+            pts = [(r*cos(a*2*pi/n), r*sin(a*2*pi/n)) for a in range(n)]
+            footprint.zones.append(Zone(layers=['*.Cu'],
+                hatch=Hatch(),
+                filled_areas_thickness=False,
+                keepout=ZoneKeepout(copperpour_allowed=False),
+                polygon=ZonePolygon(pts=[XYCoord(x=x, y=y) for x, y in pts])))
+
+        return footprint
+
