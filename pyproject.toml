@@ -11,7 +11,6 @@ maintainers = [
   { name = "Kicoil maintainers", email = "kicoil@jaseg.de" },
 ]
 keywords = ["kicad", "gerber", "pcb", "electronics", "EDA"]
-
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -29,12 +28,16 @@ classifiers = [
 [project.urls]
 Homepage = "https://jaseg.de/projects/kicoil/"
 Documentation = "https://kicoil.jaseg.de/"
-Source = "https://codeberg.org/jaseg/kicoil"
+Source = "https://git.jaseg.de/kicoil"
 "Source Mirror" = "https://git.jaseg.de/kicoil.git"
 Tracker = "https://codeberg.org/jaseg/kicoil/issues"
 
 [project.scripts]
 kicoil = "kicoil.cli:cli"
+kicoil-gui = "kicoil.gui:main"
+
+[dependency-groups]
+gui = ["cairosvg", "pillow"]
 
 [build-system]
 requires = ["uv-build"]

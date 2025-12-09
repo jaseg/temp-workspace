@@ -1,3 +1,17 @@
+# Copyright 2025 Jan Sebastian Götte <code@jaseg.de>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 
 import logging
 import subprocess
@@ -50,14 +64,13 @@ def print_valid_twists(ctx, param, value):
 @click.option('--arc-tolerance', type=float, default=0.02)
 @click.option('--format', type=click.Choice(['svg', 'gerber', 'kicad-footprint', 'kicad-pcb', 'show']), default='kicad-footprint')
 @click.option('--clipboard/--no-clipboard', help='Use clipboard integration (requires wl-clipboard)')
-@click.option('--clockwise/--counter-clockwise', help='Direction of generated spiral. Default: counter-clockwise when wound from the inside.')
+@click.option('--clockwise/--counter-clockwise', help='Direction of generated top layer spiral. Default: counter-clockwise when wound from the inside.')
 @click.option('--single-layer/--two-layer', help='Single-layer mode. This just forces twists to 0.')
 @click.version_option()
 def cli(outfile, footprint_name, clipboard, single_layer, arc_tolerance, circle_segments, format, **kwargs):
     logger = logging.getLogger('kicoil')
 
     if single_layer:
-        kwargs['twists'] = 0
         kwargs['layers'] = 1
     else:
         kwargs['layers'] = 2

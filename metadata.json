@@ -1,0 +1,28 @@
+{
+    "$schema": "https://go.kicad.org/pcm/schemas/v1",
+    "name": "KiCoil",
+    "description": "A planar inductor for KiCad",
+    "description_full": "KiCoil generates planar inductors as footprints. Currently, circular spiral and toroid inductors are supported. KiCoil supports arbitrary intermediates between spiral and toroid inductors. By playing around with this, you can create inductors that have lower parasitics and higher self-resonant frequency than standard multilayer spiral inductors.",
+    "identifier": "de.jaseg.kicoil",
+    "type": "plugin",
+    "author": {
+        "name": "jaseg",
+        "contact": {
+            "web": "https://jaseg.de/"
+        }
+    },
+    "license": "GPL-3.0",
+    "resources": {
+        "homepage": "https://jaseg.de/projects/kicoil",
+        "git": "https://git.jaseg.de/kicoil",
+        "issues": "https://codeberg.org/jaseg/kicoil/issues"
+    },
+    "versions": [
+        {
+            "version": "0.9.0",
+            "status": "stable",
+            "kicad_version": "8.00"
+        }
+    ],
+    "runtime": "ipc"
+}

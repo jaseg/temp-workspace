@@ -1,3 +1,19 @@
+
+# Copyright 2025 Jan Sebastian Götte <code@jaseg.de>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import warnings
 import logging
 from dataclasses import dataclass, field
@@ -18,26 +34,7 @@ def point_line_distance(p, l1, l2):
     x1, y1 = l1
     x2, y2 = l2
     # https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-    return abs((x2-x1)*(y1-y0) - (x1-x0)*(y2-y1)) / sqrt((x2-x1)**2 + (y2-y1)**2)
-
-def line_line_intersection(l1, l2):
-    p1, p2 = l1
-    p3, p4 = l2
-    x1, y1 = p1
-    x2, y2 = p2
-    x3, y3 = p3
-    x4, y4 = p4
-    
-    # https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
-    px = ((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4)-(y1-y2)*(x3-x4))
-    py = ((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4)-(y1-y2)*(x3-x4))
-    return px, py
-
-def angle_between_vectors(va, vb):
-    angle = atan2(vb[1], vb[0]) - atan2(va[1], va[0])
-    if angle < 0:
-        angle += 2*pi
-    return angle
+    return ((x2-x1)*(y1-y0) - (x1-x0)*(y2-y1)) / sqrt((x2-x1)**2 + (y2-y1)**2)
 
 
 # https://en.wikipedia.org/wiki/Farey_sequence#Next_term
@@ -91,11 +88,14 @@ def arc_approximate(points, trace_width, layer, tolerance=0.02, level=0):
         yield from arc_approximate(points[i_mid:], trace_width, layer, tolerance, level+1)
 
     else:
-        yield kicad.make_arc(x0, y0, x2, y2, x1, y1, trace_width, layer)
+        if point_line_distance((x1, y1), (x0, y0), (x2, y2)) > 0:
+            yield kicad.make_arc(x0, y0, x2, y2, x1, y1, trace_width, layer)
+        else:
+            yield kicad.make_arc(x2, y2, x0, y0, x1, y1, trace_width, layer)
 
 
 def compute_spiral(r1, r2, a1, a2, fn=64):
-    fn = ceil(fn * (a2-a1)/(2*pi))
+    fn = ceil(fn * abs(a2-a1)/(2*pi))
     x0, y0 = cos(a1)*r1, sin(a1)*r1
     dr = 3 if r2 < r1 else -3
 
@@ -119,7 +119,7 @@ class PlanarInductor():
     inner_diameter: float
     turns: int
     twists: int
-    trace_width: float
+    trace_width: float = None
     clearance: float = None
     layers: int = 2
     via_diameter: float = 0.6
@@ -139,9 +139,12 @@ class PlanarInductor():
         self.inner_radius = self.inner_diameter/2
         self.turns_per_layer = self.turns/self.layers
         self.sector_angle = 2*pi / self.twists
+
+        if self.clockwise:
+            self.sector_angle *= -1
+            
         self.sweeping_angle = self.sector_angle * self.turns_per_layer
         self.spiral_pitch = (self.outer_radius-self.inner_radius) / self.turns_per_layer
-        self.layers = 2 if self.twists > 0 else 1
         self.R = None # will be calculated during render
 
         c1 = self.inner_radius
@@ -151,6 +154,9 @@ class PlanarInductor():
         alpha = (alpha1+alpha2)/2
         self.projected_spiral_pitch = self.spiral_pitch*cos(alpha)
 
+        if self.layers == 1 and self.twists > 1:
+            warnings.warn('Warning: Twists set to a value other than 1, but single-layer mode is enabled. The twists value will be ignored.')
+            self.twists = 1
 
         if self.turns < 1:
             raise ValueError(f'Error: PlanarInductor.turns must be 1 or more')
@@ -248,9 +254,13 @@ class PlanarInductor():
         self.logger.info(f'Approximate resistance: {self.R:g} Ω')
 
 
+    @property
+    def default_footprint_name(self):
+        return f'planar-coil-{self.outer_diameter:.2f}x{self.inner_diameter:.2f}-n{self.turns}-k{self.twists}'
+
     def render_footprint(self, name=None, arc_tolerance=0.02, circle_segments=64):
         if name is None:
-            name = f'generated-coil-{self.outer_diameter:.2f}x{self.inner_diameter:.2f}-n{self.turns}-k{self.twists}'
+            name = self.default_footprint_name
 
         from . import __version__
         footprint = Footprint(
@@ -281,12 +291,14 @@ class PlanarInductor():
                                                        fn=circle_segments)
             x0, y0 = points_layer0[0]
             xn, yn = points_layer0[-1]
+            footprint.arcs.extend(arc_approximate(points_layer0, self.trace_width, self.layer_pair[0], arc_tolerance))
 
-            if self.twists > 0:
+            if self.layers > 1:
                 # Handle the returning arm on the bottom layer
                 points_layer1, _ = compute_spiral(r1=self.inner_radius, r2=self.outer_radius,
                                                   a1=fold_angle, a2=end_angle,
                                                   fn=circle_segments)
+                footprint.arcs.extend(arc_approximate(points_layer1, self.trace_width, self.layer_pair[1], arc_tolerance))
 
             else:
                 # Add a straight connecting segment connecting the inner point to the outside of the spiral.
@@ -294,9 +306,7 @@ class PlanarInductor():
                 xq = xn + cos(fold_angle) * dr
                 yq = yn - sin(fold_angle) * dr
                 points_layer1 = [(xn, yn), (xq, yq)]
-
-            footprint.arcs.extend(arc_approximate(points_layer0, self.trace_width, self.layer_pair[0], arc_tolerance))
-            footprint.arcs.extend(arc_approximate(points_layer1, self.trace_width, self.layer_pair[1], arc_tolerance))
+                footprint.lines.append(kicad.make_line(xn, yn, xq, yq, self.trace_width, self.layer_pair[1]))
 
             # Handle inner via ring and process staggering if enabled
             r = self.inner_via_ring_radius
