@@ -178,9 +178,9 @@ class KiCoilGUI:
                   command=self.show_valid_twists, width=20).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Save Footprint File", 
                   command=self.save_footprint_file, width=20).pack(side=tk.LEFT, padx=5)
-        if self.kicad_inst:
-            ttk.Button(button_frame, text="Update Footprint on Board", 
-                      command=self.update_board_footprint, width=20).pack(side=tk.LEFT, padx=5)
+        #if self.kicad_inst: FIXME
+        #    ttk.Button(button_frame, text="Update Footprint on Board", 
+        #              command=self.update_board_footprint, width=20).pack(side=tk.LEFT, padx=5)
         
         status_label = ttk.Label(main_frame, text="Output:", font=('Helvetica', 10, 'bold'))
         status_label.grid(row=3, column=0, sticky=tk.W, pady=(10, 0))
@@ -282,7 +282,7 @@ class KiCoilGUI:
 
         # Turns
         ttk.Label(parent, text="Number of Turns:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.turns_var = tk.IntVar(value=5)
+        self.turns_var = tk.IntVar(value=7)
         ttk.Spinbox(parent, from_=1, to=100, textvariable=self.turns_var,
                    width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Number of spiral turns",
@@ -291,7 +291,7 @@ class KiCoilGUI:
 
         # Twists
         ttk.Label(parent, text="Twists per Revolution:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.twists_var = tk.IntVar(value=1)
+        self.twists_var = tk.IntVar(value=4)
         ttk.Spinbox(parent, from_=0, to=50, textvariable=self.twists_var,
                    width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Must be co-prime to turns",
@@ -732,7 +732,7 @@ class KiCoilGUI:
             self.output_text.insert(tk.END, "Rendering footprint...\n\n", 'info')
 
             footprint = self.current_model.render_footprint(footprint_name, arc_tolerance, circle_segments)
-            default_name = footprint_name or model.default_footprint_name
+            default_name = footprint_name or self.current_model.default_footprint_name
             output_file = filedialog.asksaveasfilename(
                 title="Save KiCad Footprint",
                 defaultextension=".kicad_mod",
