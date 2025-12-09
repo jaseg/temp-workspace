@@ -1,0 +1,22 @@
+{
+    "$schema": "https://go.kicad.org/api/schemas/v1",
+    "identifier": "de.jaseg.kicoil",
+    "name": "KiCoil",
+    "description": "Planar inductor supporting spiral coils, toroidal coils, and hybrids",
+    "runtime": {
+        "type": "python",
+        "min_version": 3.13
+    },
+    "actions": [
+        {
+            "identifier": "kicoil-generator",
+            "name": "KiCoil Planar Inductor Generator",
+            "description": "Generates planar spiral inductors, toroidal inductors, and hybrids thereof",
+            "show-button": true,
+            "scopes": ["pcb"],
+            "entrypoint": "kicoil_plugin_action.py",
+            "icons-light": ["icon-light.png"],
+            "icons-dark": ["icon-dark.png"]
+        }
+    ]
+}

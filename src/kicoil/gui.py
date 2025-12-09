@@ -122,7 +122,8 @@ class EntryWithPlaceholder(tk.Entry):
 
 
 class KiCoilGUI:
-    def __init__(self, root):
+    def __init__(self, root, kicad_inst=None):
+        self.kicad_inst = kicad_inst
         self.root = root
         self.root.title("KiCoil - Planar Inductor Generator")
         self.root.geometry("1000x650")
@@ -175,8 +176,11 @@ class KiCoilGUI:
         
         ttk.Button(button_frame, text="Show Valid Twists", 
                   command=self.show_valid_twists, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Generate and Save", 
-                  command=self.generate_footprint, width=20).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Save Footprint File", 
+                  command=self.save_footprint_file, width=20).pack(side=tk.LEFT, padx=5)
+        if self.kicad_inst:
+            ttk.Button(button_frame, text="Update Footprint on Board", 
+                      command=self.update_board_footprint, width=20).pack(side=tk.LEFT, padx=5)
         
         status_label = ttk.Label(main_frame, text="Output:", font=('Helvetica', 10, 'bold'))
         status_label.grid(row=3, column=0, sticky=tk.W, pady=(10, 0))
@@ -496,10 +500,10 @@ class KiCoilGUI:
     def capture_warnings(self):
         """Context manager to capture kicoil's warnings to the output text widget"""
         def show_warning(message, category, filename, lineno, file=None, line=None):
-            self.output_text.config(state='normal')
+            self.output_text['state'] = 'normal'
             self.output_text.insert(tk.END, f'{message}\n', 'warning')
             self.output_text.see(tk.END)
-            self.output_text.config(state='disabled')
+            self.output_text['state'] = 'disabled'
             self.output_text.update_idletasks()
 
         old_showwarning, warnings.showwarning = warnings.showwarning, show_warning
@@ -540,7 +544,7 @@ class KiCoilGUI:
     def validate_parameters(self):
         """Validate parameters by creating PlanarInductor instance"""
         try:
-            self.output_text.config(state='normal')
+            self.output_text['state'] = 'normal'
             self.output_text.delete('1.0', tk.END)
 
             with self.capture_warnings():
@@ -572,7 +576,7 @@ class KiCoilGUI:
             return True
 
         finally:
-            self.output_text.config(state='disabled')
+            self.output_text['state'] = 'disabled'
 
     def update_placeholders(self):
         if self.current_model is None:
@@ -622,20 +626,99 @@ class KiCoilGUI:
 
     
     def show_valid_twists(self):
-        """Show valid twist counts for current number of turns"""
         turns = self.turns_var.get()
         valid_twists = list(divisors(turns, turns))
 
-        self.output_text.config(state='normal')
+        self.output_text['state'] = 'normal'
         self.output_text.delete('1.0', tk.END)
         self.output_text.insert('1.0', f'Valid twist counts for {turns} turns:\n')
         for d in valid_twists:
             self.output_text.insert(tk.END, f'  {d}\n')
-        self.output_text.config(state='disabled')
+        self.output_text['state'] = 'disabled'
     
-    def generate_footprint(self):
-        """Generate the KiCad footprint using the validated model"""
+    def update_board_footprint(self):
+        if not self.validate_parameters():
+            messagebox.showerror("Error", "Cannot generate model. Please check the output for warnings or errors.")
+            return
 
+        from kipy.board_types import FootprintInstance, Footprint, Pad, BoardArc, BoardSegment, FootprintAttributes,\
+                PadStack, PadStackLayer, PadStackType, PadStackShape, DrillProperties, PadType
+        from kipy.geometry import Vector2
+        from kipy.common_types import GraphicAttributes, StrokeAttributes
+        from kipy.util import from_mm
+        from kipy.util.board_layer import CANONICAL_LAYER_NAMES
+
+        from gerbonara.cad.kicad.footprints import Atom
+
+        board = self.kicad_inst.get_board()
+        selected = [item for item in board.get_selection() if isinstance(item, FootprintInstance)]
+
+        if not selected:
+            messagebox.showerror("Error", "No footprint selected. Select one footprint to replace in KiCad's PCB editor.")
+            return
+        elif len(selected) > 1:
+            messagebox.showerror("Error", "More than one footprint selected. Select only the footprint you want to replace.")
+            return
+
+        selected_footprint, = selected
+
+        footprint_name = self.footprint_name_entry.get() or None
+        arc_tolerance = self.arc_tolerance_var.get()
+        circle_segments = self.circle_segments_var.get()
+
+        self.output_text['state'] = 'normal'
+        self.output_text.insert(tk.END, "Rendering footprint...\n", 'info')
+        self.output_text.see(tk.END)
+
+        model = self.current_model.render_footprint(footprint_name, arc_tolerance, circle_segments)
+        selected_footprint.attributes.exclude_from_bill_of_materials = True
+        layer_map = {v: k for k, v in CANONICAL_LAYER_NAMES.items()}
+        items = []
+
+        for line in model.lines:
+            seg = BoardSegment()
+            seg.start = Vector2.from_xy(from_mm(line.start.x), from_mm(line.start.y))
+            seg.end = Vector2.from_xy(from_mm(line.end.x), from_mm(line.end.y))
+            seg.attributes.stroke.width = from_mm(line.stroke.width)
+            seg.layer = layer_map[line.layer]
+            selected_footprint.definition.add_item(seg)
+            items.append(seg)
+
+        for ref in model.arcs:
+            arc = BoardArc()
+            arc.start = Vector2.from_xy(from_mm(ref.start.x), from_mm(ref.start.y))
+            arc.mid = Vector2.from_xy(from_mm(ref.mid.x), from_mm(ref.mid.y))
+            arc.end = Vector2.from_xy(from_mm(ref.end.x), from_mm(ref.end.y))
+            arc.attributes.stroke.width = from_mm(ref.stroke.width)
+            arc.layer = layer_map[ref.layer]
+            selected_footprint.definition.add_item(arc)
+            items.append(arc)
+
+        for ref in model.pads:
+            pad = Pad() 
+            pad.number = ref.number
+            pad.position = Vector2.from_xy(from_mm(ref.at.x), from_mm(ref.at.y))
+            pad.type = PadType.PT_SMD if ref.type == Atom.smd else PadType.PT_PTH
+            pad.padstack.type = PadStackType.PST_NORMAL
+            pad.padstack.layers = [layer_map[name] for name in ref.layers]
+            layer = pad.padstack.copper_layers[0]
+            layer.shape = PadStackShape.PSS_CIRCLE
+            layer.size = Vector2.from_xy(from_mm(ref.size.x), from_mm(ref.size.y))
+            layer.layer = layer_map[ref.layers[0]] # ? duplicate
+            if ref.drill:
+                pad.padstack.drill.diameter = Vector2.from_xy(from_mm(ref.drill.diameter), from_mm(ref.drill.diameter))
+            selected_footprint.definition.add_item(pad)
+            items.append(pad)
+
+        commit = board.begin_commit()
+        board.create_items(items)
+        board.update_items([selected_footprint])
+        board.push_commit(commit, 'Updated planar coil footprint')
+        self.output_text.insert(tk.END, "Done.", 'info')
+        self.output_text['state'] = 'disabled'
+        self.output_text.see(tk.END)
+
+    def save_footprint_file(self):
         if not self.validate_parameters():
             messagebox.showerror("Error", "Cannot generate model. Please check the output for warnings or errors.")
             return
@@ -645,7 +728,7 @@ class KiCoilGUI:
             arc_tolerance = self.arc_tolerance_var.get()
             circle_segments = self.circle_segments_var.get()
 
-            self.output_text.config(state='normal')
+            self.output_text['state'] = 'normal'
             self.output_text.insert(tk.END, "Rendering footprint...\n\n", 'info')
 
             footprint = self.current_model.render_footprint(footprint_name, arc_tolerance, circle_segments)
@@ -666,7 +749,7 @@ class KiCoilGUI:
 
         except Exception as e:
             tb = traceback.format_exc()
-            self.output_text.config(state='normal')
+            self.output_text['state'] = 'normal'
             self.output_text.insert(tk.END, f"\nError generating footprint:\n{tb}\n", 'error')
             self.output_text.see(tk.END)
 
@@ -675,13 +758,13 @@ class KiCoilGUI:
             messagebox.showerror("Error", f"Error generating footprint: {e}")
 
         finally:
-            self.output_text.config(state='disabled')
+            self.output_text['state'] = 'disabled'
 
 
-def main():
+def main(kicad_inst=None):
+    from kipy import KiCad
+    from kipy.errors import ConnectionError
+    kicad_inst = KiCad()
     root = tk.Tk()
-    app = KiCoilGUI(root)
+    app = KiCoilGUI(root, kicad_inst)
     root.mainloop()
-
-if __name__ == "__main__":
-    main()
