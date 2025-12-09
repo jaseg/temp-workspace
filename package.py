@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import re
 import hashlib
+import tomllib
 import shutil
 import subprocess
 import json
@@ -12,24 +13,11 @@ def tree_size(path):
     return sum(entry.stat().st_size for entry in path.glob('**/*') if entry.is_file())
 
 @click.command()
-@click.option('--major', 'increment', flag_value='major')
-@click.option('--minor', 'increment', flag_value='minor', default=True)
-@click.option('--patch', 'increment', flag_value='patch', default=True)
 @click.option('--dry-run', is_flag=True)
-@click.argument('version', required=False)
-def do_release(version, increment, dry_run):
-    if not version:
-        tag = subprocess.run('git describe --tags --abbrev=0 --match v*'.split(),
-                             check=True, capture_output=True, text=True)
-        major, minor, patch = map(int, re.fullmatch(r'v([0-9]+)\.([0-9]+)\.([0-9]+)', tag.stdout.strip()).groups())
-        match increment:
-            case 'major':
-                major, minor, patch = (major+1, 0, 0)
-            case 'minor':
-                major, minor, patch = (major, minor+1, 0)
-            case 'patch':
-                major, minor, patch = (major, minor, patch+1)
-        version = f'{major}.{minor}.{patch}'
+def do_release(dry_run):
+    with open('pyproject.toml', 'rb') as f:
+        project_file = tomllib.load(f)
+        version = project_file['project']['version']
     
     if not dry_run:
         res = subprocess.run('git status --porcelain --untracked-files=no'.split(),
@@ -47,12 +35,14 @@ def do_release(version, increment, dry_run):
 
     plugin_sources = project_root / 'kicad-plugin'
     pkg_dir = project_root / 'de.jaseg.kicoil'
+    plugin_dir = pkg_dir / 'plugins'
 
     if pkg_dir.is_dir():
         shutil.rmtree(pkg_dir)
+    pkg_dir.mkdir()
 
-    shutil.copytree(plugin_sources, pkg_dir)
-    shutil.copy(project_root / 'LICENSE', pkg_dir)
+    shutil.copytree(plugin_sources, plugin_dir)
+    shutil.copy(project_root / 'LICENSE', plugin_dir)
 
     meta_path = project_root / 'metadata.json'
     print(f'Updating metadata file {meta_path}')
@@ -66,11 +56,39 @@ def do_release(version, increment, dry_run):
     meta_file['versions'] = [ver_dict]
     (pkg_dir / 'metadata.json').write_text(json.dumps(meta_file, indent=4))
 
-    res = subprocess.run(['uv', 'export', '--no-hashes', '--format', 'requirements-txt'],
+    res = subprocess.run(['uv', 'export', '--no-hashes', '--no-emit-project', '--format', 'requirements.txt', '--group', 'gui'],
                    check=True, capture_output=True, text=True)
-    (pkg_dir / 'requirements.txt').write_text(res.stdout)
+    (plugin_dir / 'requirements.txt').write_text(res.stdout)
 
-    shutil.copytree(project_root / 'src' / 'kicoil', pkg_dir / 'kicoil')
+    (pkg_dir / 'resources').mkdir()
+    shutil.copy(plugin_sources / 'icon-light.png', pkg_dir / 'resources' / 'icon.png')
+
+    module_sources = project_root / 'src'
+    for root, dirs, files in module_sources.walk(top_down=True):
+        if root.name == '__pycache__':
+            continue
+
+        for path in dirs:
+            if path == '__pycache__':
+                continue
+
+            path = root / path
+            subdir = plugin_dir / path.relative_to(module_sources)
+            subdir.mkdir()
+
+        for path in files:
+            path = root / path
+            out_path = plugin_dir / path.relative_to(module_sources)
+            content = path.read_text()
+            if path.name == '__init__.py':
+                lines = content.splitlines()
+                lines_out = []
+                for line in lines:
+                    if line.startswith('__version__ = version('):
+                        line = f'__version__ = {version!r}'
+                    lines_out.append(line)
+                content = '\n'.join(lines_out)
+            out_path.write_text(content)
 
     zip_fn = Path(shutil.make_archive(f'{pkg_dir.name}-v{version}', 'zip', pkg_dir, '.'))
     if not dry_run:
@@ -83,11 +101,11 @@ def do_release(version, increment, dry_run):
     ver_dict['download_url'] = f'https://git.jaseg.de/kimesh.git/plain/{zip_fn.name}?h=v{version}'
     ver_dict['install_size'] = tree_size(pkg_dir)
 
-    meta_file = json.loads(meta_path.read_text())
-    meta_file['versions'].append(ver_dict)
-    meta_path.write_text(json.dumps(meta_file, indent=4))
-
     if not dry_run:
+        meta_file = json.loads(meta_path.read_text())
+        meta_file['versions'].append(ver_dict)
+        meta_path.write_text(json.dumps(meta_file, indent=4))
+
         print(f'Adding updated metadata file {meta_path} to git index')
         subprocess.run(['git', 'add', str(meta_path)], check=True, capture_output=True)
 
