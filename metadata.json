@@ -18,6 +18,15 @@
         "issues": "https://codeberg.org/jaseg/kicoil/issues"
     },
     "versions": [
+        {
+            "version": "0.9.0",
+            "status": "stable",
+            "kicad_version": "9.00",
+            "download_sha256": "8c1f66c91fab315d76d640da1d197463412e4ee3d855428c37a5c66414b26b76",
+            "download_size": 38942,
+            "download_url": "https://git.jaseg.de/kimesh.git/plain/de.jaseg.kicoil-v0.9.0.zip?h=v0.9.0",
+            "install_size": 119659
+        }
     ],
     "runtime": "ipc"
 }
