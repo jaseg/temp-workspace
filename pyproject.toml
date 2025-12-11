@@ -9,6 +9,7 @@ dependencies = [
     "click",
     "gerbonara>=1.6.0",
     "kicad-python>=0.5.0",
+    "py-straight-skeleton>=0.1.0",
 ]
 authors = [{ name = "jaseg" }]
 maintainers = [
@@ -41,6 +42,9 @@ kicoil = "kicoil.cli:cli"
 kicoil-gui = "kicoil.gui:main"
 
 [dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]
 gui = ["cairosvg", "pillow"]
 
 [build-system]

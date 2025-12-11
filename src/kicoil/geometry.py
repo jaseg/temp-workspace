@@ -23,7 +23,7 @@ from math import *
 from gerbonara.cad.kicad.footprints import Footprint
 from gerbonara.cad.kicad.primitives import Zone, Hatch, ZoneKeepout, ZonePolygon, XYCoord
 
-from . import kicad
+from . import kicad, skeletonator
 
 
 mu_0 = 1.25663706127e-06 # from scipy.constants
@@ -67,7 +67,7 @@ def arc_approximate(points, trace_width, layer, tolerance=0.02, level=0):
     gerbonara arc objects approximating the input. """ 
     indent = '    ' * level
     if len(points) < 3:
-        raise ValueError()
+        raise ValueError('Need at least three points to approximate')
 
     i_mid = len(points)//2
 
@@ -94,29 +94,119 @@ def arc_approximate(points, trace_width, layer, tolerance=0.02, level=0):
             yield kicad.make_arc(x2, y2, x0, y0, x1, y1, trace_width, layer)
 
 
-def compute_spiral(r1, r2, a1, a2, fn=64):
-    fn = ceil(fn * abs(a2-a1)/(2*pi))
-    x0, y0 = cos(a1)*r1, sin(a1)*r1
-    dr = 3 if r2 < r1 else -3
+class Shape:
+    pass
 
-    xn, yn = x0, y0
-    points = [(x0, y0)]
-    dists = []
-    for i in range(fn):
-        xp, yp = xn, yn
-        r = r1 + (i+1)*(r2-r1)/fn
-        a = a1 + (i+1)*(a2-a1)/fn
-        xn, yn = cos(a)*r, sin(a)*r
-        points.append((xn, yn))
-        dists.append(dist((xp, yp), (xn, yn)))
 
-    return points, sum(dists)
+@dataclass
+class CircleShape(Shape):
+    outer_diameter: float
+    inner_diameter: float
+
+
+    def __post_init__(self):
+        self.outer_radius = self.outer_diameter / 2
+        self.inner_radius = self.inner_diameter / 2
+
+
+    @property
+    def slug(self):
+        return 'circle_{self.outer_diameter:.2f}x{self.inner_diameter:.2f}'
+
+
+    @property
+    def desc(self):
+        return f'{self.outer_diameter:.2f} mm OD, {self.inner_diameter:.2f} mm ID circular'
+
+
+    def compute_spiral(self, a1, a2, fn=64):
+        r1, r2 = self.outer_radius, self.inner_radius
+        fn = ceil(fn * abs(a2-a1)/(2*pi))
+        x0, y0 = cos(a1)*r1, sin(a1)*r1
+        dr = 3 if r2 < r1 else -3
+
+        xn, yn = x0, y0
+        points = [(x0, y0)]
+        dists = []
+        for i in range(fn):
+            xp, yp = xn, yn
+            r = r1 + (i+1)*(r2-r1)/fn
+            a = a1 + (i+1)*(a2-a1)/fn
+            xn, yn = cos(a)*r, sin(a)*r
+            points.append((xn, yn))
+            dists.append(dist((xp, yp), (xn, yn)))
+
+        return points, sum(dists)
+
+
+    def project_point(self, r, a):
+        return cos(a) * r, sin(a) * r
+
+
+    def offset_exterior(self, margin):
+        r = self.outer_radius + margin
+        tol = 0.05 # mm
+        n = ceil(pi / acos(1 - tol/r))
+        return [(r*cos(a*2*pi/n), r*sin(a*2*pi/n)) for a in range(n)]
+
+
+class OffsetShape(Shape):
+    def __post_init__(self):
+        self.sk = skeletonator.Skeletonator(self.polygon)
+        self.outer_radius = self.sk.radius
+        self.inner_radius = self.sk.radius - self.annular_width
+
+    @property
+    def slug(self):
+        return 'polygonal_{len(self.polygon)}pt_r{self.radius:.2f}mm'
+
+
+    @property
+    def desc(self):
+        return f'polygonal (n={len(self.polygon)} point, r={self.radius:.2f} mm radius)'
+
+
+    def compute_spiral(self, a1, a2, fn=None):
+        # Skeletonator uses a t coordinate from 0 - 1 per revolution instead of a radian angle.
+        points = list(self.sk.do_spiral(a1/(2*pi), a2/(2*pi), self.outer_radius, self.inner_radius))
+        arm_length = sum(dist(p1, p2) for p1, p2 in zip(points, points[1:]))
+        return points, arm_length
+
+
+    def project_point(self, r, a):
+        # Skeletonator uses a t coordinate from 0 - 1 per revolution instead of a radian angle.
+        return self.sk.project_point(a/(2*pi), r)
+
+
+    def offset_exterior(self, margin):
+        return self.sk.do_spiral(0, 1, self.outer_radius + margin, self.outer_radius + margin)
+
+
+@dataclass
+class TrapezoidShape(OffsetShape):
+    width: float
+    height: float
+    offset: float
+    annular_width: float
+    polygon: list = field(init=False)
+
+    def __post_init__(self):
+        w, h, d = self.width, self.height, self.offset
+        self.polygon = [(w/2-d, 0), (w/2, h), (-w/2, h), (-w/2+d, 0)]
+        super().__post_init__()
+    
+    @property
+    def slug(self):
+        return f'trapezoid_{self.width:.2f}-2*{self.offset:.2f}x{self.height:.2f}'
+    
+    @property
+    def desc(self):
+        return f'{self.width:.2f} x {self.height:.2f} mm, {self.offset:.2f} mm offset isosceles trapezoidal'
 
 
 @dataclass
 class PlanarInductor():
-    outer_diameter: float
-    inner_diameter: float
+    shape: Shape
     turns: int
     twists: int
     trace_width: float = None
@@ -132,11 +222,10 @@ class PlanarInductor():
     copper_thickness: float = 0.035
     layer_pair: str = 'F.Cu,B.Cu'
     clockwise: bool = False
+    approximate_arcs: bool = True
 
     def __post_init__(self):
         self.logger = logging.getLogger('kicoil')
-        self.outer_radius = self.outer_diameter/2
-        self.inner_radius = self.inner_diameter/2
         self.turns_per_layer = self.turns/self.layers
         self.sector_angle = 2*pi / self.twists
 
@@ -144,15 +233,16 @@ class PlanarInductor():
             self.sector_angle *= -1
             
         self.sweeping_angle = self.sector_angle * self.turns_per_layer
-        self.spiral_pitch = (self.outer_radius-self.inner_radius) / self.turns_per_layer
+        self.spiral_pitch = (self.shape.outer_radius-self.shape.inner_radius) / self.turns_per_layer
         self.R = None # will be calculated during render
 
-        c1 = self.inner_radius
-        c2 = self.inner_radius + self.spiral_pitch
-        alpha1 = atan((self.outer_radius - self.inner_radius) / self.sweeping_angle / c1)
-        alpha2 = atan((self.outer_radius - self.inner_radius) / self.sweeping_angle / c2)
+        c1 = self.shape.inner_radius
+        c2 = self.shape.inner_radius + self.spiral_pitch
+        alpha1 = atan((self.shape.outer_radius - self.shape.inner_radius) / self.sweeping_angle / c1)
+        alpha2 = atan((self.shape.outer_radius - self.shape.inner_radius) / self.sweeping_angle / c2)
         alpha = (alpha1+alpha2)/2
         self.projected_spiral_pitch = self.spiral_pitch*cos(alpha)
+        print(self.shape.inner_radius, self.shape.outer_radius, self.spiral_pitch, self.turns_per_layer)
 
         if self.layers == 1 and self.twists > 1:
             warnings.warn('Warning: Twists set to a value other than 1, but single-layer mode is enabled. The twists value will be ignored.')
@@ -211,15 +301,15 @@ class PlanarInductor():
         if isclose(self.via_offset, 0, abs_tol=1e-6):
             self.via_offset = 0
 
-        self.inner_via_ring_radius = self.inner_radius - self.via_offset
+        self.inner_via_ring_radius = self.shape.inner_radius - self.via_offset
         inner_via_angle = 2*asin((self.via_diameter + self.clearance)/2 / self.inner_via_ring_radius)
 
-        self.outer_via_ring_radius = self.outer_radius + self.via_offset
+        self.outer_via_ring_radius = self.shape.outer_radius + self.via_offset
         outer_via_angle = 2*asin((self.via_diameter + self.clearance)/2 / self.outer_via_ring_radius)
 
-        self.logger.info(f'Inner via ring @r={self.inner_via_ring_radius:.2f} mm (from {self.inner_radius:.2f} mm)')
+        self.logger.info(f'Inner via ring @r={self.inner_via_ring_radius:.2f} mm (from {self.shape.inner_radius:.2f} mm)')
         self.logger.info(f'    {degrees(inner_via_angle):.1f} deg / via')
-        self.logger.info(f'Outer via ring @r={self.outer_via_ring_radius:.2f} mm (from {self.outer_radius:.2f} mm)')
+        self.logger.info(f'Outer via ring @r={self.outer_via_ring_radius:.2f} mm (from {self.shape.outer_radius:.2f} mm)')
         self.logger.info(f'    {degrees(outer_via_angle):.1f} deg / via')
 
         # Check if the vias of the inner ring are so large that they would overlap
@@ -231,19 +321,17 @@ class PlanarInductor():
         self.layer_pair = (t.strip(), b.strip())
 
         # For fill factor & inductance formulas, See https://coil32.net/pcb-coil.html for details
-        d_avg = (self.outer_diameter + self.inner_diameter)/2
-        phi = (self.outer_diameter - self.inner_diameter) / (self.outer_diameter + self.inner_diameter)
-        c1, c2, c3, c4 = 1.00, 2.46, 0.00, 0.20
+        d_avg = (2*self.shape.outer_radius + self.shape.inner_radius)/2
+        phi = (2*self.shape.outer_radius - 2*self.shape.inner_radius) / (2*self.shape.outer_radius + 2*self.shape.inner_radius)
+        c1, c2, c3, c4 = 1.00, 2.46, 0.00, 0.20 # FIXME for other shapes
         self.L = mu_0 * self.turns**2 * d_avg*1e3 * c1 / 2 * (log(c2/phi) + c3*phi + c4*phi**2)
-        self.logger.info(f'Outer diameter: {self.outer_diameter:g} mm')
+        self.logger.info(f'Outer diameter: {2*self.shape.outer_radius:g} mm')
         self.logger.info(f'Average diameter: {d_avg:g} mm')
-        self.logger.info(f'Inner diameter: {self.inner_diameter:g} mm')
+        self.logger.info(f'Inner diameter: {2*self.shape.inner_radius:g} mm')
         self.logger.info(f'Fill factor: {phi:g}')
         self.logger.info(f'Approximate inductance: {self.L:g} µH')
 
-        _points, arm_length = compute_spiral(r1=self.outer_radius, r2=self.inner_radius,
-                                                   a1=0, a2=self.sector_angle,
-                                                   fn=256)
+        _points, arm_length = self.shape.compute_spiral(a1=0, a2=self.sector_angle)
 
         self.track_length = arm_length*self.twists*self.layers
         self.logger.info(f'Approximate track length: {self.track_length:.2f} mm')
@@ -253,10 +341,9 @@ class PlanarInductor():
         self.R = self.track_length/1e3 * rho / A
         self.logger.info(f'Approximate resistance: {self.R:g} Ω')
 
-
     @property
     def default_footprint_name(self):
-        return f'planar-coil-{self.outer_diameter:.2f}x{self.inner_diameter:.2f}-n{self.turns}-k{self.twists}'
+        return f'planar-coil-{self.shape.slug}-n{self.turns}-k{self.twists}'
 
     def render_footprint(self, name=None, arc_tolerance=0.02, circle_segments=64):
         if name is None:
@@ -268,7 +355,7 @@ class PlanarInductor():
                 generator=kicad.Atom('kicoil'),
                 generator_version=__version__,
                 layer='F.Cu',
-                descr=f"{self.turns} turn {self.outer_diameter:.2f} mm diameter twisted coil footprint, inductance approximately {self.L:.6f} µH. Generated by kicoil, version {__version__}.",
+                descr=f"{self.turns} turn {self.shape.desc} twisted coil footprint, inductance approximately {self.L:.6f} µH. Generated by kicoil, version {__version__}.",
                 clearance=self.clearance,
                 zone_connect=0)
 
@@ -286,25 +373,30 @@ class PlanarInductor():
 
             # Handle the spiral arm
             x = inverse[i]*floor(2*self.sweeping_angle / (2*pi)) * 2*pi
-            points_layer0, arm_length = compute_spiral(r1=self.outer_radius, r2=self.inner_radius,
-                                                       a1=start_angle, a2=fold_angle,
-                                                       fn=circle_segments)
+            points_layer0, arm_length = self.shape.compute_spiral(a1=start_angle, a2=fold_angle, fn=circle_segments)
             x0, y0 = points_layer0[0]
             xn, yn = points_layer0[-1]
-            footprint.arcs.extend(arc_approximate(points_layer0, self.trace_width, self.layer_pair[0], arc_tolerance))
+            try:
+                if not self.approximate_arcs:
+                    raise ValueError()
+                footprint.arcs.extend(arc_approximate(points_layer0, self.trace_width, self.layer_pair[0], arc_tolerance))
+            except ValueError:
+                footprint.lines.extend(kicad.make_line(*p1, *p2, self.trace_width, self.layer_pair[0]) for p1, p2 in zip(points_layer0, points_layer0[1:]))
 
             if self.layers > 1:
                 # Handle the returning arm on the bottom layer
-                points_layer1, _ = compute_spiral(r1=self.inner_radius, r2=self.outer_radius,
-                                                  a1=fold_angle, a2=end_angle,
-                                                  fn=circle_segments)
-                footprint.arcs.extend(arc_approximate(points_layer1, self.trace_width, self.layer_pair[1], arc_tolerance))
+                points_layer1, _ = self.shape.compute_spiral(a1=end_angle, a2=fold_angle, fn=circle_segments)
+                points_layer1 = points_layer1[::-1]
+                try:
+                    if not self.approximate_arcs:
+                        raise ValueError()
+                    footprint.arcs.extend(arc_approximate(points_layer1, self.trace_width, self.layer_pair[1], arc_tolerance))
+                except ValueError:
+                    footprint.lines.extend(kicad.make_line(*p1, *p2, self.trace_width, self.layer_pair[1]) for p1, p2 in zip(points_layer1, points_layer1[1:]))
 
             else:
                 # Add a straight connecting segment connecting the inner point to the outside of the spiral.
-                dr = self.outer_radius - self.inner_radius
-                xq = xn + cos(fold_angle) * dr
-                yq = yn - sin(fold_angle) * dr
+                xq, yq = shape.project_point(shape.outer_radius, fold_angle)
                 points_layer1 = [(xn, yn), (xq, yq)]
                 footprint.lines.append(kicad.make_line(xn, yn, xq, yq, self.trace_width, self.layer_pair[1]))
 
@@ -314,7 +406,7 @@ class PlanarInductor():
                 if i%2 != 0:
                     r -= 2*self.via_offset
 
-            xv, yv = r*cos(fold_angle), r*sin(fold_angle)
+            xv, yv = self.shape.project_point(r, fold_angle)
 
             if self.via_offset:
                 footprint.lines.append(kicad.make_line(*points_layer0[-1], xv, yv, self.trace_width, self.layer_pair[0]))
@@ -333,7 +425,7 @@ class PlanarInductor():
                     if i%2 != 0:
                         r += 2*self.via_offset
 
-                xv, yv = r*cos(start_angle), r*sin(start_angle)
+                xv, yv = self.shape.project_point(r, start_angle)
 
                 if self.via_offset:
                     footprint.lines.append(kicad.make_line(x0, y0, xv, yv, self.trace_width, self.layer_pair[0]))
@@ -344,15 +436,13 @@ class PlanarInductor():
                                                      self.layer_pair))
 
         # Place the pads on the outer radius
+        px, py = self.shape.project_point(self.shape.outer_radius, 0)
         footprint.pads.extend([
-                kicad.make_pad(1, [self.layer_pair[0]], self.outer_radius, 0, self.trace_width, self.clearance),
-                kicad.make_pad(2, [self.layer_pair[1]], self.outer_radius, 0, self.trace_width, self.clearance)])
+                kicad.make_pad(1, [self.layer_pair[0]], px, py, self.trace_width, self.clearance),
+                kicad.make_pad(2, [self.layer_pair[1]], px, py, self.trace_width, self.clearance)])
 
         if self.keepout_zone:
-            r = self.outer_diameter/2 + self.keepout_margin
-            tol = 0.05 # mm
-            n = ceil(pi / acos(1 - tol/r))
-            pts = [(r*cos(a*2*pi/n), r*sin(a*2*pi/n)) for a in range(n)]
+            pts = self.shape.offset_exterior(self.keepout_margin)
             footprint.zones.append(Zone(layers=['*.Cu'],
                 hatch=Hatch(),
                 filled_areas_thickness=False,
