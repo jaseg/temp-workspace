@@ -169,6 +169,8 @@ class OffsetShape(Shape):
     def compute_spiral(self, a1, a2, fn=None):
         # Skeletonator uses a t coordinate from 0 - 1 per revolution instead of a radian angle.
         points = list(self.sk.do_spiral(a1/(2*pi), a2/(2*pi), self.outer_radius, self.inner_radius))
+        if a2 < a1:
+            points = points[::-1]
         arm_length = sum(dist(p1, p2) for p1, p2 in zip(points, points[1:]))
         return points, arm_length
 
@@ -202,6 +204,35 @@ class TrapezoidShape(OffsetShape):
     @property
     def desc(self):
         return f'{self.width:.2f} x {self.height:.2f} mm, {self.offset:.2f} mm offset isosceles trapezoidal'
+
+
+@dataclass
+class SectorShape(OffsetShape):
+    inner_diameter: float
+    outer_diameter: float
+    angle: float
+    annular_width: float
+    arc_tolerance: float = 0.05 # mm
+    polygon: list = field(init=False)
+
+    def __post_init__(self):
+        # Careful: The inner/outer radius properties are relative to the polygon center and are very different from these!
+        r1, r2 = self.inner_diameter / 2, self.outer_diameter/2
+        n1 = ceil(pi / acos(1 - self.arc_tolerance/self.inner_diameter) * self.angle / (2*pi))
+        n2 = ceil(pi / acos(1 - self.arc_tolerance/self.outer_diameter) * self.angle / (2*pi))
+        # center on y axis
+        pt = lambda r, a: (r*sin(a), r*cos(a))
+        self.polygon  = [pt(r2, self.angle/2 - i/n1 * self.angle) for i in range(n1+1)]
+        self.polygon += [pt(r1, i/n1 * self.angle - self.angle/2) for i in range(n1+1)]
+        super().__post_init__()
+    
+    @property
+    def slug(self):
+        return f'sector_{self.outer_diameter:.2f}x{self.inner_diameter:.2f}_{degrees(self.angle):.0f}deg'
+    
+    @property
+    def desc(self):
+        return f'{self.outer_diameter:.2f} x {self.inner_diameter:.2f} mm {degrees(self.angle):.0f} deg sector'
 
 
 @dataclass

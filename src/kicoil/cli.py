@@ -21,11 +21,12 @@ import os
 import sys
 from pathlib import Path
 import warnings
+import math
 
 import click
 from gerbonara.layers import LayerStack
 
-from .geometry import PlanarInductor, divisors, CircleShape, TrapezoidShape
+from .geometry import PlanarInductor, divisors, CircleShape, SectorShape
 from .kicad import footprint_to_board
 from .svg import make_transparent_svg
 
@@ -87,8 +88,10 @@ def cli(ctx, footprint_name, clipboard, single_layer, arc_tolerance, circle_segm
             footprint = model.render_footprint(footprint_name, arc_tolerance, circle_segments)
 
         except ValueError as e:
-            raise
             raise click.ClickException(*e.args)
+        except:
+            import pdb
+            pdb.post_mortem()
 
         data = None
         if format == 'kicad-footprint':
@@ -164,4 +167,18 @@ def circle(ctx, inner_diameter, outer_diameter, outfile):
 @click.pass_context
 def trapezoid(ctx, outfile, **kwargs):
     shape = TrapezoidShape(**kwargs)
+    ctx.obj['write'](shape, outfile)
+
+
+@cli.command()
+@click.option('--inner-diameter', type=float, default=25, help='Inner diameter [mm]')
+@click.option('--outer-diameter', type=float, default=50, help='Outer diameter [mm]')
+@click.option('--angle', type=float, default=45, help='Sector angle [deg]')
+@click.option('--arc-tolerance', type=float, default=0.05, help='Tolerance for splitting arc into straight segments [mm] (default: 0.05 mm)')
+@click.option('--annular-width', type=float, default=5, help='Width of the trace area on the outside of the shape [mm]')
+@click.argument('outfile', required=False, type=click.Path(writable=True, dir_okay=False, path_type=Path))
+@click.pass_context
+def sector(ctx, outfile, angle, **kwargs):
+    angle = math.radians(angle)
+    shape = SectorShape(angle=angle, **kwargs)
     ctx.obj['write'](shape, outfile)
