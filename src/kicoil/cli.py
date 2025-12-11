@@ -89,9 +89,6 @@ def cli(ctx, footprint_name, clipboard, single_layer, arc_tolerance, circle_segm
 
         except ValueError as e:
             raise click.ClickException(*e.args)
-        except:
-            import pdb
-            pdb.post_mortem()
 
         data = None
         if format == 'kicad-footprint':

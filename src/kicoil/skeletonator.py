@@ -42,16 +42,18 @@ class Skeletonator:
             start = end
 
     def project_arc(self, p, r):
-        if r < self.radius - self.min_radius:
-            raise ValueError(f'r (={r:.2f}) must be greater than {self.radius - self.min_radius:.2f}')
         t = self.radius - r
 
         for n0, n1 in self.iter_arcs(p):
-            # project first arc outwards in case r < 0
             if t < 0 or approx_in_range(t, n0.time, n1.time):
                 p0 = (n0.position.x, n0.position.y)
                 p1 = (n1.position.x, n1.position.y)
-                return interpolate(p0, p1, t, n0.time, n1.time)
+                return (n0, n1), interpolate(p0, p1, t, n0.time, n1.time)
+        print(p, r, n0, n1)
+
+    def calc_circumference(self, r):
+        projected = [self.project_arc(p, r)[1] for p in self.poly]
+        return sum(math.dist(p1, p2) for p1, p2 in zip(projected, projected[1:] + projected[:1]))
 
     def project_point(self, t, r=None):
         t %= 1
@@ -65,7 +67,7 @@ class Skeletonator:
             t_end = t_start + edge_frac
     
             if approx_in_range(t, t_start, t_end):
-                p1, p2 = self.project_arc(p1, r), self.project_arc(p2, r)
+                p1, p2 = self.project_arc(p1, r)[1], self.project_arc(p2, r)[1]
                 p_cur = interpolate(p1, p2, t, t_start, t_end)
                 return p_cur
 
@@ -76,7 +78,7 @@ class Skeletonator:
             r1 = self.radius
         if r2 is None:
             r2 = self.radius - self.min_radius
-        
+
         if t2 < t1:
             t1, t2 = t2, t1
             r1, r2 = r2, r1
@@ -86,30 +88,43 @@ class Skeletonator:
         yield self.project_point(t1, r1)
 
         edge_iter = itertools.cycle(self.poly_edges)
-        
+
+        circumference = self.circumference
         t_start = 0
         t = t1
         for p1, p2 in edge_iter:
-            edge_frac = math.dist(p1, p2) / self.circumference
+            edge_frac = math.dist(p1, p2) / circumference
             t_end = t_start + edge_frac
     
             if approx_in_range(t1, t_start, t_end):
                 if t2 > t_end:
-                    yield self.project_arc(p2, r_interpolate(t_end))
+                    yield self.project_arc(p2, r_interpolate(t_end))[1]
                 t_start = t_end
                 break
 
             t_start = t_end
 
+        last_arc = None
+        r_end = r1
         for p1, p2 in edge_iter:
-            edge_frac = math.dist(p1, p2) / self.circumference
+            _arc, p1_proj = self.project_arc(p1, r_end)
+            _arc, p2_proj = self.project_arc(p2, r_end)
+            edge_frac = math.dist(p1_proj, p2_proj) / circumference
             t_end = t_start + edge_frac
+            r_end = r_interpolate(t_end)
+            print(f'{t1=} {t2=} {t=} {t_start=} {t_end=} | {edge_frac=} | {r_end=}')
+            
+            if p2 == self.poly[0]:
+                circumference = self.calc_circumference(r_end)
             
             if t2 > t_end:
-                yield self.project_arc(p2, r_interpolate(t_end))
+                arc, point = self.project_arc(p2, r_end)
+                if arc != last_arc:
+                    last_arc = arc
+                    yield point
             else:
                 break
 
             t_start = t_end
 
-        yield self.project_point(t2, r2)
+        yield interpolate(p1_proj, p2_proj, t2, t_start, t_end)
