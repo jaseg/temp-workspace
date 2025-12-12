@@ -265,6 +265,33 @@ class StarShape(OffsetShape):
         purpose = ', for demonic purposes' if self.points == 5 else ''
         return f'{self.outer_diameter:.2f} x {self.inner_diameter:.2f} mm star shape{purpose}'
 
+@dataclass
+class SVGShape(OffsetShape):
+    filename: str
+    annular_width: float
+    arc_tolerance: float = 0.05 # mm
+    polygon: list = field(init=False)
+
+    def __post_init__(self):
+        # center on y axis
+        from bs4 import BeautifulSoup
+        with open(self.filename) as f:
+            soup = BeautifulSoup(f.read(), features='xml')
+            path = soup.find('path', recursive=True)
+            d = path.attrs['d']
+            d = d.strip('MmZ ').replace(',', 'L')
+            coord_pairs = d.split('L')
+            coords = [tuple(map(float, pair.split())) for pair in coord_pairs]
+        self.polygon  = coords
+        super().__post_init__()
+    
+    @property
+    def slug(self):
+        return f'svg_{self.outer_diameter:.2f}x{self.inner_diameter:.2f}'
+    
+    @property
+    def desc(self):
+        return f'{self.outer_diameter:.2f} x {self.inner_diameter:.2f} mm imported SVG shape'
 
 @dataclass
 class PlanarInductor():

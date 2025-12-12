@@ -66,7 +66,7 @@ class Skeletonator:
                 p1 = (n1.position.x, n1.position.y)
                 return (n0, n1), interpolate(p0, p1, t, n0.time, n1.time)
         else:
-            raise ValueError('r is out of bounds!')
+            raise ValueError(f'{r=:.3f} is out of bounds [0, {self.min_radius:.4f}]')
 
     def calc_circumference(self, r):
         projected = [self.project_arc(p, r)[1] for p in self.poly]

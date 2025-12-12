@@ -26,7 +26,7 @@ import math
 import click
 from gerbonara.layers import LayerStack
 
-from .geometry import PlanarInductor, divisors, CircleShape, SectorShape, StarShape
+from .geometry import PlanarInductor, divisors, CircleShape, SectorShape, StarShape, SVGShape
 from .kicad import footprint_to_board
 from .svg import make_transparent_svg
 
@@ -192,4 +192,15 @@ def sector(ctx, outfile, angle, **kwargs):
 @click.pass_context
 def star(ctx, outfile, **kwargs):
     shape = StarShape(**kwargs)
+    ctx.obj['write'](shape, outfile)
+
+
+@cli.command()
+@click.option('--arc-tolerance', type=float, default=0.05, help='Tolerance for splitting arc into straight segments [mm] (default: 0.05 mm)')
+@click.option('--annular-width', type=float, default=5, help='Width of the trace area on the outside of the shape [mm]')
+@click.argument('svg_file', required=False, type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument('outfile', required=False, type=click.Path(writable=True, dir_okay=False, path_type=Path))
+@click.pass_context
+def svg(ctx, svg_file, outfile, **kwargs):
+    shape = SVGShape(svg_file, **kwargs)
     ctx.obj['write'](shape, outfile)

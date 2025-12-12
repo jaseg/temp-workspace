@@ -6,9 +6,11 @@ readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
+    "beautifulsoup4>=4.14.3",
     "click",
     "gerbonara>=1.6.0",
     "kicad-python>=0.5.0",
+    "lxml>=6.0.2",
     "py-straight-skeleton>=0.1.0",
 ]
 authors = [{ name = "jaseg" }]
