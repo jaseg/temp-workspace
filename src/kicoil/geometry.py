@@ -136,10 +136,10 @@ class CircleShape(Shape):
             points.append((xn, yn))
             dists.append(dist((xp, yp), (xn, yn)))
 
-        return points, sum(dists)
+        return points, sum(dists), None
 
 
-    def project_point(self, r, a):
+    def project_point(self, r, a, r_ref=None):
         return cos(a) * r, sin(a) * r
 
 
@@ -168,16 +168,21 @@ class OffsetShape(Shape):
 
     def compute_spiral(self, a1, a2, fn=None):
         # Skeletonator uses a t coordinate from 0 - 1 per revolution instead of a radian angle.
-        points = list(self.sk.do_spiral(a1/(2*pi), a2/(2*pi), self.outer_radius, self.inner_radius))
+        points = []
+        angle_refs = []
+        for point, angle_ref in self.sk.do_spiral(a1/(2*pi), a2/(2*pi), self.outer_radius, self.inner_radius):
+            points.append(point)
+            angle_refs.append(angle_ref)
         if a2 < a1:
             points = points[::-1]
+            angle_refs = angle_refs[::-1]
         arm_length = sum(dist(p1, p2) for p1, p2 in zip(points, points[1:]))
-        return points, arm_length
+        return points, arm_length, angle_refs
 
 
-    def project_point(self, r, a):
+    def project_point(self, r, a, r_ref=None):
         # Skeletonator uses a t coordinate from 0 - 1 per revolution instead of a radian angle.
-        return self.sk.project_point(a/(2*pi), r)
+        return self.sk.project_point(a/(2*pi), r, r_ref=r_ref)
 
 
     def offset_exterior(self, margin):
@@ -362,7 +367,7 @@ class PlanarInductor():
         self.logger.info(f'Fill factor: {phi:g}')
         self.logger.info(f'Approximate inductance: {self.L:g} µH')
 
-        _points, arm_length = self.shape.compute_spiral(a1=0, a2=self.sector_angle)
+        _points, arm_length, _angle_refs = self.shape.compute_spiral(a1=0, a2=self.sector_angle)
 
         self.track_length = arm_length*self.twists*self.layers
         self.logger.info(f'Approximate track length: {self.track_length:.2f} mm')
@@ -396,6 +401,7 @@ class PlanarInductor():
         for i in range(self.twists):
             inverse[i*self.turns%self.twists] = i
 
+        arms_layers = [[], []]
         # Array where we collect all gerbonara kicad line and arc objects
         for i in range(self.twists):
             start_angle = i*self.sector_angle
@@ -403,10 +409,13 @@ class PlanarInductor():
             end_angle = fold_angle + self.sweeping_angle
 
             # Handle the spiral arm
-            x = inverse[i]*floor(2*self.sweeping_angle / (2*pi)) * 2*pi
-            points_layer0, arm_length = self.shape.compute_spiral(a1=start_angle, a2=fold_angle, fn=circle_segments)
+            points_layer0, arm_length, angle_refs_layer0 = self.shape.compute_spiral(a1=start_angle, a2=fold_angle, fn=circle_segments)
             x0, y0 = points_layer0[0]
             xn, yn = points_layer0[-1]
+            if angle_refs_layer0:
+                ref_0, ref_n = angle_refs_layer0[0], angle_refs_layer0[-1]
+            else:
+                ref_0, ref_n = None, None
             try:
                 if not self.approximate_arcs:
                     raise ValueError()
@@ -416,7 +425,7 @@ class PlanarInductor():
 
             if self.layers > 1:
                 # Handle the returning arm on the bottom layer
-                points_layer1, _ = self.shape.compute_spiral(a1=end_angle, a2=fold_angle, fn=circle_segments)
+                points_layer1, _, angle_refs_layer1 = self.shape.compute_spiral(a1=end_angle, a2=fold_angle, fn=circle_segments)
                 points_layer1 = points_layer1[::-1]
                 try:
                     if not self.approximate_arcs:
@@ -430,18 +439,26 @@ class PlanarInductor():
                 xq, yq = shape.project_point(shape.outer_radius, fold_angle)
                 points_layer1 = [(xn, yn), (xq, yq)]
                 footprint.lines.append(kicad.make_line(xn, yn, xq, yq, self.trace_width, self.layer_pair[1]))
+            
+            arms_layers[0].append(points_layer0)
+            arms_layers[1].append(points_layer1)
 
+        for i in range(self.twists):
+            start_angle = i*self.sector_angle
+            fold_angle = start_angle + self.sweeping_angle
+            end_angle = fold_angle + self.sweeping_angle
+            
             # Handle inner via ring and process staggering if enabled
             r = self.inner_via_ring_radius
             if self.stagger_inner_vias:
                 if i%2 != 0:
                     r -= 2*self.via_offset
 
-            xv, yv = self.shape.project_point(r, fold_angle)
+            xv, yv = self.shape.project_point(r, fold_angle, r_ref=ref_n)
 
             if self.via_offset:
-                footprint.lines.append(kicad.make_line(*points_layer0[-1], xv, yv, self.trace_width, self.layer_pair[0]))
-                footprint.lines.append(kicad.make_line(xv, yv, *points_layer1[0], self.trace_width, self.layer_pair[1]))
+                footprint.lines.append(kicad.make_line(*arms_layers[0][i][-1], xv, yv, self.trace_width, self.layer_pair[0]))
+                footprint.lines.append(kicad.make_line(xv, yv, *arms_layers[1][i][0], self.trace_width, self.layer_pair[1]))
 
             footprint.pads.append(kicad.make_via(xv, yv,
                                                  self.via_diameter, self.via_drill, self.clearance,
@@ -456,21 +473,22 @@ class PlanarInductor():
                     if i%2 != 0:
                         r += 2*self.via_offset
 
-                xv, yv = self.shape.project_point(r, start_angle)
+                xv, yv = self.shape.project_point(r, start_angle, r_ref=ref_0)
 
                 if self.via_offset:
-                    footprint.lines.append(kicad.make_line(x0, y0, xv, yv, self.trace_width, self.layer_pair[0]))
-                    footprint.lines.append(kicad.make_line(x0, y0, xv, yv, self.trace_width, self.layer_pair[1]))
+                    footprint.lines.append(kicad.make_line(*arms_layers[0][i][0], xv, yv, self.trace_width, self.layer_pair[0]))
+                    footprint.lines.append(kicad.make_line(*arms_layers[1][(i - self.turns) % self.twists][-1], xv, yv, self.trace_width, self.layer_pair[1]))
 
                 footprint.pads.append(kicad.make_via(xv, yv,
                                                      self.via_diameter, self.via_drill, self.clearance,
                                                      self.layer_pair))
-
-        # Place the pads on the outer radius
-        px, py = self.shape.project_point(self.shape.outer_radius, 0)
-        footprint.pads.extend([
-                kicad.make_pad(1, [self.layer_pair[0]], px, py, self.trace_width, self.clearance),
-                kicad.make_pad(2, [self.layer_pair[1]], px, py, self.trace_width, self.clearance)])
+            
+            else:
+                # Place the pads on the outer radius
+                px, py = self.shape.project_point(self.shape.outer_radius, 0)
+                footprint.pads.extend([
+                        kicad.make_pad(1, [self.layer_pair[0]], px, py, self.trace_width, self.clearance),
+                        kicad.make_pad(2, [self.layer_pair[1]], px, py, self.trace_width, self.clearance)])
 
         if self.keepout_zone:
             pts = self.shape.offset_exterior(self.keepout_margin)
