@@ -122,8 +122,8 @@ class Skeletonator:
             t_end = t_start + 1
             r_outer = r_interpolate(t_start)
             r_inner = r_interpolate(t_end)
-            oc_arcs, outer_circumference = self.map_circumference(r_outer)
-            ic_arcs, inner_circumference = self.map_circumference(r_inner)
+            r_ref = min(r_inner, r_outer) # Handle outward spirals where the radii are swapped
+            _ic_arcs, inner_circumference = self.map_circumference(r_ref)
 
             angle = t_start
             circumference_angles = []
@@ -142,8 +142,8 @@ class Skeletonator:
                 _arc, p2_proj = self.project_arc(p2, rp2)
                 
                 if approx_in_range(t1, tp1, tp2):
-                    yield interpolate(p1_proj, p2_proj, t1, tp1, tp2), r_inner
+                    yield interpolate(p1_proj, p2_proj, t1, tp1, tp2), r_ref
                 if approx_in_range(t2, tp1, tp2):
-                    yield interpolate(p1_proj, p2_proj, t2, tp1, tp2), r_inner
+                    yield interpolate(p1_proj, p2_proj, t2, tp1, tp2), r_ref
                 elif approx_in_range(tp2, t1, t2):
-                    yield p2_proj, r_inner
+                    yield p2_proj, r_ref

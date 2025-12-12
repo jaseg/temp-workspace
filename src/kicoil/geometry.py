@@ -136,7 +136,7 @@ class CircleShape(Shape):
             points.append((xn, yn))
             dists.append(dist((xp, yp), (xn, yn)))
 
-        return points, sum(dists), None
+        return points, sum(dists), [None]*len(points)
 
 
     def project_point(self, r, a, r_ref=None):
@@ -182,7 +182,7 @@ class OffsetShape(Shape):
 
     def project_point(self, r, a, r_ref=None):
         # Skeletonator uses a t coordinate from 0 - 1 per revolution instead of a radian angle.
-        return self.sk.project_point(a/(2*pi), r, r_ref=r_ref)
+        return self.sk.project_point(a/(2*pi) % 1, r, r_ref=r_ref)
 
 
     def offset_exterior(self, margin):
@@ -238,6 +238,32 @@ class SectorShape(OffsetShape):
     @property
     def desc(self):
         return f'{self.outer_diameter:.2f} x {self.inner_diameter:.2f} mm {degrees(self.angle):.0f} deg sector'
+
+
+@dataclass
+class StarShape(OffsetShape):
+    inner_diameter: float
+    outer_diameter: float
+    annular_width: float
+    points: int = 5
+    arc_tolerance: float = 0.05 # mm
+    polygon: list = field(init=False)
+
+    def __post_init__(self):
+        # center on y axis
+        pt = lambda r, a: (-r*sin(a), r*cos(a))
+        circle = lambda r, n, phase: [pt(r, (i + phase)*2*pi/n) for i in range(n)]
+        self.polygon  = [x for pair in zip(circle(self.outer_diameter/2, self.points, 0), circle(self.inner_diameter/2, self.points, 0.5)) for x in pair]
+        super().__post_init__()
+    
+    @property
+    def slug(self):
+        return f'star_{self.outer_diameter:.2f}x{self.inner_diameter:.2f}'
+    
+    @property
+    def desc(self):
+        purpose = ', for demonic purposes' if self.points == 5 else ''
+        return f'{self.outer_diameter:.2f} x {self.inner_diameter:.2f} mm star shape{purpose}'
 
 
 @dataclass
@@ -436,12 +462,14 @@ class PlanarInductor():
 
             else:
                 # Add a straight connecting segment connecting the inner point to the outside of the spiral.
-                xq, yq = shape.project_point(shape.outer_radius, fold_angle)
+                ref = angle_refs_layer0[-1]
+                xq, yq = self.shape.project_point(self.shape.outer_radius, fold_angle, r_ref=ref)
+                angle_refs_layer1 = [ref, ref]
                 points_layer1 = [(xn, yn), (xq, yq)]
                 footprint.lines.append(kicad.make_line(xn, yn, xq, yq, self.trace_width, self.layer_pair[1]))
             
-            arms_layers[0].append(points_layer0)
-            arms_layers[1].append(points_layer1)
+            arms_layers[0].append((points_layer0, angle_refs_layer0))
+            arms_layers[1].append((points_layer1, angle_refs_layer1))
 
         for i in range(self.twists):
             start_angle = i*self.sector_angle
@@ -454,11 +482,13 @@ class PlanarInductor():
                 if i%2 != 0:
                     r -= 2*self.via_offset
 
-            xv, yv = self.shape.project_point(r, fold_angle, r_ref=ref_n)
+            points_layer0, refs_layer0 = arms_layers[0][i]
+            points_layer1, refs_layer1 = arms_layers[1][i]
 
-            if self.via_offset:
-                footprint.lines.append(kicad.make_line(*arms_layers[0][i][-1], xv, yv, self.trace_width, self.layer_pair[0]))
-                footprint.lines.append(kicad.make_line(xv, yv, *arms_layers[1][i][0], self.trace_width, self.layer_pair[1]))
+            xv, yv = self.shape.project_point(r, fold_angle, r_ref=refs_layer0[-1])
+
+            footprint.lines.append(kicad.make_line(*points_layer0[-1], xv, yv, self.trace_width, self.layer_pair[0]))
+            footprint.lines.append(kicad.make_line(xv, yv, *points_layer1[0], self.trace_width, self.layer_pair[1]))
 
             footprint.pads.append(kicad.make_via(xv, yv,
                                                  self.via_diameter, self.via_drill, self.clearance,
@@ -466,19 +496,21 @@ class PlanarInductor():
 
             # Handle outer via ring and process staggering if enabled unless we are at the start of the coil, where we will
             # place pads below.
+            r = self.outer_via_ring_radius
+
+            if self.stagger_outer_vias:
+                if i%2 != 0:
+                    r += 2*self.via_offset
+
+            points_layer0, refs_layer0 = arms_layers[0][i]
+            points_layer1, refs_layer1 = arms_layers[1][(i - self.turns) % self.twists]
+            
+            xv, yv = self.shape.project_point(r, start_angle, r_ref=refs_layer0[0])
+
+            footprint.lines.append(kicad.make_line(*points_layer0[0], xv, yv, self.trace_width, self.layer_pair[0]))
+            footprint.lines.append(kicad.make_line(*points_layer1[-1], xv, yv, self.trace_width, self.layer_pair[1]))
+
             if i > 0:
-                r = self.outer_via_ring_radius
-
-                if self.stagger_outer_vias:
-                    if i%2 != 0:
-                        r += 2*self.via_offset
-
-                xv, yv = self.shape.project_point(r, start_angle, r_ref=ref_0)
-
-                if self.via_offset:
-                    footprint.lines.append(kicad.make_line(*arms_layers[0][i][0], xv, yv, self.trace_width, self.layer_pair[0]))
-                    footprint.lines.append(kicad.make_line(*arms_layers[1][(i - self.turns) % self.twists][-1], xv, yv, self.trace_width, self.layer_pair[1]))
-
                 footprint.pads.append(kicad.make_via(xv, yv,
                                                      self.via_diameter, self.via_drill, self.clearance,
                                                      self.layer_pair))
