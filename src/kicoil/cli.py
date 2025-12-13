@@ -69,6 +69,8 @@ def print_valid_twists(ctx, param, value):
 @click.pass_context
 def cli(ctx, footprint_name, clipboard, single_layer, arc_tolerance, circle_segments, format, **kwargs):
     ctx.ensure_object(dict)
+    logger = logging.getLogger('kicoil')
+    logger.setLevel(logging.INFO)
 
     def write(shape, outfile):
         nonlocal footprint_name, clipboard, single_layer, arc_tolerance, circle_segments, format

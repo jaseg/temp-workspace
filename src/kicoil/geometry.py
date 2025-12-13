@@ -287,11 +287,11 @@ class SVGShape(OffsetShape):
     
     @property
     def slug(self):
-        return f'svg_{self.outer_diameter:.2f}x{self.inner_diameter:.2f}'
+        return f'svg_{len(self.polygon)}n'
     
     @property
     def desc(self):
-        return f'{self.outer_diameter:.2f} x {self.inner_diameter:.2f} mm imported SVG shape'
+        return f'{len(self.polygon)} node imported SVG shape'
 
 @dataclass
 class PlanarInductor():
@@ -358,13 +358,13 @@ class PlanarInductor():
 
         if self.trace_width is None:
             if round(self.clearance, 3) > round(self.projected_spiral_pitch, 3):
-                raise ValueError(f'Error: Given clearance of {clearance:.2f} mm is larger than the projected spiral pitch of {projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
+                warnings.warn(f'Error: Given clearance of {clearance:.2f} mm is larger than the projected spiral pitch of {projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
             self.trace_width = self.projected_spiral_pitch - self.clearance
             self.logger.info(f'Calculated trace width for {self.clearance:.2f} mm clearance is {self.trace_width:.2f} mm.')
 
         elif self.clearance is None:
             if round(self.trace_width, 2) > round(self.projected_spiral_pitch, 2):
-                raise ValueError(f'Error: Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
+                warnings.warn(f'Error: Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
             self.clearance = self.projected_spiral_pitch - self.trace_width
             self.logger.info(f'Calculated clearance for {self.trace_width:.2f} mm trace width is {self.clearance:.2f} mm.')
 
