@@ -111,7 +111,7 @@ def do_release(dry_run):
 
     if not dry_run:
         print('Create git commit')
-        subprocess.run(['git', 'commit', '-m', f'Version {version}', '--no-edit'], check=True, capture_output=True)
+        subprocess.run(['git', 'commit', '-m', f'KiCad package version {version}', '--no-edit'], check=True, capture_output=True)
         res = subprocess.run('git rev-parse --short HEAD'.split(), check=True, capture_output=True, text=True)
         print(f'Created commit {res.stdout.strip()}')
         print(f'Creating and signing version tag v{version}')
