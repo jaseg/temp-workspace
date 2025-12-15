@@ -1,12 +1,25 @@
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Simple_cartesian.h>
 #include <CGAL/Polygon_2.h>
 #include <CGAL/create_straight_skeleton_2.h>
+#include <CGAL/number_utils.h>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/number.hpp>
+#include <boost/multiprecision/rational_adaptor.hpp>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <memory>
+#include <iomanip>
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+// Use exact rational arithmetic throughout to avoid filtered predicates
+typedef boost::multiprecision::number<boost::multiprecision::rational_adaptor<boost::multiprecision::cpp_int_backend<>>> Exact_NT;
+typedef CGAL::Simple_cartesian<Exact_NT> Exact_K;
+
+// Input kernel with doubles for reading coordinates
+typedef CGAL::Simple_cartesian<double> Input_K;
+
+// Use exact kernel for computation
+typedef Exact_K K;
 typedef K::Point_2                   Point;
 typedef CGAL::Polygon_2<K>           Polygon_2;
 typedef CGAL::Straight_skeleton_2<K> Ss;
@@ -14,7 +27,6 @@ typedef std::shared_ptr<Ss>          SsPtr;
 
 int main()
 {
-    // Read polygon from stdin
     Polygon_2 poly;
     std::string line;
 
@@ -26,7 +38,8 @@ int main()
         std::istringstream iss(line);
         double x, y;
         if (iss >> x >> y) {
-            poly.push_back(Point(x, y));
+            // Convert double to exact rational
+            poly.push_back(Point(Exact_NT(x), Exact_NT(y)));
         } else {
             std::cerr << "Error: Invalid input line: " << line << std::endl;
             return EXIT_FAILURE;
@@ -38,13 +51,11 @@ int main()
         return EXIT_FAILURE;
     }
 
-    // Ensure counter-clockwise orientation
     if (!poly.is_counterclockwise_oriented()) {
         poly.reverse_orientation();
     }
 
-    // Create interior straight skeleton
-    SsPtr ss = CGAL::create_interior_straight_skeleton_2(poly.vertices_begin(), poly.vertices_end());
+    SsPtr ss = CGAL::create_interior_straight_skeleton_2(poly.vertices_begin(), poly.vertices_end(), K());
 
     if (!ss) {
         std::cerr << "Error: Failed to create straight skeleton" << std::endl;
@@ -64,6 +75,7 @@ int main()
         auto v_target = he->opposite()->vertex();
 
         // Get times (distance from boundary)
+        // Convert from exact rational to double for output
         double t1 = CGAL::to_double(v_source->time());
         double t2 = CGAL::to_double(v_target->time());
 
