@@ -526,22 +526,19 @@ class PlanarInductor():
                 ref_0, ref_n = angle_refs_layer0[0], angle_refs_layer0[-1]
             else:
                 ref_0, ref_n = None, None
-            try:
-                if not self.approximate_arcs:
-                    raise ValueError()
+
+            if self.approximate_arcs and isinstance(self.shape, CircleShape):
                 footprint.arcs.extend(arc_approximate(points_layer0, self.trace_width, self.layer_pair[0], arc_tolerance))
-            except ValueError:
+            else:
                 footprint.lines.extend(kicad.make_line(*p1, *p2, self.trace_width, self.layer_pair[0]) for p1, p2 in zip(points_layer0, points_layer0[1:]))
 
             if self.layers > 1:
                 # Handle the returning arm on the bottom layer
                 points_layer1, _, angle_refs_layer1 = self.shape.compute_spiral(a1=end_angle, a2=fold_angle, fn=circle_segments)
                 points_layer1 = points_layer1[::-1]
-                try:
-                    if not self.approximate_arcs:
-                        raise ValueError()
+                if self.approximate_arcs and isinstance(self.shape, CircleShape):
                     footprint.arcs.extend(arc_approximate(points_layer1, self.trace_width, self.layer_pair[1], arc_tolerance))
-                except ValueError:
+                else:
                     footprint.lines.extend(kicad.make_line(*p1, *p2, self.trace_width, self.layer_pair[1]) for p1, p2 in zip(points_layer1, points_layer1[1:]))
 
             else:
