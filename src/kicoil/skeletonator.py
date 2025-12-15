@@ -2,10 +2,18 @@ import math
 import itertools
 import subprocess
 import os
+from tempfile import NamedTemporaryFile
 from dataclasses import dataclass
 from pathlib import Path
+import importlib.resources
+import lzma
+import sys
+import hashlib
+
+import platformdirs
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import wasmtime
 
 
 def interpolate(p1, p2, t, t_start=0, t_end=1):
@@ -37,6 +45,53 @@ def edge_cycle(points):
     return itertools.pairwise(itertools.chain(points, points[:1]))
 
 
+class WasmApp:
+    def __init__(self, wasm_filename, cachedir="kicoil"):
+        module_binary = importlib.resources.read_binary(__package__, wasm_filename)
+
+        module_path_digest = hashlib.sha256(__file__.encode()).hexdigest()
+        module_digest = hashlib.sha256(module_binary).hexdigest()
+        cache_path = Path(os.getenv("KICOIL_CACHE_DIR", platformdirs.user_cache_dir(cachedir)))
+        cache_path.mkdir(parents=True, exist_ok=True)
+        cache_filename = (cache_path / f'{wasm_filename}-{module_path_digest[:8]}-{module_digest[:16]}')
+        
+        self.engine = wasmtime.Engine()
+
+        try:
+            with cache_filename.open("rb") as cache_file:
+                self.module = wasmtime.Module.deserialize(self.engine, lzma.decompress(cache_file.read()))
+        except:
+            print("Preparing to run {}. This might take a while...".format(wasm_filename), file=sys.stderr)
+            self.module = wasmtime.Module(self.engine, module_binary)
+            with cache_filename.open("wb") as cache_file:
+                cache_file.write(lzma.compress(self.module.serialize(), preset=0))
+
+    def run(self, stdin='', argv=[]):
+        with NamedTemporaryFile('r') as stdout_f, NamedTemporaryFile('w') as stdin_f:
+            stdin_f.write(stdin)
+            stdin_f.flush()
+
+            wasi_cfg = wasmtime.WasiConfig()
+            wasi_cfg.argv = argv
+            wasi_cfg.stdin_file = stdin_f.name
+            wasi_cfg.stdout_file = stdout_f.name
+            wasi_cfg.inherit_stderr()
+
+            linker = wasmtime.Linker(self.engine)
+            linker.define_wasi()
+            store = wasmtime.Store(self.engine)
+            store.set_wasi(wasi_cfg)
+            self.app = linker.instantiate(store, self.module)
+            linker.define_instance(store, "app", self.app)
+
+            try:
+                self.app.exports(store)["_start"](store)
+            except wasmtime.ExitTrap as trap:
+                if trap.code != 0:
+                    raise
+            return 0, stdout_f.read()
+
+
 @dataclass(frozen=True)
 class SkeletonNode:
     x: float
@@ -56,38 +111,22 @@ def polygon_is_clockwise(points):
     return det < 0
 
 
-def compute_skeleton_cli(exterior):
-    # Find the skeleton_cli binary
-    # Look in project root directory
-    cli_path = Path(__file__).parent.parent.parent / 'skeleton_cli'
-    if not cli_path.exists():
-        raise FileNotFoundError(f"skeleton_cli binary not found at {cli_path}")
+skeleton_wasm = WasmApp('skeleton.wasm')
 
-    # Prepare input: one point per line
+def compute_skeleton(exterior):
     points_deduplicated = []
     for p1, p2 in edge_cycle(exterior):
         if p2 != p1:
             points_deduplicated.append(p1)
     input_data = '\n'.join(f'{x} {y}' for x, y in points_deduplicated)
-    Path('/tmp/debug.txt').write_text(input_data)
-
-    # Run the CLI program
-    try:
-        result = subprocess.run(
-            [str(cli_path)],
-            input=input_data,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-    except subprocess.CalledProcessError as e:
-        raise ValueError(f'Error computing polygon straight skeleton. CGAL says: {e.stdout.rstrip()}\n{e.stderr.rstrip()}')
+    
+    rc, data = skeleton_wasm.run(input_data)
 
     # Parse output: each line is "x1 y1 x2 y2 t1 t2"
-    node_dict = {}  # Map (x, y, t) to SkeletonNode
+    node_map = {}  # Map (x, y, t) to SkeletonNode
     edges = []
 
-    for line in result.stdout.strip().split('\n'):
+    for line in data.strip().split('\n'):
         if not line:
             continue
 
@@ -97,21 +136,17 @@ def compute_skeleton_cli(exterior):
 
         x1, y1, x2, y2, t1, t2 = map(float, parts)
 
-        # Create or get nodes
-        key1 = (x1, y1, t1)
-        key2 = (x2, y2, t2)
+        n1 = (x1, y1, t1)
+        if n1 not in node_map:
+            node_map[n1] = SkeletonNode(*n1)
+        
+        n2 = (x2, y2, t2)
+        if n2 not in node_map:
+            node_map[n2] = SkeletonNode(*n2)
 
-        if key1 not in node_dict:
-            node_dict[key1] = SkeletonNode(x1, y1, t1)
-        if key2 not in node_dict:
-            node_dict[key2] = SkeletonNode(x2, y2, t2)
+        edges.append((node_map[n1], node_map[n2]))
 
-        node1 = node_dict[key1]
-        node2 = node_dict[key2]
-
-        edges.append((node1, node2))
-
-    nodes = list(node_dict.values())
+    nodes = list(node_map.values())
     return nodes, edges
 
 
@@ -120,7 +155,7 @@ class Skeletonator:
         self.poly = poly
         self.poly_edges = list(zip(poly, poly[1:] + poly[:1]))
         self.circumference = sum(math.dist(a, b) for a, b in self.poly_edges)
-        self.skeleton_nodes, self.skeleton_edges = compute_skeleton_cli(exterior=poly, holes=[])
+        self.skeleton_nodes, self.skeleton_edges = compute_skeleton(exterior=poly)
         self.arc_map = {}
         self.divergent = set()
         self.radius = max(n.time for n in self.skeleton_nodes)
@@ -263,7 +298,7 @@ class Skeletonator:
                 elif n in self.arc_map:
                     ax.plot(n.x, n.y, 'ro', markersize=3, alpha=0.5)
                 else:
-                    ax.plot(node.x, node.y, 'o', color='magenta', markersize=6)
+                    ax.plot(n.x, n.y, 'o', color='magenta', markersize=6)
 
             ax.set_aspect('equal', adjustable='box')
             ax.grid(True, alpha=0.3)
@@ -271,6 +306,6 @@ class Skeletonator:
             ax.set_title(f'Polygon Skeleton (radius: {self.radius:.3f}, min_radius: {self.min_radius:.3f})')
             ax.set_xlabel('X')
             ax.set_ylabel('Y')
-            ax.inver_yaxis()
+            ax.invert_yaxis()
             pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)
