@@ -50,6 +50,7 @@ dev = [
     "ipykernel>=7.1.0",
 ]
 gui = ["cairosvg", "pillow"]
+gds = ["gdstk"]
 
 [build-system]
 requires = ["uv-build"]

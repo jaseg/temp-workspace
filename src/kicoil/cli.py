@@ -45,6 +45,27 @@ def print_valid_twists(ctx, param, value):
     ctx.exit()
 
 
+def circle_center_to_tangents(center, a, b):
+    """ Given two points on a circle and the center of the circle, calculate the intersection of two tangents at the two points """
+    cx, cy = center
+    ax, ay = a
+    bx, by = b
+
+    dax = ax - cx
+    day = ay - cy
+    dbx = bx - cx
+    dby = by - cy
+
+    v = dax*ax + day*ay
+    w = dbx*bx + dby*by
+    det = dax*dby - day*dbx
+
+    ix = (v*dby - day*w) / det
+    iy = (dax*w - v*dbx) / det
+
+    return ix, iy
+
+
 @click.group()
 @click.option('--turns', type=int, default=5, help='Number of turns')
 @click.option('--twists', type=int, default=1, help='Number of twists per revolution. Note that this number must be co-prime to the number of turns. Run with --show-twists to list valid values. (default: 1)')
@@ -64,19 +85,20 @@ def print_valid_twists(ctx, param, value):
 @click.option('--circle-segments', type=int, default=64, help='When not using arcs, the number of points to use for arc interpolation per 360 degrees.')
 @click.option('--arc-tolerance', type=float, default=0.02)
 @click.option('--approximate-arcs/--no-approximate-arcs', default=True, help='Use circular arcs to smoothen output shape (default: on)')
-@click.option('--format', type=click.Choice(['svg', 'gerber', 'kicad-footprint', 'kicad-pcb', 'json', 'show']), default='kicad-footprint')
+@click.option('--format', type=click.Choice(['svg', 'gerber', 'kicad-footprint', 'kicad-pcb', 'json', 'gdsii', 'oasis', 'show']), default='kicad-footprint')
 @click.option('--clipboard/--no-clipboard', help='Use clipboard integration (requires wl-clipboard)')
 @click.option('--footprint-name', help="Name for the generated footprint. Default: Output file name sans extension.")
+@click.option('--cell-name', help="Name for the generated cell when exporting GDSII. Default: Output file name sans extension.")
 @click.option('--layer-pair', default='F.Cu,B.Cu', help="Target KiCad layer pair for the generated footprint, comma-separated. Default: F.Cu/B.Cu.")
 @click.version_option()
 @click.pass_context
-def cli(ctx, footprint_name, clipboard, single_layer, arc_tolerance, circle_segments, format, **kwargs):
+def cli(ctx, footprint_name, cell_name, clipboard, single_layer, arc_tolerance, circle_segments, format, **kwargs):
     ctx.ensure_object(dict)
     logger = logging.getLogger('kicoil')
     logger.setLevel(logging.INFO)
 
     def write(shape, outfile):
-        nonlocal footprint_name, clipboard, single_layer, arc_tolerance, circle_segments, format
+        nonlocal footprint_name, clipboard, single_layer, arc_tolerance, circle_segments, format, cell_name
         logger = logging.getLogger('kicoil')
 
         if single_layer:
@@ -159,6 +181,51 @@ def cli(ctx, footprint_name, clipboard, single_layer, arc_tolerance, circle_segm
             }
 
             data = json.dumps(d, indent=4)
+
+        elif format in ('gdsii', 'oasis'):
+            import gdstk
+
+            DRILL_LAYER = 2
+            lib = gdstk.Library()
+
+            if cell_name is None:
+                if outfile:
+                    cell_name = outfile.stem
+                else:
+                    cell_name = f'planar_coil'
+            cell = lib.new_cell(cell_name)
+            
+            for line in footprint.lines:
+                layer = model.layer_pair.index(line.layer)
+                path = gdstk.FlexPath([(line.start.x, line.start.y), (line.end.x, line.end.y)], line.stroke.width, ends=['round'], layer=layer)
+                cell.add(path)
+            
+            for arc in footprint.arcs:
+                layer = model.layer_pair.index(arc.layer)
+                center, r, _direction = kicad_mid_to_center_arc(arc.mid, arc.start, arc.end)
+                proj_x, proj_y = circle_center_to_tangents(center, tuple(arc.start), tuple(arc.end))
+                # multiply r with 0.99 to make sure gdstk's interpolation routine catches on since the arc endpoints are calculated exactly
+                path = gdstk.FlexPath([(arc.start.x, arc.start.y), (proj_x, proj_y), (arc.end.x, arc.end.y)], arc.stroke.width, bend_radius=r*0.99, ends=['round'], layer=layer)
+                cell.add(path)
+
+            for pad in footprint.pads:
+                for layer in pad.layers:
+                    layer = model.layer_pair.index(layer)
+                    layer_obj = gdstk.ellipse(tuple(pad.at), pad.size.x/2, layer=layer)
+                    cell.add(layer_obj)
+                
+                if pad.drill:
+                    drill = gdstk.ellipse(tuple(pad.at), pad.drill.diameter/2, layer=DRILL_LAYER)
+                    cell.add(drill)
+
+            if clipboard or not outfile:
+                raise click.ClickException('outfile is required for GDSII or OASIS export')
+
+            if format == 'gdsii':
+                lib.write_gds(outfile)
+            else:
+                lib.write_oas(outfile)
+            return
 
         elif format in ('svg', 'show'):
             data = str(make_transparent_svg(footprint))
