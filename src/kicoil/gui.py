@@ -27,7 +27,7 @@ from pathlib import Path
 from contextlib import contextmanager
 from io import BytesIO
 
-from .geometry import PlanarInductor, divisors
+from .geometry import PlanarInductor, divisors, CircleShape
 from .svg import make_transparent_svg
 
 try:
@@ -458,10 +458,14 @@ class KiCoilGUI:
         row += 1
         
     def get_parameters(self):
-        params = {
-            'turns'              : self.turns_var.get(),
+        shape_params = {
             'outer_diameter'     : self.outer_dia_var.get(),
             'inner_diameter'     : self.inner_dia_var.get(),
+        }
+
+        params = {
+            'shape'              : CircleShape(**shape_params),
+            'turns'              : self.turns_var.get(),
             'layers'             : self.layer_mode_var.get(),
             'twists'             : self.twists_var.get(),
             'clockwise'          : (self.direction_var.get() == "clockwise"),
