@@ -17,14 +17,17 @@ import logging
 import subprocess
 import webbrowser
 import tempfile
+import json
 import os
 import sys
 from pathlib import Path
+from collections import defaultdict
 import warnings
 import math
 
 import click
 from gerbonara.layers import LayerStack
+from gerbonara.cad.kicad.primitives import kicad_mid_to_center_arc
 
 from .geometry import PlanarInductor, divisors, CircleShape, SectorShape, StarShape, SVGShape, RectangleShape, RegularPolygonShape
 from .kicad import footprint_to_board
@@ -61,7 +64,7 @@ def print_valid_twists(ctx, param, value):
 @click.option('--circle-segments', type=int, default=64, help='When not using arcs, the number of points to use for arc interpolation per 360 degrees.')
 @click.option('--arc-tolerance', type=float, default=0.02)
 @click.option('--approximate-arcs/--no-approximate-arcs', default=True, help='Use circular arcs to smoothen output shape (default: on)')
-@click.option('--format', type=click.Choice(['svg', 'gerber', 'kicad-footprint', 'kicad-pcb', 'show']), default='kicad-footprint')
+@click.option('--format', type=click.Choice(['svg', 'gerber', 'kicad-footprint', 'kicad-pcb', 'json', 'show']), default='kicad-footprint')
 @click.option('--clipboard/--no-clipboard', help='Use clipboard integration (requires wl-clipboard)')
 @click.option('--footprint-name', help="Name for the generated footprint. Default: Output file name sans extension.")
 @click.option('--layer-pair', default='F.Cu,B.Cu', help="Target KiCad layer pair for the generated footprint, comma-separated. Default: F.Cu/B.Cu.")
@@ -113,6 +116,49 @@ def cli(ctx, footprint_name, clipboard, single_layer, arc_tolerance, circle_segm
                     f = Path(f.name)
                     stack.save_to_zipfile(f)
                     data = f.read_bytes()
+        
+        elif format == 'json':
+            lines = defaultdict(lambda: [])
+            for l in footprint.lines:
+                lines[l.layer].append({
+                    'x1': l.start.x,
+                    'y1': l.start.y,
+                    'x2': l.end.x,
+                    'y2': l.end.y})
+            
+            arcs = defaultdict(lambda: [])
+            for a in footprint.arcs:
+                center, r, direction = kicad_mid_to_center_arc(a.mid, a.start, a.end)
+                arcs[a.layer].append({
+                    'x1': a.start.x,
+                    'y1': a.start.y,
+                    'x2': a.end.x,
+                    'y2': a.end.y,
+                    'cx': center.x,
+                    'cy': center.y,
+                })
+
+            vias = [{
+                    'x': p.at.x,
+                    'y': p.at.y,
+                    'pad': p.size.x,
+                    'drill': p.drill.diameter,
+                } for p in footprint.pads if p.number == 'NC']
+            
+            pads = [{
+                    'x': p.at.x,
+                    'y': p.at.y,
+                    'pad': p.size.x,
+                } for p in footprint.pads if p.number != 'NC']
+            
+            d = {
+                'lines': dict(lines),
+                'arcs': dict(arcs),
+                'vias': vias,
+                'pads': pads
+            }
+
+            data = json.dumps(d, indent=4)
 
         elif format in ('svg', 'show'):
             data = str(make_transparent_svg(footprint))
