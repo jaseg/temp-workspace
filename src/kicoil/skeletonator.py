@@ -2,6 +2,7 @@ import math
 import itertools
 import subprocess
 import os
+from dataclasses import dataclass
 from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -36,49 +37,26 @@ def edge_cycle(points):
     return itertools.pairwise(itertools.chain(points, points[:1]))
 
 
+@dataclass(frozen=True)
 class SkeletonNode:
-    """Wrapper class for skeleton nodes to match py_straight_skeleton interface"""
-    def __init__(self, x, y, time):
-        self.position = type('Position', (), {'x': x, 'y': y})()
-        self.time = time
-        self.x = x
-        self.y = y
+    x: float
+    y: float
+    time: float
 
-    def __hash__(self):
-        return hash((self.x, self.y, self.time))
-
-    def __eq__(self, other):
-        return (self.x, self.y, self.time) == (other.x, other.y, other.time)
-
-    def __repr__(self):
-        return f'SkeletonNode({self.x}, {self.y}, t={self.time})'
+    @property
+    def pos(self):
+        return self.x, self.y
 
 
-class SkeletonWrapper:
-    """Wrapper class for skeleton to match py_straight_skeleton interface"""
-    def __init__(self, nodes, edges):
-        self.nodes = nodes
-        self.edges = edges
-
-    def arc_iterator(self):
-        """Iterate through skeleton edges as node pairs"""
-        return iter(self.edges)
+def polygon_is_clockwise(points):
+    x1, y1, i = sorted((x, y, i) for x, y in points)
+    x0, y0 = points[(i-1)%len(points)]
+    x2, y2 = points[(i+1)%len(points)]
+    det = (x1*y2 + x2*y3 + x3*y1) - (x3*y2 + x2*y1 + x1*y3)
+    return det < 0
 
 
-def compute_skeleton_cli(exterior, holes=None):
-    """
-    Compute straight skeleton using the CLI program instead of py_straight_skeleton.
-
-    Args:
-        exterior: List of (x, y) tuples representing the polygon vertices
-        holes: Not supported in this implementation
-
-    Returns:
-        SkeletonWrapper object compatible with py_straight_skeleton interface
-    """
-    if holes:
-        raise NotImplementedError("Holes are not supported in CLI implementation")
-
+def compute_skeleton_cli(exterior):
     # Find the skeleton_cli binary
     # Look in project root directory
     cli_path = Path(__file__).parent.parent.parent / 'skeleton_cli'
@@ -134,7 +112,7 @@ def compute_skeleton_cli(exterior, holes=None):
         edges.append((node1, node2))
 
     nodes = list(node_dict.values())
-    return SkeletonWrapper(nodes, edges)
+    return nodes, edges
 
 
 class Skeletonator:
@@ -142,19 +120,19 @@ class Skeletonator:
         self.poly = poly
         self.poly_edges = list(zip(poly, poly[1:] + poly[:1]))
         self.circumference = sum(math.dist(a, b) for a, b in self.poly_edges)
-        self.skeleton = compute_skeleton_cli(exterior=poly, holes=[])
+        self.skeleton_nodes, self.skeleton_edges = compute_skeleton_cli(exterior=poly, holes=[])
         self.arc_map = {}
         self.divergent = set()
-        self.radius = max(n.time for n in self.skeleton.nodes)
+        self.radius = max(n.time for n in self.skeleton_nodes)
         self.min_radius = self.radius
-        for n1, n2 in self.skeleton.arc_iterator():
+        for n1, n2 in self.skeleton_edges:
             if n1 in self.arc_map:
                 self.divergent.add(n1)
                 self.min_radius = min(n1.time, self.radius)
             self.arc_map[n1] = n2
         coord_map = {}
-        for n in self.skeleton.nodes:
-            p = (round(n.position.x, 6), round(n.position.y, 6))
+        for n in self.skeleton_nodes:
+            p = (round(n.x, 6), round(n.y, 6))
             coord_map[p] = n
         self.node_map = {}
         for x, y in poly:
@@ -178,11 +156,9 @@ class Skeletonator:
 
         for n0, n1 in self.iter_arcs(p):
             if t < 0 or approx_in_range(t, n0.time, n1.time):
-                p0 = (n0.position.x, n0.position.y)
-                p1 = (n1.position.x, n1.position.y)
-                return (n0, n1), interpolate(p0, p1, t, n0.time, n1.time)
+                return (n0, n1), interpolate(n0.pos, n1.pos, t, n0.time, n1.time)
         else:
-            raise ValueError(f'{r=:.3f} is out of bounds [0, {self.min_radius:.4f}]')
+            raise ValueError(f'{r=:.3f} is out of bounds [0, {self.radius - self.min_radius:.4f}]')
 
     def calc_circumference(self, r):
         projected = [self.project_arc(p, r)[1] for p in self.poly]
@@ -267,33 +243,27 @@ class Skeletonator:
                     yield p2_proj, r_ref
 
     def dump_to_pdf(self, filename):
-        """
-        Dump the polygon and its computed skeleton to a PDF file using matplotlib.
-        """
         with PdfPages(filename) as pdf:
             fig, ax = plt.subplots(figsize=(10, 10))
 
-            # Plot the polygon
+            # polygon outline
             poly_x = [p[0] for p in self.poly] + [self.poly[0][0]]
             poly_y = [p[1] for p in self.poly] + [self.poly[0][1]]
             ax.plot(poly_x, poly_y, 'b-', linewidth=2, label='Polygon')
             ax.plot(poly_x, poly_y, 'bo', markersize=4)
 
-            # Plot the skeleton edges
-            for node1, node2 in self.skeleton.arc_iterator():
+            # skeleton edges
+            for node1, node2 in self.skeleton_edges:
                 ax.plot([node1.x, node2.x], [node1.y, node2.y], 'r-', linewidth=1, alpha=0.7)
 
-            # Plot skeleton nodes
-            for node in self.skeleton.nodes:
-                ax.plot(node.x, node.y, 'ro', markersize=3, alpha=0.5)
-
-            # Plot divergent nodes with a different marker
-            for node in self.divergent:
-                ax.plot(node.x, node.y, 'go', markersize=6, label='Divergent' if node == list(self.divergent)[0] else '')
-
-            for node in self.skeleton.nodes:
-                if node not in self.arc_map and node not in self.divergent:
-                    ax.plot(node.x, node.y, 'o', color='magenta', markersize=6, label='Divergent' if self.divergent and node == list(self.divergent)[0] else '')
+            # skeleton nodes
+            for n in self.skeleton_nodes:
+                if n in self.divergent:
+                    ax.plot(n.x, n.y, 'go', markersize=6)
+                elif n in self.arc_map:
+                    ax.plot(n.x, n.y, 'ro', markersize=3, alpha=0.5)
+                else:
+                    ax.plot(node.x, node.y, 'o', color='magenta', markersize=6)
 
             ax.set_aspect('equal', adjustable='box')
             ax.grid(True, alpha=0.3)
@@ -301,6 +271,6 @@ class Skeletonator:
             ax.set_title(f'Polygon Skeleton (radius: {self.radius:.3f}, min_radius: {self.min_radius:.3f})')
             ax.set_xlabel('X')
             ax.set_ylabel('Y')
-
+            ax.inver_yaxis()
             pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)

@@ -281,7 +281,7 @@ class SVGShape(OffsetShape):
             d = path.attrs['d']
             d = d.strip('MmZ ').replace(',', 'L')
             coord_pairs = d.split('L')
-            coords = [tuple(map(float, pair.split())) for pair in coord_pairs]
+            coords = list(reversed([tuple(map(float, pair.split())) for pair in coord_pairs]))
         self.polygon  = coords
         super().__post_init__()
     
