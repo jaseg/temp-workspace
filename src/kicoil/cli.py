@@ -156,8 +156,8 @@ def cli(ctx, footprint_name, cell_name, clipboard, single_layer, arc_tolerance, 
                     'y1': a.start.y,
                     'x2': a.end.x,
                     'y2': a.end.y,
-                    'cx': center.x,
-                    'cy': center.y,
+                    'cx': center[0],
+                    'cy': center[1],
                 })
 
             vias = [{
