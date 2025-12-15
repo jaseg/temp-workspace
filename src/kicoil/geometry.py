@@ -195,11 +195,12 @@ class TrapezoidShape(OffsetShape):
     height: float
     offset: float
     annular_width: float
+    arc_tolerance: float = 0.05 # mm
     polygon: list = field(init=False)
 
     def __post_init__(self):
         w, h, d = self.width, self.height, self.offset
-        self.polygon = [(w/2-d, 0), (w/2, h), (-w/2, h), (-w/2+d, 0)]
+        self.polygon = [(w/2-d, -h/2), (w/2, h/2), (-w/2, h/2), (-w/2+d, -h/2)]
         super().__post_init__()
     
     @property
@@ -210,6 +211,27 @@ class TrapezoidShape(OffsetShape):
     def desc(self):
         return f'{self.width:.2f} x {self.height:.2f} mm, {self.offset:.2f} mm offset isosceles trapezoidal'
 
+
+@dataclass
+class RectangleShape(OffsetShape):
+    width: float
+    height: float
+    annular_width: float
+    arc_tolerance: float = 0.05 # mm
+    polygon: list = field(init=False)
+
+    def __post_init__(self):
+        w, h = self.width, self.height
+        self.polygon = [(w/2, -h/2), (w/2, h/2), (-w/2, h/2), (-w/2, -h/2)]
+        super().__post_init__()
+    
+    @property
+    def slug(self):
+        return f'rectangle_{self.width:.2f}x{self.height:.2f}'
+    
+    @property
+    def desc(self):
+        return f'{self.width:.2f} x {self.height:.2f} mm rectangle'
 
 @dataclass
 class SectorShape(OffsetShape):
@@ -265,6 +287,32 @@ class StarShape(OffsetShape):
         purpose = ', for demonic purposes' if self.points == 5 else ''
         return f'{self.outer_diameter:.2f} x {self.inner_diameter:.2f} mm star shape{purpose}'
 
+
+@dataclass
+class RegularPolygonShape(OffsetShape):
+    diameter: float
+    annular_width: float
+    corners: int = 8
+    arc_tolerance: float = 0.05 # mm
+    polygon: list = field(init=False)
+
+    def __post_init__(self):
+        # center on y axis
+        pt = lambda r, a: (-r*sin(a), r*cos(a))
+        circle = lambda r, n, phase: [pt(r, (i + phase)*2*pi/n) for i in range(n)]
+        self.polygon  = list(circle(self.diameter/2, self.corners, 0))
+        print(self.polygon)
+        super().__post_init__()
+    
+    @property
+    def slug(self):
+        return f'regular_{self.corners}gon_{self.diameter:.2f}'
+    
+    @property
+    def desc(self):
+        return f'{self.diameter:.2f} mm diameter {self.corners} corner regular polygon'
+
+
 @dataclass
 class SVGShape(OffsetShape):
     filename: str
@@ -282,6 +330,16 @@ class SVGShape(OffsetShape):
             d = d.strip('MmZ ').replace(',', 'L')
             coord_pairs = d.split('L')
             coords = list(reversed([tuple(map(float, pair.split())) for pair in coord_pairs]))
+            # Calculate bounding box
+            min_x = min(x for x, _y in coords)
+            min_y = max(x for x, _y in coords)
+            max_x = min(y for _x, y in coords)
+            max_y = max(y for _x, y in coords)
+            if max_x < 0 or max_y < 0 or min_x > 0 or min_y > 0:
+                # (0, 0) is not within the polygon's axis-aligned bounding box, recenter.
+                ox, oy = skeletonator.polygon_center_of_mass(coords)
+                warnings.warn(f'Polygon looks not centered, bounds are ({min_x:.2f}, {min_y:.2f}), ({max_x:.2f}, {max_y:.2f}). Aligning (0, 0) with polygon centroid at ({ox:.2f}, {oy:.2f})')
+                coords = [(x-ox, y-oy) for x, y in coords]
         self.polygon  = coords
         super().__post_init__()
     
@@ -331,7 +389,6 @@ class PlanarInductor():
         alpha2 = atan((self.shape.outer_radius - self.shape.inner_radius) / self.sweeping_angle / c2)
         alpha = (alpha1+alpha2)/2
         self.projected_spiral_pitch = self.spiral_pitch*cos(alpha)
-        print(self.shape.inner_radius, self.shape.outer_radius, self.spiral_pitch, self.turns_per_layer)
 
         if self.layers == 1 and self.twists > 1:
             warnings.warn('Warning: Twists set to a value other than 1, but single-layer mode is enabled. The twists value will be ignored.')

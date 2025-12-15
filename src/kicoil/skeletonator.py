@@ -45,6 +45,29 @@ def edge_cycle(points):
     return itertools.pairwise(itertools.chain(points, points[:1]))
 
 
+def polygon_is_clockwise(points):
+    (x1, y1, i), *_rest = sorted((x, y, i) for i, (x, y) in enumerate(points))
+    x0, y0 = points[(i-1)%len(points)]
+    x2, y2 = points[(i+1)%len(points)]
+    det = (x0*y1 + x1*y2 + x2*y0) - (x2*y1 + x1*y0 + x0*y2)
+    return det < 0
+
+
+def polygon_center_of_mass(polygon):
+    # https://en.wikipedia.org/wiki/Centroid
+    total_x, total_y = 0, 0
+    area = 0
+    for (x1, y1), (x2, y2) in edge_cycle(polygon):
+        diff = (x1*y2 - x2*y1)
+        total_x += (x1 + x2) * diff
+        total_y += (y1 + y2) * diff
+        area += diff
+    area /= 2
+    total_x /= 6*area
+    total_y /= 6*area
+    return total_x, total_y
+
+
 class WasmApp:
     def __init__(self, wasm_filename, cachedir="kicoil"):
         module_binary = importlib.resources.read_binary(__package__, wasm_filename)
@@ -103,14 +126,6 @@ class SkeletonNode:
         return self.x, self.y
 
 
-def polygon_is_clockwise(points):
-    x1, y1, i = sorted((x, y, i) for x, y in points)
-    x0, y0 = points[(i-1)%len(points)]
-    x2, y2 = points[(i+1)%len(points)]
-    det = (x1*y2 + x2*y3 + x3*y1) - (x3*y2 + x2*y1 + x1*y3)
-    return det < 0
-
-
 skeleton_wasm = WasmApp('skeleton.wasm')
 
 def compute_skeleton(exterior):
@@ -119,6 +134,7 @@ def compute_skeleton(exterior):
         if p2 != p1:
             points_deduplicated.append(p1)
     input_data = '\n'.join(f'{x} {y}' for x, y in points_deduplicated)
+    Path('/tmp/debug.txt').write_text(input_data)
     
     rc, data = skeleton_wasm.run(input_data)
 

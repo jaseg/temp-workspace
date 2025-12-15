@@ -26,7 +26,7 @@ import math
 import click
 from gerbonara.layers import LayerStack
 
-from .geometry import PlanarInductor, divisors, CircleShape, SectorShape, StarShape, SVGShape
+from .geometry import PlanarInductor, divisors, CircleShape, SectorShape, StarShape, SVGShape, RectangleShape, RegularPolygonShape
 from .kicad import footprint_to_board
 from .svg import make_transparent_svg
 
@@ -167,6 +167,28 @@ def circle(ctx, inner_diameter, outer_diameter, outfile):
 @click.pass_context
 def trapezoid(ctx, outfile, **kwargs):
     shape = TrapezoidShape(**kwargs)
+    ctx.obj['write'](shape, outfile)
+
+
+@cli.command()
+@click.option('--width', type=float, default=50, help='Width [mm]')
+@click.option('--height', type=float, default=40, help='Height [mm]')
+@click.option('--annular-width', type=float, default=10, help='Width of the trace area on the outside of the shape [mm]')
+@click.argument('outfile', required=False, type=click.Path(writable=True, dir_okay=False, path_type=Path))
+@click.pass_context
+def rectangle(ctx, outfile, **kwargs):
+    shape = RectangleShape(**kwargs)
+    ctx.obj['write'](shape, outfile)
+
+
+@cli.command()
+@click.option('--diameter', type=float, default=50, help='Width [mm]')
+@click.option('-n', '--corners', type=int, default=8, help='Number of corners')
+@click.option('--annular-width', type=float, default=10, help='Width of the trace area on the outside of the shape [mm]')
+@click.argument('outfile', required=False, type=click.Path(writable=True, dir_okay=False, path_type=Path))
+@click.pass_context
+def regular_polygon(ctx, outfile, **kwargs):
+    shape = RegularPolygonShape(**kwargs)
     ctx.obj['write'](shape, outfile)
 
 
