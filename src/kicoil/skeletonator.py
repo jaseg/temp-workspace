@@ -281,13 +281,15 @@ class Skeletonator:
                 point_angles.append(angle)
                 angle += edge_angle
             point_angles += [a+1 for a in point_angles if a+1 <= t_end]
-            print(f'{t_start=:.3f} {point_angles=}')
+            print(f'{t_start=} {point_angles=}')
 
             for (p1, p2), (tp1, tp2) in zip(self.poly_edges * 2, itertools.pairwise(point_angles)):
                 rp1 = r_interpolate(tp1)
                 rp2 = r_interpolate(tp2)
                 _arc, p1_proj = self.project_arc(p1, rp1)
                 _arc, p2_proj = self.project_arc(p2, rp2)
+                if tp2 < t_start:
+                    continue
                 
                 if approx_in_range(t1, tp1, tp2):
                     _arc, p2_proj_r1 = self.project_arc(p2, r1)
@@ -309,7 +311,7 @@ class Skeletonator:
 
     def dump_to_pdf(self, filename):
         with PdfPages(filename) as pdf:
-            fig, ax = plt.subplots(figsize=(20, 20))
+            fig, ax = plt.subplots(figsize=(10, 10))
 
             # polygon outline
             poly_x = [p[0] for p in self.poly] + [self.poly[0][0]]
