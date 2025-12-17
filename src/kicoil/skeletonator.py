@@ -280,7 +280,7 @@ class Skeletonator:
                 edge_angle = math.dist(p1, p2) / inner_circumference_sum
                 point_angles.append(angle)
                 angle += edge_angle
-            point_angles += [a+1 for a in point_angles if a+1 <= t_end]
+            point_angles += [a+1 for a in point_angles]
             print(f'{t_start=} {point_angles=}')
 
             for (p1, p2), (tp1, tp2) in zip(self.poly_edges * 2, itertools.pairwise(point_angles)):
@@ -289,6 +289,8 @@ class Skeletonator:
                 _arc, p1_proj = self.project_arc(p1, rp1)
                 _arc, p2_proj = self.project_arc(p2, rp2)
                 if tp2 < t_start:
+                    continue
+                if tp1 > t_end:
                     continue
                 
                 if approx_in_range(t1, tp1, tp2):
