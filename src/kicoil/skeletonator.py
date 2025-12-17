@@ -11,8 +11,6 @@ import sys
 import hashlib
 
 import platformdirs
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 import wasmtime
 
 
@@ -309,6 +307,9 @@ class Skeletonator:
             self.debug_arms.append((debug_arm, direction, t1, t2))
 
     def dump_to_pdf(self, filename):
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_pdf import PdfPages
+        
         with PdfPages(filename) as pdf:
             fig, ax = plt.subplots(figsize=(10, 10))
 
