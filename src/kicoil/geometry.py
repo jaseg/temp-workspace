@@ -441,10 +441,10 @@ class PlanarInductor():
 
         else:
             if round(self.trace_width, 2) > round(self.projected_spiral_pitch, 2):
-                raise click.ClickException(f'Error: Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
+                raise ValueError(f'Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
             clearance_actual = self.projected_spiral_pitch - self.trace_width
             if round(clearance_actual, 3) < round(self.clearance, 3):
-                raise click.ClickException(f'Error: Actual clearance for {self.trace_width:.2f} mm trace is {clearance_actual:.2f} mm, which is lower than the given clearance of {self.clearance:.2f} mm.')
+                raise ValueError(f'Actual clearance for {self.trace_width:.2f} mm trace is {clearance_actual:.2f} mm, which is lower than the given clearance of {self.clearance:.2f} mm.')
 
         if round(self.via_diameter, 2) < round(self.trace_width, 2):
             self.logger.warning(f'Clipping via diameter from {self.via_diameter:.2f} mm to trace width of {self.trace_width:.2f} mm.')

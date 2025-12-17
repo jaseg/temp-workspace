@@ -27,7 +27,7 @@ from pathlib import Path
 from contextlib import contextmanager
 from io import BytesIO
 
-from .geometry import PlanarInductor, divisors, CircleShape
+from .geometry import PlanarInductor, divisors, CircleShape, SectorShape, StarShape, SVGShape, RectangleShape, RegularPolygonShape, TrapezoidShape
 from .svg import make_transparent_svg
 
 try:
@@ -159,6 +159,44 @@ class KiCoilGUI:
         self.notebook.add(geometry_frame, text="Geometry")
         self.create_geometry_params(geometry_frame)
 
+        # Shape parameter tabs (will be shown/hidden based on selection)
+        self.shape_param_frames = {}
+
+        circle_frame = ttk.Frame(self.notebook, padding="10")
+        self.shape_param_frames["Circle"] = circle_frame
+        self.notebook.add(circle_frame, text="Circle Parameters")
+        self.create_circle_params(circle_frame)
+
+        rectangle_frame = ttk.Frame(self.notebook, padding="10")
+        self.shape_param_frames["Rectangle"] = rectangle_frame
+        self.notebook.add(rectangle_frame, text="Rectangle Parameters")
+        self.create_rectangle_params(rectangle_frame)
+
+        trapezoid_frame = ttk.Frame(self.notebook, padding="10")
+        self.shape_param_frames["Trapezoid"] = trapezoid_frame
+        self.notebook.add(trapezoid_frame, text="Trapezoid Parameters")
+        self.create_trapezoid_params(trapezoid_frame)
+
+        sector_frame = ttk.Frame(self.notebook, padding="10")
+        self.shape_param_frames["Sector"] = sector_frame
+        self.notebook.add(sector_frame, text="Sector Parameters")
+        self.create_sector_params(sector_frame)
+
+        star_frame = ttk.Frame(self.notebook, padding="10")
+        self.shape_param_frames["Star"] = star_frame
+        self.notebook.add(star_frame, text="Star Parameters")
+        self.create_star_params(star_frame)
+
+        polygon_frame = ttk.Frame(self.notebook, padding="10")
+        self.shape_param_frames["Regular Polygon"] = polygon_frame
+        self.notebook.add(polygon_frame, text="Polygon Parameters")
+        self.create_polygon_params(polygon_frame)
+
+        svg_frame = ttk.Frame(self.notebook, padding="10")
+        self.shape_param_frames["SVG"] = svg_frame
+        self.notebook.add(svg_frame, text="SVG Parameters")
+        self.create_svg_params(svg_frame)
+
         traces_frame = ttk.Frame(self.notebook, padding="10")
         self.notebook.add(traces_frame, text="Traces")
         self.create_trace_params(traces_frame)
@@ -219,6 +257,7 @@ class KiCoilGUI:
         self._validation_after_id = None
         self.setup_logging()
         self.setup_traces()
+        self.update_shape_tab_visibility()  # Initialize tab visibility
         self.root.after(100, self.validate_parameters)
 
     def _on_preview_resize(self, event):
@@ -280,6 +319,17 @@ class KiCoilGUI:
     def create_geometry_params(self, parent):
         row = 0
 
+        # Shape Type
+        ttk.Label(parent, text="Shape Type:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.shape_type_var = tk.StringVar(value="Circle")
+        shape_combo = ttk.Combobox(parent, textvariable=self.shape_type_var,
+                                   values=["Circle", "Rectangle", "Trapezoid", "Sector", "Star", "Regular Polygon", "SVG"],
+                                   state='readonly', width=23)
+        shape_combo.grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Coil outline shape",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
         # Turns
         ttk.Label(parent, text="Number of Turns:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.turns_var = tk.IntVar(value=7)
@@ -295,24 +345,6 @@ class KiCoilGUI:
         ttk.Spinbox(parent, from_=0, to=50, textvariable=self.twists_var,
                    width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Must be co-prime to turns",
-                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
-        row += 1
-
-        # Outer Diameter
-        ttk.Label(parent, text="Outer Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.outer_dia_var = tk.DoubleVar(value=50.0)
-        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.outer_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Label(parent, text="Outside diameter of coil",
-                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
-        row += 1
-
-        # Inner Diameter
-        ttk.Label(parent, text="Inner Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.inner_dia_var = tk.DoubleVar(value=25.0)
-        ttk.Spinbox(parent, from_=0, to=500, increment=0.5,
-                   textvariable=self.inner_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Label(parent, text="Inside diameter of coil",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
 
@@ -337,6 +369,200 @@ class KiCoilGUI:
         ttk.Radiobutton(dir_frame, text="Clockwise", variable=self.direction_var,
                        value="clockwise").pack(side=tk.LEFT)
         row += 1
+
+    def create_circle_params(self, parent):
+        row = 0
+        ttk.Label(parent, text="Outer Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.circle_outer_dia_var = tk.DoubleVar(value=50.0)
+        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
+                   textvariable=self.circle_outer_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Outside diameter of coil",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+        ttk.Label(parent, text="Inner Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.circle_inner_dia_var = tk.DoubleVar(value=25.0)
+        ttk.Spinbox(parent, from_=0, to=500, increment=0.5,
+                   textvariable=self.circle_inner_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Inside diameter of coil",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+    def create_rectangle_params(self, parent):
+        row = 0
+        ttk.Label(parent, text="Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.rect_width_var = tk.DoubleVar(value=50.0)
+        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
+                   textvariable=self.rect_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Height (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.rect_height_var = tk.DoubleVar(value=40.0)
+        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
+                   textvariable=self.rect_height_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.rect_annular_width_var = tk.DoubleVar(value=10.0)
+        ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
+                   textvariable=self.rect_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Width of trace area",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+    def create_trapezoid_params(self, parent):
+        row = 0
+        ttk.Label(parent, text="Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.trap_width_var = tk.DoubleVar(value=50.0)
+        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
+                   textvariable=self.trap_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Height (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.trap_height_var = tk.DoubleVar(value=40.0)
+        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
+                   textvariable=self.trap_height_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Offset (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.trap_offset_var = tk.DoubleVar(value=10.0)
+        ttk.Spinbox(parent, from_=0, to=100, increment=0.5,
+                   textvariable=self.trap_offset_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Corner offset at shorter edge",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+        ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.trap_annular_width_var = tk.DoubleVar(value=10.0)
+        ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
+                   textvariable=self.trap_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Width of trace area",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+    def create_sector_params(self, parent):
+        row = 0
+        ttk.Label(parent, text="Outer Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.sector_outer_dia_var = tk.DoubleVar(value=50.0)
+        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
+                   textvariable=self.sector_outer_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Inner Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.sector_inner_dia_var = tk.DoubleVar(value=25.0)
+        ttk.Spinbox(parent, from_=0, to=500, increment=0.5,
+                   textvariable=self.sector_inner_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Angle (degrees):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.sector_angle_var = tk.DoubleVar(value=45.0)
+        ttk.Spinbox(parent, from_=1, to=360, increment=1.0,
+                   textvariable=self.sector_angle_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Sector angle",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+        ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.sector_annular_width_var = tk.DoubleVar(value=5.0)
+        ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
+                   textvariable=self.sector_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Width of trace area",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+    def create_star_params(self, parent):
+        row = 0
+        ttk.Label(parent, text="Outer Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.star_outer_dia_var = tk.DoubleVar(value=50.0)
+        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
+                   textvariable=self.star_outer_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Inner Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.star_inner_dia_var = tk.DoubleVar(value=25.0)
+        ttk.Spinbox(parent, from_=0, to=500, increment=0.5,
+                   textvariable=self.star_inner_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Points:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.star_points_var = tk.IntVar(value=5)
+        ttk.Spinbox(parent, from_=3, to=20, textvariable=self.star_points_var,
+                   width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Number of star points",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+        ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.star_annular_width_var = tk.DoubleVar(value=5.0)
+        ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
+                   textvariable=self.star_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Width of trace area",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+    def create_polygon_params(self, parent):
+        row = 0
+        ttk.Label(parent, text="Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.poly_diameter_var = tk.DoubleVar(value=50.0)
+        ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
+                   textvariable=self.poly_diameter_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Corners:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.poly_corners_var = tk.IntVar(value=8)
+        ttk.Spinbox(parent, from_=3, to=20, textvariable=self.poly_corners_var,
+                   width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Number of polygon corners",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+        ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.poly_annular_width_var = tk.DoubleVar(value=10.0)
+        ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
+                   textvariable=self.poly_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Width of trace area",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+    def create_svg_params(self, parent):
+        row = 0
+        ttk.Label(parent, text="SVG File:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.svg_filename_var = tk.StringVar(value="")
+        svg_entry = ttk.Entry(parent, textvariable=self.svg_filename_var, width=30)
+        svg_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        ttk.Button(parent, text="Browse...", command=self.browse_svg_file, width=10).grid(row=row, column=2, sticky=tk.W, padx=(5, 0), pady=5)
+        row += 1
+
+        ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.svg_annular_width_var = tk.DoubleVar(value=5.0)
+        ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
+                   textvariable=self.svg_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Width of trace area",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
+        row += 1
+
+    def browse_svg_file(self):
+        filename = filedialog.askopenfilename(
+            title="Select SVG File",
+            filetypes=[("SVG files", "*.svg"), ("All files", "*.*")]
+        )
+        if filename:
+            self.svg_filename_var.set(filename)
+
+    def update_shape_tab_visibility(self, *args):
+        """Show only the shape parameter tab for the currently selected shape"""
+        selected_shape = self.shape_type_var.get()
+
+        # Hide all shape parameter tabs
+        for shape_name, frame in self.shape_param_frames.items():
+            tab_id = self.notebook.index(frame)
+            self.notebook.tab(tab_id, state='hidden')
+
+        # Show only the selected shape's tab
+        if selected_shape in self.shape_param_frames:
+            frame = self.shape_param_frames[selected_shape]
+            tab_id = self.notebook.index(frame)
+            self.notebook.tab(tab_id, state='normal')
 
     def create_trace_params(self, parent):
         row = 0
@@ -458,13 +684,58 @@ class KiCoilGUI:
         row += 1
         
     def get_parameters(self):
-        shape_params = {
-            'outer_diameter'     : self.outer_dia_var.get(),
-            'inner_diameter'     : self.inner_dia_var.get(),
-        }
+        # Create the appropriate shape based on selection
+        shape_type = self.shape_type_var.get()
+
+        if shape_type == "Circle":
+            shape = CircleShape(
+                outer_diameter=self.circle_outer_dia_var.get(),
+                inner_diameter=self.circle_inner_dia_var.get()
+            )
+        elif shape_type == "Rectangle":
+            shape = RectangleShape(
+                width=self.rect_width_var.get(),
+                height=self.rect_height_var.get(),
+                annular_width=self.rect_annular_width_var.get()
+            )
+        elif shape_type == "Trapezoid":
+            shape = TrapezoidShape(
+                width=self.trap_width_var.get(),
+                height=self.trap_height_var.get(),
+                offset=self.trap_offset_var.get(),
+                annular_width=self.trap_annular_width_var.get()
+            )
+        elif shape_type == "Sector":
+            import math
+            shape = SectorShape(
+                inner_diameter=self.sector_inner_dia_var.get(),
+                outer_diameter=self.sector_outer_dia_var.get(),
+                angle=math.radians(self.sector_angle_var.get()),
+                annular_width=self.sector_annular_width_var.get()
+            )
+        elif shape_type == "Star":
+            shape = StarShape(
+                inner_diameter=self.star_inner_dia_var.get(),
+                outer_diameter=self.star_outer_dia_var.get(),
+                points=self.star_points_var.get(),
+                annular_width=self.star_annular_width_var.get()
+            )
+        elif shape_type == "Regular Polygon":
+            shape = RegularPolygonShape(
+                diameter=self.poly_diameter_var.get(),
+                corners=self.poly_corners_var.get(),
+                annular_width=self.poly_annular_width_var.get()
+            )
+        elif shape_type == "SVG":
+            shape = SVGShape(
+                filename=self.svg_filename_var.get(),
+                annular_width=self.svg_annular_width_var.get()
+            )
+        else:
+            raise ValueError(f"Unknown shape type: {shape_type}")
 
         params = {
-            'shape'              : CircleShape(**shape_params),
+            'shape'              : shape,
             'turns'              : self.turns_var.get(),
             'layers'             : self.layer_mode_var.get(),
             'twists'             : self.twists_var.get(),
@@ -517,10 +788,12 @@ class KiCoilGUI:
             warnings.showwarning = old_showwarning
     
     def setup_traces(self):
+        # Shape type needs special handling for tab visibility
+        self.shape_type_var.trace_add('write', self.update_shape_tab_visibility)
+        self.shape_type_var.trace_add('write', self._on_parameter_change)
+
         for var in [
                     self.turns_var,
-                    self.outer_dia_var,
-                    self.inner_dia_var,
                     self.layer_mode_var,
                     self.direction_var,
                     self.twists_var,
@@ -531,13 +804,44 @@ class KiCoilGUI:
                     self.stagger_inner_var,
                     self.stagger_outer_var,
                     self.top_layer_var,
-                    self.bottom_layer_var]:
+                    self.bottom_layer_var,
+                    # Circle shape params
+                    self.circle_outer_dia_var,
+                    self.circle_inner_dia_var,
+                    # Rectangle shape params
+                    self.rect_width_var,
+                    self.rect_height_var,
+                    self.rect_annular_width_var,
+                    # Trapezoid shape params
+                    self.trap_width_var,
+                    self.trap_height_var,
+                    self.trap_offset_var,
+                    self.trap_annular_width_var,
+                    # Sector shape params
+                    self.sector_outer_dia_var,
+                    self.sector_inner_dia_var,
+                    self.sector_angle_var,
+                    self.sector_annular_width_var,
+                    # Star shape params
+                    self.star_outer_dia_var,
+                    self.star_inner_dia_var,
+                    self.star_points_var,
+                    self.star_annular_width_var,
+                    # Polygon shape params
+                    self.poly_diameter_var,
+                    self.poly_corners_var,
+                    self.poly_annular_width_var,
+                    # SVG shape params
+                    self.svg_annular_width_var]:
             var.trace_add('write', self._on_parameter_change)
 
         for entry in [self.trace_width_entry, self.clearance_entry,
                       self.via_drill_entry, self.via_offset_entry,
                       self.footprint_name_entry]:
             entry.bind('<KeyRelease>', lambda e: self._on_parameter_change())
+
+        # SVG filename entry needs special handling
+        self.svg_filename_var.trace_add('write', self._on_parameter_change)
     
     def _on_parameter_change(self, *args):
         # Schedule validation to avoid too many rapid calls
@@ -561,15 +865,21 @@ class KiCoilGUI:
             return True
 
         except ValueError as e:
+            self.output_text['state'] = 'normal'
             self.output_text.insert(tk.END, f"ERROR: {e}\n", 'error')
             self.output_text.see(tk.END)
+            
+            tb = traceback.format_exc()
+            print(tb, file=sys.stderr)
 
             self.current_model = None
             self.update_placeholders()
+            self.update_preview()
             return False
             
         except Exception as e:
             tb = traceback.format_exc()
+            self.output_text['state'] = 'normal'
             self.output_text.insert(tk.END, f"Unexpected error:\n{tb}\n", 'error')
             self.output_text.see(tk.END)
 
@@ -577,7 +887,8 @@ class KiCoilGUI:
 
             self.current_model = None
             self.update_placeholders()
-            return True
+            self.update_preview()
+            return False
 
         finally:
             self.output_text['state'] = 'disabled'
@@ -608,6 +919,13 @@ class KiCoilGUI:
 
     def update_preview(self):
         if not HAS_PREVIEW:
+            return
+
+        if self.current_model is None:
+            # Clear preview when model is invalid
+            self.preview_canvas.delete("all")
+            self.preview_raw_image = None
+            self.preview_image = None
             return
 
         arc_tolerance = self.arc_tolerance_var.get()
