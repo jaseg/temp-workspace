@@ -166,11 +166,11 @@ class OffsetShape(Shape):
         return f'polygonal (n={len(self.polygon)} point, r={self.radius:.2f} mm radius)'
 
 
-    def compute_spiral(self, a1, a2, fn=None):
+    def compute_spiral(self, a1, a2, fn=None, debug=False):
         # Skeletonator uses a t coordinate from 0 - 1 per revolution instead of a radian angle.
         points = []
         angle_refs = []
-        for point, angle_ref in self.sk.do_spiral(a1/(2*pi), a2/(2*pi), self.outer_radius, self.inner_radius):
+        for point, angle_ref in self.sk.do_spiral(a1/(2*pi), a2/(2*pi), self.outer_radius, self.inner_radius, debug=debug):
             points.append(point)
             angle_refs.append(angle_ref)
         if a2 < a1:
@@ -519,7 +519,7 @@ class PlanarInductor():
             end_angle = fold_angle + self.sweeping_angle
 
             # Handle the spiral arm
-            points_layer0, arm_length, angle_refs_layer0 = self.shape.compute_spiral(a1=start_angle, a2=fold_angle, fn=circle_segments)
+            points_layer0, arm_length, angle_refs_layer0 = self.shape.compute_spiral(a1=start_angle, a2=fold_angle, fn=circle_segments, debug=True)
             x0, y0 = points_layer0[0]
             xn, yn = points_layer0[-1]
             if angle_refs_layer0:
@@ -534,7 +534,7 @@ class PlanarInductor():
 
             if self.layers > 1:
                 # Handle the returning arm on the bottom layer
-                points_layer1, _, angle_refs_layer1 = self.shape.compute_spiral(a1=end_angle, a2=fold_angle, fn=circle_segments)
+                points_layer1, _, angle_refs_layer1 = self.shape.compute_spiral(a1=end_angle, a2=fold_angle, fn=circle_segments, debug=True)
                 points_layer1 = points_layer1[::-1]
                 if self.approximate_arcs and isinstance(self.shape, CircleShape):
                     footprint.arcs.extend(arc_approximate(points_layer1, self.trace_width, self.layer_pair[1], arc_tolerance))
@@ -611,5 +611,6 @@ class PlanarInductor():
                 keepout=ZoneKeepout(copperpour_allowed=False),
                 polygon=ZonePolygon(pts=[XYCoord(x=x, y=y) for x, y in pts])))
 
+        self.shape.sk.dump_to_pdf('/tmp/test.pdf')
         return footprint
 

@@ -189,7 +189,7 @@ class Skeletonator:
         for x, y in poly:
             p = (round(x, 6), round(y, 6))
             self.node_map[(x, y)] = coord_map[p]
-        self.dump_to_pdf('/tmp/test.pdf')
+        self.debug_arms = []
 
     def iter_arcs(self, p):
         i = 0
@@ -246,13 +246,15 @@ class Skeletonator:
             points.append(pt)
         return arcs, points
     
-    def do_spiral(self, t1, t2, r1=None, r2=None):
+    def do_spiral(self, t1, t2, r1=None, r2=None, debug=False):
         if r1 is None:
             r1 = self.radius
         if r2 is None:
             r2 = self.min_radius
 
+        direction = True
         if t2 < t1:
+            direction = False
             t1, t2 = t2, t1
             r1, r2 = r2, r1
 
@@ -260,15 +262,17 @@ class Skeletonator:
             t = max(t1, min(t2, t)) # Clip to start/end of spiral
             f = (t - t1) / (t2 - t1)
             return r1 + (r2 - r1) * f
-
-        for t_start in range(math.floor(t1), math.ceil(t2)):
+        
+        debug_arm = []
+        for t_start in range(math.ceil(t2-t1)):
+            t_start += t1
             t_end = t_start + 1
             r_outer = r_interpolate(t_start)
             r_inner = r_interpolate(t_end)
             r_ref = min(r_inner, r_outer) # Handle outward spirals where the radii are swapped
             _ic_arcs, inner_circumference = self.map_circumference(r_ref)
 
-            angle = t_start
+            angle = math.floor(t_start)
             circumference_angles = []
             inner_circumference_sum = sum(math.dist(p1, p2) for p1, p2 in edge_cycle(inner_circumference))
             point_angles = []
@@ -276,9 +280,9 @@ class Skeletonator:
                 edge_angle = math.dist(p1, p2) / inner_circumference_sum
                 point_angles.append(angle)
                 angle += edge_angle
-            point_angles.append(t_end)
+            point_angles += [a+1 for a in point_angles]
 
-            for (p1, p2), (tp1, tp2) in zip(self.poly_edges, itertools.pairwise(point_angles)):
+            for (p1, p2), (tp1, tp2) in zip(self.poly_edges * 2, itertools.pairwise(point_angles)):
                 rp1 = r_interpolate(tp1)
                 rp2 = r_interpolate(tp2)
                 _arc, p1_proj = self.project_arc(p1, rp1)
@@ -286,26 +290,35 @@ class Skeletonator:
                 
                 if approx_in_range(t1, tp1, tp2):
                     _arc, p2_proj_r1 = self.project_arc(p2, r1)
-                    yield interpolate(p1_proj, p2_proj_r1, t1, tp1, tp2), r_ref
+                    p_out = interpolate(p1_proj, p2_proj_r1, t1, tp1, tp2)
+                    debug_arm.append(p_out)
+                    yield p_out, r_ref
+
                 if approx_in_range(t2, tp1, tp2):
                     _arc, p1_proj_r2 = self.project_arc(p1, r2)
-                    yield interpolate(p1_proj_r2, p2_proj, t2, tp1, tp2), r_ref
+                    p_out = interpolate(p1_proj_r2, p2_proj, t2, tp1, tp2)
+                    debug_arm.append(p_out)
+                    yield p_out, r_ref
+
                 elif approx_in_range(tp2, t1, t2):
+                    debug_arm.append(p2_proj)
                     yield p2_proj, r_ref
+        if debug:
+            self.debug_arms.append((debug_arm, direction, t1, t2))
 
     def dump_to_pdf(self, filename):
         with PdfPages(filename) as pdf:
-            fig, ax = plt.subplots(figsize=(10, 10))
+            fig, ax = plt.subplots(figsize=(20, 20))
 
             # polygon outline
             poly_x = [p[0] for p in self.poly] + [self.poly[0][0]]
             poly_y = [p[1] for p in self.poly] + [self.poly[0][1]]
-            ax.plot(poly_x, poly_y, 'b-', linewidth=2, label='Polygon')
-            ax.plot(poly_x, poly_y, 'bo', markersize=4)
+            ax.plot(poly_x, poly_y, '-', color='black', linewidth=.5, label='Polygon')
+            ax.plot(poly_x, poly_y, 'o', color='black', markersize=4)
 
             # skeleton edges
             for node1, node2 in self.skeleton_edges:
-                ax.plot([node1.x, node2.x], [node1.y, node2.y], 'r-', linewidth=1, alpha=0.7)
+                ax.plot([node1.x, node2.x], [node1.y, node2.y], '-', color='gray', linewidth=.5, alpha=0.7)
 
             # skeleton nodes
             for n in self.skeleton_nodes:
@@ -315,6 +328,25 @@ class Skeletonator:
                     ax.plot(n.x, n.y, 'ro', markersize=3, alpha=0.5)
                 else:
                     ax.plot(n.x, n.y, 'o', color='magenta', markersize=6)
+
+            count = {True: 0, False: 0}
+            for arm, direction, t1, t2 in self.debug_arms:
+                xs = [x for x, y in arm]
+                ys = [y for x, y in arm]
+                ax.plot(xs, ys, linewidth=.2, color='red' if direction else 'blue')
+                align = 'left' if direction else 'right'
+                ax.text(xs[-1], ys[-1], f'{count[direction]}', size=3, horizontalalignment=align)
+                ax.text(xs[0], ys[0], f'{count[direction]}', size=3, horizontalalignment=align, color='gray')
+                print(f'{count[direction]:03d}/{'A' if direction else 'B'}: {t1:.3f} {t2:.3f}')
+                count[direction] += 1
+
+            xs, ys = [], []
+            for i in range(100):
+                r = self.radius - (i/99) * self.min_radius
+                arc, (px, py) = self.project_arc(self.poly[0], r)
+                xs.append(px)
+                ys.append(py)
+            ax.plot(xs, ys, linewidth=.5, color='black')
 
             ax.set_aspect('equal', adjustable='box')
             ax.grid(True, alpha=0.3)
