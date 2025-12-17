@@ -109,7 +109,7 @@ class WasmApp:
                 self.app.exports(store)["_start"](store)
             except wasmtime.ExitTrap as trap:
                 if trap.code != 0:
-                    raise
+                    raise RuntimeError('Error computing straight skeleton.')
             return 0, stdout_f.read()
 
 
@@ -308,53 +308,51 @@ class Skeletonator:
 
     def dump_to_pdf(self, filename):
         import matplotlib.pyplot as plt
-        from matplotlib.backends.backend_pdf import PdfPages
-        
-        with PdfPages(filename) as pdf:
-            fig, ax = plt.subplots(figsize=(10, 10))
+    
+        fig, ax = plt.subplots(figsize=(10, 10))
 
-            # polygon outline
-            poly_x = [p[0] for p in self.poly] + [self.poly[0][0]]
-            poly_y = [p[1] for p in self.poly] + [self.poly[0][1]]
-            ax.plot(poly_x, poly_y, '-', color='black', linewidth=.5, label='Polygon')
+        # polygon outline
+        poly_x = [p[0] for p in self.poly] + [self.poly[0][0]]
+        poly_y = [p[1] for p in self.poly] + [self.poly[0][1]]
+        ax.plot(poly_x, poly_y, '-', color='black', linewidth=.5, label='Polygon')
 
-            # skeleton edges
-            for node1, node2 in self.skeleton_edges:
-                ax.plot([node1.x, node2.x], [node1.y, node2.y], '-', color='gray', linewidth=.5, alpha=0.7)
+        # skeleton edges
+        for node1, node2 in self.skeleton_edges:
+            ax.plot([node1.x, node2.x], [node1.y, node2.y], '-', color='gray', linewidth=.5, alpha=0.7)
 
-            # skeleton nodes
-            for n in self.skeleton_nodes:
-                if n in self.divergent:
-                    ax.plot(n.x, n.y, 'o', markerfacecolor='none', markeredgecolor='green', markersize=4)
-                elif n in self.arc_map:
-                    ax.plot(n.x, n.y, 'o', color='black', markersize=3, alpha=0.5)
-                else:
-                    ax.plot(n.x, n.y, 'o', markerfacecolor='none', markeredgecolor='magenta', markersize=4)
+        # skeleton nodes
+        for n in self.skeleton_nodes:
+            if n in self.divergent:
+                ax.plot(n.x, n.y, 'o', markerfacecolor='none', markeredgecolor='green', markersize=4)
+            elif n in self.arc_map:
+                ax.plot(n.x, n.y, 'o', color='black', markersize=3, alpha=0.5)
+            else:
+                ax.plot(n.x, n.y, 'o', markerfacecolor='none', markeredgecolor='magenta', markersize=4)
 
-            count = {True: 0, False: 0}
-            for arm, direction, t1, t2 in self.debug_arms:
-                xs = [x for x, y in arm]
-                ys = [y for x, y in arm]
-                ax.plot(xs, ys, linewidth=.2, color='red' if direction else 'blue')
-                align = 'left' if direction else 'right'
-                ax.text(xs[-1], ys[-1], f'{count[direction]}', size=3, horizontalalignment=align)
-                ax.text(xs[0], ys[0], f'{count[direction]}', size=3, horizontalalignment=align, color='gray')
-                count[direction] += 1
+        count = {True: 0, False: 0}
+        for arm, direction, t1, t2 in self.debug_arms:
+            xs = [x for x, y in arm]
+            ys = [y for x, y in arm]
+            ax.plot(xs, ys, linewidth=.2, color='red' if direction else 'blue')
+            align = 'left' if direction else 'right'
+            ax.text(xs[-1], ys[-1], f'{count[direction]}', size=3, horizontalalignment=align)
+            ax.text(xs[0], ys[0], f'{count[direction]}', size=3, horizontalalignment=align, color='gray')
+            count[direction] += 1
 
-            xs, ys = [], []
-            for i in range(100):
-                r = self.radius - (i/99) * self.min_radius
-                arc, (px, py) = self.project_arc(self.poly[0], r)
-                xs.append(px)
-                ys.append(py)
-            ax.plot(xs, ys, '--', linewidth=.5, color='black')
+        xs, ys = [], []
+        for i in range(100):
+            r = self.radius - (i/99) * self.min_radius
+            arc, (px, py) = self.project_arc(self.poly[0], r)
+            xs.append(px)
+            ys.append(py)
+        ax.plot(xs, ys, '--', linewidth=.5, color='black')
 
-            ax.set_aspect('equal', adjustable='box')
-            ax.grid(True, alpha=0.3)
-            ax.legend()
-            ax.set_title(f'Polygon Skeleton (radius: {self.radius:.3f}, min_radius: {self.min_radius:.3f})')
-            ax.set_xlabel('X')
-            ax.set_ylabel('Y')
-            ax.invert_yaxis()
-            pdf.savefig(fig, bbox_inches='tight')
-            plt.close(fig)
+        ax.set_aspect('equal', adjustable='box')
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+        ax.set_title(f'Polygon Skeleton (radius: {self.radius:.3f}, min_radius: {self.min_radius:.3f})')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.invert_yaxis()
+        fig.savefig(filename, bbox_inches='tight', dpi=600)
+        plt.close(fig)

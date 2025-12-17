@@ -94,6 +94,15 @@ def arc_approximate(points, trace_width, layer, tolerance=0.02, level=0):
             yield kicad.make_arc(x2, y2, x0, y0, x1, y1, trace_width, layer)
 
 
+def polygon_is_clockwise(coords):
+    # https://en.wikipedia.org/wiki/Curve_orientation
+    xb, yb, i = min([(x, y, i) for i, (x, y) in enumerate(coords)])
+    xa, ya = coords[(i-1) % len(coords)]
+    xc, yc = coords[(i+1) % len(coords)]
+    det = (xa*yb + xb*yc + xc*ya) - (xa*yc + xb * ya + xc * yb)
+    return det < 0
+
+
 class Shape:
     pass
 
@@ -329,17 +338,22 @@ class SVGShape(OffsetShape):
             d = path.attrs['d']
             d = d.strip('MmZ ').replace(',', 'L')
             coord_pairs = d.split('L')
-            coords = list(reversed([tuple(map(float, pair.split())) for pair in coord_pairs]))
-            # Calculate bounding box
-            min_x = min(x for x, _y in coords)
-            min_y = max(x for x, _y in coords)
-            max_x = min(y for _x, y in coords)
-            max_y = max(y for _x, y in coords)
-            if max_x < 0 or max_y < 0 or min_x > 0 or min_y > 0:
-                # (0, 0) is not within the polygon's axis-aligned bounding box, recenter.
-                ox, oy = skeletonator.polygon_center_of_mass(coords)
-                warnings.warn(f'Polygon looks not centered, bounds are ({min_x:.2f}, {min_y:.2f}), ({max_x:.2f}, {max_y:.2f}). Aligning (0, 0) with polygon centroid at ({ox:.2f}, {oy:.2f})')
-                coords = [(x-ox, y-oy) for x, y in coords]
+            coords = [tuple(map(float, pair.split())) for pair in coord_pairs]
+            
+        if polygon_is_clockwise(coords):
+            coords = coords[::-1]
+            
+        # Calculate bounding box
+        min_x = min(x for x, _y in coords)
+        min_y = max(x for x, _y in coords)
+        max_x = min(y for _x, y in coords)
+        max_y = max(y for _x, y in coords)
+        if max_x < 0 or max_y < 0 or min_x > 0 or min_y > 0:
+            # (0, 0) is not within the polygon's axis-aligned bounding box, recenter.
+            ox, oy = skeletonator.polygon_center_of_mass(coords)
+            warnings.warn(f'Polygon looks not centered, bounds are ({min_x:.2f}, {min_y:.2f}), ({max_x:.2f}, {max_y:.2f}). Aligning (0, 0) with polygon centroid at ({ox:.2f}, {oy:.2f})')
+            coords = [(x-ox, y-oy) for x, y in coords]
+        
         self.polygon  = coords
         super().__post_init__()
     

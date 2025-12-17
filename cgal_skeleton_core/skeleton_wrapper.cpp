@@ -52,7 +52,8 @@ int main()
     }
 
     if (!poly.is_counterclockwise_oriented()) {
-        poly.reverse_orientation();
+        std::cerr << "Error: Polygon must be counter-clockwise" << std::endl;
+        return EXIT_FAILURE;
     }
 
     SsPtr ss = CGAL::create_interior_straight_skeleton_2(poly.vertices_begin(), poly.vertices_end(), K());
