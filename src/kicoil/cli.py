@@ -90,15 +90,16 @@ def circle_center_to_tangents(center, a, b):
 @click.option('--footprint-name', help="Name for the generated footprint. Default: Output file name sans extension.")
 @click.option('--cell-name', help="Name for the generated cell when exporting GDSII. Default: Output file name sans extension.")
 @click.option('--layer-pair', default='F.Cu,B.Cu', help="Target KiCad layer pair for the generated footprint, comma-separated. Default: F.Cu/B.Cu.")
+@click.option('--geometry-debug-file', type=click.Path(writable=True), help='Render geometry debug information to a PDF file with the given name')
 @click.version_option()
 @click.pass_context
-def cli(ctx, footprint_name, cell_name, clipboard, single_layer, arc_tolerance, circle_segments, format, **kwargs):
+def cli(ctx, footprint_name, cell_name, clipboard, single_layer, arc_tolerance, circle_segments, format, geometry_debug_file, **kwargs):
     ctx.ensure_object(dict)
     logger = logging.getLogger('kicoil')
     logger.setLevel(logging.INFO)
 
     def write(shape, outfile):
-        nonlocal footprint_name, clipboard, single_layer, arc_tolerance, circle_segments, format, cell_name
+        nonlocal footprint_name, clipboard, single_layer, arc_tolerance, circle_segments, format, cell_name, geometry_debug_file
         logger = logging.getLogger('kicoil')
 
         if single_layer:
@@ -112,7 +113,7 @@ def cli(ctx, footprint_name, cell_name, clipboard, single_layer, arc_tolerance, 
             if footprint_name is None and outfile:
                 footprint_name = outfile.stem
 
-            footprint = model.render_footprint(footprint_name, arc_tolerance, circle_segments)
+            footprint = model.render_footprint(footprint_name, arc_tolerance, circle_segments, geometry_debug_file)
 
         except ValueError as e:
             #raise click.ClickException(*e.args)

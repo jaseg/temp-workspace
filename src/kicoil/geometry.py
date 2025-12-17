@@ -119,7 +119,7 @@ class CircleShape(Shape):
         return f'{self.outer_diameter:.2f} mm OD, {self.inner_diameter:.2f} mm ID circular'
 
 
-    def compute_spiral(self, a1, a2, fn=64):
+    def compute_spiral(self, a1, a2, fn=64, debug=False):
         r1, r2 = self.outer_radius, self.inner_radius
         fn = ceil(fn * abs(a2-a1)/(2*pi))
         x0, y0 = cos(a1)*r1, sin(a1)*r1
@@ -491,7 +491,7 @@ class PlanarInductor():
     def default_footprint_name(self):
         return f'planar-coil-{self.shape.slug}-n{self.turns}-k{self.twists}'
 
-    def render_footprint(self, name=None, arc_tolerance=0.02, circle_segments=64):
+    def render_footprint(self, name=None, arc_tolerance=0.02, circle_segments=64, geometry_debug_file=None):
         if name is None:
             name = self.default_footprint_name
 
@@ -611,6 +611,7 @@ class PlanarInductor():
                 keepout=ZoneKeepout(copperpour_allowed=False),
                 polygon=ZonePolygon(pts=[XYCoord(x=x, y=y) for x, y in pts])))
 
-        self.shape.sk.dump_to_pdf('/tmp/test.pdf')
+        if geometry_debug_file:
+            self.shape.sk.dump_to_pdf(geometry_debug_file)
         return footprint
 

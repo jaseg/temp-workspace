@@ -194,10 +194,8 @@ class Skeletonator:
     def iter_arcs(self, p):
         i = 0
         start = self.node_map[p]
-        #print('start', start, start in self.arc_map, start in self.divergent)
         while start in self.arc_map and not start in self.divergent:
             end = self.arc_map[start]
-            #print('end', i, end)
             i += 1
             yield start, end
             start = end
@@ -281,7 +279,6 @@ class Skeletonator:
                 point_angles.append(angle)
                 angle += edge_angle
             point_angles += [a+1 for a in point_angles]
-            print(f'{t_start=} {point_angles=}')
 
             for (p1, p2), (tp1, tp2) in zip(self.poly_edges * 2, itertools.pairwise(point_angles)):
                 rp1 = r_interpolate(tp1)
@@ -319,7 +316,6 @@ class Skeletonator:
             poly_x = [p[0] for p in self.poly] + [self.poly[0][0]]
             poly_y = [p[1] for p in self.poly] + [self.poly[0][1]]
             ax.plot(poly_x, poly_y, '-', color='black', linewidth=.5, label='Polygon')
-            ax.plot(poly_x, poly_y, 'o', color='black', markersize=4)
 
             # skeleton edges
             for node1, node2 in self.skeleton_edges:
@@ -328,11 +324,11 @@ class Skeletonator:
             # skeleton nodes
             for n in self.skeleton_nodes:
                 if n in self.divergent:
-                    ax.plot(n.x, n.y, 'go', markersize=6)
+                    ax.plot(n.x, n.y, 'o', markerfacecolor='none', markeredgecolor='green', markersize=4)
                 elif n in self.arc_map:
-                    ax.plot(n.x, n.y, 'ro', markersize=3, alpha=0.5)
+                    ax.plot(n.x, n.y, 'o', color='black', markersize=3, alpha=0.5)
                 else:
-                    ax.plot(n.x, n.y, 'o', color='magenta', markersize=6)
+                    ax.plot(n.x, n.y, 'o', markerfacecolor='none', markeredgecolor='magenta', markersize=4)
 
             count = {True: 0, False: 0}
             for arm, direction, t1, t2 in self.debug_arms:
@@ -342,7 +338,6 @@ class Skeletonator:
                 align = 'left' if direction else 'right'
                 ax.text(xs[-1], ys[-1], f'{count[direction]}', size=3, horizontalalignment=align)
                 ax.text(xs[0], ys[0], f'{count[direction]}', size=3, horizontalalignment=align, color='gray')
-                print(f'{count[direction]:03d}/{'A' if direction else 'B'}: {t1:.3f} {t2:.3f}')
                 count[direction] += 1
 
             xs, ys = [], []
@@ -351,7 +346,7 @@ class Skeletonator:
                 arc, (px, py) = self.project_arc(self.poly[0], r)
                 xs.append(px)
                 ys.append(py)
-            ax.plot(xs, ys, linewidth=.5, color='black')
+            ax.plot(xs, ys, '--', linewidth=.5, color='black')
 
             ax.set_aspect('equal', adjustable='box')
             ax.grid(True, alpha=0.3)
