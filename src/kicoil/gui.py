@@ -128,6 +128,9 @@ class KiCoilGUI:
         self.root.title("KiCoil - Planar Inductor Generator")
         self.root.geometry("1000x650")
 
+        # Register validation command for non-negative numbers early
+        self.validate_nonneg_cmd = self.root.register(self.validate_nonnegative)
+
         style = ttk.Style()
         style.theme_use('clam')
 
@@ -252,13 +255,25 @@ class KiCoilGUI:
             self.preview_label.pack(fill=tk.BOTH, expand=True)
 
         self.preview_frame.grid(row=0, column=1, sticky=(tk.N, tk.S, tk.E, tk.W), padx=(10, 10), pady=10)
-                
+
         self.current_model = None
         self._validation_after_id = None
+
         self.setup_logging()
         self.setup_traces()
         self.update_shape_tab_visibility()  # Initialize tab visibility
         self.root.after(100, self.validate_parameters)
+
+    def validate_nonnegative(self, value_if_allowed):
+        """Validation callback for spinboxes to prevent negative values"""
+        if value_if_allowed == "" or value_if_allowed == "-":
+            # Allow empty string (user is typing) but not standalone minus
+            return value_if_allowed == ""
+        try:
+            float_val = float(value_if_allowed)
+            return float_val >= 0
+        except ValueError:
+            return False
 
     def _on_preview_resize(self, event):
         # Debounce resize events - only update after resize is complete
@@ -334,7 +349,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Number of Turns:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.turns_var = tk.IntVar(value=7)
         ttk.Spinbox(parent, from_=1, to=100, textvariable=self.turns_var,
-                   width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Number of spiral turns",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -343,7 +359,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Twists per Revolution:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.twists_var = tk.IntVar(value=4)
         ttk.Spinbox(parent, from_=0, to=50, textvariable=self.twists_var,
-                   width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Must be co-prime to turns",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -375,7 +392,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Outer Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.circle_outer_dia_var = tk.DoubleVar(value=50.0)
         ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.circle_outer_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.circle_outer_dia_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Outside diameter of coil",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -383,7 +401,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Inner Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.circle_inner_dia_var = tk.DoubleVar(value=25.0)
         ttk.Spinbox(parent, from_=0, to=500, increment=0.5,
-                   textvariable=self.circle_inner_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.circle_inner_dia_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Inside diameter of coil",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -393,19 +412,22 @@ class KiCoilGUI:
         ttk.Label(parent, text="Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.rect_width_var = tk.DoubleVar(value=50.0)
         ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.rect_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.rect_width_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Height (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.rect_height_var = tk.DoubleVar(value=40.0)
         ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.rect_height_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.rect_height_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.rect_annular_width_var = tk.DoubleVar(value=10.0)
         ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
-                   textvariable=self.rect_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.rect_annular_width_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Width of trace area",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -415,19 +437,22 @@ class KiCoilGUI:
         ttk.Label(parent, text="Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.trap_width_var = tk.DoubleVar(value=50.0)
         ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.trap_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.trap_width_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Height (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.trap_height_var = tk.DoubleVar(value=40.0)
         ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.trap_height_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.trap_height_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Offset (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.trap_offset_var = tk.DoubleVar(value=10.0)
         ttk.Spinbox(parent, from_=0, to=100, increment=0.5,
-                   textvariable=self.trap_offset_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.trap_offset_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Corner offset at shorter edge",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -435,7 +460,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.trap_annular_width_var = tk.DoubleVar(value=10.0)
         ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
-                   textvariable=self.trap_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.trap_annular_width_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Width of trace area",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -445,19 +471,22 @@ class KiCoilGUI:
         ttk.Label(parent, text="Outer Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.sector_outer_dia_var = tk.DoubleVar(value=50.0)
         ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.sector_outer_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.sector_outer_dia_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Inner Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.sector_inner_dia_var = tk.DoubleVar(value=25.0)
         ttk.Spinbox(parent, from_=0, to=500, increment=0.5,
-                   textvariable=self.sector_inner_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.sector_inner_dia_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Angle (degrees):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.sector_angle_var = tk.DoubleVar(value=45.0)
         ttk.Spinbox(parent, from_=1, to=360, increment=1.0,
-                   textvariable=self.sector_angle_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.sector_angle_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Sector angle",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -465,7 +494,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.sector_annular_width_var = tk.DoubleVar(value=5.0)
         ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
-                   textvariable=self.sector_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.sector_annular_width_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Width of trace area",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -475,19 +505,22 @@ class KiCoilGUI:
         ttk.Label(parent, text="Outer Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.star_outer_dia_var = tk.DoubleVar(value=50.0)
         ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.star_outer_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.star_outer_dia_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Inner Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.star_inner_dia_var = tk.DoubleVar(value=25.0)
         ttk.Spinbox(parent, from_=0, to=500, increment=0.5,
-                   textvariable=self.star_inner_dia_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.star_inner_dia_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Points:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.star_points_var = tk.IntVar(value=5)
         ttk.Spinbox(parent, from_=3, to=20, textvariable=self.star_points_var,
-                   width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Number of star points",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -495,7 +528,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.star_annular_width_var = tk.DoubleVar(value=5.0)
         ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
-                   textvariable=self.star_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.star_annular_width_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Width of trace area",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -505,13 +539,15 @@ class KiCoilGUI:
         ttk.Label(parent, text="Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.poly_diameter_var = tk.DoubleVar(value=50.0)
         ttk.Spinbox(parent, from_=1, to=500, increment=0.5,
-                   textvariable=self.poly_diameter_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.poly_diameter_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         ttk.Label(parent, text="Corners:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.poly_corners_var = tk.IntVar(value=8)
         ttk.Spinbox(parent, from_=3, to=20, textvariable=self.poly_corners_var,
-                   width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Number of polygon corners",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -519,7 +555,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.poly_annular_width_var = tk.DoubleVar(value=10.0)
         ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
-                   textvariable=self.poly_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.poly_annular_width_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Width of trace area",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -536,7 +573,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Annular Width (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.svg_annular_width_var = tk.DoubleVar(value=5.0)
         ttk.Spinbox(parent, from_=1, to=100, increment=0.5,
-                   textvariable=self.svg_annular_width_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.svg_annular_width_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Width of trace area",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -583,7 +621,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Copper Thickness (µm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.copper_thickness_var = tk.DoubleVar(value=35.0)  # 35µm = 0.035mm = 1 Oz
         ttk.Spinbox(parent, from_=1, to=1000, increment=1, format="%.1f",
-                   textvariable=self.copper_thickness_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.copper_thickness_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="35µm = 1 Oz copper",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -596,7 +635,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Via Diameter (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.via_diameter_var = tk.DoubleVar(value=0.6)
         ttk.Spinbox(parent, from_=0.1, to=5.0, increment=0.1, format="%.2f",
-                   textvariable=self.via_diameter_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.via_diameter_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
         
         # Via Drill
@@ -655,7 +695,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Circle Segments:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.circle_segments_var = tk.IntVar(value=64)
         ttk.Spinbox(parent, from_=8, to=360, textvariable=self.circle_segments_var,
-                   width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Points per 360° for arc interpolation",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
@@ -664,7 +705,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Arc Tolerance (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.arc_tolerance_var = tk.DoubleVar(value=0.02)
         ttk.Spinbox(parent, from_=0.001, to=1.0, increment=0.001, format="%.3f",
-                   textvariable=self.arc_tolerance_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.arc_tolerance_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
 
         # Keepout Zone
@@ -678,7 +720,8 @@ class KiCoilGUI:
         ttk.Label(parent, text="Keepout Margin (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.keepout_margin_var = tk.DoubleVar(value=5.0)
         ttk.Spinbox(parent, from_=0, to=50, increment=0.5,
-                   textvariable=self.keepout_margin_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+                   textvariable=self.keepout_margin_var, width=15,
+                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
         ttk.Label(parent, text="Margin around coil",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1

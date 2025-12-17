@@ -162,6 +162,8 @@ class CircleShape(Shape):
 class OffsetShape(Shape):
     def __post_init__(self):
         self.sk = skeletonator.Skeletonator(self.polygon)
+        if self.annular_width > self.sk.min_radius:
+            raise ValueError(f'Annular width ({self.annular_width:.2f}) is too large. Must be less than {self.sk.min_radius:.2f}')
         self.outer_radius = self.sk.radius
         self.inner_radius = self.sk.radius - self.annular_width
 
