@@ -280,7 +280,8 @@ class Skeletonator:
                 edge_angle = math.dist(p1, p2) / inner_circumference_sum
                 point_angles.append(angle)
                 angle += edge_angle
-            point_angles += [a+1 for a in point_angles]
+            point_angles += [a+1 for a in point_angles if a+1 <= t_end]
+            print(f'{t_start=:.3f} {point_angles=}')
 
             for (p1, p2), (tp1, tp2) in zip(self.poly_edges * 2, itertools.pairwise(point_angles)):
                 rp1 = r_interpolate(tp1)
