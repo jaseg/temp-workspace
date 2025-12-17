@@ -585,6 +585,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "ipykernel" },
+    { name = "matplotlib" },
 ]
 gds = [
     { name = "gdstk" },
@@ -607,7 +608,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "ipykernel", specifier = ">=7.1.0" }]
+dev = [
+    { name = "ipykernel", specifier = ">=7.1.0" },
+    { name = "matplotlib", specifier = ">=3.10.8" },
+]
 gds = [{ name = "gdstk" }]
 gui = [
     { name = "cairosvg" },

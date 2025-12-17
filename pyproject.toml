@@ -48,6 +48,7 @@ kicoil-gui = "kicoil.gui:main"
 [dependency-groups]
 dev = [
     "ipykernel>=7.1.0",
+    "matplotlib>=3.10.8",
 ]
 gui = ["cairosvg", "pillow"]
 gds = ["gdstk"]
