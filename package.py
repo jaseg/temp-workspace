@@ -79,16 +79,18 @@ def do_release(dry_run):
         for path in files:
             path = root / path
             out_path = plugin_dir / path.relative_to(module_sources)
-            content = path.read_text()
             if path.name == '__init__.py':
+                content = path.read_text()
                 lines = content.splitlines()
                 lines_out = []
                 for line in lines:
                     if line.startswith('__version__ = version('):
                         line = f'__version__ = {version!r}'
                     lines_out.append(line)
-                content = '\n'.join(lines_out)
-            out_path.write_text(content)
+                content = '\n'.join(lines_out).encode('utf-8')
+            else:
+                content = path.read_bytes()
+            out_path.write_bytes(content)
 
     zip_fn = Path(shutil.make_archive(f'{pkg_dir.name}-v{version}', 'zip', pkg_dir, '.'))
     if not dry_run:
