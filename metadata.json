@@ -1,8 +1,8 @@
 {
     "$schema": "https://go.kicad.org/pcm/schemas/v1",
     "name": "KiCoil",
-    "description": "Planar inductor supporting spiral coils, toroidal coils, and hybrids",
-    "description_full": "KiCoil generates planar inductors as footprints. Currently, circular spiral and toroid inductors are supported. KiCoil supports arbitrary intermediates between spiral and toroid inductors. By playing around with this, you can create inductors that have lower parasitics and higher self-resonant frequency than standard multilayer spiral inductors.",
+    "description": "Planar inductor supporting arbitrary shapes of spiral coils, toroidal coils, and hybrids",
+    "description_full": "KiCoil generates planar inductors as footprints. It supports arbitrary shapes with presets such as circles, rectangles, circular sectors, and SVG import for arbitrary shapes. It can generate spiral and toroid inductors as well as arbitrary intermediates between spiral and toroid inductors. By playing around with this, you can create inductors that have lower parasitics and higher self-resonant frequency than standard multilayer spiral inductors.",
     "identifier": "de.jaseg.kicoil",
     "type": "plugin",
     "author": {
