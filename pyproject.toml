@@ -1,6 +1,6 @@
 [project]
 name = "kicoil"
-version = "0.11.0"
+version = "0.11.1"
 description = "Planar Inductor Generator"
 readme = "README.rst"
 license = "Apache-2.0"
