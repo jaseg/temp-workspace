@@ -35,6 +35,15 @@
             "download_size": 1886869,
             "download_url": "https://git.jaseg.de/kimesh.git/plain/de.jaseg.kicoil-v0.11.0.zip?h=v0.11.0",
             "install_size": 14353567
+        },
+        {
+            "version": "0.11.1",
+            "status": "stable",
+            "kicad_version": "9.00",
+            "download_sha256": "8494927da4d4aca48baf13d6c8a162dc910c0be1294e5a44517b7d27a086a140",
+            "download_size": 1886906,
+            "download_url": "https://git.jaseg.de/kimesh.git/plain/de.jaseg.kicoil-v0.11.1.zip?h=v0.11.1",
+            "install_size": 14353726
         }
     ],
     "runtime": "ipc"
