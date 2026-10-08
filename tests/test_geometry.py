@@ -1,0 +1,153 @@
+import math
+
+import pytest
+from helpers import self_intersections
+
+from yanartas_pillowbox.config import Config
+from yanartas_pillowbox.geometry import (
+    Arc,
+    FoldCategory,
+    Line,
+    arc_from_chord,
+    build_model3d,
+    build_pattern,
+    closed_cross_section,
+)
+
+CONFIGS = {
+    "default": Config.defaults(),
+    "notched": Config.defaults().with_values(thumb_notch=True, thumb_notch_radius=9),
+    "deep": Config.defaults().with_values(width=40, depth=25, thickness=1.5),
+    "sagitta": Config.defaults().with_values(arc_mode="sagitta", sagitta=4, thickness=0),
+    "no-taper": Config.defaults().with_values(glue_tab_taper=0, glue_tab_width=20),
+    "big": Config.defaults().with_values(
+        width=300, length=50, depth=150, thumb_notch=True, thumb_notch_radius=60, glue_tab_taper=24
+    ),
+}
+
+
+@pytest.fixture(params=list(CONFIGS), ids=list(CONFIGS))
+def cfg(request):
+    return CONFIGS[request.param]
+
+
+def test_arc_from_chord_geometry():
+    arc = arc_from_chord((0, 0), (60, 0), 15, (0, 1))
+    assert arc.start == (0, 0) and arc.end == (60, 0)
+    apex = arc.point_at(0.5)
+    assert apex == pytest.approx((30, 15), abs=1e-9)
+    assert arc.radius == pytest.approx((30**2 + 15**2) / 30)
+    assert not arc.large_arc
+    assert arc.bbox() == pytest.approx((0, 0, 60, 15), abs=1e-9)
+
+
+def test_curved_fold_length_matches_closing_edge():
+    """A flap closes against the opposite panel's crease: same chord, same sagitta, so the
+    arc lengths must match. With zero thickness the flap's own cut edge matches too."""
+    cfg = Config.defaults().with_values(thickness=0)
+    pat = build_pattern(cfg)
+    folds = {f.name: f.segment for f in pat.folds}
+    theta = 2 * math.asin(cfg.width / 2 / pat.info["fold_radius"])
+    analytic = pat.info["fold_radius"] * theta
+    for end in ("top", "bottom"):
+        front, back = folds[f"front-{end}"], folds[f"back-{end}"]
+        assert front.length == pytest.approx(analytic, rel=1e-12)
+        assert back.length == pytest.approx(front.length, rel=1e-12)
+    cut_arcs = [s for s in pat.outline.segments if isinstance(s, Arc)]
+    assert len(cut_arcs) == 4
+    for arc in cut_arcs:
+        assert arc.length == pytest.approx(analytic, rel=1e-12)
+
+
+def test_thickness_makes_flap_edge_slightly_shorter():
+    cfg = Config.defaults().with_values(thickness=1.0)
+    pat = build_pattern(cfg)
+    fold = next(f.segment for f in pat.folds if f.category is FoldCategory.CURVED)
+    cut = next(s for s in pat.outline.segments if isinstance(s, Arc))
+    assert pat.info["cut_sagitta"] == pytest.approx(pat.info["fold_sagitta"] - 0.5)
+    assert 0 < fold.length - cut.length < 1.0
+
+
+def test_depth_maps_to_sagitta():
+    cfg = Config.defaults().with_values(depth=22)
+    assert build_pattern(cfg).info["fold_sagitta"] == pytest.approx(11)
+    cfg = Config.defaults().with_values(arc_mode="sagitta", sagitta=7)
+    assert build_pattern(cfg).info["box_depth"] == pytest.approx(14)
+
+
+def test_outline_is_single_closed_contour(cfg):
+    out = build_pattern(cfg).outline
+    assert out.is_continuous(1e-12)
+    assert math.dist(out.start, out.end) < 1e-9
+    for seg in out.segments:
+        assert seg.length > 1e-6
+
+
+def test_outline_has_no_self_intersections(cfg):
+    pts = build_pattern(cfg).outline.polyline(64)
+    assert self_intersections(pts) == []
+
+
+def test_fold_endpoints_on_outline_or_fold(cfg):
+    pat = build_pattern(cfg)
+    for fold in pat.folds:
+        for p in (fold.segment.start, fold.segment.end):
+            on_outline = pat.outline.distance_to(p) < 1e-6
+            on_fold = any(o is not fold and o.segment.distance_to(p) < 1e-6 for o in pat.folds)
+            assert on_outline or on_fold, (fold.name, p)
+
+
+def test_folds_do_not_overlap_outline(cfg):
+    pat = build_pattern(cfg)
+    for fold in pat.folds:
+        for i in range(1, 50):
+            p = fold.segment.point_at(i / 50)
+            assert pat.outline.distance_to(p) > 1e-3, (fold.name, i)
+
+
+def test_fold_categories():
+    pat = build_pattern(Config.defaults())
+    cats = [f.category for f in pat.folds]
+    assert cats.count(FoldCategory.CURVED) == 4
+    assert cats.count(FoldCategory.STRAIGHT) == 1
+    assert cats.count(FoldCategory.GLUE) == 1
+    for f in pat.folds:
+        assert isinstance(f.segment, Arc if f.category is FoldCategory.CURVED else Line)
+
+
+def test_notch_is_part_of_outline():
+    plain = build_pattern(Config.defaults())
+    notched = build_pattern(CONFIGS["notched"])
+    assert len(notched.outline.segments) == len(plain.outline.segments) + 8
+    radii = [s.radius for s in notched.outline.segments if isinstance(s, Arc)]
+    assert radii.count(9) == 4
+
+
+def test_bbox_covers_everything(cfg):
+    pat = build_pattern(cfg)
+    x0, y0, x1, y1 = pat.bbox
+    for p in pat.outline.polyline(64):
+        assert x0 - 1e-9 <= p[0] <= x1 + 1e-9 and y0 - 1e-9 <= p[1] <= y1 + 1e-9
+    assert x1 - x0 == pytest.approx(2 * cfg.width + cfg.glue_tab_width)
+
+
+def test_cross_section_preserves_panel_width():
+    theta, radius, chord = closed_cross_section(60, 15)
+    assert 2 * theta * radius == pytest.approx(60, rel=1e-9)  # arc length == panel width
+    assert radius * (1 - math.cos(theta)) == pytest.approx(15, rel=1e-9)
+    assert chord < 60
+
+
+def test_model3d(cfg):
+    model = build_model3d(cfg)
+    assert model["bounds"]["depth"] == pytest.approx(cfg.box_depth)
+    assert len(model["parts"]) == 6
+    for part in model["parts"]:
+        n = len(part["positions"]) // 3
+        assert len(part["positions"]) % 3 == 0
+        assert part["indices"] and max(part["indices"]) < n
+    zs = [p[2] for part in model["parts"] for p in zip(*[iter(part["positions"])] * 3, strict=True)]
+    assert max(zs) == pytest.approx(cfg.fold_sagitta, abs=1e-3)
+    assert min(zs) == pytest.approx(-cfg.fold_sagitta, abs=1e-3)
+    cats = sorted(line["category"] for line in model["lines"])
+    assert cats == ["curved"] * 4 + ["glue", "straight"]

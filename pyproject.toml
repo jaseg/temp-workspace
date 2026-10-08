@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yanartas-pillowbox"
+version = "0.1.0"
+description = "Generate laser-ready SVG folding patterns for pillow boxes, configured through a local web UI."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "jaseg" }]
+dependencies = ["flask>=3.0"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Web Environment",
+    "Topic :: Multimedia :: Graphics",
+]
+
+[project.scripts]
+yanartas-pillowbox = "yanartas_pillowbox.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yanartas_pillowbox"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/yanartas_pillowbox", "tests", "README.md", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["src/yanartas_pillowbox/static"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ANN", "RUF", "SIM"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]
