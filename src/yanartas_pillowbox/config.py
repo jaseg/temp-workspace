@@ -65,6 +65,8 @@ class FieldSpec:
     max_length: int | None = None
     # Not shown in the web UI (still settable via config files, imports and --set).
     hidden: bool = False
+    # Per-field UI action button: (action id, button label, tooltip).
+    action: tuple[str, str, str] | None = None
 
     def to_json(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -89,6 +91,8 @@ class FieldSpec:
             out["maxLength"] = self.max_length
         if self.hidden:
             out["hidden"] = True
+        if self.action is not None:
+            out["action"] = dict(zip(("id", "label", "title"), self.action, strict=True))
         return out
 
 
@@ -130,6 +134,25 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         help="Total thickness of the closed box at maximum bulge. The curved folds bow into "
         "the panels by half of this.",
     ),
+    *(
+        FieldSpec(
+            f"payload_{axis}",
+            f"Payload {axis}",
+            "float",
+            "Payload",
+            "mm",
+            0,
+            2000,
+            0.5,
+            help=help_text,
+            action=("maximize", "Max", f"Largest payload {axis} that fits the current box"),
+        )
+        for axis, help_text in (
+            ("width", "Across the box (along the box width)."),
+            ("depth", "Along the box length."),
+            ("height", "Along the box height. Set any payload dimension to 0 to hide it."),
+        )
+    ),
     FieldSpec("glue_tab_width", "Glue-tab width", "float", "Glue tab", "mm", 3, 100, 0.5),
     FieldSpec(
         "glue_tab_taper",
@@ -169,6 +192,10 @@ class Config:
     width: float = 55.0
     length: float = 120.0
     height: float = 20.0
+    # Rectangular payload, inscribed centred in the closed box (preview only, not exported).
+    payload_width: float = 30.0
+    payload_depth: float = 100.0
+    payload_height: float = 14.0
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
     thickness: float = 0.4

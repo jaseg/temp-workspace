@@ -10,6 +10,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request, send_from_directory
 
 from yanartas_pillowbox import dimensions as dims
+from yanartas_pillowbox import payload
 from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, field_specs_json
 from yanartas_pillowbox.geometry import build_cross_section, build_model3d, build_pattern
 from yanartas_pillowbox.persistence import load_config, save_config
@@ -103,6 +104,7 @@ def create_app(settings_path: Path) -> Flask:
             model=build_model3d(cfg, pattern),
             section=section,
             info=pattern.info,
+            payload=payload.summary(cfg),
             # Preview-only dimension annotations (never part of the exported SVG).
             dimensions={
                 "pattern": dims.to_json(
@@ -112,6 +114,26 @@ def create_app(settings_path: Path) -> Flask:
                 "model": dims.to_json(dims.model_dimensions(cfg)),
             },
         )
+
+    @app.post("/api/payload")
+    def payload_action() -> Any:
+        """``{config, action: "fit" | "maximize", field?}`` -> ``{config}`` (not saved)."""
+        if not request.is_json:
+            return jsonify(error="expected application/json"), 415
+        body = request.get_json(silent=True) or {}
+        cfg = parse_config_body()
+        if not isinstance(cfg, Config):
+            return cfg
+        try:
+            if body.get("action") == "fit":
+                out = payload.fit_box(cfg)
+            elif body.get("action") == "maximize":
+                out = payload.maximize(cfg, str(body.get("field")))
+            else:
+                return jsonify(error="unknown action", errors={}), 400
+        except payload.PayloadError as exc:
+            return jsonify(error=str(exc), errors={exc.field: str(exc)}), 422
+        return jsonify(config=out.to_dict())
 
     @app.post("/api/import")
     def import_svg() -> Any:

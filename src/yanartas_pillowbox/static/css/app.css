@@ -134,6 +134,7 @@ legend { font-weight: 600; padding: 0 4px; }
 .derived dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 0; font-size: 12px; }
 .derived dt { color: var(--text-muted); }
 .derived dd { margin: 0; font-family: var(--mono); text-align: right; }
+.derived dd.bad { color: var(--error); font-weight: 600; }
 
 /* pb-param renders into light DOM so these rules apply. */
 pb-param { display: block; padding: 5px 0; }
@@ -160,6 +161,11 @@ pb-param .control input[type="color"] {
 pb-param .control input.hex { font-family: var(--mono); text-transform: uppercase; }
 pb-param .control input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
 pb-param .unit { color: var(--text-muted); font-size: 12px; min-width: 22px; }
+pb-param .row.has-action { grid-template-columns: 1fr minmax(0, 196px); }
+pb-param button.action, .group-action {
+  font-size: 12px; padding: 3px 8px; flex: none;
+}
+.group-action { display: block; width: 100%; margin-top: 8px; }
 pb-param .help { color: var(--text-muted); font-size: 11.5px; margin-top: 2px; }
 pb-param .error { color: var(--error); font-size: 12px; margin-top: 3px; }
 pb-param .error:empty { display: none; }

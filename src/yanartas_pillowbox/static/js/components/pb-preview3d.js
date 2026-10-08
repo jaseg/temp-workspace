@@ -117,7 +117,7 @@ export class PbPreview3d extends HTMLElement {
 
   /** model: {parts:[{kind, positions, indices}], lines:[{category, points}], bounds};
    *  dims: parameter dimensions in the model frame (see dimensions.model_dimensions). */
-  update(model, colors, dims = []) {
+  update(model, colors, dims = [], payload = null) {
     this.#info.textContent =
       `closed ${fmt(model.bounds.width)} × ${fmt(model.bounds.length)} × ${fmt(model.bounds.height)} mm`;
     this.#info.title = "width × overall length (corner to corner) × height";
@@ -159,6 +159,7 @@ export class PbPreview3d extends HTMLElement {
       const mat = new THREE.LineBasicMaterial({ color: new THREE.Color(colors[line.category]) });
       group.add(new THREE.Line(geom, mat));
     }
+    if (payload && !payload.empty) group.add(this.#payloadMesh(payload));
     this.#group = group;
     this.#scene.add(group);
     const b = model.bounds;
@@ -170,6 +171,22 @@ export class PbPreview3d extends HTMLElement {
     }
     this.#size = newSize;
     this.#requestRender();
+  }
+
+  /** Payload box (preview only): drawn through the paper as a translucent box with edges.
+   *  Centred in the model frame; width along X, depth along Y (length), height along Z. */
+  #payloadMesh({ width, depth, height, fits }) {
+    const color = fits ? (this.#dark.matches ? 0xe8a052 : 0xb5651d) : 0xe53935;
+    const xray = { depthTest: false, depthWrite: false, transparent: true };
+    const geom = new THREE.BoxGeometry(width, depth, height);
+    const g = new THREE.Group();
+    const fill = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ color, opacity: 0.18, ...xray }));
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color, opacity: 0.95, ...xray }));
+    fill.renderOrder = 5;
+    edges.renderOrder = 6;
+    g.add(fill, edges);
+    return g;
   }
 
   /** Emphasise the dimensions of one parameter (or none). */

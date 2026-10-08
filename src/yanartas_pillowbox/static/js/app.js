@@ -64,6 +64,30 @@ function buildForm(specs) {
     params.set(spec.name, param);
     groups.get(spec.group).append(param);
   }
+  // Body: compute the smallest box (width, length, height) that holds the payload.
+  const fit = Object.assign(document.createElement("button"), {
+    type: "button",
+    className: "group-action",
+    textContent: "Fit box to payload",
+    title: "Smallest width, length and height that hold the payload, minimizing the "
+      + "pattern's bounding box. Glue tab and thickness are kept.",
+  });
+  fit.addEventListener("click", () => payloadAction({ action: "fit" }));
+  groups.get("Body")?.append(fit);
+}
+
+/** Run a payload action on the server and apply the resulting config. */
+async function payloadAction(request) {
+  const { ok, data } = await api("POST", "/api/payload", { config: readForm(), ...request }, { raw: true });
+  if (!ok) {
+    showErrors(data.errors || {});
+    if (!data.errors || !Object.keys(data.errors).length) showBanner(data.error || "Payload action failed");
+    setStatus(data.error || "Payload action failed", true);
+    return;
+  }
+  writeForm(data.config);
+  setStatus("Updating…");
+  scheduleRender(0);
 }
 
 function readForm() {
@@ -135,7 +159,7 @@ async function render() {
     return;
   }
   showErrors({});
-  const { svg, model, section, info, dimensions } = result.data;
+  const { svg, model, section, info, dimensions, payload } = result.data;
   lastValid = { config: result.data.config, svg, model, section, info };
   const c = lastValid.config;
   const legend = [
@@ -148,9 +172,9 @@ async function render() {
   const foldColors = {
     straight: c.color_fold_straight, curved: c.color_fold_curved, glue: c.color_fold_glue,
   };
-  preview3d.update(model, foldColors, dimensions.model);
-  sectionView.update(section, foldColors, dimensions.section);
-  renderDerived(info);
+  preview3d.update(model, foldColors, dimensions.model, payload);
+  sectionView.update(section, foldColors, dimensions.section, payload);
+  renderDerived(info, payload);
   downloadBtn.disabled = false;
   setStatus("Up to date");
   scheduleSave(lastValid.config);
@@ -172,7 +196,7 @@ function scheduleSave(config) {
   }, SAVE_DELAY);
 }
 
-function renderDerived(info) {
+function renderDerived(info, payload) {
   const rows = [
     ["Straight edge (corner to corner)", info.edge_length],
     ["Circumference", info.circumference],
@@ -188,9 +212,15 @@ function renderDerived(info) {
     const dt = document.createElement("dt");
     dt.textContent = k;
     const dd = document.createElement("dd");
-    dd.textContent = `${v.toFixed(2)} mm`;
+    dd.textContent = typeof v === "number" ? `${v.toFixed(2)} mm` : v;
     return [dt, dd];
   }));
+  if (!payload.empty) {
+    const dt = Object.assign(document.createElement("dt"), { textContent: "Payload fits" });
+    const dd = Object.assign(document.createElement("dd"), { textContent: payload.fits ? "yes" : "no" });
+    if (!payload.fits) dd.classList.add("bad");
+    $("#derived").append(dt, dd);
+  }
 }
 
 // ----------------------------------------------------------------------------- import/export
@@ -266,6 +296,9 @@ async function main() {
     scheduleRender();
   });
   form.addEventListener("submit", (e) => e.preventDefault());
+  form.addEventListener("pb-action", (e) => {
+    if (e.detail.action === "maximize") payloadAction({ action: "maximize", field: e.detail.name });
+  });
 
   // Link parameters and dimensions: focusing or hovering a field highlights its dimensions
   // in every view; clicking a dimension focuses its field.

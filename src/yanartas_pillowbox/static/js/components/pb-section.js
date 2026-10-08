@@ -28,6 +28,13 @@ template.innerHTML = `
           vector-effect: non-scaling-stroke; }
   .stage { --dim-color: var(--text-muted); --dim-halo: var(--surface); --dim-hl: var(--accent); }
   ${DIM_STYLE}
+  .payload { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent);
+             stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+  .payload.bad { fill: color-mix(in srgb, var(--error) 22%, transparent); stroke: var(--error); }
+  .legend i.payload { border-radius: 2px; box-shadow: none; border: 1.5px solid var(--accent);
+                      background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .legend i.payload.bad { border-color: var(--error);
+                          background: color-mix(in srgb, var(--error) 22%, transparent); }
   text { fill: var(--text-muted); font-family: var(--ui-font, system-ui, sans-serif); }
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
            border-radius: 5px; padding: 2px 9px; cursor: pointer; }
@@ -87,23 +94,28 @@ export class PbSection extends HTMLElement {
 
   /** section: {front, back: [[x, z]...], folds: [{category, point}], width, height};
    *  dims: parameter dimensions in the same (X, Z) frame. */
-  update(section, colors, dims = []) {
+  update(section, colors, dims = [], payload = null) {
     const { width, height } = section;
     this.#info.textContent = `${fmt(width)} × ${fmt(height)} mm`;
     this.#info.title = "The body has this cross-section everywhere between the curved folds.";
-    this.#data = { section, colors, dims };
+    this.#data = { section, colors, dims, payload };
     this.#render();
     this.#legend.replaceChildren(
       legendItem(colors.straight, "Straight fold"),
       legendItem(colors.glue, "Glue-tab fold"),
     );
+    if (payload && !payload.empty) {
+      const item = legendItem(null, payload.fits ? "Payload" : "Payload (does not fit)");
+      item.querySelector("i").className = payload.fits ? "payload" : "payload bad";
+      this.#legend.append(item);
+    }
   }
 
   /** Draw the section scaled to fit, with text at labelPx() screen pixels. The text's size
    *  in drawing units depends on the fit's scale, so the fit is iterated to a fixed point. */
   #render() {
     if (!this.#data) return;
-    const { section, colors, dims } = this.#data;
+    const { section, colors, dims, payload } = this.#data;
     const { width, height } = section;
     const r = this.#stage.getBoundingClientRect();
     const px = labelPx(this);
@@ -111,7 +123,7 @@ export class PbSection extends HTMLElement {
     let svg;
     for (let i = 0; i < 4; i++) {
       const upp = r.width && r.height ? Math.max(box[2] / r.width, box[3] / r.height) : box[2] / 400;
-      ({ svg, box } = this.#draw(section, colors, dims, px * upp));
+      ({ svg, box } = this.#draw(section, colors, dims, payload, px * upp));
     }
     svg.setAttribute("viewBox", box.join(" "));
     this.#stage.replaceChildren(svg);
@@ -119,7 +131,7 @@ export class PbSection extends HTMLElement {
     this.highlight(this.#highlight);
   }
 
-  #draw(section, colors, dims, fs) {
+  #draw(section, colors, dims, payload, fs) {
     const { width, height } = section;
     // Z points up on screen: plot (x, -z).
     const p = ([x, z]) => [x, -z];
@@ -134,6 +146,14 @@ export class PbSection extends HTMLElement {
     // Closed body outline: front panel (glued edge -> straight fold), then back panel back.
     const outline = [...section.front, ...section.back.slice(1)].map(p);
     svg.append(el("path", { class: "body", d: `M ${outline.map((q) => q.join(",")).join(" L ")} Z` }));
+
+    // Payload: preview only, centred in the section.
+    if (payload && !payload.empty) {
+      const { width: pw, height: ph } = payload;
+      svg.append(el("rect", {
+        class: payload.fits ? "payload" : "payload bad", x: -pw / 2, y: -ph / 2, width: pw, height: ph,
+      }));
+    }
 
     // Panel names, inside the body (dimensions use the space outside).
     svg.append(
@@ -164,7 +184,7 @@ export class PbSection extends HTMLElement {
 function legendItem(color, label) {
   const item = document.createElement("span");
   const swatch = document.createElement("i");
-  swatch.style.background = color;
+  if (color) swatch.style.background = color;
   item.append(swatch, label);
   return item;
 }

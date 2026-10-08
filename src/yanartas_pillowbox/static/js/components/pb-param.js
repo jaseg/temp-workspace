@@ -1,5 +1,5 @@
 // <pb-param>: one labelled configuration input (number, checkbox, select, text or color)
-// with unit, help text and an inline validation message. Built from a field spec served by
+// with unit, optional action button, help text and an inline validation message. Built from a field spec served by
 // /api/defaults. Emits a bubbling "pb-change" event whenever the user edits the value.
 
 let uid = 0;
@@ -123,6 +123,16 @@ export class PbParam extends HTMLElement {
       this.#input = input;
     }
     if (spec.unit) control.append(Object.assign(el("span", "unit"), { textContent: spec.unit }));
+    if (spec.action) {
+      // Optional per-field action (e.g. "maximize"); the app decides what it does.
+      const button = el("button", "action");
+      Object.assign(button, { type: "button", textContent: spec.action.label, title: spec.action.title });
+      button.addEventListener("click", () => this.dispatchEvent(new CustomEvent("pb-action", {
+        bubbles: true, detail: { name: spec.name, action: spec.action.id },
+      })));
+      control.append(button);
+      row.classList.add("has-action");
+    }
 
     this.append(row);
     if (spec.help) this.append(Object.assign(el("div", "help"), { textContent: spec.help }));

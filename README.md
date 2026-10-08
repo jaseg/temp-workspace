@@ -73,6 +73,17 @@ the defaults. It never crashes because of the file.
 * **Body cross-section:** a 2D section through the closed body, perpendicular to its length.
   The body has this same section everywhere between the curved folds. It shows the closed
   width and height and the two straight folds in their configured colors.
+* **Payload:** below the body controls, set the width, depth and height of a rectangular
+  payload. It is drawn centred inside the box in the cross-section and 3D views (red if it
+  does not fit; *Derived geometry* also says whether it fits). It is never drawn in the SVG,
+  but it is saved with the settings and in the SVG's embedded config. Set any payload
+  dimension to 0 to hide it.
+  * **Max** next to each payload field sets it to the largest value that fits the current
+    box.
+  * **Fit box to payload** (in the body controls) sets width, length and height to the
+    smallest box that holds the payload, minimizing the area of the pattern's bounding box.
+    Glue tab, thickness and colors are left alone. Results are rounded to 0.01 mm, always
+    towards a box that still fits.
 * **Parameter dimensions:** all three views annotate the inputs they show:
   * **Pattern:** circumference (both panels, flat), length (along the front panel's
     midline), height (across a flap), and the glue-tab width and taper (both at the tab's
@@ -99,6 +110,9 @@ All lengths are in millimetres.
 | `width` | 55 | Width of the closed box's cross-section, measured from fold to fold. 10–1000. This drives the panel size: see *circumference* below. |
 | `length` | 120 | Length along the middle of a panel, between the apexes of the two curved folds: the shortest distance between the curves. 10–2000. The straight edges (corner to corner) are `length + height` long. |
 | `height` | 20 | Total height (thickness) of the closed box at maximum bulge. The curved folds bow into the panels by height/2. At most ≈ 0.463·width (the UI states the exact limit). |
+| `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
+| `payload_depth` | 100 | Payload size along the box length. 0–2000. |
+| `payload_height` | 14 | Payload size along the box height. 0–2000. |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than one panel (half the circumference). |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to (length + height)/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `thickness` | 0.4 | Material thickness, 0–5. The flap cut edge is offset from the curved folds by t/2 (see below). |
@@ -114,6 +128,17 @@ cross-section, i.e. the flat width of both panels together. It follows from `wid
 height: the more the panels bulge, the more material it takes to span the same width. Each
 panel is half the circumference wide in the flat pattern. The UI shows both values under
 *Derived geometry*, and the pattern view dimensions the circumference.
+
+### Payload fit
+
+The fit ignores material thickness. Inside the closed box, the body's cross-section has a
+height profile `Zp(X)`, and each end wall (a flap mirrored across its crease) stands
+`Zp(X)` in from the end of the straight edges. So the interior is
+`|Z| ≤ Zp(X), |Y| ≤ (length + height)/2 − Zp(X)`. Since `Zp` is largest at the centre, a
+centred payload fits exactly when `payload_depth ≤ length` (the midline length) and
+`Zp(payload_width / 2) ≥ payload_height / 2`. *Fit box to payload* searches over the
+cross-section's sagitta/panel ratio. For each ratio, the payload's corner touching the
+profile fixes the panel width (`payload.py`).
 
 ### Geometry model
 
@@ -190,7 +215,8 @@ Two categories only share a color if you set them that way.
 | `GET /api/defaults` | — | `{config, fields}` with the default config and field specs (labels, units, ranges) |
 | `GET /api/config` | — | `{config}` with the current (persisted) config |
 | `PUT /api/config` | `{config}` | Validates and saves it, returns `{config, saved}`; `422 {errors}` if invalid |
-| `POST /api/render` | `{config}` | `{config, svg, model, section, info, dimensions}`; `422 {errors: {field: message}}` if invalid |
+| `POST /api/render` | `{config}` | `{config, svg, model, section, info, dimensions, payload}`; `422 {errors: {field: message}}` if invalid |
+| `POST /api/payload` | `{config, action: "fit"}` or `{config, action: "maximize", field}` | `{config}` with the fitted box or maximized payload (not saved); `422 {errors}` if impossible |
 | `POST /api/import` | SVG as the raw body or a multipart `file` | `{config}`; `400 {error}` if unusable |
 
 ## Development
@@ -207,6 +233,7 @@ Layout:
   schema versioning.
 * `geometry.py`: pure geometry (typed outline, folds, 3D mesh). It has no Flask or SVG code.
 * `svg.py`: SVG serialization and config extraction.
+* `payload.py`: payload fit test, per-dimension maximize and the box fit.
 * `dimensions.py`: preview dimension annotations, tagged with the parameter they show.
 * `persistence.py`, `server.py`, `cli.py`.
 * `static/`: the no-build ES-module frontend, with web components for the parameter input
