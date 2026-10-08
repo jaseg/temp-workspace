@@ -153,6 +153,18 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
             ("height", "Along the box height. Set any payload dimension to 0 to hide it."),
         )
     ),
+    FieldSpec(
+        "payload_margin",
+        "Payload margin",
+        "float",
+        "Payload",
+        "mm",
+        0,
+        100,
+        0.25,
+        help="Minimum clearance: the true distance from any point of the payload to the "
+        "nearest point of the box surface.",
+    ),
     FieldSpec("glue_tab_width", "Glue-tab width", "float", "Glue tab", "mm", 3, 100, 0.5),
     FieldSpec(
         "glue_tab_taper",
@@ -195,7 +207,8 @@ class Config:
     # Rectangular payload, inscribed centred in the closed box (preview only, not exported).
     payload_width: float = 30.0
     payload_depth: float = 100.0
-    payload_height: float = 14.0
+    payload_height: float = 13.0
+    payload_margin: float = 1.0
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
     thickness: float = 0.4

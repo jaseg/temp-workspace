@@ -30,6 +30,9 @@ template.innerHTML = `
   ${DIM_STYLE}
   .payload { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent);
              stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+  .payload-margin { fill: none; stroke: var(--accent); stroke-width: 1px; stroke-dasharray: 4 3;
+                    vector-effect: non-scaling-stroke; }
+  .payload-margin.bad { stroke: var(--error); }
   .payload.bad { fill: color-mix(in srgb, var(--error) 22%, transparent); stroke: var(--error); }
   .legend i.payload { border-radius: 2px; box-shadow: none; border: 1.5px solid var(--accent);
                       background: color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -105,7 +108,8 @@ export class PbSection extends HTMLElement {
       legendItem(colors.glue, "Glue-tab fold"),
     );
     if (payload && !payload.empty) {
-      const item = legendItem(null, payload.fits ? "Payload" : "Payload (does not fit)");
+      const label = payload.margin > 0 ? "Payload, dashed: margin" : "Payload";
+      const item = legendItem(null, payload.fits ? label : `${label} (does not fit)`);
       item.querySelector("i").className = payload.fits ? "payload" : "payload bad";
       this.#legend.append(item);
     }
@@ -149,7 +153,14 @@ export class PbSection extends HTMLElement {
 
     // Payload: preview only, centred in the section.
     if (payload && !payload.empty) {
-      const { width: pw, height: ph } = payload;
+      const { width: pw, height: ph, margin: m } = payload;
+      if (m > 0) {
+        // The margin envelope: every point within m of the payload (rounded corners).
+        svg.append(el("rect", {
+          class: payload.fits ? "payload-margin" : "payload-margin bad",
+          x: -pw / 2 - m, y: -ph / 2 - m, width: pw + 2 * m, height: ph + 2 * m, rx: m, ry: m,
+        }));
+      }
       svg.append(el("rect", {
         class: payload.fits ? "payload" : "payload bad", x: -pw / 2, y: -ph / 2, width: pw, height: ph,
       }));

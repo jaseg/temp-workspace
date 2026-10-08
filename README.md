@@ -74,14 +74,17 @@ the defaults. It never crashes because of the file.
   The body has this same section everywhere between the curved folds. It shows the closed
   width and height and the two straight folds in their configured colors.
 * **Payload:** below the body controls, set the width, depth and height of a rectangular
-  payload. It is drawn centred inside the box in the cross-section and 3D views (red if it
-  does not fit; *Derived geometry* also says whether it fits). It is never drawn in the SVG,
+  payload, and a **margin**: the minimum true distance from any point of the payload to the
+  nearest point of the box surface. The payload is drawn centred inside the box in the
+  cross-section and 3D views, with the margin envelope dashed in the cross-section. It turns
+  red if the margin is not met. *Derived geometry* shows the actual clearance. It is never drawn in the SVG,
   but it is saved with the settings and in the SVG's embedded config. Set any payload
   dimension to 0 to hide it.
-  * **Max** next to each payload field sets it to the largest value that fits the current
-    box.
+  * **Max** next to each payload field sets it to the largest value that keeps the margin in
+    the current box.
   * **Fit box to payload** (in the body controls) sets width, length and height to the
-    smallest box that holds the payload, minimizing the area of the pattern's bounding box.
+    smallest box that holds the payload with its margin, minimizing the area of the
+    pattern's bounding box.
     Glue tab, thickness and colors are left alone. Results are rounded to 0.01 mm, always
     towards a box that still fits.
 * **Parameter dimensions:** all three views annotate the inputs they show:
@@ -112,7 +115,8 @@ All lengths are in millimetres.
 | `height` | 20 | Total height (thickness) of the closed box at maximum bulge. The curved folds bow into the panels by height/2. At most ≈ 0.463·width (the UI states the exact limit). |
 | `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
 | `payload_depth` | 100 | Payload size along the box length. 0–2000. |
-| `payload_height` | 14 | Payload size along the box height. 0–2000. |
+| `payload_height` | 13 | Payload size along the box height. 0–2000. |
+| `payload_margin` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than one panel (half the circumference). |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to (length + height)/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `thickness` | 0.4 | Material thickness, 0–5. The flap cut edge is offset from the curved folds by t/2 (see below). |
@@ -129,16 +133,29 @@ height: the more the panels bulge, the more material it takes to span the same w
 panel is half the circumference wide in the flat pattern. The UI shows both values under
 *Derived geometry*, and the pattern view dimensions the circumference.
 
-### Payload fit
+### Payload fit and clearance
 
-The fit ignores material thickness. Inside the closed box, the body's cross-section has a
-height profile `Zp(X)`, and each end wall (a flap mirrored across its crease) stands
-`Zp(X)` in from the end of the straight edges. So the interior is
-`|Z| ≤ Zp(X), |Y| ≤ (length + height)/2 − Zp(X)`. Since `Zp` is largest at the centre, a
-centred payload fits exactly when `payload_depth ≤ length` (the midline length) and
-`Zp(payload_width / 2) ≥ payload_height / 2`. *Fit box to payload* searches over the
-cross-section's sagitta/panel ratio. For each ratio, the payload's corner touching the
-profile fixes the panel width (`payload.py`).
+Distances are measured to the zero-thickness box surface. Inside the closed box, the body's
+cross-section has a height profile `Zp(X)`, and each end wall (a flap mirrored across its
+crease) stands `Zp(X)` in from the end of the straight edges. So the interior is
+`|Z| ≤ Zp(X), |Y| ≤ (length + height)/2 − Zp(X)`.
+
+The surface consists of the panels, which are cylinders with rulings along the length, and
+the end walls, which are cylinders with vertical rulings. For a payload inside the box, the
+true distance to the surface is the smaller of two 2D distances:
+
+* **Panels:** the distance in the cross-section between the payload rectangle and the
+  profile.
+* **End walls:** exactly `(length − payload_depth)/2`. In plan view every wall point is at
+  least `length/2` from the centre (the midline length), with equality at the centre.
+
+This works because the nearest point on an unbounded cylinder that isn't on the real surface
+lies outside the box, so the real surface is crossed first.
+
+*Fit box to payload* sets `length = payload_depth + 2·margin`. It then searches over the
+cross-section's sagitta/panel ratio: for each ratio, it finds the smallest panel width whose
+profile keeps at least `margin` from the payload rectangle (`payload.py`). The tests check
+the clearance against a brute-force distance to every vertex of a fine 3D mesh.
 
 ### Geometry model
 

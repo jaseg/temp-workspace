@@ -16,7 +16,7 @@ D = Config.defaults()
 BOXES = {
     "default": D,
     "wide-flat": D.with_values(
-        width=120, height=20, length=60, payload_width=80, payload_depth=50, payload_height=10
+        width=120, height=20, length=60, payload_width=75, payload_depth=50, payload_height=8
     ),
     "steep": D.with_values(width=50, height=23, payload_width=20, payload_height=15),
 }
@@ -69,6 +69,51 @@ def test_fits_matches_section(box):
         assert P.profile_height(box, x) == pytest.approx(section_half_height(box, x), abs=1e-4)
 
 
+def box_point_distance(cfg, p):
+    """Distance from point p to the payload box (0 inside)."""
+    half = (cfg.payload_width / 2, cfg.payload_depth / 2, cfg.payload_height / 2)
+    return math.hypot(*(max(abs(c) - h, 0.0) for c, h in zip(p, half, strict=True)))
+
+
+MARGIN_CASES = {
+    "default": D,
+    "no-margin": D.with_values(payload_margin=0),
+    "tight-length": D.with_values(payload_depth=117, payload_height=10, payload_margin=1.5),
+    "wide": D.with_values(
+        width=120,
+        height=30,
+        length=60,
+        payload_width=90,
+        payload_depth=40,
+        payload_height=8,
+        payload_margin=2,
+    ),
+    "thin-tall": D.with_values(payload_width=6, payload_height=17, payload_margin=0.5),
+}
+
+
+@pytest.mark.parametrize("cfg", list(MARGIN_CASES.values()), ids=list(MARGIN_CASES))
+def test_clearance_is_true_distance_to_surface(cfg):
+    """Brute force: the smallest distance from the payload box to any vertex of a fine mesh of
+    the folded box (panels, end-wall flaps, glue tab) equals the computed clearance. Mesh
+    vertices only sample the surface, so they can overestimate it slightly, never under."""
+    c = P.clearance(cfg)
+    assert c is not None and c > 0
+    model = build_model3d(cfg, step=0.25, rows=60)
+    nearest = min(box_point_distance(cfg, p) for part in model["parts"] for p in pts3(part))
+    assert nearest >= c - 1e-5
+    assert nearest <= c + 0.02
+
+
+def test_margin_controls_fit():
+    c = P.clearance(D)
+    assert P.fits(D.with_values(payload_margin=math.floor(c * 100) / 100))
+    assert not P.fits(D.with_values(payload_margin=c + 0.01))
+    # End walls: clearance along the length is exactly (length - depth) / 2.
+    cfg = D.with_values(payload_depth=D.length - 1, payload_margin=0)
+    assert P.clearance(cfg) == pytest.approx(0.5)
+
+
 def test_too_large_payload_does_not_fit():
     assert not P.fits(D.with_values(payload_depth=D.length + 0.1))
     assert not P.fits(D.with_values(payload_height=D.height))
@@ -93,13 +138,21 @@ def test_maximize_is_tight(box, field):
 
 
 def test_maximize_height_touches_the_profile(box):
+    box = replace(box, payload_margin=0)
     out = P.maximize(box, "payload_height")
     expected = 2 * section_half_height(box, box.payload_width / 2)
     assert out.payload_height == pytest.approx(expected, abs=0.011)
 
 
 def test_maximize_depth_is_midline_length(box):
-    assert P.maximize(box, "payload_depth").payload_depth == pytest.approx(box.length)
+    out = P.maximize(box, "payload_depth")
+    assert out.payload_depth == pytest.approx(box.length - 2 * box.payload_margin)
+
+
+@pytest.mark.parametrize("field", ["payload_width", "payload_depth", "payload_height"])
+def test_maximize_keeps_margin_exactly(box, field):
+    out = P.maximize(box, field)
+    assert P.clearance(out) == pytest.approx(box.payload_margin, abs=0.011)
 
 
 def test_maximize_impossible():
@@ -108,6 +161,9 @@ def test_maximize_impossible():
     assert info.value.field == "payload_height"
     with pytest.raises(P.PayloadError):
         P.maximize(D.with_values(payload_width=D.width), "payload_height")
+    with pytest.raises(P.PayloadError) as info:  # cross-section already breaks the margin
+        P.maximize(D.with_values(payload_height=14), "payload_depth")
+    assert info.value.field == "payload_width"
 
 
 # ------------------------------------------------------------------ fit box
@@ -125,7 +181,8 @@ def test_fit_box_holds_payload_and_only_touches_body(dims):
     assert_inside_mesh(out)
     unchanged = {"width": out.width, "length": out.length, "height": out.height}
     assert replace(cfg, **unchanged) == out  # glue tab, thickness, colors kept
-    assert out.length == pytest.approx(max(pd, 10))
+    assert out.length == pytest.approx(max(pd + 2 * cfg.payload_margin, 10))
+    assert P.clearance(out) == pytest.approx(cfg.payload_margin, abs=0.011)  # tight
 
 
 def brute_force_min_area(cfg, n_heights=24):
@@ -136,18 +193,28 @@ def brute_force_min_area(cfg, n_heights=24):
         height = ph + (cfg.payload_width * 0.6) * i / n_heights
         lo, hi = cfg.payload_width, cfg.payload_width * 4 + 50
         try:
-            if not P.fits(cfg.with_values(height=height, width=hi, length=cfg.payload_depth)):
+            if not P.fits(
+                cfg.with_values(
+                    height=height, width=hi, length=cfg.payload_depth + 2 * cfg.payload_margin
+                )
+            ):
                 continue
         except ConfigError:
             continue
         for _ in range(30):
             mid = (lo + hi) / 2
             try:
-                ok = P.fits(cfg.with_values(height=height, width=mid, length=cfg.payload_depth))
+                ok = P.fits(
+                    cfg.with_values(
+                        height=height, width=mid, length=cfg.payload_depth + 2 * cfg.payload_margin
+                    )
+                )
             except ConfigError:
                 ok = False
             lo, hi = (lo, mid) if ok else (mid, hi)
-        cand = cfg.with_values(height=height, width=hi, length=cfg.payload_depth)
+        cand = cfg.with_values(
+            height=height, width=hi, length=cfg.payload_depth + 2 * cfg.payload_margin
+        )
         best = min(best, P.pattern_area(cand))
     return best
 
@@ -198,7 +265,9 @@ def test_api(tmp_path):
     assert data["payload"] == {
         "width": 30,
         "depth": 100,
-        "height": 14,
+        "height": 13,
+        "margin": 1,
+        "clearance": round(P.clearance(D), 4),
         "empty": False,
         "fits": True,
     }
