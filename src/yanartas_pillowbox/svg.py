@@ -12,7 +12,13 @@ import json
 import xml.etree.ElementTree as ET
 
 from yanartas_pillowbox import __version__
-from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, check_version
+from yanartas_pillowbox.config import (
+    STROKE_WIDTH,
+    Config,
+    ConfigError,
+    SchemaVersionError,
+    check_version,
+)
 from yanartas_pillowbox.geometry import (
     Arc,
     FoldCategory,
@@ -41,7 +47,6 @@ LAYERS: dict[str, tuple[str, str, str]] = {
     FoldCategory.STRAIGHT: ("fold-straight", "Fold - straight", "color_fold_straight"),
     FoldCategory.CURVED: ("fold-curved", "Fold - curved flaps", "color_fold_curved"),
     FoldCategory.GLUE: ("fold-glue", "Fold - glue tab", "color_fold_glue"),
-    "label": ("label", "Label (engrave)", "color_label"),
 }
 
 
@@ -97,7 +102,7 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
     width = (max_x - min_x) + 2 * MARGIN
     height = (max_y - min_y) + 2 * MARGIN
     offset = sheet_offset(pattern)
-    stroke_w = fmt(cfg.stroke_width)
+    stroke_w = fmt(STROKE_WIDTH)
 
     root = ET.Element(
         f"{{{SVG_NS}}}svg",
@@ -111,7 +116,7 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
     )
     ET.SubElement(
         root, f"{{{SVG_NS}}}title"
-    ).text = f"Pillow box {fmt(cfg.width)} x {fmt(cfg.length)} x {fmt(cfg.box_depth)} mm"
+    ).text = f"Pillow box {fmt(cfg.width)} x {fmt(cfg.length)} x {fmt(cfg.height)} mm"
     meta = ET.SubElement(root, f"{{{SVG_NS}}}metadata", {"id": "pillowbox-metadata"})
     cfg_el = ET.SubElement(
         meta,
@@ -156,27 +161,6 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
                     **stroke_attrs(color),
                 },
             )
-
-    if pattern.label is not None:
-        g, color = _layer(root, "label", cfg)
-        lbl = pattern.label
-        text = ET.SubElement(
-            g,
-            f"{{{SVG_NS}}}text",
-            {
-                "id": "label-text",
-                "x": fmt(lbl.position[0] + offset[0]),
-                # Shift the baseline so the text is roughly centred vertically (cap height).
-                "y": fmt(lbl.position[1] + offset[1] + 0.35 * lbl.size),
-                "font-family": "sans-serif",
-                "font-size": fmt(lbl.size),
-                "text-anchor": "middle",
-                "fill": color,
-                "stroke": "none",
-                "stroke-width": "0",
-            },
-        )
-        text.text = lbl.text
 
     ET.indent(root, space="  ")
     body = ET.tostring(root, encoding="unicode")

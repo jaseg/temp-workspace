@@ -17,13 +17,10 @@ from yanartas_pillowbox.geometry import (
 
 CONFIGS = {
     "default": Config.defaults(),
-    "notched": Config.defaults().with_values(thumb_notch=True, thumb_notch_radius=9),
-    "deep": Config.defaults().with_values(width=40, depth=16, thickness=1.5),
-    "sagitta": Config.defaults().with_values(arc_mode="sagitta", sagitta=4, thickness=0),
+    "deep": Config.defaults().with_values(width=40, height=16, thickness=1.5),
+    "shallow": Config.defaults().with_values(height=8, thickness=0),
     "no-taper": Config.defaults().with_values(glue_tab_taper=0, glue_tab_width=20),
-    "big": Config.defaults().with_values(
-        width=300, length=120, depth=110, thumb_notch=True, thumb_notch_radius=60, glue_tab_taper=24
-    ),
+    "big": Config.defaults().with_values(width=300, length=60, height=110, glue_tab_taper=24),
 }
 
 
@@ -70,11 +67,22 @@ def test_thickness_makes_flap_edge_slightly_shorter():
     assert 0 < fold.length - cut.length < 1.0
 
 
-def test_depth_maps_to_sagitta():
-    cfg = Config.defaults().with_values(depth=22)
+def test_height_maps_to_sagitta():
+    cfg = Config.defaults().with_values(height=22)
     assert build_pattern(cfg).info["fold_sagitta"] == pytest.approx(11)
-    cfg = Config.defaults().with_values(arc_mode="sagitta", sagitta=7)
-    assert build_pattern(cfg).info["box_depth"] == pytest.approx(14)
+    assert build_pattern(cfg).info["box_height"] == pytest.approx(22)
+
+
+def test_length_is_the_midline_between_fold_apexes(cfg):
+    """The input length is the shortest distance between the two curved folds of a panel
+    (apex to apex); the straight edges are ``length + height`` long."""
+    pat = build_pattern(cfg)
+    for side in ("front", "back"):
+        top = pat.fold(f"{side}-top").segment.point_at(0.5)
+        bottom = pat.fold(f"{side}-bottom").segment.point_at(0.5)
+        assert bottom[1] - top[1] == pytest.approx(cfg.length, abs=1e-9)
+        assert top[0] == pytest.approx(bottom[0])
+    assert pat.fold("panels").segment.length == pytest.approx(cfg.length + cfg.height)
 
 
 def test_outline_is_single_closed_contour(cfg):
@@ -115,14 +123,6 @@ def test_fold_categories():
     assert cats.count(FoldCategory.GLUE) == 1
     for f in pat.folds:
         assert isinstance(f.segment, Arc if f.category is FoldCategory.CURVED else Line)
-
-
-def test_notch_is_part_of_outline():
-    plain = build_pattern(Config.defaults())
-    notched = build_pattern(CONFIGS["notched"])
-    assert len(notched.outline.segments) == len(plain.outline.segments) + 8
-    radii = [s.radius for s in notched.outline.segments if isinstance(s, Arc)]
-    assert radii.count(9) == 4
 
 
 def test_bbox_covers_everything(cfg):

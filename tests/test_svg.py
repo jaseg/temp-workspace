@@ -4,7 +4,7 @@ import math
 import pytest
 from helpers import parse_path, q, self_intersections, svg_elements
 
-from yanartas_pillowbox.config import SCHEMA_VERSION, Config
+from yanartas_pillowbox.config import SCHEMA_VERSION, STROKE_WIDTH, Config
 from yanartas_pillowbox.geometry import build_pattern
 from yanartas_pillowbox.svg import (
     CONFIG_NS,
@@ -19,14 +19,12 @@ INK_LABEL = f"{{{INKSCAPE_NS}}}label"
 
 CONFIGS = [
     Config.defaults(),
-    Config.defaults().with_values(thumb_notch=True, label=True, label_text='Hi <&> "there"'),
+    Config.defaults().with_values(height=12, glue_tab_width=20),
     Config.defaults().with_values(
         width=33.3,
         length=77.7,
-        arc_mode="sagitta",
-        sagitta=6.25,
+        height=12.5,
         thickness=0.0,
-        stroke_width=0.025,
         glue_tab_taper=0,
         color_cut="#123456",
         color_fold_glue="#abcdef",
@@ -107,8 +105,6 @@ def test_layers_and_colors(cfg):
         "fold-curved": cfg.color_fold_curved,
         "fold-glue": cfg.color_fold_glue,
     }
-    if cfg.label:
-        expected["label"] = cfg.color_label
     layers = root.findall(q("g"))
     assert {g.get("id") for g in layers} == set(expected)
     for g in layers:
@@ -118,12 +114,9 @@ def test_layers_and_colors(cfg):
         children = list(g)
         assert children
         for el in children:
-            if el.tag == q("text"):
-                assert el.get("fill") == color
-                continue
             assert el.get("stroke") == color
             assert el.get("fill") == "none"
-            assert float(el.get("stroke-width")) == pytest.approx(cfg.stroke_width)
+            assert float(el.get("stroke-width")) == pytest.approx(STROKE_WIDTH) == 0.1
             assert el.get("style") is None and el.get("class") is None
             assert "stroke-dasharray" not in el.attrib
     assert root.find(f".//{q('style')}") is None
@@ -198,8 +191,8 @@ def _with_meta(text: str) -> str:
 
 
 def test_import_incompatible_version():
-    with pytest.raises(SvgImportError, match="schema version 3"):
-        extract_config(_with_meta(json.dumps({"version": 3, "width": 50})))
+    with pytest.raises(SvgImportError, match="schema version 4"):
+        extract_config(_with_meta(json.dumps({"version": 4, "width": 50})))
     with pytest.raises(SvgImportError, match="no schema version"):
         extract_config(_with_meta(json.dumps({"width": 50})))
 
@@ -215,4 +208,10 @@ def test_import_v1_file_is_migrated():
     """A file saved by schema version 1 (``width`` = flat panel width) still imports."""
     meta = json.dumps({"version": 1, "width": 60.0, "depth": 20.0, "thumb_notch": True})
     cfg = extract_config(_with_meta(meta))
-    assert cfg.panel_width == pytest.approx(60.0, abs=1e-4) and cfg.thumb_notch
+    assert cfg.panel_width == pytest.approx(60.0, abs=1e-4) and cfg.height == 20
+
+
+def test_import_v2_file_is_migrated():
+    meta = json.dumps({"version": 2, "width": 50.0, "depth": 16.0, "length": 116.0})
+    cfg = extract_config(_with_meta(meta))
+    assert (cfg.height, cfg.length) == (16, 100)

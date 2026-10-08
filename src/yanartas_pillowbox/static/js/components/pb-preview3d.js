@@ -4,6 +4,8 @@
 import * as THREE from "../../vendor/three/three.module.min.js";
 import { OrbitControls } from "../../vendor/three/OrbitControls.js";
 
+const LABEL_PX = 15; // on-screen height of dimension labels
+
 const template = document.createElement("template");
 template.innerHTML = `
 <style>
@@ -93,7 +95,9 @@ export class PbPreview3d extends HTMLElement {
     this.#scene.add(this.#camera);
 
     this.#controls = new OrbitControls(this.#camera, this.#renderer.domElement);
+    // Nearly no inertia: the camera stops almost as soon as the pointer does.
     this.#controls.enableDamping = true;
+    this.#controls.dampingFactor = 0.6;
     this.#controls.addEventListener("change", () => this.#requestRender());
 
     new ResizeObserver(() => this.#resize()).observe(this.#stage);
@@ -103,7 +107,8 @@ export class PbPreview3d extends HTMLElement {
    *  dims: parameter dimensions in the model frame (see dimensions.model_dimensions). */
   update(model, colors, dims = []) {
     this.#info.textContent =
-      `closed ${fmt(model.bounds.width)} × ${fmt(model.bounds.length)} × ${fmt(model.bounds.depth)} mm`;
+      `closed ${fmt(model.bounds.width)} × ${fmt(model.bounds.length)} × ${fmt(model.bounds.height)} mm`;
+    this.#info.title = "width × overall length (corner to corner) × height";
     if (!this.#renderer) return;
     const first = !this.#group;
     if (this.#group) {
@@ -111,7 +116,7 @@ export class PbPreview3d extends HTMLElement {
       disposeTree(this.#group);
     }
     const group = new THREE.Group();
-    // Lay the box on the table: model length (Y) -> world X, depth (Z) -> world up (Y),
+    // Lay the box on the table: model length (Y) -> world X, height (Z) -> world up (Y),
     // width (X) -> world Z (towards the default camera).
     group.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
       new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0)));
@@ -145,7 +150,7 @@ export class PbPreview3d extends HTMLElement {
     this.#group = group;
     this.#scene.add(group);
     const b = model.bounds;
-    const newSize = Math.hypot(b.width, b.length, b.depth);
+    const newSize = Math.hypot(b.width, b.length, b.height);
     this.#buildDims(dims, newSize);
     if (first || Math.abs(newSize - this.#size) / this.#size > 0.5) {
       this.#size = newSize;
@@ -216,17 +221,29 @@ export class PbPreview3d extends HTMLElement {
         normal: labelTexture(d.label, colors.normal, colors.halo),
         hl: labelTexture(d.label, colors.hl, colors.halo),
       };
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.normal, ...top }));
-      const hgt = size * 0.045;
-      sprite.scale.set(hgt * textures.normal.userData.aspect, hgt, 1);
+      // Constant on-screen size regardless of camera distance (scaled in #scaleLabels).
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: textures.normal, sizeAttenuation: false, ...top }));
       sprite.position.copy(v3(d.labelAt));
       add(sprite);
       this.#dimItems.push({ param: d.param, materials, sprite, textures });
     }
     g.visible = this.#showDims;
     this.#dims = g;
+    this.#scaleLabels();
     this.#group.add(g);
     this.highlight(this.#highlight);
+  }
+
+  /** Size the (non-attenuated) label sprites to LABEL_PX screen pixels tall. With
+   *  sizeAttenuation off, a sprite of scale s spans s / tan(fov / 2) in clip space. */
+  #scaleLabels() {
+    const h = this.#renderer?.domElement.clientHeight;
+    if (!h) return;
+    const k = (2 * LABEL_PX * Math.tan(THREE.MathUtils.degToRad(this.#camera.fov) / 2)) / h;
+    for (const { sprite, textures } of this.#dimItems) {
+      sprite.scale.set(k * textures.normal.userData.aspect, k, 1);
+    }
   }
 
   #resetCamera() {
@@ -244,6 +261,7 @@ export class PbPreview3d extends HTMLElement {
     this.#renderer.setSize(width, height, false);
     this.#camera.aspect = width / height;
     this.#camera.updateProjectionMatrix();
+    this.#scaleLabels();
     this.#requestRender();
   }
 

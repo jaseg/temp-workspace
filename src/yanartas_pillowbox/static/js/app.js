@@ -20,6 +20,9 @@ const downloadBtn = $("#btn-download");
 
 const params = new Map(); // name -> <pb-param>
 let fields = [];
+// Values of config fields that have no form input (e.g. line colors); kept so renders,
+// saves and imports carry them through unchanged.
+let hiddenValues = {};
 let lastValid = null; // {config, svg, model, info}
 let savedJson = null;
 let renderSeq = 0;
@@ -47,6 +50,7 @@ function buildForm(specs) {
   form.replaceChildren();
   const groups = new Map();
   for (const spec of specs) {
+    if (spec.hidden) continue;
     if (!groups.has(spec.group)) {
       const fs = document.createElement("fieldset");
       const legend = document.createElement("legend");
@@ -63,12 +67,14 @@ function buildForm(specs) {
 }
 
 function readForm() {
-  const config = {};
+  const config = { ...hiddenValues };
   for (const [name, p] of params) config[name] = p.value;
   return config;
 }
 
 function writeForm(config) {
+  hiddenValues = {};
+  for (const spec of fields) if (spec.hidden && spec.name in config) hiddenValues[spec.name] = config[spec.name];
   for (const [name, p] of params) if (name in config) p.value = config[name];
   updateVisibility();
 }
@@ -76,7 +82,7 @@ function writeForm(config) {
 function updateVisibility() {
   const values = readForm();
   for (const spec of fields) {
-    if (!spec.dependsOn) continue;
+    if (!spec.dependsOn || !params.has(spec.name)) continue;
     params.get(spec.name).hidden = values[spec.dependsOn.field] !== spec.dependsOn.value;
   }
 }
@@ -138,7 +144,6 @@ async function render() {
     { label: "Curved fold", color: c.color_fold_curved },
     { label: "Glue-tab fold", color: c.color_fold_glue },
   ];
-  if (c.label) legend.push({ label: "Label (engrave)", color: c.color_label, kind: "fill" });
   preview2d.update(svg, info, legend, dimensions.pattern);
   const foldColors = {
     straight: c.color_fold_straight, curved: c.color_fold_curved, glue: c.color_fold_glue,
@@ -169,7 +174,7 @@ function scheduleSave(config) {
 
 function renderDerived(info) {
   const rows = [
-    ["Box depth (max bulge)", info.box_depth],
+    ["Straight edge (corner to corner)", info.edge_length],
     ["Circumference", info.circumference],
     ["Panel width (½ circumference)", info.panel_width],
     ["Curved-fold sagitta", info.fold_sagitta],
@@ -208,8 +213,7 @@ function download() {
   if (!lastValid) return;
   const c = lastValid.config;
   const n = (v) => String(Math.round(v * 10) / 10);
-  const depth = c.arc_mode === "depth" ? c.depth : 2 * c.sagitta;
-  const name = `pillowbox-${n(c.width)}x${n(c.length)}x${n(depth)}mm.svg`;
+  const name = `pillowbox-${n(c.width)}x${n(c.length)}x${n(c.height)}mm.svg`;
   const url = URL.createObjectURL(new Blob([lastValid.svg], { type: "image/svg+xml" }));
   const a = Object.assign(document.createElement("a"), { href: url, download: name });
   document.body.append(a);

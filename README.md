@@ -43,8 +43,8 @@ Generates an SVG headlessly, using the same engine as the UI.
 Validation errors are printed per field, and the command exits with status 2.
 
 ```sh
-yanartas-pillowbox generate --set width=80 --set length=150 --set depth=30 \
-    --set thumb_notch=true -o box.svg
+yanartas-pillowbox generate --set width=80 --set length=150 --set height=30 \
+    --set thickness=0.5 -o box.svg
 ```
 
 ### Persistence
@@ -60,23 +60,25 @@ the defaults. It never crashes because of the file.
 * **Left column:** the parameter form. Invalid values are flagged inline next to the field.
   While any value is invalid, the previews keep showing the last valid design and
   *Download* is disabled. Below the form, *Derived geometry* lists the computed fold and cut
-  radii, arc length, depth, the circumference and the flat panel width.
+  radii, arc length, the straight-edge length, the circumference and the flat panel width.
+  The line colors are not shown in the UI; they keep the defaults below unless set in a
+  config file, with `--set`, or by importing an SVG that uses other colors.
 * **Pattern (2D):** the exact SVG you will download. Zoom with the wheel or the +/− buttons,
   drag to pan, and double-click or press *Fit* to reset. The header shows the pattern and
   sheet sizes. A legend maps each color to its line category. Lines are shown in their real colors, and the
   backdrop is picked for the best contrast against all of them in the current theme.
 * **Folded box (3D):** an orbitable, shaded view of the closed box, folded exactly from the
-  pattern faces (drag to orbit, scroll to zoom).
+  pattern faces (drag to orbit, scroll to zoom). The camera has almost no inertia, and the
+  dimension labels keep the same on-screen size at any zoom.
 * **Body cross-section:** a 2D section through the closed body, perpendicular to its length.
   The body has this same section everywhere between the curved folds. It shows the closed
-  width and depth, the two straight folds in their configured colors, and the glue tab lying
-  inside the front panel (drawn slightly inset so you can see it).
+  width and height and the two straight folds in their configured colors.
 * **Parameter dimensions:** all three views annotate the inputs they show:
-  * **Pattern:** circumference (both panels, flat), length, glue-tab width and taper,
-    curved-fold sagitta (labelled `depth/2` in depth mode) and the thumb-notch radius;
-  * **Folded box:** width, length and depth;
-  * **Cross-section:** width, depth, glue-tab width, and half the circumference (the front
-    panel's arc).
+  * **Pattern:** circumference (both panels, flat), length (along the front panel's
+    midline), height (across a flap), and the glue-tab width and taper (both at the tab's
+    bottom end);
+  * **Folded box:** width, length (along the top ridge) and height;
+  * **Cross-section:** width, height, and half the circumference (the front panel's arc).
 
   Focusing or hovering a field highlights its dimensions in every view, and clicking a
   dimension jumps to its field. Each view has a *Dimensions* toggle. The dimensions are
@@ -95,28 +97,21 @@ All lengths are in millimetres.
 | Key | Default | Meaning / constraints |
 |---|---|---|
 | `width` | 55 | Width of the closed box's cross-section, measured from fold to fold. 10–1000. This drives the panel size: see *circumference* below. |
-| `length` | 120 | Length of the straight body edge, corner to corner. 10–2000. |
-| `arc_mode` | `depth` | `depth`: derive the arc from `depth`. `sagitta`: use `sagitta` directly. |
-| `depth` | 20 | Target box depth at maximum bulge. Fold sagitta = depth / 2. At most ≈ 0.463·width (the UI states the exact limit); length must be at least depth + 1. |
-| `sagitta` | 10 | Curved-fold sagitta (used when `arc_mode = sagitta`). At most ≈ 0.232·width. |
+| `length` | 120 | Length along the middle of a panel, between the apexes of the two curved folds: the shortest distance between the curves. 10–2000. The straight edges (corner to corner) are `length + height` long. |
+| `height` | 20 | Total height (thickness) of the closed box at maximum bulge. The curved folds bow into the panels by height/2. At most ≈ 0.463·width (the UI states the exact limit). |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than one panel (half the circumference). |
-| `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to length/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
+| `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to (length + height)/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `thickness` | 0.4 | Material thickness, 0–5. The flap cut edge is offset from the curved folds by t/2 (see below). |
-| `stroke_width` | 0.1 | Stroke width written to every line (hairline). 0.001–2. |
-| `color_cut` | `#FF0000` | Cut outline. |
-| `color_fold_straight` | `#0000FF` | Straight fold between the panels. |
-| `color_fold_curved` | `#00A000` | Curved flap folds. |
-| `color_fold_glue` | `#FF00FF` | Glue-tab fold. |
-| `thumb_notch` | `false` | Cut a semicircular thumb notch into each flap's apex. |
-| `thumb_notch_radius` | 8 | Notch radius. At most the flap height (cut sagitta + fold sagitta) minus 1 mm, and at most one third of a panel's width. |
-| `label` | `false` | Add a text label on the front panel, in its own layer. |
-| `label_text` | `yanartas` | Label text, max. 64 characters (required when `label` is on). |
-| `label_size` | 6 | Font size of the label. 1–100. |
-| `color_label` | `#000000` | Label color (engrave layer). |
+| `color_cut` | `#FF0000` | Cut outline (not shown in the UI). |
+| `color_fold_straight` | `#0000FF` | Straight fold between the panels (not shown in the UI). |
+| `color_fold_curved` | `#00A000` | Curved flap folds (not shown in the UI). |
+| `color_fold_glue` | `#FF00FF` | Glue-tab fold (not shown in the UI). |
+
+The stroke width is fixed at 0.1 mm.
 
 **Computed, not set:** the **circumference** is the perimeter of the closed body's
 cross-section, i.e. the flat width of both panels together. It follows from `width` and the
-depth: the more the panels bulge, the more material it takes to span the same width. Each
+height: the more the panels bulge, the more material it takes to span the same width. Each
 panel is half the circumference wide in the flat pattern. The UI shows both values under
 *Derived geometry*, and the pattern view dimensions the circumference.
 
@@ -128,8 +123,7 @@ through the panel corners:
 
 `W` below is the flat panel width (half the circumference).
 
-* the **curved fold** bows *into* the panel by the fold sagitta `s_f` (`depth/2`, or
-  `sagitta`). Its distance from the chord at position `u` is `f(u)`;
+* the **curved fold** bows *into* the panel by the fold sagitta `s_f` (`height/2`). Its distance from the chord at position `u` is `f(u)`;
 * the **cut edge** bows *out* of the panel by `s_c = s_f − thickness/2`.
 
 The closed box (shown in the 3D preview) is folded exactly from these faces, without
@@ -139,19 +133,19 @@ stretching:
   along the panel width `u`, the cross-section rises by exactly `f(u)`. That makes the box
   `2·s_f` deep and puts each curved fold in a plane at 45°.
 * **Flaps:** folding along such a planar crease mirrors the flap across that plane. Each flap
-  becomes a curved end wall standing straight across the box's depth. The front and back
+  becomes a curved end wall standing straight across the box's height. The front and back
   flaps of one end lie on the same wall and overlap; nothing creases them along a midline.
 * **Thickness:** with zero thickness, each flap's cut edge lands exactly on the opposite
   panel's curved fold. The `thickness/2` offset leaves room for the material.
 * **Glue tab:** it lies against the inside of the front panel's free edge.
 
 The cross-section's shape depends only on the ratio `s_f / W`, so for a given `width` and
-depth the tool solves for the `W` whose folded cross-section is exactly `width` wide
+height the tool solves for the `W` whose folded cross-section is exactly `width` wide
 (`crosssection.py`).
 
 This only works if the fold arc turns at most 45° at the corners (`s_f < 0.207·W`). The tool
 allows `s_f ≤ 0.2·W`, which for a given box width means a fold sagitta of at most ≈ 0.232·width
-(depth ≤ ≈ 0.463·width). The tests check that every 3D face is an isometric image of its
+(height ≤ ≈ 0.463·width). The tests check that every 3D face is an isometric image of its
 pattern face and that the faces stay joined along every fold.
 
 ## Output SVG & color convention
@@ -165,7 +159,6 @@ Each color normally maps to one operation.
 | `fold-straight` | Fold - straight | `#0000FF` blue | Score / perforate |
 | `fold-curved` | Fold - curved flaps | `#00A000` green | Score / perforate |
 | `fold-glue` | Fold - glue tab | `#FF00FF` magenta | Score / perforate |
-| `label` | Label (engrave) | `#000000` black | Engrave (only present when enabled) |
 
 Two categories only share a color if you set them that way.
 
@@ -173,22 +166,22 @@ Two categories only share a color if you set them that way.
   user unit is 1 mm. The canvas is the pattern's bounding box plus exactly **10 mm** on every
   side. There are no page-size settings.
 * **Cut outline:** exactly one closed `<path>` (one `M`, ending in `Z`) that traces the whole
-  contour in one direction, including any thumb notches. Arcs are exact SVG `A` commands.
+  contour in one direction. Arcs are exact SVG `A` commands.
   The path has no duplicate segments and no stray subpaths.
 * **Fold lines:** separate open paths, always solid (never dashed, because cutter software
   treats dashes as geometry). They end exactly on the outline and never run along it.
 * **Styling:** `fill="none"`, `stroke` and `stroke-width` are plain attributes on every
-  element. There are no CSS classes and no `<style>`. The label is a `<text>` element filled
-  with the label color, for engraving. If your laser software ignores SVG text, convert it
-  with *Path → Object to Path* in Inkscape, or just disable the label.
+  element, with a fixed 0.1 mm stroke width. There are no CSS classes and no `<style>`.
 * **Metadata:** the complete config is stored as JSON in
-  `<metadata><pillowbox:config version="2">…</pillowbox:config></metadata>`, with the
+  `<metadata><pillowbox:config version="3">…</pillowbox:config></metadata>`, with the
   namespace `https://github.com/jaseg/yanartas-pillowbox/ns/config`. That is what *Import*
   and `--from-svg` read back. The `version` field is the config schema version. Files from
   an unknown version are rejected with a clear message.
-* **Schema versions:** version 1 stored the flat panel width as `width`. Version 2 stores the
-  closed box width. Version-1 files (saved settings and SVGs) are converted on load so they
-  describe the same box.
+* **Schema versions:** version 1 stored the flat panel width as `width`; version 2 the
+  closed box width. Version 3 renamed `depth` to `height`, measures `length` along the panel
+  midline (it was corner to corner) and dropped the direct-sagitta mode, the stroke width,
+  the thumb notch and the label. Version-1 and -2 files (saved settings and SVGs) are
+  converted on load so they describe the same box; removed options are ignored.
 
 ## HTTP API
 

@@ -4,8 +4,9 @@ Flat-pattern coordinate system: millimetres, x to the right, y *down* (same orie
 SVG). ``W`` is the flat panel width (half the circumference), derived from the closed box
 width ``cfg.width`` by ``crosssection.panel_width``. The front panel occupies
 ``0 <= x <= W``, the back panel ``W <= x <= 2W`` and the glue tab ``2W <= x <= 2W + g``.
-The straight body edges run from ``y = 0`` to ``y = L``; the lens-shaped closing flaps
-stick out above ``y = 0`` and below ``y = L``.
+The straight body edges run from ``y = 0`` to ``y = L`` (``cfg.edge_length``: the input
+``length`` is measured along the panel midline, between the fold apexes, and is shorter by
+the height); the lens-shaped closing flaps stick out above ``y = 0`` and below ``y = L``.
 
 Each flap is bounded by two circular arcs through the panel corners:
 
@@ -62,11 +63,6 @@ def _mul(a: Point, k: float) -> Point:
 
 def _dist(a: Point, b: Point) -> float:
     return math.hypot(a[0] - b[0], a[1] - b[1])
-
-
-def _unit(a: Point) -> Point:
-    n = math.hypot(*a)
-    return (a[0] / n, a[1] / n)
 
 
 def _angle(center: Point, p: Point) -> float:
@@ -262,13 +258,6 @@ class Outline:
 
 
 @dataclass(frozen=True)
-class Label:
-    text: str
-    position: Point  # centre of the text
-    size: float
-
-
-@dataclass(frozen=True)
 class Face:
     """One region of the pattern bounded by cut and fold segments.
 
@@ -293,7 +282,6 @@ class Pattern:
     outline: Outline
     folds: tuple[Fold, ...]
     faces: tuple[Face, ...]
-    label: Label | None
     bbox: BBox
     info: dict[str, float]
 
@@ -337,39 +325,16 @@ def union_bbox(boxes: Any) -> BBox:
     )
 
 
-def _flap_cut(
-    start: Point, end: Point, sagitta: float, bulge: Point, notch_radius: float | None
-) -> list[Segment]:
-    """The cut edge of one flap, optionally interrupted by a semicircular thumb notch
-    centred on the arc's apex and biting into the flap."""
-    arc = arc_from_chord(start, end, sagitta, bulge)
-    if not notch_radius:
-        return [arc]
-    c, rc, r = arc.center, arc.radius, notch_radius
-    apex = arc.point_at(0.5)
-    u = _unit(_sub(apex, c))
-    # Intersection of the notch circle (centre apex, radius r) with the cut circle.
-    a = (2 * rc * rc - r * r) / (2 * rc)
-    h = math.sqrt(rc * rc - a * a)
-    base = _add(c, _mul(u, a))
-    perp = (-u[1], u[0])
-    q1, q2 = _add(base, _mul(perp, h)), _sub(base, _mul(perp, h))
-    t1, t2 = arc.param_of_angle(_angle(c, q1)), arc.param_of_angle(_angle(c, q2))
-    assert t1 is not None and t2 is not None
-    if t1 > t2:
-        (t1, q1), (t2, q2) = (t2, q2), (t1, q1)
-    first = Arc(c, rc, arc.start_angle, arc.sweep * t1, arc.start, q1)
-    notch = arc_through(apex, r, q1, q2, _sub(apex, _mul(u, r)))
-    last = Arc(c, rc, arc.start_angle + arc.sweep * t2, arc.sweep * (1 - t2), q2, arc.end)
-    return [first, notch, last]
+def _flap_cut(start: Point, end: Point, sagitta: float, bulge: Point) -> tuple[Segment, ...]:
+    """The cut edge of one flap."""
+    return (arc_from_chord(start, end, sagitta, bulge),)
 
 
 def build_pattern(cfg: Config) -> Pattern:
-    """Turn a validated config into the flat pattern: one outline, typed folds, label."""
-    w, length = cfg.panel_width, cfg.length
+    """Turn a validated config into the flat pattern: one outline and typed folds."""
+    w, length = cfg.panel_width, cfg.edge_length
     g, taper = cfg.glue_tab_width, cfg.glue_tab_taper
     s_f, s_c = cfg.fold_sagitta, cfg.cut_sagitta
-    notch = cfg.thumb_notch_radius if cfg.thumb_notch else None
 
     up, down = (0.0, -1.0), (0.0, 1.0)
     p = {
@@ -383,11 +348,11 @@ def build_pattern(cfg: Config) -> Pattern:
         "gb": (2 * w + g, length - taper),
     }
 
-    cut_ft = tuple(_flap_cut(p["tl"], p["tm"], s_c, up, notch))
-    cut_bt = tuple(_flap_cut(p["tm"], p["tr"], s_c, up, notch))
+    cut_ft = _flap_cut(p["tl"], p["tm"], s_c, up)
+    cut_bt = _flap_cut(p["tm"], p["tr"], s_c, up)
     tab = (Line(p["tr"], p["gt"]), Line(p["gt"], p["gb"]), Line(p["gb"], p["br"]))
-    cut_bb = tuple(_flap_cut(p["br"], p["bm"], s_c, down, notch))
-    cut_fb = tuple(_flap_cut(p["bm"], p["bl"], s_c, down, notch))
+    cut_bb = _flap_cut(p["br"], p["bm"], s_c, down)
+    cut_fb = _flap_cut(p["bm"], p["bl"], s_c, down)
     free_edge = Line(p["bl"], p["tl"])
     outline = Outline((*cut_ft, *cut_bt, *tab, *cut_bb, *cut_fb, free_edge))
 
@@ -431,9 +396,6 @@ def build_pattern(cfg: Config) -> Pattern:
         Face("back-bottom-flap", "flap", (*cut_bb, f_bb), w, 2 * w, (f_bb,), rev(cut_bb)),
     )
 
-    label = (
-        Label(cfg.label_text.strip(), (w / 2, length / 2), cfg.label_size) if cfg.label else None
-    )
     bbox = union_bbox([outline.bbox(), *(f.segment.bbox() for f in folds)])
 
     fold_arc = folds[0].segment
@@ -445,14 +407,15 @@ def build_pattern(cfg: Config) -> Pattern:
         "fold_radius": circle_radius(w, s_f),
         "cut_radius": circle_radius(w, s_c),
         "fold_arc_length": fold_arc.length,
-        "box_depth": cfg.box_depth,
+        "box_height": cfg.height,
+        "edge_length": length,
         "closed_width": CrossSection(w, s_f).closed_width,  # == cfg.width (the input)
         "panel_width": w,
         "circumference": cfg.circumference,
         # Shallower tapers let the glued tab reach past the curved fold near the corners.
         "min_glue_tab_taper": g * fold_slope(w, s_f),
     }
-    return Pattern(outline, folds, faces, label, bbox, info)
+    return Pattern(outline, folds, faces, bbox, info)
 
 
 # --------------------------------------------------------------------------- 3D model
@@ -468,12 +431,12 @@ Point3 = tuple[float, float, float]
 class FoldedBox:
     """Maps flat-pattern points of each face to their position in the closed box.
 
-    3D frame: millimetres, X across the box, Y along the straight edges (up, centred), Z depth
+    3D frame: millimetres, X across the box, Y along the straight edges (up, centred), Z height
     (front panel at +Z)."""
 
     def __init__(self, cfg: Config) -> None:
         self.width = cfg.panel_width
-        self.length = cfg.length
+        self.length = cfg.edge_length
         self.section = CrossSection(cfg.panel_width, cfg.fold_sagitta)
 
     def map(self, face: str, p: Point) -> Point3:
@@ -505,7 +468,7 @@ class FoldedBox:
 def _face_columns(face: Face, step: float) -> list[float]:
     n = max(24, min(160, math.ceil((face.x1 - face.x0) / step)))
     xs = {face.x0 + (face.x1 - face.x0) * i / n for i in range(n + 1)}
-    for seg in (*face.lower, *face.upper):  # keep chain breakpoints (e.g. notch corners)
+    for seg in (*face.lower, *face.upper):  # keep chain breakpoints
         xs.update(q[0] for q in (seg.start, seg.end))
         if isinstance(seg, Arc):  # and arc apexes, so the mesh reaches the full bulge
             xs.add(seg.point_at(0.5)[0])
@@ -579,8 +542,9 @@ def build_model3d(
         "lines": lines,
         "bounds": {
             "width": box.section.closed_width,
-            "length": cfg.length,
-            "depth": cfg.box_depth,
+            "length": cfg.edge_length,  # overall, corner to corner
+            "midline_length": cfg.length,
+            "height": cfg.height,
         },
     }
 
@@ -595,11 +559,11 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
 
     The body is a cylinder between the curved folds, so this section is the same at every
     point along the length. Coordinates are (X, Z) in mm in the 3D model's frame: X across
-    the box, Z depth with the front panel at +Z. Taken from ``FoldedBox`` so the section,
+    the box, Z height with the front panel at +Z. Taken from ``FoldedBox`` so the section,
     3D preview and pattern always agree.
     """
     box = FoldedBox(cfg)
-    w, g, mid = cfg.panel_width, cfg.glue_tab_width, cfg.length / 2
+    w, mid = cfg.panel_width, cfg.edge_length / 2
 
     def trace(face: str, x0: float, x1: float, n: int) -> list[list[float]]:
         pts = (box.map(face, (x0 + (x1 - x0) * i / n, mid)) for i in range(n + 1))
@@ -607,17 +571,15 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
 
     front = trace("front-panel", 0.0, w, samples)  # glued edge (-X) -> straight fold (+X)
     back = trace("back-panel", w, 2 * w, samples)  # straight fold (+X) -> glue fold (-X)
-    tab = trace("glue-tab", 2 * w, 2 * w + g, max(8, round(samples * g / w)))
     return {
         "units": "mm",
         "front": front,
         "back": back,
-        "tab": tab,
         "folds": [
             {"category": FoldCategory.STRAIGHT.value, "point": front[-1]},
             {"category": FoldCategory.GLUE.value, "point": back[-1]},
         ],
         "width": box.section.closed_width,
-        "depth": cfg.box_depth,
+        "height": cfg.height,
         "panel_width": w,
     }

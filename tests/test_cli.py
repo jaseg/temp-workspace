@@ -13,7 +13,7 @@ def test_generate_defaults(tmp_path):
 
 def test_generate_with_overrides_and_config(tmp_path):
     conf = tmp_path / "c.json"
-    conf.write_text(json.dumps({"width": 80, "depth": 30}))
+    conf.write_text(json.dumps({"width": 80, "height": 30}))
     out = tmp_path / "box.svg"
     rc = main(
         [
@@ -21,16 +21,16 @@ def test_generate_with_overrides_and_config(tmp_path):
             "--config",
             str(conf),
             "--set",
-            "thumb_notch=true",
+            "color_cut=#00FF00",
             "--set",
-            "label_text=a=b",
+            "thickness=0.5",
             "-o",
             str(out),
         ]
     )
     assert rc == 0
     cfg = extract_config(out.read_text())
-    assert (cfg.width, cfg.depth, cfg.thumb_notch, cfg.label_text) == (80, 30, True, "a=b")
+    assert (cfg.width, cfg.height, cfg.color_cut, cfg.thickness) == (80, 30, "#00FF00", 0.5)
 
 
 def test_generate_from_svg(tmp_path):
@@ -47,7 +47,7 @@ def test_generate_errors(tmp_path, capsys):
     out = tmp_path / "x.svg"
     assert main(["generate", "--set", "width=abc", "-o", str(out)]) == 2
     assert main(["generate", "--set", "nope=1", "-o", str(out)]) == 2
-    assert main(["generate", "--set", "depth=100", "-o", str(out)]) == 2
+    assert main(["generate", "--set", "height=100", "-o", str(out)]) == 2
     assert main(["generate", "--from-svg", str(tmp_path / "missing.svg"), "-o", str(out)]) == 2
     assert not out.exists()
-    assert "depth" in capsys.readouterr().err
+    assert "height" in capsys.readouterr().err

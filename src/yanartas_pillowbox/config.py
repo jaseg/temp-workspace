@@ -18,10 +18,16 @@ from yanartas_pillowbox import crosssection
 # Version history:
 #   1  ``width`` was the flat width of one panel.
 #   2  ``width`` is the closed box's cross-section width (fold to fold); the flat panel width
-#      is derived from it (``panel_width``, half the ``circumference``). Version-1 documents
-#      are migrated on load.
-SCHEMA_VERSION = 2
-MIGRATABLE_VERSIONS = (1,)
+#      is derived from it (``panel_width``, half the ``circumference``).
+#   3  ``depth`` renamed to ``height``; the arc is always derived from it (``arc_mode`` and
+#      ``sagitta`` removed); ``length`` is measured along the panel midline between the
+#      curved folds (was: corner to corner, i.e. ``length + height``); ``stroke_width``
+#      fixed; thumb notch and label options removed.
+# Older documents are migrated on load.
+SCHEMA_VERSION = 3
+MIGRATABLE_VERSIONS = (1, 2)
+
+STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -57,6 +63,8 @@ class FieldSpec:
     # Show the field only when another field has a given value: (field, value).
     depends_on: tuple[str, Any] | None = None
     max_length: int | None = None
+    # Not shown in the web UI (still settable via config files, imports and --set).
+    hidden: bool = False
 
     def to_json(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -79,10 +87,10 @@ class FieldSpec:
             out["dependsOn"] = {"field": self.depends_on[0], "value": self.depends_on[1]}
         if self.max_length is not None:
             out["maxLength"] = self.max_length
+        if self.hidden:
+            out["hidden"] = True
         return out
 
-
-ARC_MODES = (("depth", "From box depth"), ("sagitta", "Arc sagitta directly"))
 
 FIELD_SPECS: tuple[FieldSpec, ...] = (
     FieldSpec(
@@ -95,7 +103,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         1000,
         0.5,
         help="Width of the closed box's cross-section, from fold to fold. The flat panel "
-        "width (half the circumference) is derived from it and the depth.",
+        "width (half the circumference) is derived from it and the height.",
     ),
     FieldSpec(
         "length",
@@ -106,39 +114,21 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         10,
         2000,
         0.5,
-        help="Length of the straight body edge, corner to corner.",
+        help="Length along the middle of a panel, between the apexes of the two curved folds "
+        "(the shortest length between the curves). The straight edges are longer by the "
+        "height.",
     ),
     FieldSpec(
-        "arc_mode",
-        "Arc geometry",
-        "choice",
-        "Curved flaps",
-        choices=ARC_MODES,
-        help="Derive the flap arc from the target depth, or set its sagitta directly.",
-    ),
-    FieldSpec(
-        "depth",
-        "Box depth",
+        "height",
+        "Box height",
         "float",
-        "Curved flaps",
+        "Body",
         "mm",
         0.5,
         640,
         0.5,
-        help="Total thickness of the closed box at maximum bulge.",
-        depends_on=("arc_mode", "depth"),
-    ),
-    FieldSpec(
-        "sagitta",
-        "Arc sagitta",
-        "float",
-        "Curved flaps",
-        "mm",
-        0.25,
-        320,
-        0.25,
-        help="How far the curved fold bows into the panel (arc height over its chord).",
-        depends_on=("arc_mode", "sagitta"),
+        help="Total thickness of the closed box at maximum bulge. The curved folds bow into "
+        "the panels by half of this.",
     ),
     FieldSpec("glue_tab_width", "Glue-tab width", "float", "Glue tab", "mm", 3, 100, 0.5),
     FieldSpec(
@@ -163,47 +153,10 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         0.05,
         help="Curved folds are offset by half of this so the flaps clear each other.",
     ),
-    FieldSpec(
-        "stroke_width",
-        "Stroke width",
-        "float",
-        "Material",
-        "mm",
-        0.001,
-        2,
-        0.01,
-        help="Hairline stroke width written to every line.",
-    ),
-    FieldSpec("color_cut", "Cut outline", "color", "Line colors"),
-    FieldSpec("color_fold_straight", "Straight folds", "color", "Line colors"),
-    FieldSpec("color_fold_curved", "Curved flap folds", "color", "Line colors"),
-    FieldSpec("color_fold_glue", "Glue-tab fold", "color", "Line colors"),
-    FieldSpec("thumb_notch", "Thumb notch on flaps", "bool", "Extras"),
-    FieldSpec(
-        "thumb_notch_radius",
-        "Thumb-notch radius",
-        "float",
-        "Extras",
-        "mm",
-        1,
-        100,
-        0.5,
-        depends_on=("thumb_notch", True),
-    ),
-    FieldSpec(
-        "label",
-        "Text label",
-        "bool",
-        "Extras",
-        help="Engraved text on the front panel, in its own layer and color.",
-    ),
-    FieldSpec(
-        "label_text", "Label text", "str", "Extras", depends_on=("label", True), max_length=64
-    ),
-    FieldSpec(
-        "label_size", "Label size", "float", "Extras", "mm", 1, 100, 0.5, depends_on=("label", True)
-    ),
-    FieldSpec("color_label", "Label color", "color", "Extras", depends_on=("label", True)),
+    FieldSpec("color_cut", "Cut outline", "color", "Line colors", hidden=True),
+    FieldSpec("color_fold_straight", "Straight folds", "color", "Line colors", hidden=True),
+    FieldSpec("color_fold_curved", "Curved flap folds", "color", "Line colors", hidden=True),
+    FieldSpec("color_fold_glue", "Glue-tab fold", "color", "Line colors", hidden=True),
 )
 
 SPECS_BY_NAME: dict[str, FieldSpec] = {s.name: s for s in FIELD_SPECS}
@@ -215,29 +168,20 @@ class Config:
 
     width: float = 55.0
     length: float = 120.0
-    arc_mode: str = "depth"
-    depth: float = 20.0
-    sagitta: float = 10.0
+    height: float = 20.0
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
     thickness: float = 0.4
-    stroke_width: float = 0.1
     color_cut: str = "#FF0000"
     color_fold_straight: str = "#0000FF"
     color_fold_curved: str = "#00A000"
     color_fold_glue: str = "#FF00FF"
-    thumb_notch: bool = False
-    thumb_notch_radius: float = 8.0
-    label: bool = False
-    label_text: str = "yanartas"
-    label_size: float = 6.0
-    color_label: str = "#000000"
 
     # ----------------------------------------------------------------- derived values
     @property
     def fold_sagitta(self) -> float:
-        """Sagitta of the curved fold (how far it bows into the panel)."""
-        return self.depth / 2 if self.arc_mode == "depth" else self.sagitta
+        """Sagitta of the curved fold (how far it bows into the panel): half the height."""
+        return self.height / 2
 
     @property
     def cut_sagitta(self) -> float:
@@ -245,8 +189,10 @@ class Config:
         return self.fold_sagitta - self.thickness / 2
 
     @property
-    def box_depth(self) -> float:
-        return 2 * self.fold_sagitta
+    def edge_length(self) -> float:
+        """Length of the straight body edges, corner to corner: the midline ``length`` plus
+        the curved fold's sagitta at both ends."""
+        return self.length + 2 * self.fold_sagitta
 
     @property
     def panel_width(self) -> float:
@@ -283,6 +229,8 @@ class Config:
         check_version(data, required=require_version)
         if data.get("version") == 1:
             data = migrate_v1(data)
+        if data.get("version") == 2:
+            data = migrate_v2(data)
 
         defaults = cls()
         values: dict[str, Any] = {}
@@ -338,7 +286,29 @@ def migrate_v1(data: dict[str, Any]) -> dict[str, Any]:
         raise ConfigError(
             {"width": "cannot convert this schema-version-1 configuration (invalid width or arc)"}
         ) from None
-    return {**data, "version": SCHEMA_VERSION, "width": round(closed, 4)}
+    return {**data, "version": 2, "width": round(closed, 4)}
+
+
+# Defaults of schema version 2 for the fields version 3 folded into ``height``.
+_V2_DEFAULTS = {"arc_mode": "depth", "depth": 20.0, "sagitta": 10.0}
+
+
+def migrate_v2(data: dict[str, Any]) -> dict[str, Any]:
+    """Version 3 renamed ``depth`` to ``height``, dropped the direct-sagitta arc mode
+    (height = 2 x sagitta) and measures ``length`` along the panel midline (corner-to-corner
+    length minus the height). Removed options (stroke width, notch, label) are ignored."""
+    v2 = {**_V2_DEFAULTS, **{k: data[k] for k in _V2_DEFAULTS if k in data}}
+    out = {k: v for k, v in data.items() if k not in _V2_DEFAULTS}
+    sagitta = v2["sagitta"]
+    if v2["arc_mode"] == "sagitta" and isinstance(sagitta, int | float):
+        out["height"] = 2 * sagitta
+    else:
+        out["height"] = v2["depth"]
+    length, height = out.get("length", 120.0), out["height"]
+    if isinstance(length, int | float) and isinstance(height, int | float):
+        out["length"] = length - height
+    out["version"] = SCHEMA_VERSION
+    return out
 
 
 def _coerce(spec: FieldSpec, value: Any) -> Any:
@@ -398,45 +368,33 @@ def validate(cfg: Config) -> dict[str, str]:
                 errors[spec.name] = f"must be at least {_fmt(spec.minimum)} {spec.unit}".strip()
             elif spec.maximum is not None and value > spec.maximum:
                 errors[spec.name] = f"must be at most {_fmt(spec.maximum)} {spec.unit}".strip()
-        if spec.max_length is not None and len(value) > spec.max_length:
+        if spec.max_length is not None and len(value) > spec.max_length:  # pragma: no cover
             errors[spec.name] = f"must be at most {spec.max_length} characters"
 
     def add(name: str, msg: str) -> None:
         errors.setdefault(name, msg)
 
-    arc_field = "depth" if cfg.arc_mode == "depth" else "sagitta"
-    if arc_field not in errors and "width" not in errors:
+    if "height" not in errors and "width" not in errors:
         # The closed box needs |f'| <= 1 along the fold, i.e. the fold arc may turn at most
         # 45 degrees at the corners (sagitta < 0.207 W). Keep a margin so the panels still
         # meet at a real fold: sagitta <= MAX_SAGITTA_RATIO * W; for a given closed width that
         # bounds the sagitta (see crosssection.max_sagitta).
-        max_sag = crosssection.max_sagitta(cfg.width)
-        if cfg.fold_sagitta > max_sag:
-            limit = 2 * max_sag if arc_field == "depth" else max_sag
+        max_height = 2 * crosssection.max_sagitta(cfg.width)
+        if cfg.height > max_height:
             add(
-                arc_field,
-                f"must be at most {_fmt(limit)} mm for a {_fmt(cfg.width)} mm wide box "
+                "height",
+                f"must be at most {_fmt(max_height)} mm for a {_fmt(cfg.width)} mm wide box "
                 "(steeper flap arcs cannot close)",
             )
-    if "thickness" not in errors and arc_field not in errors and cfg.cut_sagitta < 0.25:
+    if "thickness" not in errors and "height" not in errors and cfg.cut_sagitta < 0.25:
         add(
             "thickness",
-            "too thick for this arc: half the thickness must stay 0.25 mm "
-            f"below the fold sagitta ({_fmt(cfg.fold_sagitta)} mm)",
+            "too thick for this height: half the thickness must stay 0.25 mm below half the "
+            f"height ({_fmt(cfg.fold_sagitta)} mm)",
         )
 
-    if "length" not in errors and arc_field not in errors:
-        # The curved folds at both ends bow into the panel; they must not meet in the middle.
-        min_length = 2 * cfg.fold_sagitta + 1
-        if cfg.length < min_length:
-            add(
-                "length",
-                f"must be at least {_fmt(min_length)} mm for this arc "
-                "(the curved folds at both ends would cross)",
-            )
-
-    # Checks below need the flat panel width, which only exists for a valid width and arc.
-    panel = None if errors.keys() & {"width", arc_field} else cfg.panel_width
+    # Checks below need the flat panel width, which only exists for a valid width and height.
+    panel = None if errors.keys() & {"width", "height"} else cfg.panel_width
 
     if panel is not None and "glue_tab_width" not in errors and cfg.glue_tab_width >= panel:
         add(
@@ -445,31 +403,14 @@ def validate(cfg: Config) -> dict[str, str]:
             "since it is glued inside",
         )
 
-    if "glue_tab_taper" not in errors and "length" not in errors:
-        max_taper = cfg.length / 2 - 1
+    if "glue_tab_taper" not in errors and not errors.keys() & {"length", "height"}:
+        max_taper = cfg.edge_length / 2 - 1
         if cfg.glue_tab_taper > max_taper:
             add(
                 "glue_tab_taper",
-                f"must be at most {_fmt(max_taper)} mm (half the box length minus 1 mm)",
+                f"must be at most {_fmt(max_taper)} mm (half the straight edge, "
+                f"{_fmt(cfg.edge_length)} mm, minus 1 mm)",
             )
-
-    if (
-        cfg.thumb_notch
-        and "thumb_notch_radius" not in errors
-        and panel is not None
-        and "thickness" not in errors
-    ):
-        # The notch is centred on the flap's cut apex and must stay clear of the fold.
-        flap_height = cfg.cut_sagitta + cfg.fold_sagitta
-        max_r = min(flap_height - 1.0, panel / 3)
-        if cfg.thumb_notch_radius > max_r:
-            if max_r < 1:
-                add("thumb_notch_radius", "the flaps are too small for a thumb notch")
-            else:
-                add("thumb_notch_radius", f"must be at most {_fmt(max_r)} mm for this flap")
-
-    if cfg.label and "label_text" not in errors and not cfg.label_text.strip():
-        add("label_text", "enter some text or disable the label")
 
     return errors
 

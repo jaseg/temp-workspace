@@ -21,19 +21,10 @@ D = Config.defaults()
 CONFIGS = {
     "default": D,
     "thin-material": D.with_values(thickness=0),
-    "notched": D.with_values(thumb_notch=True, thumb_notch_radius=6, label=True),
-    "steepest-arc": D.with_values(width=50, depth=2 * max_sagitta(50), glue_tab_taper=15),
-    "shallow": D.with_values(arc_mode="sagitta", sagitta=3, length=200, thickness=1),
+    "steepest-arc": D.with_values(width=50, height=2 * max_sagitta(50), glue_tab_taper=15),
+    "shallow": D.with_values(height=6, length=200, thickness=1),
     "square-tab": D.with_values(glue_tab_taper=0, glue_tab_width=25),
-    "big-notched": D.with_values(
-        width=300,
-        length=160,
-        depth=110,
-        thumb_notch=True,
-        thumb_notch_radius=60,
-        glue_tab_width=40,
-        glue_tab_taper=30,
-    ),
+    "big": D.with_values(width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30),
 }
 
 LEN_TOL = 2e-3  # relative: chord vs. arc on ~1 mm triangles across the curved cross-section
@@ -133,8 +124,8 @@ def test_mesh_flat_coords_cover_their_face(case):
         for p in flat:
             assert face.x0 - 1e-6 <= p[0] <= face.x1 + 1e-6
             lo, hi = face.y_range(p[0])
-            # 1e-4: coordinates are rounded to 1e-6 mm, and on the steep sides of a notch a
-            # 1e-6 shift in x moves the boundary's y by much more.
+            # 1e-4: coordinates are rounded to 1e-6 mm, and where the boundary is steep a
+            # 1e-6 shift in x moves its y by much more.
             assert lo - 1e-4 <= p[1] <= hi + 1e-4, (face.name, p)
             on_edge = min(seg.distance_to(p) for seg in face.boundary) < 1e-5
             assert on_edge or point_in_polygon(p, boundary), (face.name, p)
@@ -221,7 +212,7 @@ def test_box_closes_along_glued_seam(case):
     box = FoldedBox(cfg)
     w, g = cfg.panel_width, cfg.glue_tab_width
     for i in range(11):
-        y = cfg.length * i / 10
+        y = cfg.edge_length * i / 10
         # The front panel's free (cut) edge meets the glue-tab fold of the back panel ...
         assert math.dist(box.map("front-panel", (0, y)), box.map("back-panel", (2 * w, y))) < 1e-9
         # ... and the glue tab lies flat against the inside of the front panel.
@@ -244,7 +235,7 @@ def test_flaps_overlap_on_common_end_wall(case):
                 xo = 2 * w - x
                 u = xo - w if other == "back" else xo
                 f = sagitta_offset(w, cfg.fold_sagitta, u)
-                crease = box.map(f"{other}-panel", (xo, f if end == "top" else cfg.length - f))
+                crease = box.map(f"{other}-panel", (xo, f if end == "top" else cfg.edge_length - f))
                 assert p[0] == pytest.approx(crease[0], abs=POS_TOL), (side, end, x)
                 assert p[1] == pytest.approx(crease[1], abs=POS_TOL), (side, end, x)
 
@@ -253,8 +244,6 @@ def test_flap_edge_closes_against_opposite_crease(case):
     """Each flap's cut edge runs parallel to the opposite panel's crease on the end wall, offset
     by the thickness allowance (exactly onto it when thickness = 0)."""
     cfg, pattern, _, _ = case
-    if cfg.thumb_notch:
-        pytest.skip("the notch interrupts the cut edge")
     box = FoldedBox(cfg)
     w, t = cfg.panel_width, cfg.thickness
     for end in ("top", "bottom"):
@@ -283,8 +272,9 @@ def test_closed_dimensions(case):
     zs = [p[2] for p in allp]
     ys = [p[1] for p in allp]
     xs = [p[0] for p in allp]
-    assert max(zs) - min(zs) == pytest.approx(cfg.box_depth, rel=1e-6)
-    assert max(ys) - min(ys) == pytest.approx(cfg.length, rel=1e-9)
+    assert max(zs) - min(zs) == pytest.approx(cfg.height, rel=1e-6)
+    assert max(ys) - min(ys) == pytest.approx(cfg.edge_length, abs=POS_TOL)
+    assert model["bounds"]["midline_length"] == cfg.length
     assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-6)
     assert model["bounds"]["width"] == pytest.approx(cfg.width, rel=1e-9)  # the input width
     assert model["bounds"]["width"] < cfg.panel_width  # bending shortens the chord
@@ -298,22 +288,22 @@ def polyline_length(pts):
 def test_cross_section_matches_pattern_and_mesh(case):
     cfg, _, model, parts = case
     sec = build_cross_section(cfg)
-    front, back, tab = sec["front"], sec["back"], sec["tab"]
+    front, back = sec["front"], sec["back"]
+    assert "tab" not in sec  # the section view does not show the glue tab
     # Each panel's section is exactly one panel width long (no stretching) ...
     assert polyline_length(front) == pytest.approx(cfg.panel_width, rel=1e-4)
     assert polyline_length(back) == pytest.approx(cfg.panel_width, rel=1e-4)
-    assert polyline_length(tab) == pytest.approx(cfg.glue_tab_width, rel=1e-4)
     # ... the two panels form one closed loop, joined at the two straight folds ...
     assert math.dist(front[-1], back[0]) < 1e-9
     assert math.dist(back[-1], front[0]) < 1e-9
     folds = {f["category"]: f["point"] for f in sec["folds"]}
     assert folds["straight"] == pytest.approx([sec["width"] / 2, 0], abs=1e-6)
     assert folds["glue"] == pytest.approx([-sec["width"] / 2, 0], abs=1e-6)
-    # ... with the box's closed width and depth.
+    # ... with the box's closed width and height.
     xs = [p[0] for p in front + back]
     zs = [p[1] for p in front + back]
     assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-6)
-    assert max(zs) - min(zs) == pytest.approx(cfg.box_depth, rel=1e-6)
+    assert max(zs) - min(zs) == pytest.approx(cfg.height, rel=1e-6)
     # Every 3D panel and tab vertex, seen along the length, lies on the section curve.
     tol = 2e-3 * cfg.panel_width  # chord sag of the sampled section polyline
     for name, curve in (("front-panel", front), ("back-panel", back), ("glue-tab", front)):

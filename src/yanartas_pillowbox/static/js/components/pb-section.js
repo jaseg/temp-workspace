@@ -24,8 +24,6 @@ template.innerHTML = `
   .fold { stroke: var(--surface); stroke-width: 1.5px; vector-effect: non-scaling-stroke;
           paint-order: stroke; outline: none; }
   .fold-ring { fill: none; stroke: var(--text); stroke-width: 1px; vector-effect: non-scaling-stroke; }
-  .tab { fill: none; stroke: var(--text-muted); stroke-width: 3px; stroke-linecap: round;
-         vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--border); stroke-width: 1px; stroke-dasharray: 4 4;
           vector-effect: non-scaling-stroke; }
   .stage { --dim-color: var(--text-muted); --dim-halo: var(--surface); --dim-hl: var(--accent); }
@@ -40,8 +38,6 @@ template.innerHTML = `
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block;
               box-shadow: 0 0 0 1px var(--text); }
-  .legend i.tab { width: 18px; height: 0; border-radius: 2px; border-top: 3px solid var(--text-muted);
-                  box-shadow: none; }
 </style>
 <header>
   <h2>Body cross-section</h2>
@@ -87,37 +83,34 @@ export class PbSection extends HTMLElement {
     if (this.#svg) highlightDims(this.#svg, param);
   }
 
-  /** section: {front, back, tab: [[x, z]...], folds: [{category, point}], width, depth};
+  /** section: {front, back: [[x, z]...], folds: [{category, point}], width, height};
    *  dims: parameter dimensions in the same (X, Z) frame. */
   update(section, colors, dims = []) {
-    const { width, depth } = section;
-    this.#info.textContent = `${fmt(width)} × ${fmt(depth)} mm`;
+    const { width, height } = section;
+    this.#info.textContent = `${fmt(width)} × ${fmt(height)} mm`;
     this.#info.title = "The body has this cross-section everywhere between the curved folds.";
 
     // Z points up on screen: plot (x, -z).
     const p = ([x, z]) => [x, -z];
-    const span = Math.max(width, depth);
+    const span = Math.max(width, height);
     const fs = span / 20; // label size in user units
     const pad = span * 0.06;
 
     const svg = el("svg", { preserveAspectRatio: "xMidYMid meet" });
     svg.append(
       el("line", { class: "axis", x1: -width / 2 - pad / 2, y1: 0, x2: width / 2 + pad / 2, y2: 0 }),
-      el("line", { class: "axis", x1: 0, y1: -depth / 2 - pad / 2, x2: 0, y2: depth / 2 + pad / 2 }),
+      el("line", { class: "axis", x1: 0, y1: -height / 2 - pad / 2, x2: 0, y2: height / 2 + pad / 2 }),
     );
 
     // Closed body outline: front panel (glued edge -> straight fold), then back panel back.
     const outline = [...section.front, ...section.back.slice(1)].map(p);
     svg.append(el("path", { class: "body", d: `M ${outline.map((q) => q.join(",")).join(" L ")} Z` }));
 
-    // The glue tab lies on the inside of the front panel; draw it slightly inset to show it.
-    const inset = offsetInward(section.tab, span * 0.025).map(p);
-    svg.append(el("path", { class: "tab", d: `M ${inset.map((q) => q.join(",")).join(" L ")}` }));
 
     // Panel names, inside the body (dimensions use the space outside).
     svg.append(
-      text(width * 0.2, -depth * 0.16, "front", fs * 0.8, "middle", "name"),
-      text(width * 0.2, depth * 0.24, "back", fs * 0.8, "middle", "name"),
+      text(width * 0.2, -height * 0.16, "front", fs * 0.8, "middle", "name"),
+      text(width * 0.2, height * 0.24, "back", fs * 0.8, "middle", "name"),
     );
 
     // Fold markers.
@@ -132,7 +125,7 @@ export class PbSection extends HTMLElement {
     const { group, bounds } = drawDims2d(dims, { fs: fs * 0.8, flipY: true });
     group.classList.toggle("off", !this.#showDims);
     svg.append(group);
-    let [x0, y0, x1, y1] = [-width / 2, -depth / 2, width / 2, depth / 2];
+    let [x0, y0, x1, y1] = [-width / 2, -height / 2, width / 2, height / 2];
     if (bounds) [x0, y0, x1, y1] = [Math.min(x0, bounds[0]), Math.min(y0, bounds[1]), Math.max(x1, bounds[2]), Math.max(y1, bounds[3])];
     svg.setAttribute("viewBox", [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad].join(" "));
     this.#stage.replaceChildren(svg);
@@ -142,29 +135,14 @@ export class PbSection extends HTMLElement {
     this.#legend.replaceChildren(
       legendItem(colors.straight, "Straight fold"),
       legendItem(colors.glue, "Glue-tab fold"),
-      legendItem(null, "Glue tab (inside front panel)"),
     );
   }
-}
-
-/** Offset an open polyline by `d` towards the inside of the box (right of travel direction
- *  for the front panel, which runs from -X to +X with the box interior below it). */
-function offsetInward(pts, d) {
-  return pts.map((q, i) => {
-    const a = pts[Math.max(0, i - 1)];
-    const b = pts[Math.min(pts.length - 1, i + 1)];
-    const tx = b[0] - a[0];
-    const tz = b[1] - a[1];
-    const n = Math.hypot(tx, tz) || 1;
-    return [q[0] + (tz / n) * d, q[1] - (tx / n) * d];
-  });
 }
 
 function legendItem(color, label) {
   const item = document.createElement("span");
   const swatch = document.createElement("i");
-  if (color) swatch.style.background = color;
-  else swatch.className = "tab";
+  swatch.style.background = color;
   item.append(swatch, label);
   return item;
 }
