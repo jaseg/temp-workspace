@@ -9,12 +9,12 @@ import pytest
 from helpers import loop_area, polyline
 
 from yanartas_pillowbox.config import Config
+from yanartas_pillowbox.crosssection import max_sagitta, sagitta_offset
 from yanartas_pillowbox.geometry import (
     FoldedBox,
     build_cross_section,
     build_model3d,
     build_pattern,
-    sagitta_offset,
 )
 
 D = Config.defaults()
@@ -22,7 +22,7 @@ CONFIGS = {
     "default": D,
     "thin-material": D.with_values(thickness=0),
     "notched": D.with_values(thumb_notch=True, thumb_notch_radius=6, label=True),
-    "steepest-arc": D.with_values(width=50, depth=20, glue_tab_taper=15),  # s_f = 0.2 W
+    "steepest-arc": D.with_values(width=50, depth=2 * max_sagitta(50), glue_tab_taper=15),
     "shallow": D.with_values(arc_mode="sagitta", sagitta=3, length=200, thickness=1),
     "square-tab": D.with_values(glue_tab_taper=0, glue_tab_width=25),
     "big-notched": D.with_values(
@@ -133,7 +133,9 @@ def test_mesh_flat_coords_cover_their_face(case):
         for p in flat:
             assert face.x0 - 1e-6 <= p[0] <= face.x1 + 1e-6
             lo, hi = face.y_range(p[0])
-            assert lo - 1e-6 <= p[1] <= hi + 1e-6, (face.name, p)
+            # 1e-4: coordinates are rounded to 1e-6 mm, and on the steep sides of a notch a
+            # 1e-6 shift in x moves the boundary's y by much more.
+            assert lo - 1e-4 <= p[1] <= hi + 1e-4, (face.name, p)
             on_edge = min(seg.distance_to(p) for seg in face.boundary) < 1e-5
             assert on_edge or point_in_polygon(p, boundary), (face.name, p)
         mesh_area = sum(tri_area(*(flat[i] for i in t)) for t in tris(part))
@@ -217,7 +219,7 @@ def test_no_hidden_creases_inside_faces(case):
 def test_box_closes_along_glued_seam(case):
     cfg, _, _, _ = case
     box = FoldedBox(cfg)
-    w, g = cfg.width, cfg.glue_tab_width
+    w, g = cfg.panel_width, cfg.glue_tab_width
     for i in range(11):
         y = cfg.length * i / 10
         # The front panel's free (cut) edge meets the glue-tab fold of the back panel ...
@@ -233,7 +235,7 @@ def test_flaps_overlap_on_common_end_wall(case):
     the depth axis, every flap point sits on the opposite panel's crease."""
     cfg, _, _, parts = case
     box = FoldedBox(cfg)
-    w = cfg.width
+    w = cfg.panel_width
     for end in ("top", "bottom"):
         for side, other in (("front", "back"), ("back", "front")):
             part = parts[f"{side}-{end}-flap"]
@@ -254,7 +256,7 @@ def test_flap_edge_closes_against_opposite_crease(case):
     if cfg.thumb_notch:
         pytest.skip("the notch interrupts the cut edge")
     box = FoldedBox(cfg)
-    w, t = cfg.width, cfg.thickness
+    w, t = cfg.panel_width, cfg.thickness
     for end in ("top", "bottom"):
         cut_f = pattern.face(f"front-{end}-flap")
         for i in range(1, 32):
@@ -284,7 +286,8 @@ def test_closed_dimensions(case):
     assert max(zs) - min(zs) == pytest.approx(cfg.box_depth, rel=1e-6)
     assert max(ys) - min(ys) == pytest.approx(cfg.length, rel=1e-9)
     assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-6)
-    assert model["bounds"]["width"] < cfg.width  # bending shortens the chord
+    assert model["bounds"]["width"] == pytest.approx(cfg.width, rel=1e-9)  # the input width
+    assert model["bounds"]["width"] < cfg.panel_width  # bending shortens the chord
 
 
 # ------------------------------------------------------------------ body cross-section
@@ -297,8 +300,8 @@ def test_cross_section_matches_pattern_and_mesh(case):
     sec = build_cross_section(cfg)
     front, back, tab = sec["front"], sec["back"], sec["tab"]
     # Each panel's section is exactly one panel width long (no stretching) ...
-    assert polyline_length(front) == pytest.approx(cfg.width, rel=1e-4)
-    assert polyline_length(back) == pytest.approx(cfg.width, rel=1e-4)
+    assert polyline_length(front) == pytest.approx(cfg.panel_width, rel=1e-4)
+    assert polyline_length(back) == pytest.approx(cfg.panel_width, rel=1e-4)
     assert polyline_length(tab) == pytest.approx(cfg.glue_tab_width, rel=1e-4)
     # ... the two panels form one closed loop, joined at the two straight folds ...
     assert math.dist(front[-1], back[0]) < 1e-9
@@ -312,7 +315,7 @@ def test_cross_section_matches_pattern_and_mesh(case):
     assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-6)
     assert max(zs) - min(zs) == pytest.approx(cfg.box_depth, rel=1e-6)
     # Every 3D panel and tab vertex, seen along the length, lies on the section curve.
-    tol = 2e-3 * cfg.width  # chord sag of the sampled section polyline
+    tol = 2e-3 * cfg.panel_width  # chord sag of the sampled section polyline
     for name, curve in (("front-panel", front), ("back-panel", back), ("glue-tab", front)):
         for p in pts3(parts[name]):
             d = min(seg_dist((p[0], p[2]), a, b) for a, b in itertools.pairwise(curve))

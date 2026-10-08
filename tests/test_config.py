@@ -10,6 +10,9 @@ from yanartas_pillowbox.config import (
     SchemaVersionError,
     parse_cli_value,
 )
+from yanartas_pillowbox.crosssection import CrossSection, max_sagitta
+
+MAX_SAG_55 = max_sagitta(55.0)  # the default box is 55 mm wide
 
 
 def errors_for(**changes):
@@ -51,10 +54,10 @@ def test_ints_coerced_to_float():
         ({"length": -1}, "length"),
         ({"arc_mode": "banana"}, "arc_mode"),
         ({"depth": 0}, "depth"),
-        ({"depth": 24.01}, "depth"),  # > 0.4 W for W=60
-        ({"arc_mode": "sagitta", "sagitta": 12.01}, "sagitta"),  # > 0.2 W
+        ({"depth": 2 * MAX_SAG_55 + 0.01}, "depth"),  # too steep for a 55 mm wide box
+        ({"arc_mode": "sagitta", "sagitta": MAX_SAG_55 + 0.01}, "sagitta"),
         ({"length": 20}, "length"),  # curved folds of both ends would cross (depth 20)
-        ({"glue_tab_width": 60}, "glue_tab_width"),  # must be narrower than the box
+        ({"glue_tab_width": 60.2}, "glue_tab_width"),  # wider than one panel (60.11 mm)
         ({"thickness": -0.1}, "thickness"),
         ({"thickness": 6}, "thickness"),
         ({"depth": 2, "thickness": 1.8}, "thickness"),  # cut sagitta would vanish
@@ -80,8 +83,8 @@ def test_validation_errors(changes, field):
 
 
 def test_boundary_values_accepted():
-    w = 60
-    assert Config.from_dict({"depth": 0.4 * w}).depth == 24
+    assert Config.from_dict({"depth": 2 * MAX_SAG_55}).depth == 2 * MAX_SAG_55
+    assert Config.from_dict({"glue_tab_width": 60}).glue_tab_width == 60
     assert Config.from_dict({"length": 21}).length == 21
     assert Config.from_dict({"glue_tab_taper": 59}).glue_tab_taper == 59
     assert Config.from_dict({"glue_tab_taper": 0, "thickness": 0}).thickness == 0
@@ -134,3 +137,47 @@ def test_cli_value_parsing():
         parse_cli_value("nope", "1")
     with pytest.raises(ConfigError):
         parse_cli_value("width", "abc")
+
+
+# ------------------------------------------------------------------ width / circumference
+@pytest.mark.parametrize(
+    ("width", "arc"),
+    [
+        (55, {"depth": 20}),
+        (10, {"depth": 3}),
+        (300, {"depth": 110}),
+        (80, {"arc_mode": "sagitta", "sagitta": 0.5}),
+        (55, {"depth": 2 * MAX_SAG_55}),
+    ],
+)
+def test_width_drives_the_cross_section(width, arc):
+    """``width`` is the closed cross-section width; the flat panel width (half the
+    circumference) is derived so that the folded panel spans exactly that width."""
+    cfg = Config.from_dict({"width": width, "length": 400, "glue_tab_width": 5, **arc})
+    section = CrossSection(cfg.panel_width, cfg.fold_sagitta)
+    assert section.closed_width == pytest.approx(width, rel=1e-12)
+    assert cfg.circumference == pytest.approx(2 * cfg.panel_width)
+    assert cfg.panel_width > width  # the bulge needs more material than the chord
+
+
+def test_circumference_is_computed_not_stored():
+    cfg = Config.defaults()
+    assert "circumference" not in cfg.to_dict() and "panel_width" not in cfg.to_dict()
+    assert Config.from_dict({"circumference": 999}) == cfg  # unknown keys are ignored
+
+
+def test_v1_documents_are_migrated():
+    """Schema 1 stored the flat panel width as ``width``; loading converts it to the closed
+    width so the box (and its pattern) stays the same."""
+    v1 = {"version": 1, "width": 60.0, "depth": 20.0, "length": 100.0}
+    cfg = Config.from_dict(v1, require_version=True)
+    assert cfg.panel_width == pytest.approx(60.0, abs=1e-4)
+    assert cfg.width == pytest.approx(CrossSection(60.0, 10.0).closed_width, abs=1e-4)
+    assert cfg.length == 100.0 and cfg.to_dict()["version"] == SCHEMA_VERSION
+    # Missing fields use the version-1 defaults (60 mm panel, depth 20).
+    assert Config.from_dict({"version": 1}).panel_width == pytest.approx(60.0, abs=1e-4)
+    sag = Config.from_dict({"version": 1, "width": 80, "arc_mode": "sagitta", "sagitta": 5})
+    assert sag.panel_width == pytest.approx(80.0, abs=1e-4)
+    with pytest.raises(ConfigError) as info:
+        Config.from_dict({"version": 1, "width": -3})
+    assert "width" in info.value.errors

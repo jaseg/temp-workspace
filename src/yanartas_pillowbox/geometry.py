@@ -1,9 +1,11 @@
 """Pure pillow box geometry (no Flask, no SVG).
 
 Flat-pattern coordinate system: millimetres, x to the right, y *down* (same orientation as
-SVG). The front panel occupies ``0 <= x <= W``, the back panel ``W <= x <= 2W`` and the glue
-tab ``2W <= x <= 2W + g``. The straight body edges run from ``y = 0`` to ``y = L``; the
-lens-shaped closing flaps stick out above ``y = 0`` and below ``y = L``.
+SVG). ``W`` is the flat panel width (half the circumference), derived from the closed box
+width ``cfg.width`` by ``crosssection.panel_width``. The front panel occupies
+``0 <= x <= W``, the back panel ``W <= x <= 2W`` and the glue tab ``2W <= x <= 2W + g``.
+The straight body edges run from ``y = 0`` to ``y = L``; the lens-shaped closing flaps
+stick out above ``y = 0`` and below ``y = L``.
 
 Each flap is bounded by two circular arcs through the panel corners:
 
@@ -26,7 +28,7 @@ flat face:
 * The glue tab lies against the inside of the front panel, along its free edge.
 
 This needs ``|f'| <= 1``, i.e. the fold arc may turn at most 45 degrees at the corners
-(``s_f < 0.207 W``); the config enforces ``s_f <= 0.2 W``.
+(``s_f < 0.207 W``); the config enforces ``s_f <= 0.2 W`` (see ``crosssection``).
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ from enum import StrEnum
 from typing import Any
 
 from yanartas_pillowbox.config import Config
+from yanartas_pillowbox.crosssection import CrossSection, circle_radius
 
 Point = tuple[float, float]
 BBox = tuple[float, float, float, float]  # min_x, min_y, max_x, max_y
@@ -213,16 +216,6 @@ def arc_from_chord(start: Point, end: Point, sagitta: float, bulge: Point) -> Ar
     return arc_through(center, radius, start, end, apex)
 
 
-def circle_radius(chord: float, sagitta: float) -> float:
-    return (chord**2 / 4 + sagitta**2) / (2 * sagitta)
-
-
-def sagitta_offset(chord: float, sagitta: float, u: float) -> float:
-    """Distance of the arc from its chord at chord position ``u`` (0..chord)."""
-    r = circle_radius(chord, sagitta)
-    return math.sqrt(max(0.0, r * r - (u - chord / 2) ** 2)) - (r - sagitta)
-
-
 # --------------------------------------------------------------------------- pattern
 class FoldCategory(StrEnum):
     STRAIGHT = "straight"
@@ -373,7 +366,7 @@ def _flap_cut(
 
 def build_pattern(cfg: Config) -> Pattern:
     """Turn a validated config into the flat pattern: one outline, typed folds, label."""
-    w, length = cfg.width, cfg.length
+    w, length = cfg.panel_width, cfg.length
     g, taper = cfg.glue_tab_width, cfg.glue_tab_taper
     s_f, s_c = cfg.fold_sagitta, cfg.cut_sagitta
     notch = cfg.thumb_notch_radius if cfg.thumb_notch else None
@@ -453,7 +446,9 @@ def build_pattern(cfg: Config) -> Pattern:
         "cut_radius": circle_radius(w, s_c),
         "fold_arc_length": fold_arc.length,
         "box_depth": cfg.box_depth,
-        "closed_width": CrossSection(w, s_f).closed_width,
+        "closed_width": CrossSection(w, s_f).closed_width,  # == cfg.width (the input)
+        "panel_width": w,
+        "circumference": cfg.circumference,
         # Shallower tapers let the glued tab reach past the curved fold near the corners.
         "min_glue_tab_taper": g * fold_slope(w, s_f),
     }
@@ -467,60 +462,6 @@ def fold_slope(width: float, sagitta: float) -> float:
     return (width / 2) / (r - sagitta)
 
 
-class CrossSection:
-    """Cross-section of a closed panel, parametrised by arc length ``u`` in ``[0, W]``:
-    ``Z(u) = f(u)`` (the crease offset) and ``X'(u) = sqrt(1 - f'(u)^2)``, centred on X = 0.
-
-    With ``u - W/2 = R sin(psi)``, ``X = R * E(psi)`` where ``E(psi) = int_0^psi sqrt(cos 2t) dt``,
-    evaluated with a Simpson table plus a Simpson remainder."""
-
-    TABLE = 512
-
-    def __init__(self, width: float, sagitta: float) -> None:
-        self.width = width
-        self.sagitta = sagitta
-        self.radius = circle_radius(width, sagitta)
-        self.psi_max = math.asin(min(1.0, (width / 2) / self.radius))
-        if self.psi_max >= math.pi / 4:
-            raise ValueError("fold arc too steep to close (sagitta must be < 0.207 * width)")
-        self._step = self.psi_max / self.TABLE
-        table = [0.0]
-        for k in range(self.TABLE):
-            a = k * self._step
-            table.append(table[-1] + _simpson(a, a + self._step, 4))
-        self._table = table
-
-    def e(self, psi: float) -> float:
-        sign = -1.0 if psi < 0 else 1.0
-        psi = min(abs(psi), self.psi_max)
-        k = min(int(psi / self._step), self.TABLE - 1)
-        a = k * self._step
-        return sign * (self._table[k] + _simpson(a, psi, 4))
-
-    def x(self, u: float) -> float:
-        d = min(1.0, max(-1.0, (u - self.width / 2) / self.radius))
-        return self.radius * self.e(math.asin(d))
-
-    def z(self, u: float) -> float:
-        return sagitta_offset(self.width, self.sagitta, min(self.width, max(0.0, u)))
-
-    @property
-    def closed_width(self) -> float:
-        return 2 * self.radius * self.e(self.psi_max)
-
-
-def _simpson(a: float, b: float, n: int) -> float:
-    """Composite Simpson rule for sqrt(cos 2t) on [a, b] (n even)."""
-    if b == a:
-        return 0.0
-    h = (b - a) / n
-    total = 0.0
-    for i in range(n + 1):
-        w = 1 if i in (0, n) else (4 if i % 2 else 2)
-        total += w * math.sqrt(max(0.0, math.cos(2 * (a + i * h))))
-    return total * h / 3
-
-
 Point3 = tuple[float, float, float]
 
 
@@ -531,9 +472,9 @@ class FoldedBox:
     (front panel at +Z)."""
 
     def __init__(self, cfg: Config) -> None:
-        self.width = cfg.width
+        self.width = cfg.panel_width
         self.length = cfg.length
-        self.section = CrossSection(cfg.width, cfg.fold_sagitta)
+        self.section = CrossSection(cfg.panel_width, cfg.fold_sagitta)
 
     def map(self, face: str, p: Point) -> Point3:
         w, length, sec = self.width, self.length, self.section
@@ -566,6 +507,8 @@ def _face_columns(face: Face, step: float) -> list[float]:
     xs = {face.x0 + (face.x1 - face.x0) * i / n for i in range(n + 1)}
     for seg in (*face.lower, *face.upper):  # keep chain breakpoints (e.g. notch corners)
         xs.update(q[0] for q in (seg.start, seg.end))
+        if isinstance(seg, Arc):  # and arc apexes, so the mesh reaches the full bulge
+            xs.add(seg.point_at(0.5)[0])
     out: list[float] = []
     for x in sorted(xs):
         if face.x0 - 1e-9 <= x <= face.x1 + 1e-9 and (not out or x - out[-1] > 1e-7):
@@ -656,7 +599,7 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
     3D preview and pattern always agree.
     """
     box = FoldedBox(cfg)
-    w, g, mid = cfg.width, cfg.glue_tab_width, cfg.length / 2
+    w, g, mid = cfg.panel_width, cfg.glue_tab_width, cfg.length / 2
 
     def trace(face: str, x0: float, x1: float, n: int) -> list[list[float]]:
         pts = (box.map(face, (x0 + (x1 - x0) * i / n, mid)) for i in range(n + 1))

@@ -93,7 +93,7 @@ def polyline_length(pts: list[Coords]) -> float:
 # ------------------------------------------------------------------------- 2D pattern
 def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dimension]:
     """Dimensions for the flat pattern, in SVG user units (flat coordinates + ``offset``)."""
-    w, length, g, taper = cfg.width, cfg.length, cfg.glue_tab_width, cfg.glue_tab_taper
+    w, length, g, taper = cfg.panel_width, cfg.length, cfg.glue_tab_width, cfg.glue_tab_taper
     dx, dy = offset
     x0, y0, x1, y1 = pattern.bbox
     # Dimension lines sit outside the sheet (pattern + margin), so they never cover it.
@@ -103,12 +103,14 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
         return (x + dx, y + dy)
 
     dims = [
+        # The two panels, flat, are the closed cross-section's full circumference (computed
+        # from the box width and depth; not an input).
         Dimension(
-            "width",
-            f"width {fmt(w)}",
+            "circumference",
+            f"circumference {fmt(2 * w)}",
             "horizontal",
-            (p(0, length), p(w, length)),
-            w,
+            (p(0, length), p(2 * w, length)),
+            2 * w,
             at=y1 + dy + gap,
         ),
         Dimension(
@@ -185,16 +187,16 @@ def section_dimensions(cfg: Config, section: dict[str, Any]) -> list[Dimension]:
     return [
         Dimension(param, label, "vertical", (apex_b, apex_f), depth, at=width / 2 + gap),
         Dimension(
-            None,
-            f"≈ {fmt(width)}",
+            "width",
+            f"width {fmt(cfg.width)}",
             "horizontal",
             (tuple(section["back"][-1]), tuple(front[-1])),
             width,
             at=-depth / 2 - gap,
         ),
         Dimension(
-            "width",
-            f"width {fmt(cfg.width)} (arc)",
+            "circumference",
+            f"½ circumference {fmt(cfg.panel_width)}",
             "path",
             tuple(tuple(q) for q in front),
             polyline_length(front),
@@ -212,11 +214,11 @@ def section_dimensions(cfg: Config, section: dict[str, Any]) -> list[Dimension]:
 
 
 # ------------------------------------------------------------------------- 3D model
-def model_dimensions(cfg: Config, samples: int = 48) -> list[Dimension]:
+def model_dimensions(cfg: Config) -> list[Dimension]:
     """Dimensions for the 3D preview, in the model frame (X across, Y length, Z depth)."""
     box = FoldedBox(cfg)
     sec: CrossSection = box.section
-    w, length, s_f = cfg.width, cfg.length, cfg.fold_sagitta
+    w, length, s_f = cfg.panel_width, cfg.length, cfg.fold_sagitta
     half_w = sec.closed_width / 2
     gap = 0.12 * max(length, sec.closed_width)
 
@@ -263,27 +265,21 @@ def model_dimensions(cfg: Config, samples: int = 48) -> list[Dimension]:
         )
     )
 
-    # Panel width: the arc of the front panel's cross-section at mid-length.
-    along = [box.map("front-panel", (w * i / samples, length / 2)) for i in range(samples + 1)]
-    line: list[Coords] = []
-    for i, q in enumerate(along):
-        u = w * i / samples
-        # Outward normal of the section (X, Z) = (-Z'(u), X'(u)); X' = sqrt(1 - Z'^2).
-        h = 1e-4 * w
-        dz = (sec.z(min(w, u + h)) - sec.z(max(0.0, u - h))) / (min(w, u + h) - max(0.0, u - h))
-        dz = max(-1.0, min(1.0, dz))
-        nx, nz = -dz, math.sqrt(1 - dz * dz)
-        line.append((q[0] + nx * gap * 0.5, q[1], q[2] + nz * gap * 0.5))
+    # Width: across the cross-section from fold to fold, at the near end of the box.
+    a, b = box.map("front-panel", (0.0, 0.0)), box.map("front-panel", (w, 0.0))
+    a, b = (a[0], -length / 2, a[2]), (b[0], -length / 2, b[2])  # the -Y end
+    y_line = -length / 2 - gap * 0.6
+    la, lb = (a[0], y_line, 0.0), (b[0], y_line, 0.0)
     dims.append(
         Dimension(
             "width",
-            f"width {fmt(w)}",
-            "path3d",
-            tuple(along),
-            polyline_length(list(along)),
-            line=tuple(line),
-            extensions=((along[0], line[0]), (along[-1], line[-1])),
-            label_at=add(line[samples // 2], (0.0, 0.0, gap * 0.35)),
+            f"width {fmt(cfg.width)}",
+            "aligned3d",
+            (a, b),
+            math.dist(a, b),
+            line=(la, lb),
+            extensions=((a, add(la, (0.0, -gap * 0.1, 0.0))), (b, add(lb, (0.0, -gap * 0.1, 0.0)))),
+            label_at=(0.0, y_line - gap * 0.35, 0.0),
         )
     )
     return dims

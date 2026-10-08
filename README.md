@@ -43,7 +43,7 @@ Generates an SVG headlessly, using the same engine as the UI.
 Validation errors are printed per field, and the command exits with status 2.
 
 ```sh
-yanartas-pillowbox generate --set width=80 --set length=150 --set depth=40 \
+yanartas-pillowbox generate --set width=80 --set length=150 --set depth=30 \
     --set thumb_notch=true -o box.svg
 ```
 
@@ -51,15 +51,16 @@ yanartas-pillowbox generate --set width=80 --set length=150 --set depth=40 \
 
 The UI saves the last valid configuration to **`./yanartas-pillowbox.json`** in the current
 working directory. Saves happen through the server, debounced, and the file is reloaded on
-startup. If the file is missing, corrupt, invalid or from another schema version, the tool
-logs a warning and starts with the defaults. It never crashes because of the file.
+startup. Files from schema version 1 are migrated (see below). If the file is missing,
+corrupt, invalid or from an unknown schema version, the tool logs a warning and starts with
+the defaults. It never crashes because of the file.
 
 ## Web UI
 
 * **Left column:** the parameter form. Invalid values are flagged inline next to the field.
   While any value is invalid, the previews keep showing the last valid design and
   *Download* is disabled. Below the form, *Derived geometry* lists the computed fold and cut
-  radii, arc length, closed width and depth.
+  radii, arc length, depth, the circumference and the flat panel width.
 * **Pattern (2D):** the exact SVG you will download. Zoom with the wheel or the +/− buttons,
   drag to pan, and double-click or press *Fit* to reset. The header shows the pattern and
   sheet sizes. A legend maps each color to its line category. Lines are shown in their real colors, and the
@@ -71,11 +72,11 @@ logs a warning and starts with the defaults. It never crashes because of the fil
   width and depth, the two straight folds in their configured colors, and the glue tab lying
   inside the front panel (drawn slightly inset so you can see it).
 * **Parameter dimensions:** all three views annotate the inputs they show:
-  * **Pattern:** width, length, glue-tab width and taper, curved-fold sagitta (labelled
-    `depth/2` in depth mode) and the thumb-notch radius;
-  * **Folded box:** length, depth and panel width (as an arc);
-  * **Cross-section:** depth, panel width (as an arc) and glue-tab width, plus the derived
-    closed width.
+  * **Pattern:** circumference (both panels, flat), length, glue-tab width and taper,
+    curved-fold sagitta (labelled `depth/2` in depth mode) and the thumb-notch radius;
+  * **Folded box:** width, length and depth;
+  * **Cross-section:** width, depth, glue-tab width, and half the circumference (the front
+    panel's arc).
 
   Focusing or hovering a field highlights its dimensions in every view, and clicking a
   dimension jumps to its field. Each view has a *Dimensions* toggle. The dimensions are
@@ -93,12 +94,12 @@ All lengths are in millimetres.
 
 | Key | Default | Meaning / constraints |
 |---|---|---|
-| `width` | 60 | Width of one body panel (the chord of the curved fold). 10–1000. |
+| `width` | 55 | Width of the closed box's cross-section, measured from fold to fold. 10–1000. This drives the panel size: see *circumference* below. |
 | `length` | 120 | Length of the straight body edge, corner to corner. 10–2000. |
 | `arc_mode` | `depth` | `depth`: derive the arc from `depth`. `sagitta`: use `sagitta` directly. |
-| `depth` | 20 | Target box depth at maximum bulge. Fold sagitta = depth / 2. At most 0.4·width; length must be at least depth + 1. |
-| `sagitta` | 10 | Curved-fold sagitta (used when `arc_mode = sagitta`). At most 0.2·width. |
-| `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than `width`. |
+| `depth` | 20 | Target box depth at maximum bulge. Fold sagitta = depth / 2. At most ≈ 0.463·width (the UI states the exact limit); length must be at least depth + 1. |
+| `sagitta` | 10 | Curved-fold sagitta (used when `arc_mode = sagitta`). At most ≈ 0.232·width. |
+| `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than one panel (half the circumference). |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to length/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `thickness` | 0.4 | Material thickness, 0–5. The flap cut edge is offset from the curved folds by t/2 (see below). |
 | `stroke_width` | 0.1 | Stroke width written to every line (hairline). 0.001–2. |
@@ -107,17 +108,25 @@ All lengths are in millimetres.
 | `color_fold_curved` | `#00A000` | Curved flap folds. |
 | `color_fold_glue` | `#FF00FF` | Glue-tab fold. |
 | `thumb_notch` | `false` | Cut a semicircular thumb notch into each flap's apex. |
-| `thumb_notch_radius` | 8 | Notch radius. At most the flap height (cut sagitta + fold sagitta) minus 1 mm, and at most width/3. |
+| `thumb_notch_radius` | 8 | Notch radius. At most the flap height (cut sagitta + fold sagitta) minus 1 mm, and at most one third of a panel's width. |
 | `label` | `false` | Add a text label on the front panel, in its own layer. |
 | `label_text` | `yanartas` | Label text, max. 64 characters (required when `label` is on). |
 | `label_size` | 6 | Font size of the label. 1–100. |
 | `color_label` | `#000000` | Label color (engrave layer). |
+
+**Computed, not set:** the **circumference** is the perimeter of the closed body's
+cross-section, i.e. the flat width of both panels together. It follows from `width` and the
+depth: the more the panels bulge, the more material it takes to span the same width. Each
+panel is half the circumference wide in the flat pattern. The UI shows both values under
+*Derived geometry*, and the pattern view dimensions the circumference.
 
 ### Geometry model
 
 The flat pattern is laid out as front panel, back panel and then the glue tab, side by side.
 The straight body edges are `length` long. Each flap is a lens between two circular arcs
 through the panel corners:
+
+`W` below is the flat panel width (half the circumference).
 
 * the **curved fold** bows *into* the panel by the fold sagitta `s_f` (`depth/2`, or
   `sagitta`). Its distance from the chord at position `u` is `f(u)`;
@@ -136,9 +145,14 @@ stretching:
   panel's curved fold. The `thickness/2` offset leaves room for the material.
 * **Glue tab:** it lies against the inside of the front panel's free edge.
 
-This only works if the fold arc turns at most 45° at the corners (`s_f < 0.207·width`). The
-tool allows `s_f ≤ 0.2·width`, i.e. `depth ≤ 0.4·width`. The tests check that every 3D face
-is an isometric image of its pattern face and that the faces stay joined along every fold.
+The cross-section's shape depends only on the ratio `s_f / W`, so for a given `width` and
+depth the tool solves for the `W` whose folded cross-section is exactly `width` wide
+(`crosssection.py`).
+
+This only works if the fold arc turns at most 45° at the corners (`s_f < 0.207·W`). The tool
+allows `s_f ≤ 0.2·W`, which for a given box width means a fold sagitta of at most ≈ 0.232·width
+(depth ≤ ≈ 0.463·width). The tests check that every 3D face is an isometric image of its
+pattern face and that the faces stay joined along every fold.
 
 ## Output SVG & color convention
 
@@ -168,10 +182,13 @@ Two categories only share a color if you set them that way.
   with the label color, for engraving. If your laser software ignores SVG text, convert it
   with *Path → Object to Path* in Inkscape, or just disable the label.
 * **Metadata:** the complete config is stored as JSON in
-  `<metadata><pillowbox:config version="1">…</pillowbox:config></metadata>`, with the
+  `<metadata><pillowbox:config version="2">…</pillowbox:config></metadata>`, with the
   namespace `https://github.com/jaseg/yanartas-pillowbox/ns/config`. That is what *Import*
   and `--from-svg` read back. The `version` field is the config schema version. Files from
-  an incompatible version are rejected with a clear message.
+  an unknown version are rejected with a clear message.
+* **Schema versions:** version 1 stored the flat panel width as `width`. Version 2 stores the
+  closed box width. Version-1 files (saved settings and SVGs) are converted on load so they
+  describe the same box.
 
 ## HTTP API
 

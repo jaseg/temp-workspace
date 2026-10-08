@@ -13,10 +13,15 @@ import re
 from dataclasses import dataclass, fields, replace
 from typing import Any, Literal
 
-SCHEMA_VERSION = 1
+from yanartas_pillowbox import crosssection
 
-# Largest fold sagitta, as a fraction of the box width, that can still close (see geometry).
-MAX_SAGITTA_RATIO = 0.2
+# Version history:
+#   1  ``width`` was the flat width of one panel.
+#   2  ``width`` is the closed box's cross-section width (fold to fold); the flat panel width
+#      is derived from it (``panel_width``, half the ``circumference``). Version-1 documents
+#      are migrated on load.
+SCHEMA_VERSION = 2
+MIGRATABLE_VERSIONS = (1,)
 
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -89,7 +94,8 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         10,
         1000,
         0.5,
-        help="Width of one body panel (across the curved flap).",
+        help="Width of the closed box's cross-section, from fold to fold. The flat panel "
+        "width (half the circumference) is derived from it and the depth.",
     ),
     FieldSpec(
         "length",
@@ -207,7 +213,7 @@ SPECS_BY_NAME: dict[str, FieldSpec] = {s.name: s for s in FIELD_SPECS}
 class Config:
     """A complete, validated pillow box configuration. Lengths in mm."""
 
-    width: float = 60.0
+    width: float = 55.0
     length: float = 120.0
     arc_mode: str = "depth"
     depth: float = 20.0
@@ -242,6 +248,17 @@ class Config:
     def box_depth(self) -> float:
         return 2 * self.fold_sagitta
 
+    @property
+    def panel_width(self) -> float:
+        """Flat width of one body panel: the arc length of its closed cross-section, which is
+        ``width`` wide (fold to fold) and bulges by the fold sagitta. Half the circumference."""
+        return crosssection.panel_width(self.width, self.fold_sagitta)
+
+    @property
+    def circumference(self) -> float:
+        """Perimeter of the closed body's cross-section (both panels)."""
+        return 2 * self.panel_width
+
     # -------------------------------------------------------------- (de)serialization
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready dict including the schema ``version``."""
@@ -259,11 +276,13 @@ class Config:
         """Build and validate a config from untrusted data.
 
         Missing fields take their defaults; unknown keys are ignored. If ``version`` is
-        present (or required) it must equal ``SCHEMA_VERSION``.
+        present (or required) it must be ``SCHEMA_VERSION`` or a migratable older version.
         """
         if not isinstance(data, dict):
             raise ConfigError({"_": "configuration must be a JSON object"})
         check_version(data, required=require_version)
+        if data.get("version") == 1:
+            data = migrate_v1(data)
 
         defaults = cls()
         values: dict[str, Any] = {}
@@ -296,11 +315,30 @@ def check_version(data: dict[str, Any], *, required: bool) -> None:
     version = data["version"]
     if isinstance(version, bool) or not isinstance(version, int):
         raise SchemaVersionError(f"invalid schema version {version!r}")
-    if version != SCHEMA_VERSION:
+    if version != SCHEMA_VERSION and version not in MIGRATABLE_VERSIONS:
         raise SchemaVersionError(
             f"configuration uses schema version {version}; "
             f"this version of yanartas-pillowbox supports version {SCHEMA_VERSION}"
         )
+
+
+# Defaults of schema version 1, needed to interpret v1 documents with missing fields.
+_V1_DEFAULTS = {"width": 60.0, "arc_mode": "depth", "depth": 20.0, "sagitta": 10.0}
+
+
+def migrate_v1(data: dict[str, Any]) -> dict[str, Any]:
+    """Version 1 stored the flat panel width; version 2 stores the closed box width. Convert
+    so the migrated document describes the same box (to 0.1 um)."""
+    v1 = {**_V1_DEFAULTS, **{k: data[k] for k in _V1_DEFAULTS if k in data}}
+    try:
+        panel = float(v1["width"])
+        sag = float(v1["depth"]) / 2 if v1["arc_mode"] == "depth" else float(v1["sagitta"])
+        closed = crosssection.CrossSection(panel, sag).closed_width
+    except (TypeError, ValueError, ZeroDivisionError):
+        raise ConfigError(
+            {"width": "cannot convert this schema-version-1 configuration (invalid width or arc)"}
+        ) from None
+    return {**data, "version": SCHEMA_VERSION, "width": round(closed, 4)}
 
 
 def _coerce(spec: FieldSpec, value: Any) -> Any:
@@ -370,8 +408,9 @@ def validate(cfg: Config) -> dict[str, str]:
     if arc_field not in errors and "width" not in errors:
         # The closed box needs |f'| <= 1 along the fold, i.e. the fold arc may turn at most
         # 45 degrees at the corners (sagitta < 0.207 W). Keep a margin so the panels still
-        # meet at a real fold: sagitta <= MAX_SAGITTA_RATIO * W.
-        max_sag = MAX_SAGITTA_RATIO * cfg.width
+        # meet at a real fold: sagitta <= MAX_SAGITTA_RATIO * W; for a given closed width that
+        # bounds the sagitta (see crosssection.max_sagitta).
+        max_sag = crosssection.max_sagitta(cfg.width)
         if cfg.fold_sagitta > max_sag:
             limit = 2 * max_sag if arc_field == "depth" else max_sag
             add(
@@ -396,8 +435,15 @@ def validate(cfg: Config) -> dict[str, str]:
                 "(the curved folds at both ends would cross)",
             )
 
-    if "glue_tab_width" not in errors and "width" not in errors and cfg.glue_tab_width >= cfg.width:
-        add("glue_tab_width", "must be narrower than the box width (it is glued inside)")
+    # Checks below need the flat panel width, which only exists for a valid width and arc.
+    panel = None if errors.keys() & {"width", arc_field} else cfg.panel_width
+
+    if panel is not None and "glue_tab_width" not in errors and cfg.glue_tab_width >= panel:
+        add(
+            "glue_tab_width",
+            f"must be narrower than one panel ({_fmt(panel)} mm, half the circumference) "
+            "since it is glued inside",
+        )
 
     if "glue_tab_taper" not in errors and "length" not in errors:
         max_taper = cfg.length / 2 - 1
@@ -410,11 +456,12 @@ def validate(cfg: Config) -> dict[str, str]:
     if (
         cfg.thumb_notch
         and "thumb_notch_radius" not in errors
-        and not (errors.keys() & {"width", arc_field, "thickness"})
+        and panel is not None
+        and "thickness" not in errors
     ):
         # The notch is centred on the flap's cut apex and must stay clear of the fold.
         flap_height = cfg.cut_sagitta + cfg.fold_sagitta
-        max_r = min(flap_height - 1.0, cfg.width / 3)
+        max_r = min(flap_height - 1.0, panel / 3)
         if cfg.thumb_notch_radius > max_r:
             if max_r < 1:
                 add("thumb_notch_radius", "the flaps are too small for a thumb notch")

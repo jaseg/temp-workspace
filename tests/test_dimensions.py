@@ -47,6 +47,8 @@ def measured(d):
 
 
 def expected_value(cfg, param):
+    if param == "circumference":  # computed, not an input
+        return cfg.circumference
     if param == "depth" and cfg.arc_mode == "depth":
         return cfg.depth
     if param == "sagitta":
@@ -58,7 +60,7 @@ def expected_value(cfg, param):
 def test_pattern_dimensions_cover_the_parameters(cfg):
     pattern = build_pattern(cfg)
     dims = dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern))
-    expected = {"width", "length", "glue_tab_width", cfg.arc_mode}
+    expected = {"circumference", "length", "glue_tab_width", cfg.arc_mode}
     if cfg.glue_tab_taper > 0:
         expected.add("glue_tab_taper")
     if cfg.thumb_notch:
@@ -95,7 +97,7 @@ def test_outer_pattern_dimensions_are_outside_the_sheet(cfg):
     w = float(root.get("width")[:-2])
     h = float(root.get("height")[:-2])
     for d in dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern)):
-        if d.param in ("width", "glue_tab_width"):
+        if d.param in ("circumference", "glue_tab_width"):
             assert d.at > h
         elif d.param == "length":
             assert d.at < 0
@@ -118,25 +120,30 @@ def test_section_dimensions(cfg):
     # The depth is measured between the apexes of the front and back panel curves.
     assert list(depth.points[1]) in section["front"]
     assert depth.points[0] == pytest.approx((depth.points[1][0], -depth.points[1][1]))
+    # The driving width: fold to fold across the section.
     width = dims["width"]
-    assert measured(width) == pytest.approx(cfg.width, rel=1e-3)  # arc length of the panel
-    assert [list(p) for p in width.points] == section["front"]
+    assert measured(width) == pytest.approx(cfg.width, abs=1e-5)  # 1e-6 mm rounding
+    assert dm.fmt(cfg.width) in width.label
+    assert width.points[0][1] == width.points[1][1] == 0  # both straight folds, Z = 0
+    # Half the circumference: the arc length of the front panel.
+    half = dims["circumference"]
+    assert measured(half) == pytest.approx(cfg.circumference / 2, rel=1e-4)
+    assert [list(p) for p in half.points] == section["front"]
     tab = dims["glue_tab_width"]
     assert measured(tab) == pytest.approx(cfg.glue_tab_width, rel=1e-3)
-    closed = dims[None]  # derived closed width, not a parameter
-    assert measured(closed) == pytest.approx(section["width"], abs=1e-5)  # 1e-6 mm rounding
 
 
 # ------------------------------------------------------------------ 3D model
 def test_model_dimensions(cfg):
     box = FoldedBox(cfg)
+    w = cfg.panel_width
     dims = {d.param: d for d in dm.model_dimensions(cfg)}
     assert set(dims) == {"length", "width", cfg.arc_mode}
 
     length = dims["length"]
     assert math.dist(*length.points) == pytest.approx(cfg.length)
     # ... measured between the two ends of the straight fold between the panels.
-    fold_ends = [box.map("front-panel", (cfg.width, y)) for y in (0.0, cfg.length)]
+    fold_ends = [box.map("front-panel", (w, y)) for y in (0.0, cfg.length)]
     for p in length.points:
         assert min(math.dist(p, e) for e in fold_ends) < 1e-9
 
@@ -144,11 +151,12 @@ def test_model_dimensions(cfg):
     assert math.dist(*depth.points) == pytest.approx(cfg.box_depth)
     assert dm.fmt(cfg.box_depth) in depth.label
 
-    width = dims["width"]
-    assert dm.polyline_length(list(width.points)) == pytest.approx(cfg.width, rel=1e-3)
-    n = len(width.points) - 1
-    for i, p in enumerate(width.points):  # on the front panel, across its full width
-        assert math.dist(p, box.map("front-panel", (cfg.width * i / n, cfg.length / 2))) < 1e-9
+    width = dims["width"]  # fold to fold across the box
+    assert math.dist(*width.points) == pytest.approx(cfg.width, rel=1e-9)
+    # (drawn at the -Y end of the box, i.e. flat y = length)
+    fold_ends = [box.map("front-panel", (x, cfg.length)) for x in (0.0, w)]
+    for p in width.points:
+        assert min(math.dist(p, e) for e in fold_ends) < 1e-9
 
     for d in dims.values():  # drawing geometry is present
         assert len(d.line) >= 2 and d.label_at is not None and d.extensions
@@ -160,8 +168,17 @@ def test_render_returns_dimensions(tmp_path):
     cfg = CONFIGS["notched"]
     data = client.post("/api/render", json={"config": cfg.to_dict()}).get_json()
     dims = data["dimensions"]
-    assert {d["param"] for d in dims["pattern"]} >= {"width", "length", "thumb_notch_radius"}
-    assert {d["param"] for d in dims["section"]} >= {"width", "depth", "glue_tab_width"}
+    assert {d["param"] for d in dims["pattern"]} >= {
+        "circumference",
+        "length",
+        "thumb_notch_radius",
+    }
+    assert {d["param"] for d in dims["section"]} == {
+        "width",
+        "depth",
+        "circumference",
+        "glue_tab_width",
+    }
     assert {d["param"] for d in dims["model"]} == {"width", "length", "depth"}
     for view in dims.values():
         for d in view:

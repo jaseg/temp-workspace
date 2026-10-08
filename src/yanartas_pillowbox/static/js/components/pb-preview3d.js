@@ -103,7 +103,7 @@ export class PbPreview3d extends HTMLElement {
    *  dims: parameter dimensions in the model frame (see dimensions.model_dimensions). */
   update(model, colors, dims = []) {
     this.#info.textContent =
-      `closed ≈ ${fmt(model.bounds.width)} × ${fmt(model.bounds.length)} × ${fmt(model.bounds.depth)} mm`;
+      `closed ${fmt(model.bounds.width)} × ${fmt(model.bounds.length)} × ${fmt(model.bounds.depth)} mm`;
     if (!this.#renderer) return;
     const first = !this.#group;
     if (this.#group) {

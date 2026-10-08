@@ -4,7 +4,7 @@ import math
 import pytest
 from helpers import parse_path, q, self_intersections, svg_elements
 
-from yanartas_pillowbox.config import Config
+from yanartas_pillowbox.config import SCHEMA_VERSION, Config
 from yanartas_pillowbox.geometry import build_pattern
 from yanartas_pillowbox.svg import (
     CONFIG_NS,
@@ -159,9 +159,9 @@ def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
 def test_metadata_embedded(cfg):
     root = svg_elements(render_svg(cfg))
     el = root.find(f"{q('metadata')}/{{{CONFIG_NS}}}config")
-    assert el is not None and el.get("version") == "1"
+    assert el is not None and el.get("version") == str(SCHEMA_VERSION)
     data = json.loads(el.text)
-    assert data["version"] == 1
+    assert data["version"] == SCHEMA_VERSION
 
 
 def test_round_trip(cfg):
@@ -198,8 +198,8 @@ def _with_meta(text: str) -> str:
 
 
 def test_import_incompatible_version():
-    with pytest.raises(SvgImportError, match="schema version 2"):
-        extract_config(_with_meta(json.dumps({"version": 2, "width": 50})))
+    with pytest.raises(SvgImportError, match="schema version 3"):
+        extract_config(_with_meta(json.dumps({"version": 3, "width": 50})))
     with pytest.raises(SvgImportError, match="no schema version"):
         extract_config(_with_meta(json.dumps({"width": 50})))
 
@@ -209,3 +209,10 @@ def test_import_corrupt_or_invalid():
         extract_config(_with_meta("{nope"))
     with pytest.raises(SvgImportError, match="invalid"):
         extract_config(_with_meta(json.dumps({"version": 1, "width": -5})))
+
+
+def test_import_v1_file_is_migrated():
+    """A file saved by schema version 1 (``width`` = flat panel width) still imports."""
+    meta = json.dumps({"version": 1, "width": 60.0, "depth": 20.0, "thumb_notch": True})
+    cfg = extract_config(_with_meta(meta))
+    assert cfg.panel_width == pytest.approx(60.0, abs=1e-4) and cfg.thumb_notch

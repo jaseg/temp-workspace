@@ -5,6 +5,7 @@ import pytest
 from helpers import self_intersections
 
 from yanartas_pillowbox.config import Config
+from yanartas_pillowbox.crosssection import sagitta_offset
 from yanartas_pillowbox.geometry import (
     Arc,
     CrossSection,
@@ -12,7 +13,6 @@ from yanartas_pillowbox.geometry import (
     Line,
     arc_from_chord,
     build_pattern,
-    sagitta_offset,
 )
 
 CONFIGS = {
@@ -49,7 +49,7 @@ def test_curved_fold_length_matches_closing_edge():
     cfg = Config.defaults().with_values(thickness=0)
     pat = build_pattern(cfg)
     folds = {f.name: f.segment for f in pat.folds}
-    theta = 2 * math.asin(cfg.width / 2 / pat.info["fold_radius"])
+    theta = 2 * math.asin(cfg.panel_width / 2 / pat.info["fold_radius"])
     analytic = pat.info["fold_radius"] * theta
     for end in ("top", "bottom"):
         front, back = folds[f"front-{end}"], folds[f"back-{end}"]
@@ -130,7 +130,7 @@ def test_bbox_covers_everything(cfg):
     x0, y0, x1, y1 = pat.bbox
     for p in pat.outline.polyline(64):
         assert x0 - 1e-9 <= p[0] <= x1 + 1e-9 and y0 - 1e-9 <= p[1] <= y1 + 1e-9
-    assert x1 - x0 == pytest.approx(2 * cfg.width + cfg.glue_tab_width)
+    assert x1 - x0 == pytest.approx(2 * cfg.panel_width + cfg.glue_tab_width)
 
 
 def test_cross_section_is_unit_speed_and_bulges_by_sagitta():

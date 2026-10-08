@@ -170,7 +170,8 @@ function scheduleSave(config) {
 function renderDerived(info) {
   const rows = [
     ["Box depth (max bulge)", info.box_depth],
-    ["Closed width (approx.)", info.closed_width],
+    ["Circumference", info.circumference],
+    ["Panel width (½ circumference)", info.panel_width],
     ["Curved-fold sagitta", info.fold_sagitta],
     ["Curved-fold radius", info.fold_radius],
     ["Curved-fold arc length", info.fold_arc_length],
