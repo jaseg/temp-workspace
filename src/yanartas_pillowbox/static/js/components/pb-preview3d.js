@@ -93,7 +93,12 @@ export class PbPreview3d extends HTMLElement {
     }
     const group = new THREE.Group();
     group.rotation.z = -Math.PI / 2; // model length runs along Y; lay the box down lengthwise
-    const paper = { panel: 0xeee6d3, flap: 0xd9cdb2 };
+    const paper = { panel: 0xeee6d3, flap: 0xd9cdb2, tab: 0xc9bc9c };
+    // The model is zero-thickness: the two flaps of an end lie on the same wall and the glue
+    // tab lies on the front panel. Depth offsets decide which coincident surface shows
+    // (front flaps over back flaps; the tab stays hidden under the front panel).
+    const depthBias = (part) =>
+      part.kind === "tab" ? 6 : part.name.startsWith("back-") && part.kind === "flap" ? 3 : 1;
     for (const part of model.parts) {
       const geom = new THREE.BufferGeometry();
       geom.setAttribute("position", new THREE.Float32BufferAttribute(part.positions, 3));
@@ -104,9 +109,9 @@ export class PbPreview3d extends HTMLElement {
         roughness: 0.85,
         metalness: 0,
         side: THREE.DoubleSide,
-        polygonOffset: true, // keep fold lines drawn on the surface visible
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 1,
+        polygonOffset: true, // also keeps fold lines drawn on the surface visible
+        polygonOffsetFactor: depthBias(part),
+        polygonOffsetUnits: 4 * depthBias(part),
       });
       group.add(new THREE.Mesh(geom, mat));
     }

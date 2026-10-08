@@ -51,8 +51,10 @@ def test_ints_coerced_to_float():
         ({"length": -1}, "length"),
         ({"arc_mode": "banana"}, "arc_mode"),
         ({"depth": 0}, "depth"),
-        ({"depth": 40}, "depth"),  # >= 2 W / pi for W=60
-        ({"arc_mode": "sagitta", "sagitta": 19.1}, "sagitta"),  # >= W / pi
+        ({"depth": 24.01}, "depth"),  # > 0.4 W for W=60
+        ({"arc_mode": "sagitta", "sagitta": 12.01}, "sagitta"),  # > 0.2 W
+        ({"length": 20}, "length"),  # curved folds of both ends would cross (depth 20)
+        ({"glue_tab_width": 60}, "glue_tab_width"),  # must be narrower than the box
         ({"thickness": -0.1}, "thickness"),
         ({"thickness": 6}, "thickness"),
         ({"depth": 2, "thickness": 1.8}, "thickness"),  # cut sagitta would vanish
@@ -79,12 +81,15 @@ def test_validation_errors(changes, field):
 
 def test_boundary_values_accepted():
     w = 60
-    ok = Config.from_dict({"depth": 2 * w / math.pi - 1e-6})
-    assert ok.depth < 2 * w / math.pi
+    assert Config.from_dict({"depth": 0.4 * w}).depth == 24
+    assert Config.from_dict({"length": 21}).length == 21
     assert Config.from_dict({"glue_tab_taper": 59}).glue_tab_taper == 59
     assert Config.from_dict({"glue_tab_taper": 0, "thickness": 0}).thickness == 0
     assert (
-        Config.from_dict({"width": 10, "length": 10, "depth": 6, "glue_tab_taper": 4}).width == 10
+        Config.from_dict(
+            {"width": 10, "length": 10, "depth": 4, "glue_tab_taper": 4, "glue_tab_width": 5}
+        ).width
+        == 10
     )
 
 

@@ -82,10 +82,10 @@ All lengths are in millimetres.
 | `width` | 60 | Width of one body panel (the chord of the curved fold). 10–1000. |
 | `length` | 120 | Length of the straight body edge, corner to corner. 10–2000. |
 | `arc_mode` | `depth` | `depth`: derive the arc from `depth`. `sagitta`: use `sagitta` directly. |
-| `depth` | 30 | Target box depth at maximum bulge. Fold sagitta = depth / 2. Must be < 2·width/π. |
-| `sagitta` | 15 | Curved-fold sagitta (used when `arc_mode = sagitta`). Must be < width/π. |
-| `glue_tab_width` | 12 | Width of the glue tab. 3–100. |
-| `glue_tab_taper` | 6 | How far each end of the glue tab is cut back along the length. 0 to length/2 − 1. |
+| `depth` | 20 | Target box depth at maximum bulge. Fold sagitta = depth / 2. At most 0.4·width; length must be at least depth + 1. |
+| `sagitta` | 10 | Curved-fold sagitta (used when `arc_mode = sagitta`). At most 0.2·width. |
+| `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than `width`. |
+| `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to length/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `thickness` | 0.4 | Material thickness, 0–5. The flap cut edge is offset from the curved folds by t/2 (see below). |
 | `stroke_width` | 0.1 | Stroke width written to every line (hairline). 0.001–2. |
 | `color_cut` | `#FF0000` | Cut outline. |
@@ -106,18 +106,25 @@ The straight body edges are `length` long. Each flap is a lens between two circu
 through the panel corners:
 
 * the **curved fold** bows *into* the panel by the fold sagitta `s_f` (`depth/2`, or
-  `sagitta`);
+  `sagitta`). Its distance from the chord at position `u` is `f(u)`;
 * the **cut edge** bows *out* of the panel by `s_c = s_f − thickness/2`.
 
-When the box is closed, the two creases at one end face each other and form a lens
-`2·s_f` deep, which is the box depth. Folding a flap in mirrors its cut edge across its
-crease onto the opposite panel's crease, which has the same arc length. The flap therefore
-exactly fills the end opening. The `thickness/2` offset makes it a touch smaller, so both
-flaps can overlap.
+The closed box (shown in the 3D preview) is folded exactly from these faces, without
+stretching:
 
-A panel of width `W` cannot bulge past a half cylinder, which is why `s_f < W/π`. The 3D
-preview bends each panel into a circular arc of arc length `W` (no stretching) with height
-`s_f`. That gives the approximate closed width shown under *Derived geometry*.
+* **Panels:** each panel bends into a cylinder whose rulings run along the length. Measured
+  along the panel width `u`, the cross-section rises by exactly `f(u)`. That makes the box
+  `2·s_f` deep and puts each curved fold in a plane at 45°.
+* **Flaps:** folding along such a planar crease mirrors the flap across that plane. Each flap
+  becomes a curved end wall standing straight across the box's depth. The front and back
+  flaps of one end lie on the same wall and overlap; nothing creases them along a midline.
+* **Thickness:** with zero thickness, each flap's cut edge lands exactly on the opposite
+  panel's curved fold. The `thickness/2` offset leaves room for the material.
+* **Glue tab:** it lies against the inside of the front panel's free edge.
+
+This only works if the fold arc turns at most 45° at the corners (`s_f < 0.207·width`). The
+tool allows `s_f ≤ 0.2·width`, i.e. `depth ≤ 0.4·width`. The tests check that every 3D face
+is an isometric image of its pattern face and that the faces stay joined along every fold.
 
 ## Output SVG & color convention
 

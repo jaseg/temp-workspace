@@ -1,3 +1,4 @@
+import itertools
 import math
 
 import pytest
@@ -6,22 +7,22 @@ from helpers import self_intersections
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.geometry import (
     Arc,
+    CrossSection,
     FoldCategory,
     Line,
     arc_from_chord,
-    build_model3d,
     build_pattern,
-    closed_cross_section,
+    sagitta_offset,
 )
 
 CONFIGS = {
     "default": Config.defaults(),
     "notched": Config.defaults().with_values(thumb_notch=True, thumb_notch_radius=9),
-    "deep": Config.defaults().with_values(width=40, depth=25, thickness=1.5),
+    "deep": Config.defaults().with_values(width=40, depth=16, thickness=1.5),
     "sagitta": Config.defaults().with_values(arc_mode="sagitta", sagitta=4, thickness=0),
     "no-taper": Config.defaults().with_values(glue_tab_taper=0, glue_tab_width=20),
     "big": Config.defaults().with_values(
-        width=300, length=50, depth=150, thumb_notch=True, thumb_notch_radius=60, glue_tab_taper=24
+        width=300, length=120, depth=110, thumb_notch=True, thumb_notch_radius=60, glue_tab_taper=24
     ),
 }
 
@@ -42,8 +43,9 @@ def test_arc_from_chord_geometry():
 
 
 def test_curved_fold_length_matches_closing_edge():
-    """A flap closes against the opposite panel's crease: same chord, same sagitta, so the
-    arc lengths must match. With zero thickness the flap's own cut edge matches too."""
+    """A flap closes against the opposite panel's crease (see test_model3d for the folded
+    check): front and back creases have equal arc length, and with zero thickness so does
+    the flap's cut edge."""
     cfg = Config.defaults().with_values(thickness=0)
     pat = build_pattern(cfg)
     folds = {f.name: f.segment for f in pat.folds}
@@ -131,23 +133,23 @@ def test_bbox_covers_everything(cfg):
     assert x1 - x0 == pytest.approx(2 * cfg.width + cfg.glue_tab_width)
 
 
-def test_cross_section_preserves_panel_width():
-    theta, radius, chord = closed_cross_section(60, 15)
-    assert 2 * theta * radius == pytest.approx(60, rel=1e-9)  # arc length == panel width
-    assert radius * (1 - math.cos(theta)) == pytest.approx(15, rel=1e-9)
-    assert chord < 60
+def test_cross_section_is_unit_speed_and_bulges_by_sagitta():
+    """The closed panel's cross-section keeps the panel width (no stretching) and has height
+    profile f(u), the crease offset, so the box is exactly 2 * s_f deep."""
+    for w, s_f in ((60, 10), (50, 10), (300, 55), (33.3, 3)):
+        sec = CrossSection(w, s_f)
+        n = 4000
+        pts = [(sec.x(w * i / n), sec.z(w * i / n)) for i in range(n + 1)]
+        arc_len = sum(math.dist(a, b) for a, b in itertools.pairwise(pts))
+        assert arc_len == pytest.approx(w, rel=1e-6)
+        assert sec.z(w / 2) == pytest.approx(s_f)
+        for u in (0, w / 7, w / 3, w / 2, w):
+            assert sec.z(u) == pytest.approx(sagitta_offset(w, s_f, u), abs=1e-12)
+            assert sec.x(u) == pytest.approx(-sec.x(w - u), abs=1e-9)  # symmetric
+        assert sec.x(w) - sec.x(0) == pytest.approx(sec.closed_width)
+        assert sec.closed_width < w
 
 
-def test_model3d(cfg):
-    model = build_model3d(cfg)
-    assert model["bounds"]["depth"] == pytest.approx(cfg.box_depth)
-    assert len(model["parts"]) == 6
-    for part in model["parts"]:
-        n = len(part["positions"]) // 3
-        assert len(part["positions"]) % 3 == 0
-        assert part["indices"] and max(part["indices"]) < n
-    zs = [p[2] for part in model["parts"] for p in zip(*[iter(part["positions"])] * 3, strict=True)]
-    assert max(zs) == pytest.approx(cfg.fold_sagitta, abs=1e-3)
-    assert min(zs) == pytest.approx(-cfg.fold_sagitta, abs=1e-3)
-    cats = sorted(line["category"] for line in model["lines"])
-    assert cats == ["curved"] * 4 + ["glue", "straight"]
+def test_cross_section_rejects_arcs_that_cannot_close():
+    with pytest.raises(ValueError):
+        CrossSection(60, 0.21 * 60)

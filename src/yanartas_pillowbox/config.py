@@ -15,6 +15,9 @@ from typing import Any, Literal
 
 SCHEMA_VERSION = 1
 
+# Largest fold sagitta, as a fraction of the box width, that can still close (see geometry).
+MAX_SAGITTA_RATIO = 0.2
+
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 FieldKind = Literal["float", "bool", "str", "color", "choice"]
@@ -207,10 +210,10 @@ class Config:
     width: float = 60.0
     length: float = 120.0
     arc_mode: str = "depth"
-    depth: float = 30.0
-    sagitta: float = 15.0
+    depth: float = 20.0
+    sagitta: float = 10.0
     glue_tab_width: float = 12.0
-    glue_tab_taper: float = 6.0
+    glue_tab_taper: float = 9.0
     thickness: float = 0.4
     stroke_width: float = 0.1
     color_cut: str = "#FF0000"
@@ -365,14 +368,16 @@ def validate(cfg: Config) -> dict[str, str]:
 
     arc_field = "depth" if cfg.arc_mode == "depth" else "sagitta"
     if arc_field not in errors and "width" not in errors:
-        # A panel of width W cannot bulge further than a half cylinder: sagitta < W / pi.
-        max_sag = cfg.width / math.pi
-        if cfg.fold_sagitta >= max_sag:
+        # The closed box needs |f'| <= 1 along the fold, i.e. the fold arc may turn at most
+        # 45 degrees at the corners (sagitta < 0.207 W). Keep a margin so the panels still
+        # meet at a real fold: sagitta <= MAX_SAGITTA_RATIO * W.
+        max_sag = MAX_SAGITTA_RATIO * cfg.width
+        if cfg.fold_sagitta > max_sag:
             limit = 2 * max_sag if arc_field == "depth" else max_sag
             add(
                 arc_field,
-                f"must be less than {_fmt(limit)} mm for a {_fmt(cfg.width)} mm "
-                "wide box (the panel cannot bulge past a half cylinder)",
+                f"must be at most {_fmt(limit)} mm for a {_fmt(cfg.width)} mm wide box "
+                "(steeper flap arcs cannot close)",
             )
     if "thickness" not in errors and arc_field not in errors and cfg.cut_sagitta < 0.25:
         add(
@@ -380,6 +385,19 @@ def validate(cfg: Config) -> dict[str, str]:
             "too thick for this arc: half the thickness must stay 0.25 mm "
             f"below the fold sagitta ({_fmt(cfg.fold_sagitta)} mm)",
         )
+
+    if "length" not in errors and arc_field not in errors:
+        # The curved folds at both ends bow into the panel; they must not meet in the middle.
+        min_length = 2 * cfg.fold_sagitta + 1
+        if cfg.length < min_length:
+            add(
+                "length",
+                f"must be at least {_fmt(min_length)} mm for this arc "
+                "(the curved folds at both ends would cross)",
+            )
+
+    if "glue_tab_width" not in errors and "width" not in errors and cfg.glue_tab_width >= cfg.width:
+        add("glue_tab_width", "must be narrower than the box width (it is glued inside)")
 
     if "glue_tab_taper" not in errors and "length" not in errors:
         max_taper = cfg.length / 2 - 1

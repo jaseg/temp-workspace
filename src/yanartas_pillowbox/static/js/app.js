@@ -172,6 +172,7 @@ function renderDerived(info) {
     ["Curved-fold arc length", info.fold_arc_length],
     ["Flap cut sagitta", info.cut_sagitta],
     ["Flap cut radius", info.cut_radius],
+    ["Min. glue-tab taper", info.min_glue_tab_taper],
   ];
   $("#derived").replaceChildren(...rows.flatMap(([k, v]) => {
     const dt = document.createElement("dt");

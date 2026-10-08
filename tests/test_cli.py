@@ -13,7 +13,7 @@ def test_generate_defaults(tmp_path):
 
 def test_generate_with_overrides_and_config(tmp_path):
     conf = tmp_path / "c.json"
-    conf.write_text(json.dumps({"width": 80, "depth": 40}))
+    conf.write_text(json.dumps({"width": 80, "depth": 30}))
     out = tmp_path / "box.svg"
     rc = main(
         [
@@ -30,7 +30,7 @@ def test_generate_with_overrides_and_config(tmp_path):
     )
     assert rc == 0
     cfg = extract_config(out.read_text())
-    assert (cfg.width, cfg.depth, cfg.thumb_notch, cfg.label_text) == (80, 40, True, "a=b")
+    assert (cfg.width, cfg.depth, cfg.thumb_notch, cfg.label_text) == (80, 30, True, "a=b")
 
 
 def test_generate_from_svg(tmp_path):
