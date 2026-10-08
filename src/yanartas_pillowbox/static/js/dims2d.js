@@ -9,7 +9,7 @@ export const DIM_STYLE = `
                             vector-effect: non-scaling-stroke; }
   .dim line.ext { stroke-dasharray: 3 2; opacity: 0.8; }
   .dim path.arrow { fill: var(--dim-color); stroke: none; }
-  .dim text { fill: var(--dim-color); font-family: system-ui, sans-serif; }
+  .dim text { fill: var(--dim-color); font-family: var(--ui-font, system-ui, sans-serif); }
   .dim rect.plate { fill: var(--dim-halo); stroke: none; }
   .dim[data-param] { cursor: pointer; }
   .dim.hl line, .dim.hl path.ln { stroke: var(--dim-hl); stroke-width: 2px; }
@@ -94,6 +94,13 @@ export function drawDims2d(dims, { fs, flipY = false }) {
   }
   const bounds = xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null;
   return { group, bounds };
+}
+
+/** On-screen size (px) of dimension labels: the UI's --label-font-size, so labels match the
+ *  rest of the interface. */
+export function labelPx(el) {
+  const v = parseFloat(getComputedStyle(el).getPropertyValue("--label-font-size"));
+  return Number.isFinite(v) && v > 0 ? v : 13;
 }
 
 export function highlightDims(root, param) {

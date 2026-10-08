@@ -4,8 +4,6 @@
 import * as THREE from "../../vendor/three/three.module.min.js";
 import { OrbitControls } from "../../vendor/three/OrbitControls.js";
 
-const LABEL_PX = 15; // on-screen height of dimension labels
-
 const template = document.createElement("template");
 template.innerHTML = `
 <style>
@@ -21,6 +19,15 @@ template.innerHTML = `
   button[aria-pressed="true"] { background: var(--surface-2); border-color: var(--text-muted); }
   .stage { position: relative; flex: 1; min-height: 0; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+  /* Dimension labels are HTML, positioned over the canvas each frame: crisp, and the same
+     font and size as the rest of the UI regardless of camera distance. */
+  .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .labels.off { display: none; }
+  .lbl { position: absolute; left: 0; top: 0; white-space: nowrap; padding: 0 3px;
+         font: var(--label-font-size, 13px)/1.3 var(--ui-font, system-ui, sans-serif);
+         color: var(--lbl-color); background: color-mix(in srgb, var(--surface) 80%, transparent);
+         border-radius: 3px; will-change: transform; }
+  .lbl.hl { color: var(--lbl-hl); font-weight: 650; }
   .fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
               color: var(--text-muted); text-align: center; }
 </style>
@@ -44,7 +51,8 @@ export class PbPreview3d extends HTMLElement {
   #frame = 0;
   #size = 100;
   #dims = null; // THREE.Group of dimension annotations
-  #dimItems = []; // [{param, materials, sprite, textures: {normal, hl}}]
+  #dimItems = []; // [{param, materials, el, pos}]
+  #labels = null; // container of the HTML dimension labels
   #highlight = null;
   #showDims = true;
   #dark = matchMedia("(prefers-color-scheme: dark)");
@@ -62,6 +70,7 @@ export class PbPreview3d extends HTMLElement {
       this.#showDims = !this.#showDims;
       toggle.setAttribute("aria-pressed", String(this.#showDims));
       if (this.#dims) this.#dims.visible = this.#showDims;
+      this.#labels?.classList.toggle("off", !this.#showDims);
       this.#requestRender();
     });
     this.#dark.addEventListener("change", () => {
@@ -82,6 +91,9 @@ export class PbPreview3d extends HTMLElement {
     }
     this.#renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.#stage.append(this.#renderer.domElement);
+    this.#labels = document.createElement("div");
+    this.#labels.className = "labels";
+    this.#stage.append(this.#labels);
 
     this.#scene = new THREE.Scene();
     this.#camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100000);
@@ -168,16 +180,15 @@ export class PbPreview3d extends HTMLElement {
     for (const item of this.#dimItems) {
       const on = Boolean(param) && item.param === param;
       for (const m of item.materials) m.color.set(on ? hlColor : normal);
-      item.sprite.material.map = on ? item.textures.hl : item.textures.normal;
-      item.sprite.material.needsUpdate = true;
+      item.el.classList.toggle("hl", on);
     }
     this.#requestRender();
   }
 
   #dimColors() {
     return this.#dark.matches
-      ? { normal: "#c3c7cc", hl: "#ffb35c", halo: "#1d2024" }
-      : { normal: "#4f545b", hl: "#c2410c", halo: "#ffffff" };
+      ? { normal: "#c3c7cc", hl: "#ffb35c" }
+      : { normal: "#4f545b", hl: "#c2410c" };
   }
 
   /** Dimension lines, extension lines, arrowheads and text labels; drawn on top of the box. */
@@ -187,11 +198,10 @@ export class PbPreview3d extends HTMLElement {
       this.#dims.parent?.remove(this.#dims);
       disposeTree(this.#dims);
     }
-    for (const item of this.#dimItems) {
-      item.textures.normal.dispose();
-      item.textures.hl.dispose();
-    }
     const colors = this.#dimColors();
+    this.#labels.replaceChildren();
+    this.#labels.style.setProperty("--lbl-color", colors.normal);
+    this.#labels.style.setProperty("--lbl-hl", colors.hl);
     const top = { depthTest: false, depthWrite: false, transparent: true };
     const g = new THREE.Group();
     g.renderOrder = 10;
@@ -217,32 +227,29 @@ export class PbPreview3d extends HTMLElement {
         cone.position.copy(v3(tip).addScaledVector(dir, -h / 2));
         add(cone);
       }
-      const textures = {
-        normal: labelTexture(d.label, colors.normal, colors.halo),
-        hl: labelTexture(d.label, colors.hl, colors.halo),
-      };
-      // Constant on-screen size regardless of camera distance (scaled in #scaleLabels).
-      const sprite = new THREE.Sprite(
-        new THREE.SpriteMaterial({ map: textures.normal, sizeAttenuation: false, ...top }));
-      sprite.position.copy(v3(d.labelAt));
-      add(sprite);
-      this.#dimItems.push({ param: d.param, materials, sprite, textures });
+      const el = document.createElement("div");
+      el.className = "lbl";
+      el.textContent = d.label;
+      this.#labels.append(el);
+      this.#dimItems.push({ param: d.param, materials, el, pos: v3(d.labelAt) });
     }
     g.visible = this.#showDims;
     this.#dims = g;
-    this.#scaleLabels();
     this.#group.add(g);
     this.highlight(this.#highlight);
   }
 
-  /** Size the (non-attenuated) label sprites to LABEL_PX screen pixels tall. With
-   *  sizeAttenuation off, a sprite of scale s spans s / tan(fov / 2) in clip space. */
-  #scaleLabels() {
-    const h = this.#renderer?.domElement.clientHeight;
-    if (!h) return;
-    const k = (2 * LABEL_PX * Math.tan(THREE.MathUtils.degToRad(this.#camera.fov) / 2)) / h;
-    for (const { sprite, textures } of this.#dimItems) {
-      sprite.scale.set(k * textures.normal.userData.aspect, k, 1);
+  /** Place the HTML labels at their anchors' projected screen positions. */
+  #placeLabels() {
+    if (!this.#showDims || !this.#group) return;
+    const { clientWidth: w, clientHeight: h } = this.#renderer.domElement;
+    const v = new THREE.Vector3();
+    for (const { el, pos } of this.#dimItems) {
+      v.copy(pos).applyMatrix4(this.#group.matrixWorld).project(this.#camera);
+      el.hidden = v.z > 1; // behind the camera
+      const x = ((v.x + 1) / 2) * w;
+      const y = ((1 - v.y) / 2) * h;
+      el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
     }
   }
 
@@ -261,7 +268,6 @@ export class PbPreview3d extends HTMLElement {
     this.#renderer.setSize(width, height, false);
     this.#camera.aspect = width / height;
     this.#camera.updateProjectionMatrix();
-    this.#scaleLabels();
     this.#requestRender();
   }
 
@@ -272,38 +278,14 @@ export class PbPreview3d extends HTMLElement {
       // Damping keeps the camera moving for a few frames; update() returns true meanwhile.
       if (this.#controls.update()) this.#requestRender();
       this.#renderer.render(this.#scene, this.#camera);
+      this.#placeLabels();
     });
   }
-}
-
-function labelTexture(text, color, halo) {
-  const px = 48;
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  const font = `600 ${px}px system-ui, sans-serif`;
-  ctx.font = font;
-  const w = Math.ceil(ctx.measureText(text).width) + px * 0.6;
-  canvas.width = w;
-  canvas.height = Math.ceil(px * 1.4);
-  ctx.font = font;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.lineWidth = px * 0.22;
-  ctx.strokeStyle = halo;
-  ctx.strokeText(text, w / 2, canvas.height / 2);
-  ctx.fillStyle = color;
-  ctx.fillText(text, w / 2, canvas.height / 2);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.userData.aspect = w / canvas.height;
-  return tex;
 }
 
 function disposeTree(root) {
   root.traverse((o) => {
     o.geometry?.dispose();
-    o.material?.map?.dispose();
     o.material?.dispose();
   });
 }

@@ -2,7 +2,7 @@
 // computed by geometry.build_cross_section. The body is a cylinder between the curved folds,
 // so this section holds along the whole straight part of the box.
 
-import { DIM_STYLE, drawDims2d, highlightDims } from "../dims2d.js";
+import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -28,7 +28,7 @@ template.innerHTML = `
           vector-effect: non-scaling-stroke; }
   .stage { --dim-color: var(--text-muted); --dim-halo: var(--surface); --dim-hl: var(--accent); }
   ${DIM_STYLE}
-  text { fill: var(--text-muted); font-family: system-ui, sans-serif; }
+  text { fill: var(--text-muted); font-family: var(--ui-font, system-ui, sans-serif); }
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
            border-radius: 5px; padding: 2px 9px; cursor: pointer; }
   button[aria-pressed="true"] { background: var(--surface-2); border-color: var(--text-muted); }
@@ -55,6 +55,7 @@ export class PbSection extends HTMLElement {
   #svg = null;
   #highlight = null;
   #showDims = true;
+  #data = null; // {section, colors, dims} of the last update
 
   constructor() {
     super();
@@ -67,8 +68,9 @@ export class PbSection extends HTMLElement {
     toggle.addEventListener("click", () => {
       this.#showDims = !this.#showDims;
       toggle.setAttribute("aria-pressed", String(this.#showDims));
-      this.#svg?.querySelector(".dims")?.classList.toggle("off", !this.#showDims);
+      this.#render();
     });
+    new ResizeObserver(() => this.#render()).observe(this.#stage);
     this.#stage.addEventListener("click", (e) => {
       const param = e.target.closest?.(".dim")?.dataset.param;
       if (param) {
@@ -89,12 +91,39 @@ export class PbSection extends HTMLElement {
     const { width, height } = section;
     this.#info.textContent = `${fmt(width)} × ${fmt(height)} mm`;
     this.#info.title = "The body has this cross-section everywhere between the curved folds.";
+    this.#data = { section, colors, dims };
+    this.#render();
+    this.#legend.replaceChildren(
+      legendItem(colors.straight, "Straight fold"),
+      legendItem(colors.glue, "Glue-tab fold"),
+    );
+  }
 
+  /** Draw the section scaled to fit, with text at labelPx() screen pixels. The text's size
+   *  in drawing units depends on the fit's scale, so the fit is iterated to a fixed point. */
+  #render() {
+    if (!this.#data) return;
+    const { section, colors, dims } = this.#data;
+    const { width, height } = section;
+    const r = this.#stage.getBoundingClientRect();
+    const px = labelPx(this);
+    let box = [-width / 2, -height / 2, width, height];
+    let svg;
+    for (let i = 0; i < 4; i++) {
+      const upp = r.width && r.height ? Math.max(box[2] / r.width, box[3] / r.height) : box[2] / 400;
+      ({ svg, box } = this.#draw(section, colors, dims, px * upp));
+    }
+    svg.setAttribute("viewBox", box.join(" "));
+    this.#stage.replaceChildren(svg);
+    this.#svg = svg;
+    this.highlight(this.#highlight);
+  }
+
+  #draw(section, colors, dims, fs) {
+    const { width, height } = section;
     // Z points up on screen: plot (x, -z).
     const p = ([x, z]) => [x, -z];
-    const span = Math.max(width, height);
-    const fs = span / 20; // label size in user units
-    const pad = span * 0.06;
+    const pad = fs * 1.2;
 
     const svg = el("svg", { preserveAspectRatio: "xMidYMid meet" });
     svg.append(
@@ -106,11 +135,10 @@ export class PbSection extends HTMLElement {
     const outline = [...section.front, ...section.back.slice(1)].map(p);
     svg.append(el("path", { class: "body", d: `M ${outline.map((q) => q.join(",")).join(" L ")} Z` }));
 
-
     // Panel names, inside the body (dimensions use the space outside).
     svg.append(
-      text(width * 0.2, -height * 0.16, "front", fs * 0.8, "middle", "name"),
-      text(width * 0.2, height * 0.24, "back", fs * 0.8, "middle", "name"),
+      text(width * 0.2, -height * 0.16, "front", fs, "middle", "name"),
+      text(width * 0.2, height * 0.16 + fs * 0.8, "back", fs, "middle", "name"),
     );
 
     // Fold markers.
@@ -118,24 +146,18 @@ export class PbSection extends HTMLElement {
       const [x, y] = p(fold.point);
       svg.append(
         el("circle", { class: "fold", cx: x, cy: y, r: fs * 0.32, fill: colors[fold.category] }),
-        el("circle", { class: "fold-ring", cx: x, cy: y, r: fs * 0.32 + fs * 0.08 }),
+        el("circle", { class: "fold-ring", cx: x, cy: y, r: fs * 0.4 }),
       );
     }
 
-    const { group, bounds } = drawDims2d(dims, { fs: fs * 0.8, flipY: true });
+    const { group, bounds } = drawDims2d(dims, { fs, flipY: true });
     group.classList.toggle("off", !this.#showDims);
     svg.append(group);
     let [x0, y0, x1, y1] = [-width / 2, -height / 2, width / 2, height / 2];
-    if (bounds) [x0, y0, x1, y1] = [Math.min(x0, bounds[0]), Math.min(y0, bounds[1]), Math.max(x1, bounds[2]), Math.max(y1, bounds[3])];
-    svg.setAttribute("viewBox", [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad].join(" "));
-    this.#stage.replaceChildren(svg);
-    this.#svg = svg;
-    this.highlight(this.#highlight);
-
-    this.#legend.replaceChildren(
-      legendItem(colors.straight, "Straight fold"),
-      legendItem(colors.glue, "Glue-tab fold"),
-    );
+    if (bounds && this.#showDims) {
+      [x0, y0, x1, y1] = [Math.min(x0, bounds[0]), Math.min(y0, bounds[1]), Math.max(x1, bounds[2]), Math.max(y1, bounds[3])];
+    }
+    return { svg, box: [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad] };
   }
 }
 

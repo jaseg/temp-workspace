@@ -3,7 +3,7 @@
 // per the configured colors) so that every line color stays visible. Dimensions are a
 // preview-only overlay; they are never part of the downloaded SVG.
 
-import { DIM_STYLE, drawDims2d, highlightDims } from "../dims2d.js";
+import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -71,6 +71,10 @@ export class PbPreview2d extends HTMLElement {
   #moved = false;
   #downParam = null;
   #showDims = true;
+  #dimData = []; // parameter dimensions in SVG user units
+  #sheet = null; // [0, 0, w, h] of the exported sheet
+  #overlay = null; // <g> holding the sheet outline and the dimensions
+  #dimFs = 0; // label size (user units) the dimensions were last drawn at
 
   constructor() {
     super();
@@ -86,6 +90,7 @@ export class PbPreview2d extends HTMLElement {
         this.#showDims = !this.#showDims;
         button.setAttribute("aria-pressed", String(this.#showDims));
         this.#svg?.querySelector(".dims")?.classList.toggle("off", !this.#showDims);
+        if (!this.#zoomed) this.fit();
         return;
       }
       const action = button?.dataset.zoom;
@@ -126,6 +131,11 @@ export class PbPreview2d extends HTMLElement {
     this.#stage.addEventListener("pointerup", endDrag);
     this.#stage.addEventListener("pointercancel", endDrag);
     this.#dark.addEventListener("change", () => this.#applyBackdrop());
+    new ResizeObserver(() => {
+      if (!this.#svg) return;
+      if (this.#zoomed) this.#drawDims();
+      else this.fit();
+    }).observe(this.#stage);
   }
 
   /** Show a new SVG. `info` holds pattern dimensions, `legend` is [{label, color, kind}],
@@ -138,12 +148,14 @@ export class PbPreview2d extends HTMLElement {
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     svg.removeAttribute("width");
     svg.removeAttribute("height");
-    const base = this.#addAnnotations(svg, sheet, dims);
+    this.#addOverlay(svg, sheet);
+    this.#dimData = dims;
+    this.#sheet = sheet;
 
     const keepView = this.#zoomed && this.#view;
     this.#stage.replaceChildren(svg);
     this.#svg = svg;
-    this.#base = base;
+    this.#dimFs = 0;
     if (keepView) this.#setView(this.#view);
     else this.fit();
 
@@ -176,17 +188,54 @@ export class PbPreview2d extends HTMLElement {
 
   fit() {
     this.#zoomed = false;
-    if (this.#base) this.#setView([...this.#base]);
+    if (!this.#sheet) return;
+    this.#base = this.#fitBox();
+    this.#setView([...this.#base]);
+  }
+
+  /** viewBox fitting the sheet plus all dimensions. Labels have a fixed on-screen size, so
+   *  their extent in user units depends on the fit's scale: iterate to a fixed point. */
+  #fitBox() {
+    const [, , w, h] = this.#sheet;
+    let box = [0, 0, w, h];
+    for (let i = 0; i < 4; i++) {
+      const fs = labelPx(this) * this.#unitsPerPixel(box);
+      const { bounds } = drawDims2d(this.#dimData, { fs });
+      let [x0, y0, x1, y1] = [0, 0, w, h];
+      if (bounds && this.#showDims) {
+        x0 = Math.min(x0, bounds[0] - fs);
+        y0 = Math.min(y0, bounds[1] - fs);
+        x1 = Math.max(x1, bounds[2] + fs);
+        y1 = Math.max(y1, bounds[3] + fs);
+      }
+      box = [x0, y0, x1 - x0, y1 - y0];
+    }
+    return box;
   }
 
   #setView(v) {
     this.#view = v;
     this.#svg?.setAttribute("viewBox", v.map((n) => n.toFixed(4)).join(" "));
+    this.#drawDims();
   }
 
-  #unitsPerPixel() {
+  /** (Re)draw the dimensions so their labels are labelPx() screen pixels tall. */
+  #drawDims() {
+    if (!this.#overlay || !this.#view) return;
+    const fs = labelPx(this) * this.#unitsPerPixel();
+    if (this.#dimFs && Math.abs(fs / this.#dimFs - 1) < 1e-3) return; // panning only
+    this.#dimFs = fs;
+    this.#overlay.querySelector(".dims")?.remove();
+    const { group } = drawDims2d(this.#dimData, { fs });
+    group.classList.toggle("off", !this.#showDims);
+    this.#overlay.append(group);
+    highlightDims(this.#svg, this.#highlight);
+  }
+
+  #unitsPerPixel(view = this.#view) {
     const r = this.#stage.getBoundingClientRect();
-    const [, , w, h] = this.#view;
+    const [, , w, h] = view;
+    if (!r.width || !r.height) return w / 600; // not laid out yet
     return Math.max(w / r.width, h / r.height);
   }
 
@@ -207,27 +256,15 @@ export class PbPreview2d extends HTMLElement {
     this.#zoomed = true;
   }
 
-  #addAnnotations(svg, [, , w, h], dims) {
-    // Preview-only overlay (never exported): sheet boundary and parameter dimensions. Returns
-    // the viewBox that fits the sheet plus all annotations.
+  #addOverlay(svg, [, , w, h]) {
+    // Preview-only overlay (never exported): sheet boundary, plus the dimensions (#drawDims).
     const g = document.createElementNS(NS, "g");
     g.setAttribute("class", "preview-overlay");
     const sheet = document.createElementNS(NS, "rect");
     Object.entries({ class: "sheet", x: 0, y: 0, width: w, height: h }).forEach(([k, v]) => sheet.setAttribute(k, v));
     g.append(sheet);
-    const fs = Math.min(14, Math.max(3, Math.min(w, h) / 26));
-    const { group, bounds } = drawDims2d(dims, { fs });
-    group.classList.toggle("off", !this.#showDims);
-    g.append(group);
     svg.append(g);
-    let [x0, y0, x1, y1] = [0, 0, w, h];
-    if (bounds) {
-      x0 = Math.min(x0, bounds[0] - fs);
-      y0 = Math.min(y0, bounds[1] - fs);
-      x1 = Math.max(x1, bounds[2] + fs);
-      y1 = Math.max(y1, bounds[3] + fs);
-    }
-    return [x0, y0, x1 - x0, y1 - y0];
+    this.#overlay = g;
   }
 
   #applyBackdrop() {

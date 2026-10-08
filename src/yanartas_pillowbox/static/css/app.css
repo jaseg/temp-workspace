@@ -14,6 +14,9 @@
   --panel-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
   --radius: 8px;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ui-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Text size of field labels; dimension labels in all preview views use the same size. */
+  --label-font-size: 13px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -41,7 +44,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 14px/1.4 var(--ui-font);
   display: flex;
   flex-direction: column;
 }
@@ -136,7 +139,7 @@ legend { font-weight: 600; padding: 0 4px; }
 pb-param { display: block; padding: 5px 0; }
 pb-param[hidden] { display: none; }
 pb-param .row { display: grid; grid-template-columns: 1fr minmax(0, 150px); align-items: center; gap: 8px; }
-pb-param label { font-size: 13px; }
+pb-param label { font-size: var(--label-font-size); }
 pb-param .control { display: flex; align-items: center; gap: 6px; min-width: 0; }
 pb-param .control input[type="number"],
 pb-param .control input[type="text"],
