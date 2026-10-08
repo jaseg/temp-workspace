@@ -129,7 +129,7 @@ async function render() {
     return;
   }
   showErrors({});
-  const { svg, model, section, info } = result.data;
+  const { svg, model, section, info, dimensions } = result.data;
   lastValid = { config: result.data.config, svg, model, section, info };
   const c = lastValid.config;
   const legend = [
@@ -139,12 +139,12 @@ async function render() {
     { label: "Glue-tab fold", color: c.color_fold_glue },
   ];
   if (c.label) legend.push({ label: "Label (engrave)", color: c.color_label, kind: "fill" });
-  preview2d.update(svg, info, legend);
+  preview2d.update(svg, info, legend, dimensions.pattern);
   const foldColors = {
     straight: c.color_fold_straight, curved: c.color_fold_curved, glue: c.color_fold_glue,
   };
-  preview3d.update(model, foldColors);
-  sectionView.update(section, foldColors);
+  preview3d.update(model, foldColors, dimensions.model);
+  sectionView.update(section, foldColors, dimensions.section);
   renderDerived(info);
   downloadBtn.disabled = false;
   setStatus("Up to date");
@@ -261,6 +261,24 @@ async function main() {
     scheduleRender();
   });
   form.addEventListener("submit", (e) => e.preventDefault());
+
+  // Link parameters and dimensions: focusing or hovering a field highlights its dimensions
+  // in every view; clicking a dimension focuses its field.
+  let focused = null;
+  const highlight = (param) => {
+    for (const view of [preview2d, preview3d, sectionView]) view.highlight(param);
+  };
+  form.addEventListener("focusin", (e) => {
+    focused = e.target.closest("pb-param")?.name ?? null;
+    highlight(focused);
+  });
+  form.addEventListener("focusout", () => {
+    focused = null;
+    highlight(null);
+  });
+  form.addEventListener("mouseover", (e) => highlight(e.target.closest("pb-param")?.name ?? focused));
+  form.addEventListener("mouseleave", () => highlight(focused));
+  document.addEventListener("pb-dim-click", (e) => params.get(e.detail.param)?.focusInput());
   $("#btn-import").addEventListener("click", () => $("#file-input").click());
   $("#file-input").addEventListener("change", (e) => {
     importFile(e.target.files[0]);

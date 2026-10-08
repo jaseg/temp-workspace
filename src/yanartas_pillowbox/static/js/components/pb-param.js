@@ -46,6 +46,14 @@ export class PbParam extends HTMLElement {
     } else this.#input.value = v;
   }
 
+  /** Focus the field's input and bring it into view. */
+  focusInput() {
+    if (this.hidden) return;
+    const target = this.#spec.kind === "color" ? this.#hex : this.#input;
+    target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    target.focus({ preventScroll: true });
+  }
+
   set error(message) {
     this.#error.textContent = message || "";
     this.classList.toggle("invalid", Boolean(message));

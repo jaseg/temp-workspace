@@ -1,6 +1,9 @@
-// <pb-preview2d>: shows the generated SVG with zoom/pan, overall dimensions and a color legend.
-// Line colors are shown exactly as exported; only the backdrop adapts (per theme and per the
-// configured colors) so that every line color stays visible.
+// <pb-preview2d>: shows the generated SVG with zoom/pan, parameter dimensions and a color
+// legend. Line colors are shown exactly as exported; only the backdrop adapts (per theme and
+// per the configured colors) so that every line color stays visible. Dimensions are a
+// preview-only overlay; they are never part of the downloaded SVG.
+
+import { DIM_STYLE, drawDims2d, highlightDims } from "../dims2d.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -16,7 +19,8 @@ template.innerHTML = `
   header { display: flex; align-items: center; gap: 10px; padding: 6px 10px;
            border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   h2 { font-size: 13px; margin: 0; }
-  .dims { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1; min-width: 0; }
+  .size { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1; min-width: 0; }
+  button[aria-pressed="true"] { background: var(--surface-2); border-color: var(--text-muted); }
   .tools { display: flex; gap: 4px; }
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
            border-radius: 5px; padding: 2px 9px; cursor: pointer; }
@@ -29,8 +33,7 @@ template.innerHTML = `
   .stage svg path { vector-effect: non-scaling-stroke; stroke-width: 1.4px; }
   .stage svg .sheet { fill: none; stroke: var(--sheet-stroke); stroke-dasharray: 4 3;
                       stroke-width: 1px; vector-effect: non-scaling-stroke; }
-  .stage svg .dim line { stroke: var(--dim-color); stroke-width: 1px; vector-effect: non-scaling-stroke; }
-  .stage svg .dim text { fill: var(--dim-color); font-family: system-ui, sans-serif; }
+  ${DIM_STYLE}
   .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; font-size: 12px;
             border-top: 1px solid var(--border); }
@@ -41,8 +44,9 @@ template.innerHTML = `
 </style>
 <header>
   <h2>Pattern</h2>
-  <div class="dims" aria-live="polite"></div>
+  <div class="size" aria-live="polite"></div>
   <div class="tools">
+    <button type="button" data-dims aria-pressed="true" title="Show parameter dimensions">Dimensions</button>
     <button type="button" data-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>
     <button type="button" data-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>
     <button type="button" data-zoom="fit" title="Fit to view (double-click)">Fit</button>
@@ -63,21 +67,41 @@ export class PbPreview2d extends HTMLElement {
   #colors = [];
   #drag = null;
   #dark = matchMedia("(prefers-color-scheme: dark)");
+  #highlight = null;
+  #moved = false;
+  #downParam = null;
+  #showDims = true;
 
   constructor() {
     super();
     const root = this.attachShadow({ mode: "open" });
     root.append(template.content.cloneNode(true));
     this.#stage = root.querySelector(".stage");
-    this.#dims = root.querySelector(".dims");
+    this.#dims = root.querySelector(".size");
     this.#legend = root.querySelector(".legend");
 
     root.querySelector(".tools").addEventListener("click", (e) => {
-      const action = e.target.closest("button")?.dataset.zoom;
+      const button = e.target.closest("button");
+      if (button?.hasAttribute("data-dims")) {
+        this.#showDims = !this.#showDims;
+        button.setAttribute("aria-pressed", String(this.#showDims));
+        this.#svg?.querySelector(".dims")?.classList.toggle("off", !this.#showDims);
+        return;
+      }
+      const action = button?.dataset.zoom;
       if (action === "fit") this.fit();
       else if (action) this.#zoomAt(action === "in" ? 1 / 1.4 : 1.4);
     });
     this.#stage.addEventListener("dblclick", () => this.fit());
+    // Clicking a dimension asks the app to focus the parameter it shows.
+    // (Pointer capture for panning retargets the click to the stage, so remember the
+    // dimension that was under the pointer when it went down.)
+    this.#stage.addEventListener("click", () => {
+      const param = this.#downParam;
+      if (param && !this.#moved) {
+        this.dispatchEvent(new CustomEvent("pb-dim-click", { bubbles: true, composed: true, detail: { param } }));
+      }
+    });
     this.#stage.addEventListener("wheel", (e) => {
       e.preventDefault();
       this.#zoomAt(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)), e);
@@ -87,11 +111,14 @@ export class PbPreview2d extends HTMLElement {
       this.#stage.setPointerCapture(e.pointerId);
       this.#stage.classList.add("dragging");
       this.#drag = { x: e.clientX, y: e.clientY, view: [...this.#view] };
+      this.#moved = false;
+      this.#downParam = e.target.closest?.(".dim")?.dataset.param ?? null;
     });
     this.#stage.addEventListener("pointermove", (e) => {
       if (!this.#drag) return;
       const scale = this.#unitsPerPixel();
       const [x, y, w, h] = this.#drag.view;
+      if (Math.hypot(e.clientX - this.#drag.x, e.clientY - this.#drag.y) > 3) this.#moved = true;
       this.#setView([x - (e.clientX - this.#drag.x) * scale, y - (e.clientY - this.#drag.y) * scale, w, h]);
       this.#zoomed = true;
     });
@@ -101,16 +128,17 @@ export class PbPreview2d extends HTMLElement {
     this.#dark.addEventListener("change", () => this.#applyBackdrop());
   }
 
-  /** Show a new SVG. `info` holds pattern dimensions, `legend` is [{label, color, kind}]. */
-  update(svgText, info, legend) {
+  /** Show a new SVG. `info` holds pattern dimensions, `legend` is [{label, color, kind}],
+   *  `dims` the parameter dimensions in SVG user units. */
+  update(svgText, info, legend, dims = []) {
     const doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
     const svg = document.importNode(doc.documentElement, true);
     if (svg.nodeName !== "svg") return;
-    const base = svg.getAttribute("viewBox").split(/[\s,]+/).map(Number);
+    const sheet = svg.getAttribute("viewBox").split(/[\s,]+/).map(Number);
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     svg.removeAttribute("width");
     svg.removeAttribute("height");
-    this.#addAnnotations(svg, base, info);
+    const base = this.#addAnnotations(svg, sheet, dims);
 
     const keepView = this.#zoomed && this.#view;
     this.#stage.replaceChildren(svg);
@@ -119,7 +147,7 @@ export class PbPreview2d extends HTMLElement {
     if (keepView) this.#setView(this.#view);
     else this.fit();
 
-    const [, , w, h] = base;
+    const [, , w, h] = sheet;
     this.#dims.textContent =
       `pattern ${fmt(info.pattern_width)} × ${fmt(info.pattern_height)} mm · ` +
       `sheet ${fmt(w)} × ${fmt(h)} mm (10 mm margin)`;
@@ -137,6 +165,13 @@ export class PbPreview2d extends HTMLElement {
       return item;
     }));
     this.#applyBackdrop();
+    this.highlight(this.#highlight);
+  }
+
+  /** Emphasise the dimensions of one parameter (or none). */
+  highlight(param) {
+    this.#highlight = param;
+    if (this.#svg) highlightDims(this.#svg, param);
   }
 
   fit() {
@@ -172,20 +207,27 @@ export class PbPreview2d extends HTMLElement {
     this.#zoomed = true;
   }
 
-  #addAnnotations(svg, [, , w, h], info) {
-    // Preview-only overlay (never exported): sheet boundary and overall dimension lines
-    // drawn in the 10 mm margin.
+  #addAnnotations(svg, [, , w, h], dims) {
+    // Preview-only overlay (never exported): sheet boundary and parameter dimensions. Returns
+    // the viewBox that fits the sheet plus all annotations.
     const g = document.createElementNS(NS, "g");
     g.setAttribute("class", "preview-overlay");
     const sheet = document.createElementNS(NS, "rect");
     Object.entries({ class: "sheet", x: 0, y: 0, width: w, height: h }).forEach(([k, v]) => sheet.setAttribute(k, v));
     g.append(sheet);
-    const fs = Math.min(4, Math.max(2, Math.min(w, h) / 45));
-    g.append(
-      dimension(10, 5, 10 + info.pattern_width, 5, `${fmt(info.pattern_width)} mm`, fs, false),
-      dimension(5, 10, 5, 10 + info.pattern_height, `${fmt(info.pattern_height)} mm`, fs, true),
-    );
+    const fs = Math.min(14, Math.max(3, Math.min(w, h) / 26));
+    const { group, bounds } = drawDims2d(dims, { fs });
+    group.classList.toggle("off", !this.#showDims);
+    g.append(group);
     svg.append(g);
+    let [x0, y0, x1, y1] = [0, 0, w, h];
+    if (bounds) {
+      x0 = Math.min(x0, bounds[0] - fs);
+      y0 = Math.min(y0, bounds[1] - fs);
+      x1 = Math.max(x1, bounds[2] + fs);
+      y1 = Math.max(y1, bounds[3] + fs);
+    }
+    return [x0, y0, x1 - x0, y1 - y0];
   }
 
   #applyBackdrop() {
@@ -201,37 +243,11 @@ export class PbPreview2d extends HTMLElement {
     }
     const lum = luminance(best);
     this.#stage.style.backgroundColor = best;
-    this.#stage.style.setProperty("--dim-color", lum > 0.3 ? "#5d6168" : "#b8bcc2");
+    this.#stage.style.setProperty("--dim-color", lum > 0.3 ? "#4f545b" : "#c3c7cc");
+    this.#stage.style.setProperty("--dim-halo", best);
+    this.#stage.style.setProperty("--dim-hl", lum > 0.3 ? "#c2410c" : "#ffb35c");
     this.#stage.style.setProperty("--sheet-stroke", lum > 0.3 ? "#9a9da3" : "#6b7077");
   }
-}
-
-function dimension(x1, y1, x2, y2, text, fs, vertical) {
-  const g = document.createElementNS(NS, "g");
-  g.setAttribute("class", "dim");
-  const tick = fs * 0.6;
-  const lines = vertical
-    ? [[x1, y1, x2, y2], [x1 - tick, y1, x1 + tick, y1], [x2 - tick, y2, x2 + tick, y2]]
-    : [[x1, y1, x2, y2], [x1, y1 - tick, x1, y1 + tick], [x2, y2 - tick, x2, y2 + tick]];
-  for (const [a, b, c, d] of lines) {
-    const l = document.createElementNS(NS, "line");
-    l.setAttribute("x1", a); l.setAttribute("y1", b); l.setAttribute("x2", c); l.setAttribute("y2", d);
-    g.append(l);
-  }
-  const t = document.createElementNS(NS, "text");
-  const cx = (x1 + x2) / 2;
-  const cy = (y1 + y2) / 2;
-  t.setAttribute("font-size", fs);
-  t.setAttribute("text-anchor", "middle");
-  if (vertical) {
-    t.setAttribute("transform", `translate(${cx - fs * 0.35} ${cy}) rotate(-90)`);
-  } else {
-    t.setAttribute("x", cx);
-    t.setAttribute("y", cy - fs * 0.35);
-  }
-  t.textContent = text;
-  g.append(t);
-  return g;
 }
 
 function fmt(v) {

@@ -86,12 +86,17 @@ def _layer(root: ET.Element, key: str, cfg: Config) -> tuple[ET.Element, str]:
     return g, getattr(cfg, color_attr)
 
 
+def sheet_offset(pattern: Pattern) -> Point:
+    """Translation from flat-pattern coordinates to SVG user units (mm)."""
+    return (MARGIN - pattern.bbox[0], MARGIN - pattern.bbox[1])
+
+
 def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
     pattern = pattern or build_pattern(cfg)
     min_x, min_y, max_x, max_y = pattern.bbox
     width = (max_x - min_x) + 2 * MARGIN
     height = (max_y - min_y) + 2 * MARGIN
-    offset = (MARGIN - min_x, MARGIN - min_y)
+    offset = sheet_offset(pattern)
     stroke_w = fmt(cfg.stroke_width)
 
     root = ET.Element(

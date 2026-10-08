@@ -2,6 +2,8 @@
 // computed by geometry.build_cross_section. The body is a cylinder between the curved folds,
 // so this section holds along the whole straight part of the box.
 
+import { DIM_STYLE, drawDims2d, highlightDims } from "../dims2d.js";
+
 const NS = "http://www.w3.org/2000/svg";
 
 const template = document.createElement("template");
@@ -26,8 +28,12 @@ template.innerHTML = `
          vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--border); stroke-width: 1px; stroke-dasharray: 4 4;
           vector-effect: non-scaling-stroke; }
-  .dim line { stroke: var(--text-muted); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+  .stage { --dim-color: var(--text-muted); --dim-halo: var(--surface); --dim-hl: var(--accent); }
+  ${DIM_STYLE}
   text { fill: var(--text-muted); font-family: system-ui, sans-serif; }
+  button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
+           border-radius: 5px; padding: 2px 9px; cursor: pointer; }
+  button[aria-pressed="true"] { background: var(--surface-2); border-color: var(--text-muted); }
   text.name { fill: var(--text); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; font-size: 12px;
             border-top: 1px solid var(--border); }
@@ -40,6 +46,7 @@ template.innerHTML = `
 <header>
   <h2>Body cross-section</h2>
   <div class="info" aria-live="polite"></div>
+  <button type="button" data-dims aria-pressed="true" title="Show parameter dimensions">Dimensions</button>
 </header>
 <div class="stage" role="img" aria-label="Cross-section of the closed box body"></div>
 <div class="legend"></div>
@@ -49,6 +56,9 @@ export class PbSection extends HTMLElement {
   #stage;
   #info;
   #legend;
+  #svg = null;
+  #highlight = null;
+  #showDims = true;
 
   constructor() {
     super();
@@ -57,10 +67,29 @@ export class PbSection extends HTMLElement {
     this.#stage = root.querySelector(".stage");
     this.#info = root.querySelector(".info");
     this.#legend = root.querySelector(".legend");
+    const toggle = root.querySelector("[data-dims]");
+    toggle.addEventListener("click", () => {
+      this.#showDims = !this.#showDims;
+      toggle.setAttribute("aria-pressed", String(this.#showDims));
+      this.#svg?.querySelector(".dims")?.classList.toggle("off", !this.#showDims);
+    });
+    this.#stage.addEventListener("click", (e) => {
+      const param = e.target.closest?.(".dim")?.dataset.param;
+      if (param) {
+        this.dispatchEvent(new CustomEvent("pb-dim-click", { bubbles: true, composed: true, detail: { param } }));
+      }
+    });
   }
 
-  /** section: {front, back, tab: [[x, z]...], folds: [{category, point}], width, depth}. */
-  update(section, colors) {
+  /** Emphasise the dimensions of one parameter (or none). */
+  highlight(param) {
+    this.#highlight = param;
+    if (this.#svg) highlightDims(this.#svg, param);
+  }
+
+  /** section: {front, back, tab: [[x, z]...], folds: [{category, point}], width, depth};
+   *  dims: parameter dimensions in the same (X, Z) frame. */
+  update(section, colors, dims = []) {
     const { width, depth } = section;
     this.#info.textContent = `${fmt(width)} × ${fmt(depth)} mm`;
     this.#info.title = "The body has this cross-section everywhere between the curved folds.";
@@ -68,17 +97,10 @@ export class PbSection extends HTMLElement {
     // Z points up on screen: plot (x, -z).
     const p = ([x, z]) => [x, -z];
     const span = Math.max(width, depth);
-    const fs = span / 18; // label size in user units
-    const pad = span * 0.12;
-    const dimGap = fs * 1.6;
-    const vb = [
-      -width / 2 - pad,
-      -depth / 2 - pad,
-      width + 2 * pad + dimGap + fs * 2,
-      depth + 2 * pad + dimGap + fs * 1.5,
-    ];
+    const fs = span / 20; // label size in user units
+    const pad = span * 0.06;
 
-    const svg = el("svg", { viewBox: vb.join(" "), preserveAspectRatio: "xMidYMid meet" });
+    const svg = el("svg", { preserveAspectRatio: "xMidYMid meet" });
     svg.append(
       el("line", { class: "axis", x1: -width / 2 - pad / 2, y1: 0, x2: width / 2 + pad / 2, y2: 0 }),
       el("line", { class: "axis", x1: 0, y1: -depth / 2 - pad / 2, x2: 0, y2: depth / 2 + pad / 2 }),
@@ -92,10 +114,10 @@ export class PbSection extends HTMLElement {
     const inset = offsetInward(section.tab, span * 0.025).map(p);
     svg.append(el("path", { class: "tab", d: `M ${inset.map((q) => q.join(",")).join(" L ")}` }));
 
-    // Panel names.
+    // Panel names, inside the body (dimensions use the space outside).
     svg.append(
-      text(0, -depth / 2 - fs * 0.6, "front", fs, "middle", "name"),
-      text(0, depth / 2 + fs * 1.3, "back", fs, "middle", "name"),
+      text(width * 0.2, -depth * 0.16, "front", fs * 0.8, "middle", "name"),
+      text(width * 0.2, depth * 0.24, "back", fs * 0.8, "middle", "name"),
     );
 
     // Fold markers.
@@ -107,14 +129,15 @@ export class PbSection extends HTMLElement {
       );
     }
 
-    // Dimensions: closed width below, depth to the right.
-    const yDim = depth / 2 + dimGap + fs * 0.6;
-    const xDim = width / 2 + dimGap;
-    svg.append(
-      dimension([-width / 2, yDim], [width / 2, yDim], `≈ ${fmt(width)} mm`, fs, false),
-      dimension([xDim, -depth / 2], [xDim, depth / 2], `${fmt(depth)} mm`, fs, true),
-    );
+    const { group, bounds } = drawDims2d(dims, { fs: fs * 0.8, flipY: true });
+    group.classList.toggle("off", !this.#showDims);
+    svg.append(group);
+    let [x0, y0, x1, y1] = [-width / 2, -depth / 2, width / 2, depth / 2];
+    if (bounds) [x0, y0, x1, y1] = [Math.min(x0, bounds[0]), Math.min(y0, bounds[1]), Math.max(x1, bounds[2]), Math.max(y1, bounds[3])];
+    svg.setAttribute("viewBox", [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad].join(" "));
     this.#stage.replaceChildren(svg);
+    this.#svg = svg;
+    this.highlight(this.#highlight);
 
     this.#legend.replaceChildren(
       legendItem(colors.straight, "Straight fold"),
@@ -135,24 +158,6 @@ function offsetInward(pts, d) {
     const n = Math.hypot(tx, tz) || 1;
     return [q[0] + (tz / n) * d, q[1] - (tx / n) * d];
   });
-}
-
-function dimension([x1, y1], [x2, y2], label, fs, vertical) {
-  const g = el("g", { class: "dim" });
-  const tick = fs * 0.35;
-  g.append(el("line", { x1, y1, x2, y2 }));
-  if (vertical) {
-    g.append(el("line", { x1: x1 - tick, y1, x2: x1 + tick, y2: y1 }));
-    g.append(el("line", { x1: x2 - tick, y1: y2, x2: x2 + tick, y2 }));
-    const t = text(0, 0, label, fs * 0.8, "middle");
-    t.setAttribute("transform", `translate(${x1 + fs * 0.9} ${(y1 + y2) / 2}) rotate(90)`);
-    g.append(t);
-  } else {
-    g.append(el("line", { x1, y1: y1 - tick, x2: x1, y2: y1 + tick }));
-    g.append(el("line", { x1: x2, y1: y2 - tick, x2, y2: y2 + tick }));
-    g.append(text((x1 + x2) / 2, y1 + fs * 1.05, label, fs * 0.8, "middle"));
-  }
-  return g;
 }
 
 function legendItem(color, label) {

@@ -9,10 +9,11 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
+from yanartas_pillowbox import dimensions as dims
 from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, field_specs_json
 from yanartas_pillowbox.geometry import build_cross_section, build_model3d, build_pattern
 from yanartas_pillowbox.persistence import load_config, save_config
-from yanartas_pillowbox.svg import SvgImportError, extract_config, render_svg
+from yanartas_pillowbox.svg import SvgImportError, extract_config, render_svg, sheet_offset
 
 log = logging.getLogger(__name__)
 
@@ -95,12 +96,21 @@ def create_app(settings_path: Path) -> Flask:
         if not isinstance(cfg, Config):
             return cfg
         pattern = build_pattern(cfg)
+        section = build_cross_section(cfg)
         return jsonify(
             config=cfg.to_dict(),
             svg=render_svg(cfg, pattern),
             model=build_model3d(cfg, pattern),
-            section=build_cross_section(cfg),
+            section=section,
             info=pattern.info,
+            # Preview-only dimension annotations (never part of the exported SVG).
+            dimensions={
+                "pattern": dims.to_json(
+                    dims.pattern_dimensions(cfg, pattern, sheet_offset(pattern))
+                ),
+                "section": dims.to_json(dims.section_dimensions(cfg, section)),
+                "model": dims.to_json(dims.model_dimensions(cfg)),
+            },
         )
 
     @app.post("/api/import")
