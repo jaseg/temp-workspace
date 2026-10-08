@@ -10,7 +10,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request, send_from_directory
 
 from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, field_specs_json
-from yanartas_pillowbox.geometry import build_model3d, build_pattern
+from yanartas_pillowbox.geometry import build_cross_section, build_model3d, build_pattern
 from yanartas_pillowbox.persistence import load_config, save_config
 from yanartas_pillowbox.svg import SvgImportError, extract_config, render_svg
 
@@ -98,7 +98,8 @@ def create_app(settings_path: Path) -> Flask:
         return jsonify(
             config=cfg.to_dict(),
             svg=render_svg(cfg, pattern),
-            model=build_model3d(cfg),
+            model=build_model3d(cfg, pattern),
+            section=build_cross_section(cfg),
             info=pattern.info,
         )
 

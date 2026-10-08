@@ -48,6 +48,7 @@ def test_render(client):
     data = r.get_json()
     assert data["svg"].startswith("<?xml")
     assert data["model"]["parts"]
+    assert data["section"]["front"] and data["section"]["depth"] == 20
     assert data["info"]["box_depth"] == 20
 
 

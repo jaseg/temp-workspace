@@ -5,6 +5,7 @@
 import "./components/pb-param.js";
 import "./components/pb-preview2d.js";
 import "./components/pb-preview3d.js";
+import "./components/pb-section.js";
 
 const RENDER_DELAY = 60; // ms; server round-trip is a few ms, so previews update well < 300 ms
 const SAVE_DELAY = 600;
@@ -13,6 +14,7 @@ const $ = (sel) => document.querySelector(sel);
 const form = $("#params");
 const preview2d = $("#preview2d");
 const preview3d = $("#preview3d");
+const sectionView = $("#section");
 const statusEl = $("#status");
 const downloadBtn = $("#btn-download");
 
@@ -127,8 +129,8 @@ async function render() {
     return;
   }
   showErrors({});
-  const { svg, model, info } = result.data;
-  lastValid = { config: result.data.config, svg, model, info };
+  const { svg, model, section, info } = result.data;
+  lastValid = { config: result.data.config, svg, model, section, info };
   const c = lastValid.config;
   const legend = [
     { label: "Cut", color: c.color_cut },
@@ -138,9 +140,11 @@ async function render() {
   ];
   if (c.label) legend.push({ label: "Label (engrave)", color: c.color_label, kind: "fill" });
   preview2d.update(svg, info, legend);
-  preview3d.update(model, {
+  const foldColors = {
     straight: c.color_fold_straight, curved: c.color_fold_curved, glue: c.color_fold_glue,
-  });
+  };
+  preview3d.update(model, foldColors);
+  sectionView.update(section, foldColors);
   renderDerived(info);
   downloadBtn.disabled = false;
   setStatus("Up to date");

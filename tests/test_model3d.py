@@ -2,13 +2,20 @@
 corresponding pattern face, faces stay attached along their folds, and the closed state is
 consistent (seam closes, flaps overlap on the end wall, no extra creases)."""
 
+import itertools
 import math
 
 import pytest
 from helpers import loop_area, polyline
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import FoldedBox, build_model3d, build_pattern, sagitta_offset
+from yanartas_pillowbox.geometry import (
+    FoldedBox,
+    build_cross_section,
+    build_model3d,
+    build_pattern,
+    sagitta_offset,
+)
 
 D = Config.defaults()
 CONFIGS = {
@@ -278,6 +285,38 @@ def test_closed_dimensions(case):
     assert max(ys) - min(ys) == pytest.approx(cfg.length, rel=1e-9)
     assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-6)
     assert model["bounds"]["width"] < cfg.width  # bending shortens the chord
+
+
+# ------------------------------------------------------------------ body cross-section
+def polyline_length(pts):
+    return sum(math.dist(a, b) for a, b in itertools.pairwise(pts))
+
+
+def test_cross_section_matches_pattern_and_mesh(case):
+    cfg, _, model, parts = case
+    sec = build_cross_section(cfg)
+    front, back, tab = sec["front"], sec["back"], sec["tab"]
+    # Each panel's section is exactly one panel width long (no stretching) ...
+    assert polyline_length(front) == pytest.approx(cfg.width, rel=1e-4)
+    assert polyline_length(back) == pytest.approx(cfg.width, rel=1e-4)
+    assert polyline_length(tab) == pytest.approx(cfg.glue_tab_width, rel=1e-4)
+    # ... the two panels form one closed loop, joined at the two straight folds ...
+    assert math.dist(front[-1], back[0]) < 1e-9
+    assert math.dist(back[-1], front[0]) < 1e-9
+    folds = {f["category"]: f["point"] for f in sec["folds"]}
+    assert folds["straight"] == pytest.approx([sec["width"] / 2, 0], abs=1e-6)
+    assert folds["glue"] == pytest.approx([-sec["width"] / 2, 0], abs=1e-6)
+    # ... with the box's closed width and depth.
+    xs = [p[0] for p in front + back]
+    zs = [p[1] for p in front + back]
+    assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-6)
+    assert max(zs) - min(zs) == pytest.approx(cfg.box_depth, rel=1e-6)
+    # Every 3D panel and tab vertex, seen along the length, lies on the section curve.
+    tol = 2e-3 * cfg.width  # chord sag of the sampled section polyline
+    for name, curve in (("front-panel", front), ("back-panel", back), ("glue-tab", front)):
+        for p in pts3(parts[name]):
+            d = min(seg_dist((p[0], p[2]), a, b) for a, b in itertools.pairwise(curve))
+            assert d < tol, (name, p)
 
 
 # ------------------------------------------------------------------ helpers

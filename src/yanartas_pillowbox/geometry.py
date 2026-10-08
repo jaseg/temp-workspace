@@ -645,3 +645,36 @@ def build_model3d(
 def _flat_area(flat: list[float], tri: tuple[int, int, int]) -> float:
     (ax, ay), (bx, by), (cx, cy) = ((flat[2 * i], flat[2 * i + 1]) for i in tri)
     return abs((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) / 2
+
+
+def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
+    """2D cross-section of the closed box body, perpendicular to its length.
+
+    The body is a cylinder between the curved folds, so this section is the same at every
+    point along the length. Coordinates are (X, Z) in mm in the 3D model's frame: X across
+    the box, Z depth with the front panel at +Z. Taken from ``FoldedBox`` so the section,
+    3D preview and pattern always agree.
+    """
+    box = FoldedBox(cfg)
+    w, g, mid = cfg.width, cfg.glue_tab_width, cfg.length / 2
+
+    def trace(face: str, x0: float, x1: float, n: int) -> list[list[float]]:
+        pts = (box.map(face, (x0 + (x1 - x0) * i / n, mid)) for i in range(n + 1))
+        return [[round(p[0], 6), round(p[2], 6)] for p in pts]
+
+    front = trace("front-panel", 0.0, w, samples)  # glued edge (-X) -> straight fold (+X)
+    back = trace("back-panel", w, 2 * w, samples)  # straight fold (+X) -> glue fold (-X)
+    tab = trace("glue-tab", 2 * w, 2 * w + g, max(8, round(samples * g / w)))
+    return {
+        "units": "mm",
+        "front": front,
+        "back": back,
+        "tab": tab,
+        "folds": [
+            {"category": FoldCategory.STRAIGHT.value, "point": front[-1]},
+            {"category": FoldCategory.GLUE.value, "point": back[-1]},
+        ],
+        "width": box.section.closed_width,
+        "depth": cfg.box_depth,
+        "panel_width": w,
+    }

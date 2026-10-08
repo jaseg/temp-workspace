@@ -65,8 +65,12 @@ logs a warning and starts with the defaults. It never crashes because of the fil
   sheet sizes. Dimension lines are drawn in the margin (preview only, never exported). A
   legend maps each color to its line category. Lines are shown in their real colors, and the
   backdrop is picked for the best contrast against all of them in the current theme.
-* **Folded box (3D):** an orbitable, shaded approximation of the closed box (drag to orbit,
-  scroll to zoom).
+* **Folded box (3D):** an orbitable, shaded view of the closed box, folded exactly from the
+  pattern faces (drag to orbit, scroll to zoom).
+* **Body cross-section:** a 2D section through the closed body, perpendicular to its length.
+  The body has this same section everywhere between the curved folds. It shows the closed
+  width and depth, the two straight folds in their configured colors, and the glue tab lying
+  inside the front panel (drawn slightly inset so you can see it).
 * **Import:** *Import SVG…* or drag and drop a previously downloaded SVG anywhere onto the
   page to restore all of its parameters. A file without an embedded config, or with an
   incompatible one, produces a clear error message.
@@ -166,7 +170,7 @@ Two categories only share a color if you set them that way.
 | `GET /api/defaults` | — | `{config, fields}` with the default config and field specs (labels, units, ranges) |
 | `GET /api/config` | — | `{config}` with the current (persisted) config |
 | `PUT /api/config` | `{config}` | Validates and saves it, returns `{config, saved}`; `422 {errors}` if invalid |
-| `POST /api/render` | `{config}` | `{config, svg, model, info}`; `422 {errors: {field: message}}` if invalid |
+| `POST /api/render` | `{config}` | `{config, svg, model, section, info}`; `422 {errors: {field: message}}` if invalid |
 | `POST /api/import` | SVG as the raw body or a multipart `file` | `{config}`; `400 {error}` if unusable |
 
 ## Development
