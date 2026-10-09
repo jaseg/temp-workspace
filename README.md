@@ -125,13 +125,13 @@ All lengths are in millimetres.
 | `length` | 120 | Interior length along the middle of the box, between the end walls: the shortest distance between the curves. 10–2000. The straight edges (corner to corner) are `length + height + 3·thickness` long. |
 | `height` | 20 | Interior height of the closed box at maximum bulge. At most ≈ 0.46·width (the UI states the exact limit). |
 | `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
-| `payload_depth` | 95 | Payload size along the box length. 0–2000. With interior walls, it has to fit between them. |
+| `payload_depth` | 80 | Payload size along the box length. 0–2000. With interior walls, it has to fit between them. |
 | `payload_height` | 13 | Payload size along the box height. 0–2000. |
 | `payload_margin` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than the front panel it is glued onto. |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to half the straight edge − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `interior_walls` | on | Extends each inner flap into a bridge along the front panel and a second, interior end wall (see *Interior walls* below). |
-| `interior_wall_offset` | 10 | Clear gap between the inside of the doubled end wall and the outside of the interior wall. 0–500. The payload space between the interior walls is `length − 2·(offset + thickness)`. |
+| `interior_wall_offset` | 10 | Clear gap between the inside of the doubled end wall and the outside of the interior wall. 0–500. In the middle the interior walls are `length − 2·(offset + thickness)` apart; towards the sides they curve in. |
 | `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). With interior walls, it instead notches both bridge folds (see below). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
 | `fpc_cutout_width` | 15 | Width of that flat section. 0 to the inner flaps' width − 1. The cut is level and exactly this wide. The flap's edge is not quite symmetric, so the section sits around its highest point, within about a millimetre of the flap's centre. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
@@ -201,9 +201,11 @@ continues past its former cut edge into a **bridge** and then a second oval flap
 * The inner flap's top edge becomes a fold where it meets the inside of the front panel.
   That fold sits at the bridge's mid-surface, one thickness inside the front panel's
   mid-surface.
-* The bridge runs `offset + thickness` along the inside of the front panel, then folds
-  down into the interior wall. The interior wall reaches down to the back panel's inner
-  surface.
+* The bridge runs along the inside of the front panel, then folds down into the interior
+  wall. The interior wall reaches down to the back panel's inner surface.
+* The interior wall is the inner flap's mirror image in plan view: `))__(` rather than
+  `))__)`. The clear gap equals `offset` in the middle and widens towards the sides, and
+  the walls come closest to the payload at its sides.
 * Both folds follow the exact curve as fine polylines, emitted as one dashed SVG path each.
   Bridge and interior wall are slightly narrower than the inner flap: they stop where the
   interior wall would be lower than 1 mm, two thicknesses, or a tenth of the height. That
@@ -213,8 +215,8 @@ continues past its former cut edge into a **bridge** and then a second oval flap
   against both curved surfaces at once; the material's flexibility absorbs the difference.
   The 3D view therefore draws bridges and interior walls as translucent surfaces, like the
   payload, rather than as folded paper.
-* The payload clearance and *Fit box to payload* count the interior walls: *Fit* adds
-  `2·(offset + thickness)` to the length.
+* The payload clearance and *Fit box to payload* count the interior walls, including how
+  far they curve in at the payload's sides.
 * **FPC cutout with interior walls:** the cutout notches both bridge folds over its width.
   The inner flap and the interior wall are cut back by the same depth below the bridge,
   which keeps its full edge. The fold lines stop at the notches, and each notch is its own

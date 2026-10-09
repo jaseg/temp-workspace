@@ -255,7 +255,7 @@ class Config:
     height: float = 20.0
     # Rectangular payload, inscribed centred in the closed box (preview only, not exported).
     payload_width: float = 30.0
-    payload_depth: float = 95.0
+    payload_depth: float = 80.0
     payload_height: float = 13.0
     payload_margin: float = 1.0
     glue_tab_width: float = 12.0

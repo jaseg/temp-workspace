@@ -42,7 +42,7 @@ from functools import lru_cache
 from typing import Any
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.crosssection import Body, circle_radius, sagitta_offset
+from yanartas_pillowbox.crosssection import Body, CrossSection, circle_radius, sagitta_offset
 
 Point = tuple[float, float]
 BBox = tuple[float, float, float, float]  # min_x, min_y, max_x, max_y
@@ -463,13 +463,14 @@ class WallLayout:
     panel from the straight fold, offsets beyond the fold chord, like ``Body.back_cuts``).
 
     The inner flap's top edge becomes a fold (``crease``) at the bridge's mid-surface, ``t``
-    inside the front panel's mid-surface. The bridge runs ``strip`` (offset + t) inward
-    along the front panel, then folds down into the interior wall (``crease`` shifted by
-    ``strip``), which ends on the back panel's inner surface (``drops``: its height below the
-    bridge at each ``u``). Bridge and interior wall only span ``ua..ub``, where the interior
-    wall is at least ``WALL_MIN_HEIGHT`` (or two thicknesses, or a tenth of the height)
-    high; nearer the body folds the inner flap's edge is cut as before, at the bridge's
-    level."""
+    inside the front panel's mid-surface. The bridge runs inward along the front panel, then
+    folds down into the interior wall, which ends on the back panel's inner surface
+    (``drops``: its height below the bridge at each ``u``). The interior wall curves the
+    other way from the inner flap (its mirror image in plan), so the bridge is ``strip``
+    (offset + t) long in the middle and longer towards its ends (``bridge_at``). Bridge and
+    interior wall only span ``ua..ub``, where the interior wall is at least
+    ``WALL_MIN_HEIGHT`` (or two thicknesses, or a tenth of the height) high; nearer the body
+    folds the inner flap's edge is cut as before, at the bridge's level."""
 
     strip: float
     ua: float
@@ -477,12 +478,24 @@ class WallLayout:
     edge: tuple[Point, ...]  # (u, offset) of the inner flap's top edge, full width
     drops: tuple[Point, ...]  # (u, interior wall height), ua..ub
     crease: Polyline  # flat coordinates (x = front width + u, y = -offset)
+    back: CrossSection  # the back panel, whose crease the inner flap's wall follows
+
+    def bridge_at(self, u: float) -> float:
+        """Bridge length at ``u``: the inner flap's wall stands ``back.z(u)`` in from the
+        corner line, the interior wall (mirrored) ``strip + 2 s - back.z(u)``."""
+        return self.strip + 2 * (self.back.sagitta - self.back.z(u))
+
+    def shift(self, seg: Segment, wf: float) -> Polyline:
+        """A segment along the inner flap's fold moved to the interior wall's fold."""
+        pts = seg.points if isinstance(seg, Polyline) else (seg.start, seg.end)
+        return Polyline(tuple((x, y - self.bridge_at(x - wf)) for x, y in pts))
 
     @property
     def reach(self) -> float:
         """How far the interior wall's free edge reaches beyond the fold chord."""
         wf = self.crease.start[0] - self.ua
-        return max(-y_on_chain((self.crease,), wf + u) + self.strip + d for u, d in self.drops)
+        crease2 = self.shift(self.crease, wf)
+        return max(-y_on_chain((crease2,), wf + u) + d for u, d in self.drops)
 
 
 def _interp(samples: Sequence[Point], u: float) -> float:
@@ -544,7 +557,7 @@ def wall_layout(cfg: Config) -> WallLayout | None:
     )
     k = max(2, math.ceil((ub - ua) / (sec.width / n)))
     drops = tuple((ua + (ub - ua) * i / k, drop_at(ua + (ub - ua) * i / k)) for i in range(k + 1))
-    return WallLayout(cfg.interior_wall_offset + t, ua, ub, edge, drops, crease)
+    return WallLayout(cfg.interior_wall_offset + t, ua, ub, edge, drops, crease, body.back)
 
 
 def _mirror(seg: Segment, length: float) -> Segment:
@@ -592,7 +605,7 @@ def _back_end(cfg: Config, fpc: bool) -> _EndPieces:
         chain = _cut_chain(wf, 0.0, flatten_cut(body.back_cuts, width), up=True)
         return _EndPieces(chain, chain)
 
-    s, crease = layout.strip, layout.crease
+    crease = layout.crease
     pa, pb = crease.start, crease.end
     left = [(wf + u, -c) for u, c in layout.edge if u < layout.ua - 1e-9]
     right = [(wf + u, -c) for u, c in layout.edge if u > layout.ub + 1e-9]
@@ -600,7 +613,7 @@ def _back_end(cfg: Config, fpc: bool) -> _EndPieces:
     right_cut = tuple(
         Line(a, b) for a, b in itertools.pairwise([pb, *right]) if _dist(a, b) > 1e-12
     )
-    crease2 = _translate(crease, -s)
+    crease2 = layout.shift(crease, wf)
     pa2, pb2 = crease2.start, crease2.end
     free_pts = [(wf + u, y_on_chain((crease2,), wf + u) - d) for u, d in layout.drops]
     free = tuple(Line(a, b) for a, b in itertools.pairwise(free_pts) if _dist(a, b) > 1e-12)
@@ -623,10 +636,12 @@ def _back_end(cfg: Config, fpc: bool) -> _EndPieces:
             Polyline((na, *mid, nb)),
             Polyline((nb, *(q for q in crease.points if q[0] > nb[0] + 1e-9))),
         )
-        c2 = tuple(_translate(seg, -s) for seg in c1)
+        c2 = tuple(layout.shift(seg, wf) for seg in c1)
         flap_notch = Line(na, nb)  # the inner flap's edge in the notch
         # ... and the interior wall's, cut back as far below the bridge (mirrored about it).
-        wall_notch = Polyline(tuple((x, 2 * (y - s) - (-level - s)) for x, y in c1[1].points))
+        wall_notch = Polyline(
+            tuple((x, 2 * y - layout.bridge_at(x - wf) + level) for x, y in c1[1].points)
+        )
         holes = (
             Outline((c1[1], flap_notch.reversed())),
             Outline((c2[1], wall_notch.reversed())),
@@ -1052,8 +1067,8 @@ def _wall_volumes(
     """Bridges and interior walls of the closed box, for the 3D preview (drawn like the
     payload, not folded paper): one surface per bridge and wall, each with the closed
     ``outline`` of its edges. Placed like the inner flap they hang from: the bridge at the
-    inner flap's top fold height, running ``strip`` inward; the wall hanging from its inner
-    end down to the back panel's inner surface."""
+    inner flap's top fold height, running ``bridge_at(u)`` inward; the wall hanging from
+    its inner end down to the back panel's inner surface."""
     layout = wall_layout(cfg)
     if layout is None:
         return []
@@ -1075,9 +1090,11 @@ def _wall_volumes(
             grid = []  # per column: rows + 1 points from the inner flap / bridge end
             for u, z, d in zip(us, top_z, drops, strict=True):
                 if kind == "bridge":
-                    pts = [at(u, layout.strip * j / rows, z) for j in range(rows + 1)]
+                    b = layout.bridge_at(u)
+                    pts = [at(u, b * j / rows, z) for j in range(rows + 1)]
                 else:
-                    pts = [at(u, layout.strip, z - d * j / rows) for j in range(rows + 1)]
+                    b = layout.bridge_at(u)
+                    pts = [at(u, b, z - d * j / rows) for j in range(rows + 1)]
                 grid.append(pts)
             k = rows + 1
             indices = []

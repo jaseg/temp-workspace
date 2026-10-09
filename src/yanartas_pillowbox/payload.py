@@ -114,11 +114,14 @@ def section_clearance(body: Body, width: float, height: float) -> float:
 
 def wall_clearance(body: Body, width: float, depth: float, inset: float = 0.0) -> float:
     """Distance in plan from the payload (width x depth, centred) to the inner end walls'
-    inner surfaces (the same at both ends). ``inset``: interior walls stand that much
-    further in (the bridge length), parallel to the inner flaps."""
-    half = body.edge_length / 2 - inset
+    inner surfaces (the same at both ends). ``inset``: with interior walls, the bridge
+    length in the middle; the interior walls are the inner flaps' mirror images, standing
+    that much further in at the middle."""
+    half, s = body.edge_length / 2, body.back.sagitta
 
     def wall(u: float) -> tuple[float, float]:
+        if inset:
+            return (body.back_point(u)[0], half - inset - 2 * s + body.back.z(u))
         return (body.back_point(u)[0], half - body.back.z(u))
 
     return curve_clearance(wall, body.back.width, width / 2, depth / 2) - body.thickness / 2
@@ -363,11 +366,15 @@ def fit_box(cfg: Config) -> Config:
                 break
         except ValueError:  # pragma: no cover - the width only grows
             pass
-        body = out.body
-        if section_clearance(body, cfg.payload_width, cfg.payload_height) < cfg.payload_margin:
+        body, m = out.body, cfg.payload_margin
+        if section_clearance(body, cfg.payload_width, cfg.payload_height) < m:
             out = replace(out, width=_r2(out.width + ROUND))
         else:
-            out = replace(out, length=_r2(out.length + ROUND))
+            # The end walls' clearance grows by exactly half of what the length grows (the
+            # walls keep their shape): one step, rounded up.
+            walls = wall_clearance(body, cfg.payload_width, cfg.payload_depth, _inset(out))
+            length = _r2(_ceil(out.length + 2 * max(m - walls, 0.0)))
+            out = replace(out, length=max(length, _r2(out.length + ROUND)))
     try:
         return Config.from_dict(out.to_dict())
     except ConfigError as exc:  # pragma: no cover - guarded by _candidate

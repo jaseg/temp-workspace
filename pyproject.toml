@@ -20,7 +20,11 @@ classifiers = [
 yanartas-pillowbox = "yanartas_pillowbox.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = [
+    "pytest>=8",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.6",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/yanartas_pillowbox"]
@@ -30,6 +34,7 @@ include = ["src/yanartas_pillowbox", "tests", "README.md", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-n auto --maxprocesses 12"  # pytest-xdist: CPU-bound, independent tests
 
 [tool.ruff]
 line-length = 100

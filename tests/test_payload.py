@@ -16,7 +16,13 @@ D = Config.defaults()
 BOXES = {
     "default": D,
     "wide-flat": D.with_values(
-        width=120, height=20, length=60, payload_width=75, payload_depth=30, payload_height=8
+        width=120,
+        height=20,
+        length=60,
+        payload_width=75,
+        payload_depth=30,
+        payload_height=8,
+        interior_walls=False,
     ),
     "no-walls": D.with_values(interior_walls=False, payload_depth=110),
     "steep": D.with_values(width=50, height=22.5, payload_width=20, payload_height=15),
@@ -90,9 +96,9 @@ MARGIN_CASES = {
     "tight-length": D.with_values(
         payload_depth=117, payload_height=10, payload_margin=1.5, interior_walls=False
     ),
-    "tight-walls": D.with_values(payload_depth=96, payload_height=10, payload_margin=0.5),
+    "tight-walls": D.with_values(payload_depth=82, payload_height=10, payload_margin=0.5),
     "wide": D.with_values(
-        interior_wall_offset=4,
+        interior_walls=False,
         width=120,
         height=30,
         length=60,
@@ -103,7 +109,7 @@ MARGIN_CASES = {
     ),
     "thin-tall": D.with_values(payload_width=6, payload_height=17, payload_margin=0.5),
     "thick": D.with_values(
-        thickness=2, height=24, width=70, payload_width=40, payload_height=14, payload_depth=90
+        thickness=2, height=24, width=70, payload_width=40, payload_height=14, payload_depth=60
     ),
 }
 
@@ -133,9 +139,23 @@ def test_margin_controls_fit():
     # interior walls' offset and thickness when they are on.
     cfg = D.with_values(payload_depth=D.length - 1, payload_margin=0, interior_walls=False)
     assert P.clearance(cfg) == pytest.approx(0.5)
-    inset = D.interior_wall_offset + D.thickness
-    cfg = D.with_values(payload_depth=D.length - 2 * inset - 1, payload_margin=0)
-    assert P.clearance(cfg) == pytest.approx(0.5)
+    # With interior walls (mirrored inner flaps), the walls come closest at the payload's
+    # sides: the interior wall stands strip + 2 s - z(X) in from the corner line, z being the
+    # back panel's depth at X.
+    cfg = D.with_values(payload_margin=0)
+    body, inset = cfg.body, cfg.interior_wall_offset + cfg.thickness
+    reach = 0.0
+    for x in (-cfg.payload_width / 2, cfg.payload_width / 2):
+        lo, hi = 0.0, body.back.width  # back panel X falls with u
+        for _ in range(80):
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if body.back_point(mid)[0] > x else (lo, mid)
+        reach = max(reach, inset + 2 * body.back.sagitta - body.back.z(lo))
+    depth = cfg.edge_length - 2 * reach - cfg.thickness - 1  # leaves 0.5 mm at each end
+    # ... lengthwise at the corners; the wall slopes there, so the true distance (checked
+    # exactly against a mesh in test_clearance_is_true_distance_to_surface) is a bit less.
+    c = P.clearance(cfg.with_values(payload_depth=round(depth, 6)))
+    assert 0.4 < c <= 0.5 + 1e-6
 
 
 def test_too_large_payload_does_not_fit():
@@ -172,8 +192,11 @@ def test_maximize_height_touches_the_inner_surface(box):
 
 def test_maximize_depth_is_midline_length(box):
     out = P.maximize(box, "payload_depth")
-    inset = box.interior_wall_offset + box.thickness if box.interior_walls else 0
-    assert out.payload_depth == pytest.approx(box.length - 2 * (box.payload_margin + inset))
+    if not box.interior_walls:
+        assert out.payload_depth == pytest.approx(box.length - 2 * box.payload_margin)
+    else:  # the interior walls come in further at the payload's sides
+        inset = box.interior_wall_offset + box.thickness
+        assert out.payload_depth < box.length - 2 * (box.payload_margin + inset)
 
 
 @pytest.mark.parametrize("field", ["payload_width", "payload_depth", "payload_height"])
@@ -209,7 +232,7 @@ def test_fit_box_holds_payload_and_only_touches_body(dims):
     unchanged = {"width": out.width, "length": out.length, "height": out.height}
     assert replace(cfg, **unchanged) == out  # glue tab and thickness kept
     inset = cfg.interior_wall_offset + cfg.thickness
-    assert out.length == pytest.approx(max(pd + 2 * (cfg.payload_margin + inset), 10))
+    assert out.length >= pd + 2 * (cfg.payload_margin + inset)  # more where walls curve in
     assert P.clearance(out) == pytest.approx(cfg.payload_margin, abs=0.011)  # tight
 
 
@@ -292,7 +315,7 @@ def test_api(tmp_path):
     data = client.post("/api/render", json={"config": cfg}).get_json()
     assert data["payload"] == {
         "width": 30,
-        "depth": 95,
+        "depth": 80,
         "height": 13,
         "margin": 1,
         "clearance": round(P.clearance(D), 4),

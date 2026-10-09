@@ -24,7 +24,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import FoldedBox, Pattern, Point, Point3, wall_layout
+from yanartas_pillowbox.geometry import (
+    FoldedBox,
+    Pattern,
+    Point,
+    Point3,
+    wall_layout,
+    y_on_chain,
+)
 from yanartas_pillowbox.svg import MARGIN
 
 Coords = tuple[float, ...]
@@ -162,9 +169,10 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
     layout = wall_layout(cfg)
     if layout is not None:
         # Interior wall offset: the clear gap across the bottom bridge (the height takes the
-        # top one), from t/2 beyond the inner flap's fold to t/2 short of the interior
-        # wall's fold, where the folds are level (their highest point).
-        xo, yc = min(layout.crease.points, key=lambda q: q[1])
+        # top one) in the middle, where the walls are closest, from t/2 beyond the inner
+        # flap's fold to t/2 short of the interior wall's fold.
+        xo = wf + wb / 2
+        yc = y_on_chain((layout.crease,), xo)
         ya, yb = edge - yc + t / 2, edge - yc + layout.strip - t / 2
         dims.append(
             Dimension(

@@ -265,10 +265,11 @@ WALL_CONFIGS = {
 
 @pytest.mark.parametrize("cfg", list(WALL_CONFIGS.values()), ids=list(WALL_CONFIGS))
 def test_interior_walls_layout(cfg):
-    """Each inner flap continues into a bridge of the offset plus one thickness (wall
-    mid-surface to wall mid-surface) and an interior wall reaching down to the back panel's
-    inner surface. The bridge's folds follow its place under the front panel exactly, and
-    bridge and wall are a little narrower than the inner flap."""
+    """Each inner flap continues into a bridge and an interior wall reaching down to the back
+    panel's inner surface. The interior wall is the inner flap's mirror image in plan: the
+    bridge is the offset plus one thickness long (wall mid-surface to wall mid-surface) in
+    the middle and longer towards the sides. The bridge's folds follow its place under the
+    front panel exactly, and bridge and wall are a little narrower than the inner flap."""
     pat = build_pattern(cfg)
     layout = wall_layout(cfg)
     t, body = cfg.thickness, cfg.body
@@ -280,12 +281,17 @@ def test_interior_walls_layout(cfg):
     for x, y in folds["top-bridge"].points[1:-1]:
         x3 = body.back_point(x - wf)[0]
         assert -y == pytest.approx(body.surface_z("front", -t, x3) - body.z_shift, abs=1e-9)
-    # The interior wall's fold is the bridge's, shifted by the bridge length, and the wall's
-    # free edge lies a wall height beyond it.
+    # The interior wall's fold is the bridge's, moved by the bridge length: in plan, the
+    # inner flap's wall stands back.z(u) in from the corner line, the interior wall at
+    # strip + 2 s - back.z(u), i.e. mirrored about the middle of the bridge's centre.
     for (xa, ya), (xb, yb) in zip(
         folds["top-bridge"].points, folds["top-wall"].points, strict=True
     ):
-        assert (xb, yb) == pytest.approx((xa, ya - layout.strip))
+        u = xa - wf
+        inner = body.back.z(u)
+        interior = layout.strip + 2 * body.back.sagitta - body.back.z(u)
+        assert (xb, yb) == pytest.approx((xa, ya - (interior - inner)))
+    assert layout.bridge_at(body.back.width / 2) == pytest.approx(layout.strip)
     wall = next(f for f in pat.wall_faces if f.name == "top-wall")
     for u, d in layout.drops[1:-1]:
         lo, hi = wall.y_range(wf + u)

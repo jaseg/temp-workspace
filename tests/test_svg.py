@@ -166,6 +166,11 @@ def test_fold_paths_are_open_and_single(cfg):
         assert len(segs) == 1 or el.get("id").startswith(("fold-top-", "fold-bottom-"))
 
 
+def _near_bbox(seg, p, tol):
+    x0, y0, x1, y1 = seg.bbox()
+    return x0 - tol <= p[0] <= x1 + tol and y0 - tol <= p[1] <= y1 + tol
+
+
 def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
     root = svg_elements(render_svg(cfg))
     _, outline = parse_path(_path(root, "cut-outline").get("d"))
@@ -173,10 +178,13 @@ def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
         _, segs = parse_path(el.get("d"))
         for p in (segs[0].start, segs[-1].end):
             assert min(s.distance_to(p) for s in outline) < 1e-5
+        # (bridge folds are polylines of many short pieces: a few points on each suffice)
+        steps = 40 if len(segs) == 1 else 2
         for seg in segs:
-            for i in range(1, 40):
-                p = seg.point_at(i / 40)
-                assert min(s.distance_to(p) for s in outline) > 1e-3
+            for i in range(1, steps):
+                p = seg.point_at(i / steps)
+                near = [s for s in outline if _near_bbox(s, p, 1e-3)]
+                assert min((s.distance_to(p) for s in near), default=1.0) > 1e-3
 
 
 def test_metadata_embedded(cfg):
