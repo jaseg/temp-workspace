@@ -132,7 +132,7 @@ All lengths are in millimetres.
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to half the straight edge − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `interior_walls` | on | Extends each inner flap into a bridge along the front panel and a second, interior end wall (see *Interior walls* below). |
 | `interior_wall_offset` | 10 | Clear gap between the inside of the doubled end wall and the outside of the interior wall. 0–500. In the middle the interior walls are `length − 2·(offset + thickness)` apart; towards the sides they curve in. |
-| `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). With interior walls, it instead notches both bridge folds (see below). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
+| `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). With interior walls, it instead straightens the bridge folds (see below). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
 | `fpc_cutout_width` | 15 | Width of that flat section. 0 to the inner flaps' width − 1. The cut is level and exactly this wide. The flap's edge is not quite symmetric, so the section sits around its highest point, within about a millimetre of the flap's centre. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
 | `thickness` | 0.2 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
@@ -217,11 +217,11 @@ continues past its former cut edge into a **bridge** and then a second oval flap
   payload, rather than as folded paper.
 * The payload clearance and *Fit box to payload* count the interior walls, including how
   far they curve in at the payload's sides.
-* **FPC cutout with interior walls:** the cutout notches both bridge folds over its width.
-  The inner flap and the interior wall are cut back by the same depth below the bridge,
-  which keeps its full edge. The fold lines stop at the notches, and each notch is its own
-  closed cut path. A flat cable runs under the bridge and out between the inner and outer
-  flaps.
+* **FPC cutout with interior walls:** nothing is cut. The inner flap's fold into the bridge
+  runs straight (level) across the cutout width instead of following the curve, which
+  lowers the flap's top there. The bridge's fold into the interior wall is lowered by the
+  same amount on the wall's side, so the bridge, a little wider there, sags into a shallow
+  trough that a flat cable passes over, between it and the front panel.
 
 #### Material thickness
 
@@ -275,10 +275,9 @@ layers keep the line types apart.
 * **Cut outline:** exactly one closed `<path>` (one `M`, ending in `Z`) that traces the whole
   contour in one direction. Arcs are exact SVG `A` commands; with material thickness,
   flap edges that follow the body are fine polylines. The path has no duplicate segments
-  and no stray subpaths. FPC notches through the interior walls' folds are extra closed
-  paths (`cut-notch-N`) in the same layer.
+  and no stray subpaths.
 * **Fold lines:** separate open paths, dashed by fold direction. They end exactly on the
-  outline (or a notch) and never run along it.
+  outline and never run along it.
 * **Styling:** `fill="none"`, `stroke` and `stroke-width` are plain attributes on every
   element, with a fixed 0.1 mm stroke width. There are no CSS classes and no `<style>`.
 * **Metadata:** the complete config is stored as JSON in

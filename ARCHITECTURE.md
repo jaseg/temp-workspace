@@ -67,7 +67,7 @@ outputs.
 | File | What it pins down |
 |---|---|
 | `test_config.py` | Validation messages, limits, the width solve (interior corner to corner), interior height and flap offsets. |
-| `test_geometry.py` | Outline continuity and absence of self-intersections, fold placement, fold directions from both sides, thickness offsets, FPC cutouts, interior wall layout and notches. |
+| `test_geometry.py` | Outline continuity and absence of self-intersections, fold placement, fold directions from both sides, thickness offsets, FPC cutouts, interior wall layout. |
 | `test_model3d.py` | That the 3D model *is* the pattern folded: faces tile the pattern, each mesh triangle is isometric to its flat triangle, faces stay attached along every fold, no hidden creases inside a face, flap edges meet the intended surfaces, the glue tab lies at distance `t`, and the section matches the mesh. |
 | `test_svg.py` | SVG conventions (layers, dashes, a single closed cut path, attributes only), round-trip of the embedded config, parsed paths reproducing the geometry, labels. |
 | `test_dimensions.py` | Every dimension measures its parameter and its points lie on, or a stated allowance off, the exported geometry. |
@@ -174,9 +174,10 @@ middle and longer towards its ends, and the walls are closest at the payload's s
 point, which is slightly off-centre because the edge is not symmetric.
 
 - **Without interior walls,** the cut flattens the inner flap's free edge.
-- **With interior walls,** the same cut notches both bridge creases. The creases are split
-  around the notch (fold pieces + cut pieces). Each notch is a closed cut contour shared
-  by two faces, and the interior wall's notch mirrors the flap's about the fold.
+- **With interior walls,** the same level line replaces the flap-to-bridge crease over the
+  cutout width, and the bridge-to-wall crease is lowered by as much on the wall's side
+  (mirrored about the bridge). Nothing is cut; the wider bridge sags into a trough for
+  the cable.
 
 ## 5. Other algorithms
 
@@ -202,6 +203,6 @@ point, which is slightly off-centre because the edge is not symmetric.
 - **Dimensions.** They are computed in Python with measured points on the real geometry,
   or at a documented allowance off it for interior measures. They are drawn as overlays at
   the UI's text size and never exported.
-- **SVG.** The output has one closed cut path, plus notch contours. Folds are grouped into
+- **SVG.** The output has one closed cut path. Folds are grouped into
   mountain and valley layers, every line is black at 0.1 mm, and labels go in their own
   layer. The full config is embedded as JSON in `<metadata>` for re-import.

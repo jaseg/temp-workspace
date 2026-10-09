@@ -345,11 +345,9 @@ class Pattern:
     faces: tuple[Face, ...]  # faces of the folded 3D model
     bbox: BBox
     info: dict[str, float]
-    # Interior walls (not part of the folded mesh): their faces and folds, and the FPC
-    # notches cut through those folds (closed cut contours inside the outline).
+    # Interior walls (not part of the folded mesh): their faces and folds.
     wall_faces: tuple[Face, ...] = ()
     wall_folds: tuple[Fold, ...] = ()
-    holes: tuple[Outline, ...] = ()
 
     @property
     def all_folds(self) -> tuple[Fold, ...]:
@@ -592,7 +590,6 @@ class _EndPieces:
     edge: tuple[Segment, ...]  # the flap's outer boundary (cut and fold), left to right
     wall_faces: tuple[Face, ...] = ()
     wall_folds: tuple[Fold, ...] = ()
-    holes: tuple[Outline, ...] = ()
 
 
 def _back_end(cfg: Config, fpc: bool) -> _EndPieces:
@@ -622,47 +619,27 @@ def _back_end(cfg: Config, fpc: bool) -> _EndPieces:
     side_b2, side_b1 = Line(pb3, pb2), Line(pb2, pb)
     outline = (*left_cut, side_a1, side_a2, *free, side_b2, side_b1, *right_cut)
     x0, x1 = pa[0], pb[0]
-    # The folds, split around the FPC notches (if any): (left, notch, right) pieces, where
-    # the notch pieces are cut, not folded. Without a cutout the "notch" is empty.
     if width > 0:
-        # FPC: notch both folds over the cutout width (a level cut of exactly that width
-        # across the top of the fold), cutting the inner flap and the interior wall back to
-        # the same level below the bridge; the bridge keeps its full edge.
+        # FPC: straighten the flap-to-bridge fold over the cutout width (a level line of
+        # exactly that width across the top of the crease), lowering the inner flap's top
+        # there. The bridge-to-wall fold is lowered by as much on the wall's side (mirrored
+        # about the bridge), so the widened bridge sags into a trough under both walls' tops
+        # for the cable to pass through.
         ua_n, ub_n, level = level_cut([(x - wf, -y) for x, y in crease.points], width)
         na, nb = (wf + ua_n, -level), (wf + ub_n, -level)
+        left_pts = [q for q in crease.points if q[0] < na[0] - 1e-9]
         mid = [q for q in crease.points if ua_n + 1e-9 < q[0] - wf < ub_n - 1e-9]
-        c1 = (
-            Polyline((*(q for q in crease.points if q[0] < na[0] - 1e-9), na)),
-            Polyline((na, *mid, nb)),
-            Polyline((nb, *(q for q in crease.points if q[0] > nb[0] + 1e-9))),
-        )
-        c2 = tuple(layout.shift(seg, wf) for seg in c1)
-        flap_notch = Line(na, nb)  # the inner flap's edge in the notch
-        # ... and the interior wall's, cut back as far below the bridge (mirrored about it).
-        wall_notch = Polyline(
-            tuple((x, 2 * y - layout.bridge_at(x - wf) + level) for x, y in c1[1].points)
-        )
-        holes = (
-            Outline((c1[1], flap_notch.reversed())),
-            Outline((c2[1], wall_notch.reversed())),
-        )
-        folds = tuple(
-            Fold(f"{name}-{side}", FoldCategory.WALL, seg)
-            for name, pieces in (("bridge", c1), ("wall", c2))
-            for side, seg in (("left", pieces[0]), ("right", pieces[2]))
-        )
-        flap_edge: tuple[Segment, ...] = (c1[0], flap_notch, c1[2])
-        bridge_top: tuple[Segment, ...] = c1
-        bridge_bottom: tuple[Segment, ...] = c2
-        wall_top: tuple[Segment, ...] = (c2[0], wall_notch, c2[2])
-    else:
-        holes = ()
-        folds = (
-            Fold("bridge", FoldCategory.WALL, crease),
-            Fold("wall", FoldCategory.WALL, crease2),
-        )
-        flap_edge = bridge_top = (crease,)
-        bridge_bottom = wall_top = (crease2,)
+        right_pts = [q for q in crease.points if q[0] > nb[0] + 1e-9]
+        crease = Polyline((*left_pts, na, nb, *right_pts))
+        drop = layout.shift(Polyline((*left_pts, *right_pts)), wf).points
+        sunk = [(x, 2 * y - layout.bridge_at(x - wf) + level) for x, y in (na, *mid, nb)]
+        crease2 = Polyline((*drop[: len(left_pts)], *sunk, *drop[len(left_pts) :]))
+    folds = (
+        Fold("bridge", FoldCategory.WALL, crease),
+        Fold("wall", FoldCategory.WALL, crease2),
+    )
+    flap_edge = bridge_top = (crease,)
+    bridge_bottom = wall_top = (crease2,)
 
     def back_along(chain: Sequence[Segment]) -> tuple[Segment, ...]:
         return tuple(seg.reversed() for seg in reversed(chain))
@@ -685,7 +662,7 @@ def _back_end(cfg: Config, fpc: bool) -> _EndPieces:
         free,
         wall_top,
     )
-    return _EndPieces(outline, (*left_cut, *flap_edge, *right_cut), (bridge, wall), folds, holes)
+    return _EndPieces(outline, (*left_cut, *flap_edge, *right_cut), (bridge, wall), folds)
 
 
 def _mirror_face(face: Face, length: float, name: str) -> Face:
@@ -824,16 +801,10 @@ def build_pattern(cfg: Config) -> Pattern:
             for f in bottom.wall_folds
         ),
     )
-    holes = (
-        *top.holes,
-        *(Outline(tuple(_mirror(seg, length) for seg in h.segments)) for h in bottom.holes),
-    )
-
     bbox = union_bbox(
         [
             outline.bbox(),
             *(f.segment.bbox() for f in (*folds, *wall_folds)),
-            *(h.bbox() for h in holes),
         ]
     )
 
@@ -864,7 +835,7 @@ def build_pattern(cfg: Config) -> Pattern:
         info["interior_wall_width"] = layout.ub - layout.ua
         info["interior_wall_strip"] = layout.strip
     folds = tuple(replace(f, direction=fold_direction(cfg, f.segment, faces)) for f in folds)
-    return Pattern(outline, folds, faces, bbox, info, wall_faces, wall_folds, holes)
+    return Pattern(outline, folds, faces, bbox, info, wall_faces, wall_folds)
 
 
 def _face_at(faces: Sequence[Face], p: Point) -> Face:

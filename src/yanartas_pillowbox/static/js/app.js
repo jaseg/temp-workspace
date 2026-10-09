@@ -277,6 +277,7 @@ async function importFile(file) {
 
 function download() {
   if (!lastValid) return;
+  const c = lastValid.config;
   const n = (v) => String(Math.round(v * 10) / 10);
   const name = `pillowbox-${n(c.width)}x${n(c.length)}x${n(c.height)}mm.svg`;
   const url = URL.createObjectURL(new Blob([lastValid.svg], { type: "image/svg+xml" }));

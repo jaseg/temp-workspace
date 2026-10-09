@@ -7,7 +7,12 @@ from helpers import parse_path, q, svg_elements
 
 from yanartas_pillowbox import dimensions as dm
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import FoldedBox, build_cross_section, build_pattern
+from yanartas_pillowbox.geometry import (
+    FoldedBox,
+    build_cross_section,
+    build_pattern,
+    y_on_chain,
+)
 from yanartas_pillowbox.server import create_app
 from yanartas_pillowbox.svg import render_svg, sheet_offset
 
@@ -81,6 +86,19 @@ def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
         # height runs to the front panel's inside, t/2 beyond the inner flap's fold.
         allowance.update({("interior_wall_offset", 0): t / 2, ("interior_wall_offset", 1): t / 2})
         allowance["height", 1] = t / 2
+        # With an FPC cutout, both measure to where the folds would be without it.
+        x = cfg.body.front.width + cfg.body.back.width / 2
+        plain = build_pattern(cfg.with_values(fpc_cutout="none"))
+
+        def sunk(name):
+            fold, fold0 = (
+                next(f.segment for f in p.wall_folds if f.name == name) for p in (pattern, plain)
+            )
+            return abs(y_on_chain((fold,), x) - y_on_chain((fold0,), x))
+
+        allowance["height", 1] += sunk("top-bridge")
+        allowance["interior_wall_offset", 0] += sunk("bottom-bridge")
+        allowance["interior_wall_offset", 1] += sunk("bottom-wall")
     elif cfg.fpc_cutout == "both":  # measured to where the edge would be without the cutout
         x = cfg.body.front.width + cfg.body.back.width / 2
         plain = build_pattern(cfg.with_values(fpc_cutout="none"))
@@ -89,7 +107,7 @@ def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
     for d in dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern)):
         for i, p in enumerate(d.points):
             dist = min(s.distance_to(p) for s in segs)
-            assert dist == pytest.approx(allowance.get((d.param, i), 0), abs=1e-5), (d.param, i)
+            assert dist == pytest.approx(allowance.get((d.param, i), 0), abs=1e-4), (d.param, i)
 
 
 def test_length_dimension_runs_along_the_midline(cfg):

@@ -457,7 +457,7 @@ def validate(cfg: Config) -> dict[str, str]:
             add("interior_walls", "the box is too low for interior walls")
 
     if body is not None and cfg.fpc_cutout != "none" and "fpc_cutout_width" not in errors:
-        if walls is not None:  # the notches go through the bridge's folds
+        if walls is not None:  # the straightened folds lie within the bridge
             limit, what = walls.ub - walls.ua - 1, "the interior walls' width"
             full = walls.ub - walls.ua
         else:

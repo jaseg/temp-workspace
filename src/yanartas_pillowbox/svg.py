@@ -159,16 +159,6 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
             **stroke_attrs(dash),
         },
     )
-    for i, hole in enumerate(pattern.holes):  # FPC notches through the interior walls' folds
-        ET.SubElement(
-            g,
-            f"{{{SVG_NS}}}path",
-            {
-                "id": f"cut-notch-{i + 1}",
-                "d": path_data(hole.segments, offset, close=True),
-                **stroke_attrs(dash),
-            },
-        )
 
     for direction in FoldDirection:
         folds = [f for f in pattern.all_folds if f.direction == direction]

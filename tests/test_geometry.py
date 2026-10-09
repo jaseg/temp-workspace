@@ -3,7 +3,7 @@ import math
 from dataclasses import replace
 
 import pytest
-from helpers import loop_area, self_intersections
+from helpers import self_intersections
 
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.crosssection import CrossSection, sagitta_offset
@@ -18,6 +18,7 @@ from yanartas_pillowbox.geometry import (
     fold_direction,
     print_side_normal,
     wall_layout,
+    y_on_chain,
 )
 
 CONFIGS = {
@@ -314,34 +315,42 @@ def test_interior_walls_layout(cfg):
 def test_interior_walls_off_restore_the_plain_box():
     cfg = Config.defaults().with_values(interior_walls=False)
     pat = build_pattern(cfg)
-    assert pat.wall_faces == pat.wall_folds == pat.holes == ()
+    assert pat.wall_faces == pat.wall_folds == ()
     assert wall_layout(cfg) is None
 
 
+def _wall_fold(pattern, name):
+    return next(f.segment for f in pattern.wall_folds if f.name == name)
+
+
+def _between(a, b, n):
+    return [a + (b - a) * i / (n - 1) for i in range(n)]
+
+
 @pytest.mark.parametrize("which", ["front", "back", "both"])
-def test_fpc_cutout_notches_both_wall_folds(which):
-    """With interior walls the FPC cutout notches the inner flap -> bridge and bridge ->
-    interior wall folds: the folds stop at the notch, the bridge keeps its edge, and the
-    inner flap and interior wall are cut back by the same depth over exactly the width."""
+def test_fpc_cutout_straightens_both_wall_folds(which):
+    """With interior walls the FPC cutout straightens the inner flap -> bridge fold over
+    exactly the width, and lowers the bridge -> interior wall fold by as much on the wall's
+    side; elsewhere both folds are unchanged, and nothing is cut."""
     cfg = Config.defaults().with_values(fpc_cutout=which, fpc_cutout_width=18)
+    plain = build_pattern(cfg.with_values(fpc_cutout="none"))
     pat = build_pattern(cfg)
+    assert pat.outline == plain.outline
     ends = {"front": ["top"], "back": ["bottom"], "both": ["top", "bottom"]}[which]
-    assert len(pat.holes) == 2 * len(ends)
-    names = {f.name for f in pat.wall_folds}
     for end in ("top", "bottom"):
-        split = {
-            f"{end}-bridge-left",
-            f"{end}-bridge-right",
-            f"{end}-wall-left",
-            f"{end}-wall-right",
-        }
-        assert (split <= names) == (end in ends)
-    for flap_notch, wall_notch in zip(pat.holes[::2], pat.holes[1::2], strict=True):
-        x0, _, x1, _ = flap_notch.bbox()
-        assert x1 - x0 == pytest.approx(18, abs=1e-6)
-        assert wall_notch.bbox()[2] - wall_notch.bbox()[0] == pytest.approx(18, abs=1e-6)
-        # Same depth on both sides: the wall's notch mirrors the flap's about the fold, so
-        # both cut away the same area.
-        a1, a2 = abs(loop_area(flap_notch.segments)), abs(loop_area(wall_notch.segments))
-        assert a1 == pytest.approx(a2, rel=1e-6)
-        assert 0 < flap_notch.bbox()[3] - flap_notch.bbox()[1] < 2  # small and shallow
+        bridge, bridge0 = (_wall_fold(p, f"{end}-bridge") for p in (pat, plain))
+        wall, wall0 = (_wall_fold(p, f"{end}-wall") for p in (pat, plain))
+        if end not in ends:
+            assert (bridge, wall) == (bridge0, wall0)
+            continue
+        level = [(x, y) for x, y in bridge.points if (x, y) not in bridge0.points]
+        assert len(level) == 2 and level[0][1] == level[1][1]
+        assert level[1][0] - level[0][0] == pytest.approx(18, abs=1e-6)
+        sign = 1 if end == "top" else -1  # toward the body
+        for x in _between(level[0][0], level[1][0], 25)[1:-1]:
+            d = sign * (y_on_chain((bridge,), x) - y_on_chain((bridge0,), x))
+            assert 0 < d < 2  # lowered a little, onto the level
+            dw = sign * (y_on_chain((wall0,), x) - y_on_chain((wall,), x))
+            assert dw == pytest.approx(d, abs=1e-6)
+        for x in _between(bridge.start[0], level[0][0], 10)[:-1]:
+            assert y_on_chain((bridge,), x) == pytest.approx(y_on_chain((bridge0,), x), abs=1e-9)

@@ -16,7 +16,6 @@ from yanartas_pillowbox.geometry import (
     build_cross_section,
     build_model3d,
     build_pattern,
-    wall_layout,
 )
 
 D = Config.defaults()
@@ -106,17 +105,9 @@ def test_faces_tile_the_pattern(case):
     for fold in pattern.all_folds:
         owners = [f.name for f in faces if any(same_segment(fold.segment, s) for s in f.boundary)]
         assert len(owners) == 2, (fold.name, owners)
-    # ... and the face areas add up to the area enclosed by the cut outline, less the FPC
-    # notches: closed cuts between the bridge and the inner flap or interior wall, whose
-    # edges belong to those faces.
+    # ... and the face areas add up to the area enclosed by the cut outline.
     total = sum(abs(loop_area(f.boundary)) for f in faces)
-    holes = sum(abs(loop_area(h.segments)) for h in pattern.holes)
-    assert total + holes == pytest.approx(abs(loop_area(pattern.outline.segments)), rel=1e-9)
-    for hole in pattern.holes:
-        assert hole.is_continuous(1e-9)
-        for seg in hole.segments:
-            owners = [f.name for f in faces if any(same_segment(seg, s) for s in f.boundary)]
-            assert len(owners) == 1, (seg, owners)
+    assert total == pytest.approx(abs(loop_area(pattern.outline.segments)), rel=1e-9)
 
 
 # ------------------------------------------------------------------ mesh <-> 2D faces
@@ -287,13 +278,7 @@ def test_flap_edges_meet_the_body_surfaces(case):
     body, t = box.body, cfg.thickness
     wf, wb = body.front.width, body.back.width
     walls = cfg.interior_walls
-    layout = wall_layout(cfg)
-    # (with interior walls the FPC cutout notches the folds and leaves the flap's edge alone)
-    plain = (
-        None
-        if cfg.fpc_cutout == "none" or walls
-        else build_pattern(replace(cfg, fpc_cutout="none"))
-    )
+    plain = None if cfg.fpc_cutout == "none" else build_pattern(replace(cfg, fpc_cutout="none"))
     for end in ("top", "bottom"):
         for i in range(1, 200):
             # Outer flap.
@@ -311,11 +296,6 @@ def test_flap_edges_meet_the_body_surfaces(case):
             gap = _surface_gap(body, "front", -t if walls else -t / 2, p[0], p[2])
             tol = 0.01 + 1e-3 * t
             on_chord = abs(p[2] - body.z_shift) < 1e-6
-            if layout is not None:
-                notched = any(h.bbox()[0] < x < h.bbox()[2] for h in pattern.holes)
-                if notched and layout.ua < x - wf < layout.ub:
-                    assert gap < 1e-6, ("FPC notch", end, x, gap)  # cut back below
-                    continue
             if plain is not None:
                 plo, phi = plain.face(f"back-{end}-flap").y_range(x)
                 if abs((lo, hi)[end == "bottom"] - (plo, phi)[end == "bottom"]) > 1e-9:
