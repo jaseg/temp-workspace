@@ -118,13 +118,10 @@ def test_exported_svg_has_no_dimensions(cfg):
 
 
 # ------------------------------------------------------------------ cross-section
-def on_band(section, p, tol=1e-5):
-    """Distance from p to the nearest material outline edge of the section."""
-    best = math.inf
-    for band in section["material"]:
-        for a, b in zip(band, band[1:] + band[:1], strict=True):
-            best = min(best, seg_dist(p, a, b))
-    return best < tol
+def on_outline(section, p, tol=1e-5):
+    """Is p on the section's interior outline?"""
+    loop = section["interior"]
+    return min(seg_dist(p, a, b) for a, b in zip(loop, loop[1:] + loop[:1], strict=True)) < tol
 
 
 def seg_dist(p, a, b):
@@ -143,11 +140,13 @@ def test_section_dimensions(cfg):
     assert measured(height) == pytest.approx(cfg.height, abs=1e-5)
     assert dm.fmt(cfg.height) in height.label
     for p in height.points:
-        assert on_band(section, p, tol=2e-3 * cfg.width), p  # chord sag of the outline
+        assert on_outline(section, p, tol=2e-3 * cfg.width), p  # chord sag of the outline
     # The driving width: between the interior corners at the two side folds.
     width = dims["width"]
     assert measured(width) == pytest.approx(cfg.width, abs=1e-5)  # 1e-6 mm rounding
     assert dm.fmt(cfg.width) in width.label
+    for p in width.points:  # the interior corners
+        assert list(p) in section["interior"]
     if cfg.thickness == 0:  # the corners are the folds themselves
         folds = sorted(tuple(f["point"]) for f in section["folds"])
         assert sorted(width.points) == pytest.approx(folds, abs=1e-5)

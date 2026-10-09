@@ -340,16 +340,17 @@ def test_cross_section_matches_pattern_and_mesh(case):
     assert inner["fold"][0] - inner["glue"][0] == pytest.approx(cfg.width, abs=1e-5)
     assert inner["front_apex"][1] == pytest.approx(cfg.height / 2, abs=1e-5)
     assert inner["back_apex"][1] == pytest.approx(-cfg.height / 2, abs=1e-5)
-    # The material outlines are t wide around the mid-surfaces.
-    for band, mid in zip(sec["material"], (front, back), strict=True):
-        n = len(band) // 2
-        for a, b, m in zip(band[:n], reversed(band[n:]), mid, strict=True):
-            assert math.dist(a, b) == pytest.approx(cfg.thickness, abs=1e-5)
-            assert math.dist(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), m) < 1e-5
+    # The interior outline runs corner to corner, t/2 inside the mid-surfaces.
+    outline = sec["interior"]
+    assert inner["glue"] in outline and inner["fold"] in outline
+    for q in outline:
+        assert inner["glue"][0] - 1e-6 <= q[0] <= inner["fold"][0] + 1e-6
+        d = min(seg_dist(q, a, b) for c in (front, back) for a, b in itertools.pairwise(c))
+        if q not in (inner["glue"], inner["fold"]):
+            assert d == pytest.approx(cfg.thickness / 2, abs=2e-3 * body.front.width)
     x0, z0, x1, z1 = sec["bbox"]
-    for band in sec["material"]:
-        for x, z in band:
-            assert x0 - 1e-6 <= x <= x1 + 1e-6 and z0 - 1e-6 <= z <= z1 + 1e-6
+    for x, z in outline:
+        assert x0 - 1e-6 <= x <= x1 + 1e-6 and z0 - 1e-6 <= z <= z1 + 1e-6
     # Every 3D panel vertex, seen along the length, lies on the section curve.
     tol = 2e-3 * body.front.width  # chord sag of the sampled section polyline
     for name, curve in (("front-panel", front), ("back-panel", back)):

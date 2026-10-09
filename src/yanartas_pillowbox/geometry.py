@@ -687,20 +687,24 @@ def _trace(points: Any, n: int) -> list[list[float]]:
     return [[round(c, 6) for c in points(i / n)] for i in range(n + 1)]
 
 
-def _band(body: Body, panel: str, samples: int) -> list[list[float]]:
-    """Closed outline of one panel's material: mid-surface +- t/2, ends cut square."""
-    sec = body.front if panel == "front" else body.back
-    point = body.front_point if panel == "front" else body.back_point
-    normal = body.front_normal if panel == "front" else body.back_normal
+def _interior(body: Body, samples: int) -> list[list[float]]:
+    """Closed outline of the interior: the panels' inner surfaces (t/2 inside the
+    mid-surface), from the interior corner at the glued edge over the front panel to the
+    corner at the straight fold and back along the back panel."""
     h = body.thickness / 2
-
-    def side(k: float, f: float) -> list[float]:
-        u = sec.width * f
-        (x, z), (nx, nz) = point(u), normal(u)
-        return [round(x + k * nx, 6), round(z + k * nz, 6)]
-
-    out = [side(h, i / samples) for i in range(samples + 1)]
-    return out + [side(-h, 1 - i / samples) for i in range(samples + 1)]
+    (gx, gz), (fx, fz) = body.inner_glue, body.inner_fold
+    out = [(gx, gz)]
+    for panel, sec, point, normal in (
+        ("front", body.front, body.front_point, body.front_normal),
+        ("back", body.back, body.back_point, body.back_normal),
+    ):
+        for i in range(samples + 1):
+            (x, z), (nx, nz) = point(sec.width * i / samples), normal(sec.width * i / samples)
+            q = (x - h * nx, z - h * nz)
+            if gx < q[0] < fx:  # past the corners the inner surfaces run into each other
+                out.append(q)
+        out.append((fx, fz) if panel == "front" else (gx, gz))
+    return [[round(c, 6) for c in q] for q in out]
 
 
 def body_bbox(body: Body, with_material: bool = True) -> BBox:
@@ -733,7 +737,7 @@ def build_cross_section(
     point along the length. Coordinates are (X, Z) in mm in the 3D model's frame: X across
     the box, Z height with the front panel at +Z, centred on the interior. ``front``/``back``
     are the panels' mid-surfaces (from ``FoldedBox``, so the section, 3D preview and pattern
-    always agree), ``material`` the outlines of their material, ``inner`` the interior's
+    always agree), ``interior`` the closed outline of the interior, ``inner`` the interior's
     corners and apexes (where the interior width and height are measured).
     """
     box = FoldedBox(cfg)
@@ -762,7 +766,7 @@ def build_cross_section(
         "units": "mm",
         "front": front,
         "back": back,
-        "material": [_band(body, "front", samples), _band(body, "back", samples)],
+        "interior": _interior(body, samples),
         "inner": {k: [round(c, 6) for c in v] for k, v in inner.items()},
         "folds": [
             {

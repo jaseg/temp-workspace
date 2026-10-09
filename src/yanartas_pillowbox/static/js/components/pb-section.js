@@ -19,37 +19,36 @@ template.innerHTML = `
           min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stage { position: relative; flex: 1; min-height: 0; }
   svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .body { fill: color-mix(in srgb, var(--text) 7%, transparent); stroke: none; }
-  .material { fill: color-mix(in srgb, var(--text) 55%, transparent); stroke: var(--text);
-              stroke-width: 1px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .interior { fill: var(--interior-fill); stroke: var(--text); stroke-width: 1.4px;
+              stroke-linejoin: round; vector-effect: non-scaling-stroke; }
   .fold { fill: var(--text); stroke: var(--surface); stroke-width: 1.5px; vector-effect: non-scaling-stroke;
           paint-order: stroke; outline: none; }
   .fold-ring { fill: none; stroke: var(--text); stroke-width: 1px; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--border); stroke-width: 1px; stroke-dasharray: 4 4;
           vector-effect: non-scaling-stroke; }
   .stage { --dim-color: var(--text-muted); --dim-halo: var(--surface); --dim-hl: var(--accent); }
+  :host { --interior-fill: color-mix(in srgb, var(--text) 9%, transparent);
+          --payload-fill: color-mix(in srgb, var(--accent) 22%, transparent); }
   ${DIM_STYLE}
-  .payload { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent);
+  .payload { fill: var(--payload-fill); stroke: var(--accent);
              stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
   .payload-margin { fill: none; stroke: var(--accent); stroke-width: 1px; stroke-dasharray: 4 3;
                     vector-effect: non-scaling-stroke; }
   .payload-margin.bad { stroke: var(--error); }
   .payload.bad { fill: color-mix(in srgb, var(--error) 22%, transparent); stroke: var(--error); }
-  .legend i.payload { border-radius: 2px; box-shadow: none; border: 1.5px solid var(--accent);
-                      background: color-mix(in srgb, var(--accent) 22%, transparent); }
-  .legend i.payload.bad { border-color: var(--error);
-                          background: color-mix(in srgb, var(--error) 22%, transparent); }
+  .legend i { width: 14px; height: 9px; display: inline-block; border-radius: 2px; }
+  .legend i.interior { background: var(--interior-fill); border: 1px solid var(--text); }
+  .legend i.payload { background: var(--payload-fill); }
+  .legend i.payload.bad { background: color-mix(in srgb, var(--error) 22%, transparent); }
+  .legend i.margin { height: 0; border-radius: 0; border-top: 1.5px dashed var(--accent); }
+  .legend i.margin.bad { border-top-color: var(--error); }
   text { fill: var(--text-muted); font-family: var(--ui-font, system-ui, sans-serif); }
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
            border-radius: 5px; padding: 2px 9px; cursor: pointer; }
   button[aria-pressed="true"] { background: var(--surface-2); border-color: var(--text-muted); }
-  text.name { fill: var(--text); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; font-size: 12px;
             border-top: 1px solid var(--border); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .legend i.fold { background: var(--text); }
-  .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block;
-              box-shadow: 0 0 0 1px var(--text); }
 </style>
 <header>
   <h2>Body cross-section</h2>
@@ -97,7 +96,7 @@ export class PbSection extends HTMLElement {
     if (this.#svg) highlightDims(this.#svg, param);
   }
 
-  /** section: {front, back: [[x, z]...] (mid-surfaces), material: [outline...],
+  /** section: {front, back: [[x, z]...] (mid-surfaces), interior: [[x, z]...] (closed),
    *  folds: [{category, point}], width, height (interior), bbox};
    *  dims: parameter dimensions in the same (X, Z) frame. */
   update(section, dims = [], payload = null) {
@@ -107,14 +106,12 @@ export class PbSection extends HTMLElement {
       + "between the curved folds.";
     this.#data = { section, dims, payload };
     this.#render();
-    this.#legend.replaceChildren(
-      legendItem("fold", `Fold, seen end-on (${[...new Set(section.folds.map((f) => f.direction))].join(", ")})`),
-    );
+    this.#legend.replaceChildren(legendItem("interior", "Box interior"));
     if (payload && !payload.empty) {
-      const label = payload.margin > 0 ? "Payload, dashed: margin" : "Payload";
-      const item = legendItem(null, payload.fits ? label : `${label} (does not fit)`);
-      item.querySelector("i").className = payload.fits ? "payload" : "payload bad";
-      this.#legend.append(item);
+      const bad = payload.fits ? "" : " bad";
+      this.#legend.append(
+        legendItem(`payload${bad}`, payload.fits ? "Payload space" : "Payload space (does not fit)"));
+      if (payload.margin > 0) this.#legend.append(legendItem(`margin${bad}`, "Payload margin"));
     }
   }
 
@@ -151,13 +148,9 @@ export class PbSection extends HTMLElement {
       el("line", { class: "axis", x1: 0, y1: -height / 2 - pad / 2, x2: 0, y2: height / 2 + pad / 2 }),
     );
 
-    // Body: mid-surface loop (front panel from the glued edge to the straight fold, back panel
-    // back to the glue fold), shaded; then the material of both panels.
-    const outline = [...section.front, ...section.back.slice(1)].map(p);
-    svg.append(el("path", { class: "body", d: `M ${outline.map((q) => q.join(",")).join(" L ")} Z` }));
-    for (const band of section.material) {
-      svg.append(el("path", { class: "material", d: `M ${band.map(p).map((q) => q.join(",")).join(" L ")} Z` }));
-    }
+    // The interior: the panels' inner surfaces.
+    const interior = section.interior.map(p);
+    svg.append(el("path", { class: "interior", d: `M ${interior.map((q) => q.join(",")).join(" L ")} Z` }));
 
     // Payload: preview only, centred in the section.
     if (payload && !payload.empty) {
@@ -173,12 +166,6 @@ export class PbSection extends HTMLElement {
         class: payload.fits ? "payload" : "payload bad", x: -pw / 2, y: -ph / 2, width: pw, height: ph,
       }));
     }
-
-    // Panel names, inside the body (dimensions use the space outside).
-    svg.append(
-      text(width * 0.2, -height * 0.16, "front", fs, "middle", "name"),
-      text(width * 0.2, height * 0.16 + fs * 0.8, "back", fs, "middle", "name"),
-    );
 
     // Fold markers.
     for (const fold of section.folds) {
@@ -200,20 +187,12 @@ export class PbSection extends HTMLElement {
   }
 }
 
-function legendItem(color, label) {
+function legendItem(swatchClass, label) {
   const item = document.createElement("span");
   const swatch = document.createElement("i");
-  if (color === "fold") swatch.className = "fold";
-  else if (color) swatch.style.background = color;
+  swatch.className = swatchClass;
   item.append(swatch, label);
   return item;
-}
-
-function text(x, y, content, size, anchor, cls) {
-  const t = el("text", { x, y, "font-size": size, "text-anchor": anchor });
-  if (cls) t.setAttribute("class", cls);
-  t.textContent = content;
-  return t;
 }
 
 function el(tag, attrs = {}) {

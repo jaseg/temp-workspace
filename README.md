@@ -93,8 +93,8 @@ the defaults. It never crashes because of the file.
     tab's bottom end);
   * **Folded box:** width, length (along the top ridge) and height;
   * **Cross-section:** width, height, and the front panel's arc (part of the
-    circumference). This view
-    draws the material at its thickness.
+    circumference). This view shades the box interior (inside the material), the payload
+    space and, dashed, the payload margin.
 
   Width, length and height are interior dimensions, so where they are measured inside the
   material their end points sit off the drawn lines by the material allowance.

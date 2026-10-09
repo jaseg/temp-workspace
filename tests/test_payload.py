@@ -66,14 +66,13 @@ def test_default_payload_fits():
 
 
 def test_fits_matches_section(box):
-    """The cross-section clearance is the distance to the material the section view draws
-    (its inner surface, t/2 inside the mid-surface)."""
+    """The cross-section clearance is the distance to the interior outline the section view
+    draws (the material's inner surface, t/2 inside the mid-surface)."""
     section = build_cross_section(box, samples=1500)
     w, h = box.payload_width, box.payload_height
     brute = min(
         rect_segment_distance(a, b, w, h)
-        for band in section["material"]
-        for a, b in itertools.pairwise(band)
+        for a, b in itertools.pairwise(section["interior"] + section["interior"][:1])
     )
     assert P.section_clearance(box.body, w, h) == pytest.approx(brute, abs=2e-3)
 
