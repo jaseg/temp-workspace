@@ -1,32 +1,31 @@
 """Pure pillow box geometry (no Flask, no SVG).
 
 Flat-pattern coordinate system: millimetres, x to the right, y *down* (same orientation as
-SVG). ``W`` is the flat panel width (half the circumference), derived from the closed box
-width ``cfg.width`` by ``crosssection.panel_width``. The front panel occupies
-``0 <= x <= W``, the back panel ``W <= x <= 2W`` and the glue tab ``2W <= x <= 2W + g``.
-The straight body edges run from ``y = 0`` to ``y = L`` (``cfg.edge_length``: the input
-``length`` is measured along the panel midline, between the fold apexes, and is shorter by
-the height); the lens-shaped closing flaps stick out above ``y = 0`` and below ``y = L``.
+SVG). The front panel occupies ``0 <= x <= Wf``, the back panel ``Wf <= x <= Wf + Wb`` and the
+glue tab the next ``g``; the panel widths come from ``crosssection.solve_body``, which builds
+the material (thickness ``t``) around the interior ``width x height x length`` of the
+config. The straight body edges run from ``y = 0`` to ``y = L`` (``cfg.edge_length``); the
+lens-shaped closing flaps stick out above ``y = 0`` and below ``y = L``.
 
-Each flap is bounded by two circular arcs through the panel corners:
+Each flap is bounded by two circular arcs through its panel's corners:
 
-* the **curved fold**, bowing *into* the panel by the fold sagitta ``s_f``; its distance from
-  the chord at ``x = u`` is ``f(u)``;
-* the **cut edge**, bowing *out* of the panel by ``s_c = s_f - t/2``.
+* the **curved fold**, bowing *into* the panel by the fold sagitta (front ``height/2``, back
+  ``height/2 + t``); its distance from the chord at ``x = u`` is ``f(u)``;
+* the **cut edge**, bowing *out* of the panel: the front (outer) flaps reach the back
+  panel's outer surface, the back (inner) flaps stop at the front panel's inner surface.
 
-Folded (closed) state, used for the 3D model -- every face is an exact isometric image of its
-flat face:
+Folded (closed) state of the mid-surface, used for the 3D model -- every face is an exact
+isometric image of its flat face:
 
 * Each panel becomes a cylinder whose rulings run along the length and whose cross-section,
   parametrised by arc length ``u``, has height ``Z(u) = f(u)`` (so ``X'(u) = sqrt(1 - f'(u)^2)``).
-  The box is therefore ``2 s_f`` deep and every crease ``(X(u), f(u), f(u))`` lies in a plane
-  at 45 degrees.
+  Every crease ``(X(u), f(u), f(u))`` therefore lies in a plane at 45 degrees.
 * Folding along a planar crease reflects the panel's extension across that plane. The flap
-  becomes a cylindrical end wall ``{(X(u), f(u), z)}`` with vertical rulings. Front and back
-  flaps of one end land on the *same* wall and overlap; with zero thickness each flap's cut
-  edge lies exactly on the opposite panel's crease (the edge it closes against), and the
-  ``t/2`` offset leaves room for the material.
-* The glue tab lies against the inside of the front panel, along its free edge.
+  becomes a cylindrical end wall ``{(X(u), f(u), z)}`` with vertical rulings. The back flaps'
+  wall lies inside, the front flaps' wall ``t`` further out (the front fold bows in ``t``
+  less), so the two flaps of an end lie on top of each other.
+* The glue tab lies on the outside of the front panel, along its free edge (its
+  mid-surface ``t`` out from the panel's).
 
 This needs ``|f'| <= 1``, i.e. the fold arc may turn at most 45 degrees at the corners
 (``s_f < 0.207 W``); the config enforces ``s_f <= 0.2 W`` (see ``crosssection``).
@@ -34,6 +33,7 @@ This needs ``|f'| <= 1``, i.e. the fold arc may turn at most 45 degrees at the c
 
 from __future__ import annotations
 
+import itertools
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -41,7 +41,7 @@ from enum import StrEnum
 from typing import Any
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.crosssection import CrossSection, circle_radius
+from yanartas_pillowbox.crosssection import Body, circle_radius, sagitta_offset
 
 Point = tuple[float, float]
 BBox = tuple[float, float, float, float]  # min_x, min_y, max_x, max_y
@@ -335,50 +335,87 @@ def union_bbox(boxes: Any) -> BBox:
     )
 
 
-def _flap_cut(start: Point, end: Point, sagitta: float, bulge: Point) -> tuple[Segment, ...]:
-    """The cut edge of one flap."""
-    return (arc_from_chord(start, end, sagitta, bulge),)
+def _cut_chain(x0: float, y0: float, cuts: Sequence[Point], up: bool) -> tuple[Segment, ...]:
+    """One flap's cut edge, left to right, through ``(x0 + u, y0 -+ c)`` for the (u, c)
+    samples of ``crosssection.Body``: an exact arc where the samples are one (zero
+    thickness), a fine polyline otherwise."""
+    sign = -1.0 if up else 1.0
+    pts = [(x0 + u, y0 + sign * c) for u, c in cuts]
+    width, sagitta = cuts[-1][0], max(c for _, c in cuts)
+    if cuts[0][1] == cuts[-1][1] == 0 and sagitta > 0:
+        arc = arc_from_chord(pts[0], pts[-1], sagitta, (0.0, sign))
+        if all(abs(c - sagitta_offset(width, sagitta, u)) < 1e-9 for u, c in cuts):
+            return (arc,)
+    return tuple(Line(a, b) for a, b in itertools.pairwise(pts) if _dist(a, b) > 1e-12)
+
+
+def _lines(*pairs: tuple[Point, Point]) -> tuple[Line, ...]:
+    """Lines between the given point pairs, skipping zero-length ones."""
+    return tuple(Line(a, b) for a, b in pairs if _dist(a, b) > 1e-9)
 
 
 def build_pattern(cfg: Config) -> Pattern:
     """Turn a validated config into the flat pattern: one outline and typed folds."""
-    w, length = cfg.panel_width, cfg.edge_length
+    body = cfg.body
+    wf, wb, length = body.front.width, body.back.width, cfg.edge_length
+    w2 = wf + wb
     g, taper = cfg.glue_tab_width, cfg.glue_tab_taper
-    s_f, s_c = cfg.fold_sagitta, cfg.cut_sagitta
+    sf, sb = body.front.sagitta, body.back.sagitta
+    front_cuts, back_cuts = body.front_cuts, body.back_cuts
+    # The outer flaps reach past the corners where the back panel runs on (glued edge) or
+    # bends around the outside (straight fold): short cut steps there.
+    c_left, c_right = front_cuts[0][1], front_cuts[-1][1]
 
     up, down = (0.0, -1.0), (0.0, 1.0)
     p = {
         "tl": (0.0, 0.0),
-        "tm": (w, 0.0),
-        "tr": (2 * w, 0.0),
+        "tm": (wf, 0.0),
+        "tr": (w2, 0.0),
         "bl": (0.0, length),
-        "bm": (w, length),
-        "br": (2 * w, length),
-        "gt": (2 * w + g, taper),
-        "gb": (2 * w + g, length - taper),
+        "bm": (wf, length),
+        "br": (w2, length),
+        "gt": (w2 + g, taper),
+        "gb": (w2 + g, length - taper),
     }
 
-    cut_ft = _flap_cut(p["tl"], p["tm"], s_c, up)
-    cut_bt = _flap_cut(p["tm"], p["tr"], s_c, up)
+    def rev(chain: Sequence[Segment]) -> tuple[Segment, ...]:
+        return tuple(seg.reversed() for seg in reversed(chain))
+
+    cut_ft = _cut_chain(0.0, 0.0, front_cuts, up=True)
+    step_t = _lines(((wf, -c_right), p["tm"]))
+    cut_bt = _cut_chain(wf, 0.0, back_cuts, up=True)
     tab = (Line(p["tr"], p["gt"]), Line(p["gt"], p["gb"]), Line(p["gb"], p["br"]))
-    cut_bb = _flap_cut(p["br"], p["bm"], s_c, down)
-    cut_fb = _flap_cut(p["bm"], p["bl"], s_c, down)
+    cut_bb = rev(_cut_chain(wf, length, back_cuts, up=False))
+    step_b = _lines((p["bm"], (wf, length + c_right)))
+    cut_fb = rev(_cut_chain(0.0, length, front_cuts, up=False))
+    free_bottom = _lines(((0.0, length + c_left), p["bl"]))
     free_edge = Line(p["bl"], p["tl"])
-    outline = Outline((*cut_ft, *cut_bt, *tab, *cut_bb, *cut_fb, free_edge))
+    free_top = _lines((p["tl"], (0.0, -c_left)))
+    outline = Outline(
+        (
+            *cut_ft,
+            *step_t,
+            *cut_bt,
+            *tab,
+            *cut_bb,
+            *step_b,
+            *cut_fb,
+            *free_bottom,
+            free_edge,
+            *free_top,
+        )
+    )
 
     folds = (
-        Fold("front-top", FoldCategory.CURVED, arc_from_chord(p["tl"], p["tm"], s_f, down)),
-        Fold("back-top", FoldCategory.CURVED, arc_from_chord(p["tm"], p["tr"], s_f, down)),
-        Fold("front-bottom", FoldCategory.CURVED, arc_from_chord(p["bl"], p["bm"], s_f, up)),
-        Fold("back-bottom", FoldCategory.CURVED, arc_from_chord(p["bm"], p["br"], s_f, up)),
+        Fold("front-top", FoldCategory.CURVED, arc_from_chord(p["tl"], p["tm"], sf, down)),
+        Fold("back-top", FoldCategory.CURVED, arc_from_chord(p["tm"], p["tr"], sb, down)),
+        Fold("front-bottom", FoldCategory.CURVED, arc_from_chord(p["bl"], p["bm"], sf, up)),
+        Fold("back-bottom", FoldCategory.CURVED, arc_from_chord(p["bm"], p["br"], sb, up)),
         Fold("panels", FoldCategory.STRAIGHT, Line(p["tm"], p["bm"])),
         Fold("glue-tab", FoldCategory.GLUE, Line(p["tr"], p["br"])),
     )
 
     f_ft, f_bt, f_fb, f_bb, f_mid, f_glue = (f.segment for f in folds)
-
-    def rev(chain: Sequence[Segment]) -> tuple[Segment, ...]:
-        return tuple(seg.reversed() for seg in reversed(chain))
 
     faces = (
         Face(
@@ -386,7 +423,7 @@ def build_pattern(cfg: Config) -> Pattern:
             "panel",
             (f_ft, f_mid, f_fb.reversed(), free_edge),
             0.0,
-            w,
+            wf,
             (f_ft,),
             (f_fb,),
         ),
@@ -394,36 +431,57 @@ def build_pattern(cfg: Config) -> Pattern:
             "back-panel",
             "panel",
             (f_bt, f_glue, f_bb.reversed(), f_mid.reversed()),
-            w,
-            2 * w,
+            wf,
+            w2,
             (f_bt,),
             (f_bb,),
         ),
-        Face("glue-tab", "tab", (*tab, f_glue.reversed()), 2 * w, 2 * w + g, tab[:1], tab[2:]),
-        Face("front-top-flap", "flap", (*cut_ft, f_ft.reversed()), 0.0, w, cut_ft, (f_ft,)),
-        Face("back-top-flap", "flap", (*cut_bt, f_bt.reversed()), w, 2 * w, cut_bt, (f_bt,)),
-        Face("front-bottom-flap", "flap", (*cut_fb, f_fb), 0.0, w, (f_fb,), rev(cut_fb)),
-        Face("back-bottom-flap", "flap", (*cut_bb, f_bb), w, 2 * w, (f_bb,), rev(cut_bb)),
+        Face("glue-tab", "tab", (*tab, f_glue.reversed()), w2, w2 + g, tab[:1], tab[2:]),
+        Face(
+            "front-top-flap",
+            "flap",
+            (*cut_ft, *step_t, f_ft.reversed(), *free_top),
+            0.0,
+            wf,
+            cut_ft,
+            (f_ft,),
+        ),
+        Face("back-top-flap", "flap", (*cut_bt, f_bt.reversed()), wf, w2, cut_bt, (f_bt,)),
+        Face(
+            "front-bottom-flap",
+            "flap",
+            (f_fb, *step_b, *cut_fb, *free_bottom),
+            0.0,
+            wf,
+            (f_fb,),
+            rev(cut_fb),
+        ),
+        Face("back-bottom-flap", "flap", (*cut_bb, f_bb), wf, w2, (f_bb,), rev(cut_bb)),
     )
 
     bbox = union_bbox([outline.bbox(), *(f.segment.bbox() for f in folds)])
 
-    fold_arc = folds[0].segment
+    x0, z0, x1, z1 = body_bbox(body)
     info = {
         "pattern_width": bbox[2] - bbox[0],
         "pattern_height": bbox[3] - bbox[1],
-        "fold_sagitta": s_f,
-        "cut_sagitta": s_c,
-        "fold_radius": circle_radius(w, s_f),
-        "cut_radius": circle_radius(w, s_c),
-        "fold_arc_length": fold_arc.length,
+        "front_fold_sagitta": sf,
+        "back_fold_sagitta": sb,
+        # Cut edges' furthest reach beyond the chord (outer flaps) and at the centre (inner).
+        "front_cut_sagitta": max(c for _, c in front_cuts),
+        "back_cut_sagitta": max(c for _, c in back_cuts),
+        "front_fold_radius": circle_radius(wf, sf),
+        "back_fold_radius": circle_radius(wb, sb),
         "box_height": cfg.height,
         "edge_length": length,
-        "closed_width": CrossSection(w, s_f).closed_width,  # == cfg.width (the input)
-        "panel_width": w,
-        "circumference": cfg.circumference,
+        "front_panel_width": wf,
+        "back_panel_width": wb,
+        "circumference": w2,
+        "outer_width": x1 - x0,  # outside of the material, fold to fold
+        "outer_height": z1 - z0,
+        "outer_length": length,
         # Shallower tapers let the glued tab reach past the curved fold near the corners.
-        "min_glue_tab_taper": g * fold_slope(w, s_f),
+        "min_glue_tab_taper": g * fold_slope(wf, sf),
     }
     folds = tuple(replace(f, direction=fold_direction(cfg, f.segment, faces)) for f in folds)
     return Pattern(outline, folds, faces, bbox, info)
@@ -469,7 +527,7 @@ def fold_direction(cfg: Config, segment: Segment, faces: Sequence[Face]) -> Fold
     midpoint, does the face on one side bend away from (mountain) or towards (valley) the
     print side of the face on the other side?"""
     box = FoldedBox(cfg)
-    eps = 1e-3 * cfg.panel_width
+    eps = 1e-3 * cfg.body.front.width
     p = segment.point_at(0.5)
     a, b = segment.point_at(0.5 - 1e-4), segment.point_at(0.5 + 1e-4)
     t = (b[0] - a[0], b[1] - a[1])
@@ -503,31 +561,32 @@ class FoldedBox:
     (front panel at +Z)."""
 
     def __init__(self, cfg: Config) -> None:
-        self.width = cfg.panel_width
+        self.body: Body = cfg.body
         self.length = cfg.edge_length
-        self.section = CrossSection(cfg.panel_width, cfg.fold_sagitta)
 
     def map(self, face: str, p: Point) -> Point3:
-        w, length, sec = self.width, self.length, self.section
+        body, length = self.body, self.length
+        front, back, zs = body.front, body.back, body.z_shift
         x, y = p
+        # Crease planes (unshifted Z): front y = Z, back y = -Z (and mirrored at y = L).
         if face == "front-panel":
-            pos = (sec.x(x), y, sec.z(x))
+            pos = (body.front_x + front.x(x), y, zs + front.z(x))
         elif face == "front-top-flap":  # reflected across the crease plane y = Z
-            pos = (sec.x(x), sec.z(x), y)
+            pos = (body.front_x + front.x(x), front.z(x), zs + y)
         elif face == "front-bottom-flap":  # reflected across y + Z = L
-            pos = (sec.x(x), length - sec.z(x), length - y)
+            pos = (body.front_x + front.x(x), length - front.z(x), zs + length - y)
         elif face == "back-panel":
-            u = x - w
-            pos = (-sec.x(u), y, -sec.z(u))
+            u = x - front.width
+            pos = (body.back_x - back.x(u), y, zs - back.z(u))
         elif face == "back-top-flap":  # reflected across y = -Z
-            u = x - w
-            pos = (-sec.x(u), sec.z(u), -y)
+            u = x - front.width
+            pos = (body.back_x - back.x(u), back.z(u), zs - y)
         elif face == "back-bottom-flap":  # reflected across y - Z = L
-            u = x - w
-            pos = (-sec.x(u), length - sec.z(u), y - length)
-        elif face == "glue-tab":  # glued to the inside of the front panel's free edge
-            u = x - 2 * w
-            pos = (sec.x(u), y, sec.z(u))
+            u = x - front.width
+            pos = (body.back_x - back.x(u), length - back.z(u), zs + y - length)
+        elif face == "glue-tab":  # on the outside of the front panel's free edge
+            tx, tz = body.tab_point(x - front.width - back.width)
+            pos = (tx, y, tz)
         else:
             raise KeyError(face)
         return (pos[0], length / 2 - pos[1], pos[2])
@@ -605,22 +664,64 @@ def build_model3d(
             }
         )
 
+    x0, z0, x1, z1 = body_bbox(box.body, with_material=False)
     return {
         "units": "mm",
         "parts": parts,
         "lines": lines,
-        "bounds": {
-            "width": box.section.closed_width,
+        "bounds": {  # of the mid-surface model
+            "width": x1 - x0,
             "length": cfg.edge_length,  # overall, corner to corner
-            "midline_length": cfg.length,
-            "height": cfg.height,
+            "height": z1 - z0,
         },
+        "interior": {"width": cfg.width, "length": cfg.length, "height": cfg.height},
     }
 
 
 def _flat_area(flat: list[float], tri: tuple[int, int, int]) -> float:
     (ax, ay), (bx, by), (cx, cy) = ((flat[2 * i], flat[2 * i + 1]) for i in tri)
     return abs((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) / 2
+
+
+def _trace(points: Any, n: int) -> list[list[float]]:
+    return [[round(c, 6) for c in points(i / n)] for i in range(n + 1)]
+
+
+def _band(body: Body, panel: str, samples: int) -> list[list[float]]:
+    """Closed outline of one panel's material: mid-surface +- t/2, ends cut square."""
+    sec = body.front if panel == "front" else body.back
+    point = body.front_point if panel == "front" else body.back_point
+    normal = body.front_normal if panel == "front" else body.back_normal
+    h = body.thickness / 2
+
+    def side(k: float, f: float) -> list[float]:
+        u = sec.width * f
+        (x, z), (nx, nz) = point(u), normal(u)
+        return [round(x + k * nx, 6), round(z + k * nz, 6)]
+
+    out = [side(h, i / samples) for i in range(samples + 1)]
+    return out + [side(-h, 1 - i / samples) for i in range(samples + 1)]
+
+
+def body_bbox(body: Body, with_material: bool = True) -> BBox:
+    """(x0, z0, x1, z1) of the closed body's cross-section, glue tab included."""
+    h = body.thickness / 2 if with_material else 0.0
+    pts = []
+    for sec, point, normal in (
+        (body.front, body.front_point, body.front_normal),
+        (body.back, body.back_point, body.back_normal),
+    ):
+        for i in range(129):
+            (x, z), (nx, nz) = point(sec.width * i / 128), normal(sec.width * i / 128)
+            pts.append((x + h * nx, z + h * nz))
+    (gx, gz), (px, pz) = body.glue_point, body.fold_point
+    pts += [(gx - h, gz), (px + h, pz)]  # outsides of the two side folds (rounded)
+    return (
+        min(p[0] for p in pts),
+        min(p[1] for p in pts),
+        max(p[0] for p in pts),
+        max(p[1] for p in pts),
+    )
 
 
 def build_cross_section(
@@ -630,23 +731,39 @@ def build_cross_section(
 
     The body is a cylinder between the curved folds, so this section is the same at every
     point along the length. Coordinates are (X, Z) in mm in the 3D model's frame: X across
-    the box, Z height with the front panel at +Z. Taken from ``FoldedBox`` so the section,
-    3D preview and pattern always agree.
+    the box, Z height with the front panel at +Z, centred on the interior. ``front``/``back``
+    are the panels' mid-surfaces (from ``FoldedBox``, so the section, 3D preview and pattern
+    always agree), ``material`` the outlines of their material, ``inner`` the interior's
+    corners and apexes (where the interior width and height are measured).
     """
     box = FoldedBox(cfg)
+    body = box.body
     pattern = pattern or build_pattern(cfg)
-    w, mid = cfg.panel_width, cfg.edge_length / 2
+    wf, wb, mid = body.front.width, body.back.width, cfg.edge_length / 2
 
-    def trace(face: str, x0: float, x1: float, n: int) -> list[list[float]]:
-        pts = (box.map(face, (x0 + (x1 - x0) * i / n, mid)) for i in range(n + 1))
-        return [[round(p[0], 6), round(p[2], 6)] for p in pts]
+    def trace(face: str, x0: float, x1: float) -> list[list[float]]:
+        def at(f: float) -> tuple[float, float]:
+            p = box.map(face, (x0 + (x1 - x0) * f, mid))
+            return (p[0], p[2])
 
-    front = trace("front-panel", 0.0, w, samples)  # glued edge (-X) -> straight fold (+X)
-    back = trace("back-panel", w, 2 * w, samples)  # straight fold (+X) -> glue fold (-X)
+        return _trace(at, samples)
+
+    front = trace("front-panel", 0.0, wf)  # glued edge (-X) -> straight fold (+X)
+    back = trace("back-panel", wf, wf + wb)  # straight fold (+X) -> glue fold (-X)
+    h = body.thickness / 2
+    fa, ba = body.front_point(wf / 2), body.back_point(wb / 2)
+    inner = {
+        "fold": list(body.inner_fold),
+        "glue": list(body.inner_glue),
+        "front_apex": [fa[0], fa[1] - h],
+        "back_apex": [ba[0], ba[1] + h],
+    }
     return {
         "units": "mm",
         "front": front,
         "back": back,
+        "material": [_band(body, "front", samples), _band(body, "back", samples)],
+        "inner": {k: [round(c, 6) for c in v] for k, v in inner.items()},
         "folds": [
             {
                 "category": FoldCategory.STRAIGHT.value,
@@ -659,7 +776,8 @@ def build_cross_section(
                 "point": back[-1],
             },
         ],
-        "width": box.section.closed_width,
+        "width": cfg.width,  # interior
         "height": cfg.height,
-        "panel_width": w,
+        "thickness": body.thickness,
+        "bbox": [round(c, 6) for c in body_bbox(body)],
     }

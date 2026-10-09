@@ -51,7 +51,7 @@ yanartas-pillowbox generate --set width=80 --set length=150 --set height=30 \
 
 The UI saves the last valid configuration to **`./yanartas-pillowbox.json`** in the current
 working directory. Saves happen through the server, debounced, and the file is reloaded on
-startup. Files from schema version 1 are migrated (see below). If the file is missing,
+startup. Files from older schema versions are migrated (see below). If the file is missing,
 corrupt, invalid or from an unknown schema version, the tool logs a warning and starts with
 the defaults. It never crashes because of the file.
 
@@ -89,10 +89,15 @@ the defaults. It never crashes because of the file.
     towards a box that still fits.
 * **Parameter dimensions:** all three views annotate the inputs they show:
   * **Pattern:** circumference (both panels, flat), length (along the front panel's
-    midline), height (across a flap), and the glue-tab width and taper (both at the tab's
-    bottom end);
+    midline), height (across an inner flap), and the glue-tab width and taper (both at the
+    tab's bottom end);
   * **Folded box:** width, length (along the top ridge) and height;
-  * **Cross-section:** width, height, and half the circumference (the front panel's arc).
+  * **Cross-section:** width, height, and the front panel's arc (part of the
+    circumference). This view
+    draws the material at its thickness.
+
+  Width, length and height are interior dimensions, so where they are measured inside the
+  material their end points sit off the drawn lines by the material allowance.
 
   Focusing or hovering a field highlights its dimensions in every view, and clicking a
   dimension jumps to its field. Each view has a *Dimensions* toggle. The dimensions are
@@ -110,82 +115,97 @@ All lengths are in millimetres.
 
 | Key | Default | Meaning / constraints |
 |---|---|---|
-| `width` | 55 | Width of the closed box's cross-section, measured from fold to fold. 10–1000. This drives the panel size: see *circumference* below. |
-| `length` | 120 | Length along the middle of a panel, between the apexes of the two curved folds: the shortest distance between the curves. 10–2000. The straight edges (corner to corner) are `length + height` long. |
-| `height` | 20 | Total height (thickness) of the closed box at maximum bulge. The curved folds bow into the panels by height/2. At most ≈ 0.463·width (the UI states the exact limit). |
+| `width` | 55 | Interior width of the closed box's cross-section, from fold to fold (between the material's inner corners). 10–1000. This drives the panel size: see *circumference* below. |
+| `length` | 120 | Interior length along the middle of the box, between the end walls: the shortest distance between the curves. 10–2000. The straight edges (corner to corner) are `length + height + 3·thickness` long. |
+| `height` | 20 | Interior height of the closed box at maximum bulge. At most ≈ 0.46·width (the UI states the exact limit). |
 | `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
 | `payload_depth` | 100 | Payload size along the box length. 0–2000. |
 | `payload_height` | 13 | Payload size along the box height. 0–2000. |
 | `payload_margin` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
-| `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than one panel (half the circumference). |
-| `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to (length + height)/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
+| `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than the front panel it is glued onto. |
+| `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to half the straight edge − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
-| `thickness` | 0.4 | Material thickness, 0–5. The flap cut edge is offset from the curved folds by t/2 (see below). |
+| `thickness` | 0.4 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
 
 The stroke width is fixed at 0.1 mm.
 
 **Computed, not set:** the **circumference** is the perimeter of the closed body's
-cross-section, i.e. the flat width of both panels together. It follows from `width` and the
-height: the more the panels bulge, the more material it takes to span the same width. Each
-panel is half the circumference wide in the flat pattern. The UI shows both values under
-*Derived geometry*, and the pattern view dimensions the circumference.
+cross-section (along the middle of the material), i.e. the flat width of both panels
+together. It follows from `width`, the height and the thickness: the more the panels bulge,
+the more material it takes to span the same width. The two panels differ slightly in width
+(see below). The UI shows these values, and the outside dimensions, under *Derived
+geometry*, and the pattern view dimensions the circumference.
 
 ### Payload fit and clearance
 
-Distances are measured to the zero-thickness box surface. Inside the closed box, the body's
-cross-section has a height profile `Zp(X)`, and each end wall (a flap mirrored across its
-crease) stands `Zp(X)` in from the end of the straight edges. So the interior is
-`|Z| ≤ Zp(X), |Y| ≤ (length + height)/2 − Zp(X)`.
+Distances are measured to the material's inner surface, half a thickness inside the
+mid-surface that the geometry model folds. That surface consists of the panels, which are
+cylinders with rulings along the length, and the inner flaps' end walls, which are
+cylinders with vertical rulings. For a payload inside the box, the true distance to the
+surface is the smaller of two 2D distances, each minus half the thickness:
 
-The surface consists of the panels, which are cylinders with rulings along the length, and
-the end walls, which are cylinders with vertical rulings. For a payload inside the box, the
-true distance to the surface is the smaller of two 2D distances:
-
-* **Panels:** the distance in the cross-section between the payload rectangle and the
-  profile.
-* **End walls:** exactly `(length − payload_depth)/2`. In plan view every wall point is at
-  least `length/2` from the centre (the midline length), with equality at the centre.
+* **Panels:** the distance in the cross-section between the payload rectangle and each
+  panel's mid-surface.
+* **End walls:** the distance in plan view between the payload and the back panel's crease
+  curve. It is `(length − payload_depth)/2` whenever the payload spans the box's centre.
 
 This works because the nearest point on an unbounded cylinder that isn't on the real surface
 lies outside the box, so the real surface is crossed first.
 
-*Fit box to payload* sets `length = payload_depth + 2·margin`. It then searches over the
-cross-section's sagitta/panel ratio: for each ratio, it finds the smallest panel width whose
-profile keeps at least `margin` from the payload rectangle (`payload.py`). The tests check
-the clearance against a brute-force distance to every vertex of a fine 3D mesh.
+*Fit box to payload* sets `length = payload_depth + 2·margin`. It picks the height with a
+fast search on an approximation: the interior as a zero-thickness box, whose cross-section
+shape depends only on its sagitta/panel ratio. The pattern area is flat around its minimum,
+so the approximation costs next to nothing. It then solves the exact smallest width for that
+height (`payload.py`). The tests check the clearance against a brute-force distance to every
+vertex of a fine 3D mesh.
 
 ### Geometry model
 
 The flat pattern is laid out as front panel, back panel and then the glue tab, side by side.
-The straight body edges are `length` long. Each flap is a lens between two circular arcs
-through the panel corners:
+Each flap sits between its panel's **curved fold**, a circular arc through the panel corners
+that bows *into* the panel by the fold sagitta `s_f` (distance `f(u)` from the chord at
+position `u`), and its **cut edge**, which bows *out* of the panel.
 
-`W` below is the flat panel width (half the circumference).
-
-* the **curved fold** bows *into* the panel by the fold sagitta `s_f` (`height/2`). Its distance from the chord at position `u` is `f(u)`;
-* the **cut edge** bows *out* of the panel by `s_c = s_f − thickness/2`.
-
-The closed box (shown in the 3D preview) is folded exactly from these faces, without
-stretching:
+The model folds the material's mid-surface. The closed box (shown in the 3D preview) is
+folded exactly from the pattern faces, without stretching:
 
 * **Panels:** each panel bends into a cylinder whose rulings run along the length. Measured
-  along the panel width `u`, the cross-section rises by exactly `f(u)`. That makes the box
-  `2·s_f` deep and puts each curved fold in a plane at 45°.
+  along the panel width `u`, the cross-section rises by exactly `f(u)`. That puts each
+  curved fold in a plane at 45°.
 * **Flaps:** folding along such a planar crease mirrors the flap across that plane. Each flap
-  becomes a curved end wall standing straight across the box's height. The front and back
-  flaps of one end lie on the same wall and overlap; nothing creases them along a midline.
-* **Thickness:** with zero thickness, each flap's cut edge lands exactly on the opposite
-  panel's curved fold. The `thickness/2` offset leaves room for the material.
-* **Glue tab:** it lies against the inside of the front panel's free edge.
+  becomes a curved end wall standing straight across the box's height, at its own panel's
+  crease. Nothing creases the flaps along a midline.
 
-The cross-section's shape depends only on the ratio `s_f / W`, so for a given `width` and
-height the tool solves for the `W` whose folded cross-section is exactly `width` wide
-(`crosssection.py`).
+This only works if a fold arc turns at most 45° at the corners (`s_f < 0.207·W`, `W` being
+the panel's flat width). The tool allows `s_f ≤ 0.2·W`, which limits the height to roughly
+0.46·width. The tests check that every 3D face is an isometric image of its pattern face
+and that the faces stay joined along every fold.
 
-This only works if the fold arc turns at most 45° at the corners (`s_f < 0.207·W`). The tool
-allows `s_f ≤ 0.2·W`, which for a given box width means a fold sagitta of at most ≈ 0.232·width
-(height ≤ ≈ 0.463·width). The tests check that every 3D face is an isometric image of its
-pattern face and that the faces stay joined along every fold.
+#### Material thickness
+
+`width`, `length` and `height` are the interior. With thickness `t`, the material's
+mid-surface lies `t/2` outside it, and the two flaps of each end lie on top of each other:
+
+* The **front** panel's flaps close on the **outside**. Its fold bows in by `height/2`. The
+  **back** panel's flaps close on the **inside**, and its fold bows in by `height/2 + t`, so
+  the outer wall stands one thickness outside the inner wall. As a result the front panel
+  is about `t` flatter than the back.
+* **Inner flaps** are cut short to the front panel's inner surface. Near the corners, where
+  that surface dips below the fold chord, their edge runs along the chord.
+* **Outer flaps'** cut edges are flush with the back panel's outer surface all along. At the
+  corners they reach slightly past the panel corners, which shows as short cut steps.
+* With `t > 0` the cut edges are fine polylines (about 0.5 mm segments) that follow these
+  surfaces exactly. At zero thickness they are the plain circular arcs.
+* **Glue tab:** it lies on the **outside** of the front panel, unlike in usual packaging. The
+  back panel's glue fold sits `t / sin α` beyond the front panel's free edge (α being the
+  panel's angle at that edge), so the tab wraps around that edge.
+* **Width solve:** the interior width runs between the inner corners at the two side folds,
+  where the panels' inner surfaces meet. The tool solves for the two panels' flat widths so
+  that this is exactly `width` (`crosssection.solve_body`).
+* **Lengths:** the straight edges are `length + height + 3·t` long.
+* **Old files:** files from schema version 3 and earlier described the zero-thickness
+  mid-surface. They are migrated by shrinking width, height and length by the material, so
+  the box keeps about the same size.
 
 ## Output SVG & line convention
 
@@ -221,15 +241,17 @@ layers keep the line types apart.
 * **Styling:** `fill="none"`, `stroke` and `stroke-width` are plain attributes on every
   element, with a fixed 0.1 mm stroke width. There are no CSS classes and no `<style>`.
 * **Metadata:** the complete config is stored as JSON in
-  `<metadata><pillowbox:config version="3">…</pillowbox:config></metadata>`, with the
+  `<metadata><pillowbox:config version="4">…</pillowbox:config></metadata>`, with the
   namespace `https://github.com/jaseg/yanartas-pillowbox/ns/config`. That is what *Import*
   and `--from-svg` read back. The `version` field is the config schema version. Files from
   an unknown version are rejected with a clear message.
 * **Schema versions:** version 1 stored the flat panel width as `width`; version 2 the
   closed box width. Version 3 renamed `depth` to `height`, measures `length` along the panel
   midline (it was corner to corner) and dropped the direct-sagitta mode, the stroke width,
-  the thumb notch and the label. Version-1 and -2 files (saved settings and SVGs) are
-  converted on load so they describe the same box; removed options are ignored. Line colors used to be settings; they are now fixed to black, and old color settings are
+  the thumb notch and the label. Version 4 makes width, length and height interior
+  dimensions (they used to describe the zero-thickness mid-surface). Files from versions
+  1–3 (saved settings and SVGs) are converted on load so they describe the same box, up to
+  the thickness approximation of the version 3 → 4 step. Removed options are ignored. Line colors used to be settings; they are now fixed to black, and old color settings are
   ignored on load.
 
 ## HTTP API

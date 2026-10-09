@@ -186,16 +186,19 @@ function scheduleSave(config) {
   }, SAVE_DELAY);
 }
 
+function pair(a, b) {
+  return `${a.toFixed(2)} / ${b.toFixed(2)} mm`;
+}
+
 function renderDerived(info, payload) {
   const rows = [
+    ["Outside (w × h × l)", `${[info.outer_width, info.outer_height, info.outer_length].map((v) => v.toFixed(2)).join(" × ")} mm`],
     ["Straight edge (corner to corner)", info.edge_length],
     ["Circumference", info.circumference],
-    ["Panel width (½ circumference)", info.panel_width],
-    ["Curved-fold sagitta", info.fold_sagitta],
-    ["Curved-fold radius", info.fold_radius],
-    ["Curved-fold arc length", info.fold_arc_length],
-    ["Flap cut sagitta", info.cut_sagitta],
-    ["Flap cut radius", info.cut_radius],
+    ["Front / back panel width", pair(info.front_panel_width, info.back_panel_width)],
+    ["Front / back fold sagitta", pair(info.front_fold_sagitta, info.back_fold_sagitta)],
+    ["Front / back fold radius", pair(info.front_fold_radius, info.back_fold_radius)],
+    ["Outer / inner flap cut sagitta", pair(info.front_cut_sagitta, info.back_cut_sagitta)],
     ["Min. glue-tab taper", info.min_glue_tab_taper],
   ];
   $("#derived").replaceChildren(...rows.flatMap(([k, v]) => {

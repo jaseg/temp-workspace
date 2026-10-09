@@ -23,9 +23,11 @@ from yanartas_pillowbox import crosssection
 #      ``sagitta`` removed); ``length`` is measured along the panel midline between the
 #      curved folds (was: corner to corner, i.e. ``length + height``); ``stroke_width``
 #      fixed; thumb notch and label options removed.
+#   4  ``width``, ``height`` and ``length`` are the box's interior; the pattern adds the
+#      material thickness (was: the zero-thickness mid-surface).
 # Older documents are migrated on load.
-SCHEMA_VERSION = 3
-MIGRATABLE_VERSIONS = (1, 2)
+SCHEMA_VERSION = 4
+MIGRATABLE_VERSIONS = (1, 2, 3)
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
@@ -106,8 +108,9 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         10,
         1000,
         0.5,
-        help="Width of the closed box's cross-section, from fold to fold. The flat panel "
-        "width (half the circumference) is derived from it and the height.",
+        help="Interior width of the closed box's cross-section, from fold to fold (inside "
+        "the material). The flat panel widths are derived from it, the height and the "
+        "thickness.",
     ),
     FieldSpec(
         "length",
@@ -118,9 +121,9 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         10,
         2000,
         0.5,
-        help="Length along the middle of a panel, between the apexes of the two curved folds "
-        "(the shortest length between the curves). The straight edges are longer by the "
-        "height.",
+        help="Interior length along the middle of the box, between the end walls (the "
+        "shortest length between the curves). The straight edges are longer by the height "
+        "plus three times the thickness.",
     ),
     FieldSpec(
         "height",
@@ -131,8 +134,8 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         0.5,
         640,
         0.5,
-        help="Total thickness of the closed box at maximum bulge. The curved folds bow into "
-        "the panels by half of this.",
+        help="Interior height of the closed box at maximum bulge. The curved folds bow into "
+        "the panels by about half of this.",
     ),
     *(
         FieldSpec(
@@ -186,7 +189,9 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         0,
         5,
         0.05,
-        help="Curved folds are offset by half of this so the flaps clear each other.",
+        help="Width, height and length are interior dimensions; the pattern adds the material "
+        "around them. The front panel's flaps close on the outside, flush with the body; "
+        "the back panel's flaps are shortened to fit inside.",
     ),
     FieldSpec(
         "print_side",
@@ -222,31 +227,19 @@ class Config:
 
     # ----------------------------------------------------------------- derived values
     @property
-    def fold_sagitta(self) -> float:
-        """Sagitta of the curved fold (how far it bows into the panel): half the height."""
-        return self.height / 2
-
-    @property
-    def cut_sagitta(self) -> float:
-        """Sagitta of the flap's cut edge; smaller than the fold by half the thickness."""
-        return self.fold_sagitta - self.thickness / 2
+    def body(self) -> crosssection.Body:
+        """Mid-surface geometry of the closed body around the interior (cached)."""
+        return crosssection.solve_body(self.width, self.height, self.length, self.thickness)
 
     @property
     def edge_length(self) -> float:
-        """Length of the straight body edges, corner to corner: the midline ``length`` plus
-        the curved fold's sagitta at both ends."""
-        return self.length + 2 * self.fold_sagitta
-
-    @property
-    def panel_width(self) -> float:
-        """Flat width of one body panel: the arc length of its closed cross-section, which is
-        ``width`` wide (fold to fold) and bulges by the fold sagitta. Half the circumference."""
-        return crosssection.panel_width(self.width, self.fold_sagitta)
+        """Length of the straight body edges, corner to corner."""
+        return crosssection.edge_length(self.length, self.height, self.thickness)
 
     @property
     def circumference(self) -> float:
-        """Perimeter of the closed body's cross-section (both panels)."""
-        return 2 * self.panel_width
+        """Flat width of both body panels: the closed cross-section's mid-surface perimeter."""
+        return self.body.circumference
 
     # -------------------------------------------------------------- (de)serialization
     def to_dict(self) -> dict[str, Any]:
@@ -274,6 +267,8 @@ class Config:
             data = migrate_v1(data)
         if data.get("version") == 2:
             data = migrate_v2(data)
+        if data.get("version") == 3:
+            data = migrate_v3(data)
 
         defaults = cls()
         values: dict[str, Any] = {}
@@ -350,7 +345,24 @@ def migrate_v2(data: dict[str, Any]) -> dict[str, Any]:
     length, height = out.get("length", 120.0), out["height"]
     if isinstance(length, int | float) and isinstance(height, int | float):
         out["length"] = length - height
-    out["version"] = SCHEMA_VERSION
+    out["version"] = 3
+    return out
+
+
+def migrate_v3(data: dict[str, Any]) -> dict[str, Any]:
+    """Version 3 described the zero-thickness mid-surface; version 4 the interior. Shrink
+    width, height and length by the material so the box keeps about the same size."""
+    t = data.get("thickness", 0.4)
+    w, h, ln = (data.get(k, d) for k, d in (("width", 55.0), ("height", 20.0), ("length", 120.0)))
+    out = {**data, "version": SCHEMA_VERSION}
+    if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in (t, w, h, ln)):
+        return out  # leave it to validation
+    try:  # interior corners sit t/2 / sin(alpha) inside the folds
+        panel = crosssection.panel_width(w, h / 2)
+        sine = (panel / 2) / (crosssection.circle_radius(panel, h / 2) - h / 2)
+    except (ValueError, ZeroDivisionError):
+        return out
+    out.update(width=round(w - t / sine, 4), height=round(h - t, 4), length=round(ln - t, 4))
     return out
 
 
@@ -417,36 +429,40 @@ def validate(cfg: Config) -> dict[str, str]:
     def add(name: str, msg: str) -> None:
         errors.setdefault(name, msg)
 
-    if "height" not in errors and "width" not in errors:
-        # The closed box needs |f'| <= 1 along the fold, i.e. the fold arc may turn at most
+    if not errors.keys() & {"width", "height", "thickness"}:
+        # The closed box needs |f'| <= 1 along the folds, i.e. the fold arcs may turn at most
         # 45 degrees at the corners (sagitta < 0.207 W). Keep a margin so the panels still
-        # meet at a real fold: sagitta <= MAX_SAGITTA_RATIO * W; for a given closed width that
-        # bounds the sagitta (see crosssection.max_sagitta).
-        max_height = 2 * crosssection.max_sagitta(cfg.width)
-        if cfg.height > max_height:
+        # meet at a real fold: sagitta <= MAX_SAGITTA_RATIO * W for both panels, which bounds
+        # the height for a given width (see crosssection.max_height).
+        try:
+            _ = cfg.body
+        except ValueError:
+            max_height = crosssection.max_height(cfg.width, cfg.thickness)
             add(
                 "height",
-                f"must be at most {_fmt(max_height)} mm for a {_fmt(cfg.width)} mm wide box "
-                "(steeper flap arcs cannot close)",
+                f"must be at most {_fmt(max_height - 0.005)} mm for a {_fmt(cfg.width)} mm "
+                "wide box (steeper flap arcs cannot close)",
             )
-    if "thickness" not in errors and "height" not in errors and cfg.cut_sagitta < 0.25:
+    if "thickness" not in errors and "height" not in errors and cfg.height - cfg.thickness < 0.5:
         add(
             "thickness",
-            "too thick for this height: half the thickness must stay 0.25 mm below half the "
-            f"height ({_fmt(cfg.fold_sagitta)} mm)",
+            "too thick for this height: the inner flaps need half of (height - thickness) "
+            "to be at least 0.25 mm",
         )
 
-    # Checks below need the flat panel width, which only exists for a valid width and height.
-    panel = None if errors.keys() & {"width", "height"} else cfg.panel_width
+    # Checks below need the flat panel widths, which only exist for a valid body.
+    body = None if errors.keys() & {"width", "height", "thickness"} else cfg.body
 
-    if panel is not None and "glue_tab_width" not in errors and cfg.glue_tab_width >= panel:
-        add(
-            "glue_tab_width",
-            f"must be narrower than one panel ({_fmt(panel)} mm, half the circumference) "
-            "since it is glued inside",
-        )
+    if body is not None and "glue_tab_width" not in errors:
+        panel = body.front.width
+        if cfg.glue_tab_width >= panel:
+            add(
+                "glue_tab_width",
+                f"must be narrower than the front panel ({_fmt(panel)} mm) since it is glued "
+                "onto it",
+            )
 
-    if "glue_tab_taper" not in errors and not errors.keys() & {"length", "height"}:
+    if "glue_tab_taper" not in errors and not errors.keys() & {"length", "height", "thickness"}:
         max_taper = cfg.edge_length / 2 - 1
         if cfg.glue_tab_taper > max_taper:
             add(

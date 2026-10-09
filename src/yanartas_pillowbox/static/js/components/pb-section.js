@@ -19,8 +19,9 @@ template.innerHTML = `
           min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stage { position: relative; flex: 1; min-height: 0; }
   svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .body { fill: color-mix(in srgb, var(--text) 7%, transparent); stroke: var(--text);
-          stroke-width: 2px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .body { fill: color-mix(in srgb, var(--text) 7%, transparent); stroke: none; }
+  .material { fill: color-mix(in srgb, var(--text) 55%, transparent); stroke: var(--text);
+              stroke-width: 1px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
   .fold { fill: var(--text); stroke: var(--surface); stroke-width: 1.5px; vector-effect: non-scaling-stroke;
           paint-order: stroke; outline: none; }
   .fold-ring { fill: none; stroke: var(--text); stroke-width: 1px; vector-effect: non-scaling-stroke; }
@@ -96,12 +97,14 @@ export class PbSection extends HTMLElement {
     if (this.#svg) highlightDims(this.#svg, param);
   }
 
-  /** section: {front, back: [[x, z]...], folds: [{category, point}], width, height};
+  /** section: {front, back: [[x, z]...] (mid-surfaces), material: [outline...],
+   *  folds: [{category, point}], width, height (interior), bbox};
    *  dims: parameter dimensions in the same (X, Z) frame. */
   update(section, dims = [], payload = null) {
     const { width, height } = section;
     this.#info.textContent = `${fmt(width)} × ${fmt(height)} mm`;
-    this.#info.title = "The body has this cross-section everywhere between the curved folds.";
+    this.#info.title = "Interior width × height. The body has this cross-section everywhere "
+      + "between the curved folds.";
     this.#data = { section, dims, payload };
     this.#render();
     this.#legend.replaceChildren(
@@ -120,10 +123,10 @@ export class PbSection extends HTMLElement {
   #render() {
     if (!this.#data) return;
     const { section, dims, payload } = this.#data;
-    const { width, height } = section;
+    const [bx0, bz0, bx1, bz1] = section.bbox;
     const r = this.#stage.getBoundingClientRect();
     const px = labelPx(this);
-    let box = [-width / 2, -height / 2, width, height];
+    let box = [bx0, -bz1, bx1 - bx0, bz1 - bz0];
     let svg;
     for (let i = 0; i < 4; i++) {
       const upp = r.width && r.height ? Math.max(box[2] / r.width, box[3] / r.height) : box[2] / 400;
@@ -137,6 +140,7 @@ export class PbSection extends HTMLElement {
 
   #draw(section, dims, payload, fs) {
     const { width, height } = section;
+    const [bx0, bz0, bx1, bz1] = section.bbox;
     // Z points up on screen: plot (x, -z).
     const p = ([x, z]) => [x, -z];
     const pad = fs * 1.2;
@@ -147,9 +151,13 @@ export class PbSection extends HTMLElement {
       el("line", { class: "axis", x1: 0, y1: -height / 2 - pad / 2, x2: 0, y2: height / 2 + pad / 2 }),
     );
 
-    // Closed body outline: front panel (glued edge -> straight fold), then back panel back.
+    // Body: mid-surface loop (front panel from the glued edge to the straight fold, back panel
+    // back to the glue fold), shaded; then the material of both panels.
     const outline = [...section.front, ...section.back.slice(1)].map(p);
     svg.append(el("path", { class: "body", d: `M ${outline.map((q) => q.join(",")).join(" L ")} Z` }));
+    for (const band of section.material) {
+      svg.append(el("path", { class: "material", d: `M ${band.map(p).map((q) => q.join(",")).join(" L ")} Z` }));
+    }
 
     // Payload: preview only, centred in the section.
     if (payload && !payload.empty) {
@@ -184,7 +192,7 @@ export class PbSection extends HTMLElement {
     const { group, bounds } = drawDims2d(dims, { fs, flipY: true });
     group.classList.toggle("off", !this.#showDims);
     svg.append(group);
-    let [x0, y0, x1, y1] = [-width / 2, -height / 2, width / 2, height / 2];
+    let [x0, y0, x1, y1] = [bx0, -bz1, bx1, -bz0];
     if (bounds && this.#showDims) {
       [x0, y0, x1, y1] = [Math.min(x0, bounds[0]), Math.min(y0, bounds[1]), Math.max(x1, bounds[2]), Math.max(y1, bounds[3])];
     }

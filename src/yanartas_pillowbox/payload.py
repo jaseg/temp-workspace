@@ -1,44 +1,52 @@
 """Rectangular payload inscribed, centred, in the closed pillow box. Pure functions.
 
 Payload axes: ``payload_width`` across the box (X), ``payload_depth`` along its length (Y),
-``payload_height`` along its height (Z), in the 3D model frame of ``geometry.FoldedBox``.
+``payload_height`` along its height (Z), in the 3D model frame of ``geometry.FoldedBox``,
+which is centred on the box interior.
 
-Interior of the closed box (zero material thickness): the body is a cylinder whose
-cross-section has height profile ``Zp(X)`` (front panel at ``+Zp``, back at ``-Zp``), and each
-end wall is a flap reflected across its crease, standing at ``|Y| = edge/2 - Zp(X)``. So the
-interior is ``{|Z| <= Zp(X), |Y| <= edge/2 - Zp(X)}``.
+The box surface facing the payload is the material's inner surface, ``t/2`` inside the
+mid-surface the model folds: the panels (cylinders with rulings along Y, see
+``crosssection.Body``) and the inner flaps' end walls (cylinders with rulings along Z through
+the back panel's creases, ``|Y| = edge/2 - Zb(u)``).
 
-**Clearance** is the true 3D distance from the payload to the nearest point of the box
-surface. The surface consists of the panels (cylinders with rulings along Y) and the end walls
-(cylinders with rulings along Z). For a payload inside the box, the distance to the surface
-equals the smaller of the distances to the two *unbounded* cylinders: a nearest point on an
-unbounded cylinder that is not on the real surface lies outside the interior, and the
-segment to it crosses the real surface earlier. The nearest point on a cylinder shares the
-ruling coordinate, so each distance is a 2D one:
+**Clearance** is the true 3D distance from the payload to the nearest point of that surface.
+For a payload inside the box, the distance to the surface equals the smallest of the
+distances to the *unbounded* cylinders: a nearest point on an unbounded cylinder that is not
+on the real surface lies outside the interior, and the segment to it crosses the real
+surface earlier. The nearest point on a cylinder shares the ruling coordinate, so each
+distance is a 2D one, from a centred rectangle to a curve, minus ``t/2`` (the inner surface
+is the mid-surface offset by ``t/2``):
 
-* panels: distance, in the cross-section (X, Z), from the payload rectangle to the profile;
-* end walls: in plan (X, Y) every wall point has ``|Y| >= length / 2`` (the midline length),
-  with equality at X = 0, so the distance is exactly ``(length - payload_depth) / 2``.
+* panels: in the cross-section (X, Z), from the payload's width x height to each panel;
+* end walls: in plan (X, Y), from the payload's width x depth to the back panel's crease
+  curve. Its closest point to the centre is the inner wall's apex, ``length/2`` away.
 
 The payload fits when ``clearance >= payload_margin``.
 
 ``fit_box`` finds the box (width, length, height only) with the smallest pattern bounding box
-that keeps the margin: ``length = payload_depth + 2 margin`` and, since the cross-section
-shape depends only on ``r = sagitta / W``, a 1D search over ``r`` in which each ``r`` gives the
-smallest panel width ``W`` whose profile clears the payload rectangle by the margin.
+that keeps the margin; see there.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import replace
 
 from yanartas_pillowbox.config import SPECS_BY_NAME, Config, ConfigError
-from yanartas_pillowbox.crosssection import MAX_SAGITTA_RATIO, CrossSection, width_ratio
+from yanartas_pillowbox.crosssection import (
+    MAX_SAGITTA_RATIO,
+    Body,
+    CrossSection,
+    solve_body,
+    width_ratio,
+)
 
 ROUND = 0.01  # mm: results are rounded to this grid, always towards a fitting box
-SAMPLES = 1000  # profile samples (per quarter) for clearance computations
+SAMPLES = 1000  # curve samples for clearance computations
 FIT_SAMPLES = 600
+
+Curve = Callable[[float], tuple[float, float]]
 
 
 class PayloadError(ValueError):
@@ -53,51 +61,24 @@ def is_empty(cfg: Config) -> bool:
     return min(cfg.payload_width, cfg.payload_depth, cfg.payload_height) <= 0
 
 
-def _section(cfg: Config) -> CrossSection:
-    return CrossSection(cfg.panel_width, cfg.fold_sagitta)
-
-
-def _u_at_x(sec: CrossSection, x: float) -> float:
-    """Arc position u in [0, W/2] whose cross-section point is at |X| = x (x <= half width)."""
-    lo, hi = 0.0, sec.width / 2  # |X(u)| decreases from closed_width/2 to 0
-    for _ in range(80):
-        mid = (lo + hi) / 2
-        if -sec.x(mid) > x:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) / 2
-
-
-def profile_height(cfg: Config, x: float, sec: CrossSection | None = None) -> float:
-    """Half-height ``Zp`` of the box interior at distance ``x`` from the centre."""
-    sec = sec or _section(cfg)
-    if x >= sec.closed_width / 2:
-        return 0.0
-    return sec.z(_u_at_x(sec, max(0.0, x)))
-
-
 # ------------------------------------------------------------------------- clearance
 def _point_rect(qx: float, qz: float, a: float, b: float) -> float:
-    """Signed distance from (qx, qz) (first quadrant) to the rectangle |x| <= a, |z| <= b:
-    positive outside, negative (depth) inside."""
-    dx, dz = qx - a, qz - b
+    """Signed distance from (qx, qz) to the rectangle |x| <= a, |z| <= b: positive outside,
+    negative (depth) inside."""
+    dx, dz = abs(qx) - a, abs(qz) - b
     if dx <= 0 and dz <= 0:
         return max(dx, dz)
     return math.hypot(max(dx, 0.0), max(dz, 0.0))
 
 
-def section_clearance(sec: CrossSection, width: float, height: float) -> float:
-    """Distance in the cross-section from the payload rectangle (width x height, centred) to
-    the profile; negative if the rectangle pokes through it. By symmetry one quarter of the
-    profile suffices: u in [0, W/2] runs from the side fold (|X| max, Z = 0) to the apex."""
-    a, b = width / 2, height / 2
-    half = sec.width / 2
+def curve_clearance(curve: Curve, length: float, a: float, b: float) -> float:
+    """Distance from the centred rectangle |x| <= a, |z| <= b to the curve ``curve(u)``,
+    u in [0, length]; negative if the rectangle pokes through it."""
 
     def f(u: float) -> float:
-        return _point_rect(-sec.x(u), sec.z(u), a, b)
+        return _point_rect(*curve(u), a, b)
 
-    us = [half * i / SAMPLES for i in range(SAMPLES + 1)]
+    us = [length * i / SAMPLES for i in range(SAMPLES + 1)]
     vals = [f(u) for u in us]
     k = min(range(len(us)), key=vals.__getitem__)
     # Golden-section refinement between the neighbouring samples.
@@ -117,14 +98,40 @@ def section_clearance(sec: CrossSection, width: float, height: float) -> float:
     return min(vals[k], fc, fd)
 
 
-def clearance(cfg: Config, sec: CrossSection | None = None) -> float | None:
+def section_clearance(body: Body, width: float, height: float) -> float:
+    """Distance in the cross-section from the payload rectangle (width x height, centred) to
+    the panels' inner surfaces; negative if the rectangle pokes through them."""
+    a, b, h = width / 2, height / 2, body.thickness / 2
+    return (
+        min(
+            curve_clearance(body.front_point, body.front.width, a, b),
+            curve_clearance(body.back_point, body.back.width, a, b),
+        )
+        - h
+    )
+
+
+def wall_clearance(body: Body, width: float, depth: float) -> float:
+    """Distance in plan from the payload (width x depth, centred) to the inner end walls'
+    inner surfaces (the same at both ends)."""
+    half = body.edge_length / 2
+
+    def wall(u: float) -> tuple[float, float]:
+        return (body.back_point(u)[0], half - body.back.z(u))
+
+    return curve_clearance(wall, body.back.width, width / 2, depth / 2) - body.thickness / 2
+
+
+def clearance(cfg: Config) -> float | None:
     """True distance from the payload to the box surface (negative: it does not fit;
     None: no payload)."""
     if is_empty(cfg):
         return None
-    sec = sec or _section(cfg)
-    walls = (cfg.length - cfg.payload_depth) / 2
-    return min(section_clearance(sec, cfg.payload_width, cfg.payload_height), walls)
+    body = cfg.body
+    return min(
+        section_clearance(body, cfg.payload_width, cfg.payload_height),
+        wall_clearance(body, cfg.payload_width, cfg.payload_depth),
+    )
 
 
 def fits(cfg: Config, tol: float = 1e-6) -> bool:
@@ -148,29 +155,35 @@ def _r2(v: float) -> float:
 def maximize(cfg: Config, field: str) -> Config:
     """Largest value of one payload dimension that keeps the margin in the current box."""
     m = cfg.payload_margin
-    sec = _section(cfg)
+    body = cfg.body
     if field == "payload_depth":
-        if section_clearance(sec, cfg.payload_width, cfg.payload_height) < m:
+        if section_clearance(body, cfg.payload_width, cfg.payload_height) < m:
             raise PayloadError(
                 "payload_width", "the payload's width and height already break the margin"
             )
-        depth = _floor(cfg.length - 2 * m)
-        if depth <= 0:
+
+        def ok(v: float) -> bool:
+            return wall_clearance(body, cfg.payload_width, v) >= m
+
+        if not ok(0.0):
             raise PayloadError("payload_margin", "the margin leaves no room along the length")
-        return replace(cfg, payload_depth=_r2(depth))
-    if field not in ("payload_width", "payload_height"):
+        limit = cfg.edge_length
+    elif field in ("payload_width", "payload_height"):
+        other = "payload_height" if field == "payload_width" else "payload_width"
+        limit = cfg.width if field == "payload_width" else cfg.height
+
+        def ok(v: float) -> bool:
+            w, h = (v, cfg.payload_height) if field == "payload_width" else (cfg.payload_width, v)
+            return section_clearance(body, w, h) >= m and (
+                field == "payload_height" or wall_clearance(body, v, cfg.payload_depth) >= m
+            )
+
+        if not ok(0.0):
+            axis = other.removeprefix("payload_")
+            raise PayloadError(other, f"the payload {axis} leaves no room for the margin")
+    else:
         raise PayloadError(field, f"unknown payload field {field!r}")
 
-    other = "payload_height" if field == "payload_width" else "payload_width"
-    limit = cfg.width if field == "payload_width" else cfg.height
-
-    def ok(v: float) -> bool:
-        w, h = (v, cfg.payload_height) if field == "payload_width" else (cfg.payload_width, v)
-        return section_clearance(sec, w, h) >= m
-
-    if not ok(0.0):
-        axis = other.removeprefix("payload_")
-        raise PayloadError(other, f"the payload {axis} leaves no room for the margin")
     lo, hi = 0.0, limit  # ok(lo), not ok(hi)
     for _ in range(60):
         mid = (lo + hi) / 2
@@ -180,12 +193,13 @@ def maximize(cfg: Config, field: str) -> Config:
 
 # ------------------------------------------------------------------------- fit box
 def pattern_area(cfg: Config) -> float:
-    """Area of the flat pattern's bounding box: (2 W + glue tab) x (edge + both flaps)."""
-    return (2 * cfg.panel_width + cfg.glue_tab_width) * pattern_height(cfg)
+    """Area of the flat pattern's bounding box: (both panels + glue tab) x (edge + both outer
+    flaps, which stick out further than the inner ones)."""
+    return (cfg.circumference + cfg.glue_tab_width) * pattern_height(cfg)
 
 
 def pattern_height(cfg: Config) -> float:
-    return cfg.edge_length + 2 * cfg.cut_sagitta
+    return cfg.edge_length + 2 * cfg.body.front_cut_sagitta
 
 
 def _scale_needed(x: float, z: float, a: float, b: float, m: float) -> float:
@@ -207,9 +221,15 @@ def _scale_needed(x: float, z: float, a: float, b: float, m: float) -> float:
 
 
 def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
-    """(pattern area, width, height) of the smallest box with sagitta ratio r that keeps the
-    margin, or None if that box violates a constraint on the untouched parameters."""
-    a, b, m = base.payload_width / 2, base.payload_height / 2, base.payload_margin
+    """(approximate pattern area, width, height) of the smallest box with sagitta ratio r
+    that keeps the margin, or None if that box violates a constraint on the untouched
+    parameters. Approximates the interior by a zero-thickness box of the interior size."""
+    a, b, m, t = (
+        base.payload_width / 2,
+        base.payload_height / 2,
+        base.payload_margin,
+        base.thickness,
+    )
     sec = CrossSection(1.0, r)
     panel = max(
         _scale_needed(-sec.x(u), sec.z(u), a, b, m)
@@ -218,19 +238,53 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
     sagitta = r * panel
     width = panel * width_ratio(r)
     length = max(base.payload_depth + 2 * m, 10.0)
-    if width < 10 or sagitta - base.thickness / 2 < 0.25 or base.glue_tab_width >= panel:
+    if width < 10 or 2 * sagitta - t < 0.5 or base.glue_tab_width >= panel:
         return None
     if width > SPECS_BY_NAME["width"].maximum or 2 * sagitta > SPECS_BY_NAME["height"].maximum:
         return None
-    if base.glue_tab_taper > (length + 2 * sagitta) / 2 - 1:
+    if base.glue_tab_taper > (length + 2 * sagitta + 3 * t) / 2 - 1:
         return None
-    area = (2 * panel + base.glue_tab_width) * (length + 4 * sagitta - base.thickness)
+    area = (2 * panel + base.glue_tab_width) * (length + 4 * sagitta + 6 * t)
     return area, width, 2 * sagitta
+
+
+def _min_width(cfg: Config, height: float, guess: float) -> float | None:
+    """Smallest interior width (to 1 um) at which the payload's cross-section keeps the
+    margin, for this height; None if there is none within the width limit."""
+    t, m = cfg.thickness, cfg.payload_margin
+    w_max = SPECS_BY_NAME["width"].maximum
+
+    def ok(w: float) -> bool:
+        try:
+            body = solve_body(w, height, cfg.length, t)
+        except ValueError:  # too narrow to close at this height
+            return False
+        return section_clearance(body, cfg.payload_width, cfg.payload_height) >= m
+
+    step = 0.02 * guess + 0.5
+    lo, hi = max(cfg.payload_width, guess - step), min(w_max, guess + step)
+    while ok(lo) and lo > cfg.payload_width:
+        lo, hi = max(cfg.payload_width, lo - 4 * step), lo
+    while not ok(hi):
+        if hi >= w_max:
+            return None
+        lo, hi = hi, min(w_max, hi + 4 * step)
+    while hi - lo > 1e-3:
+        mid = (lo + hi) / 2
+        lo, hi = (lo, mid) if ok(mid) else (mid, hi)
+    return hi
 
 
 def fit_box(cfg: Config) -> Config:
     """Box (width, length, height) holding the payload with its margin, with the smallest
-    pattern bounding box. Glue tab, thickness and colors are kept."""
+    pattern bounding box. Glue tab and thickness are kept.
+
+    The height comes from a fast search on an approximation: the interior as a zero-thickness
+    box of the interior size, whose cross-section shape depends only on ``r = sagitta / W``
+    (a 1D search over ``r``, each ``r`` giving the smallest ``W`` whose profile clears the
+    payload by the margin). The area is flat around its minimum, so the small error in the
+    height costs next to nothing; the width is then solved exactly for that height, and the
+    length grown until the end walls keep the margin."""
     if is_empty(cfg):
         raise PayloadError("payload_width", "set all three payload dimensions first")
     length = _r2(_ceil(max(cfg.payload_depth + 2 * cfg.payload_margin, 10.0)))
@@ -268,13 +322,24 @@ def fit_box(cfg: Config) -> Config:
     assert cand is not None
     _, width, height = cand
 
-    # Round to the grid towards a box that still fits: height down (keeps the arc within
-    # limits), then width up until the margin holds.
-    out = replace(cfg, length=length, height=_r2(_floor(height)), width=_r2(_ceil(width)))
+    # Exact width for the (rounded down) height, rounded up to the grid; then the length.
+    height = _r2(_floor(height))
+    base = replace(cfg, length=length, height=height)
+    exact = _min_width(base, height, width)
+    if exact is None:
+        raise PayloadError("payload_width", "the fitted box would be wider than the limit")
+    out = replace(base, width=_r2(_ceil(exact)))
     for _ in range(1000):
-        if fits(out):
-            break
-        out = replace(out, width=_r2(out.width + ROUND))
+        try:
+            if fits(out):
+                break
+        except ValueError:  # pragma: no cover - the width only grows
+            pass
+        body = out.body
+        if section_clearance(body, cfg.payload_width, cfg.payload_height) < cfg.payload_margin:
+            out = replace(out, width=_r2(out.width + ROUND))
+        else:
+            out = replace(out, length=_r2(out.length + ROUND))
     try:
         return Config.from_dict(out.to_dict())
     except ConfigError as exc:  # pragma: no cover - guarded by _candidate

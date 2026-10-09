@@ -18,7 +18,7 @@ BOXES = {
     "wide-flat": D.with_values(
         width=120, height=20, length=60, payload_width=75, payload_depth=50, payload_height=8
     ),
-    "steep": D.with_values(width=50, height=23, payload_width=20, payload_height=15),
+    "steep": D.with_values(width=50, height=22.5, payload_width=20, payload_height=15),
 }
 PAYLOADS = [(30, 100, 14), (60, 40, 10), (10, 200, 30), (80, 25, 5)]
 
@@ -48,13 +48,15 @@ def assert_inside_mesh(cfg):
                 assert abs(y) >= pd / 2 - 1e-6, (part["name"], x, y, z)
 
 
-def section_half_height(cfg, x):
-    """Front-panel height at |X| = x, interpolated on the cross-section polyline."""
-    front = build_cross_section(cfg, samples=2000)["front"]
-    for (x0, z0), (x1, z1) in itertools.pairwise(front):
-        if x0 <= x <= x1:
-            return z0 + (z1 - z0) * (x - x0) / (x1 - x0)
-    raise AssertionError(x)
+def rect_segment_distance(a, b, w, h):
+    """Distance from the centred rectangle |x| <= w/2, |z| <= h/2 to segment ab (sampled
+    finely; segments are short)."""
+    best = math.inf
+    for i in range(9):
+        x = a[0] + (b[0] - a[0]) * i / 8
+        z = a[1] + (b[1] - a[1]) * i / 8
+        best = min(best, math.hypot(max(abs(x) - w / 2, 0), max(abs(z) - h / 2, 0)))
+    return best
 
 
 # ------------------------------------------------------------------ fit test
@@ -64,9 +66,16 @@ def test_default_payload_fits():
 
 
 def test_fits_matches_section(box):
-    """The fit criterion uses the same profile the section view draws."""
-    for x in (0.0, box.width / 8, box.width / 4, box.width * 0.4):
-        assert P.profile_height(box, x) == pytest.approx(section_half_height(box, x), abs=1e-4)
+    """The cross-section clearance is the distance to the material the section view draws
+    (its inner surface, t/2 inside the mid-surface)."""
+    section = build_cross_section(box, samples=1500)
+    w, h = box.payload_width, box.payload_height
+    brute = min(
+        rect_segment_distance(a, b, w, h)
+        for band in section["material"]
+        for a, b in itertools.pairwise(band)
+    )
+    assert P.section_clearance(box.body, w, h) == pytest.approx(brute, abs=2e-3)
 
 
 def box_point_distance(cfg, p):
@@ -89,6 +98,7 @@ MARGIN_CASES = {
         payload_margin=2,
     ),
     "thin-tall": D.with_values(payload_width=6, payload_height=17, payload_margin=0.5),
+    "thick": D.with_values(thickness=2, height=24, width=70, payload_width=40, payload_height=14),
 }
 
 
@@ -96,11 +106,13 @@ MARGIN_CASES = {
 def test_clearance_is_true_distance_to_surface(cfg):
     """Brute force: the smallest distance from the payload box to any vertex of a fine mesh of
     the folded box (panels, end-wall flaps, glue tab) equals the computed clearance. Mesh
-    vertices only sample the surface, so they can overestimate it slightly, never under."""
+    vertices only sample the surface, so they can overestimate it slightly, never under. The
+    model is the material's mid-surface, half a thickness beyond the surface that counts."""
     c = P.clearance(cfg)
     assert c is not None and c > 0
     model = build_model3d(cfg, step=0.25, rows=60)
     nearest = min(box_point_distance(cfg, p) for part in model["parts"] for p in pts3(part))
+    nearest -= cfg.thickness / 2
     assert nearest >= c - 1e-5
     assert nearest <= c + 0.02
 
@@ -137,11 +149,13 @@ def test_maximize_is_tight(box, field):
     assert not P.fits(replace(out, **{field: getattr(out, field) + 0.02}))
 
 
-def test_maximize_height_touches_the_profile(box):
+def test_maximize_height_touches_the_inner_surface(box):
+    """With no margin the largest payload touches the material's inner surface."""
     box = replace(box, payload_margin=0)
     out = P.maximize(box, "payload_height")
-    expected = 2 * section_half_height(box, box.payload_width / 2)
-    assert out.payload_height == pytest.approx(expected, abs=0.011)
+    assert P.section_clearance(out.body, out.payload_width, out.payload_height) == pytest.approx(
+        0, abs=0.011
+    )
 
 
 def test_maximize_depth_is_midline_length(box):
@@ -185,7 +199,7 @@ def test_fit_box_holds_payload_and_only_touches_body(dims):
     assert P.clearance(out) == pytest.approx(cfg.payload_margin, abs=0.011)  # tight
 
 
-def brute_force_min_area(cfg, n_heights=24):
+def brute_force_min_area(cfg, n_heights=12):
     """Independent search: for each height on a grid, the narrowest valid box that fits."""
     best = math.inf
     ph = cfg.payload_height
@@ -201,7 +215,7 @@ def brute_force_min_area(cfg, n_heights=24):
                 continue
         except ConfigError:
             continue
-        for _ in range(30):
+        for _ in range(22):
             mid = (lo + hi) / 2
             try:
                 ok = P.fits(

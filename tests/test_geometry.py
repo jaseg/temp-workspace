@@ -6,10 +6,9 @@ import pytest
 from helpers import self_intersections
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.crosssection import sagitta_offset
+from yanartas_pillowbox.crosssection import CrossSection, sagitta_offset
 from yanartas_pillowbox.geometry import (
     Arc,
-    CrossSection,
     FoldCategory,
     FoldDirection,
     FoldedBox,
@@ -51,8 +50,10 @@ def test_curved_fold_length_matches_closing_edge():
     cfg = Config.defaults().with_values(thickness=0)
     pat = build_pattern(cfg)
     folds = {f.name: f.segment for f in pat.folds}
-    theta = 2 * math.asin(cfg.panel_width / 2 / pat.info["fold_radius"])
-    analytic = pat.info["fold_radius"] * theta
+    radius = pat.info["front_fold_radius"]
+    assert pat.info["back_fold_radius"] == pytest.approx(radius)
+    theta = 2 * math.asin(cfg.body.front.width / 2 / radius)
+    analytic = radius * theta
     for end in ("top", "bottom"):
         front, back = folds[f"front-{end}"], folds[f"back-{end}"]
         assert front.length == pytest.approx(analytic, rel=1e-12)
@@ -63,31 +64,42 @@ def test_curved_fold_length_matches_closing_edge():
         assert arc.length == pytest.approx(analytic, rel=1e-12)
 
 
-def test_thickness_makes_flap_edge_slightly_shorter():
-    cfg = Config.defaults().with_values(thickness=1.0)
-    pat = build_pattern(cfg)
-    fold = next(f.segment for f in pat.folds if f.category is FoldCategory.CURVED)
-    cut = next(s for s in pat.outline.segments if isinstance(s, Arc))
-    assert pat.info["cut_sagitta"] == pytest.approx(pat.info["fold_sagitta"] - 0.5)
-    assert 0 < fold.length - cut.length < 1.0
+def test_thickness_offsets_folds_and_flaps():
+    """With material, the front (outer-flap) fold bows in height/2 and its flaps reach the
+    back panel's outer surface; the back (inner-flap) fold bows in t more and its flaps stop
+    at the front panel's inner surface."""
+    cfg = Config.defaults().with_values(height=20, thickness=1.0)
+    info = build_pattern(cfg).info
+    assert (info["front_fold_sagitta"], info["back_fold_sagitta"]) == pytest.approx((10, 11))
+    # (on the centreline; the two panels' apexes are a fraction of t apart across the box)
+    assert (info["front_cut_sagitta"], info["back_cut_sagitta"]) == pytest.approx(
+        (11.5, 9.5), abs=0.01
+    )
+    # Each flap's apex-to-apex height across its wall:
+    assert info["front_fold_sagitta"] + info["front_cut_sagitta"] == pytest.approx(21.5, abs=0.01)
+    assert info["back_fold_sagitta"] + info["back_cut_sagitta"] == pytest.approx(20.5, abs=0.01)
+    assert info["outer_height"] == pytest.approx(20 + 2)
 
 
 def test_height_maps_to_sagitta():
     cfg = Config.defaults().with_values(height=22)
-    assert build_pattern(cfg).info["fold_sagitta"] == pytest.approx(11)
+    assert build_pattern(cfg).info["front_fold_sagitta"] == pytest.approx(11)
     assert build_pattern(cfg).info["box_height"] == pytest.approx(22)
 
 
 def test_length_is_the_midline_between_fold_apexes(cfg):
-    """The input length is the shortest distance between the two curved folds of a panel
-    (apex to apex); the straight edges are ``length + height`` long."""
+    """The input length is the interior length on the centreline. The back (inner-flap)
+    folds' apexes are a thickness further apart (the inner walls' mid-surfaces), the front
+    (outer-flap) folds' three thicknesses (the outer walls' mid-surfaces); the straight edges
+    are ``length + height + 3 t`` long."""
     pat = build_pattern(cfg)
-    for side in ("front", "back"):
+    t = cfg.thickness
+    for side, extra in (("front", 3 * t), ("back", t)):
         top = pat.fold(f"{side}-top").segment.point_at(0.5)
         bottom = pat.fold(f"{side}-bottom").segment.point_at(0.5)
-        assert bottom[1] - top[1] == pytest.approx(cfg.length, abs=1e-9)
+        assert bottom[1] - top[1] == pytest.approx(cfg.length + extra, abs=1e-9)
         assert top[0] == pytest.approx(bottom[0])
-    assert pat.fold("panels").segment.length == pytest.approx(cfg.length + cfg.height)
+    assert pat.fold("panels").segment.length == pytest.approx(cfg.length + cfg.height + 3 * t)
 
 
 def test_outline_is_single_closed_contour(cfg):
@@ -135,7 +147,9 @@ def test_bbox_covers_everything(cfg):
     x0, y0, x1, y1 = pat.bbox
     for p in pat.outline.polyline(64):
         assert x0 - 1e-9 <= p[0] <= x1 + 1e-9 and y0 - 1e-9 <= p[1] <= y1 + 1e-9
-    assert x1 - x0 == pytest.approx(2 * cfg.panel_width + cfg.glue_tab_width)
+    assert x1 - x0 == pytest.approx(cfg.circumference + cfg.glue_tab_width)
+    # The outer flaps stick out furthest.
+    assert y1 - y0 == pytest.approx(cfg.edge_length + 2 * cfg.body.front_cut_sagitta)
 
 
 def test_cross_section_is_unit_speed_and_bulges_by_sagitta():
@@ -164,14 +178,15 @@ def test_print_side_is_the_outside():
     """The SVG's visible side (the print side) becomes the outside of the folded box: at the
     front panel's apex its normal points away from the box centre (+Z)."""
     cfg = Config.defaults()
-    n = print_side_normal(FoldedBox(cfg), "front-panel", (cfg.panel_width / 2, 60.0), 1e-3)
+    n = print_side_normal(FoldedBox(cfg), "front-panel", (cfg.body.front.width / 2, 60.0), 1e-3)
     assert n == pytest.approx((0, 0, 1), abs=1e-6)
 
 
 @pytest.mark.parametrize("name", list(CONFIGS))
 def test_all_folds_are_mountain_folds_from_the_print_side(name):
-    """Seen from the outside every crease is convex: the panels fold around the interior and
-    the flaps and glue tab fold inwards. Classifying from either side of a fold agrees."""
+    """Seen from the outside every crease is convex: the panels fold around the interior, the
+    flaps fold inwards and the glue tab folds back over the outside of the front panel.
+    Classifying from either side of a fold agrees."""
     cfg = CONFIGS[name]
     pat = build_pattern(cfg)
     assert {f.direction for f in pat.folds} == {FoldDirection.MOUNTAIN}

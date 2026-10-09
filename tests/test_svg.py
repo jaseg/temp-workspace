@@ -215,8 +215,8 @@ def _with_meta(text: str) -> str:
 
 
 def test_import_incompatible_version():
-    with pytest.raises(SvgImportError, match="schema version 4"):
-        extract_config(_with_meta(json.dumps({"version": 4, "width": 50})))
+    with pytest.raises(SvgImportError, match="schema version 5"):
+        extract_config(_with_meta(json.dumps({"version": 5, "width": 50})))
     with pytest.raises(SvgImportError, match="no schema version"):
         extract_config(_with_meta(json.dumps({"width": 50})))
 
@@ -230,15 +230,17 @@ def test_import_corrupt_or_invalid():
 
 def test_import_v1_file_is_migrated():
     """A file saved by schema version 1 (``width`` = flat panel width) still imports."""
-    meta = json.dumps({"version": 1, "width": 60.0, "depth": 20.0, "thumb_notch": True})
+    meta = json.dumps(
+        {"version": 1, "width": 60.0, "depth": 20.0, "thumb_notch": True, "thickness": 0}
+    )
     cfg = extract_config(_with_meta(meta))
-    assert cfg.panel_width == pytest.approx(60.0, abs=1e-4) and cfg.height == 20
+    assert cfg.circumference / 2 == pytest.approx(60.0, abs=1e-4) and cfg.height == 20
 
 
 def test_import_v2_file_is_migrated():
     meta = json.dumps({"version": 2, "width": 50.0, "depth": 16.0, "length": 116.0})
     cfg = extract_config(_with_meta(meta))
-    assert (cfg.height, cfg.length) == (16, 100)
+    assert (cfg.height, cfg.length) == (15.6, 99.6)  # then shrunk by 0.4 mm material (v4)
 
 
 def test_print_inside_only_flips_fold_indicators():

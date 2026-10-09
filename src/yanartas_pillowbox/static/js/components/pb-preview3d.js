@@ -118,9 +118,9 @@ export class PbPreview3d extends HTMLElement {
   /** model: {parts:[{kind, positions, indices}], lines:[{category, points}], bounds};
    *  dims: parameter dimensions in the model frame (see dimensions.model_dimensions). */
   update(model, dims = [], payload = null) {
-    this.#info.textContent =
-      `closed ${fmt(model.bounds.width)} × ${fmt(model.bounds.length)} × ${fmt(model.bounds.height)} mm`;
-    this.#info.title = "width × overall length (corner to corner) × height";
+    const inside = model.interior;
+    this.#info.textContent = `interior ${fmt(inside.width)} × ${fmt(inside.length)} × ${fmt(inside.height)} mm`;
+    this.#info.title = "Interior width × length × height";
     if (!this.#renderer) return;
     const first = !this.#group;
     if (this.#group) {
@@ -133,11 +133,11 @@ export class PbPreview3d extends HTMLElement {
     group.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
       new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0)));
     const paper = { panel: 0xeee6d3, flap: 0xd9cdb2, tab: 0xc9bc9c };
-    // The model is zero-thickness: the two flaps of an end lie on the same wall and the glue
-    // tab lies on the front panel. Depth offsets decide which coincident surface shows
-    // (front flaps over back flaps; the tab stays hidden under the front panel).
+    // The model is the material's mid-surface: the two flaps of an end lie only a thickness
+    // apart (none at zero thickness), as do the glue tab and the front panel under it. Depth
+    // offsets keep the outer surface on top (front flaps over back flaps, tab over panel).
     const depthBias = (part) =>
-      part.kind === "tab" ? 6 : part.name.startsWith("back-") && part.kind === "flap" ? 3 : 1;
+      part.kind === "tab" ? 1 : part.name.startsWith("back-") && part.kind === "flap" ? 4 : 2;
     for (const part of model.parts) {
       const geom = new THREE.BufferGeometry();
       geom.setAttribute("position", new THREE.Float32BufferAttribute(part.positions, 3));

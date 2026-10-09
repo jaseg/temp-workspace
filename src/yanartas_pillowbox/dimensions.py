@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import CrossSection, FoldedBox, Pattern, Point, Point3
+from yanartas_pillowbox.geometry import FoldedBox, Pattern, Point, Point3
 from yanartas_pillowbox.svg import MARGIN
 
 Coords = tuple[float, ...]
@@ -78,9 +78,13 @@ def polyline_length(pts: list[Coords]) -> float:
 
 # ------------------------------------------------------------------------- 2D pattern
 def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dimension]:
-    """Dimensions for the flat pattern, in SVG user units (flat coordinates + ``offset``)."""
-    w, edge, g, taper = cfg.panel_width, cfg.edge_length, cfg.glue_tab_width, cfg.glue_tab_taper
-    s_f = cfg.fold_sagitta
+    """Dimensions for the flat pattern, in SVG user units (flat coordinates + ``offset``).
+
+    Width, length and height are interior dimensions: where they are measured inside the
+    material, the measured points sit off the drawn lines by the material allowance."""
+    body = cfg.body
+    wf, wb = body.front.width, body.back.width
+    edge, g, taper, t = cfg.edge_length, cfg.glue_tab_width, cfg.glue_tab_taper, cfg.thickness
     dx, dy = offset
     x0, y0, x1, y1 = pattern.bbox
     # Outer dimension lines sit outside the sheet (pattern + margin), so they never cover it.
@@ -89,45 +93,46 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
     def p(x: float, y: float) -> Coords:
         return (x + dx, y + dy)
 
-    top_apex = pattern.fold("front-top").segment.point_at(0.5)
-    bottom_apex = pattern.fold("front-bottom").segment.point_at(0.5)
+    # Interior length along the front panel's midline: the inner end walls' inner surfaces
+    # stand 1.5 t inside the front panel's curved folds (outer wall, then inner wall).
+    ya, yb = body.front.sagitta + 1.5 * t, edge - body.front.sagitta - 1.5 * t
+    # Interior height across the back panel's top (inner) flap: from t/2 inside the fold (the
+    # back panel's inner surface) to the cut edge (the front panel's inner surface).
+    xh = wf + wb / 2
+    y_cut = pattern.face("back-top-flap").y_range(xh)[0]
     dims = [
         # The two panels, flat, are the closed cross-section's full circumference (computed
-        # from the box width and height; not an input).
+        # from the box width, height and thickness; not an input).
         Dimension(
             "circumference",
-            f"circumference {fmt(2 * w)}",
+            f"circumference {fmt(wf + wb)}",
             "horizontal",
-            (p(0, edge), p(2 * w, edge)),
-            2 * w,
+            (p(0, edge), p(wf + wb, edge)),
+            wf + wb,
             at=y1 + dy + gap,
         ),
-        # Length along the front panel's midline, between the two curved folds' apexes.
         Dimension(
             "length",
             f"length {fmt(cfg.length)}",
             "vertical",
-            (p(*top_apex), p(*bottom_apex)),
-            cfg.length,
-            at=top_apex[0] + dx,
+            (p(wf / 2, ya), p(wf / 2, yb)),
+            yb - ya,
+            at=wf / 2 + dx,
         ),
-        # Height: twice the fold sagitta, across the back panel's top flap, from the fold's
-        # apex to where the opposite panel's fold apex lands when closed (the flap's cut
-        # edge stops thickness/2 short of it).
         Dimension(
             "height",
             f"height {fmt(cfg.height)}",
             "vertical",
-            (p(1.5 * w, s_f), p(1.5 * w, -s_f)),
-            cfg.height,
-            at=1.5 * w + dx,
+            (p(xh, body.back.sagitta - t / 2), p(xh, y_cut)),
+            body.back.sagitta - t / 2 - y_cut,
+            at=xh + dx,
         ),
         # Glue tab: width and taper both dimensioned at the tab's bottom end.
         Dimension(
             "glue_tab_width",
             f"tab {fmt(g)}",
             "horizontal",
-            (p(2 * w, edge), p(2 * w + g, edge - taper)),
+            (p(wf + wb, edge), p(wf + wb + g, edge - taper)),
             g,
             at=y1 + dy + gap,
         ),
@@ -138,7 +143,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 "glue_tab_taper",
                 f"taper {fmt(taper)}",
                 "vertical",
-                (p(2 * w, edge), p(2 * w + g, edge - taper)),
+                (p(wf + wb, edge), p(wf + wb + g, edge - taper)),
                 taper,
                 at=x1 + dx + gap,
             )
@@ -148,34 +153,32 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
 
 # ------------------------------------------------------------------------- cross-section
 def section_dimensions(cfg: Config, section: dict[str, Any]) -> list[Dimension]:
-    """Dimensions for the body cross-section, in its (X, Z) frame (Z up)."""
-    front = section["front"]
-    width, height = section["width"], section["height"]
-    span = max(width, height)
-    gap = 0.12 * span
-    mid = len(front) // 2  # apex of the front panel (u = W/2)
-    apex_f = tuple(front[mid])
-    apex_b = (apex_f[0], -apex_f[1])
+    """Dimensions for the body cross-section, in its (X, Z) frame (Z up). Width and height
+    are measured on the interior (the material's inner surfaces)."""
+    front, inner = section["front"], section["inner"]
+    x0, z0, x1, z1 = section["bbox"]
+    gap = 0.12 * max(x1 - x0, z1 - z0)
     return [
         Dimension(
             "height",
             f"height {fmt(cfg.height)}",
             "vertical",
-            (apex_b, apex_f),
-            height,
-            at=width / 2 + gap,
+            (tuple(inner["back_apex"]), tuple(inner["front_apex"])),
+            inner["front_apex"][1] - inner["back_apex"][1],
+            at=x1 + gap,
         ),
         Dimension(
             "width",
             f"width {fmt(cfg.width)}",
             "horizontal",
-            (tuple(section["back"][-1]), tuple(front[-1])),
-            width,
-            at=-height / 2 - gap,
+            (tuple(inner["glue"]), tuple(inner["fold"])),
+            inner["fold"][0] - inner["glue"][0],
+            at=z0 - gap,
         ),
+        # Part of the (computed) circumference: the front panel's arc.
         Dimension(
             "circumference",
-            f"½ circumference {fmt(cfg.panel_width)}",
+            f"front panel {fmt(cfg.body.front.width)}",
             "path",
             tuple(tuple(q) for q in front),
             polyline_length(front),
@@ -186,20 +189,23 @@ def section_dimensions(cfg: Config, section: dict[str, Any]) -> list[Dimension]:
 
 # ------------------------------------------------------------------------- 3D model
 def model_dimensions(cfg: Config) -> list[Dimension]:
-    """Dimensions for the 3D preview, in the model frame (X across, Y length, Z height)."""
+    """Dimensions for the 3D preview, in the model frame (X across, Y length, Z height),
+    measured on the interior."""
     box = FoldedBox(cfg)
-    sec: CrossSection = box.section
-    w, length, s_f = cfg.panel_width, cfg.edge_length, cfg.fold_sagitta
-    gap = 0.12 * max(length, sec.closed_width)
+    body = box.body
+    wf, length, s_f, t = body.front.width, cfg.edge_length, body.front.sagitta, cfg.thickness
+    x0, x1 = body.inner_glue[0], body.inner_fold[0]
+    gap = 0.12 * max(length, x1 - x0)
 
     def add(a: Point3, v: Coords, k: float = 1.0) -> Coords:
         return tuple(a[i] + v[i] * k for i in range(3))
 
     dims: list[Dimension] = []
 
-    # Length: along the front panel's midline (its top ridge), between the curved folds'
-    # apexes; drawn above the box.
-    a, b = box.map("front-panel", (w / 2, s_f)), box.map("front-panel", (w / 2, length - s_f))
+    # Length: along the front panel's midline (its top ridge), between the inner end walls'
+    # inner surfaces, 1.5 t inside the front's curved folds; drawn above the box.
+    a = box.map("front-panel", (wf / 2, s_f + 1.5 * t))
+    b = box.map("front-panel", (wf / 2, length - s_f - 1.5 * t))
     off = (0.0, 0.0, gap * 0.6)
     la, lb = add(a, off), add(b, off)
     dims.append(
@@ -215,11 +221,10 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
         )
     )
 
-    # Height: between the front and back apex lines where they end at the curved folds,
+    # Height: between the panels' inner surfaces on the centreline, at the interior's end,
     # drawn beyond the end of the box.
-    y_end = length / 2 - s_f
-    a, b = box.map("back-panel", (1.5 * w, s_f)), box.map("front-panel", (w / 2, s_f))
-    assert math.isclose(a[1], y_end) and math.isclose(b[1], y_end)
+    y_end = cfg.length / 2
+    a, b = (0.0, y_end, -cfg.height / 2), (0.0, y_end, cfg.height / 2)
     y_line = length / 2 + gap * 0.6
     la, lb = (0.0, y_line, a[2]), (0.0, y_line, b[2])
     dims.append(
@@ -235,9 +240,9 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
         )
     )
 
-    # Width: across the cross-section from fold to fold, at the near end of the box.
-    a, b = box.map("front-panel", (0.0, 0.0)), box.map("front-panel", (w, 0.0))
-    a, b = (a[0], -length / 2, a[2]), (b[0], -length / 2, b[2])  # the -Y end
+    # Width: across the interior from inner corner to inner corner, at the near end.
+    z = (body.inner_glue[1] + body.inner_fold[1]) / 2
+    a, b = (x0, -length / 2, z), (x1, -length / 2, z)
     y_line = -length / 2 - gap * 0.6
     la, lb = (a[0], y_line, 0.0), (b[0], y_line, 0.0)
     dims.append(
