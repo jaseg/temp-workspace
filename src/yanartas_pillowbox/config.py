@@ -181,6 +181,33 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         help="How far each end of the glue tab is cut back along the length.",
     ),
     FieldSpec(
+        "fpc_cutout",
+        "FPC cutout",
+        "choice",
+        "FPC cutout",
+        choices=(
+            ("none", "None"),
+            ("front", "Front end"),
+            ("back", "Back end"),
+            ("both", "Both ends"),
+        ),
+        help="Cuts the top of the inner flaps' curved edge off level, leaving a slot between "
+        "flap and box for a flat cable. Front end: the flap at the top of the pattern; back "
+        "end: the one at the bottom.",
+    ),
+    FieldSpec(
+        "fpc_cutout_width",
+        "FPC cutout width",
+        "float",
+        "FPC cutout",
+        "mm",
+        0,
+        1000,
+        0.5,
+        help="Width of the flat section, around the top of the inner flap's edge (within "
+        "about a millimetre of its centre).",
+    ),
+    FieldSpec(
         "thickness",
         "Material thickness",
         "float",
@@ -222,6 +249,8 @@ class Config:
     payload_margin: float = 1.0
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
+    fpc_cutout: str = "none"
+    fpc_cutout_width: float = 15.0
     thickness: float = 0.4
     print_side: str = "outside"
 
@@ -460,6 +489,15 @@ def validate(cfg: Config) -> dict[str, str]:
                 "glue_tab_width",
                 f"must be narrower than the front panel ({_fmt(panel)} mm) since it is glued "
                 "onto it",
+            )
+
+    if body is not None and cfg.fpc_cutout != "none" and "fpc_cutout_width" not in errors:
+        limit = body.back.width - 1
+        if cfg.fpc_cutout_width > limit:
+            add(
+                "fpc_cutout_width",
+                f"must be at most {_fmt(limit)} mm (the inner flaps' width, "
+                f"{_fmt(body.back.width)} mm, minus 1 mm)",
             )
 
     if "glue_tab_taper" not in errors and not errors.keys() & {"length", "height", "thickness"}:

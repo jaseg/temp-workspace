@@ -203,3 +203,46 @@ def test_print_inside_flips_every_fold():
     for cfg in CONFIGS.values():
         inside = build_pattern(replace(cfg, print_side="inside"))
         assert {f.direction for f in inside.folds} == {FoldDirection.VALLEY}
+
+
+# ------------------------------------------------------------------ FPC cutout
+@pytest.mark.parametrize("which", ["none", "front", "back", "both"])
+def test_fpc_cutout_flattens_only_the_chosen_inner_flaps(which):
+    """The FPC cutout cuts the top of the inner (back) flaps' edge off level, over exactly
+    the given width: front end = top of the pattern, back end = bottom. Outer flaps and the
+    other end are untouched."""
+    base = Config.defaults().with_values(thickness=0.6)
+    plain = build_pattern(base)
+    cfg = base.with_values(fpc_cutout=which, fpc_cutout_width=18)
+    pat = build_pattern(cfg)
+    assert pat.outline.is_continuous(1e-12)
+    assert self_intersections(pat.outline.polyline(16)) == []
+    flattened = {"none": set(), "front": {"top"}, "back": {"bottom"}, "both": {"top", "bottom"}}
+    x0, x1 = cfg.body.front.width, cfg.body.front.width + cfg.body.back.width
+    for end, k in (("top", 0), ("bottom", 1)):
+        face, before = pat.face(f"back-{end}-flap"), plain.face(f"back-{end}-flap")
+        xs = [x0 + (x1 - x0) * i / 2000 for i in range(1, 2000)]
+        changed = [x for x in xs if abs(face.y_range(x)[k] - before.y_range(x)[k]) > 1e-9]
+        if end in flattened[which]:
+            assert max(changed) - min(changed) == pytest.approx(18, abs=0.05)
+            assert abs(sum(changed) / len(changed) - (x0 + x1) / 2) < 1  # near the middle
+            level = {round(face.y_range(x)[k], 9) for x in changed}
+            assert len(level) == 1  # a single level cut
+            # cut back, never added to
+            for x in changed:
+                assert (face.y_range(x)[k] - before.y_range(x)[k]) * (1 if k == 0 else -1) > 0
+        else:
+            assert changed == []
+    for name in ("front-top-flap", "front-bottom-flap"):
+        x = cfg.body.front.width / 2
+        assert pat.face(name).y_range(x) == pytest.approx(plain.face(name).y_range(x))
+
+
+def test_fpc_cutout_width_validated():
+    from yanartas_pillowbox.config import ConfigError
+
+    with pytest.raises(ConfigError) as info:
+        Config.defaults().with_values(fpc_cutout="both", fpc_cutout_width=61)
+    assert "fpc_cutout_width" in info.value.errors
+    assert Config.defaults().with_values(fpc_cutout="none", fpc_cutout_width=61)  # unused
+    assert Config.defaults().fpc_cutout == "none"

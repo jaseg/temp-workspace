@@ -4,6 +4,7 @@ consistent (seam closes, flaps overlap on the end wall, no extra creases)."""
 
 import itertools
 import math
+from dataclasses import replace
 
 import pytest
 from helpers import loop_area, polyline
@@ -24,6 +25,7 @@ CONFIGS = {
     "steepest-arc": D.with_values(width=50, height=max_height(50, 0.4), glue_tab_taper=15),
     "shallow": D.with_values(height=6, length=200, thickness=1),
     "thick": D.with_values(width=70, height=24, thickness=2, glue_tab_width=15),
+    "fpc": D.with_values(fpc_cutout="both", fpc_cutout_width=20),
     "square-tab": D.with_values(glue_tab_taper=0, glue_tab_width=25),
     "big": D.with_values(width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30),
 }
@@ -268,11 +270,13 @@ def test_flap_edges_meet_the_body_surfaces(case):
     """The outer (front) flaps' cut edge is flush with the back panel's outer surface, the
     inner (back) flaps' cut edge meets the front panel's inner surface (or, near the
     corners where that dips below, runs along the chord). Exact at the polyline's
-    vertices, to well under 0.01 mm in between."""
+    vertices, to well under 0.01 mm in between. An FPC cutout cuts the inner edge back
+    further."""
     cfg, pattern, _, _ = case
     box = FoldedBox(cfg)
     body, t = box.body, cfg.thickness
     wf, wb = body.front.width, body.back.width
+    plain = None if cfg.fpc_cutout == "none" else build_pattern(replace(cfg, fpc_cutout="none"))
     for end in ("top", "bottom"):
         for i in range(1, 200):
             # Outer flap.
@@ -287,6 +291,11 @@ def test_flap_edges_meet_the_body_surfaces(case):
             p = box.map(f"back-{end}-flap", (x, lo if end == "top" else hi))
             gap = _surface_gap(body, "front", -t / 2, p[0], p[2])
             on_chord = abs(p[2] - body.z_shift) < 1e-6
+            if plain is not None:
+                plo, phi = plain.face(f"back-{end}-flap").y_range(x)
+                if abs((lo, hi)[end == "bottom"] - (plo, phi)[end == "bottom"]) > 1e-9:
+                    assert gap < 1e-6, ("FPC cutout", end, x, gap)  # cut back below
+                    continue
             assert on_chord or abs(gap) < 0.01 + 1e-3 * t, ("inner", end, x, gap)
             if on_chord:
                 assert gap > -1e-6  # trimmed to the chord only where the surface is lower

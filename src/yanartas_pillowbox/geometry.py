@@ -349,6 +349,35 @@ def _cut_chain(x0: float, y0: float, cuts: Sequence[Point], up: bool) -> tuple[S
     return tuple(Line(a, b) for a, b in itertools.pairwise(pts) if _dist(a, b) > 1e-12)
 
 
+def flatten_cut(cuts: Sequence[Point], width: float) -> tuple[Point, ...]:
+    """FPC cutout: the (u, c) cut samples with the top of the edge cut off level, at the
+    offset where the flat section is exactly ``width`` wide. (The edge is not quite
+    symmetric, so the section sits a little off the flap's centre, around its highest
+    point.)"""
+    if width <= 0:
+        return tuple(cuts)
+
+    def crossings(cap: float) -> tuple[float, float]:
+        """First and last u where the edge reaches ``cap`` (the edge rises, then falls)."""
+        pts = [
+            u0 + (u1 - u0) * (cap - c0) / (c1 - c0)
+            for (u0, c0), (u1, c1) in itertools.pairwise(cuts)
+            if (c0 - cap) * (c1 - cap) <= 0 and c0 != c1
+        ]
+        return min(pts), max(pts)
+
+    lo, hi = 0.0, max(c for _, c in cuts)  # flat width shrinks as the cap rises
+    for _ in range(80):
+        cap = (lo + hi) / 2
+        a, b = crossings(cap)
+        lo, hi = (cap, hi) if b - a > width else (lo, cap)
+    cap = (lo + hi) / 2
+    a, b = crossings(cap)
+    left = [q for q in cuts if q[0] < a - 1e-9]
+    right = [q for q in cuts if q[0] > b + 1e-9]
+    return (*left, (a, cap), (b, cap), *right)
+
+
 def _lines(*pairs: tuple[Point, Point]) -> tuple[Line, ...]:
     """Lines between the given point pairs, skipping zero-length ones."""
     return tuple(Line(a, b) for a, b in pairs if _dist(a, b) > 1e-9)
@@ -383,9 +412,12 @@ def build_pattern(cfg: Config) -> Pattern:
 
     cut_ft = _cut_chain(0.0, 0.0, front_cuts, up=True)
     step_t = _lines(((wf, -c_right), p["tm"]))
-    cut_bt = _cut_chain(wf, 0.0, back_cuts, up=True)
+    fpc = cfg.fpc_cutout
+    top_cuts = flatten_cut(back_cuts, cfg.fpc_cutout_width if fpc in ("front", "both") else 0)
+    bottom_cuts = flatten_cut(back_cuts, cfg.fpc_cutout_width if fpc in ("back", "both") else 0)
+    cut_bt = _cut_chain(wf, 0.0, top_cuts, up=True)
     tab = (Line(p["tr"], p["gt"]), Line(p["gt"], p["gb"]), Line(p["gb"], p["br"]))
-    cut_bb = rev(_cut_chain(wf, length, back_cuts, up=False))
+    cut_bb = rev(_cut_chain(wf, length, bottom_cuts, up=False))
     step_b = _lines((p["bm"], (wf, length + c_right)))
     cut_fb = rev(_cut_chain(0.0, length, front_cuts, up=False))
     free_bottom = _lines(((0.0, length + c_left), p["bl"]))

@@ -16,6 +16,8 @@ CONFIGS = {
     "default": D,
     "zero-thickness": D.with_values(thickness=0, glue_tab_width=20),
     "no-taper": D.with_values(glue_tab_taper=0),
+    "fpc-front": D.with_values(fpc_cutout="front"),
+    "fpc-both": D.with_values(fpc_cutout="both"),
     "big": D.with_values(width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30),
 }
 
@@ -72,6 +74,11 @@ def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
     segs = [s for el in root.iter(q("path")) for s in parse_path(el.get("d"))[1]]
     t = cfg.thickness
     allowance = {("length", 0): 1.5 * t, ("length", 1): 1.5 * t, ("height", 0): t / 2}
+    if cfg.fpc_cutout == "both":  # measured to where the edge would be without the cutout
+        x = cfg.body.front.width + cfg.body.back.width / 2
+        plain = build_pattern(cfg.with_values(fpc_cutout="none"))
+        cut = pattern.face("back-top-flap").y_range(x)[0]
+        allowance["height", 1] = cut - plain.face("back-top-flap").y_range(x)[0]
     for d in dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern)):
         for i, p in enumerate(d.points):
             dist = min(s.distance_to(p) for s in segs)

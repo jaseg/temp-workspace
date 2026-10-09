@@ -96,10 +96,18 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
     # Interior length along the front panel's midline: the inner end walls' inner surfaces
     # stand 1.5 t inside the front panel's curved folds (outer wall, then inner wall).
     ya, yb = body.front.sagitta + 1.5 * t, edge - body.front.sagitta - 1.5 * t
-    # Interior height across the back panel's top (inner) flap: from t/2 inside the fold (the
-    # back panel's inner surface) to the cut edge (the front panel's inner surface).
+    # Interior height across a back panel (inner) flap: from t/2 inside the fold (the back
+    # panel's inner surface) to the cut edge (the front panel's inner surface). Taken on the
+    # bottom flap if an FPC cutout flattens only the top one; with both flattened, measured
+    # to where the edge would be without the cutout.
     xh = wf + wb / 2
-    y_cut = pattern.face("back-top-flap").y_range(xh)[0]
+    reach = body.back_cuts[len(body.back_cuts) // 2][1] if cfg.fpc_cutout == "both" else None
+    if cfg.fpc_cutout == "front":
+        y_cut = pattern.face("back-bottom-flap").y_range(xh)[1]
+        y_fold = edge - body.back.sagitta + t / 2
+    else:
+        y_cut = -reach if reach is not None else pattern.face("back-top-flap").y_range(xh)[0]
+        y_fold = body.back.sagitta - t / 2
     dims = [
         # The two panels, flat, are the closed cross-section's full circumference (computed
         # from the box width, height and thickness; not an input).
@@ -123,8 +131,8 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
             "height",
             f"height {fmt(cfg.height)}",
             "vertical",
-            (p(xh, body.back.sagitta - t / 2), p(xh, y_cut)),
-            body.back.sagitta - t / 2 - y_cut,
+            (p(xh, y_fold), p(xh, y_cut)),
+            abs(y_fold - y_cut),
             at=xh + dx,
         ),
         # Glue tab: width and taper both dimensioned at the tab's bottom end.
