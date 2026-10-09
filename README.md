@@ -119,6 +119,7 @@ All lengths are in millimetres.
 | `payload_margin` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than one panel (half the circumference). |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to (length + height)/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
+| `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
 | `thickness` | 0.4 | Material thickness, 0–5. The flap cut edge is offset from the curved folds by t/2 (see below). |
 
 The stroke width is fixed at 0.1 mm.
@@ -189,8 +190,10 @@ pattern face and that the faces stay joined along every fold.
 ## Output SVG & line convention
 
 All lines are black (`#000000`) and differ only in dashing. Folds are grouped by their
-direction as seen from the **print side**, which is the side facing you when you view the
-SVG. That side becomes the outside of the box.
+direction as seen from the **print side**: by default the outside of the box, which is the
+side facing you when you view the SVG. Set `print_side` to `inside` if you score or mark the
+other side of the material. The pattern is not mirrored for that, since a pillow box is its
+own mirror image. Only the fold indicators flip.
 
 | Layer (`<g id>`) | Inkscape label | Line | `stroke-dasharray` (mm) |
 |---|---|---|---|
@@ -199,9 +202,10 @@ SVG. That side becomes the outside of the box.
 | `fold-valley` | Fold - valley | dashed | `3 2` |
 
 The dashes follow the origami convention. Each fold's direction is computed from the folded
-3D model, not set by hand. For a pillow box printed on the outside, every fold is a mountain
-fold: the panels fold around the interior, and the flaps and glue tab fold inwards. So the
-valley layer is only written when there are valley folds, which currently there aren't.
+3D model, not set by hand. Seen from the outside, every fold of a pillow box is a mountain
+fold: the panels fold around the interior, and the flaps and glue tab fold inwards. Seen
+from the inside, every fold is a valley fold. A fold layer is only written when it has
+folds.
 Fold lines use butt caps so dashes and dots keep their nominal lengths. Some laser software
 turns dashed strokes into separate short segments or ignores the dashing. Either way the
 layers keep the line types apart.

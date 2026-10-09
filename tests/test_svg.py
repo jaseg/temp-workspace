@@ -14,12 +14,14 @@ from yanartas_pillowbox.svg import (
     SvgImportError,
     extract_config,
     render_svg,
+    sheet_offset,
 )
 
 INK_LABEL = f"{{{INKSCAPE_NS}}}label"
 
 CONFIGS = [
     Config.defaults(),
+    Config.defaults().with_values(print_side="inside", glue_tab_taper=0),
     Config.defaults().with_values(height=12, glue_tab_width=20),
     Config.defaults().with_values(
         width=33.3,
@@ -60,13 +62,17 @@ def test_outline_is_one_closed_path(cfg):
 
 
 def test_svg_arcs_reproduce_geometry(cfg):
-    """Parsing the emitted path gives back the same contour (catches flag mistakes)."""
+    """Parsing the emitted paths gives back the same contour and folds (catches arc flag
+    mistakes)."""
     pat = build_pattern(cfg)
     root = svg_elements(render_svg(cfg, pat))
+    dx, dy = sheet_offset(pat)
     _, segs = parse_path(_path(root, "cut-outline").get("d"))
-    dx, dy = MARGIN - pat.bbox[0], MARGIN - pat.bbox[1]
     assert len(segs) == len(pat.outline.segments)
-    for mine, theirs in zip(pat.outline.segments, segs, strict=True):
+    pairs = list(zip(pat.outline.segments, segs, strict=True))
+    for fold in pat.folds:
+        pairs.append((fold.segment, parse_path(_path(root, f"fold-{fold.name}").get("d"))[1][0]))
+    for mine, theirs in pairs:
         for t in (0.25, 0.5, 0.75):
             a, b = mine.point_at(t), theirs.point_at(t)
             assert math.dist((a[0] + dx, a[1] + dy), b) < 1e-5
@@ -233,3 +239,19 @@ def test_import_v2_file_is_migrated():
     meta = json.dumps({"version": 2, "width": 50.0, "depth": 16.0, "length": 116.0})
     cfg = extract_config(_with_meta(meta))
     assert (cfg.height, cfg.length) == (16, 100)
+
+
+def test_print_inside_only_flips_fold_indicators():
+    """Printing on the inside keeps the geometry identical and just turns every fold into a
+    valley fold (dashed instead of dash-dot)."""
+    out = svg_elements(render_svg(Config.defaults()))
+    ins_cfg = Config.defaults().with_values(print_side="inside")
+    ins = svg_elements(render_svg(ins_cfg))
+    paths = lambda root: {el.get("id"): el.get("d") for el in root.iter(q("path"))}  # noqa: E731
+    assert paths(ins) == paths(out)
+    assert (ins.get("width"), ins.get("height")) == (out.get("width"), out.get("height"))
+    assert {g.get("id") for g in ins.findall(q("g"))} == {"cut", "fold-valley"}
+    for el in ins.find(f"{q('g')}[@id='fold-valley']"):
+        assert el.get("stroke-dasharray") == LAYERS[FoldDirection.VALLEY][2]
+    assert {f.direction for f in build_pattern(ins_cfg).folds} == {FoldDirection.VALLEY}
+    assert extract_config(render_svg(ins_cfg)) == ins_cfg

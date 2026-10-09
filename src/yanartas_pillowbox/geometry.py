@@ -220,7 +220,9 @@ class FoldCategory(StrEnum):
 
 
 class FoldDirection(StrEnum):
-    """Fold direction seen from the print side (the side facing the viewer of the SVG)."""
+    """Fold direction seen from the print side: the box outside, or the inside with
+    ``print_side = "inside"``. The pattern geometry is the same either way (a pillow box is
+    its own mirror image), so only the fold indicators change."""
 
     MOUNTAIN = "mountain"  # crease points towards the viewer; the faces bend away
     VALLEY = "valley"  # the faces bend towards the viewer
@@ -476,6 +478,8 @@ def fold_direction(cfg: Config, segment: Segment, faces: Sequence[Face]) -> Fold
     qa, qb = (p[0] + eps * n[0], p[1] + eps * n[1]), (p[0] - eps * n[0], p[1] - eps * n[1])
     face_a, face_b = _face_at(faces, qa), _face_at(faces, qb)
     normal_a = print_side_normal(box, face_a.name, qa, eps / 4)
+    if cfg.print_side == "inside":  # seen from the other side of the material
+        normal_a = (-normal_a[0], -normal_a[1], -normal_a[2])
     origin = box.map(face_b.name, p)
     into_b = [c - o for c, o in zip(box.map(face_b.name, qb), origin, strict=True)]
     bend = sum(i * j for i, j in zip(into_b, normal_a, strict=True))

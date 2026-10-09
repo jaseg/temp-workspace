@@ -188,6 +188,16 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         0.05,
         help="Curved folds are offset by half of this so the flaps clear each other.",
     ),
+    FieldSpec(
+        "print_side",
+        "Print side",
+        "choice",
+        "Material",
+        choices=(("outside", "Outside of the box"), ("inside", "Inside of the box")),
+        help="Which side of the material the fold indicators are drawn for (e.g. the side "
+        "the laser scores). Only switches the fold lines between mountain (dash-dot) and "
+        "valley (dashed); the pattern itself is the same either way.",
+    ),
 )
 
 SPECS_BY_NAME: dict[str, FieldSpec] = {s.name: s for s in FIELD_SPECS}
@@ -208,6 +218,7 @@ class Config:
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
     thickness: float = 0.4
+    print_side: str = "outside"
 
     # ----------------------------------------------------------------- derived values
     @property

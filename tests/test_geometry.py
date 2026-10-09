@@ -1,5 +1,6 @@
 import itertools
 import math
+from dataclasses import replace
 
 import pytest
 from helpers import self_intersections
@@ -181,3 +182,9 @@ def test_all_folds_are_mountain_folds_from_the_print_side(name):
             else fold.segment.reversed()
         )
         assert fold_direction(cfg, flipped, pat.faces) == fold.direction
+
+
+def test_print_inside_flips_every_fold():
+    for cfg in CONFIGS.values():
+        inside = build_pattern(replace(cfg, print_side="inside"))
+        assert {f.direction for f in inside.folds} == {FoldDirection.VALLEY}

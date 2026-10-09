@@ -98,6 +98,11 @@ def test_multiple_errors_reported_together():
     assert set(errs) >= {"width", "length", "thickness"}
 
 
+def test_print_side_validated():
+    assert Config.from_dict({"print_side": "inside"}).print_side == "inside"
+    assert "print_side" in errors_for(print_side="top")
+
+
 def test_old_color_settings_are_ignored():
     assert Config.from_dict({"color_cut": "#00FF00"}) == Config.defaults()
 
