@@ -61,9 +61,6 @@ def test_ints_coerced_to_float():
         ({"glue_tab_width": 1}, "glue_tab_width"),
         ({"glue_tab_taper": -1}, "glue_tab_taper"),
         ({"glue_tab_taper": 70}, "glue_tab_taper"),  # > edge/2 - 1 = (120 + 20)/2 - 1
-        ({"color_cut": "red"}, "color_cut"),
-        ({"color_cut": "#12345"}, "color_cut"),
-        ({"color_fold_curved": 0xFF0000}, "color_fold_curved"),
     ],
 )
 def test_validation_errors(changes, field):
@@ -97,12 +94,12 @@ def test_removed_options_are_ignored():
 
 
 def test_multiple_errors_reported_together():
-    errs = errors_for(width="x", color_cut="nope", thickness=10)
-    assert set(errs) >= {"width", "color_cut", "thickness"}
+    errs = errors_for(width="x", length="nope", thickness=10)
+    assert set(errs) >= {"width", "length", "thickness"}
 
 
-def test_colors_normalised():
-    assert Config.from_dict({"color_cut": " #abcdef"}).color_cut == "#ABCDEF"
+def test_old_color_settings_are_ignored():
+    assert Config.from_dict({"color_cut": "#00FF00"}) == Config.defaults()
 
 
 def test_version_handling():
@@ -126,7 +123,7 @@ def test_unknown_keys_ignored():
 
 def test_cli_value_parsing():
     assert parse_cli_value("width", "80") == 80.0
-    assert parse_cli_value("color_cut", "#00FF00") == "#00FF00"
+    assert parse_cli_value("payload_margin", "2.5") == 2.5
     with pytest.raises(ConfigError):
         parse_cli_value("nope", "1")
     with pytest.raises(ConfigError):

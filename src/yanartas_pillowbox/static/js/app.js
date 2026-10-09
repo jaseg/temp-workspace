@@ -161,19 +161,9 @@ async function render() {
   showErrors({});
   const { svg, model, section, info, dimensions, payload } = result.data;
   lastValid = { config: result.data.config, svg, model, section, info };
-  const c = lastValid.config;
-  const legend = [
-    { label: "Cut", color: c.color_cut },
-    { label: "Straight fold", color: c.color_fold_straight },
-    { label: "Curved fold", color: c.color_fold_curved },
-    { label: "Glue-tab fold", color: c.color_fold_glue },
-  ];
-  preview2d.update(svg, info, legend, dimensions.pattern);
-  const foldColors = {
-    straight: c.color_fold_straight, curved: c.color_fold_curved, glue: c.color_fold_glue,
-  };
-  preview3d.update(model, foldColors, dimensions.model, payload);
-  sectionView.update(section, foldColors, dimensions.section, payload);
+  preview2d.update(svg, info, dimensions.pattern);
+  preview3d.update(model, dimensions.model, payload);
+  sectionView.update(section, dimensions.section, payload);
   renderDerived(info, payload);
   downloadBtn.disabled = false;
   setStatus("Up to date");
@@ -246,7 +236,6 @@ async function importFile(file) {
 
 function download() {
   if (!lastValid) return;
-  const c = lastValid.config;
   const n = (v) => String(Math.round(v * 10) / 10);
   const name = `pillowbox-${n(c.width)}x${n(c.length)}x${n(c.height)}mm.svg`;
   const url = URL.createObjectURL(new Blob([lastValid.svg], { type: "image/svg+xml" }));

@@ -117,7 +117,7 @@ export class PbPreview3d extends HTMLElement {
 
   /** model: {parts:[{kind, positions, indices}], lines:[{category, points}], bounds};
    *  dims: parameter dimensions in the model frame (see dimensions.model_dimensions). */
-  update(model, colors, dims = [], payload = null) {
+  update(model, dims = [], payload = null) {
     this.#info.textContent =
       `closed ${fmt(model.bounds.width)} × ${fmt(model.bounds.length)} × ${fmt(model.bounds.height)} mm`;
     this.#info.title = "width × overall length (corner to corner) × height";
@@ -154,10 +154,14 @@ export class PbPreview3d extends HTMLElement {
       });
       group.add(new THREE.Mesh(geom, mat));
     }
+    // Fold lines: black, dashed by fold direction like the export (pattern scaled with size).
+    const b0 = model.bounds;
+    const k = Math.max(1, Math.hypot(b0.width, b0.length, b0.height) / 150);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x111111 });
     for (const line of model.lines) {
-      const geom = new THREE.BufferGeometry().setFromPoints(line.points.map((p) => new THREE.Vector3(...p)));
-      const mat = new THREE.LineBasicMaterial({ color: new THREE.Color(colors[line.category]) });
-      group.add(new THREE.Line(geom, mat));
+      const dash = (DASH_MM[line.direction] ?? [1, 0]).map((v) => v * k);
+      const pts = dashSegments(line.points.map((p) => new THREE.Vector3(...p)), dash);
+      group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
     }
     if (payload && !payload.empty) group.add(this.#payloadMesh(payload));
     this.#group = group;
@@ -298,6 +302,34 @@ export class PbPreview3d extends HTMLElement {
       this.#placeLabels();
     });
   }
+}
+
+// Dash patterns (mm, before scaling) matching the SVG export: mountain dash-dot, valley dashed.
+const DASH_MM = { mountain: [3, 1.5, 0.5, 1.5], valley: [3, 2] };
+
+/** Split a polyline into the "on" pieces of a repeating dash pattern; returns segment pairs. */
+function dashSegments(points, pattern) {
+  const out = [];
+  let idx = 0;
+  let left = pattern[0]; // length remaining in the current dash/gap
+  for (let i = 0; i + 1 < points.length; i++) {
+    let a = points[i].clone();
+    const b = points[i + 1];
+    let segLen = a.distanceTo(b);
+    while (segLen > 1e-9) {
+      const step = Math.min(left, segLen);
+      const next = a.clone().lerp(b, step / segLen);
+      if (idx % 2 === 0) out.push(a, next); // even entries are dashes, odd are gaps
+      a = next;
+      segLen -= step;
+      left -= step;
+      if (left <= 1e-9) {
+        idx = (idx + 1) % pattern.length;
+        left = pattern[idx];
+      }
+    }
+  }
+  return out;
 }
 
 function disposeTree(root) {

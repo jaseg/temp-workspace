@@ -61,18 +61,18 @@ the defaults. It never crashes because of the file.
   While any value is invalid, the previews keep showing the last valid design and
   *Download* is disabled. Below the form, *Derived geometry* lists the computed fold and cut
   radii, arc length, the straight-edge length, the circumference and the flat panel width.
-  The line colors are not shown in the UI; they keep the defaults below unless set in a
-  config file, with `--set`, or by importing an SVG that uses other colors.
 * **Pattern (2D):** the exact SVG you will download. Zoom with the wheel or the +/− buttons,
   drag to pan, and double-click or press *Fit* to reset. The header shows the pattern and
-  sheet sizes. A legend maps each color to its line category. Lines are shown in their real colors, and the
-  backdrop is picked for the best contrast against all of them in the current theme.
+  sheet sizes. All lines are black, as in the export, and differ only in dashing (see
+  *Output SVG*). A legend shows the line types; dashes keep their on-screen size at any
+  zoom. The backdrop stays light in the dark theme so the black lines remain visible.
 * **Folded box (3D):** an orbitable, shaded view of the closed box, folded exactly from the
-  pattern faces (drag to orbit, scroll to zoom). The camera has almost no inertia, and the
+  pattern faces (drag to orbit, scroll to zoom). Fold lines are drawn black, dashed by fold
+  direction. The camera has almost no inertia, and the
   dimension labels keep the same on-screen size at any zoom.
 * **Body cross-section:** a 2D section through the closed body, perpendicular to its length.
   The body has this same section everywhere between the curved folds. It shows the closed
-  width and height and the two straight folds in their configured colors.
+  width and height, and marks the two straight folds where they are seen end-on.
 * **Payload:** below the body controls, set the width, depth and height of a rectangular
   payload, and a **margin**: the minimum true distance from any point of the payload to the
   nearest point of the box surface. The payload is drawn centred inside the box in the
@@ -85,7 +85,7 @@ the defaults. It never crashes because of the file.
   * **Fit box to payload** (in the body controls) sets width, length and height to the
     smallest box that holds the payload with its margin, minimizing the area of the
     pattern's bounding box.
-    Glue tab, thickness and colors are left alone. Results are rounded to 0.01 mm, always
+    Glue tab and thickness are left alone. Results are rounded to 0.01 mm, always
     towards a box that still fits.
 * **Parameter dimensions:** all three views annotate the inputs they show:
   * **Pattern:** circumference (both panels, flat), length (along the front panel's
@@ -120,10 +120,6 @@ All lengths are in millimetres.
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than one panel (half the circumference). |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to (length + height)/2 − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `thickness` | 0.4 | Material thickness, 0–5. The flap cut edge is offset from the curved folds by t/2 (see below). |
-| `color_cut` | `#FF0000` | Cut outline (not shown in the UI). |
-| `color_fold_straight` | `#0000FF` | Straight fold between the panels (not shown in the UI). |
-| `color_fold_curved` | `#00A000` | Curved flap folds (not shown in the UI). |
-| `color_fold_glue` | `#FF00FF` | Glue-tab fold (not shown in the UI). |
 
 The stroke width is fixed at 0.1 mm.
 
@@ -190,19 +186,25 @@ allows `s_f ≤ 0.2·W`, which for a given box width means a fold sagitta of at 
 (height ≤ ≈ 0.463·width). The tests check that every 3D face is an isometric image of its
 pattern face and that the faces stay joined along every fold.
 
-## Output SVG & color convention
+## Output SVG & line convention
 
-The file is meant to go straight into LightBurn, Inkscape, RDWorks and similar software.
-Each color normally maps to one operation.
+All lines are black (`#000000`) and differ only in dashing. Folds are grouped by their
+direction as seen from the **print side**, which is the side facing you when you view the
+SVG. That side becomes the outside of the box.
 
-| Layer (`<g id>`) | Inkscape label | Default color | Typical operation |
+| Layer (`<g id>`) | Inkscape label | Line | `stroke-dasharray` (mm) |
 |---|---|---|---|
-| `cut` | Cut | `#FF0000` red | Cut through |
-| `fold-straight` | Fold - straight | `#0000FF` blue | Score / perforate |
-| `fold-curved` | Fold - curved flaps | `#00A000` green | Score / perforate |
-| `fold-glue` | Fold - glue tab | `#FF00FF` magenta | Score / perforate |
+| `cut` | Cut | solid | — |
+| `fold-mountain` | Fold - mountain | dash-dot | `3 1.5 0.5 1.5` |
+| `fold-valley` | Fold - valley | dashed | `3 2` |
 
-Two categories only share a color if you set them that way.
+The dashes follow the origami convention. Each fold's direction is computed from the folded
+3D model, not set by hand. For a pillow box printed on the outside, every fold is a mountain
+fold: the panels fold around the interior, and the flaps and glue tab fold inwards. So the
+valley layer is only written when there are valley folds, which currently there aren't.
+Fold lines use butt caps so dashes and dots keep their nominal lengths. Some laser software
+turns dashed strokes into separate short segments or ignores the dashing. Either way the
+layers keep the line types apart.
 
 * **Units and canvas:** `width`/`height` are given in mm with a matching `viewBox`, so one
   user unit is 1 mm. The canvas is the pattern's bounding box plus exactly **10 mm** on every
@@ -210,8 +212,8 @@ Two categories only share a color if you set them that way.
 * **Cut outline:** exactly one closed `<path>` (one `M`, ending in `Z`) that traces the whole
   contour in one direction. Arcs are exact SVG `A` commands.
   The path has no duplicate segments and no stray subpaths.
-* **Fold lines:** separate open paths, always solid (never dashed, because cutter software
-  treats dashes as geometry). They end exactly on the outline and never run along it.
+* **Fold lines:** separate open paths, dashed by fold direction. They end exactly on the
+  outline and never run along it.
 * **Styling:** `fill="none"`, `stroke` and `stroke-width` are plain attributes on every
   element, with a fixed 0.1 mm stroke width. There are no CSS classes and no `<style>`.
 * **Metadata:** the complete config is stored as JSON in
@@ -223,7 +225,8 @@ Two categories only share a color if you set them that way.
   closed box width. Version 3 renamed `depth` to `height`, measures `length` along the panel
   midline (it was corner to corner) and dropped the direct-sagitta mode, the stroke width,
   the thumb notch and the label. Version-1 and -2 files (saved settings and SVGs) are
-  converted on load so they describe the same box; removed options are ignored.
+  converted on load so they describe the same box; removed options are ignored. Line colors used to be settings; they are now fixed to black, and old color settings are
+  ignored on load.
 
 ## HTTP API
 

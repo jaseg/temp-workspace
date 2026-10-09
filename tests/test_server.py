@@ -53,9 +53,9 @@ def test_render(client):
 
 
 def test_render_validation_errors(client):
-    r = client.post("/api/render", json={"config": {"width": -1, "color_cut": "x"}})
+    r = client.post("/api/render", json={"config": {"width": -1, "length": "x"}})
     assert r.status_code == 422
-    assert set(r.get_json()["errors"]) >= {"width", "color_cut"}
+    assert set(r.get_json()["errors"]) >= {"width", "length"}
 
 
 def test_render_requires_json(client):
@@ -80,7 +80,7 @@ def test_put_invalid_config_not_saved(client, settings):
 
 
 def test_import_raw_and_multipart(client):
-    cfg = Config.defaults().with_values(width=52.5, height=18, color_cut="#00FFFF")
+    cfg = Config.defaults().with_values(width=52.5, height=18, payload_margin=0.5)
     svg = render_svg(cfg)
     r = client.post("/api/import", data=svg, content_type="image/svg+xml")
     assert r.status_code == 200 and r.get_json()["config"] == cfg.to_dict()
@@ -123,6 +123,6 @@ def test_bad_settings_file_falls_back(settings, content, caplog):
 
 
 def test_save_load_round_trip(settings):
-    cfg = Config.defaults().with_values(length=99.5, color_cut="#ABCDEF")
+    cfg = Config.defaults().with_values(length=99.5, glue_tab_taper=3)
     save_config(settings, cfg)
     assert load_config(settings) == cfg

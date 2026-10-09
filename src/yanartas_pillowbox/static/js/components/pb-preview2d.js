@@ -1,9 +1,10 @@
-// <pb-preview2d>: shows the generated SVG with zoom/pan, parameter dimensions and a color
-// legend. Line colors are shown exactly as exported; only the backdrop adapts (per theme and
-// per the configured colors) so that every line color stays visible. Dimensions are a
+// <pb-preview2d>: shows the generated SVG with zoom/pan, parameter dimensions and a line-type
+// legend. Lines are black, as exported; the backdrop adapts per theme so they stay visible.
+// Fold dashes are drawn at a fixed screen size (the export's are in mm). Dimensions are a
 // preview-only overlay; they are never part of the downloaded SVG.
 
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
+import { LINE_STYLES, lineSwatch } from "../lines.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -31,6 +32,8 @@ template.innerHTML = `
   .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* Hairlines would be invisible on screen: draw them at a fixed screen width instead. */
   .stage svg path { vector-effect: non-scaling-stroke; stroke-width: 1.4px; }
+  .stage svg #fold-mountain path { stroke-dasharray: ${LINE_STYLES.mountain.dash.join(" ")}; }
+  .stage svg #fold-valley path { stroke-dasharray: ${LINE_STYLES.valley.dash.join(" ")}; }
   .stage svg .sheet { fill: none; stroke: var(--sheet-stroke); stroke-dasharray: 4 3;
                       stroke-width: 1px; vector-effect: non-scaling-stroke; }
   ${DIM_STYLE}
@@ -38,9 +41,7 @@ template.innerHTML = `
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; font-size: 12px;
             border-top: 1px solid var(--border); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .legend i { width: 22px; height: 0; border-top: 3px solid; border-radius: 2px; display: inline-block; }
-  .legend i.fill { height: 10px; border: none; }
-  .legend .stale { color: var(--error); }
+  .legend .swatch { color: var(--text); }
 </style>
 <header>
   <h2>Pattern</h2>
@@ -53,7 +54,7 @@ template.innerHTML = `
   </div>
 </header>
 <div class="stage" role="img" aria-label="2D pattern preview"><div class="empty">Rendering…</div></div>
-<div class="legend" aria-label="Line color legend"></div>
+<div class="legend" aria-label="Line type legend"></div>
 `;
 
 export class PbPreview2d extends HTMLElement {
@@ -138,9 +139,9 @@ export class PbPreview2d extends HTMLElement {
     }).observe(this.#stage);
   }
 
-  /** Show a new SVG. `info` holds pattern dimensions, `legend` is [{label, color, kind}],
-   *  `dims` the parameter dimensions in SVG user units. */
-  update(svgText, info, legend, dims = []) {
+  /** Show a new SVG. `info` holds pattern dimensions, `dims` the parameter dimensions in
+   *  SVG user units. */
+  update(svgText, info, dims = []) {
     const doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
     const svg = document.importNode(doc.documentElement, true);
     if (svg.nodeName !== "svg") return;
@@ -164,16 +165,12 @@ export class PbPreview2d extends HTMLElement {
       `pattern ${fmt(info.pattern_width)} × ${fmt(info.pattern_height)} mm · ` +
       `sheet ${fmt(w)} × ${fmt(h)} mm (10 mm margin)`;
 
-    this.#colors = legend.map((l) => l.color);
-    this.#legend.replaceChildren(...legend.map((l) => {
+    // Legend: the line types present in this pattern.
+    this.#colors = ["#000000"];
+    const present = ["cut", ...["mountain", "valley"].filter((t) => svg.querySelector(`#fold-${t}`))];
+    this.#legend.replaceChildren(...present.map((t) => {
       const item = document.createElement("span");
-      const swatch = document.createElement("i");
-      if (l.kind === "fill") { swatch.className = "fill"; swatch.style.background = l.color; }
-      else swatch.style.borderTopColor = l.color;
-      item.append(swatch, `${l.label} `);
-      const code = document.createElement("code");
-      code.textContent = l.color;
-      item.append(code);
+      item.append(lineSwatch(LINE_STYLES[t].dash), LINE_STYLES[t].label);
       return item;
     }));
     this.#applyBackdrop();

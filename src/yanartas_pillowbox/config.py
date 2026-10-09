@@ -188,10 +188,6 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         0.05,
         help="Curved folds are offset by half of this so the flaps clear each other.",
     ),
-    FieldSpec("color_cut", "Cut outline", "color", "Line colors", hidden=True),
-    FieldSpec("color_fold_straight", "Straight folds", "color", "Line colors", hidden=True),
-    FieldSpec("color_fold_curved", "Curved flap folds", "color", "Line colors", hidden=True),
-    FieldSpec("color_fold_glue", "Glue-tab fold", "color", "Line colors", hidden=True),
 )
 
 SPECS_BY_NAME: dict[str, FieldSpec] = {s.name: s for s in FIELD_SPECS}
@@ -212,10 +208,6 @@ class Config:
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
     thickness: float = 0.4
-    color_cut: str = "#FF0000"
-    color_fold_straight: str = "#0000FF"
-    color_fold_curved: str = "#00A000"
-    color_fold_glue: str = "#FF00FF"
 
     # ----------------------------------------------------------------- derived values
     @property

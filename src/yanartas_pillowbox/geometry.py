@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
@@ -219,11 +219,19 @@ class FoldCategory(StrEnum):
     GLUE = "glue"
 
 
+class FoldDirection(StrEnum):
+    """Fold direction seen from the print side (the side facing the viewer of the SVG)."""
+
+    MOUNTAIN = "mountain"  # crease points towards the viewer; the faces bend away
+    VALLEY = "valley"  # the faces bend towards the viewer
+
+
 @dataclass(frozen=True)
 class Fold:
     name: str
-    category: FoldCategory
+    category: FoldCategory  # what the fold is for (panel joint, flap, glue tab)
     segment: Segment
+    direction: FoldDirection | None = None  # set by build_pattern from the folded model
 
 
 @dataclass(frozen=True)
@@ -415,7 +423,63 @@ def build_pattern(cfg: Config) -> Pattern:
         # Shallower tapers let the glued tab reach past the curved fold near the corners.
         "min_glue_tab_taper": g * fold_slope(w, s_f),
     }
+    folds = tuple(replace(f, direction=fold_direction(cfg, f.segment, faces)) for f in folds)
     return Pattern(outline, folds, faces, bbox, info)
+
+
+def _face_at(faces: Sequence[Face], p: Point) -> Face:
+    for face in faces:
+        if face.x0 < p[0] < face.x1:
+            lo, hi = face.y_range(p[0])
+            if lo < p[1] < hi:
+                return face
+    raise ValueError(f"no face at {p}")
+
+
+def print_side_normal(box: FoldedBox, face: str, p: Point, h: float) -> Point3:
+    """Unit normal, in the folded box, of the face's print side at flat point p (interior).
+
+    Flat pattern axes are x right, y down, so x cross y points into the page, away from the
+    viewer; the print side's normal is the folded image of the opposite direction."""
+    dx = [
+        b - a
+        for a, b in zip(
+            box.map(face, (p[0] - h, p[1])), box.map(face, (p[0] + h, p[1])), strict=True
+        )
+    ]
+    dy = [
+        b - a
+        for a, b in zip(
+            box.map(face, (p[0], p[1] - h)), box.map(face, (p[0], p[1] + h)), strict=True
+        )
+    ]
+    n = (
+        -(dx[1] * dy[2] - dx[2] * dy[1]),
+        -(dx[2] * dy[0] - dx[0] * dy[2]),
+        -(dx[0] * dy[1] - dx[1] * dy[0]),
+    )
+    k = math.hypot(*n)
+    return (n[0] / k, n[1] / k, n[2] / k)
+
+
+def fold_direction(cfg: Config, segment: Segment, faces: Sequence[Face]) -> FoldDirection:
+    """Mountain or valley, seen from the print side, from the folded model: at the fold's
+    midpoint, does the face on one side bend away from (mountain) or towards (valley) the
+    print side of the face on the other side?"""
+    box = FoldedBox(cfg)
+    eps = 1e-3 * cfg.panel_width
+    p = segment.point_at(0.5)
+    a, b = segment.point_at(0.5 - 1e-4), segment.point_at(0.5 + 1e-4)
+    t = (b[0] - a[0], b[1] - a[1])
+    k = math.hypot(*t)
+    n = (-t[1] / k, t[0] / k)
+    qa, qb = (p[0] + eps * n[0], p[1] + eps * n[1]), (p[0] - eps * n[0], p[1] - eps * n[1])
+    face_a, face_b = _face_at(faces, qa), _face_at(faces, qb)
+    normal_a = print_side_normal(box, face_a.name, qa, eps / 4)
+    origin = box.map(face_b.name, p)
+    into_b = [c - o for c, o in zip(box.map(face_b.name, qb), origin, strict=True)]
+    bend = sum(i * j for i, j in zip(into_b, normal_a, strict=True))
+    return FoldDirection.MOUNTAIN if bend < 0 else FoldDirection.VALLEY
 
 
 # --------------------------------------------------------------------------- 3D model
@@ -532,6 +596,7 @@ def build_model3d(
             {
                 "name": fold.name,
                 "category": fold.category.value,
+                "direction": fold.direction.value if fold.direction else None,
                 "points": [[round(c, 6) for c in pt] for pt in pts],
             }
         )
@@ -554,7 +619,9 @@ def _flat_area(flat: list[float], tri: tuple[int, int, int]) -> float:
     return abs((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) / 2
 
 
-def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
+def build_cross_section(
+    cfg: Config, samples: int = 96, pattern: Pattern | None = None
+) -> dict[str, Any]:
     """2D cross-section of the closed box body, perpendicular to its length.
 
     The body is a cylinder between the curved folds, so this section is the same at every
@@ -563,6 +630,7 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
     3D preview and pattern always agree.
     """
     box = FoldedBox(cfg)
+    pattern = pattern or build_pattern(cfg)
     w, mid = cfg.panel_width, cfg.edge_length / 2
 
     def trace(face: str, x0: float, x1: float, n: int) -> list[list[float]]:
@@ -576,8 +644,16 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
         "front": front,
         "back": back,
         "folds": [
-            {"category": FoldCategory.STRAIGHT.value, "point": front[-1]},
-            {"category": FoldCategory.GLUE.value, "point": back[-1]},
+            {
+                "category": FoldCategory.STRAIGHT.value,
+                "direction": pattern.fold("panels").direction,
+                "point": front[-1],
+            },
+            {
+                "category": FoldCategory.GLUE.value,
+                "direction": pattern.fold("glue-tab").direction,
+                "point": back[-1],
+            },
         ],
         "width": box.section.closed_width,
         "height": cfg.height,

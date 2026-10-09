@@ -5,10 +5,11 @@ import pytest
 from helpers import parse_path, q, self_intersections, svg_elements
 
 from yanartas_pillowbox.config import SCHEMA_VERSION, STROKE_WIDTH, Config
-from yanartas_pillowbox.geometry import build_pattern
+from yanartas_pillowbox.geometry import FoldDirection, build_pattern
 from yanartas_pillowbox.svg import (
     CONFIG_NS,
     INKSCAPE_NS,
+    LAYERS,
     MARGIN,
     SvgImportError,
     extract_config,
@@ -26,8 +27,6 @@ CONFIGS = [
         height=12.5,
         thickness=0.0,
         glue_tab_taper=0,
-        color_cut="#123456",
-        color_fold_glue="#abcdef",
     ),
 ]
 
@@ -97,56 +96,75 @@ def test_canvas_is_bbox_plus_margin(cfg):
     assert max(ys) == pytest.approx(h - MARGIN, abs=1e-5)
 
 
-def test_layers_and_colors(cfg):
-    root = svg_elements(render_svg(cfg))
-    expected = {
-        "cut": cfg.color_cut,
-        "fold-straight": cfg.color_fold_straight,
-        "fold-curved": cfg.color_fold_curved,
-        "fold-glue": cfg.color_fold_glue,
-    }
+FOLD_LAYERS = {"fold-mountain": FoldDirection.MOUNTAIN, "fold-valley": FoldDirection.VALLEY}
+
+
+def fold_elements(root):
+    for layer in FOLD_LAYERS:
+        g = root.find(f"{q('g')}[@id='{layer}']")
+        yield from (g if g is not None else [])
+
+
+def test_layers_and_line_styles(cfg):
+    """All lines black; the cut is solid, folds are dashed by direction (mountain dash-dot,
+    valley dashed), one Inkscape layer per line type."""
+    pattern = build_pattern(cfg)
+    root = svg_elements(render_svg(cfg, pattern))
+    present = {d for d in FoldDirection if any(f.direction == d for f in pattern.folds)}
     layers = root.findall(q("g"))
-    assert {g.get("id") for g in layers} == set(expected)
+    assert {g.get("id") for g in layers} == {"cut"} | {LAYERS[d][0] for d in present}
     for g in layers:
         assert g.get(f"{{{INKSCAPE_NS}}}groupmode") == "layer"
         assert g.get(INK_LABEL)
-        color = expected[g.get("id")]
         children = list(g)
         assert children
         for el in children:
-            assert el.get("stroke") == color
+            assert el.get("stroke") == "#000000"
             assert el.get("fill") == "none"
             assert float(el.get("stroke-width")) == pytest.approx(STROKE_WIDTH) == 0.1
             assert el.get("style") is None and el.get("class") is None
-            assert "stroke-dasharray" not in el.attrib
+            if g.get("id") == "cut":
+                assert "stroke-dasharray" not in el.attrib
+            else:
+                assert el.get("stroke-dasharray") == LAYERS[FOLD_LAYERS[g.get("id")]][2]
     assert root.find(f".//{q('style')}") is None
 
 
-def test_default_colors_are_distinct():
-    cfg = Config.defaults()
-    colors = [cfg.color_cut, cfg.color_fold_straight, cfg.color_fold_curved, cfg.color_fold_glue]
-    assert len(set(colors)) == 4
+def test_fold_dash_patterns_differ():
+    mountain, valley = LAYERS[FoldDirection.MOUNTAIN][2], LAYERS[FoldDirection.VALLEY][2]
+    assert mountain and valley and mountain != valley
+    assert len(mountain.split()) == 4  # dash-dot
+    assert len(valley.split()) == 2  # dashed
+
+
+def test_folds_grouped_by_direction(cfg):
+    pattern = build_pattern(cfg)
+    root = svg_elements(render_svg(cfg, pattern))
+    for fold in pattern.folds:
+        el = root.find(f".//{q('path')}[@id='fold-{fold.name}']")
+        layer = next(g for g in root.findall(q("g")) if el in list(g))
+        assert FOLD_LAYERS[layer.get("id")] == fold.direction
 
 
 def test_fold_paths_are_open_and_single(cfg):
     root = svg_elements(render_svg(cfg))
-    for layer in ("fold-straight", "fold-curved", "fold-glue"):
-        for el in root.find(f"{q('g')}[@id='{layer}']"):
-            cmds, segs = parse_path(el.get("d"))
-            assert cmds.count("M") == 1 and "Z" not in cmds and len(segs) == 1
+    els = list(fold_elements(root))
+    assert len(els) == 6
+    for el in els:
+        cmds, segs = parse_path(el.get("d"))
+        assert cmds.count("M") == 1 and "Z" not in cmds and len(segs) == 1
 
 
 def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
     root = svg_elements(render_svg(cfg))
     _, outline = parse_path(_path(root, "cut-outline").get("d"))
-    for layer in ("fold-straight", "fold-curved", "fold-glue"):
-        for el in root.find(f"{q('g')}[@id='{layer}']"):
-            _, (seg,) = parse_path(el.get("d"))
-            for p in (seg.start, seg.end):
-                assert min(s.distance_to(p) for s in outline) < 1e-5
-            for i in range(1, 40):
-                p = seg.point_at(i / 40)
-                assert min(s.distance_to(p) for s in outline) > 1e-3
+    for el in fold_elements(root):
+        _, (seg,) = parse_path(el.get("d"))
+        for p in (seg.start, seg.end):
+            assert min(s.distance_to(p) for s in outline) < 1e-5
+        for i in range(1, 40):
+            p = seg.point_at(i / 40)
+            assert min(s.distance_to(p) for s in outline) > 1e-3
 
 
 def test_metadata_embedded(cfg):

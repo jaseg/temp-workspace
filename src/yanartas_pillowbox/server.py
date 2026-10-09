@@ -97,7 +97,7 @@ def create_app(settings_path: Path) -> Flask:
         if not isinstance(cfg, Config):
             return cfg
         pattern = build_pattern(cfg)
-        section = build_cross_section(cfg)
+        section = build_cross_section(cfg, pattern=pattern)
         return jsonify(
             config=cfg.to_dict(),
             svg=render_svg(cfg, pattern),

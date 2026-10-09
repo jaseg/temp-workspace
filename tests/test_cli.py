@@ -21,7 +21,7 @@ def test_generate_with_overrides_and_config(tmp_path):
             "--config",
             str(conf),
             "--set",
-            "color_cut=#00FF00",
+            "glue_tab_width=15",
             "--set",
             "thickness=0.5",
             "-o",
@@ -30,7 +30,7 @@ def test_generate_with_overrides_and_config(tmp_path):
     )
     assert rc == 0
     cfg = extract_config(out.read_text())
-    assert (cfg.width, cfg.height, cfg.color_cut, cfg.thickness) == (80, 30, "#00FF00", 0.5)
+    assert (cfg.width, cfg.height, cfg.glue_tab_width, cfg.thickness) == (80, 30, 15, 0.5)
 
 
 def test_generate_from_svg(tmp_path):

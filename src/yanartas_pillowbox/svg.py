@@ -1,9 +1,10 @@
 """Serialize a pillow box pattern to laser-ready SVG, and read the config back out of one.
 
 Conventions (see README): 1 user unit = 1 mm, canvas = pattern bbox + ``MARGIN`` on every
-side, one closed ``<path>`` for the cut outline, solid open paths for folds, every style as a
-plain presentation attribute, one Inkscape layer per line category, and the full config as
-JSON in ``<metadata>``.
+side, all lines black: one solid closed ``<path>`` for the cut outline, and open dashed paths
+for folds, grouped by fold direction seen from the print side (mountain: dash-dot, valley:
+dashed). Every style is a plain presentation attribute, each line type is its own Inkscape
+layer, and the full config is stored as JSON in ``<metadata>``.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from yanartas_pillowbox.config import (
 )
 from yanartas_pillowbox.geometry import (
     Arc,
-    FoldCategory,
+    FoldDirection,
     Line,
     Pattern,
     Point,
@@ -41,12 +42,14 @@ ET.register_namespace("inkscape", INKSCAPE_NS)
 ET.register_namespace("sodipodi", SODIPODI_NS)
 ET.register_namespace("pillowbox", CONFIG_NS)
 
-# Layer id, Inkscape label, config color attribute.
-LAYERS: dict[str, tuple[str, str, str]] = {
-    "cut": ("cut", "Cut", "color_cut"),
-    FoldCategory.STRAIGHT: ("fold-straight", "Fold - straight", "color_fold_straight"),
-    FoldCategory.CURVED: ("fold-curved", "Fold - curved flaps", "color_fold_curved"),
-    FoldCategory.GLUE: ("fold-glue", "Fold - glue tab", "color_fold_glue"),
+LINE_COLOR = "#000000"
+
+# Layer id, Inkscape label, stroke-dasharray in mm (None: solid). Origami convention:
+# valley folds dashed, mountain folds dash-dot.
+LAYERS: dict[str, tuple[str, str, str | None]] = {
+    "cut": ("cut", "Cut", None),
+    FoldDirection.MOUNTAIN: ("fold-mountain", "Fold - mountain", "3 1.5 0.5 1.5"),
+    FoldDirection.VALLEY: ("fold-valley", "Fold - valley", "3 2"),
 }
 
 
@@ -77,8 +80,8 @@ def path_data(segments: list[Segment] | tuple[Segment, ...], offset: Point, clos
     return " ".join(parts)
 
 
-def _layer(root: ET.Element, key: str, cfg: Config) -> tuple[ET.Element, str]:
-    layer_id, label, color_attr = LAYERS[key]
+def _layer(root: ET.Element, key: str) -> tuple[ET.Element, str | None]:
+    layer_id, label, dash = LAYERS[key]
     g = ET.SubElement(
         root,
         f"{{{SVG_NS}}}g",
@@ -88,7 +91,7 @@ def _layer(root: ET.Element, key: str, cfg: Config) -> tuple[ET.Element, str]:
             f"{{{INKSCAPE_NS}}}label": label,
         },
     )
-    return g, getattr(cfg, color_attr)
+    return g, dash
 
 
 def sheet_offset(pattern: Pattern) -> Point:
@@ -128,29 +131,36 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
     )
     cfg_el.text = json.dumps(cfg.to_dict(), ensure_ascii=False)
 
-    def stroke_attrs(color: str) -> dict[str, str]:
-        return {
+    def stroke_attrs(dash: str | None) -> dict[str, str]:
+        attrs = {
             "fill": "none",
-            "stroke": color,
+            "stroke": LINE_COLOR,
             "stroke-width": stroke_w,
-            "stroke-linecap": "round",
             "stroke-linejoin": "round",
         }
+        if dash is None:
+            attrs["stroke-linecap"] = "round"
+        else:  # butt caps keep dashes and dots at their nominal lengths
+            attrs["stroke-linecap"] = "butt"
+            attrs["stroke-dasharray"] = dash
+        return attrs
 
-    g, color = _layer(root, "cut", cfg)
+    g, dash = _layer(root, "cut")
     ET.SubElement(
         g,
         f"{{{SVG_NS}}}path",
         {
             "id": "cut-outline",
             "d": path_data(pattern.outline.segments, offset, close=True),
-            **stroke_attrs(color),
+            **stroke_attrs(dash),
         },
     )
 
-    for category in FoldCategory:
-        folds = [f for f in pattern.folds if f.category == category]
-        g, color = _layer(root, category, cfg)
+    for direction in FoldDirection:
+        folds = [f for f in pattern.folds if f.direction == direction]
+        if not folds:
+            continue
+        g, dash = _layer(root, direction)
         for fold in folds:
             ET.SubElement(
                 g,
@@ -158,7 +168,7 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
                 {
                     "id": f"fold-{fold.name}",
                     "d": path_data([fold.segment], offset, close=False),
-                    **stroke_attrs(color),
+                    **stroke_attrs(dash),
                 },
             )
 

@@ -180,7 +180,7 @@ def test_fit_box_holds_payload_and_only_touches_body(dims):
     assert P.fits(out)
     assert_inside_mesh(out)
     unchanged = {"width": out.width, "length": out.length, "height": out.height}
-    assert replace(cfg, **unchanged) == out  # glue tab, thickness, colors kept
+    assert replace(cfg, **unchanged) == out  # glue tab and thickness kept
     assert out.length == pytest.approx(max(pd + 2 * cfg.payload_margin, 10))
     assert P.clearance(out) == pytest.approx(cfg.payload_margin, abs=0.011)  # tight
 

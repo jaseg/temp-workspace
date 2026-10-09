@@ -21,7 +21,7 @@ template.innerHTML = `
   svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .body { fill: color-mix(in srgb, var(--text) 7%, transparent); stroke: var(--text);
           stroke-width: 2px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-  .fold { stroke: var(--surface); stroke-width: 1.5px; vector-effect: non-scaling-stroke;
+  .fold { fill: var(--text); stroke: var(--surface); stroke-width: 1.5px; vector-effect: non-scaling-stroke;
           paint-order: stroke; outline: none; }
   .fold-ring { fill: none; stroke: var(--text); stroke-width: 1px; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--border); stroke-width: 1px; stroke-dasharray: 4 4;
@@ -46,6 +46,7 @@ template.innerHTML = `
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; font-size: 12px;
             border-top: 1px solid var(--border); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i.fold { background: var(--text); }
   .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block;
               box-shadow: 0 0 0 1px var(--text); }
 </style>
@@ -97,15 +98,14 @@ export class PbSection extends HTMLElement {
 
   /** section: {front, back: [[x, z]...], folds: [{category, point}], width, height};
    *  dims: parameter dimensions in the same (X, Z) frame. */
-  update(section, colors, dims = [], payload = null) {
+  update(section, dims = [], payload = null) {
     const { width, height } = section;
     this.#info.textContent = `${fmt(width)} × ${fmt(height)} mm`;
     this.#info.title = "The body has this cross-section everywhere between the curved folds.";
-    this.#data = { section, colors, dims, payload };
+    this.#data = { section, dims, payload };
     this.#render();
     this.#legend.replaceChildren(
-      legendItem(colors.straight, "Straight fold"),
-      legendItem(colors.glue, "Glue-tab fold"),
+      legendItem("fold", `Fold, seen end-on (${[...new Set(section.folds.map((f) => f.direction))].join(", ")})`),
     );
     if (payload && !payload.empty) {
       const label = payload.margin > 0 ? "Payload, dashed: margin" : "Payload";
@@ -119,7 +119,7 @@ export class PbSection extends HTMLElement {
    *  in drawing units depends on the fit's scale, so the fit is iterated to a fixed point. */
   #render() {
     if (!this.#data) return;
-    const { section, colors, dims, payload } = this.#data;
+    const { section, dims, payload } = this.#data;
     const { width, height } = section;
     const r = this.#stage.getBoundingClientRect();
     const px = labelPx(this);
@@ -127,7 +127,7 @@ export class PbSection extends HTMLElement {
     let svg;
     for (let i = 0; i < 4; i++) {
       const upp = r.width && r.height ? Math.max(box[2] / r.width, box[3] / r.height) : box[2] / 400;
-      ({ svg, box } = this.#draw(section, colors, dims, payload, px * upp));
+      ({ svg, box } = this.#draw(section, dims, payload, px * upp));
     }
     svg.setAttribute("viewBox", box.join(" "));
     this.#stage.replaceChildren(svg);
@@ -135,7 +135,7 @@ export class PbSection extends HTMLElement {
     this.highlight(this.#highlight);
   }
 
-  #draw(section, colors, dims, payload, fs) {
+  #draw(section, dims, payload, fs) {
     const { width, height } = section;
     // Z points up on screen: plot (x, -z).
     const p = ([x, z]) => [x, -z];
@@ -176,7 +176,7 @@ export class PbSection extends HTMLElement {
     for (const fold of section.folds) {
       const [x, y] = p(fold.point);
       svg.append(
-        el("circle", { class: "fold", cx: x, cy: y, r: fs * 0.32, fill: colors[fold.category] }),
+        el("circle", { class: "fold", cx: x, cy: y, r: fs * 0.32 }),
         el("circle", { class: "fold-ring", cx: x, cy: y, r: fs * 0.4 }),
       );
     }
@@ -195,7 +195,8 @@ export class PbSection extends HTMLElement {
 function legendItem(color, label) {
   const item = document.createElement("span");
   const swatch = document.createElement("i");
-  if (color) swatch.style.background = color;
+  if (color === "fold") swatch.className = "fold";
+  else if (color) swatch.style.background = color;
   item.append(swatch, label);
   return item;
 }

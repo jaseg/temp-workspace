@@ -10,9 +10,13 @@ from yanartas_pillowbox.geometry import (
     Arc,
     CrossSection,
     FoldCategory,
+    FoldDirection,
+    FoldedBox,
     Line,
     arc_from_chord,
     build_pattern,
+    fold_direction,
+    print_side_normal,
 )
 
 CONFIGS = {
@@ -153,3 +157,27 @@ def test_cross_section_is_unit_speed_and_bulges_by_sagitta():
 def test_cross_section_rejects_arcs_that_cannot_close():
     with pytest.raises(ValueError):
         CrossSection(60, 0.21 * 60)
+
+
+def test_print_side_is_the_outside():
+    """The SVG's visible side (the print side) becomes the outside of the folded box: at the
+    front panel's apex its normal points away from the box centre (+Z)."""
+    cfg = Config.defaults()
+    n = print_side_normal(FoldedBox(cfg), "front-panel", (cfg.panel_width / 2, 60.0), 1e-3)
+    assert n == pytest.approx((0, 0, 1), abs=1e-6)
+
+
+@pytest.mark.parametrize("name", list(CONFIGS))
+def test_all_folds_are_mountain_folds_from_the_print_side(name):
+    """Seen from the outside every crease is convex: the panels fold around the interior and
+    the flaps and glue tab fold inwards. Classifying from either side of a fold agrees."""
+    cfg = CONFIGS[name]
+    pat = build_pattern(cfg)
+    assert {f.direction for f in pat.folds} == {FoldDirection.MOUNTAIN}
+    for fold in pat.folds:
+        flipped = (
+            Line(fold.segment.end, fold.segment.start)
+            if isinstance(fold.segment, Line)
+            else fold.segment.reversed()
+        )
+        assert fold_direction(cfg, flipped, pat.faces) == fold.direction
