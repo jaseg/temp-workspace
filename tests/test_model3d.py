@@ -346,6 +346,13 @@ def test_cross_section_matches_pattern_and_mesh(case):
     assert inner["fold"][0] - inner["glue"][0] == pytest.approx(cfg.width, abs=1e-5)
     assert inner["front_apex"][1] == pytest.approx(cfg.height / 2, abs=1e-5)
     assert inner["back_apex"][1] == pytest.approx(-cfg.height / 2, abs=1e-5)
+    # The material outlines are t wide around the panels' and the tab's mid-surfaces.
+    for band, mid in zip(sec["material"], (front, back, tab), strict=True):
+        n = len(band) // 2
+        assert n == len(mid)
+        for a, b, m in zip(band[:n], reversed(band[n:]), mid, strict=True):
+            assert math.dist(a, b) == pytest.approx(cfg.thickness, abs=1e-5)
+            assert math.dist(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), m) < 1e-5
     # The interior outline runs corner to corner, t/2 inside the mid-surfaces.
     outline = sec["interior"]
     assert inner["glue"] in outline and inner["fold"] in outline

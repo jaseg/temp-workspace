@@ -19,6 +19,7 @@ template.innerHTML = `
           min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stage { position: relative; flex: 1; min-height: 0; }
   svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .material { fill: var(--material-fill); stroke: none; }
   .interior { fill: var(--interior-fill); stroke: var(--text); stroke-width: 1.4px;
               stroke-linejoin: round; vector-effect: non-scaling-stroke; }
   .glue-tab { fill: none; stroke: var(--glue-color); stroke-width: 1.4px; stroke-linecap: round;
@@ -28,6 +29,7 @@ template.innerHTML = `
   .stage { --dim-color: var(--text-muted); --dim-halo: var(--surface); --dim-hl: var(--accent); }
   :host { --interior-fill: color-mix(in srgb, var(--text) 9%, transparent);
           --glue-color: var(--focus);
+          --material-fill: color-mix(in srgb, #c2459b 30%, transparent);
           --payload-fill: color-mix(in srgb, var(--accent) 22%, transparent); }
   ${DIM_STYLE}
   .payload { fill: var(--payload-fill); stroke: var(--accent);
@@ -43,6 +45,7 @@ template.innerHTML = `
                           border-color: var(--error); }
   .legend i.margin { height: 0; border-radius: 0; border-top: 1.5px dashed var(--accent); }
   .legend i.margin.bad { border-top-color: var(--error); }
+  .legend i.material { background: var(--material-fill); }
   .legend i.glue-tab { height: 0; border-radius: 0; border-top: 1.4px solid var(--glue-color); }
   text { fill: var(--text-muted); font-family: var(--ui-font, system-ui, sans-serif); }
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
@@ -99,7 +102,7 @@ export class PbSection extends HTMLElement {
   }
 
   /** section: {front, back: [[x, z]...] (mid-surfaces), interior: [[x, z]...] (closed),
-   *  glue_tab: [[x, z]...], width, height (interior), bbox};
+   *  glue_tab: [[x, z]...], material: [outline...], width, height (interior), bbox};
    *  dims: parameter dimensions in the same (X, Z) frame. */
   update(section, dims = [], payload = null) {
     const { width, height } = section;
@@ -108,7 +111,7 @@ export class PbSection extends HTMLElement {
       + "between the curved folds.";
     this.#data = { section, dims, payload };
     this.#render();
-    this.#legend.replaceChildren(legendItem("interior", "Box interior"), legendItem("glue-tab", "Glue tab"));
+    this.#legend.replaceChildren(legendItem("interior", "Box interior"), legendItem("material", "Material"), legendItem("glue-tab", "Glue tab"));
     if (payload && !payload.empty) {
       const bad = payload.fits ? "" : " bad";
       this.#legend.append(
@@ -145,11 +148,14 @@ export class PbSection extends HTMLElement {
     const pad = fs * 1.2;
 
     const svg = el("svg", { preserveAspectRatio: "xMidYMid meet" });
+    // The material at its thickness (panels and glue tab), behind everything else.
+    for (const band of section.material) {
+      svg.append(el("path", { class: "material", d: `M ${band.map(p).map((q) => q.join(",")).join(" L ")} Z` }));
+    }
     svg.append(
       el("line", { class: "axis", x1: -width / 2 - pad / 2, y1: 0, x2: width / 2 + pad / 2, y2: 0 }),
       el("line", { class: "axis", x1: 0, y1: -height / 2 - pad / 2, x2: 0, y2: height / 2 + pad / 2 }),
     );
-
     // The interior: the panels' inner surfaces.
     const interior = section.interior.map(p);
     svg.append(el("path", { class: "interior", d: `M ${interior.map((q) => q.join(",")).join(" L ")} Z` }));

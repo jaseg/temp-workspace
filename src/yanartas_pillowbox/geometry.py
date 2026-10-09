@@ -687,6 +687,20 @@ def _trace(points: Any, n: int) -> list[list[float]]:
     return [[round(c, 6) for c in points(i / n)] for i in range(n + 1)]
 
 
+def _band(mid: list[list[float]], thickness: float) -> list[list[float]]:
+    """Closed outline of the material around a mid-surface polyline: offset by +-t/2
+    perpendicular to it, ends cut square."""
+    h = thickness / 2
+    sides: tuple[list[list[float]], list[list[float]]] = ([], [])
+    for i, (x, z) in enumerate(mid):
+        (ax, az), (bx, bz) = mid[max(0, i - 1)], mid[min(len(mid) - 1, i + 1)]
+        k = math.hypot(bx - ax, bz - az)
+        nx, nz = -(bz - az) / k, (bx - ax) / k
+        for side, s in zip(sides, (h, -h), strict=True):
+            side.append([round(x + s * nx, 6), round(z + s * nz, 6)])
+    return sides[0] + sides[1][::-1]
+
+
 def _interior(body: Body, samples: int) -> list[list[float]]:
     """Closed outline of the interior: the panels' inner surfaces (t/2 inside the
     mid-surface), from the interior corner at the glued edge over the front panel to the
@@ -736,7 +750,8 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
     the box, Z height with the front panel at +Z, centred on the interior. ``front``/``back``
     are the panels' mid-surfaces (from ``FoldedBox``, so the section, 3D preview and pattern
     always agree), ``glue_tab`` the glue tab's mid-surface from the glue fold, on the
-    outside of the front panel, ``interior`` the closed outline of the interior, ``inner``
+    outside of the front panel, ``material`` the outlines of the material around the two
+    panels and the tab, ``interior`` the closed outline of the interior, ``inner``
     the interior's corners and apexes (where the interior width and height are measured).
     """
     box = FoldedBox(cfg)
@@ -768,6 +783,7 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
         "interior": _interior(body, samples),
         "inner": {k: [round(c, 6) for c in v] for k, v in inner.items()},
         "glue_tab": glue_tab,
+        "material": [_band(c, body.thickness) for c in (front, back, glue_tab)],
         "width": cfg.width,  # interior
         "height": cfg.height,
         "thickness": body.thickness,
