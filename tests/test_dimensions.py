@@ -148,7 +148,7 @@ def test_section_dimensions(cfg):
     for p in width.points:  # the interior corners
         assert list(p) in section["interior"]
     if cfg.thickness == 0:  # the corners are the folds themselves
-        folds = sorted(tuple(f["point"]) for f in section["folds"])
+        folds = sorted([tuple(section["front"][-1]), tuple(section["back"][-1])])
         assert sorted(width.points) == pytest.approx(folds, abs=1e-5)
     # Part of the circumference: the arc length of the front panel's mid-surface.
     arc = dims["circumference"]

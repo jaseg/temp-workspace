@@ -728,21 +728,19 @@ def body_bbox(body: Body, with_material: bool = True) -> BBox:
     )
 
 
-def build_cross_section(
-    cfg: Config, samples: int = 96, pattern: Pattern | None = None
-) -> dict[str, Any]:
+def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
     """2D cross-section of the closed box body, perpendicular to its length.
 
     The body is a cylinder between the curved folds, so this section is the same at every
     point along the length. Coordinates are (X, Z) in mm in the 3D model's frame: X across
     the box, Z height with the front panel at +Z, centred on the interior. ``front``/``back``
     are the panels' mid-surfaces (from ``FoldedBox``, so the section, 3D preview and pattern
-    always agree), ``interior`` the closed outline of the interior, ``inner`` the interior's
-    corners and apexes (where the interior width and height are measured).
+    always agree), ``glue_tab`` the glue tab's mid-surface from the glue fold, on the
+    outside of the front panel, ``interior`` the closed outline of the interior, ``inner``
+    the interior's corners and apexes (where the interior width and height are measured).
     """
     box = FoldedBox(cfg)
     body = box.body
-    pattern = pattern or build_pattern(cfg)
     wf, wb, mid = body.front.width, body.back.width, cfg.edge_length / 2
 
     def trace(face: str, x0: float, x1: float) -> list[list[float]]:
@@ -754,6 +752,7 @@ def build_cross_section(
 
     front = trace("front-panel", 0.0, wf)  # glued edge (-X) -> straight fold (+X)
     back = trace("back-panel", wf, wf + wb)  # straight fold (+X) -> glue fold (-X)
+    glue_tab = trace("glue-tab", wf + wb, wf + wb + cfg.glue_tab_width)  # glue fold -> free edge
     h = body.thickness / 2
     fa, ba = body.front_point(wf / 2), body.back_point(wb / 2)
     inner = {
@@ -768,18 +767,7 @@ def build_cross_section(
         "back": back,
         "interior": _interior(body, samples),
         "inner": {k: [round(c, 6) for c in v] for k, v in inner.items()},
-        "folds": [
-            {
-                "category": FoldCategory.STRAIGHT.value,
-                "direction": pattern.fold("panels").direction,
-                "point": front[-1],
-            },
-            {
-                "category": FoldCategory.GLUE.value,
-                "direction": pattern.fold("glue-tab").direction,
-                "point": back[-1],
-            },
-        ],
+        "glue_tab": glue_tab,
         "width": cfg.width,  # interior
         "height": cfg.height,
         "thickness": body.thickness,

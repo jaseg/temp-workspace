@@ -325,7 +325,6 @@ def test_cross_section_matches_pattern_and_mesh(case):
     sec = build_cross_section(cfg)
     body = cfg.body
     front, back = sec["front"], sec["back"]
-    assert "tab" not in sec  # the section view does not show the glue tab
     # Each panel's section is exactly its flat width long (no stretching) ...
     assert polyline_length(front) == pytest.approx(body.front.width, rel=1e-4)
     assert polyline_length(back) == pytest.approx(body.back.width, rel=1e-4)
@@ -333,8 +332,15 @@ def test_cross_section_matches_pattern_and_mesh(case):
     # outside the front panel's free edge (the tab wraps around it).
     assert math.dist(front[-1], back[0]) < 1e-9
     assert math.dist(back[-1], front[0]) == pytest.approx(cfg.thickness / body.edge_sine, abs=1e-5)
-    folds = {f["category"]: f["point"] for f in sec["folds"]}
-    assert folds["straight"] == front[-1] and folds["glue"] == back[-1]
+    # The glue tab starts at the glue fold and lies t outside the front panel.
+    tab = sec["glue_tab"]
+    assert tab[0] == pytest.approx(back[-1], abs=1e-6)
+    assert polyline_length(tab) == pytest.approx(cfg.glue_tab_width, rel=1e-4)
+    fine = [body.front_point(body.front.width * i / 4000) for i in range(4001)]
+    for q in tab:
+        if math.dist(q, tab[0]) > body.tab_lead + 1e-6:
+            d = min(seg_dist(q, a, b) for a, b in itertools.pairwise(fine))
+            assert d == pytest.approx(cfg.thickness, abs=1e-5)
     # The interior: corners at +-width/2, inner surfaces at +-height/2.
     inner = sec["inner"]
     assert inner["fold"][0] - inner["glue"][0] == pytest.approx(cfg.width, abs=1e-5)
