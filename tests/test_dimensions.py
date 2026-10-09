@@ -100,7 +100,8 @@ def test_length_dimension_runs_along_the_midline(cfg):
     for p, fold, k in zip(length.points, ("front-top", "front-bottom"), (1, -1), strict=True):
         apex = pattern.fold(fold).segment.point_at(0.5)
         assert p == pytest.approx((apex[0] + dx, apex[1] + dy + k * inset))
-    assert length.at == pytest.approx(cfg.body.front.width / 2 + dx)  # drawn on the midline
+    # (drawn beside the midline, clear of the exported "front end"/"back end" labels)
+    assert length.at == pytest.approx(cfg.body.front.width * 0.3 + dx)
 
 
 def test_tab_and_taper_are_on_the_same_side(cfg):

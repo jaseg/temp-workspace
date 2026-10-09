@@ -135,7 +135,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
             "vertical",
             (p(wf / 2, ya), p(wf / 2, yb)),
             yb - ya,
-            at=wf / 2 + dx,
+            at=wf * 0.3 + dx,  # beside the midline, clear of the exported labels
         ),
         Dimension(
             "height",
@@ -143,7 +143,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
             "vertical",
             (p(xh, y_fold), p(xh, y_cut)),
             abs(y_fold - y_cut),
-            at=xh + dx,
+            at=wf + wb * 0.8 + dx,  # beside the middle, clear of the exported labels
         ),
         # Glue tab: width and taper both dimensioned at the tab's bottom end.
         Dimension(
@@ -181,7 +181,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 "vertical",
                 (p(xo, ya), p(xo, yb)),
                 yb - ya,
-                at=xo + dx,
+                at=wf + wb * 0.8 + dx,  # beside the middle, clear of the labels
             )
         )
     return dims

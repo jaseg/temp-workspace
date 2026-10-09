@@ -194,22 +194,33 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
 
 
 def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]:
-    """(text, centre, font size) of the labels: which side of the material faces the viewer
-    (on the back panel), and which end of the box each oval end panel closes (front end:
-    top of the pattern, like the FPC cutout setting)."""
+    """(text, centre, font size) of the labels:
+
+    * on the back panel, which side of the box the print side (the side facing the viewer)
+      ends up on;
+    * on the front panel, just inside each curved fold, which end of the box that is (front
+      end: the top of the pattern, like the FPC cutout setting);
+    * on every oval panel, which way its print side faces once folded. The flaps keep the
+      panels' orientation; the interior walls, two folds further on, face the other way."""
+    printed_out = cfg.print_side == "outside"
+
+    def facing(outward: bool) -> str:
+        return "outside" if outward == printed_out else "inside"
+
     out = []
-    side = "outside" if cfg.print_side == "outside" else "inside"
-    back = pattern.face("back-panel")
-    xm = (back.x0 + back.x1) / 2
-    out.append((side, (xm, sum(back.y_range(xm)) / 2), LABEL_SIZE))
-    ovals = [f for f in (*pattern.faces, *pattern.wall_faces) if f.kind in ("flap", "wall")]
-    for face in ovals:
-        # Off the middle on the back panel's side, where the previews put dimensions.
-        k = 0.5 if face.x0 < back.x0 - 1e-9 else 0.3
-        xm = face.x0 + (face.x1 - face.x0) * k
+    back, front = pattern.face("back-panel"), pattern.face("front-panel")
+    xb, xf = (back.x0 + back.x1) / 2, (front.x0 + front.x1) / 2
+    out.append((facing(True), (xb, sum(back.y_range(xb)) / 2), LABEL_SIZE))
+    top, bottom = front.y_range(xf)
+    out.append(("front end", (xf, top + 2 * LABEL_SIZE), LABEL_SIZE))
+    out.append(("back end", (xf, bottom - 2 * LABEL_SIZE), LABEL_SIZE))
+    for face in (*pattern.faces, *pattern.wall_faces):
+        if face.kind not in ("flap", "wall"):
+            continue
+        xm = (face.x0 + face.x1) / 2
         lo, hi = face.y_range(xm)
-        end = "front end" if "top" in face.name else "back end"
-        out.append((end, (xm, (lo + hi) / 2), min(LABEL_SIZE, (hi - lo) / 3)))
+        size = min(LABEL_SIZE, (hi - lo) / 3)
+        out.append((facing(face.kind == "flap"), (xm, (lo + hi) / 2), size))
     return out
 
 
