@@ -50,6 +50,8 @@ def test_pattern_dimensions_cover_the_parameters(cfg):
     expected = {"circumference", "length", "height", "glue_tab_width"}
     if cfg.glue_tab_taper > 0:
         expected.add("glue_tab_taper")
+    if cfg.interior_walls:
+        expected.add("interior_wall_offset")
     assert {d.param for d in dims} == expected
 
 
@@ -74,7 +76,12 @@ def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
     segs = [s for el in root.iter(q("path")) for s in parse_path(el.get("d"))[1]]
     t = cfg.thickness
     allowance = {("length", 0): 1.5 * t, ("length", 1): 1.5 * t, ("height", 0): t / 2}
-    if cfg.fpc_cutout == "both":  # measured to where the edge would be without the cutout
+    if cfg.interior_walls:
+        # The offset is the clear gap across the bridge, t/2 inside its two folds; the
+        # height runs to the front panel's inside, t/2 beyond the inner flap's fold.
+        allowance.update({("interior_wall_offset", 0): t / 2, ("interior_wall_offset", 1): t / 2})
+        allowance["height", 1] = t / 2
+    elif cfg.fpc_cutout == "both":  # measured to where the edge would be without the cutout
         x = cfg.body.front.width + cfg.body.back.width / 2
         plain = build_pattern(cfg.with_values(fpc_cutout="none"))
         cut = pattern.face("back-top-flap").y_range(x)[0]
@@ -204,6 +211,7 @@ def test_render_returns_dimensions(tmp_path):
         "height",
         "glue_tab_width",
         "glue_tab_taper",
+        "interior_wall_offset",
     }
     assert {d["param"] for d in dims["section"]} == {"width", "height", "circumference"}
     assert {d["param"] for d in dims["model"]} == {"width", "length", "height"}

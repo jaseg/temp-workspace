@@ -16,8 +16,9 @@ D = Config.defaults()
 BOXES = {
     "default": D,
     "wide-flat": D.with_values(
-        width=120, height=20, length=60, payload_width=75, payload_depth=50, payload_height=8
+        width=120, height=20, length=60, payload_width=75, payload_depth=30, payload_height=8
     ),
+    "no-walls": D.with_values(interior_walls=False, payload_depth=110),
     "steep": D.with_values(width=50, height=22.5, payload_width=20, payload_height=15),
 }
 PAYLOADS = [(30, 100, 14), (60, 40, 10), (10, 200, 30), (80, 25, 5)]
@@ -86,8 +87,12 @@ def box_point_distance(cfg, p):
 MARGIN_CASES = {
     "default": D,
     "no-margin": D.with_values(payload_margin=0),
-    "tight-length": D.with_values(payload_depth=117, payload_height=10, payload_margin=1.5),
+    "tight-length": D.with_values(
+        payload_depth=117, payload_height=10, payload_margin=1.5, interior_walls=False
+    ),
+    "tight-walls": D.with_values(payload_depth=96, payload_height=10, payload_margin=0.5),
     "wide": D.with_values(
+        interior_wall_offset=4,
         width=120,
         height=30,
         length=60,
@@ -97,20 +102,24 @@ MARGIN_CASES = {
         payload_margin=2,
     ),
     "thin-tall": D.with_values(payload_width=6, payload_height=17, payload_margin=0.5),
-    "thick": D.with_values(thickness=2, height=24, width=70, payload_width=40, payload_height=14),
+    "thick": D.with_values(
+        thickness=2, height=24, width=70, payload_width=40, payload_height=14, payload_depth=90
+    ),
 }
 
 
 @pytest.mark.parametrize("cfg", list(MARGIN_CASES.values()), ids=list(MARGIN_CASES))
 def test_clearance_is_true_distance_to_surface(cfg):
     """Brute force: the smallest distance from the payload box to any vertex of a fine mesh of
-    the folded box (panels, end-wall flaps, glue tab) equals the computed clearance. Mesh
-    vertices only sample the surface, so they can overestimate it slightly, never under. The
-    model is the material's mid-surface, half a thickness beyond the surface that counts."""
+    the folded box (panels, end-wall flaps, glue tab) and of the interior walls equals the
+    computed clearance. Mesh vertices only sample the surface, so they can overestimate it
+    slightly, never under. The model is the material's mid-surface, half a thickness beyond
+    the surface that counts."""
     c = P.clearance(cfg)
     assert c is not None and c > 0
     model = build_model3d(cfg, step=0.25, rows=60)
-    nearest = min(box_point_distance(cfg, p) for part in model["parts"] for p in pts3(part))
+    parts = model["parts"] + model["walls"]
+    nearest = min(box_point_distance(cfg, p) for part in parts for p in pts3(part))
     nearest -= cfg.thickness / 2
     assert nearest >= c - 1e-5
     assert nearest <= c + 0.02
@@ -120,8 +129,12 @@ def test_margin_controls_fit():
     c = P.clearance(D)
     assert P.fits(D.with_values(payload_margin=math.floor(c * 100) / 100))
     assert not P.fits(D.with_values(payload_margin=c + 0.01))
-    # End walls: clearance along the length is exactly (length - depth) / 2.
-    cfg = D.with_values(payload_depth=D.length - 1, payload_margin=0)
+    # End walls: clearance along the length is exactly (length - depth) / 2, less the
+    # interior walls' offset and thickness when they are on.
+    cfg = D.with_values(payload_depth=D.length - 1, payload_margin=0, interior_walls=False)
+    assert P.clearance(cfg) == pytest.approx(0.5)
+    inset = D.interior_wall_offset + D.thickness
+    cfg = D.with_values(payload_depth=D.length - 2 * inset - 1, payload_margin=0)
     assert P.clearance(cfg) == pytest.approx(0.5)
 
 
@@ -159,7 +172,8 @@ def test_maximize_height_touches_the_inner_surface(box):
 
 def test_maximize_depth_is_midline_length(box):
     out = P.maximize(box, "payload_depth")
-    assert out.payload_depth == pytest.approx(box.length - 2 * box.payload_margin)
+    inset = box.interior_wall_offset + box.thickness if box.interior_walls else 0
+    assert out.payload_depth == pytest.approx(box.length - 2 * (box.payload_margin + inset))
 
 
 @pytest.mark.parametrize("field", ["payload_width", "payload_depth", "payload_height"])
@@ -194,7 +208,8 @@ def test_fit_box_holds_payload_and_only_touches_body(dims):
     assert_inside_mesh(out)
     unchanged = {"width": out.width, "length": out.length, "height": out.height}
     assert replace(cfg, **unchanged) == out  # glue tab and thickness kept
-    assert out.length == pytest.approx(max(pd + 2 * cfg.payload_margin, 10))
+    inset = cfg.interior_wall_offset + cfg.thickness
+    assert out.length == pytest.approx(max(pd + 2 * (cfg.payload_margin + inset), 10))
     assert P.clearance(out) == pytest.approx(cfg.payload_margin, abs=0.011)  # tight
 
 
@@ -277,7 +292,7 @@ def test_api(tmp_path):
     data = client.post("/api/render", json={"config": cfg}).get_json()
     assert data["payload"] == {
         "width": 30,
-        "depth": 100,
+        "depth": 95,
         "height": 13,
         "margin": 1,
         "clearance": round(P.clearance(D), 4),

@@ -26,6 +26,7 @@ from yanartas_pillowbox.geometry import (
     Line,
     Pattern,
     Point,
+    Polyline,
     Segment,
     build_pattern,
 )
@@ -70,7 +71,9 @@ def path_data(segments: list[Segment] | tuple[Segment, ...], offset: Point, clos
 
     parts = [f"M {pt(segments[0].start)}"]
     for seg in segments:
-        if isinstance(seg, Line):
+        if isinstance(seg, Polyline):
+            parts.extend(f"L {pt(q)}" for q in seg.points[1:])
+        elif isinstance(seg, Line):
             parts.append(f"L {pt(seg.end)}")
         elif isinstance(seg, Arc):
             r = fmt(seg.radius)
@@ -155,9 +158,19 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
             **stroke_attrs(dash),
         },
     )
+    for i, hole in enumerate(pattern.holes):  # FPC notches through the interior walls' folds
+        ET.SubElement(
+            g,
+            f"{{{SVG_NS}}}path",
+            {
+                "id": f"cut-notch-{i + 1}",
+                "d": path_data(hole.segments, offset, close=True),
+                **stroke_attrs(dash),
+            },
+        )
 
     for direction in FoldDirection:
-        folds = [f for f in pattern.folds if f.direction == direction]
+        folds = [f for f in pattern.all_folds if f.direction == direction]
         if not folds:
             continue
         g, dash = _layer(root, direction)

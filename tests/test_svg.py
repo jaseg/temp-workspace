@@ -155,22 +155,27 @@ def test_folds_grouped_by_direction(cfg):
 def test_fold_paths_are_open_and_single(cfg):
     root = svg_elements(render_svg(cfg))
     els = list(fold_elements(root))
-    assert len(els) == 6
+    pattern = build_pattern(cfg)
+    assert len(els) == len(pattern.all_folds)
+    assert len(pattern.wall_folds) == (4 if cfg.interior_walls else 0)  # two per end
     for el in els:
         cmds, segs = parse_path(el.get("d"))
-        assert cmds.count("M") == 1 and "Z" not in cmds and len(segs) == 1
+        assert cmds.count("M") == 1 and "Z" not in cmds
+        # Body folds are one line or arc; the bridge folds one polyline each.
+        assert len(segs) == 1 or el.get("id").startswith(("fold-top-", "fold-bottom-"))
 
 
 def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
     root = svg_elements(render_svg(cfg))
     _, outline = parse_path(_path(root, "cut-outline").get("d"))
     for el in fold_elements(root):
-        _, (seg,) = parse_path(el.get("d"))
-        for p in (seg.start, seg.end):
+        _, segs = parse_path(el.get("d"))
+        for p in (segs[0].start, segs[-1].end):
             assert min(s.distance_to(p) for s in outline) < 1e-5
-        for i in range(1, 40):
-            p = seg.point_at(i / 40)
-            assert min(s.distance_to(p) for s in outline) > 1e-3
+        for seg in segs:
+            for i in range(1, 40):
+                p = seg.point_at(i / 40)
+                assert min(s.distance_to(p) for s in outline) > 1e-3
 
 
 def test_metadata_embedded(cfg):
@@ -215,8 +220,8 @@ def _with_meta(text: str) -> str:
 
 
 def test_import_incompatible_version():
-    with pytest.raises(SvgImportError, match="schema version 5"):
-        extract_config(_with_meta(json.dumps({"version": 5, "width": 50})))
+    with pytest.raises(SvgImportError, match="schema version 6"):
+        extract_config(_with_meta(json.dumps({"version": 6, "width": 50})))
     with pytest.raises(SvgImportError, match="no schema version"):
         extract_config(_with_meta(json.dumps({"width": 50})))
 
@@ -225,22 +230,7 @@ def test_import_corrupt_or_invalid():
     with pytest.raises(SvgImportError, match="corrupt"):
         extract_config(_with_meta("{nope"))
     with pytest.raises(SvgImportError, match="invalid"):
-        extract_config(_with_meta(json.dumps({"version": 1, "width": -5})))
-
-
-def test_import_v1_file_is_migrated():
-    """A file saved by schema version 1 (``width`` = flat panel width) still imports."""
-    meta = json.dumps(
-        {"version": 1, "width": 60.0, "depth": 20.0, "thumb_notch": True, "thickness": 0}
-    )
-    cfg = extract_config(_with_meta(meta))
-    assert cfg.circumference / 2 == pytest.approx(60.0, abs=1e-4) and cfg.height == 20
-
-
-def test_import_v2_file_is_migrated():
-    meta = json.dumps({"version": 2, "width": 50.0, "depth": 16.0, "length": 116.0})
-    cfg = extract_config(_with_meta(meta))
-    assert (cfg.height, cfg.length) == (15.6, 99.6)  # then shrunk by 0.4 mm material (v4)
+        extract_config(_with_meta(json.dumps({"version": SCHEMA_VERSION, "width": -5})))
 
 
 def test_print_inside_only_flips_fold_indicators():

@@ -8,9 +8,6 @@ from yanartas_pillowbox.config import (
     Config,
     ConfigError,
     SchemaVersionError,
-    migrate_v1,
-    migrate_v2,
-    migrate_v3,
     parse_cli_value,
 )
 from yanartas_pillowbox.crosssection import CrossSection, max_height, panel_width
@@ -78,7 +75,14 @@ def test_boundary_values_accepted():
     assert Config.from_dict({"glue_tab_taper": 0, "thickness": 0}).thickness == 0
     assert (
         Config.from_dict(
-            {"width": 10, "length": 10, "height": 4, "glue_tab_taper": 4, "glue_tab_width": 5}
+            {
+                "width": 10,
+                "length": 10,
+                "height": 4,
+                "glue_tab_taper": 4,
+                "glue_tab_width": 5,
+                "interior_walls": False,
+            }
         ).width
         == 10
     )
@@ -93,11 +97,6 @@ def test_length_is_measured_on_the_midline():
     assert Config.from_dict({"length": 100, "height": 24, "thickness": 0}).edge_length == 124
 
 
-def test_removed_options_are_ignored():
-    old = {"stroke_width": 0.5, "thumb_notch": True, "label": True, "arc_mode": "sagitta"}
-    assert Config.from_dict(old) == Config.defaults()
-
-
 def test_multiple_errors_reported_together():
     errs = errors_for(width="x", length="nope", thickness=10)
     assert set(errs) >= {"width", "length", "thickness"}
@@ -106,10 +105,6 @@ def test_multiple_errors_reported_together():
 def test_print_side_validated():
     assert Config.from_dict({"print_side": "inside"}).print_side == "inside"
     assert "print_side" in errors_for(print_side="top")
-
-
-def test_old_color_settings_are_ignored():
-    assert Config.from_dict({"color_cut": "#00FF00"}) == Config.defaults()
 
 
 def test_version_handling():
@@ -158,7 +153,14 @@ def test_width_drives_the_cross_section(width, arc, t):
     if arc["height"] - t < 0.5 or arc["height"] > max_height(width, t):
         pytest.skip("not a valid box")
     cfg = Config.from_dict(
-        {"width": width, "length": 400, "glue_tab_width": 5, "thickness": t, **arc}
+        {
+            "width": width,
+            "length": 400,
+            "glue_tab_width": 5,
+            "thickness": t,
+            "interior_walls": False,
+            **arc,
+        }
     )
     body = cfg.body
     assert body.inner_fold[0] - body.inner_glue[0] == pytest.approx(width, rel=1e-10)
@@ -193,53 +195,10 @@ def test_circumference_is_computed_not_stored():
     assert Config.from_dict({"circumference": 999}) == cfg  # unknown keys are ignored
 
 
-def test_v1_documents_are_migrated():
-    """Schema 1 stored the flat panel width as ``width``; migrating converts it to the closed
-    width so the box (and its pattern) stays the same."""
-    v1 = {"version": 1, "width": 60.0, "depth": 20.0, "length": 100.0}
-    v2 = migrate_v1(v1)
-    assert v2["version"] == 2
-    assert v2["width"] == pytest.approx(CrossSection(60.0, 10.0).closed_width, abs=1e-4)
-    # End to end at zero thickness (where versions 3 and 4 agree): same panel width.
-    cfg = Config.from_dict({**v1, "thickness": 0}, require_version=True)
-    assert cfg.circumference / 2 == pytest.approx(60.0, abs=1e-4)
-    assert cfg.edge_length == 100.0 and cfg.to_dict()["version"] == SCHEMA_VERSION
-    # Missing fields use the version-1 defaults (60 mm panel, depth 20).
-    assert migrate_v1({"version": 1})["width"] == v2["width"]
-    sag = Config.from_dict(
-        {"version": 1, "width": 80, "arc_mode": "sagitta", "sagitta": 5, "thickness": 0}
-    )
-    assert sag.circumference / 2 == pytest.approx(80.0, abs=1e-4) and sag.height == 10
-    with pytest.raises(ConfigError) as info:
-        Config.from_dict({"version": 1, "width": -3})
-    assert "width" in info.value.errors
-
-
-def test_v2_documents_are_migrated():
-    """Schema 2 called the height ``depth``, could set the sagitta directly, and measured
-    ``length`` corner to corner. Migrating keeps the same box."""
-    v2 = {"version": 2, "width": 50.0, "depth": 16.0, "length": 116.0, "stroke_width": 0.2}
-    v3 = migrate_v2(v2)
-    assert (v3["version"], v3["width"], v3["height"], v3["length"]) == (3, 50, 16, 100)
-    sag = migrate_v2({"version": 2, "arc_mode": "sagitta", "sagitta": 7, "length": 120})
-    assert (sag["height"], sag["length"]) == (14, 106)
-    assert migrate_v2({"version": 2})["height"] == 20  # v2 default depth
-    cfg = Config.from_dict({**v2, "thickness": 0}, require_version=True)
-    assert (cfg.width, cfg.height, cfg.length, cfg.edge_length) == (50, 16, 100, 116)
-
-
-def test_v3_documents_are_migrated():
-    """Schema 3 described the zero-thickness mid-surface; schema 4 the interior. Migrating
-    shrinks width, height and length by the material, so the box keeps about its size."""
-    v3 = {"version": 3, "width": 55.0, "height": 20.0, "length": 120.0, "thickness": 0.4}
-    cfg = Config.from_dict(v3, require_version=True)
-    assert (cfg.height, cfg.length) == (19.6, 119.6)
-    assert 54 < cfg.width < 54.7  # inner corners sit t/2 / sin(alpha) inside the folds
-    old_circumference = 2 * panel_width(55.0, 10.0)
-    assert cfg.circumference == pytest.approx(old_circumference, rel=5e-3)
-    assert cfg.edge_length == pytest.approx(140, abs=0.5)
-    # Zero thickness: nothing changes. Version 3 defaults (0.4 mm) apply when it is missing.
-    assert migrate_v3({**v3, "thickness": 0})["width"] == 55
-    assert migrate_v3({"version": 3})["height"] == 19.6
-    # Garbage is left for validation to report.
-    assert migrate_v3({"version": 3, "width": "x"})["width"] == "x"
+def test_interior_wall_validation():
+    errs = errors_for(interior_wall_offset=60)  # no room left in a 120 mm box
+    assert "interior_wall_offset" in errs
+    errs = errors_for(height=1, thickness=0.4, payload_height=0.5)  # too low for the walls
+    assert "interior_walls" in errs
+    errs = errors_for(fpc_cutout="both", fpc_cutout_width=59)  # wider than the walls
+    assert "fpc_cutout_width" in errs

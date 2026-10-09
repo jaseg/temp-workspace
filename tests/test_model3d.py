@@ -16,6 +16,7 @@ from yanartas_pillowbox.geometry import (
     build_cross_section,
     build_model3d,
     build_pattern,
+    wall_layout,
 )
 
 D = Config.defaults()
@@ -90,9 +91,10 @@ def same_segment(a, b, tol=1e-9):
 
 # ------------------------------------------------------------------ the 2D faces tile the pattern
 def test_faces_tile_the_pattern(case):
-    _, pattern, _, _ = case
-    faces = pattern.faces
-    assert len(faces) == 7
+    cfg, pattern, _, _ = case
+    assert len(pattern.faces) == 7
+    assert len(pattern.wall_faces) == (4 if cfg.interior_walls else 0)
+    faces = pattern.faces + pattern.wall_faces
     for face in faces:  # closed, consistently oriented loops
         loop = face.boundary
         for a, b in zip(loop, (*loop[1:], loop[0]), strict=True):
@@ -101,12 +103,20 @@ def test_faces_tile_the_pattern(case):
     for seg in pattern.outline.segments:
         owners = [f.name for f in faces if any(same_segment(seg, s) for s in f.boundary)]
         assert len(owners) == 1, (seg, owners)
-    for fold in pattern.folds:
+    for fold in pattern.all_folds:
         owners = [f.name for f in faces if any(same_segment(fold.segment, s) for s in f.boundary)]
         assert len(owners) == 2, (fold.name, owners)
-    # ... and the face areas add up to the area enclosed by the cut outline.
+    # ... and the face areas add up to the area enclosed by the cut outline, less the FPC
+    # notches: closed cuts between the bridge and the inner flap or interior wall, whose
+    # edges belong to those faces.
     total = sum(abs(loop_area(f.boundary)) for f in faces)
-    assert total == pytest.approx(abs(loop_area(pattern.outline.segments)), rel=1e-9)
+    holes = sum(abs(loop_area(h.segments)) for h in pattern.holes)
+    assert total + holes == pytest.approx(abs(loop_area(pattern.outline.segments)), rel=1e-9)
+    for hole in pattern.holes:
+        assert hole.is_continuous(1e-9)
+        for seg in hole.segments:
+            owners = [f.name for f in faces if any(same_segment(seg, s) for s in f.boundary)]
+            assert len(owners) == 1, (seg, owners)
 
 
 # ------------------------------------------------------------------ mesh <-> 2D faces
@@ -276,7 +286,14 @@ def test_flap_edges_meet_the_body_surfaces(case):
     box = FoldedBox(cfg)
     body, t = box.body, cfg.thickness
     wf, wb = body.front.width, body.back.width
-    plain = None if cfg.fpc_cutout == "none" else build_pattern(replace(cfg, fpc_cutout="none"))
+    walls = cfg.interior_walls
+    layout = wall_layout(cfg)
+    # (with interior walls the FPC cutout notches the folds and leaves the flap's edge alone)
+    plain = (
+        None
+        if cfg.fpc_cutout == "none" or walls
+        else build_pattern(replace(cfg, fpc_cutout="none"))
+    )
     for end in ("top", "bottom"):
         for i in range(1, 200):
             # Outer flap.
@@ -289,14 +306,22 @@ def test_flap_edges_meet_the_body_surfaces(case):
             x = wf + wb * i / 200
             lo, hi = pattern.face(f"back-{end}-flap").y_range(x)
             p = box.map(f"back-{end}-flap", (x, lo if end == "top" else hi))
-            gap = _surface_gap(body, "front", -t / 2, p[0], p[2])
+            # With interior walls the flap's top is the fold into the bridge, whose
+            # mid-surface lies a thickness inside the front panel's.
+            gap = _surface_gap(body, "front", -t if walls else -t / 2, p[0], p[2])
+            tol = 0.01 + 1e-3 * t
             on_chord = abs(p[2] - body.z_shift) < 1e-6
+            if layout is not None:
+                notched = any(h.bbox()[0] < x < h.bbox()[2] for h in pattern.holes)
+                if notched and layout.ua < x - wf < layout.ub:
+                    assert gap < 1e-6, ("FPC notch", end, x, gap)  # cut back below
+                    continue
             if plain is not None:
                 plo, phi = plain.face(f"back-{end}-flap").y_range(x)
                 if abs((lo, hi)[end == "bottom"] - (plo, phi)[end == "bottom"]) > 1e-9:
                     assert gap < 1e-6, ("FPC cutout", end, x, gap)  # cut back below
                     continue
-            assert on_chord or abs(gap) < 0.01 + 1e-3 * t, ("inner", end, x, gap)
+            assert on_chord or abs(gap) < tol, ("inner", end, x, gap)
             if on_chord:
                 assert gap > -1e-6  # trimmed to the chord only where the surface is lower
     # At the panels' apexes, exactly: the outer flap reaches Z = -(h/2 + t), the inner +h/2.

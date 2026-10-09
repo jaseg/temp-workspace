@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import FoldedBox, Pattern, Point, Point3
+from yanartas_pillowbox.geometry import FoldedBox, Pattern, Point, Point3, wall_layout
 from yanartas_pillowbox.svg import MARGIN
 
 Coords = tuple[float, ...]
@@ -98,11 +98,14 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
     ya, yb = body.front.sagitta + 1.5 * t, edge - body.front.sagitta - 1.5 * t
     # Interior height across a back panel (inner) flap: from t/2 inside the fold (the back
     # panel's inner surface) to the cut edge (the front panel's inner surface). Taken on the
-    # bottom flap if an FPC cutout flattens only the top one; with both flattened, measured
-    # to where the edge would be without the cutout.
+    # bottom flap if an FPC cutout flattens only the top one; with both flattened, or with
+    # interior walls (the flap's top is then a fold t/2 lower), measured to where that edge
+    # would be.
     xh = wf + wb / 2
     reach = body.back_cuts[len(body.back_cuts) // 2][1] if cfg.fpc_cutout == "both" else None
-    if cfg.fpc_cutout == "front":
+    if cfg.interior_walls:  # the flap folds into the bridge t/2 below the front's inside
+        reach = body.back_cuts[len(body.back_cuts) // 2][1]
+    if cfg.fpc_cutout == "front" and reach is None:
         y_cut = pattern.face("back-bottom-flap").y_range(xh)[1]
         y_fold = edge - body.back.sagitta + t / 2
     else:
@@ -154,6 +157,23 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 (p(wf + wb, edge), p(wf + wb + g, edge - taper)),
                 taper,
                 at=x1 + dx + gap,
+            )
+        )
+    layout = wall_layout(cfg)
+    if layout is not None:
+        # Interior wall offset: the clear gap across the bottom bridge (the height takes the
+        # top one), from t/2 beyond the inner flap's fold to t/2 short of the interior
+        # wall's fold, where the folds are level (their highest point).
+        xo, yc = min(layout.crease.points, key=lambda q: q[1])
+        ya, yb = edge - yc + t / 2, edge - yc + layout.strip - t / 2
+        dims.append(
+            Dimension(
+                "interior_wall_offset",
+                f"offset {fmt(cfg.interior_wall_offset)}",
+                "vertical",
+                (p(xo, ya), p(xo, yb)),
+                yb - ya,
+                at=xo + dx,
             )
         )
     return dims

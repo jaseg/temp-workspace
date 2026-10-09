@@ -71,8 +71,9 @@ def loop_area(segs) -> float:
     twice = 0.0
     for s in segs:
         (x0, y0), (x1, y1) = s.start, s.end
-        if isinstance(s, Line):
-            twice += x0 * y1 - x1 * y0
+        if not hasattr(s, "center"):  # lines and polylines
+            for (ax, ay), (bx, by) in zip(s.sample(1)[:-1], s.sample(1)[1:], strict=True):
+                twice += ax * by - bx * ay
         else:
             cx, cy = s.center
             twice += cx * (y1 - y0) - cy * (x1 - x0) + s.radius**2 * s.sweep

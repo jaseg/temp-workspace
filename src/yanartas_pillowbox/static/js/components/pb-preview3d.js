@@ -163,6 +163,7 @@ export class PbPreview3d extends HTMLElement {
       const pts = dashSegments(line.points.map((p) => new THREE.Vector3(...p)), dash);
       group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
     }
+    for (const wall of model.walls ?? []) group.add(this.#wallMesh(wall));
     if (payload && !payload.empty) group.add(this.#payloadMesh(payload));
     this.#group = group;
     this.#scene.add(group);
@@ -190,6 +191,26 @@ export class PbPreview3d extends HTMLElement {
     fill.renderOrder = 5;
     edges.renderOrder = 6;
     g.add(fill, edges);
+    return g;
+  }
+
+  /** Interior wall or bridge (not folded paper): drawn through the paper like the payload,
+   *  as a translucent surface with its outline. */
+  #wallMesh({ positions, indices, outline }) {
+    const color = this.#dark.matches ? 0xc792ea : 0x8e44ad;
+    const xray = { depthTest: false, depthWrite: false, transparent: true };
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    const g = new THREE.Group();
+    const fill = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({
+      color, opacity: 0.16, side: THREE.DoubleSide, ...xray }));
+    const edge = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(outline.map((p) => new THREE.Vector3(...p))),
+      new THREE.LineBasicMaterial({ color, opacity: 0.9, ...xray }));
+    fill.renderOrder = 3;
+    edge.renderOrder = 4;
+    g.add(fill, edge);
     return g;
   }
 

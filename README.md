@@ -51,8 +51,7 @@ yanartas-pillowbox generate --set width=80 --set length=150 --set height=30 \
 
 The UI saves the last valid configuration to **`./yanartas-pillowbox.json`** in the current
 working directory. Saves happen through the server, debounced, and the file is reloaded on
-startup. Files from older schema versions are migrated (see below). If the file is missing,
-corrupt, invalid or from an unknown schema version, the tool logs a warning and starts with
+startup. If the file is missing, corrupt, invalid or from another schema version, the tool logs a warning and starts with
 the defaults. It never crashes because of the file.
 
 ## Web UI
@@ -126,15 +125,17 @@ All lengths are in millimetres.
 | `length` | 120 | Interior length along the middle of the box, between the end walls: the shortest distance between the curves. 10–2000. The straight edges (corner to corner) are `length + height + 3·thickness` long. |
 | `height` | 20 | Interior height of the closed box at maximum bulge. At most ≈ 0.46·width (the UI states the exact limit). |
 | `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
-| `payload_depth` | 100 | Payload size along the box length. 0–2000. |
+| `payload_depth` | 95 | Payload size along the box length. 0–2000. With interior walls, it has to fit between them. |
 | `payload_height` | 13 | Payload size along the box height. 0–2000. |
 | `payload_margin` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than the front panel it is glued onto. |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to half the straight edge − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
-| `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
+| `interior_walls` | on | Extends each inner flap into a bridge along the front panel and a second, interior end wall (see *Interior walls* below). |
+| `interior_wall_offset` | 10 | Clear gap between the inside of the doubled end wall and the outside of the interior wall. 0–500. The payload space between the interior walls is `length − 2·(offset + thickness)`. |
+| `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). With interior walls, it instead notches both bridge folds (see below). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
 | `fpc_cutout_width` | 15 | Width of that flat section. 0 to the inner flaps' width − 1. The cut is level and exactly this wide. The flap's edge is not quite symmetric, so the section sits around its highest point, within about a millimetre of the flap's centre. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
-| `thickness` | 0.4 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
+| `thickness` | 0.2 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
 
 The stroke width is fixed at 0.1 mm.
 
@@ -190,6 +191,36 @@ the panel's flat width). The tool allows `s_f ≤ 0.2·W`, which limits the heig
 0.46·width. The tests check that every 3D face is an isometric image of its pattern face
 and that the faces stay joined along every fold.
 
+#### Interior walls
+
+Seen in a lengthwise cut, each end of the box goes from a doubled wall (`||`) to a doubled
+wall plus an interior wall (`||  |`). On the pattern, each inner (back-panel) flap
+continues past its former cut edge into a **bridge** and then a second oval flap, the
+**interior wall**:
+
+* The inner flap's top edge becomes a fold where it meets the inside of the front panel.
+  That fold sits at the bridge's mid-surface, one thickness inside the front panel's
+  mid-surface.
+* The bridge runs `offset + thickness` along the inside of the front panel, then folds
+  down into the interior wall. The interior wall reaches down to the back panel's inner
+  surface.
+* Both folds follow the exact curve as fine polylines, emitted as one dashed SVG path each.
+  Bridge and interior wall are slightly narrower than the inner flap: they stop where the
+  interior wall would be lower than 1 mm, two thicknesses, or a tenth of the height. That
+  leaves some room at the body folds, where the inner flap's edge is cut at the bridge's
+  level instead.
+* Folding them is only approximately isometric, since a bridge can't lie perfectly flat
+  against both curved surfaces at once; the material's flexibility absorbs the difference.
+  The 3D view therefore draws bridges and interior walls as translucent surfaces, like the
+  payload, rather than as folded paper.
+* The payload clearance and *Fit box to payload* count the interior walls: *Fit* adds
+  `2·(offset + thickness)` to the length.
+* **FPC cutout with interior walls:** the cutout notches both bridge folds over its width.
+  The inner flap and the interior wall are cut back by the same depth below the bridge,
+  which keeps its full edge. The fold lines stop at the notches, and each notch is its own
+  closed cut path. A flat cable runs under the bridge and out between the inner and outer
+  flaps.
+
 #### Material thickness
 
 `width`, `length` and `height` are the interior. With thickness `t`, the material's
@@ -212,9 +243,6 @@ mid-surface lies `t/2` outside it, and the two flaps of each end lie on top of e
   where the panels' inner surfaces meet. The tool solves for the two panels' flat widths so
   that this is exactly `width` (`crosssection.solve_body`).
 * **Lengths:** the straight edges are `length + height + 3·t` long.
-* **Old files:** files from schema version 3 and earlier described the zero-thickness
-  mid-surface. They are migrated by shrinking width, height and length by the material, so
-  the box keeps about the same size.
 
 ## Output SVG & line convention
 
@@ -243,25 +271,22 @@ layers keep the line types apart.
   user unit is 1 mm. The canvas is the pattern's bounding box plus exactly **10 mm** on every
   side. There are no page-size settings.
 * **Cut outline:** exactly one closed `<path>` (one `M`, ending in `Z`) that traces the whole
-  contour in one direction. Arcs are exact SVG `A` commands.
-  The path has no duplicate segments and no stray subpaths.
+  contour in one direction. Arcs are exact SVG `A` commands; with material thickness,
+  flap edges that follow the body are fine polylines. The path has no duplicate segments
+  and no stray subpaths. FPC notches through the interior walls' folds are extra closed
+  paths (`cut-notch-N`) in the same layer.
 * **Fold lines:** separate open paths, dashed by fold direction. They end exactly on the
-  outline and never run along it.
+  outline (or a notch) and never run along it.
 * **Styling:** `fill="none"`, `stroke` and `stroke-width` are plain attributes on every
   element, with a fixed 0.1 mm stroke width. There are no CSS classes and no `<style>`.
 * **Metadata:** the complete config is stored as JSON in
-  `<metadata><pillowbox:config version="4">…</pillowbox:config></metadata>`, with the
+  `<metadata><pillowbox:config version="5">…</pillowbox:config></metadata>`, with the
   namespace `https://github.com/jaseg/yanartas-pillowbox/ns/config`. That is what *Import*
   and `--from-svg` read back. The `version` field is the config schema version. Files from
-  an unknown version are rejected with a clear message.
-* **Schema versions:** version 1 stored the flat panel width as `width`; version 2 the
-  closed box width. Version 3 renamed `depth` to `height`, measures `length` along the panel
-  midline (it was corner to corner) and dropped the direct-sagitta mode, the stroke width,
-  the thumb notch and the label. Version 4 makes width, length and height interior
-  dimensions (they used to describe the zero-thickness mid-surface). Files from versions
-  1–3 (saved settings and SVGs) are converted on load so they describe the same box, up to
-  the thickness approximation of the version 3 → 4 step. Removed options are ignored. Line colors used to be settings; they are now fixed to black, and old color settings are
-  ignored on load.
+  another version are rejected with a clear message.
+* **Schema versions:** the version is bumped whenever the meaning of saved settings
+  changes. Settings files and SVGs from any other version are rejected; there are no
+  migrations.
 
 ## HTTP API
 

@@ -15,19 +15,9 @@ from typing import Any, Literal
 
 from yanartas_pillowbox import crosssection
 
-# Version history:
-#   1  ``width`` was the flat width of one panel.
-#   2  ``width`` is the closed box's cross-section width (fold to fold); the flat panel width
-#      is derived from it (``panel_width``, half the ``circumference``).
-#   3  ``depth`` renamed to ``height``; the arc is always derived from it (``arc_mode`` and
-#      ``sagitta`` removed); ``length`` is measured along the panel midline between the
-#      curved folds (was: corner to corner, i.e. ``length + height``); ``stroke_width``
-#      fixed; thumb notch and label options removed.
-#   4  ``width``, ``height`` and ``length`` are the box's interior; the pattern adds the
-#      material thickness (was: the zero-thickness mid-surface).
-# Older documents are migrated on load.
-SCHEMA_VERSION = 4
-MIGRATABLE_VERSIONS = (1, 2, 3)
+# Bumped whenever the meaning of saved settings changes; documents of any other version are
+# rejected (no migrations).
+SCHEMA_VERSION = 5
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
@@ -181,6 +171,27 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         help="How far each end of the glue tab is cut back along the length.",
     ),
     FieldSpec(
+        "interior_walls",
+        "Interior walls",
+        "bool",
+        "Interior walls",
+        help="Extend each inner end flap into a bridge along the front panel and a second "
+        "end wall, standing inside the doubled end wall. The box length stays the space "
+        "between the end walls; the payload has to fit between the interior walls.",
+    ),
+    FieldSpec(
+        "interior_wall_offset",
+        "Interior wall offset",
+        "float",
+        "Interior walls",
+        "mm",
+        0,
+        500,
+        0.5,
+        help="Clear gap between the inside of the doubled end wall and the outside of the "
+        "interior wall.",
+    ),
+    FieldSpec(
         "fpc_cutout",
         "FPC cutout",
         "choice",
@@ -244,14 +255,16 @@ class Config:
     height: float = 20.0
     # Rectangular payload, inscribed centred in the closed box (preview only, not exported).
     payload_width: float = 30.0
-    payload_depth: float = 100.0
+    payload_depth: float = 95.0
     payload_height: float = 13.0
     payload_margin: float = 1.0
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
+    interior_walls: bool = True
+    interior_wall_offset: float = 10.0
     fpc_cutout: str = "none"
     fpc_cutout_width: float = 15.0
-    thickness: float = 0.4
+    thickness: float = 0.2
     print_side: str = "outside"
 
     # ----------------------------------------------------------------- derived values
@@ -287,19 +300,13 @@ class Config:
         """Build and validate a config from untrusted data.
 
         Missing fields take their defaults; unknown keys are ignored. If ``version`` is
-        present (or required) it must be ``SCHEMA_VERSION`` or a migratable older version.
+        present (or required) it must be ``SCHEMA_VERSION``.
         """
         if not isinstance(data, dict):
             raise ConfigError({"_": "configuration must be a JSON object"})
         check_version(data, required=require_version)
-        if data.get("version") == 1:
-            data = migrate_v1(data)
-        if data.get("version") == 2:
-            data = migrate_v2(data)
-        if data.get("version") == 3:
-            data = migrate_v3(data)
 
-        defaults = cls()
+        defaults = cls.defaults()
         values: dict[str, Any] = {}
         errors: dict[str, str] = {}
         for spec in FIELD_SPECS:
@@ -330,69 +337,11 @@ def check_version(data: dict[str, Any], *, required: bool) -> None:
     version = data["version"]
     if isinstance(version, bool) or not isinstance(version, int):
         raise SchemaVersionError(f"invalid schema version {version!r}")
-    if version != SCHEMA_VERSION and version not in MIGRATABLE_VERSIONS:
+    if version != SCHEMA_VERSION:
         raise SchemaVersionError(
             f"configuration uses schema version {version}; "
             f"this version of yanartas-pillowbox supports version {SCHEMA_VERSION}"
         )
-
-
-# Defaults of schema version 1, needed to interpret v1 documents with missing fields.
-_V1_DEFAULTS = {"width": 60.0, "arc_mode": "depth", "depth": 20.0, "sagitta": 10.0}
-
-
-def migrate_v1(data: dict[str, Any]) -> dict[str, Any]:
-    """Version 1 stored the flat panel width; version 2 stores the closed box width. Convert
-    so the migrated document describes the same box (to 0.1 um)."""
-    v1 = {**_V1_DEFAULTS, **{k: data[k] for k in _V1_DEFAULTS if k in data}}
-    try:
-        panel = float(v1["width"])
-        sag = float(v1["depth"]) / 2 if v1["arc_mode"] == "depth" else float(v1["sagitta"])
-        closed = crosssection.CrossSection(panel, sag).closed_width
-    except (TypeError, ValueError, ZeroDivisionError):
-        raise ConfigError(
-            {"width": "cannot convert this schema-version-1 configuration (invalid width or arc)"}
-        ) from None
-    return {**data, "version": 2, "width": round(closed, 4)}
-
-
-# Defaults of schema version 2 for the fields version 3 folded into ``height``.
-_V2_DEFAULTS = {"arc_mode": "depth", "depth": 20.0, "sagitta": 10.0}
-
-
-def migrate_v2(data: dict[str, Any]) -> dict[str, Any]:
-    """Version 3 renamed ``depth`` to ``height``, dropped the direct-sagitta arc mode
-    (height = 2 x sagitta) and measures ``length`` along the panel midline (corner-to-corner
-    length minus the height). Removed options (stroke width, notch, label) are ignored."""
-    v2 = {**_V2_DEFAULTS, **{k: data[k] for k in _V2_DEFAULTS if k in data}}
-    out = {k: v for k, v in data.items() if k not in _V2_DEFAULTS}
-    sagitta = v2["sagitta"]
-    if v2["arc_mode"] == "sagitta" and isinstance(sagitta, int | float):
-        out["height"] = 2 * sagitta
-    else:
-        out["height"] = v2["depth"]
-    length, height = out.get("length", 120.0), out["height"]
-    if isinstance(length, int | float) and isinstance(height, int | float):
-        out["length"] = length - height
-    out["version"] = 3
-    return out
-
-
-def migrate_v3(data: dict[str, Any]) -> dict[str, Any]:
-    """Version 3 described the zero-thickness mid-surface; version 4 the interior. Shrink
-    width, height and length by the material so the box keeps about the same size."""
-    t = data.get("thickness", 0.4)
-    w, h, ln = (data.get(k, d) for k, d in (("width", 55.0), ("height", 20.0), ("length", 120.0)))
-    out = {**data, "version": SCHEMA_VERSION}
-    if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in (t, w, h, ln)):
-        return out  # leave it to validation
-    try:  # interior corners sit t/2 / sin(alpha) inside the folds
-        panel = crosssection.panel_width(w, h / 2)
-        sine = (panel / 2) / (crosssection.circle_radius(panel, h / 2) - h / 2)
-    except (ValueError, ZeroDivisionError):
-        return out
-    out.update(width=round(w - t / sine, 4), height=round(h - t, 4), length=round(ln - t, 4))
-    return out
 
 
 def _coerce(spec: FieldSpec, value: Any) -> Any:
@@ -491,13 +440,32 @@ def validate(cfg: Config) -> dict[str, str]:
                 "onto it",
             )
 
+    walls = None
+    if body is not None and cfg.interior_walls and "interior_wall_offset" not in errors:
+        from yanartas_pillowbox.geometry import wall_layout  # geometry imports this module
+
+        room = cfg.length - 2 * (cfg.interior_wall_offset + cfg.thickness)
+        if "length" not in errors and room <= 0:
+            add(
+                "interior_wall_offset",
+                f"leaves no room between the interior walls (at most "
+                f"{_fmt(cfg.length / 2 - cfg.thickness)} mm for this length)",
+            )
+        try:
+            walls = wall_layout(cfg)
+        except ValueError:
+            add("interior_walls", "the box is too low for interior walls")
+
     if body is not None and cfg.fpc_cutout != "none" and "fpc_cutout_width" not in errors:
-        limit = body.back.width - 1
+        if walls is not None:  # the notches go through the bridge's folds
+            limit, what = walls.ub - walls.ua - 1, "the interior walls' width"
+            full = walls.ub - walls.ua
+        else:
+            limit, what, full = body.back.width - 1, "the inner flaps' width", body.back.width
         if cfg.fpc_cutout_width > limit:
             add(
                 "fpc_cutout_width",
-                f"must be at most {_fmt(limit)} mm (the inner flaps' width, "
-                f"{_fmt(body.back.width)} mm, minus 1 mm)",
+                f"must be at most {_fmt(limit)} mm ({what}, {_fmt(full)} mm, minus 1 mm)",
             )
 
     if "glue_tab_taper" not in errors and not errors.keys() & {"length", "height", "thickness"}:

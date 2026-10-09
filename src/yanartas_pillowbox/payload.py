@@ -41,6 +41,7 @@ from yanartas_pillowbox.crosssection import (
     solve_body,
     width_ratio,
 )
+from yanartas_pillowbox.geometry import wall_layout
 
 ROUND = 0.01  # mm: results are rounded to this grid, always towards a fitting box
 SAMPLES = 1000  # curve samples for clearance computations
@@ -111,10 +112,11 @@ def section_clearance(body: Body, width: float, height: float) -> float:
     )
 
 
-def wall_clearance(body: Body, width: float, depth: float) -> float:
+def wall_clearance(body: Body, width: float, depth: float, inset: float = 0.0) -> float:
     """Distance in plan from the payload (width x depth, centred) to the inner end walls'
-    inner surfaces (the same at both ends)."""
-    half = body.edge_length / 2
+    inner surfaces (the same at both ends). ``inset``: interior walls stand that much
+    further in (the bridge length), parallel to the inner flaps."""
+    half = body.edge_length / 2 - inset
 
     def wall(u: float) -> tuple[float, float]:
         return (body.back_point(u)[0], half - body.back.z(u))
@@ -130,8 +132,14 @@ def clearance(cfg: Config) -> float | None:
     body = cfg.body
     return min(
         section_clearance(body, cfg.payload_width, cfg.payload_height),
-        wall_clearance(body, cfg.payload_width, cfg.payload_depth),
+        wall_clearance(body, cfg.payload_width, cfg.payload_depth, _inset(cfg)),
     )
+
+
+def _inset(cfg: Config) -> float:
+    """How far the interior walls stand inside the inner flaps (0 without them)."""
+    layout = wall_layout(cfg)
+    return 0.0 if layout is None else layout.strip
 
 
 def fits(cfg: Config, tol: float = 1e-6) -> bool:
@@ -155,7 +163,7 @@ def _r2(v: float) -> float:
 def maximize(cfg: Config, field: str) -> Config:
     """Largest value of one payload dimension that keeps the margin in the current box."""
     m = cfg.payload_margin
-    body = cfg.body
+    body, inset = cfg.body, _inset(cfg)
     if field == "payload_depth":
         if section_clearance(body, cfg.payload_width, cfg.payload_height) < m:
             raise PayloadError(
@@ -163,7 +171,7 @@ def maximize(cfg: Config, field: str) -> Config:
             )
 
         def ok(v: float) -> bool:
-            return wall_clearance(body, cfg.payload_width, v) >= m
+            return wall_clearance(body, cfg.payload_width, v, inset) >= m
 
         if not ok(0.0):
             raise PayloadError("payload_margin", "the margin leaves no room along the length")
@@ -175,7 +183,7 @@ def maximize(cfg: Config, field: str) -> Config:
         def ok(v: float) -> bool:
             w, h = (v, cfg.payload_height) if field == "payload_width" else (cfg.payload_width, v)
             return section_clearance(body, w, h) >= m and (
-                field == "payload_height" or wall_clearance(body, v, cfg.payload_depth) >= m
+                field == "payload_height" or wall_clearance(body, v, cfg.payload_depth, inset) >= m
             )
 
         if not ok(0.0):
@@ -199,7 +207,15 @@ def pattern_area(cfg: Config) -> float:
 
 
 def pattern_height(cfg: Config) -> float:
-    return cfg.edge_length + 2 * cfg.body.front_cut_sagitta
+    """Straight edge plus what sticks out furthest at each end: the outer flaps, or the
+    interior walls."""
+    layout = wall_layout(cfg)
+    reach = (
+        cfg.body.front_cut_sagitta
+        if layout is None
+        else max(cfg.body.front_cut_sagitta, layout.reach)
+    )
+    return cfg.edge_length + 2 * reach
 
 
 def _scale_needed(x: float, z: float, a: float, b: float, m: float) -> float:
@@ -237,14 +253,19 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
     )
     sagitta = r * panel
     width = panel * width_ratio(r)
-    length = max(base.payload_depth + 2 * m, 10.0)
+    length = _fit_length(base)
     if width < 10 or 2 * sagitta - t < 0.5 or base.glue_tab_width >= panel:
         return None
     if width > SPECS_BY_NAME["width"].maximum or 2 * sagitta > SPECS_BY_NAME["height"].maximum:
         return None
     if base.glue_tab_taper > (length + 2 * sagitta + 3 * t) / 2 - 1:
         return None
-    area = (2 * panel + base.glue_tab_width) * (length + 4 * sagitta + 6 * t)
+    # Each end sticks out by the outer flap (sagitta + 1.5 t) or, with interior walls, the
+    # inner flap, bridge and interior wall (about sagitta + offset + t + 2 sagitta).
+    reach = sagitta + 1.5 * t
+    if base.interior_walls:
+        reach = max(reach, 3 * sagitta + base.interior_wall_offset + t)
+    area = (2 * panel + base.glue_tab_width) * (length + 2 * sagitta + 3 * t + 2 * reach)
     return area, width, 2 * sagitta
 
 
@@ -275,6 +296,13 @@ def _min_width(cfg: Config, height: float, guess: float) -> float | None:
     return hi
 
 
+def _fit_length(cfg: Config) -> float:
+    """Box length for the payload depth and margin, plus the interior walls (each a gap and
+    a thickness inside the end walls)."""
+    extra = 2 * (cfg.interior_wall_offset + cfg.thickness) if cfg.interior_walls else 0.0
+    return max(cfg.payload_depth + 2 * cfg.payload_margin + extra, 10.0)
+
+
 def fit_box(cfg: Config) -> Config:
     """Box (width, length, height) holding the payload with its margin, with the smallest
     pattern bounding box. Glue tab and thickness are kept.
@@ -287,7 +315,7 @@ def fit_box(cfg: Config) -> Config:
     length grown until the end walls keep the margin."""
     if is_empty(cfg):
         raise PayloadError("payload_width", "set all three payload dimensions first")
-    length = _r2(_ceil(max(cfg.payload_depth + 2 * cfg.payload_margin, 10.0)))
+    length = _r2(_ceil(_fit_length(cfg)))
 
     def area(r: float) -> float:
         c = _candidate(cfg, r)
