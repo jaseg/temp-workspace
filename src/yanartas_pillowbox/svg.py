@@ -44,6 +44,7 @@ ET.register_namespace("sodipodi", SODIPODI_NS)
 ET.register_namespace("pillowbox", CONFIG_NS)
 
 LINE_COLOR = "#000000"
+LABEL_SIZE = 3.0  # mm, at most; smaller on small faces
 
 # Layer id, Inkscape label, stroke-dasharray in mm (None: solid). Origami convention:
 # valley folds dashed, mountain folds dash-dot.
@@ -185,9 +186,58 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
                 },
             )
 
+    _labels(root, cfg, pattern, offset)
+
     ET.indent(root, space="  ")
     body = ET.tostring(root, encoding="unicode")
     return '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + body + "\n"
+
+
+def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]:
+    """(text, centre, font size) of the labels: which side of the material faces the viewer
+    (on the back panel), and which end of the box each oval end panel closes (front end:
+    top of the pattern, like the FPC cutout setting)."""
+    out = []
+    side = "outside" if cfg.print_side == "outside" else "inside"
+    back = pattern.face("back-panel")
+    xm = (back.x0 + back.x1) / 2
+    out.append((side, (xm, sum(back.y_range(xm)) / 2), LABEL_SIZE))
+    ovals = [f for f in (*pattern.faces, *pattern.wall_faces) if f.kind in ("flap", "wall")]
+    for face in ovals:
+        # Off the middle on the back panel's side, where the previews put dimensions.
+        k = 0.5 if face.x0 < back.x0 - 1e-9 else 0.3
+        xm = face.x0 + (face.x1 - face.x0) * k
+        lo, hi = face.y_range(xm)
+        end = "front end" if "top" in face.name else "back end"
+        out.append((end, (xm, (lo + hi) / 2), min(LABEL_SIZE, (hi - lo) / 3)))
+    return out
+
+
+def _labels(root: ET.Element, cfg: Config, pattern: Pattern, offset: Point) -> None:
+    g = ET.SubElement(
+        root,
+        f"{{{SVG_NS}}}g",
+        {
+            "id": "labels",
+            f"{{{INKSCAPE_NS}}}groupmode": "layer",
+            f"{{{INKSCAPE_NS}}}label": "Labels",
+        },
+    )
+    for text, (x, y), size in face_labels(cfg, pattern):
+        el = ET.SubElement(
+            g,
+            f"{{{SVG_NS}}}text",
+            {
+                "x": fmt(x + offset[0]),
+                "y": fmt(y + offset[1] + 0.35 * size),  # vertically centred on the point
+                "font-family": "sans-serif",
+                "font-size": fmt(size),
+                "text-anchor": "middle",
+                "fill": LINE_COLOR,
+                "stroke": "none",
+            },
+        )
+        el.text = text
 
 
 def extract_config(svg_text: str | bytes) -> Config:

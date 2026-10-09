@@ -17,7 +17,9 @@ template.innerHTML = `
   h2 { font-size: 13px; margin: 0; white-space: nowrap; }
   .info { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1;
           min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stage { position: relative; flex: 1; min-height: 0; }
+  .tools { display: flex; gap: 4px; }
+  .stage { position: relative; flex: 1; min-height: 0; cursor: grab; touch-action: none; }
+  .stage.dragging { cursor: grabbing; }
   svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .material { fill: var(--material-fill); stroke: none; }
   .interior { fill: var(--interior-fill); stroke: var(--text); stroke-width: 1.4px;
@@ -58,7 +60,12 @@ template.innerHTML = `
 <header>
   <h2>Body cross-section</h2>
   <div class="info" aria-live="polite"></div>
-  <button type="button" data-dims aria-pressed="true" title="Show parameter dimensions">Dimensions</button>
+  <div class="tools">
+    <button type="button" data-dims aria-pressed="true" title="Show parameter dimensions">Dimensions</button>
+    <button type="button" data-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>
+    <button type="button" data-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>
+    <button type="button" data-zoom="fit" title="Fit to view (double-click)">Fit</button>
+  </div>
 </header>
 <div class="stage" role="img" aria-label="Cross-section of the closed box body"></div>
 <div class="legend"></div>
@@ -72,6 +79,12 @@ export class PbSection extends HTMLElement {
   #highlight = null;
   #showDims = true;
   #data = null; // {section, colors, dims} of the last update
+  #base = null; // fitted viewBox [x, y, w, h]
+  #view = null; // current viewBox
+  #zoomed = false; // the user zoomed or panned: keep the view across updates
+  #drag = null;
+  #moved = false;
+  #downParam = null;
 
   constructor() {
     super();
@@ -86,13 +99,46 @@ export class PbSection extends HTMLElement {
       toggle.setAttribute("aria-pressed", String(this.#showDims));
       this.#render();
     });
+    root.querySelector(".tools").addEventListener("click", (e) => {
+      const action = e.target.closest("button")?.dataset.zoom;
+      if (action === "fit") this.fit();
+      else if (action) this.#zoomAt(action === "in" ? 1 / 1.4 : 1.4);
+    });
     new ResizeObserver(() => this.#render()).observe(this.#stage);
-    this.#stage.addEventListener("click", (e) => {
-      const param = e.target.closest?.(".dim")?.dataset.param;
-      if (param) {
+    this.#stage.addEventListener("dblclick", () => this.fit());
+    // Clicking a dimension asks the app to focus its parameter. (Pointer capture for panning
+    // retargets the click to the stage, so remember the dimension under the pointer.)
+    this.#stage.addEventListener("click", () => {
+      const param = this.#downParam;
+      if (param && !this.#moved) {
         this.dispatchEvent(new CustomEvent("pb-dim-click", { bubbles: true, composed: true, detail: { param } }));
       }
     });
+    this.#stage.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      this.#zoomAt(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)), e);
+    }, { passive: false });
+    this.#stage.addEventListener("pointerdown", (e) => {
+      if (!this.#svg || e.button !== 0) return;
+      this.#stage.setPointerCapture(e.pointerId);
+      this.#stage.classList.add("dragging");
+      this.#drag = { x: e.clientX, y: e.clientY, view: [...this.#view] };
+      this.#moved = false;
+      this.#downParam = e.target.closest?.(".dim")?.dataset.param ?? null;
+    });
+    this.#stage.addEventListener("pointermove", (e) => {
+      if (!this.#drag) return;
+      const scale = this.#unitsPerPixel(this.#drag.view);
+      const [x, y, w, h] = this.#drag.view;
+      if (Math.hypot(e.clientX - this.#drag.x, e.clientY - this.#drag.y) > 3) this.#moved = true;
+      // Panning keeps the scale, so only the viewBox moves (no redraw).
+      this.#view = [x - (e.clientX - this.#drag.x) * scale, y - (e.clientY - this.#drag.y) * scale, w, h];
+      this.#zoomed = true;
+      this.#svg.setAttribute("viewBox", this.#view.join(" "));
+    });
+    const endDrag = () => { this.#drag = null; this.#stage.classList.remove("dragging"); };
+    this.#stage.addEventListener("pointerup", endDrag);
+    this.#stage.addEventListener("pointercancel", endDrag);
   }
 
   /** Emphasise the dimensions of one parameter (or none). */
@@ -120,20 +166,53 @@ export class PbSection extends HTMLElement {
     }
   }
 
-  /** Draw the section scaled to fit, with text at labelPx() screen pixels. The text's size
-   *  in drawing units depends on the fit's scale, so the fit is iterated to a fixed point. */
+  /** Back to the fitted view. */
+  fit() {
+    this.#zoomed = false;
+    this.#render();
+  }
+
+  #unitsPerPixel([, , w, h]) {
+    const r = this.#stage.getBoundingClientRect();
+    return r.width && r.height ? Math.max(w / r.width, h / r.height) : w / 400;
+  }
+
+  #zoomAt(factor, event) {
+    if (!this.#svg) return;
+    const r = this.#stage.getBoundingClientRect();
+    const [x, y, w, h] = this.#view;
+    const scale = this.#unitsPerPixel(this.#view);
+    // Point under the cursor (or the centre) in user units; keep it fixed while zooming.
+    const px = event ? event.clientX - r.left : r.width / 2;
+    const py = event ? event.clientY - r.top : r.height / 2;
+    const ux = x + w / 2 + (px - r.width / 2) * scale;
+    const uy = y + h / 2 + (py - r.height / 2) * scale;
+    const nw = Math.min(Math.max(w * factor, this.#base[2] / 50), this.#base[2] * 10);
+    const k = nw / w;
+    this.#view = [ux - (ux - x) * k, uy - (uy - y) * k, nw, h * k];
+    this.#zoomed = true;
+    this.#render();
+  }
+
+  /** Draw the section scaled to fit (or at the user's zoom), with text at labelPx() screen
+   *  pixels. The text's size in drawing units depends on the fit's scale, so the fit is
+   *  iterated to a fixed point. */
   #render() {
     if (!this.#data) return;
     const { section, dims, payload } = this.#data;
     const [bx0, bz0, bx1, bz1] = section.bbox;
-    const r = this.#stage.getBoundingClientRect();
     const px = labelPx(this);
     let box = [bx0, -bz1, bx1 - bx0, bz1 - bz0];
     let svg;
     for (let i = 0; i < 4; i++) {
-      const upp = r.width && r.height ? Math.max(box[2] / r.width, box[3] / r.height) : box[2] / 400;
-      ({ svg, box } = this.#draw(section, dims, payload, px * upp));
+      ({ svg, box } = this.#draw(section, dims, payload, px * this.#unitsPerPixel(box)));
     }
+    this.#base = box;
+    if (this.#zoomed && this.#view) {
+      ({ svg } = this.#draw(section, dims, payload, px * this.#unitsPerPixel(this.#view)));
+      box = this.#view;
+    }
+    this.#view = box;
     svg.setAttribute("viewBox", box.join(" "));
     this.#stage.replaceChildren(svg);
     this.#svg = svg;

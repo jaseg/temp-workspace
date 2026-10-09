@@ -13,6 +13,7 @@ from yanartas_pillowbox.svg import (
     MARGIN,
     SvgImportError,
     extract_config,
+    face_labels,
     render_svg,
     sheet_offset,
 )
@@ -117,7 +118,7 @@ def test_layers_and_line_styles(cfg):
     pattern = build_pattern(cfg)
     root = svg_elements(render_svg(cfg, pattern))
     present = {d for d in FoldDirection if any(f.direction == d for f in pattern.folds)}
-    layers = root.findall(q("g"))
+    layers = [g for g in root.findall(q("g")) if g.get("id") != "labels"]
     assert {g.get("id") for g in layers} == {"cut"} | {LAYERS[d][0] for d in present}
     for g in layers:
         assert g.get(f"{{{INKSCAPE_NS}}}groupmode") == "layer"
@@ -242,8 +243,42 @@ def test_print_inside_only_flips_fold_indicators():
     paths = lambda root: {el.get("id"): el.get("d") for el in root.iter(q("path"))}  # noqa: E731
     assert paths(ins) == paths(out)
     assert (ins.get("width"), ins.get("height")) == (out.get("width"), out.get("height"))
-    assert {g.get("id") for g in ins.findall(q("g"))} == {"cut", "fold-valley"}
+    assert {g.get("id") for g in ins.findall(q("g"))} == {"cut", "fold-valley", "labels"}
     for el in ins.find(f"{q('g')}[@id='fold-valley']"):
         assert el.get("stroke-dasharray") == LAYERS[FoldDirection.VALLEY][2]
     assert {f.direction for f in build_pattern(ins_cfg).folds} == {FoldDirection.VALLEY}
     assert extract_config(render_svg(ins_cfg)) == ins_cfg
+
+
+@pytest.mark.parametrize("walls", [False, True])
+def test_face_labels(walls):
+    """A text layer names the print side on the back panel and, on every oval end panel
+    (flaps and interior walls), the end of the box it closes. Text is filled, not stroked,
+    and sits inside its face."""
+    for side in ("outside", "inside"):
+        cfg = Config.defaults().with_values(print_side=side, interior_walls=walls)
+        pattern = build_pattern(cfg)
+        root = svg_elements(render_svg(cfg, pattern))
+        layer = root.find(f"{q('g')}[@id='labels']")
+        assert layer.get(INK_LABEL) == "Labels"
+        texts = [el.text for el in layer.iter(q("text"))]
+        ovals = 6 if walls else 4
+        assert texts.count(side) == 1 and len(texts) == 1 + ovals
+        assert texts.count("front end") == texts.count("back end") == ovals // 2
+        for el in layer.iter(q("text")):
+            assert el.get("fill") == "#000000" and el.get("stroke") == "none"
+            assert 0 < float(el.get("font-size")) <= 3
+        faces = {f.name: f for f in (*pattern.faces, *pattern.wall_faces)}
+        for text, (x, y), _ in face_labels(cfg, pattern):
+            inside = [
+                n
+                for n, f in faces.items()
+                if f.x0 < x < f.x1 and f.y_range(x)[0] < y < f.y_range(x)[1]
+            ]
+            assert len(inside) == 1, (text, inside)
+            name = inside[0]
+            if text in ("outside", "inside"):
+                assert name == "back-panel"
+            else:
+                assert ("top" in name) == (text == "front end"), (text, name)
+                assert name.endswith(("flap", "wall"))
