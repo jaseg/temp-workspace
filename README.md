@@ -113,6 +113,14 @@ the defaults. It never crashes because of the file.
   page to restore all of its parameters. A file without an embedded config, or with an
   incompatible one, produces a clear error message.
 * **Download SVG** and **Reset to defaults** are in the top bar.
+* **Download OpenSCAD** saves a model of the box's interior (`.scad`, mm, centred on the
+  interior; X across, Y along the length, Z height with the front panel up). It has the
+  main space for the payload, bounded by the panels' inner surfaces and the interior walls
+  (or the inner end flaps), and with interior walls the two end spaces between each inner
+  flap and its interior wall, under the bridge. Each space is a module (`main_space()`,
+  `end_space()` / `end_spaces()`), built as the intersection of a cross-section prism and a
+  plan prism. The payload is a `payload()` module, shown only in the preview. The FPC
+  trough and the inner flaps' cut corners are not modelled.
 * Light and dark themes follow `prefers-color-scheme`.
 
 ## Parameter reference
@@ -298,6 +306,7 @@ layers keep the line types apart.
 | `PUT /api/config` | `{config}` | Validates and saves it, returns `{config, saved}`; `422 {errors}` if invalid |
 | `POST /api/render` | `{config}` | `{config, svg, model, section, info, dimensions, payload}`; `422 {errors: {field: message}}` if invalid |
 | `POST /api/payload` | `{config, action: "fit"}` or `{config, action: "maximize", field}` | `{config}` with the fitted box or maximized payload (not saved); `422 {errors}` if impossible |
+| `POST /api/scad` | `{config}` | OpenSCAD source of the interior (`application/x-openscad`); `422` if invalid |
 | `POST /api/import` | SVG as the raw body or a multipart `file` | `{config}`; `400 {error}` if unusable |
 
 ## Development

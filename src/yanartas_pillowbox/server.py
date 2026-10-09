@@ -15,6 +15,7 @@ from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, f
 from yanartas_pillowbox.geometry import build_cross_section, build_model3d, build_pattern
 from yanartas_pillowbox.persistence import load_config, save_config
 from yanartas_pillowbox.presets import presets_json
+from yanartas_pillowbox.scad import render_scad
 from yanartas_pillowbox.svg import SvgImportError, extract_config, render_svg, sheet_offset
 
 log = logging.getLogger(__name__)
@@ -119,6 +120,16 @@ def create_app(settings_path: Path) -> Flask:
                 "model": dims.to_json(dims.model_dimensions(cfg)),
             },
         )
+
+    @app.post("/api/scad")
+    def scad() -> Any:
+        """``{config}`` -> OpenSCAD source of the box's interior."""
+        if not request.is_json:
+            return jsonify(error="expected application/json"), 415
+        cfg = parse_config_body()
+        if not isinstance(cfg, Config):
+            return cfg
+        return Response(render_scad(cfg), mimetype="application/x-openscad")
 
     @app.post("/api/payload")
     def payload_action() -> Any:

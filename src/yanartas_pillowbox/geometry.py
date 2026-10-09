@@ -1129,7 +1129,9 @@ def _interior(body: Body, samples: int) -> list[list[float]]:
         for i in range(samples + 1):
             (x, z), (nx, nz) = point(sec.width * i / samples), normal(sec.width * i / samples)
             q = (x - h * nx, z - h * nz)
-            if gx < q[0] < fx:  # past the corners the inner surfaces run into each other
+            # Past the (mitred) corners the inner surfaces run through each other.
+            other = body.surface_z("back" if panel == "front" else "front", -h, q[0])
+            if gx < q[0] < fx and (q[1] > other if panel == "front" else q[1] < other):
                 out.append(q)
         out.append((fx, fz) if panel == "front" else (gx, gz))
     return [[round(c, 6) for c in q] for q in out]

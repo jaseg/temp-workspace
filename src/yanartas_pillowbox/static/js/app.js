@@ -17,6 +17,7 @@ const preview3d = $("#preview3d");
 const sectionView = $("#section");
 const statusEl = $("#status");
 const downloadBtn = $("#btn-download");
+const scadBtn = $("#btn-scad");
 
 const params = new Map(); // name -> <pb-param>
 let fields = [];
@@ -193,7 +194,7 @@ async function render() {
     if (!Object.keys(errors).length) showBanner(result.data.error || "Render failed");
     const n = Object.keys(errors).length;
     setStatus(`${n || "An"} invalid value${n === 1 ? "" : "s"} — previews show the last valid design`, true);
-    downloadBtn.disabled = true;
+    downloadBtn.disabled = scadBtn.disabled = true;
     return;
   }
   showErrors({});
@@ -203,7 +204,7 @@ async function render() {
   preview3d.update(model, dimensions.model, payload);
   sectionView.update(section, dimensions.section, payload);
   renderDerived(info, payload);
-  downloadBtn.disabled = false;
+  downloadBtn.disabled = scadBtn.disabled = false;
   setStatus("Up to date");
   scheduleSave(lastValid.config);
 }
@@ -275,17 +276,40 @@ async function importFile(file) {
   scheduleRender(0);
 }
 
-function download() {
-  if (!lastValid) return;
+function fileName(suffix) {
   const c = lastValid.config;
   const n = (v) => String(Math.round(v * 10) / 10);
-  const name = `pillowbox-${n(c.width)}x${n(c.length)}x${n(c.height)}mm.svg`;
-  const url = URL.createObjectURL(new Blob([lastValid.svg], { type: "image/svg+xml" }));
+  return `pillowbox-${n(c.width)}x${n(c.length)}x${n(c.height)}mm${suffix}`;
+}
+
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement("a"), { href: url, download: name });
   document.body.append(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function download() {
+  if (!lastValid) return;
+  saveBlob(new Blob([lastValid.svg], { type: "image/svg+xml" }), fileName(".svg"));
+}
+
+async function downloadScad() {
+  if (!lastValid) return;
+  const name = fileName("-interior.scad");
+  try {
+    const res = await fetch("/api/scad", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config: lastValid.config }),
+    });
+    if (!res.ok) throw new Error(`export failed (${res.status})`);
+    saveBlob(await res.blob(), name);
+  } catch (err) {
+    showBanner(`OpenSCAD export failed: ${err.message}`);
+  }
 }
 
 async function resetToDefaults() {
@@ -361,6 +385,7 @@ async function main() {
   });
   $("#btn-reset").addEventListener("click", resetToDefaults);
   downloadBtn.addEventListener("click", download);
+  scadBtn.addEventListener("click", downloadScad);
   $("#banner-close").addEventListener("click", hideBanner);
   setupDragAndDrop();
   await render();
