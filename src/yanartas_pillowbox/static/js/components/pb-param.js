@@ -96,7 +96,15 @@ export class PbParam extends HTMLElement {
     } else if (spec.kind === "choice") {
       const select = el("select");
       select.id = id;
-      for (const c of spec.choices) select.append(new Option(c.label, c.value));
+      // Choices with a "group" go into <optgroup>s of that name, in order of appearance.
+      const optgroups = new Map();
+      for (const c of spec.choices) {
+        if (c.group && !optgroups.has(c.group)) {
+          optgroups.set(c.group, Object.assign(el("optgroup"), { label: c.group }));
+          select.append(optgroups.get(c.group));
+        }
+        (c.group ? optgroups.get(c.group) : select).append(new Option(c.label, c.value));
+      }
       select.addEventListener("change", emit);
       control.append(select);
       this.#input = select;

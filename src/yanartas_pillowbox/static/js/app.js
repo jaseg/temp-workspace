@@ -20,6 +20,8 @@ const downloadBtn = $("#btn-download");
 
 const params = new Map(); // name -> <pb-param>
 let fields = [];
+let payloadPresets = []; // board sizes from /api/defaults
+let presetParam = null; // the "Board preset" <pb-param> (not a config field)
 // Values of config fields that have no form input (e.g. line colors); kept so renders,
 // saves and imports carry them through unchanged.
 let hiddenValues = {};
@@ -45,7 +47,7 @@ async function api(method, url, body, { raw = false } = {}) {
 }
 
 // ----------------------------------------------------------------------------- form
-function buildForm(specs) {
+function buildForm(specs, presets = []) {
   fields = specs;
   form.replaceChildren();
   const groups = new Map();
@@ -74,6 +76,41 @@ function buildForm(specs) {
   });
   fit.addEventListener("click", () => payloadAction({ action: "fit" }));
   groups.get("Body")?.append(fit);
+
+  // Payload: board presets fill in width, depth and height (UI only, not a setting).
+  payloadPresets = presets;
+  presetParam = document.createElement("pb-param");
+  presetParam.className = "wide"; // long board names
+  presetParam.spec = {
+    name: "payload_preset",
+    label: "Board preset",
+    kind: "choice",
+    help: "Approximate sizes of common boards, long side along the box. Heights include "
+      + "connectors and stacked add-on boards; check your own board.",
+    choices: [
+      { value: "", label: "Custom" },
+      ...presets.map((p) => ({
+        value: p.id, label: `${p.label} (${p.depth} × ${p.width} × ${p.height})`, group: p.group,
+      })),
+    ],
+  };
+  presetParam.addEventListener("pb-change", () => {
+    const preset = payloadPresets.find((p) => p.id === presetParam.value);
+    if (!preset) return;
+    params.get("payload_width").value = preset.width;
+    params.get("payload_depth").value = preset.depth;
+    params.get("payload_height").value = preset.height;
+  });
+  groups.get("Payload")?.querySelector("legend").after(presetParam);
+}
+
+/** Show the preset matching the current payload size, or "Custom". */
+function syncPreset() {
+  if (!presetParam) return;
+  const c = readForm();
+  const match = payloadPresets.find((p) =>
+    p.width === c.payload_width && p.depth === c.payload_depth && p.height === c.payload_height);
+  presetParam.value = match ? match.id : "";
 }
 
 /** Run a payload action on the server and apply the resulting config. */
@@ -101,6 +138,7 @@ function writeForm(config) {
   for (const spec of fields) if (spec.hidden && spec.name in config) hiddenValues[spec.name] = config[spec.name];
   for (const [name, p] of params) if (name in config) p.value = config[name];
   updateVisibility();
+  syncPreset();
 }
 
 function updateVisibility() {
@@ -283,12 +321,13 @@ function setupDragAndDrop() {
 // ----------------------------------------------------------------------------- boot
 async function main() {
   const [defaults, current] = await Promise.all([api("GET", "/api/defaults"), api("GET", "/api/config")]);
-  buildForm(defaults.fields);
+  buildForm(defaults.fields, defaults.payload_presets);
   writeForm(current.config);
   savedJson = JSON.stringify(current.config);
 
   form.addEventListener("pb-change", () => {
     updateVisibility();
+    syncPreset();
     setStatus("Updating…");
     scheduleRender();
   });

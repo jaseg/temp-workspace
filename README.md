@@ -80,6 +80,13 @@ the defaults. It never crashes because of the file.
   red if the margin is not met. *Derived geometry* shows the actual clearance. It is never drawn in the SVG,
   but it is saved with the settings and in the SVG's embedded config. Set any payload
   dimension to 0 to hide it.
+  * **Board preset** fills in the payload size of a common development board: Raspberry Pi
+    Model A, Model B and Zero (each also with a HAT or pHAT), Arduino UNO Q (with and
+    without a shield), STM32 Nucleo-64, BeagleBone Black, Odroid C4 and N2+, and Jetson
+    Orin Nano (Super) and Orin Nano 2. The board's long side runs along the box. The sizes
+    are approximate (`presets.py`): heights include connectors and stacked add-on boards, and
+    some are estimated, so check your own board. The preset is not a setting; the dropdown
+    just shows which preset, if any, matches the current payload size.
   * **Max** next to each payload field sets it to the largest value that keeps the margin in
     the current box.
   * **Fit box to payload** (in the body controls) sets width, length and height to the

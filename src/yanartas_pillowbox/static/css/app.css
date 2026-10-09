@@ -162,6 +162,7 @@ pb-param .control input.hex { font-family: var(--mono); text-transform: uppercas
 pb-param .control input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
 pb-param .unit { color: var(--text-muted); font-size: 12px; min-width: 22px; }
 pb-param .row.has-action { grid-template-columns: 1fr minmax(0, 196px); }
+pb-param.wide .row { grid-template-columns: auto minmax(0, 1fr); }
 pb-param button.action, .group-action {
   font-size: 12px; padding: 3px 8px; flex: none;
 }

@@ -126,3 +126,21 @@ def test_save_load_round_trip(settings):
     cfg = Config.defaults().with_values(length=99.5, glue_tab_taper=3)
     save_config(settings, cfg)
     assert load_config(settings) == cfg
+
+
+def test_defaults_include_payload_presets(tmp_path):
+    from yanartas_pillowbox.presets import PAYLOAD_PRESETS
+
+    client = create_app(tmp_path / "s.json").test_client()
+    presets = client.get("/api/defaults").get_json()["payload_presets"]
+    assert len(presets) == len(PAYLOAD_PRESETS)
+    assert len({p["id"] for p in presets}) == len(presets)
+    for p in presets:
+        assert p["label"] and p["group"]
+        assert 0 < p["width"] <= p["depth"] and p["height"] > 0  # long side along the box
+        # Every preset is a valid payload size.
+        Config.defaults().with_values(
+            payload_width=p["width"], payload_depth=p["depth"], payload_height=p["height"]
+        )
+    ids = {p["id"] for p in presets}
+    assert {"rpi-a", "rpi-a-hat", "rpi-b", "rpi-b-hat", "uno-q", "uno-q-shield"} <= ids

@@ -14,6 +14,7 @@ from yanartas_pillowbox import payload
 from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, field_specs_json
 from yanartas_pillowbox.geometry import build_cross_section, build_model3d, build_pattern
 from yanartas_pillowbox.persistence import load_config, save_config
+from yanartas_pillowbox.presets import presets_json
 from yanartas_pillowbox.svg import SvgImportError, extract_config, render_svg, sheet_offset
 
 log = logging.getLogger(__name__)
@@ -66,7 +67,11 @@ def create_app(settings_path: Path) -> Flask:
 
     @app.get("/api/defaults")
     def defaults() -> Response:
-        return jsonify(config=Config.defaults().to_dict(), fields=field_specs_json())
+        return jsonify(
+            config=Config.defaults().to_dict(),
+            fields=field_specs_json(),
+            payload_presets=presets_json(),
+        )
 
     @app.get("/api/config")
     def get_config() -> Response:
