@@ -1,0 +1,12 @@
+Results calculated from plots fig_covar_time_drift_minmax.pdf / fig_cdf_time_drift_minmax.pdf on 2026-10-12T07:27:24.240464
+
+setting threshold for quantile 0.001
+Baseline threshold set at 0.160074
+
+Distribution parameters:
+Within class: 0.418±0.0836 min: 0.208 max: 0.539
+Cross class: 0.39±0.0899 min: 0.105 max: 0.539
+
+Type 1 error (false alarm rate): 0.001000000000
+Type 2 error (missed alarm rate): 0.994771050513
+EER: 0.4235294117647059 th: 0.42234734134839336

@@ -1,0 +1,12 @@
+Results calculated from plots fig_covar_environment_ref_probe_p0.3_minmax.pdf / fig_cdf_environment_ref_probe_p0.3_minmax.pdf on 2026-10-12T07:28:37.288262
+
+setting threshold for quantile 0.001
+Baseline threshold set at 0.187119
+
+Distribution parameters:
+Within class: 0.464±0.0896 min: -0.0726 max: 0.636
+Cross class: -0.0202±0.79 min: -2.47 max: 0.551
+
+Type 1 error (false alarm rate): 0.001000000000
+Type 2 error (missed alarm rate): 0.396483909561
+EER: 0.21596401028277637 th: 0.4076621357746832

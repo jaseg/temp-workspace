@@ -1,0 +1,12 @@
+Results calculated from plots fig_covar_antenna_wire_30mm_p0.3.pdf / fig_cdf_antenna_wire_30mm_p0.3.pdf on 2026-10-12T07:28:28.698460
+
+setting threshold for quantile 0.001
+Baseline threshold set at 0.984799
+
+Distribution parameters:
+Within class: 0.986±0.000537 min: 0.985 max: 0.987
+Cross class: 0.979±0.00436 min: 0.971 max: 0.985
+
+Type 1 error (false alarm rate): 0.001000000000
+Type 2 error (missed alarm rate): 0.095942766287
+EER: 0.006896551724137931 th: 0.9849765969646523

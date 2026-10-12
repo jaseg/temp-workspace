@@ -1,0 +1,12 @@
+Results calculated from plots fig_covar_soldering_p0.3.pdf / fig_cdf_soldering_p0.3.pdf on 2026-10-12T07:28:27.934877
+
+setting threshold for quantile 0.001
+Baseline threshold set at 0.984799
+
+Distribution parameters:
+Within class: 0.986±0.000537 min: 0.985 max: 0.987
+Cross class: 0.936±0.00569 min: 0.923 max: 0.944
+
+Type 1 error (false alarm rate): 0.001000000000
+Type 2 error (missed alarm rate): 0.000000000000
+EER: 0.0 th: 0.9842857435867194

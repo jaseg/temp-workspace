@@ -1,0 +1,12 @@
+Results calculated from plots fig_covar_touch_mesh.pdf / fig_cdf_touch_mesh.pdf on 2026-10-12T07:27:22.201586
+
+setting threshold for quantile 0.001
+Baseline threshold set at 0.981066
+
+Distribution parameters:
+Within class: 0.984±0.00094 min: 0.982 max: 0.986
+Cross class: 0.924±0.0132 min: 0.89 max: 0.948
+
+Type 1 error (false alarm rate): 0.001000000000
+Type 2 error (missed alarm rate): 0.000007289617
+EER: 0.0 th: 0.9811027642073021

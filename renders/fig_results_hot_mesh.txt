@@ -1,0 +1,12 @@
+Results calculated from plots fig_covar_hot_mesh.pdf / fig_cdf_hot_mesh.pdf on 2026-10-12T07:27:23.604574
+
+setting threshold for quantile 0.001
+Baseline threshold set at 0.980069
+
+Distribution parameters:
+Within class: 0.983±0.000806 min: 0.981 max: 0.984
+Cross class: 0.965±0.0058 min: 0.946 max: 0.972
+
+Type 1 error (false alarm rate): 0.001000000000
+Type 2 error (missed alarm rate): 0.005675672795
+EER: 0.0 th: 0.9805802709390348
