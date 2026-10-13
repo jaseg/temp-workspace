@@ -157,7 +157,8 @@ def test_fold_paths_are_open_and_single(cfg):
     root = svg_elements(render_svg(cfg))
     els = list(fold_elements(root))
     pattern = build_pattern(cfg)
-    assert len(els) == len(pattern.folds) == (6 if cfg.end_wall_gap == 0 else 8)  # + lids
+    # + the lids' folds and the front folds continued over the wings, at each end
+    assert len(els) == len(pattern.folds) == (6 if cfg.end_wall_gap == 0 else 12)
     for el in els:
         cmds, segs = parse_path(el.get("d"))
         assert cmds.count("M") == 1 and "Z" not in cmds
@@ -172,10 +173,16 @@ def _near_bbox(seg, p, tol):
 def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
     root = svg_elements(render_svg(cfg))
     _, outline = parse_path(_path(root, "cut-outline").get("d"))
-    for el in fold_elements(root):
-        _, segs = parse_path(el.get("d"))
+    folds = {el.get("id"): parse_path(el.get("d"))[1] for el in fold_elements(root)}
+    for name, segs in folds.items():
         for p in (segs[0].start, segs[-1].end):
-            assert min(s.distance_to(p) for s in outline) < 1e-5
+            # (where a front fold runs on into a wing's, it ends on the other fold)
+            on_fold = any(
+                min(s.distance_to(p) for s in other) < 1e-5
+                for key, other in folds.items()
+                if key != name
+            )
+            assert on_fold or min(s.distance_to(p) for s in outline) < 1e-5
         for seg in segs:
             for i in range(1, 40):
                 p = seg.point_at(i / 40)

@@ -17,7 +17,7 @@ CONFIGS = {
     "default": D,
     "stacked": D.with_values(end_wall_gap=0),
     "wide-gap": D.with_values(end_wall_gap=30, length=70, payload_depth=50),
-    "thick": D.with_values(thickness=1.5, width=60, height=24),
+    "thick": D.with_values(thickness=1.5, width=60, height=24, lid_offset=1.5),
     "fpc": D.with_values(fpc_cutout="both"),
 }
 
@@ -103,9 +103,14 @@ def test_end_space_lies_between_the_end_walls(cfg):
         [lid_inner, cfg.height / 2], abs=CHORD
     )
     assert lid_inner <= -cfg.height / 2 - t + 1e-9  # outside the back panel
-    xs = sorted(x for x, _ in polys["end_section"])
+    # Across the widened end section, past the body's sides, to where the lid's and the
+    # front panel's inner surfaces meet (the section's ends are single points).
+    section = polys["end_section"]
+    xs = sorted(x for x, _ in section)
     edges = sorted(body.front_point(u)[0] for u in (0.0, body.front.width))
-    assert [xs[0], xs[-1]] == pytest.approx(edges, abs=1e-4)  # the lid's sides
+    assert xs[0] < edges[0] and xs[-1] > edges[1]
+    for x in (xs[0], xs[-1]):
+        assert len([q for q in section if q[0] == x]) == 1
     # Across the box, the inner wall's thickness separates the end space from the main space
     # (measured along Y: t / cos of the wall's angle; away from the tight corners, where this
     # first-order estimate no longer holds for thick material).

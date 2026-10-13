@@ -62,23 +62,37 @@ def _interp(samples: Sequence[Point], x: float) -> float:
     return samples[0][1] if x < samples[0][0] else samples[-1][1]
 
 
+def _spread(cfg: Config) -> float:
+    lid = lid_layout(cfg)
+    return 0.0 if lid is None else lid.spread
+
+
+def _front_point(cfg: Config, u: float) -> Point:
+    """The front panel's mid-surface (X, Z) at flat u, its section continued past the
+    panel's edges (the widened end sections)."""
+    body = cfg.body
+    return (body.front_x + body.front.x_ext(u), body.z_shift + body.front.z_ext(u))
+
+
 def _plan_curves(cfg: Config) -> dict[str, list[Point]]:
     """Plan curves at the top end (+Y): the inner wall's two surfaces and the outer wall's
-    inner surface."""
+    inner surface (across the widened end section)."""
     body, t = cfg.body, cfg.thickness
     half, front, back = body.edge_length / 2, body.front, body.back
     ext = 2 * (body.inner_fold[0] - body.inner_glue[0])  # far past the interior's corners
+    sp = _spread(cfg)
 
     def inner(u: float) -> Point:
         return (body.back_point(u)[0], half - back.z(u))
 
-    def outer(u: float) -> Point:  # the front panel runs on by the gap
-        return (body.front_point(u)[0], half + cfg.end_wall_gap - front.z(u))
+    def outer(v: float) -> Point:  # the front panel runs on by the gap, and wider
+        return (_front_point(cfg, v - sp)[0], half + cfg.end_wall_gap - front.z_ext(v - sp))
 
     return {
         "inner_in": _offset_curve(inner, back.width, t / 2, ext),
-        "inner_out": _offset_curve(inner, back.width, -t / 2, ext),
-        "outer_in": _offset_curve(outer, front.width, t / 2, ext),
+        # (only where the inner wall is: beyond it the end space ends at its corner line)
+        "inner_out": _offset_curve(inner, back.width, -t / 2, 0.0),
+        "outer_in": _offset_curve(outer, front.width + 2 * sp, t / 2, ext),
     }
 
 
@@ -89,22 +103,37 @@ def main_plan(cfg: Config) -> list[Point]:
     return [*top, *((x, -y) for x, y in reversed(top))]
 
 
+def _front_inner(cfg: Config, x: float) -> float:
+    """Z of the front panel's inner surface at ``X = x``, across the widened end section."""
+    body, t, sp = cfg.body, cfg.thickness, _spread(cfg)
+    sec = body.front
+
+    def at(u: float) -> Point:
+        (px, pz), k = _front_point(cfg, u), sec.slope_ext(u)
+        return (px + t / 2 * k, pz - t / 2 * math.sqrt(1 - k * k))  # inward: -normal
+
+    lo, hi = -sp, sec.width + sp
+    for _ in range(100):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if at(mid)[0] < x else (lo, mid)
+    return at((lo + hi) / 2)[1]
+
+
 def _lid_inner(cfg: Config, x: float) -> float:
     """Z of the lid's inner surface at ``X = x``: the lid is the front panel turned over
     about ``Z = zs + level / 2`` (``geometry.LidLayout``), its inner surface the image of the
     front panel's."""
     body, lid = cfg.body, lid_layout(cfg)
     assert lid is not None
-    return 2 * body.z_shift + lid.level - body.surface_z("front", -cfg.thickness / 2, x)
+    return 2 * body.z_shift + lid.level - _front_inner(cfg, x)
 
 
 def _end_span(cfg: Config) -> tuple[float, float]:
-    """X range of the end spaces: across the lid, as far as the front panel's inner surface
-    lies above the lid's."""
-    body, t = cfg.body, cfg.thickness
+    """X range of the end spaces: as far across the widened end section as the front panel's
+    inner surface lies above the lid's."""
 
     def room(x: float) -> float:
-        return body.surface_z("front", -t / 2, x) - _lid_inner(cfg, x)
+        return _front_inner(cfg, x) - _lid_inner(cfg, x)
 
     def edge(inside: float, outside: float) -> float:
         if room(outside) > 0:
@@ -114,8 +143,8 @@ def _end_span(cfg: Config) -> tuple[float, float]:
             inside, outside = (mid, outside) if room(mid) > 0 else (inside, mid)
         return inside
 
-    x0, x1 = body.front_point(0.0)[0], body.front_point(body.front.width)[0]
-    return edge(0.0, x0), edge(0.0, x1)
+    sp, w = _spread(cfg), cfg.body.front.width
+    return edge(0.0, _front_point(cfg, -sp)[0]), edge(0.0, _front_point(cfg, w + sp)[0])
 
 
 def end_plan(cfg: Config) -> list[Point]:
@@ -136,14 +165,13 @@ def main_section(cfg: Config) -> list[Point]:
 
 def end_section(cfg: Config) -> list[Point]:
     """(X, Z) outline of an end space: from the lid's inner surface up to the front panel's
-    inner surface."""
-    body, t = cfg.body, cfg.thickness
+    inner surface, across the widened end section."""
     x0, x1 = _end_span(cfg)
     n = _samples(x1 - x0)
     xs = [x0 + (x1 - x0) * i / n for i in range(n + 1)]
     return [
         *((x, _lid_inner(cfg, x)) for x in xs),
-        *((x, body.surface_z("front", -t / 2, x)) for x in reversed(xs)),
+        *((x, _front_inner(cfg, x)) for x in reversed(xs[1:-1])),
     ]
 
 

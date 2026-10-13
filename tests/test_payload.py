@@ -24,7 +24,9 @@ BOXES = {
         payload_height=8,
     ),
     "stacked": D.with_values(end_wall_gap=0, payload_depth=110),
-    "steep": D.with_values(width=50, height=22.5, payload_width=20, payload_height=15),
+    "steep": D.with_values(
+        width=50, height=22.5, payload_width=20, payload_height=15, end_wall_gap=0
+    ),
 }
 PAYLOADS = [(30, 100, 14), (60, 40, 10), (10, 200, 30), (80, 25, 5)]
 

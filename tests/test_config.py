@@ -69,7 +69,8 @@ def test_validation_errors(changes, field):
 
 
 def test_boundary_values_accepted():
-    assert Config.from_dict({"height": MAX_H_55}).height == MAX_H_55
+    # (the steepest box is too steep at the sides for lids: no end wall gap)
+    assert Config.from_dict({"height": MAX_H_55, "end_wall_gap": 0}).height == MAX_H_55
     assert Config.from_dict({"glue_tab_width": 60.3}).glue_tab_width == 60.3
     assert Config.from_dict({"glue_tab_taper": 69.6}).glue_tab_taper == 69.6
     assert Config.from_dict({"glue_tab_taper": 0, "thickness": 0}).thickness == 0
@@ -81,6 +82,7 @@ def test_boundary_values_accepted():
                 "height": 4,
                 "glue_tab_taper": 4,
                 "glue_tab_width": 5,
+                "end_wall_gap": 0,
             }
         ).width
         == 10
@@ -91,7 +93,7 @@ def test_length_is_measured_on_the_midline():
     """``length`` runs between the inner end walls on the centreline; the straight edges are
     longer by the height and three thicknesses (inner wall at height/2 + t from the corner
     line, plus half its thickness, at both ends)."""
-    cfg = Config.from_dict({"length": 100, "height": 24, "thickness": 0.5})
+    cfg = Config.from_dict({"length": 100, "height": 24, "thickness": 0.5, "lid_offset": 0})
     assert cfg.edge_length == pytest.approx(125.5)
     assert Config.from_dict({"length": 100, "height": 24, "thickness": 0}).edge_length == 124
 
@@ -99,7 +101,9 @@ def test_length_is_measured_on_the_midline():
 def test_end_wall_gap_lengthens_the_front_panel():
     """The front panel runs on by the end wall gap at each end; the back panel (and the
     interior) keep their length."""
-    cfg = Config.from_dict({"length": 100, "height": 24, "thickness": 0.5, "end_wall_gap": 7})
+    cfg = Config.from_dict(
+        {"length": 100, "height": 24, "thickness": 0.5, "end_wall_gap": 7, "lid_offset": 0}
+    )
     assert cfg.edge_length == pytest.approx(125.5)
     assert cfg.front_length == pytest.approx(139.5)
     assert cfg.with_values(end_wall_gap=0).front_length == pytest.approx(125.5)
@@ -108,6 +112,22 @@ def test_end_wall_gap_lengthens_the_front_panel():
     assert "end_wall_gap" in errors_for(end_wall_gap=501)
     assert Config.defaults().lid_overlap == 5
     assert "lid_overlap" in errors_for(lid_overlap=-1)
+
+
+def test_lid_offset_is_limited_by_the_45_degree_turn():
+    """The lid offset widens the end sections along the front panel's continued fold arc,
+    which has to stay under 45 degrees: the limit is stated, and a box too steep for even a
+    resting lid asks for no gap."""
+    from yanartas_pillowbox.geometry import max_lid_offset
+
+    cfg = Config.defaults()
+    assert cfg.lid_offset == 2
+    limit = max_lid_offset(cfg.body)
+    assert cfg.with_values(lid_offset=math.floor(limit * 100) / 100)
+    errs = errors_for(lid_offset=limit + 0.1)
+    assert "lid_offset" in errs and "45 degrees" in errs["lid_offset"]
+    assert "end_wall_gap" in errors_for(height=MAX_H_55)  # steepest box: no room for lids
+    assert Config.from_dict({"height": MAX_H_55, "end_wall_gap": 0})
 
 
 def test_multiple_errors_reported_together():
@@ -171,6 +191,7 @@ def test_width_drives_the_cross_section(width, arc, t):
             "length": 400,
             "glue_tab_width": 5,
             "thickness": t,
+            "end_wall_gap": 0,  # (lids need a flat enough box)
             **arc,
         }
     )

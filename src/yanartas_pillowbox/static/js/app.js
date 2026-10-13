@@ -239,6 +239,9 @@ function renderDerived(info, payload) {
     ["Front / back fold radius", pair(info.front_fold_radius, info.back_fold_radius)],
     ["Outer / inner flap cut sagitta", pair(info.front_cut_sagitta, info.back_cut_sagitta)],
     ["Min. glue-tab taper", info.min_glue_tab_taper],
+    ...(info.end_width_increase == null ? [] : [
+      ["Ends wider / taller by", pair(info.end_width_increase, info.end_height_increase)],
+    ]),
   ];
   $("#derived").replaceChildren(...rows.flatMap(([k, v]) => {
     const dt = document.createElement("dt");

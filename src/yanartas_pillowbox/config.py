@@ -144,6 +144,20 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "Only with an end wall gap.",
     ),
     FieldSpec(
+        "lid_offset",
+        "Lid offset",
+        "float",
+        "Body",
+        "mm",
+        0,
+        100,
+        0.25,
+        help="How far the lids float above the back panel where they come closest. The box's "
+        "ends (the gaps, outer walls and lids) grow by as much in height, and wider to match: "
+        "there the front panel's cross-section runs on past the side folds. Only with an end "
+        "wall gap.",
+    ),
+    FieldSpec(
         "height",
         "Box height",
         "float",
@@ -262,6 +276,7 @@ class Config:
     height: float = 20.0
     end_wall_gap: float = 10.0
     lid_overlap: float = 5.0
+    lid_offset: float = 2.0
     # Rectangular payload, inscribed centred in the closed box (preview only, not exported).
     payload_width: float = 30.0
     payload_depth: float = 80.0
@@ -451,6 +466,27 @@ def validate(cfg: Config) -> dict[str, str]:
                 "glue_tab_width",
                 f"must be narrower than the front panel ({_fmt(panel)} mm) since it is glued "
                 "onto it",
+            )
+
+    if (
+        body is not None
+        and cfg.end_wall_gap > 0
+        and not errors.keys() & {"end_wall_gap", "lid_offset"}
+    ):
+        from yanartas_pillowbox.geometry import max_lid_offset  # geometry imports this module
+
+        limit = max_lid_offset(body)
+        if limit < 0:
+            add(
+                "end_wall_gap",
+                "this box's cross-section is too steep at the sides for the lids (set the "
+                "gap to 0, or make the box flatter)",
+            )
+        elif cfg.lid_offset > limit:
+            add(
+                "lid_offset",
+                f"must be at most {_fmt(math.floor(limit * 100) / 100)} mm for this box (the "
+                "widened ends would have to turn past 45 degrees at the sides)",
             )
 
     if body is not None and cfg.fpc_cutout != "none" and "fpc_cutout_width" not in errors:

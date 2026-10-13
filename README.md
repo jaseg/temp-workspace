@@ -92,14 +92,15 @@ the defaults. It never crashes because of the file.
   * **Fit box to payload** (in the body controls) sets width, length and height to the
     smallest box that holds the payload with its margin, minimizing the area of the
     pattern's bounding box.
-    Glue tab, end wall gap, lid overlap and thickness are left alone. Results are rounded to 0.01 mm, always
+    Glue tab, end wall gap, lid overlap, lid offset and thickness are left alone. Results are rounded to 0.01 mm, always
     towards a box that still fits.
 * **Parameter dimensions:** all three views annotate the inputs they show:
   * **Pattern:** circumference (both panels, flat), length and end wall gap (along the
     front panel's midline), lid overlap (on the top lid), height (across an inner flap),
     and the glue-tab width and taper (both at the tab's bottom end);
   * **Folded box:** width, length, end wall gap and lid overlap (along the back panel's
-    ridge, on top) and height;
+    ridge, on top), the lid offset (where the lid comes closest to the back panel) and
+    height;
   * **Cross-section:** width, height, and the front panel's arc (part of the
     circumference). This view shades the material at its thickness, the box interior and the
     payload space, and draws the glue tab and, dashed, the payload margin.
@@ -135,6 +136,7 @@ All lengths are in millimetres.
 | `length` | 120 | Interior length along the middle of the box, between the inner end walls: the shortest distance between the curves. 10–2000. The back panel's straight edges (corner to corner) are `length + height + 3·thickness` long, the front panel's `2·end_wall_gap` longer. |
 | `end_wall_gap` | 10 | Clear gap, in the middle of the box, between each outer end wall and the inner end wall inside it, covered by a lid (see *End wall gap* below). 0–500. 0 stacks the two walls of each end on each other, with no lid. |
 | `lid_overlap` | 5 | How far each lid runs on over the outside of the back panel, past the inner end wall's outer surface (measured along the box). 0–200. Only with an end wall gap. |
+| `lid_offset` | 2 | How far the lids float above the back panel where they come closest; the box's end sections grow by as much in height, and wider to match (see *End wall gap*). 0–100, limited per box: the widened sections may turn at most 45° at the sides, so steep boxes and thick material allow less (the UI states the limit). Only with an end wall gap. |
 | `height` | 20 | Interior height of the closed box at maximum bulge. At most ≈ 0.46·width (the UI states the exact limit). |
 | `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
 | `payload_depth` | 80 | Payload size along the box length. 0–2000. It has to fit between the inner end walls. |
@@ -221,9 +223,19 @@ rather than the stacked `))___((`.
 * The lid's fold lies in a plane at 45°, like the curved folds, so the lid folds exactly:
   in the pattern the fold is the front panel's curved fold turned over (an arc of the
   same radius, bowing out of the panel). Folded, the lid takes the front panel's profile,
-  turned over. That is about one thickness flatter than the back panel, so the lid touches
-  the back panel towards the sides and stands off it by about a thickness in the middle
-  (0.2 mm at the default thickness); it never cuts into it.
+  turned over, about one thickness flatter than the back panel.
+* **Widened ends:** the lids float `lid_offset` above the back panel where they come
+  closest (a little more towards the middle), so the end sections are taller than the
+  body. They are wider to match: over the gap only, the front panel's cross-section runs
+  on past both side folds, along its own fold arc continued, until it meets the lid's
+  fold. The outer flap closes to a point there again, and nothing needs an extra crease.
+  In the pattern the front panel grows two small **wings** over each gap, and its curved
+  fold continues across them. At the straight fold the wing stops a little short of the
+  inner flap's cut edge. Because the outer walls follow the continued arc, they reach
+  slightly past the front panel's ends at the sides, so the box is a few millimetres
+  longer overall. *Derived geometry* shows how much wider and taller the ends are.
+* The continued arc must turn less than 45°, which limits the lid offset. Steep boxes and
+  thick material allow less, and the steepest have no room for lids at all (use no gap).
 * The folding stays exact: the tests check the folded model with and without a gap.
 * The payload has to fit between the inner walls, as before. *Fit box to payload* keeps the
   gap and minimizes the pattern including it.

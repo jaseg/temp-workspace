@@ -139,6 +139,26 @@ class CrossSection:
     def closed_width(self) -> float:
         return 2 * self.radius * e_integral(self.psi_max)
 
+    # The fold arc and the section continued past the panel's edges (u < 0 or u > width),
+    # as long as the arc turns less than 45 degrees (|f'| < 1). Inside, the same as x/z.
+    def x_ext(self, u: float) -> float:
+        if 0 <= u <= self.width:
+            return self.x(u)
+        d = (u - self.width / 2) / self.radius
+        if abs(d) >= math.sqrt(0.5):
+            raise ValueError("fold arc continued past 45 degrees")
+        psi = math.asin(abs(d))
+        far = self.e(self.psi_max) + _simpson(self.psi_max, psi, 16)
+        return math.copysign(self.radius * far, d)
+
+    def z_ext(self, u: float) -> float:
+        d = u - self.width / 2
+        return math.sqrt(self.radius**2 - d * d) - (self.radius - self.sagitta)
+
+    def slope_ext(self, u: float) -> float:
+        d = u - self.width / 2
+        return -d / math.sqrt(self.radius**2 - d * d)
+
 
 def _simpson(a: float, b: float, n: int) -> float:
     """Composite Simpson rule for sqrt(cos 2t) on [a, b] (n even)."""

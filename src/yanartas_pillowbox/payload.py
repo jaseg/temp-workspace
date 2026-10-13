@@ -41,7 +41,7 @@ from yanartas_pillowbox.crosssection import (
     solve_body,
     width_ratio,
 )
-from yanartas_pillowbox.geometry import lid_layout
+from yanartas_pillowbox.geometry import MAX_SPREAD_SLOPE, lid_layout
 
 ROUND = 0.01  # mm: results are rounded to this grid, always towards a fitting box
 SAMPLES = 1000  # curve samples for clearance computations
@@ -194,9 +194,12 @@ def maximize(cfg: Config, field: str) -> Config:
 
 # ------------------------------------------------------------------------- fit box
 def pattern_area(cfg: Config) -> float:
-    """Area of the flat pattern's bounding box: (both panels + glue tab) x (the front panel's
-    edge + both outer flaps or lids, which stick out furthest)."""
-    return (cfg.circumference + cfg.glue_tab_width) * pattern_height(cfg)
+    """Area of the flat pattern's bounding box: (both panels + glue tab, + the front panel's
+    wing beyond its free edge) x (the front panel's edge + both outer flaps or lids, which
+    stick out furthest)."""
+    lid = lid_layout(cfg)
+    wing = 0.0 if lid is None else lid.spread
+    return (cfg.circumference + cfg.glue_tab_width + wing) * pattern_height(cfg)
 
 
 def pattern_height(cfg: Config) -> float:
@@ -247,13 +250,28 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
         return None
     if base.glue_tab_taper > (length + 2 * sagitta + 3 * t) / 2 - 1:
         return None
+    if base.end_wall_gap > 0 and _max_drop(panel, sagitta) < (base.lid_offset + 4 * t) / 2:
+        return None  # too steep at the sides to widen the ends for the lids
     # The front panel's edge, plus at both ends the outer flaps (sagitta + 1.5 t) or, with a
-    # gap, the lids (about the gap, the overlap, the sagitta and 2.5 t beyond the edge).
+    # gap, the lids (about the gap, the overlap, the sagitta, 2.5 t and the lid offset beyond
+    # the edge). (The wings' width is left out: it is small and changes slowly with r.)
     gap = base.end_wall_gap
     edge = length + 2 * sagitta + 3 * t + 2 * gap
-    reach = sagitta + 1.5 * t if gap <= 0 else gap + base.lid_overlap + sagitta + 2.5 * t
+    reach = sagitta + 1.5 * t
+    if gap > 0:
+        reach = gap + base.lid_overlap + sagitta + 2.5 * t + base.lid_offset
     area = (2 * panel + base.glue_tab_width) * (edge + 2 * reach)
     return area, width, 2 * sagitta
+
+
+def _max_drop(panel: float, sagitta: float) -> float:
+    """How far below its chord the front fold arc can run on before it turns 45 degrees
+    (with geometry.MAX_SPREAD_SLOPE): the widened ends' lid offset is about twice that,
+    less the lid's resting level (about -3 t)."""
+    r = (panel**2 / 4 + sagitta**2) / (2 * sagitta)
+    m = MAX_SPREAD_SLOPE
+    d = m * r / math.sqrt(1 + m * m)
+    return (r - sagitta) - math.sqrt(r * r - d * d)
 
 
 def _min_width(cfg: Config, height: float, guess: float) -> float | None:

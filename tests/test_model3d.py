@@ -17,6 +17,7 @@ from yanartas_pillowbox.geometry import (
     build_model3d,
     build_pattern,
     lid_layout,
+    max_lid_offset,
 )
 
 D = Config.defaults()
@@ -25,7 +26,11 @@ CONFIGS = {
     "stacked": D.with_values(end_wall_gap=0),
     "wide-gap": D.with_values(end_wall_gap=35, length=60),
     "thin-material": D.with_values(thickness=0),
-    "steepest-arc": D.with_values(width=50, height=max_height(50, 0.4), glue_tab_taper=15),
+    "steepest-arc": D.with_values(
+        width=50, height=max_height(50, 0.4), glue_tab_taper=15, end_wall_gap=0
+    ),
+    # The lids as far off the back panel as the end sections can widen (to 45 degrees).
+    "max-offset": D.with_values(lid_offset=math.floor(max_lid_offset(D.body) * 100) / 100),
     "shallow": D.with_values(height=6, length=200, thickness=1),
     "thick": D.with_values(width=70, height=24, thickness=2, glue_tab_width=15),
     "fpc": D.with_values(fpc_cutout="both", fpc_cutout_width=20),
@@ -94,7 +99,10 @@ def same_segment(a, b, tol=1e-9):
 # ------------------------------------------------------------------ the 2D faces tile the pattern
 def test_faces_tile_the_pattern(case):
     cfg, pattern, _, _ = case
-    assert len(pattern.faces) == (7 if cfg.end_wall_gap == 0 else 9)  # + a lid at each end
+    # + a lid at each end, and the front panel's two wings over each gap
+    lid = lid_layout(cfg)
+    extra = 0 if lid is None else 2 + (4 if lid.spread > 0 else 0)
+    assert len(pattern.faces) == 7 + extra
     faces = pattern.faces
     for face in faces:  # closed, consistently oriented loops
         loop = face.boundary
@@ -325,9 +333,8 @@ def test_flap_edges_meet_the_body_surfaces(case):
             assert on_chord or abs(gap) < tol, ("inner", end, x, gap)
             if on_chord:
                 assert gap > -1e-6  # trimmed to the chord only where the surface is lower
-        if lid is not None:
-            assert min(clearances) > -1e-3 * t - 1e-9, end
-            assert min(clearances) < 0.01 + 0.05 * t, end  # it rests on the back panel
+        if lid is not None:  # floating the lid offset off the back panel where closest
+            assert min(clearances) == pytest.approx(cfg.lid_offset, abs=1e-3 * t + 1e-9), end
     if lid is None:
         # At the panels' apexes, exactly: the outer flap reaches Z = -(h/2 + t), the inner
         # +h/2.
@@ -357,15 +364,21 @@ def test_lids_cover_the_gap(case):
             # On or outside the back panel's outer surface (a thickness out, mid to mid).
             assert p[2] <= body.surface_z("back", t, p[0]) + POS_TOL, (end, x, y)
             # Ruled along the box: the height depends on x only.
-            assert p[2] == pytest.approx(body.z_shift + lid.level - body.front.z(x), abs=POS_TOL)
+            fz = body.front.z_ext(x)  # (the front panel's profile, continued past its edges)
+            assert p[2] == pytest.approx(body.z_shift + lid.level - fz, abs=POS_TOL)
             lo, hi = face.y_range(x)
-            if abs(y - (lo if end == "top" else hi)) < 1e-9 and 0 < x < body.front.width:
-                # The free edge: the overlap beyond the inner wall's outer surface.
-                inner_wall = half - (body.z_shift - body.surface_z("back", 0.0, p[0]))
-                assert sign * p[1] == pytest.approx(inner_wall + t / 2 - cfg.lid_overlap, abs=1e-5)
             if abs(y - (hi if end == "top" else lo)) < 1e-9:  # the fold: on the outer wall
-                outer_wall = half + e - body.front.z(x)
+                outer_wall = half + e - fz
                 assert sign * p[1] == pytest.approx(outer_wall, abs=POS_TOL)
+        # The free edge (a polyline through exact samples; checked at the samples): the
+        # overlap beyond the inner wall's outer surface.
+        for x, depth in lid.depth:
+            if not 0 < x < body.front.width:
+                continue
+            y = lid.level - depth
+            q = box.map(f"front-{end}-lid", (x, y if end == "top" else cfg.front_length - y))
+            inner_wall = half - (body.z_shift - body.surface_z("back", 0.0, q[0]))
+            assert sign * q[1] == pytest.approx(inner_wall + t / 2 - cfg.lid_overlap, abs=1e-9)
 
 
 def test_closed_dimensions(case):
@@ -386,8 +399,10 @@ def test_closed_dimensions(case):
         lowest = cfg.body.z_shift + lid.level - cfg.body.front.sagitta
         assert min(zs) == pytest.approx(lowest, abs=1e-6)
         assert lowest <= -(h / 2 + 1.5 * t) + 1e-9
-    assert max(ys) - min(ys) == pytest.approx(cfg.front_length, abs=POS_TOL)
-    assert model["bounds"]["length"] == pytest.approx(cfg.front_length)
+    # (with lids, the widened outer walls reach past the front panel's ends by the drop)
+    overall = cfg.front_length + (0 if lid_layout(cfg) is None else 2 * lid_layout(cfg).drop)
+    assert max(ys) - min(ys) == pytest.approx(overall, abs=POS_TOL)
+    assert model["bounds"]["length"] == pytest.approx(overall)
     assert model["interior"] == {"width": cfg.width, "length": cfg.length, "height": cfg.height}
     assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-4)
     assert model["bounds"]["width"] > cfg.width or t == 0

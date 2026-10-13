@@ -210,7 +210,7 @@ def test_model_dimensions(cfg):
     w, edge, t = body.front.width, cfg.edge_length, cfg.thickness
     e, front = cfg.end_wall_gap, cfg.front_length
     dims = {d.param: d for d in dm.model_dimensions(cfg)}
-    extra = {"end_wall_gap", "lid_overlap"} if e > 0 else set()
+    extra = {"end_wall_gap", "lid_overlap", "lid_offset"} if e > 0 else set()
     assert set(dims) == {"length", "width", "height"} | extra
 
     length = dims["length"]  # along the back panel's midline, between the inner walls
@@ -228,6 +228,13 @@ def test_model_dimensions(cfg):
         assert ys == pytest.approx([cfg.length / 2 + t, cfg.length / 2 + t + e])
         overlap = dims["lid_overlap"]  # along the lid
         assert math.dist(*overlap.points) == pytest.approx(cfg.lid_overlap)
+        # The lid offset: straight up (in the view) from where the lid would rest, a
+        # thickness outside the back panel, to the lid, where it comes closest.
+        offset = dims["lid_offset"]
+        rest, lid_point = offset.points
+        assert math.dist(rest, lid_point) == pytest.approx(cfg.lid_offset, abs=1e-9)
+        assert rest[2] == pytest.approx(body.surface_z("back", t, rest[0]))
+        assert lid_point[2] < rest[2]
         # (drawn on the back panel's side, which the 3D view shows up)
         for name in ("length", "end_wall_gap", "lid_overlap"):
             start, end = dims[name].extensions[0]
@@ -263,7 +270,7 @@ def test_render_returns_dimensions(tmp_path):
         "lid_overlap",
     }
     assert {d["param"] for d in dims["section"]} == {"width", "height", "circumference"}
-    model = {"width", "length", "height", "end_wall_gap", "lid_overlap"}
+    model = {"width", "length", "height", "end_wall_gap", "lid_overlap", "lid_offset"}
     assert {d["param"] for d in dims["model"]} == model
     for view in dims.values():
         for d in view:

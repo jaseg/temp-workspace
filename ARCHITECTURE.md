@@ -165,10 +165,16 @@ planes by `e` accordingly; everything stays an exact isometric folding.
   gap (`geometry.lid_layout`). Its fold lies in the plane `y_int + (Z - zs) = level` (45°),
   so it is the front fold arc mirrored (`y = level - f(x)`), and the lid lies on the
   cylinder `Z = zs + level - f(x)`, ruled along the box: the front profile turned over.
-  `level` is the highest that keeps the lid's mid-surface at least `t` outside the back
-  panel's everywhere, so the lid touches the back panel near the sides and stands off it by
-  about `t` in the middle (the back panel bows `t` deeper). Its free edge runs
-  `e - t/2 + lid_overlap` beyond the back panel's crease, in folded depth.
+  At rest, `level` is the highest that keeps the lid's mid-surface at least `t` outside the
+  back panel's everywhere; `lid_offset` lowers it further, so the lid floats that far off
+  the back panel where closest. Its free edge runs `e - t/2 + lid_overlap` beyond the back
+  panel's crease, in folded depth.
+- **Widened ends.** The two folds meet where `f(x) = level / 2`: over the gap, the front
+  panel's fold arc and cross-section run on past both edges (`CrossSection.x_ext/z_ext`,
+  the arc continued, valid below 45°) by `spread` on each side. In the pattern these are
+  the front panel's wings, with their own curved folds continuing the panel's. The outer
+  flap is a lens between the continued front fold and the lid's fold. `max_lid_offset`
+  limits the offset so the continued arc turns at most `MAX_SPREAD_SLOPE`.
 - **Views.** The 3D and section views show the model turned half a turn about its length,
   back panel (lids) up; the model frame itself keeps the front panel at +Z.
 - **Interior.** The interior, payload clearance and fit are unchanged: they are bounded by

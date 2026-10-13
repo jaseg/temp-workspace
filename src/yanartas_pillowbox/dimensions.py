@@ -303,6 +303,39 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
             )
         )
 
+    if lid is not None and cfg.lid_offset > 0:
+        # Lid offset, where the lid comes closest to the back panel, over the overlap at the
+        # near end: from where the lid's mid-surface would rest (a thickness outside the back
+        # panel's) up to where it floats; drawn beside, outward across the box.
+        zs, front = body.z_shift, body.front
+        n = 2 * max(16, min(80, math.ceil(wf)))
+        us = [wf * i / n for i in range(n + 1)]
+
+        def float_at(u: float) -> float:
+            x3 = body.front_point(u)[0]
+            return body.surface_z("back", t, x3) - (zs + lid.level - front.z(u))
+
+        u = min(us, key=float_at)
+        x3 = body.front_point(u)[0]
+        y_int = e + (zs - body.surface_z("back", 0.0, x3)) + cfg.lid_overlap / 2
+        y3 = length / 2 - y_int
+        a = (x3, y3, body.surface_z("back", t, x3))
+        b = (x3, y3, zs + lid.level - front.z(u))
+        side = (math.copysign(gap * 0.35, x3 or 1.0), 0.0, 0.0)
+        la, lb = add(a, side), add(b, side)
+        dims.append(
+            Dimension(
+                "lid_offset",
+                f"lid offset {fmt(cfg.lid_offset)}",
+                "aligned3d",
+                (a, b),
+                math.dist(a, b),
+                line=(la, lb),
+                extensions=((a, add(a, side, 1.15)), (b, add(b, side, 1.15))),
+                label_at=tuple((la[i] + lb[i]) / 2 + side[i] * 0.9 for i in range(3)),
+            )
+        )
+
     # Height: between the panels' inner surfaces on the centreline, at the interior's end,
     # drawn beyond the end of the box.
     y_end = cfg.length / 2
