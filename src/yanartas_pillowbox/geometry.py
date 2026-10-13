@@ -994,6 +994,14 @@ def build_model3d(
                 "flat": [round(v, 6) for v in flat],
                 "positions": [round(v, 6) for v in positions],
                 "indices": indices,
+                # The face's boundary as a closed loop of vertex indices: the lower edge,
+                # the last column, the upper edge back and the first column back.
+                "outline": [
+                    *(i * k for i in range(len(xs))),
+                    *((len(xs) - 1) * k + j for j in range(1, rows + 1)),
+                    *(i * k + rows for i in range(len(xs) - 2, -1, -1)),
+                    *(j for j in range(rows - 1, 0, -1)),
+                ],
             }
         )
 

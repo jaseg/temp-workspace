@@ -141,6 +141,12 @@ export class PbPreview3d extends HTMLElement {
       part.kind === "tab" || part.kind === "lid" ? 1
         : part.name.startsWith("back-") && part.kind === "flap" ? 4 : 2;
     for (const part of model.parts) {
+      // The inner end flaps stand inside the box (behind the end wall gap): drawn through
+      // the paper, like the payload.
+      if (part.kind === "flap" && part.name.startsWith("back-")) {
+        group.add(this.#interiorMesh(part));
+        continue;
+      }
       const geom = new THREE.BufferGeometry();
       geom.setAttribute("position", new THREE.Float32BufferAttribute(part.positions, 3));
       geom.setIndex(part.indices);
@@ -192,6 +198,27 @@ export class PbPreview3d extends HTMLElement {
     fill.renderOrder = 5;
     edges.renderOrder = 6;
     g.add(fill, edges);
+    return g;
+  }
+
+  /** An inner end flap (inside the box): a translucent surface with its outline, drawn
+   *  through the paper. */
+  #interiorMesh({ positions, indices, outline }) {
+    const color = this.#dark.matches ? 0xc792ea : 0x8e44ad;
+    const xray = { depthTest: false, depthWrite: false, transparent: true };
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    const g = new THREE.Group();
+    const fill = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({
+      color, opacity: 0.16, side: THREE.DoubleSide, ...xray }));
+    const at = (i) => new THREE.Vector3(positions[3 * i], positions[3 * i + 1], positions[3 * i + 2]);
+    const edge = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(outline.map(at)),
+      new THREE.LineBasicMaterial({ color, opacity: 0.9, ...xray }));
+    fill.renderOrder = 3;
+    edge.renderOrder = 4;
+    g.add(fill, edge);
     return g;
   }
 

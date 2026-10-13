@@ -152,6 +152,21 @@ def test_mesh_flat_coords_cover_their_face(case):
         assert mesh_area == pytest.approx(face_area, rel=2e-3), face.name
 
 
+def test_part_outlines_run_along_the_face_boundary(case):
+    """Each part's ``outline`` (used to draw the inner end flaps through the paper) is a
+    closed loop of its own vertices, all on its pattern face's boundary, going round once."""
+    _, pattern, _, parts = case
+    for face in pattern.faces:
+        part = parts[face.name]
+        flat, loop = pts2(part), part["outline"]
+        assert len(set(loop)) == len(loop) and max(loop) < len(flat)
+        for i in loop:
+            assert min(seg.distance_to(flat[i]) for seg in face.boundary) < 1e-5, face.name
+        pts = [flat[i] for i in loop]
+        area = sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(pts, pts[1:] + pts[:1], strict=True))
+        assert abs(area) / 2 == pytest.approx(abs(loop_area(face.boundary)), rel=0.01), face.name
+
+
 def test_mesh_is_isometric_to_pattern(case):
     """Folding never stretches: every triangle has the same edge lengths and area in 3D as in
     the flat pattern (up to the chord error of ~1 mm triangles on curved surfaces)."""
