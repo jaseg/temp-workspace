@@ -19,6 +19,7 @@ import argparse
 import base64
 import hashlib
 import io
+import json
 import re
 import shutil
 import tarfile
@@ -38,8 +39,8 @@ PYODIDE_FILES = ("pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "pyodide-l
 
 # The package modules the API needs (no Flask, no file persistence).
 PY_MODULES = (
-    "__init__", "config", "crosssection", "geometry", "svg", "dimensions", "payload",
-    "presets", "scad",
+    "__init__", "api", "config", "crosssection", "dimensions", "geometry", "payload",
+    "presets", "scad", "svg",
 )  # fmt: skip
 
 
@@ -68,11 +69,14 @@ def build(out: Path, tgz: Path | None) -> None:
         shutil.rmtree(out)
     out.mkdir(parents=True)
 
-    # Python: the package modules verbatim, plus the API module.
+    # Python: the package modules verbatim, plus the API module; pyworker.js loads the files
+    # listed in py/files.json.
     (out / "py/yanartas_pillowbox").mkdir(parents=True)
+    files = ["pb_api.py", *(f"yanartas_pillowbox/{name}.py" for name in PY_MODULES)]
     for name in PY_MODULES:
         shutil.copy(PKG / f"{name}.py", out / f"py/yanartas_pillowbox/{name}.py")
     shutil.copy(HERE / "pb_api.py", out / "py/pb_api.py")
+    (out / "py/files.json").write_text(json.dumps(files, indent=1) + "\n")
 
     # Pyodide runtime. Artifacts do not serve .zip files: the standard library ships
     # base64-encoded as text and pyworker.js hands it to Pyodide as a blob URL.
@@ -89,12 +93,9 @@ def build(out: Path, tgz: Path | None) -> None:
     # Frontend: verbatim except for the patches below.
     (out / "static/js/components").mkdir(parents=True)
     (out / "static/css").mkdir()
-    for rel in (
-        "js/dims2d.js", "js/lines.js", "js/components/pb-param.js",
-        "js/components/pb-preview2d.js", "js/components/pb-preview3d.js",
-        "js/components/pb-section.js",
-    ):  # fmt: skip
-        shutil.copy(STATIC / rel, out / "static" / rel)
+    for src in (STATIC / "js").rglob("*.js"):
+        if src.name != "app.js":
+            shutil.copy(src, out / "static" / src.relative_to(STATIC))
 
     app = (STATIC / "js/app.js").read_text()
     app, n = re.subn(

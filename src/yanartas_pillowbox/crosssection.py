@@ -183,9 +183,24 @@ def _mitre(
     return ((s1 * a22 - a12 * s2) / det, (a11 * s2 - a21 * s1) / det)
 
 
-def _edge_sine(width: float, sagitta: float) -> float:
-    """``sin`` of a closed panel's angle to the X axis at its edges, ``f'(0)``."""
+def edge_slope(width: float, sagitta: float) -> float:
+    """``|f'|`` at a panel's edges: the sine of the closed panel's angle to the X axis there,
+    and the tangent of the angle the flat fold arc makes with its chord."""
     return (width / 2) / (circle_radius(width, sagitta) - sagitta)
+
+
+def drop_at_slope(width: float, sagitta: float, slope: float) -> float:
+    """How far below its chord the fold arc, continued past the panel's edges, runs before
+    ``|f'|`` reaches ``slope``."""
+    r = circle_radius(width, sagitta)
+    d = slope * r / math.sqrt(1 + slope * slope)
+    return (r - sagitta) - math.sqrt(r * r - d * d)
+
+
+def curve_samples(width: float) -> int:
+    """Even number of segments for sampling a curve across a panel (0.5 mm each, 32 to
+    160)."""
+    return 2 * max(16, min(80, math.ceil(width)))
 
 
 @dataclass(frozen=True)
@@ -240,11 +255,6 @@ class Body:
         ``height/2 + 1.5 t`` out at the back panel's apex."""
         return max(c for _, c in self.front_cuts)
 
-    @property
-    def back_cut_sagitta(self) -> float:
-        """Inner flaps' cut edge at the centre: stops at the front panel's inner surface."""
-        return self.height / 2 - self.thickness / 2
-
     def surface_z(self, panel: str, offset: float, x: float) -> float:
         """Z of a panel's surface ``offset`` out from its mid-surface (along the outward
         normal; negative: inwards) at ``X = x``. Beyond the panel's ends the surface
@@ -282,7 +292,7 @@ class Body:
         """Outer (front) flaps' cut edge as (x, offset beyond the chord) samples, x from the
         glued edge: flush with the back panel's outer surface all along (at the glued edge
         too, where the back panel runs on to the glue fold)."""
-        sec, n = self.front, _cut_samples(self.front.width)
+        sec, n = self.front, curve_samples(self.front.width)
         out = []
         for i in range(n + 1):
             u = sec.width * i / n
@@ -296,7 +306,7 @@ class Body:
         """Inner (back) flaps' cut edge as (u, offset beyond the chord) samples, u from the
         straight fold: stops at the front panel's inner surface (never below the chord, so
         near the corners it runs along the chord)."""
-        sec, n = self.back, _cut_samples(self.back.width)
+        sec, n = self.back, curve_samples(self.back.width)
 
         def target(u: float) -> float:
             x = self.back_point(u)[0]
@@ -380,11 +390,6 @@ class Body:
         return (x + t * nx, z + t * nz)
 
 
-def _cut_samples(width: float) -> int:
-    """Even number of polyline segments for a flap's cut edge (0.5 mm each up to 160)."""
-    return 2 * max(16, min(80, math.ceil(width)))
-
-
 def edge_length(length: float, height: float, thickness: float) -> float:
     """Straight body edges for an interior ``length`` x ``height``: the inner wall's
     mid-surface stands ``t/2`` beyond the interior, at the back fold's apex (``height/2 + t``
@@ -395,10 +400,10 @@ def edge_length(length: float, height: float, thickness: float) -> float:
 def _assemble(xf: float, s_f: float, s_b: float, t: float) -> tuple[float, ...]:
     """Body pieces for a front panel of closed mid-surface width ``xf``."""
     wf = panel_width(xf, s_f)
-    sf = _edge_sine(wf, s_f)
+    sf = edge_slope(wf, s_f)
     xb = xf + t / sf  # the glue fold sits t / sin(alpha) beyond the front's free edge
     wb = panel_width(xb, s_b)
-    sb = _edge_sine(wb, s_b)
+    sb = edge_slope(wb, s_b)
     cf, cb = math.sqrt(1 - sf * sf), math.sqrt(1 - sb * sb)
     # Interior corners, relative to P and G: where the panels' inner surfaces (t/2 inside the
     # mid-surface) meet. At the glued edge the front's inner surface is 3t/2 from G's line.

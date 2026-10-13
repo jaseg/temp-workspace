@@ -5,11 +5,9 @@
 
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
 import { LINE_STYLES, lineSwatch } from "../lines.js";
+import { attachPanZoom, unitsPerPixel } from "../panzoom.js";
 
 const NS = "http://www.w3.org/2000/svg";
-
-const LIGHT_BACKDROPS = ["#ffffff", "#f1f0ec", "#c9ccd1", "#8d939b", "#3a3f47", "#1d2024"];
-const DARK_BACKDROPS = ["#1d2024", "#2b3036", "#4a5058", "#8d939b", "#c9ccd1", "#eceae4"];
 
 const template = document.createElement("template");
 template.innerHTML = `
@@ -26,8 +24,13 @@ template.innerHTML = `
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
            border-radius: 5px; padding: 2px 9px; cursor: pointer; }
   button:hover { border-color: var(--text-muted); }
+  /* The lines are black, as exported: the sheet stays light in both themes. */
   .stage { position: relative; flex: 1; min-height: 0; cursor: grab; touch-action: none;
-           transition: background-color 0.2s; }
+           background: #ffffff; --dim-color: #4f545b; --dim-halo: #ffffff;
+           --dim-hl: #c2410c; --sheet-stroke: #9a9da3; }
+  @media (prefers-color-scheme: dark) {
+    .stage { background: #eceae4; --dim-halo: #eceae4; }
+  }
   .stage.dragging { cursor: grabbing; }
   .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* Hairlines would be invisible on screen: draw them at a fixed screen width instead. */
@@ -65,13 +68,8 @@ export class PbPreview2d extends HTMLElement {
   #base = null; // full sheet viewBox [x, y, w, h]
   #view = null; // current viewBox
   #zoomed = false;
-  #colors = [];
-  #drag = null;
-  #pinch = null; // two-finger zoom: start distance, midpoint and view
-  #dark = matchMedia("(prefers-color-scheme: dark)");
+  #zoom; // zoom(factor): about the centre
   #highlight = null;
-  #moved = false;
-  #downParam = null;
   #showDims = true;
   #dimData = []; // parameter dimensions in SVG user units
   #sheet = null; // [0, 0, w, h] of the exported sheet
@@ -97,73 +95,19 @@ export class PbPreview2d extends HTMLElement {
       }
       const action = button?.dataset.zoom;
       if (action === "fit") this.fit();
-      else if (action) this.#zoomAt(action === "in" ? 1 / 1.4 : 1.4);
+      else if (action && this.#svg) this.#zoom(action === "in" ? 1 / 1.4 : 1.4);
     });
-    this.#stage.addEventListener("dblclick", () => this.fit());
-    // Clicking a dimension asks the app to focus the parameter it shows.
-    // (Pointer capture for panning retargets the click to the stage, so remember the
-    // dimension that was under the pointer when it went down.)
-    this.#stage.addEventListener("click", () => {
-      const param = this.#downParam;
-      if (param && !this.#moved) {
-        this.dispatchEvent(new CustomEvent("pb-dim-click", { bubbles: true, composed: true, detail: { param } }));
-      }
-    });
-    this.#stage.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      this.#zoomAt(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)), e);
-    }, { passive: false });
-    // Pointers on the stage: one pans; two pinch-zoom about their midpoint (and pan with it).
-    const pointers = new Map();
-    const pinchState = () => {
-      const [a, b] = [...pointers.values()];
-      return { dist: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    };
-    const startDrag = (p) => { this.#drag = { x: p.x, y: p.y, view: [...this.#view] }; };
-    this.#stage.addEventListener("pointerdown", (e) => {
-      if (!this.#svg || e.button !== 0) return;
-      this.#stage.setPointerCapture(e.pointerId);
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointers.size === 2) {
-        this.#pinch = { ...pinchState(), view: [...this.#view] };
-        this.#drag = null;
-        this.#moved = true; // a pinch never counts as a click
-        return;
-      }
-      if (pointers.size > 2) return;
-      this.#stage.classList.add("dragging");
-      startDrag(pointers.get(e.pointerId));
-      this.#moved = false;
-      this.#downParam = e.target.closest?.(".dim")?.dataset.param ?? null;
-    });
-    this.#stage.addEventListener("pointermove", (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (this.#pinch && pointers.size >= 2) {
-        const now = pinchState();
-        const start = this.#pinch;
-        if (!now.dist || !start.dist) return;
-        this.#view = [...start.view];
-        this.#zoomAt(start.dist / now.dist, { clientX: start.x, clientY: start.y });
-        this.#panBy(now.x - start.x, now.y - start.y, this.#view);
-        return;
-      }
-      if (!this.#drag) return;
-      if (Math.hypot(e.clientX - this.#drag.x, e.clientY - this.#drag.y) > 3) this.#moved = true;
-      this.#panBy(e.clientX - this.#drag.x, e.clientY - this.#drag.y, this.#drag.view);
-    });
-    const endPointer = (e) => {
-      pointers.delete(e.pointerId);
-      if (pointers.size < 2) this.#pinch = null;
-      if (pointers.size === 1) startDrag([...pointers.values()][0]); // carry on panning
-      if (pointers.size === 0) {
-        this.#drag = null;
-        this.#stage.classList.remove("dragging");
-      }
-    };
-    this.#stage.addEventListener("pointerup", endPointer);
-    this.#stage.addEventListener("pointercancel", endPointer);
-    this.#dark.addEventListener("change", () => this.#applyBackdrop());
+    this.#zoom = attachPanZoom(this.#stage, {
+      view: () => (this.#svg ? this.#view : null),
+      setView: (v) => {
+        this.#zoomed = true;
+        this.#setView(v);
+      },
+      minMax: () => [this.#base[2] / 200, this.#base[2] * 20],
+      fit: () => this.fit(),
+      dimClick: (param) => this.dispatchEvent(new CustomEvent("pb-dim-click", {
+        bubbles: true, composed: true, detail: { param } })),
+    }).zoom;
     new ResizeObserver(() => {
       if (!this.#svg) return;
       if (this.#zoomed) this.#drawDims();
@@ -198,14 +142,12 @@ export class PbPreview2d extends HTMLElement {
       `sheet ${fmt(w)} × ${fmt(h)} mm (10 mm margin)`;
 
     // Legend: the line types present in this pattern.
-    this.#colors = ["#000000"];
     const present = ["cut", ...["mountain", "valley"].filter((t) => svg.querySelector(`#fold-${t}`))];
     this.#legend.replaceChildren(...present.map((t) => {
       const item = document.createElement("span");
       item.append(lineSwatch(LINE_STYLES[t].dash), LINE_STYLES[t].label);
       return item;
     }));
-    this.#applyBackdrop();
     this.highlight(this.#highlight);
   }
 
@@ -228,7 +170,7 @@ export class PbPreview2d extends HTMLElement {
     const [, , w, h] = this.#sheet;
     let box = [0, 0, w, h];
     for (let i = 0; i < 4; i++) {
-      const fs = labelPx(this) * this.#unitsPerPixel(box);
+      const fs = labelPx(this) * unitsPerPixel(this.#stage, box);
       const { bounds } = drawDims2d(this.#dimData, { fs });
       let [x0, y0, x1, y1] = [0, 0, w, h];
       if (bounds && this.#showDims) {
@@ -251,7 +193,7 @@ export class PbPreview2d extends HTMLElement {
   /** (Re)draw the dimensions so their labels are labelPx() screen pixels tall. */
   #drawDims() {
     if (!this.#overlay || !this.#view) return;
-    const fs = labelPx(this) * this.#unitsPerPixel();
+    const fs = labelPx(this) * unitsPerPixel(this.#stage, this.#view);
     if (this.#dimFs && Math.abs(fs / this.#dimFs - 1) < 1e-3) return; // panning only
     this.#dimFs = fs;
     this.#overlay.querySelector(".dims")?.remove();
@@ -259,37 +201,6 @@ export class PbPreview2d extends HTMLElement {
     group.classList.toggle("off", !this.#showDims);
     this.#overlay.append(group);
     highlightDims(this.#svg, this.#highlight);
-  }
-
-  /** Pan by a screen-pixel offset from a given view. */
-  #panBy(dx, dy, [x, y, w, h]) {
-    const scale = this.#unitsPerPixel([x, y, w, h]);
-    this.#setView([x - dx * scale, y - dy * scale, w, h]);
-    this.#zoomed = true;
-  }
-
-  #unitsPerPixel(view = this.#view) {
-    const r = this.#stage.getBoundingClientRect();
-    const [, , w, h] = view;
-    if (!r.width || !r.height) return w / 600; // not laid out yet
-    return Math.max(w / r.width, h / r.height);
-  }
-
-  #zoomAt(factor, event) {
-    if (!this.#svg) return;
-    const r = this.#stage.getBoundingClientRect();
-    const [x, y, w, h] = this.#view;
-    const scale = this.#unitsPerPixel();
-    // Point under the cursor (or the centre) in user units; keep it fixed while zooming.
-    const px = event ? event.clientX - r.left : r.width / 2;
-    const py = event ? event.clientY - r.top : r.height / 2;
-    const ux = x + w / 2 + (px - r.width / 2) * scale;
-    const uy = y + h / 2 + (py - r.height / 2) * scale;
-    const nw = Math.min(Math.max(w * factor, this.#base[2] / 200), this.#base[2] * 20);
-    const k = nw / w;
-    const nh = h * k;
-    this.#setView([ux - (ux - x) * k, uy - (uy - y) * k, nw, nh]);
-    this.#zoomed = true;
   }
 
   #addOverlay(svg, [, , w, h]) {
@@ -302,43 +213,10 @@ export class PbPreview2d extends HTMLElement {
     svg.append(g);
     this.#overlay = g;
   }
-
-  #applyBackdrop() {
-    const dark = this.#dark.matches;
-    const candidates = dark ? DARK_BACKDROPS : LIGHT_BACKDROPS;
-    // Pick the backdrop with the best worst-case contrast against all line colors; earlier
-    // (theme-appropriate) candidates win ties within a small tolerance.
-    let best = candidates[0];
-    let bestScore = -1;
-    for (const bg of candidates) {
-      const score = Math.min(...this.#colors.map((c) => contrast(bg, c)));
-      if (score > bestScore + 0.25) { best = bg; bestScore = score; }
-    }
-    const lum = luminance(best);
-    this.#stage.style.backgroundColor = best;
-    this.#stage.style.setProperty("--dim-color", lum > 0.3 ? "#4f545b" : "#c3c7cc");
-    this.#stage.style.setProperty("--dim-halo", best);
-    this.#stage.style.setProperty("--dim-hl", lum > 0.3 ? "#c2410c" : "#ffb35c");
-    this.#stage.style.setProperty("--sheet-stroke", lum > 0.3 ? "#9a9da3" : "#6b7077");
-  }
 }
 
 function fmt(v) {
   return Number(v).toFixed(1).replace(/\.0$/, "");
-}
-
-function luminance(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
-}
-
-function contrast(a, b) {
-  const [l1, l2] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (l1 + 0.05) / (l2 + 0.05);
 }
 
 customElements.define("pb-preview2d", PbPreview2d);

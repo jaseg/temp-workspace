@@ -20,12 +20,8 @@ const downloadBtn = $("#btn-download");
 const scadBtn = $("#btn-scad");
 
 const params = new Map(); // name -> <pb-param>
-let fields = [];
 let payloadPresets = []; // board sizes from /api/defaults
 let presetParam = null; // the "Board preset" <pb-param> (not a config field)
-// Values of config fields that have no form input (e.g. line colors); kept so renders,
-// saves and imports carry them through unchanged.
-let hiddenValues = {};
 let lastValid = null; // {config, svg, model, info}
 let savedJson = null;
 let renderSeq = 0;
@@ -49,11 +45,9 @@ async function api(method, url, body, { raw = false } = {}) {
 
 // ----------------------------------------------------------------------------- form
 function buildForm(specs, presets = []) {
-  fields = specs;
   form.replaceChildren();
   const groups = new Map();
   for (const spec of specs) {
-    if (spec.hidden) continue;
     if (!groups.has(spec.group)) {
       const fs = document.createElement("fieldset");
       const legend = document.createElement("legend");
@@ -129,25 +123,14 @@ async function payloadAction(request) {
 }
 
 function readForm() {
-  const config = { ...hiddenValues };
+  const config = {};
   for (const [name, p] of params) config[name] = p.value;
   return config;
 }
 
 function writeForm(config) {
-  hiddenValues = {};
-  for (const spec of fields) if (spec.hidden && spec.name in config) hiddenValues[spec.name] = config[spec.name];
   for (const [name, p] of params) if (name in config) p.value = config[name];
-  updateVisibility();
   syncPreset();
-}
-
-function updateVisibility() {
-  const values = readForm();
-  for (const spec of fields) {
-    if (!spec.dependsOn || !params.has(spec.name)) continue;
-    params.get(spec.name).hidden = values[spec.dependsOn.field] !== spec.dependsOn.value;
-  }
 }
 
 function showErrors(errors) {
@@ -354,7 +337,6 @@ async function main() {
   savedJson = JSON.stringify(current.config);
 
   form.addEventListener("pb-change", () => {
-    updateVisibility();
     syncPreset();
     setStatus("Updating…");
     scheduleRender();

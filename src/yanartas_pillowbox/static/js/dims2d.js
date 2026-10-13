@@ -19,7 +19,7 @@ export const DIM_STYLE = `
 `;
 
 /**
- * @param dims    list from /api/render (kinds horizontal, vertical, radius, path)
+ * @param dims    list from /api/render (kinds horizontal, vertical, path)
  * @param fs      label font size in user units
  * @param flipY   true when the data frame has y up (plotted as -y)
  * @returns {{group: SVGGElement, bounds: number[]}} bounds = [minX, minY, maxX, maxY]
@@ -57,17 +57,6 @@ export function drawDims2d(dims, { fs, flipY = false }) {
       const half = d.label.length * fs * 0.3;
       track(horiz ? [mid[0] - half, mid[1] - fs] : [mid[0] - fs, mid[1] - half],
             horiz ? [mid[0] + half, mid[1] + fs] : [mid[0] + fs, mid[1] + half]);
-    } else if (d.kind === "radius") {
-      const [c, p] = d.points.map(T);
-      const cross = fs * 0.3;
-      g.append(line([c[0] - cross, c[1]], [c[0] + cross, c[1]]),
-               line([c[0], c[1] - cross], [c[0], c[1] + cross]),
-               line(c, p), arrowhead(p, unit(c, p), a));
-      // Label beyond the arc, along the radius direction.
-      const u = unit(c, p);
-      const at = [p[0] + u[0] * fs * 1.4, p[1] + u[1] * fs * 1.4];
-      g.append(label(at, d.label, fs, 0));
-      track(c, p, [at[0] - fs * 2, at[1] - fs], [at[0] + fs * 2, at[1] + fs]);
     } else if (d.kind === "path") {
       // Offset the measured curve to the left of its direction of travel (in data frame).
       const src = d.points;

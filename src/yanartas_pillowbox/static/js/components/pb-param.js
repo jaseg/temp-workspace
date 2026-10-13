@@ -1,13 +1,12 @@
-// <pb-param>: one labelled configuration input (number, checkbox, select, text or color)
-// with unit, optional action button, help text and an inline validation message. Built from a field spec served by
-// /api/defaults. Emits a bubbling "pb-change" event whenever the user edits the value.
+// <pb-param>: one labelled configuration input (number or select) with unit, optional
+// action button, help text and an inline validation message. Built from a field spec served
+// by /api/defaults. Emits a bubbling "pb-change" event whenever the user edits the value.
 
 let uid = 0;
 
 export class PbParam extends HTMLElement {
   #spec = null;
   #input = null;
-  #hex = null;
   #error = null;
 
   set spec(spec) {
@@ -26,40 +25,29 @@ export class PbParam extends HTMLElement {
   /** Current value in its JSON type. Unparsable numbers are sent as the raw string so the
    *  server can report them ("must be a number") like any other validation error. */
   get value() {
-    const kind = this.#spec.kind;
-    if (kind === "bool") return this.#input.checked;
-    if (kind === "float") {
+    if (this.#spec.kind === "float") {
       const raw = this.#input.value.trim();
       const n = Number(raw);
       return raw !== "" && Number.isFinite(n) ? n : this.#input.value;
     }
-    if (kind === "color") return this.#hex.value.trim();
     return this.#input.value;
   }
 
   set value(v) {
-    const kind = this.#spec.kind;
-    if (kind === "bool") this.#input.checked = Boolean(v);
-    else if (kind === "color") {
-      this.#hex.value = v;
-      if (/^#[0-9a-f]{6}$/i.test(v)) this.#input.value = v.toLowerCase();
-    } else this.#input.value = v;
+    this.#input.value = v;
   }
 
   /** Focus the field's input and bring it into view. */
   focusInput() {
-    if (this.hidden) return;
-    const target = this.#spec.kind === "color" ? this.#hex : this.#input;
-    target.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    target.focus({ preventScroll: true });
+    this.#input.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    this.#input.focus({ preventScroll: true });
   }
 
   set error(message) {
     this.#error.textContent = message || "";
     this.classList.toggle("invalid", Boolean(message));
-    const target = this.#spec.kind === "color" ? this.#hex : this.#input;
-    if (message) target.setAttribute("aria-invalid", "true");
-    else target.removeAttribute("aria-invalid");
+    if (message) this.#input.setAttribute("aria-invalid", "true");
+    else this.#input.removeAttribute("aria-invalid");
   }
 
   #render() {
@@ -87,13 +75,7 @@ export class PbParam extends HTMLElement {
       input.addEventListener("input", emit);
       control.append(input);
       this.#input = input;
-    } else if (spec.kind === "bool") {
-      const input = el("input");
-      Object.assign(input, { type: "checkbox", id });
-      input.addEventListener("change", emit);
-      control.append(input);
-      this.#input = input;
-    } else if (spec.kind === "choice") {
+    } else {
       const select = el("select");
       select.id = id;
       // Choices with a "group" go into <optgroup>s of that name, in order of appearance.
@@ -108,27 +90,6 @@ export class PbParam extends HTMLElement {
       select.addEventListener("change", emit);
       control.append(select);
       this.#input = select;
-    } else if (spec.kind === "color") {
-      const picker = el("input");
-      Object.assign(picker, { type: "color", title: spec.label });
-      picker.setAttribute("aria-label", `${spec.label} color picker`);
-      const hex = el("input", "hex");
-      Object.assign(hex, { type: "text", id, maxLength: 7, spellcheck: false });
-      picker.addEventListener("input", () => { hex.value = picker.value.toUpperCase(); emit(); });
-      hex.addEventListener("input", () => {
-        if (/^#[0-9a-f]{6}$/i.test(hex.value.trim())) picker.value = hex.value.trim().toLowerCase();
-        emit();
-      });
-      control.append(picker, hex);
-      this.#input = picker;
-      this.#hex = hex;
-    } else {
-      const input = el("input");
-      Object.assign(input, { type: "text", id });
-      if (spec.maxLength) input.maxLength = spec.maxLength;
-      input.addEventListener("input", emit);
-      control.append(input);
-      this.#input = input;
     }
     if (spec.unit) control.append(Object.assign(el("span", "unit"), { textContent: spec.unit }));
     if (spec.action) {
@@ -147,7 +108,7 @@ export class PbParam extends HTMLElement {
     this.#error = el("div", "error");
     this.#error.id = `${id}-error`;
     this.#error.setAttribute("aria-live", "polite");
-    (this.#hex ?? this.#input).setAttribute("aria-describedby", this.#error.id);
+    this.#input.setAttribute("aria-describedby", this.#error.id);
     this.append(this.#error);
   }
 }

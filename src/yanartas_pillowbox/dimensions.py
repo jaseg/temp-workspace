@@ -9,10 +9,9 @@ Kinds:
 
 * ``horizontal`` / ``vertical`` (2D): ``points`` = two measured points; ``value`` is their
   x / y distance; the dimension line is drawn at ``at`` (y for horizontal, x for vertical).
-* ``radius`` (2D): ``points`` = (centre, point on the arc).
 * ``path`` (2D): ``points`` = polyline along the measured curve (its length is ``value``);
   drawn parallel to it, ``offset`` to the left of the direction of travel.
-* ``aligned3d`` / ``path3d`` (3D): ``points`` as above; ``line`` is the polyline to draw,
+* ``aligned3d`` (3D): ``points`` = two measured points; ``line`` is the polyline to draw,
   ``extensions`` the extension lines and ``label_at`` the label anchor (all precomputed).
 """
 
@@ -24,6 +23,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from yanartas_pillowbox.config import Config
+from yanartas_pillowbox.crosssection import curve_samples
 from yanartas_pillowbox.geometry import FoldedBox, Pattern, Point, Point3, lid_layout
 from yanartas_pillowbox.svg import MARGIN
 
@@ -239,6 +239,23 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
     def add(a: Point3, v: Coords, k: float = 1.0) -> Coords:
         return tuple(a[i] + v[i] * k for i in range(3))
 
+    def offset_dim(
+        param: str, label: str, a: Point3, b: Point3, off: Coords, ext: float, at: float
+    ) -> Dimension:
+        """a to b, its line drawn ``off`` away, extension lines ``ext`` times as far, the
+        label a further ``at`` times ``off`` out."""
+        la, lb = add(a, off), add(b, off)
+        return Dimension(
+            param,
+            label,
+            "aligned3d",
+            (a, b),
+            math.dist(a, b),
+            line=(la, lb),
+            extensions=((a, add(a, off, ext)), (b, add(b, off, ext))),
+            label_at=tuple((la[i] + lb[i]) / 2 + off[i] * at for i in range(3)),
+        )
+
     dims: list[Dimension] = []
 
     # Length: along the back panel's midline (the ridge on the side the view shows up), between
@@ -248,19 +265,7 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
     a = box.map("back-panel", (wf + wb / 2, e + s_b + t / 2))
     b = box.map("back-panel", (wf + wb / 2, length - e - s_b - t / 2))
     off = (0.0, 0.0, -gap * 0.6)
-    la, lb = add(a, off), add(b, off)
-    dims.append(
-        Dimension(
-            "length",
-            f"length {fmt(cfg.length)}",
-            "aligned3d",
-            (a, b),
-            math.dist(a, b),
-            line=(la, lb),
-            extensions=((a, add(a, off, 1.15)), (b, add(b, off, 1.15))),
-            label_at=tuple((la[i] + lb[i]) / 2 + off[i] * 0.5 for i in range(3)),
-        )
-    )
+    dims.append(offset_dim("length", f"length {fmt(cfg.length)}", a, b, off, 1.15, 0.5))
     lid = lid_layout(cfg)
     if e > 0 and lid is not None:
         # End wall gap, in line with the length at the far end (-Y), on the centreline under
@@ -268,19 +273,7 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
         z = body.z_shift + lid.level - s_f + t / 2  # the lid's inner surface there
         a = (0.0, -(cfg.length / 2 + t), z)
         b = (0.0, -(cfg.length / 2 + t + e), z)
-        la, lb = add(a, off), add(b, off)
-        dims.append(
-            Dimension(
-                "end_wall_gap",
-                f"gap {fmt(e)}",
-                "aligned3d",
-                (a, b),
-                math.dist(a, b),
-                line=(la, lb),
-                extensions=((a, add(a, off, 1.15)), (b, add(b, off, 1.15))),
-                label_at=tuple((la[i] + lb[i]) / 2 + off[i] * 0.5 for i in range(3)),
-            )
-        )
+        dims.append(offset_dim("end_wall_gap", f"gap {fmt(e)}", a, b, off, 1.15, 0.5))
     if lid is not None and cfg.lid_overlap > 0:
         # Lid overlap, on the near end's lid (+Y): from where the inner wall's outer surface
         # lies under it to its free edge; drawn further out than the length.
@@ -289,26 +282,15 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
         a = box.map("front-top-lid", (x_mid, lid.level - depth + cfg.lid_overlap))
         b = box.map("front-top-lid", (x_mid, lid.level - depth))
         off2 = tuple(c * 1.6 for c in off)
-        la, lb = add(a, off2), add(b, off2)
-        dims.append(
-            Dimension(
-                "lid_overlap",
-                f"overlap {fmt(cfg.lid_overlap)}",
-                "aligned3d",
-                (a, b),
-                math.dist(a, b),
-                line=(la, lb),
-                extensions=((a, add(a, off2, 1.1)), (b, add(b, off2, 1.1))),
-                label_at=tuple((la[i] + lb[i]) / 2 + off2[i] * 0.3 for i in range(3)),
-            )
-        )
+        label = f"overlap {fmt(cfg.lid_overlap)}"
+        dims.append(offset_dim("lid_overlap", label, a, b, off2, 1.1, 0.3))
 
     if lid is not None and cfg.lid_offset > 0:
         # Lid offset, where the lid comes closest to the back panel, over the overlap at the
         # near end: from where the lid's mid-surface would rest (a thickness outside the back
         # panel's) up to where it floats; drawn beside, outward across the box.
         zs, front = body.z_shift, body.front
-        n = 2 * max(16, min(80, math.ceil(wf)))
+        n = curve_samples(wf)
         us = [wf * i / n for i in range(n + 1)]
 
         def float_at(u: float) -> float:
@@ -322,19 +304,8 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
         a = (x3, y3, body.surface_z("back", t, x3))
         b = (x3, y3, zs + lid.level - front.z(u))
         side = (math.copysign(gap * 0.35, x3 or 1.0), 0.0, 0.0)
-        la, lb = add(a, side), add(b, side)
-        dims.append(
-            Dimension(
-                "lid_offset",
-                f"lid offset {fmt(cfg.lid_offset)}",
-                "aligned3d",
-                (a, b),
-                math.dist(a, b),
-                line=(la, lb),
-                extensions=((a, add(a, side, 1.15)), (b, add(b, side, 1.15))),
-                label_at=tuple((la[i] + lb[i]) / 2 + side[i] * 0.9 for i in range(3)),
-            )
-        )
+        label = f"lid offset {fmt(cfg.lid_offset)}"
+        dims.append(offset_dim("lid_offset", label, a, b, side, 1.15, 0.9))
 
     # Height: between the panels' inner surfaces on the centreline, at the interior's end,
     # drawn beyond the end of the box.

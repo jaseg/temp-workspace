@@ -196,9 +196,10 @@ def test_maximize_impossible():
 
 
 # ------------------------------------------------------------------ fit box
-def test_pattern_area_matches_pattern_bbox(box):
-    x0, y0, x1, y1 = build_pattern(box).bbox
-    assert P.pattern_area(box) == pytest.approx((x1 - x0) * (y1 - y0), rel=1e-9)
+def pattern_area(cfg):
+    """Area of the flat pattern's bounding box, which fit_box minimizes."""
+    x0, y0, x1, y1 = build_pattern(cfg).bbox
+    return (x1 - x0) * (y1 - y0)
 
 
 @pytest.mark.parametrize("dims", PAYLOADS, ids=[f"{w}x{d}x{h}" for w, d, h in PAYLOADS])
@@ -244,7 +245,7 @@ def brute_force_min_area(cfg, n_heights=12):
         cand = cfg.with_values(
             height=height, width=hi, length=cfg.payload_depth + 2 * cfg.payload_margin
         )
-        best = min(best, P.pattern_area(cand))
+        best = min(best, pattern_area(cand))
     return best
 
 
@@ -254,7 +255,7 @@ def test_fit_box_minimizes_pattern_area(dims):
     cfg = D.with_values(payload_width=pw, payload_depth=pd, payload_height=ph)
     out = P.fit_box(cfg)
     # 0.01 mm rounding of width/height costs well under 0.2 % of the area.
-    assert P.pattern_area(out) <= brute_force_min_area(cfg) * 1.002
+    assert pattern_area(out) <= brute_force_min_area(cfg) * 1.002
 
 
 def test_fit_box_errors():

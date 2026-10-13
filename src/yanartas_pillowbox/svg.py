@@ -14,11 +14,11 @@ import xml.etree.ElementTree as ET
 
 from yanartas_pillowbox import __version__
 from yanartas_pillowbox.config import (
+    SCHEMA_VERSION,
     STROKE_WIDTH,
     Config,
     ConfigError,
     SchemaVersionError,
-    check_version,
 )
 from yanartas_pillowbox.geometry import (
     Arc,
@@ -126,7 +126,7 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
         meta,
         f"{{{CONFIG_NS}}}config",
         {
-            "version": str(cfg.to_dict()["version"]),
+            "version": str(SCHEMA_VERSION),
             "generator": f"yanartas-pillowbox {__version__}",
         },
     )
@@ -280,7 +280,6 @@ def extract_config(svg_text: str | bytes) -> Config:
     if not isinstance(data, dict):
         raise SvgImportError("The embedded configuration is corrupt (not a JSON object).")
     try:
-        check_version(data, required=True)
         return Config.from_dict(data, require_version=True)
     except SchemaVersionError as exc:
         raise SvgImportError(f"Incompatible configuration: {exc}.") from None

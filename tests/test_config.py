@@ -37,11 +37,6 @@ def test_missing_fields_use_defaults():
     assert Config.from_dict({}) == Config.defaults()
 
 
-def test_ints_coerced_to_float():
-    cfg = Config.from_dict({"width": 80})
-    assert isinstance(cfg.width, float)
-
-
 @pytest.mark.parametrize(
     ("changes", "field"),
     [
@@ -61,6 +56,9 @@ def test_ints_coerced_to_float():
         ({"glue_tab_width": 1}, "glue_tab_width"),
         ({"glue_tab_taper": -1}, "glue_tab_taper"),
         ({"glue_tab_taper": 70}, "glue_tab_taper"),  # > edge/2 - 1 = (120 + 20 + 1.2)/2 - 1
+        ({"end_wall_gap": -1}, "end_wall_gap"),
+        ({"end_wall_gap": 501}, "end_wall_gap"),
+        ({"lid_overlap": -1}, "lid_overlap"),
     ],
 )
 def test_validation_errors(changes, field):
@@ -107,11 +105,6 @@ def test_end_wall_gap_lengthens_the_front_panel():
     assert cfg.edge_length == pytest.approx(125.5)
     assert cfg.front_length == pytest.approx(139.5)
     assert cfg.with_values(end_wall_gap=0).front_length == pytest.approx(125.5)
-    assert Config.defaults().end_wall_gap == 10
-    assert "end_wall_gap" in errors_for(end_wall_gap=-1)
-    assert "end_wall_gap" in errors_for(end_wall_gap=501)
-    assert Config.defaults().lid_overlap == 5
-    assert "lid_overlap" in errors_for(lid_overlap=-1)
 
 
 def test_lid_offset_is_limited_by_the_45_degree_turn():
@@ -121,7 +114,6 @@ def test_lid_offset_is_limited_by_the_45_degree_turn():
     from yanartas_pillowbox.geometry import max_lid_offset
 
     cfg = Config.defaults()
-    assert cfg.lid_offset == 2
     limit = max_lid_offset(cfg.body)
     assert cfg.with_values(lid_offset=math.floor(limit * 100) / 100)
     errs = errors_for(lid_offset=limit + 0.1)
@@ -198,7 +190,6 @@ def test_width_drives_the_cross_section(width, arc, t):
     body = cfg.body
     assert body.inner_fold[0] - body.inner_glue[0] == pytest.approx(width, rel=1e-10)
     assert body.inner_fold[0] == pytest.approx(width / 2, rel=1e-10)  # centred
-    assert cfg.circumference == pytest.approx(body.front.width + body.back.width)
     if t == 0:  # zero thickness: both panels are the plain cross-section of that width
         for sec in (body.front, body.back):
             assert sec.width == pytest.approx(panel_width(width, arc["height"] / 2), rel=1e-12)
@@ -219,16 +210,5 @@ def test_interior_height_and_flap_offsets():
     # Outer flaps reach the back panel's outer surface, inner flaps the front's inner surface.
     # (exactly at the panels' apexes, which are a fraction of t apart across the box)
     assert body.front.sagitta + body.front_cut_sagitta == pytest.approx(18 + 1.2, abs=0.01)
-    assert body.back.sagitta + body.back_cut_sagitta == pytest.approx(18 + 0.4)
-
-
-def test_circumference_is_computed_not_stored():
-    cfg = Config.defaults()
-    assert "circumference" not in cfg.to_dict() and "panel_width" not in cfg.to_dict()
-    assert Config.from_dict({"circumference": 999}) == cfg  # unknown keys are ignored
-
-
-def test_old_interior_wall_settings_are_ignored():
-    """Interior walls are gone: their keys are unknown and ignored like any other."""
-    cfg = Config.from_dict({"interior_walls": True, "interior_wall_offset": 3})
-    assert cfg == Config.defaults()
+    back_cut = body.back_cuts[len(body.back_cuts) // 2][1]
+    assert body.back.sagitta + back_cut == pytest.approx(18 + 0.4, abs=0.01)

@@ -16,6 +16,10 @@ Each flap is bounded by two circular arcs through its panel's corners:
 * the **cut edge**, bowing *out* of the panel: the front (outer) flaps reach the back
   panel's outer surface, the back (inner) flaps stop at the front panel's inner surface.
 
+With an end wall gap the outer flaps instead end in a fold into a lid over the gap, and the
+front panel runs on past its edges over the gap (the wings), widening the ends; see
+``LidLayout``.
+
 Folded (closed) state of the mid-surface, used for the 3D model -- every face is an exact
 isometric image of its flat face:
 
@@ -46,7 +50,14 @@ from functools import lru_cache
 from typing import Any
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.crosssection import Body, circle_radius, sagitta_offset
+from yanartas_pillowbox.crosssection import (
+    Body,
+    circle_radius,
+    curve_samples,
+    drop_at_slope,
+    edge_slope,
+    sagitta_offset,
+)
 
 Point = tuple[float, float]
 BBox = tuple[float, float, float, float]  # min_x, min_y, max_x, max_y
@@ -102,9 +113,6 @@ class Line:
             return _dist(p, self.start)
         t = max(0.0, min(1.0, ((p[0] - self.start[0]) * d[0] + (p[1] - self.start[1]) * d[1]) / ll))
         return _dist(p, self.point_at(t))
-
-    def sample(self, n: int) -> list[Point]:
-        return [self.start, self.end]
 
     def reversed(self) -> Line:
         return Line(self.end, self.start)
@@ -181,9 +189,6 @@ class Arc:
             self.point_at(t1),
         )
 
-    def sample(self, n: int) -> list[Point]:
-        return [self.point_at(i / n) for i in range(n + 1)]
-
     def reversed(self) -> Arc:
         return Arc(
             self.center,
@@ -256,18 +261,8 @@ class Outline:
     def end(self) -> Point:
         return self.segments[-1].end
 
-    def is_continuous(self, tol: float = 1e-9) -> bool:
-        pairs = zip(self.segments, (*self.segments[1:], self.segments[0]), strict=True)
-        return all(_dist(a.end, b.start) <= tol for a, b in pairs)
-
     def distance_to(self, p: Point) -> float:
         return min(s.distance_to(p) for s in self.segments)
-
-    def polyline(self, arc_steps: int = 32) -> list[Point]:
-        pts: list[Point] = [self.start]
-        for s in self.segments:
-            pts.extend(s.sample(arc_steps)[1:])
-        return pts
 
     def bbox(self) -> BBox:
         return union_bbox(s.bbox() for s in self.segments)
@@ -456,7 +451,7 @@ def _lid_rest(body: Body) -> float:
     t, sec, zs = body.thickness, body.front, body.z_shift
     if t == 0:  # the back panel is the front one turned over: the lid lies on it
         return 0.0
-    n = 2 * max(16, min(80, math.ceil(sec.width)))
+    n = curve_samples(sec.width)
     us = [sec.width * i / n for i in range(n + 1)]
     return min(body.surface_z("back", t, body.front_point(u)[0]) - zs + sec.z(u) for u in us)
 
@@ -465,10 +460,7 @@ def max_lid_offset(body: Body) -> float:
     """Largest lid offset whose end section turns at most ``MAX_SPREAD_SLOPE`` (negative:
     not even a resting lid fits)."""
     sec = body.front
-    r, m = sec.radius, MAX_SPREAD_SLOPE
-    d = m * r / math.sqrt(1 + m * m)
-    drop = (r - sec.sagitta) - math.sqrt(r * r - d * d)
-    return _lid_rest(body) + 2 * drop
+    return _lid_rest(body) + 2 * drop_at_slope(sec.width, sec.sagitta, MAX_SPREAD_SLOPE)
 
 
 @lru_cache(maxsize=64)
@@ -479,7 +471,7 @@ def lid_layout(cfg: Config) -> LidLayout | None:
         return None
     body, t = cfg.body, cfg.thickness
     sec, zs = body.front, body.z_shift
-    n = 2 * max(16, min(80, math.ceil(sec.width)))
+    n = curve_samples(sec.width)
     us = [sec.width * i / n for i in range(n + 1)]
     level = _lid_rest(body) - cfg.lid_offset
     # Where the fold arc, continued, is level / 2 off its chord: half-chord d from the middle.
@@ -805,9 +797,9 @@ def build_pattern(cfg: Config) -> Pattern:
         "outer_width": x1 - x0,  # outside of the material, fold to fold
         "outer_height": z1 - z0,
         # (the widened end sections' outer walls reach past the front panel's ends)
-        "outer_length": length + (0.0 if lid is None else 2 * lid.drop),
+        "outer_length": overall_length(cfg),
         # Shallower tapers let the glued tab reach past the curved fold near the corners.
-        "min_glue_tab_taper": g * fold_slope(wf, sf),
+        "min_glue_tab_taper": g * edge_slope(wf, sf),
     }
     if lid is not None:
         # The end sections' growth over the body (mid-surface): across the box, the front
@@ -879,13 +871,16 @@ def fold_direction(cfg: Config, segment: Segment, faces: Sequence[Face]) -> Fold
 
 
 # --------------------------------------------------------------------------- 3D model
-def fold_slope(width: float, sagitta: float) -> float:
-    """|f'| at the panel corners: tangent of the angle the fold arc makes with its chord."""
-    r = circle_radius(width, sagitta)
-    return (width / 2) / (r - sagitta)
-
-
 Point3 = tuple[float, float, float]
+
+
+# The front panel and its wings: one cylinder.
+_FRONT_SURFACE = frozenset(
+    [
+        "front-panel",
+        *(f"front-{end}-{side}" for end in ("top", "bottom") for side in ("left", "right")),
+    ]
+)
 
 
 class FoldedBox:
@@ -902,7 +897,7 @@ class FoldedBox:
         self.lid_level = 0.0 if lid is None else lid.level
 
     def map(self, face: str, p: Point) -> Point3:
-        body, length, e = self.body, self.length, self.gap
+        body, length, e, k = self.body, self.length, self.gap, self.lid_level
         front, back, zs = body.front, body.back, body.z_shift
         x, y = p
         # Crease planes (unshifted Z): front y = Z, back y - e = -Z (and mirrored about the
@@ -912,11 +907,7 @@ class FoldedBox:
             inside = 0 <= x <= front.width
             fx = body.front_x + (front.x(x) if inside else front.x_ext(x))
             fz = front.z(x) if inside else front.z_ext(x)
-            k = self.lid_level
-        if face in (
-            "front-panel",
-            *(f"front-{e}-{s}" for e in ("top", "bottom") for s in ("left", "right")),
-        ):
+        if face in _FRONT_SURFACE:
             pos = (fx, y, zs + fz)
         elif face == "front-top-flap":  # reflected across the crease plane y = Z
             pos = (fx, fz, zs + y)

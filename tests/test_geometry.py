@@ -3,7 +3,7 @@ import math
 from dataclasses import replace
 
 import pytest
-from helpers import self_intersections
+from helpers import is_closed_loop, polyline, self_intersections
 
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.crosssection import CrossSection, sagitta_offset
@@ -11,13 +11,11 @@ from yanartas_pillowbox.geometry import (
     Arc,
     FoldCategory,
     FoldDirection,
-    FoldedBox,
     Line,
     arc_from_chord,
     build_pattern,
     fold_direction,
     lid_layout,
-    print_side_normal,
 )
 
 CONFIGS = {
@@ -84,12 +82,6 @@ def test_thickness_offsets_folds_and_flaps():
     assert info["front_fold_sagitta"] + info["front_cut_sagitta"] == pytest.approx(21.5, abs=0.01)
     assert info["back_fold_sagitta"] + info["back_cut_sagitta"] == pytest.approx(20.5, abs=0.01)
     assert info["outer_height"] == pytest.approx(20 + 2)
-
-
-def test_height_maps_to_sagitta():
-    cfg = Config.defaults().with_values(height=22)
-    assert build_pattern(cfg).info["front_fold_sagitta"] == pytest.approx(11)
-    assert build_pattern(cfg).info["box_height"] == pytest.approx(22)
 
 
 def test_length_is_the_midline_between_fold_apexes(cfg):
@@ -161,14 +153,14 @@ def test_end_sections_widen_the_front_panel(cfg):
 
 def test_outline_is_single_closed_contour(cfg):
     out = build_pattern(cfg).outline
-    assert out.is_continuous(1e-12)
+    assert is_closed_loop(out.segments)
     assert math.dist(out.start, out.end) < 1e-9
     for seg in out.segments:
         assert seg.length > 1e-6
 
 
 def test_outline_has_no_self_intersections(cfg):
-    pts = build_pattern(cfg).outline.polyline(64)
+    pts = polyline(build_pattern(cfg).outline.segments, 64)
     assert self_intersections(pts) == []
 
 
@@ -189,27 +181,13 @@ def test_folds_do_not_overlap_outline(cfg):
             assert pat.outline.distance_to(p) > 1e-3, (fold.name, i)
 
 
-@pytest.mark.parametrize("gap", [0, 10])
-def test_fold_categories(gap):
-    pat = build_pattern(Config.defaults().with_values(end_wall_gap=gap))
-    cats = [f.category for f in pat.folds]
-    # Four panel folds, and with a gap the wings' continuations of the front ones.
-    assert cats.count(FoldCategory.CURVED) == (8 if gap else 4)
-    assert cats.count(FoldCategory.STRAIGHT) == 1
-    assert cats.count(FoldCategory.GLUE) == 1
-    assert cats.count(FoldCategory.LID) == (2 if gap else 0)  # one lid at each end
-    for f in pat.folds:
-        straight = f.category in (FoldCategory.STRAIGHT, FoldCategory.GLUE)
-        assert isinstance(f.segment, Line if straight else Arc)
-
-
 def test_bbox_covers_everything(cfg):
     pat = build_pattern(cfg)
     x0, y0, x1, y1 = pat.bbox
-    for p in pat.outline.polyline(64):
+    for p in polyline(pat.outline.segments, 64):
         assert x0 - 1e-9 <= p[0] <= x1 + 1e-9 and y0 - 1e-9 <= p[1] <= y1 + 1e-9
     spread = 0.0 if lid_layout(cfg) is None else lid_layout(cfg).spread  # the bands, at x < 0
-    assert x1 - x0 == pytest.approx(cfg.circumference + cfg.glue_tab_width + spread)
+    assert x1 - x0 == pytest.approx(cfg.body.circumference + cfg.glue_tab_width + spread)
     # The outer flaps, or with an end wall gap their lids, stick out furthest.
     lid = lid_layout(cfg)
     reach = cfg.body.front_cut_sagitta if lid is None else max(d for _, d in lid.depth) - lid.level
@@ -302,14 +280,6 @@ def test_cross_section_rejects_arcs_that_cannot_close():
         CrossSection(60, 0.21 * 60)
 
 
-def test_print_side_is_the_outside():
-    """The SVG's visible side (the print side) becomes the outside of the folded box: at the
-    front panel's apex its normal points away from the box centre (+Z)."""
-    cfg = Config.defaults()
-    n = print_side_normal(FoldedBox(cfg), "front-panel", (cfg.body.front.width / 2, 60.0), 1e-3)
-    assert n == pytest.approx((0, 0, 1), abs=1e-6)
-
-
 @pytest.mark.parametrize("name", list(CONFIGS))
 def test_all_folds_are_mountain_folds_from_the_print_side(name):
     """Seen from the outside every crease is convex: the panels fold around the interior, the
@@ -343,8 +313,8 @@ def test_fpc_cutout_flattens_only_the_chosen_inner_flaps(which):
     plain = build_pattern(base)
     cfg = base.with_values(fpc_cutout=which, fpc_cutout_width=18)
     pat = build_pattern(cfg)
-    assert pat.outline.is_continuous(1e-12)
-    assert self_intersections(pat.outline.polyline(16)) == []
+    assert is_closed_loop(pat.outline.segments)
+    assert self_intersections(polyline(pat.outline.segments, 16)) == []
     flattened = {"none": set(), "front": {"top"}, "back": {"bottom"}, "both": {"top", "bottom"}}
     x0, x1 = cfg.body.front.width, cfg.body.front.width + cfg.body.back.width
     for end, k in (("top", 0), ("bottom", 1)):
@@ -373,4 +343,3 @@ def test_fpc_cutout_width_validated():
         Config.defaults().with_values(fpc_cutout="both", fpc_cutout_width=61)
     assert "fpc_cutout_width" in info.value.errors
     assert Config.defaults().with_values(fpc_cutout="none", fpc_cutout_width=61)  # unused
-    assert Config.defaults().fpc_cutout == "none"

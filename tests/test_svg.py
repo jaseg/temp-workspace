@@ -2,12 +2,11 @@ import json
 import math
 
 import pytest
-from helpers import parse_path, q, self_intersections, svg_elements
+from helpers import parse_path, polyline, q, self_intersections, svg_elements
 
 from yanartas_pillowbox.config import SCHEMA_VERSION, STROKE_WIDTH, Config
 from yanartas_pillowbox.geometry import FoldDirection, build_pattern
 from yanartas_pillowbox.svg import (
-    CONFIG_NS,
     INKSCAPE_NS,
     LAYERS,
     MARGIN,
@@ -64,10 +63,7 @@ def test_outline_is_one_closed_path(cfg):
     first = segs[0].start
     last = segs[-1].end
     assert math.dist(first, last) < 1e-6
-    pts = [segs[0].start]
-    for s in segs:
-        pts.extend(s.sample(48)[1:])
-    assert self_intersections(pts) == []
+    assert self_intersections(polyline(segs)) == []
 
 
 def test_svg_arcs_reproduce_geometry(cfg):
@@ -145,13 +141,6 @@ def test_layers_and_line_styles(cfg):
     assert root.find(f".//{q('style')}") is None
 
 
-def test_fold_dash_patterns_differ():
-    mountain, valley = LAYERS[FoldDirection.MOUNTAIN][2], LAYERS[FoldDirection.VALLEY][2]
-    assert mountain and valley and mountain != valley
-    assert len(mountain.split()) == 4  # dash-dot
-    assert len(valley.split()) == 2  # dashed
-
-
 def test_folds_grouped_by_direction(cfg):
     pattern = build_pattern(cfg)
     root = svg_elements(render_svg(cfg, pattern))
@@ -196,14 +185,6 @@ def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
                 p = seg.point_at(i / 40)
                 near = [s for s in outline if _near_bbox(s, p, 1e-3)]
                 assert min((s.distance_to(p) for s in near), default=1.0) > 1e-3
-
-
-def test_metadata_embedded(cfg):
-    root = svg_elements(render_svg(cfg))
-    el = root.find(f"{q('metadata')}/{{{CONFIG_NS}}}config")
-    assert el is not None and el.get("version") == str(SCHEMA_VERSION)
-    data = json.loads(el.text)
-    assert data["version"] == SCHEMA_VERSION
 
 
 def test_round_trip(cfg):

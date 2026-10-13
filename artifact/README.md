@@ -14,8 +14,8 @@ sha512 against the registry's integrity hash. Pass `--pyodide-tgz FILE` to use a
 
 | File | Role |
 | --- | --- |
-| `pb_api.py` | Python side of the API. It mirrors `server.py` route by route; `tests/test_artifact_api.py` keeps the two in step. Settings are stored by the caller, not on disk. |
-| `pyworker.js` | Web worker that starts Pyodide, loads the modules and answers requests. |
+| `pb_api.py` | Python side of the API. It routes requests to the package's `api` module like `server.py` does; `tests/test_artifact_api.py` keeps the two in step. Settings are stored by the caller, not on disk. |
+| `pyworker.js` | Web worker that starts Pyodide, loads the modules listed in `py/files.json` and answers requests. |
 | `pyshim.js` | Loaded before `app.js`. It routes `fetch("/api/…")` to the worker and keeps settings in `localStorage`. Downloads go through the Artifact viewer's `downloads` capability. |
 | `build.py` | Assembles `dist/`. |
 

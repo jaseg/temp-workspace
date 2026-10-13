@@ -315,7 +315,7 @@ layers keep the line types apart.
 
 | Method & path | Body | Response |
 |---|---|---|
-| `GET /api/defaults` | — | `{config, fields}` with the default config and field specs (labels, units, ranges) |
+| `GET /api/defaults` | — | `{config, fields, payload_presets}` with the default config, field specs (labels, units, ranges) and board presets |
 | `GET /api/config` | — | `{config}` with the current (persisted) config |
 | `PUT /api/config` | `{config}` | Validates and saves it, returns `{config, saved}`; `422 {errors}` if invalid |
 | `POST /api/render` | `{config}` | `{config, svg, model, section, info, dimensions, payload}`; `422 {errors: {field: message}}` if invalid |
@@ -339,6 +339,8 @@ Layout:
 * `svg.py`: SVG serialization and config extraction.
 * `payload.py`: payload fit test, per-dimension maximize and the box fit.
 * `dimensions.py`: preview dimension annotations, tagged with the parameter they show.
+* `scad.py`: the OpenSCAD interior model.
+* `api.py`: the JSON API, shared by the Flask server and the in-browser build.
 * `persistence.py`, `server.py`, `cli.py`.
 * `static/`: the no-build ES-module frontend, with web components for the parameter input
   and both previews. three.js r160 is vendored under `static/vendor/three` (MIT).

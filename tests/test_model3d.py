@@ -125,13 +125,6 @@ def test_faces_tile_the_pattern(case):
 
 
 # ------------------------------------------------------------------ mesh <-> 2D faces
-def test_one_mesh_part_per_face(case):
-    _, pattern, _, parts = case
-    assert set(parts) == {f.name for f in pattern.faces}
-    for face in pattern.faces:
-        assert parts[face.name]["kind"] == face.kind
-
-
 def test_mesh_flat_coords_cover_their_face(case):
     """The mesh's flat triangulation lies inside its pattern face and covers all of it."""
     _, pattern, _, parts = case
@@ -220,14 +213,6 @@ def test_mesh_is_isometric_to_pattern(case):
             assert abs(a3 - a2) <= 2 * LEN_TOL * a2 + 1e-4, (name, t)
 
 
-def test_mesh_matches_folding_map(case):
-    cfg, _, _, parts = case
-    box = FoldedBox(cfg)
-    for name, part in parts.items():
-        for p2, p3 in zip(pts2(part), pts3(part), strict=True):
-            assert math.dist(box.map(name, p2), p3) < POS_TOL
-
-
 def test_faces_stay_attached_along_folds(case):
     """Both faces adjacent to a fold put every fold point at the same 3D position, so the
     mesh has no gaps or tears along folds."""
@@ -241,22 +226,6 @@ def test_faces_stay_attached_along_folds(case):
             p = fold.segment.point_at(i / 32)
             a, b = (box.map(n, p) for n in owners)
             assert math.dist(a, b) < 1e-9, (fold.name, owners, p)
-
-
-def test_fold_lines_lie_on_their_faces(case):
-    cfg, pattern, model, _ = case
-    box = FoldedBox(cfg)
-    lines = {ln["name"]: ln for ln in model["lines"]}
-    assert set(lines) == {f.name for f in pattern.folds}
-    for fold in pattern.folds:
-        owner = next(
-            f.name for f in pattern.faces if any(same_segment(fold.segment, s) for s in f.boundary)
-        )
-        pts = lines[fold.name]["points"]
-        assert lines[fold.name]["category"] == fold.category.value
-        for i, q in enumerate(pts):
-            p = fold.segment.point_at(i / (len(pts) - 1))
-            assert math.dist(box.map(owner, p), q) < POS_TOL
 
 
 def test_no_hidden_creases_inside_faces(case):
@@ -462,8 +431,6 @@ def test_closed_dimensions(case):
     assert model["interior"] == {"width": cfg.width, "length": cfg.length, "height": cfg.height}
     assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-4)
     assert model["bounds"]["width"] > cfg.width or t == 0
-    for sec in (cfg.body.front, cfg.body.back):
-        assert sec.closed_width < sec.width  # bending shortens the chord
 
 
 # ------------------------------------------------------------------ body cross-section

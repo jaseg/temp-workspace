@@ -4,19 +4,6 @@
 
 import { loadPyodide } from "./pyodide/pyodide.mjs";
 
-const PY_FILES = [
-  "pb_api.py",
-  "yanartas_pillowbox/__init__.py",
-  "yanartas_pillowbox/config.py",
-  "yanartas_pillowbox/crosssection.py",
-  "yanartas_pillowbox/geometry.py",
-  "yanartas_pillowbox/svg.py",
-  "yanartas_pillowbox/dimensions.py",
-  "yanartas_pillowbox/payload.py",
-  "yanartas_pillowbox/presets.py",
-  "yanartas_pillowbox/scad.py",
-];
-
 // Artifacts cannot serve .zip files, so the standard library ships base64-encoded as text.
 async function stdLibURL() {
   const res = await fetch(new URL("./pyodide/python_stdlib.zip.b64.txt", import.meta.url));
@@ -33,7 +20,9 @@ const api = (async () => {
     stdLibURL: await stdLibURL(),
   });
   py.FS.mkdirTree("/home/pyodide/yanartas_pillowbox");
-  await Promise.all(PY_FILES.map(async (name) => {
+  const listing = await fetch(new URL("./py/files.json", import.meta.url));
+  if (!listing.ok) throw new Error(`could not load the module list (${listing.status})`);
+  await Promise.all((await listing.json()).map(async (name) => {
     const res = await fetch(new URL(`./py/${name}`, import.meta.url));
     if (!res.ok) throw new Error(`could not load ${name} (${res.status})`);
     py.FS.writeFile(`/home/pyodide/${name}`, await res.text());

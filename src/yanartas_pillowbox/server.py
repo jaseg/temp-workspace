@@ -1,22 +1,20 @@
-"""Local Flask server: the web UI plus a small JSON API."""
+"""Local Flask server: the web UI plus a small JSON API (see ``api``)."""
 
 from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from yanartas_pillowbox import dimensions as dims
-from yanartas_pillowbox import payload
-from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, field_specs_json
-from yanartas_pillowbox.geometry import build_cross_section, build_model3d, build_pattern
+from yanartas_pillowbox import api
 from yanartas_pillowbox.persistence import load_config, save_config
-from yanartas_pillowbox.presets import presets_json
 from yanartas_pillowbox.scad import render_scad
-from yanartas_pillowbox.svg import SvgImportError, extract_config, render_svg, sheet_offset
+from yanartas_pillowbox.svg import SvgImportError, extract_config
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +27,21 @@ class State:
         self.settings_path = settings_path
         self.lock = threading.Lock()
         self.config = load_config(settings_path)
+
+
+def _json_route(view: Callable[[Any], Any]) -> Callable[[], Any]:
+    """A JSON route: the view gets the parsed request body; ``ApiError`` becomes its reply."""
+
+    @wraps(view)
+    def wrapper() -> Any:
+        if not request.is_json:
+            return jsonify(error="expected application/json"), 415
+        try:
+            return view(request.get_json(silent=True))
+        except api.ApiError as exc:
+            return jsonify(exc.body), exc.status
+
+    return wrapper
 
 
 def create_app(settings_path: Path) -> Flask:
@@ -50,29 +63,13 @@ def create_app(settings_path: Path) -> Flask:
         resp.headers.setdefault("Cache-Control", "no-store")
         return resp
 
-    def parse_config_body() -> Config | tuple[Response, int]:
-        data = request.get_json(silent=True)
-        if not isinstance(data, dict):
-            return jsonify(error="expected a JSON object", errors={}), 400
-        data = data.get("config", data)
-        try:
-            return Config.from_dict(data)
-        except SchemaVersionError as exc:
-            return jsonify(error=str(exc), errors={}), 422
-        except ConfigError as exc:
-            return jsonify(error="invalid configuration", errors=exc.errors), 422
-
     @app.get("/")
     def index() -> Response:
         return send_from_directory(STATIC_DIR, "index.html")
 
     @app.get("/api/defaults")
     def defaults() -> Response:
-        return jsonify(
-            config=Config.defaults().to_dict(),
-            fields=field_specs_json(),
-            payload_presets=presets_json(),
-        )
+        return jsonify(api.defaults())
 
     @app.get("/api/config")
     def get_config() -> Response:
@@ -80,12 +77,9 @@ def create_app(settings_path: Path) -> Flask:
             return jsonify(config=state.config.to_dict())
 
     @app.put("/api/config")
-    def put_config() -> Any:
-        if not request.is_json:
-            return jsonify(error="expected application/json"), 415
-        cfg = parse_config_body()
-        if not isinstance(cfg, Config):
-            return cfg
+    @_json_route
+    def put_config(body: Any) -> Any:
+        cfg = api.parse_config(body)
         with state.lock:
             state.config = cfg
             try:
@@ -96,60 +90,20 @@ def create_app(settings_path: Path) -> Flask:
         return jsonify(config=cfg.to_dict(), saved=True)
 
     @app.post("/api/render")
-    def render() -> Any:
-        if not request.is_json:
-            return jsonify(error="expected application/json"), 415
-        cfg = parse_config_body()
-        if not isinstance(cfg, Config):
-            return cfg
-        pattern = build_pattern(cfg)
-        section = build_cross_section(cfg)
-        return jsonify(
-            config=cfg.to_dict(),
-            svg=render_svg(cfg, pattern),
-            model=build_model3d(cfg, pattern),
-            section=section,
-            info=pattern.info,
-            payload=payload.summary(cfg),
-            # Preview-only dimension annotations (never part of the exported SVG).
-            dimensions={
-                "pattern": dims.to_json(
-                    dims.pattern_dimensions(cfg, pattern, sheet_offset(pattern))
-                ),
-                "section": dims.to_json(dims.section_dimensions(cfg, section)),
-                "model": dims.to_json(dims.model_dimensions(cfg)),
-            },
-        )
+    @_json_route
+    def render(body: Any) -> Any:
+        return jsonify(api.render(api.parse_config(body)))
 
     @app.post("/api/scad")
-    def scad() -> Any:
+    @_json_route
+    def scad(body: Any) -> Any:
         """``{config}`` -> OpenSCAD source of the box's interior."""
-        if not request.is_json:
-            return jsonify(error="expected application/json"), 415
-        cfg = parse_config_body()
-        if not isinstance(cfg, Config):
-            return cfg
-        return Response(render_scad(cfg), mimetype="application/x-openscad")
+        return Response(render_scad(api.parse_config(body)), mimetype="application/x-openscad")
 
     @app.post("/api/payload")
-    def payload_action() -> Any:
-        """``{config, action: "fit" | "maximize", field?}`` -> ``{config}`` (not saved)."""
-        if not request.is_json:
-            return jsonify(error="expected application/json"), 415
-        body = request.get_json(silent=True) or {}
-        cfg = parse_config_body()
-        if not isinstance(cfg, Config):
-            return cfg
-        try:
-            if body.get("action") == "fit":
-                out = payload.fit_box(cfg)
-            elif body.get("action") == "maximize":
-                out = payload.maximize(cfg, str(body.get("field")))
-            else:
-                return jsonify(error="unknown action", errors={}), 400
-        except payload.PayloadError as exc:
-            return jsonify(error=str(exc), errors={exc.field: str(exc)}), 422
-        return jsonify(config=out.to_dict())
+    @_json_route
+    def payload_action(body: Any) -> Any:
+        return jsonify(api.payload_action(body))
 
     @app.post("/api/import")
     def import_svg() -> Any:

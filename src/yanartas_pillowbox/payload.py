@@ -38,10 +38,11 @@ from yanartas_pillowbox.crosssection import (
     MAX_SAGITTA_RATIO,
     Body,
     CrossSection,
+    drop_at_slope,
     solve_body,
     width_ratio,
 )
-from yanartas_pillowbox.geometry import MAX_SPREAD_SLOPE, lid_layout
+from yanartas_pillowbox.geometry import MAX_SPREAD_SLOPE
 
 ROUND = 0.01  # mm: results are rounded to this grid, always towards a fitting box
 SAMPLES = 1000  # curve samples for clearance computations
@@ -72,18 +73,14 @@ def _point_rect(qx: float, qz: float, a: float, b: float) -> float:
     return math.hypot(max(dx, 0.0), max(dz, 0.0))
 
 
-def curve_clearance(curve: Curve, length: float, a: float, b: float) -> float:
-    """Distance from the centred rectangle |x| <= a, |z| <= b to the curve ``curve(u)``,
-    u in [0, length]; negative if the rectangle pokes through it."""
-
-    def f(u: float) -> float:
-        return _point_rect(*curve(u), a, b)
-
-    us = [length * i / SAMPLES for i in range(SAMPLES + 1)]
-    vals = [f(u) for u in us]
-    k = min(range(len(us)), key=vals.__getitem__)
-    # Golden-section refinement between the neighbouring samples.
-    lo, hi = us[max(0, k - 1)], us[min(SAMPLES, k + 1)]
+def _grid_min(f: Callable[[float], float], grid: list[float]) -> tuple[float, float]:
+    """(x, f(x)) at the minimum of f: the best grid point, refined by golden-section search
+    between its neighbours (f is unimodal there)."""
+    vals = [f(x) for x in grid]
+    k = min(range(len(grid)), key=vals.__getitem__)
+    if math.isinf(vals[k]):
+        return grid[k], vals[k]
+    lo, hi = grid[max(0, k - 1)], grid[min(len(grid) - 1, k + 1)]
     g = (math.sqrt(5) - 1) / 2
     c, d = hi - g * (hi - lo), lo + g * (hi - lo)
     fc, fd = f(c), f(d)
@@ -96,7 +93,17 @@ def curve_clearance(curve: Curve, length: float, a: float, b: float) -> float:
             lo, c, fc = c, d, fd
             d = lo + g * (hi - lo)
             fd = f(d)
-    return min(vals[k], fc, fd)
+    return min(((grid[k], vals[k]), (c, fc), (d, fd)), key=lambda q: q[1])
+
+
+def curve_clearance(curve: Curve, length: float, a: float, b: float) -> float:
+    """Distance from the centred rectangle |x| <= a, |z| <= b to the curve ``curve(u)``,
+    u in [0, length]; negative if the rectangle pokes through it."""
+
+    def f(u: float) -> float:
+        return _point_rect(*curve(u), a, b)
+
+    return _grid_min(f, [length * i / SAMPLES for i in range(SAMPLES + 1)])[1]
 
 
 def section_clearance(body: Body, width: float, height: float) -> float:
@@ -193,21 +200,6 @@ def maximize(cfg: Config, field: str) -> Config:
 
 
 # ------------------------------------------------------------------------- fit box
-def pattern_area(cfg: Config) -> float:
-    """Area of the flat pattern's bounding box: (both panels + glue tab, + the front panel's
-    wing beyond its free edge) x (the front panel's edge + both outer flaps or lids, which
-    stick out furthest)."""
-    lid = lid_layout(cfg)
-    wing = 0.0 if lid is None else lid.spread
-    return (cfg.circumference + cfg.glue_tab_width + wing) * pattern_height(cfg)
-
-
-def pattern_height(cfg: Config) -> float:
-    lid = lid_layout(cfg)
-    reach = cfg.body.front_cut_sagitta if lid is None else max(d for _, d in lid.depth) - lid.level
-    return cfg.front_length + 2 * reach
-
-
 def _scale_needed(x: float, z: float, a: float, b: float, m: float) -> float:
     """Smallest scale W at which the profile point W * (x, z) is at least ``m`` away from the
     rectangle |X| <= a, |Z| <= b (the distance grows monotonically with W)."""
@@ -250,7 +242,10 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
         return None
     if base.glue_tab_taper > (length + 2 * sagitta + 3 * t) / 2 - 1:
         return None
-    if base.end_wall_gap > 0 and _max_drop(panel, sagitta) < (base.lid_offset + 4 * t) / 2:
+    # The lid offset the widened ends allow is about twice the drop at the steepest turn,
+    # less the lid's resting level (about -3 t); see geometry.max_lid_offset.
+    drop = drop_at_slope(panel, sagitta, MAX_SPREAD_SLOPE)
+    if base.end_wall_gap > 0 and drop < (base.lid_offset + 4 * t) / 2:
         return None  # too steep at the sides to widen the ends for the lids
     # The front panel's edge, plus at both ends the outer flaps (sagitta + 1.5 t) or, with a
     # gap, the lids (about the gap, the overlap, the sagitta, 2.5 t and the lid offset beyond
@@ -262,16 +257,6 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
         reach = gap + base.lid_overlap + sagitta + 2.5 * t + base.lid_offset
     area = (2 * panel + base.glue_tab_width) * (edge + 2 * reach)
     return area, width, 2 * sagitta
-
-
-def _max_drop(panel: float, sagitta: float) -> float:
-    """How far below its chord the front fold arc can run on before it turns 45 degrees
-    (with geometry.MAX_SPREAD_SLOPE): the widened ends' lid offset is about twice that,
-    less the lid's resting level (about -3 t)."""
-    r = (panel**2 / 4 + sagitta**2) / (2 * sagitta)
-    m = MAX_SPREAD_SLOPE
-    d = m * r / math.sqrt(1 + m * m)
-    return (r - sagitta) - math.sqrt(r * r - d * d)
 
 
 def _min_width(cfg: Config, height: float, guess: float) -> float | None:
@@ -324,31 +309,13 @@ def fit_box(cfg: Config) -> Config:
         c = _candidate(cfg, r)
         return math.inf if c is None else c[0]
 
-    lo_r, hi_r = 1e-3, MAX_SAGITTA_RATIO
-    n = 80
-    grid = [lo_r * (hi_r / lo_r) ** (i / n) for i in range(n + 1)]
-    values = [area(r) for r in grid]
-    best = min(range(len(grid)), key=values.__getitem__)
-    if math.isinf(values[best]):
+    lo_r, hi_r, n = 1e-3, MAX_SAGITTA_RATIO, 80
+    r, best = _grid_min(area, [lo_r * (hi_r / lo_r) ** (i / n) for i in range(n + 1)])
+    if math.isinf(best):
         raise PayloadError(
             "payload_width",
             "no valid box holds this payload with the current margin, glue tab and thickness",
         )
-    # Golden-section refinement between the grid neighbours (area is unimodal there).
-    a, b = grid[max(0, best - 1)], grid[min(n, best + 1)]
-    g = (math.sqrt(5) - 1) / 2
-    c, d = b - g * (b - a), a + g * (b - a)
-    fc, fd = area(c), area(d)
-    for _ in range(40):
-        if fc <= fd:
-            b, d, fd = d, c, fc
-            c = b - g * (b - a)
-            fc = area(c)
-        else:
-            a, c, fc = c, d, fd
-            d = a + g * (b - a)
-            fd = area(d)
-    r = min((grid[best], c, d), key=area)
     cand = _candidate(cfg, r)
     assert cand is not None
     _, width, height = cand

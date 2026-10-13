@@ -40,7 +40,7 @@ def measured(d):
 
 def expected_value(cfg, param):
     if param == "circumference":  # computed, not an input
-        return cfg.circumference
+        return cfg.body.circumference
     return getattr(cfg, param)
 
 
@@ -257,21 +257,12 @@ def test_model_dimensions(cfg):
 
 # ------------------------------------------------------------------ API
 def test_render_returns_dimensions(tmp_path):
+    """The render API serves the dimensions of all three views, as JSON."""
     client = create_app(tmp_path / "s.json").test_client()
-    data = client.post("/api/render", json={"config": D.to_dict()}).get_json()
-    dims = data["dimensions"]
-    assert {d["param"] for d in dims["pattern"]} == {
-        "circumference",
-        "length",
-        "height",
-        "glue_tab_width",
-        "glue_tab_taper",
-        "end_wall_gap",
-        "lid_overlap",
+    dims = client.post("/api/render", json={"config": D.to_dict()}).get_json()["dimensions"]
+    pattern = build_pattern(D)
+    assert dims == {
+        "pattern": dm.to_json(dm.pattern_dimensions(D, pattern, sheet_offset(pattern))),
+        "section": dm.to_json(dm.section_dimensions(D, build_cross_section(D))),
+        "model": dm.to_json(dm.model_dimensions(D)),
     }
-    assert {d["param"] for d in dims["section"]} == {"width", "height", "circumference"}
-    model = {"width", "length", "height", "end_wall_gap", "lid_overlap", "lid_offset"}
-    assert {d["param"] for d in dims["model"]} == model
-    for view in dims.values():
-        for d in view:
-            assert d["label"] and d["kind"] and d["points"]

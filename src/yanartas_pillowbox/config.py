@@ -9,7 +9,6 @@ validated ``Config`` or raises ``ConfigError`` carrying one message per offendin
 from __future__ import annotations
 
 import math
-import re
 from dataclasses import dataclass, fields, replace
 from typing import Any, Literal
 
@@ -21,9 +20,7 @@ SCHEMA_VERSION = 6
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
-HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
-
-FieldKind = Literal["float", "bool", "str", "color", "choice"]
+FieldKind = Literal["float", "choice"]
 
 
 class ConfigError(ValueError):
@@ -52,11 +49,6 @@ class FieldSpec:
     step: float | None = None
     choices: tuple[tuple[str, str], ...] = ()
     help: str = ""
-    # Show the field only when another field has a given value: (field, value).
-    depends_on: tuple[str, Any] | None = None
-    max_length: int | None = None
-    # Not shown in the web UI (still settable via config files, imports and --set).
-    hidden: bool = False
     # Per-field UI action button: (action id, button label, tooltip).
     action: tuple[str, str, str] | None = None
 
@@ -77,12 +69,6 @@ class FieldSpec:
             out["step"] = self.step
         if self.choices:
             out["choices"] = [{"value": v, "label": lbl} for v, lbl in self.choices]
-        if self.depends_on is not None:
-            out["dependsOn"] = {"field": self.depends_on[0], "value": self.depends_on[1]}
-        if self.max_length is not None:
-            out["maxLength"] = self.max_length
-        if self.hidden:
-            out["hidden"] = True
         if self.action is not None:
             out["action"] = dict(zip(("id", "label", "title"), self.action, strict=True))
         return out
@@ -306,11 +292,6 @@ class Config:
         front panel runs on by the end wall gap at each end."""
         return self.edge_length + 2 * self.end_wall_gap
 
-    @property
-    def circumference(self) -> float:
-        """Flat width of both body panels: the closed cross-section's mid-surface perimeter."""
-        return self.body.circumference
-
     # -------------------------------------------------------------- (de)serialization
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready dict including the schema ``version``."""
@@ -380,21 +361,9 @@ def _coerce(spec: FieldSpec, value: Any) -> Any:
         if not math.isfinite(value):
             raise ValueError("must be a finite number")
         return value
-    if spec.kind == "bool":
-        if not isinstance(value, bool):
-            raise ValueError("must be true or false")
-        return value
-    if spec.kind == "color":
-        if not isinstance(value, str) or not HEX_COLOR_RE.match(value.strip()):
-            raise ValueError("must be a color like #FF0000")
-        return value.strip().upper()
-    if spec.kind == "choice":
-        allowed = [c[0] for c in spec.choices]
-        if value not in allowed:
-            raise ValueError(f"must be one of {', '.join(allowed)}")
-        return value
-    if not isinstance(value, str):
-        raise ValueError("must be text")
+    allowed = [c[0] for c in spec.choices]
+    if value not in allowed:
+        raise ValueError(f"must be one of {', '.join(allowed)}")
     return value
 
 
@@ -408,13 +377,6 @@ def parse_cli_value(name: str, raw: str) -> Any:
             return float(raw)
         except ValueError:
             raise ConfigError({name: "must be a number"}) from None
-    if spec.kind == "bool":
-        lowered = raw.strip().lower()
-        if lowered in ("1", "true", "yes", "on"):
-            return True
-        if lowered in ("0", "false", "no", "off"):
-            return False
-        raise ConfigError({name: "must be true or false"})
     return raw
 
 
@@ -429,8 +391,6 @@ def validate(cfg: Config) -> dict[str, str]:
                 errors[spec.name] = f"must be at least {_fmt(spec.minimum)} {spec.unit}".strip()
             elif spec.maximum is not None and value > spec.maximum:
                 errors[spec.name] = f"must be at most {_fmt(spec.maximum)} {spec.unit}".strip()
-        if spec.max_length is not None and len(value) > spec.max_length:  # pragma: no cover
-            errors[spec.name] = f"must be at most {spec.max_length} characters"
 
     def add(name: str, msg: str) -> None:
         errors.setdefault(name, msg)

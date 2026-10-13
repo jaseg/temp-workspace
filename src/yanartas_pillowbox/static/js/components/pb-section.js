@@ -3,6 +3,7 @@
 // so this section holds along the whole straight part of the box.
 
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
+import { attachPanZoom, unitsPerPixel } from "../panzoom.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -82,10 +83,7 @@ export class PbSection extends HTMLElement {
   #base = null; // fitted viewBox [x, y, w, h]
   #view = null; // current viewBox
   #zoomed = false; // the user zoomed or panned: keep the view across updates
-  #drag = null;
-  #pinch = null; // two-finger zoom: start distance, midpoint and view
-  #moved = false;
-  #downParam = null;
+  #zoom; // zoom(factor): about the centre
 
   constructor() {
     super();
@@ -103,72 +101,24 @@ export class PbSection extends HTMLElement {
     root.querySelector(".tools").addEventListener("click", (e) => {
       const action = e.target.closest("button")?.dataset.zoom;
       if (action === "fit") this.fit();
-      else if (action) this.#zoomAt(action === "in" ? 1 / 1.4 : 1.4);
+      else if (action && this.#svg) this.#zoom(action === "in" ? 1 / 1.4 : 1.4);
     });
     new ResizeObserver(() => this.#render()).observe(this.#stage);
-    this.#stage.addEventListener("dblclick", () => this.fit());
-    // Clicking a dimension asks the app to focus its parameter. (Pointer capture for panning
-    // retargets the click to the stage, so remember the dimension under the pointer.)
-    this.#stage.addEventListener("click", () => {
-      const param = this.#downParam;
-      if (param && !this.#moved) {
-        this.dispatchEvent(new CustomEvent("pb-dim-click", { bubbles: true, composed: true, detail: { param } }));
-      }
-    });
-    this.#stage.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      this.#zoomAt(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)), e);
-    }, { passive: false });
-    // Pointers on the stage: one pans; two pinch-zoom about their midpoint (and pan with it).
-    const pointers = new Map();
-    const pinchState = () => {
-      const [a, b] = [...pointers.values()];
-      return { dist: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    };
-    const startDrag = (p) => { this.#drag = { x: p.x, y: p.y, view: [...this.#view] }; };
-    this.#stage.addEventListener("pointerdown", (e) => {
-      if (!this.#svg || e.button !== 0) return;
-      this.#stage.setPointerCapture(e.pointerId);
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointers.size === 2) {
-        this.#pinch = { ...pinchState(), view: [...this.#view] };
-        this.#drag = null;
-        this.#moved = true; // a pinch never counts as a click
-        return;
-      }
-      if (pointers.size > 2) return;
-      this.#stage.classList.add("dragging");
-      startDrag(pointers.get(e.pointerId));
-      this.#moved = false;
-      this.#downParam = e.target.closest?.(".dim")?.dataset.param ?? null;
-    });
-    this.#stage.addEventListener("pointermove", (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (this.#pinch && pointers.size >= 2) {
-        const now = pinchState();
-        const start = this.#pinch;
-        if (!now.dist || !start.dist) return;
-        this.#view = [...start.view];
-        this.#zoomAt(start.dist / now.dist, { clientX: start.x, clientY: start.y });
-        this.#panBy(now.x - start.x, now.y - start.y, this.#view);
-        return;
-      }
-      if (!this.#drag) return;
-      if (Math.hypot(e.clientX - this.#drag.x, e.clientY - this.#drag.y) > 3) this.#moved = true;
-      this.#panBy(e.clientX - this.#drag.x, e.clientY - this.#drag.y, this.#drag.view);
-    });
-    const endPointer = (e) => {
-      pointers.delete(e.pointerId);
-      if (pointers.size < 2) this.#pinch = null;
-      if (pointers.size === 1) startDrag([...pointers.values()][0]); // carry on panning
-      if (pointers.size === 0) {
-        this.#drag = null;
-        this.#stage.classList.remove("dragging");
-      }
-    };
-    this.#stage.addEventListener("pointerup", endPointer);
-    this.#stage.addEventListener("pointercancel", endPointer);
+    this.#zoom = attachPanZoom(this.#stage, {
+      view: () => (this.#svg ? this.#view : null),
+      setView: (v) => {
+        const rescaled = Math.abs(v[2] / this.#view[2] - 1) > 1e-9;
+        this.#view = v;
+        this.#zoomed = true;
+        // Panning keeps the scale: only the viewBox moves. Zooming redraws the text.
+        if (rescaled) this.#render();
+        else this.#svg.setAttribute("viewBox", v.join(" "));
+      },
+      minMax: () => [this.#base[2] / 50, this.#base[2] * 10],
+      fit: () => this.fit(),
+      dimClick: (param) => this.dispatchEvent(new CustomEvent("pb-dim-click", {
+        bubbles: true, composed: true, detail: { param } })),
+    }).zoom;
   }
 
   /** Emphasise the dimensions of one parameter (or none). */
@@ -203,37 +153,6 @@ export class PbSection extends HTMLElement {
     this.#render();
   }
 
-  #unitsPerPixel([, , w, h]) {
-    const r = this.#stage.getBoundingClientRect();
-    return r.width && r.height ? Math.max(w / r.width, h / r.height) : w / 400;
-  }
-
-  /** Pan by a screen-pixel offset from a given view. Panning keeps the scale, so only the
-   *  viewBox moves (no redraw). */
-  #panBy(dx, dy, [x, y, w, h]) {
-    const scale = this.#unitsPerPixel([x, y, w, h]);
-    this.#view = [x - dx * scale, y - dy * scale, w, h];
-    this.#zoomed = true;
-    this.#svg.setAttribute("viewBox", this.#view.join(" "));
-  }
-
-  #zoomAt(factor, event) {
-    if (!this.#svg) return;
-    const r = this.#stage.getBoundingClientRect();
-    const [x, y, w, h] = this.#view;
-    const scale = this.#unitsPerPixel(this.#view);
-    // Point under the cursor (or the centre) in user units; keep it fixed while zooming.
-    const px = event ? event.clientX - r.left : r.width / 2;
-    const py = event ? event.clientY - r.top : r.height / 2;
-    const ux = x + w / 2 + (px - r.width / 2) * scale;
-    const uy = y + h / 2 + (py - r.height / 2) * scale;
-    const nw = Math.min(Math.max(w * factor, this.#base[2] / 50), this.#base[2] * 10);
-    const k = nw / w;
-    this.#view = [ux - (ux - x) * k, uy - (uy - y) * k, nw, h * k];
-    this.#zoomed = true;
-    this.#render();
-  }
-
   /** Draw the section scaled to fit (or at the user's zoom), with text at labelPx() screen
    *  pixels. The text's size in drawing units depends on the fit's scale, so the fit is
    *  iterated to a fixed point. */
@@ -245,11 +164,11 @@ export class PbSection extends HTMLElement {
     let box = [bx0, -bz1, bx1 - bx0, bz1 - bz0];
     let svg;
     for (let i = 0; i < 4; i++) {
-      ({ svg, box } = this.#draw(section, dims, payload, px * this.#unitsPerPixel(box)));
+      ({ svg, box } = this.#draw(section, dims, payload, px * unitsPerPixel(this.#stage, box)));
     }
     this.#base = box;
     if (this.#zoomed && this.#view) {
-      ({ svg } = this.#draw(section, dims, payload, px * this.#unitsPerPixel(this.#view)));
+      ({ svg } = this.#draw(section, dims, payload, px * unitsPerPixel(this.#stage, this.#view)));
       box = this.#view;
     }
     this.#view = box;

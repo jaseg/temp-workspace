@@ -115,7 +115,8 @@ export class PbPreview3d extends HTMLElement {
     new ResizeObserver(() => this.#resize()).observe(this.#stage);
   }
 
-  /** model: {parts:[{kind, positions, indices}], lines:[{category, points}], bounds};
+  /** model: {parts:[{name, kind, positions, indices, outline}], lines:[{direction, points}],
+   *  cuts:[[point...]], bounds, interior};
    *  dims: parameter dimensions in the model frame (see dimensions.model_dimensions). */
   update(model, dims = [], payload = null) {
     const inside = model.interior;
@@ -133,13 +134,10 @@ export class PbPreview3d extends HTMLElement {
     group.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
       new THREE.Vector3(0, 0, -1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0)));
     const paper = { panel: 0xeee6d3, flap: 0xd9cdb2, lid: 0xd9cdb2, tab: 0xc9bc9c };
-    // The model is the material's mid-surface: the two flaps of a stacked end lie only a
-    // thickness apart (none at zero thickness), as do the glue tab and the front panel under
-    // it, and the lids and the back panel under them. Depth offsets keep the outer surface on
-    // top (front flaps over back flaps, tab and lids over panels).
-    const depthBias = (part) =>
-      part.kind === "tab" || part.kind === "lid" ? 1
-        : part.name.startsWith("back-") && part.kind === "flap" ? 4 : 2;
+    // The model is the material's mid-surface: the glue tab lies only a thickness from the
+    // front panel under it (none at zero thickness), as do the lids from the back panel.
+    // Depth offsets keep the outer surface on top.
+    const depthBias = (part) => (part.kind === "tab" || part.kind === "lid" ? 1 : 2);
     for (const part of model.parts) {
       // The inner end flaps stand inside the box (behind the end wall gap): drawn through
       // the paper, like the payload.
@@ -172,7 +170,7 @@ export class PbPreview3d extends HTMLElement {
       group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
     }
     // Cut (open) edges: solid, like the export; hidden behind the paper where out of sight.
-    for (const cut of model.cuts ?? []) {
+    for (const cut of model.cuts) {
       const pts = cut.map((p) => new THREE.Vector3(...p));
       group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
     }

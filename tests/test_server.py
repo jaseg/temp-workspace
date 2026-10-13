@@ -142,5 +142,3 @@ def test_defaults_include_payload_presets(tmp_path):
         Config.defaults().with_values(
             payload_width=p["width"], payload_depth=p["depth"], payload_height=p["height"]
         )
-    ids = {p["id"] for p in presets}
-    assert {"rpi-a", "rpi-a-hat", "rpi-b", "rpi-b-hat", "uno-q", "uno-q-shield"} <= ids

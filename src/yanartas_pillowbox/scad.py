@@ -22,19 +22,16 @@ from collections.abc import Callable, Sequence
 
 from yanartas_pillowbox import __version__
 from yanartas_pillowbox.config import Config
+from yanartas_pillowbox.crosssection import curve_samples
 from yanartas_pillowbox.geometry import _interior, lid_layout
 
 Point = tuple[float, float]
 
 
-def _samples(width: float) -> int:
-    return 2 * max(16, min(80, math.ceil(width)))
-
-
 def _offset_curve(mid: Callable[[float], Point], width: float, d: float, ext: float) -> list[Point]:
     """(X, Y) samples, sorted by X, of a plan curve ``mid(u)`` (u in 0..width, Y = f(X))
     offset by ``d`` towards -Y, extended along its end tangents by ``ext``."""
-    n = _samples(width)
+    n = curve_samples(width)
     pts = [mid(width * i / n) for i in range(n + 1)]
     pts.sort()
     out = []
@@ -160,14 +157,14 @@ def end_plan(cfg: Config) -> list[Point]:
 
 def main_section(cfg: Config) -> list[Point]:
     """(X, Z) outline of the main space: the panels' inner surfaces."""
-    return [(x, z) for x, z in _interior(cfg.body, _samples(cfg.body.front.width))]
+    return [(x, z) for x, z in _interior(cfg.body, curve_samples(cfg.body.front.width))]
 
 
 def end_section(cfg: Config) -> list[Point]:
     """(X, Z) outline of an end space: from the lid's inner surface up to the front panel's
     inner surface, across the widened end section."""
     x0, x1 = _end_span(cfg)
-    n = _samples(x1 - x0)
+    n = curve_samples(x1 - x0)
     xs = [x0 + (x1 - x0) * i / n for i in range(n + 1)]
     return [
         *((x, _lid_inner(cfg, x)) for x in xs),

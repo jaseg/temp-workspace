@@ -19,10 +19,14 @@ the browser only display what Python computes.
 
 ```
 config ──► crosssection ──► geometry ──► svg ──► (download / CLI output)
-  │             │              │  └──────► dimensions ┐
-  │             │              └─────────► payload ───┤
-  └── persistence                                     ▼
-                         server (Flask, /api/*) ──► static/js (UI components)
+  │             │              │  ├──────► scad ───────┐
+  │             │              │  └──────► dimensions ─┤
+  │             │              └─────────► payload ────┤
+  └── persistence                                      ▼
+                                                      api ──► server (Flask, /api/*)
+                                                       │  └─► artifact/pb_api (Pyodide)
+                                                       ▼
+                                        static/js (UI components)
 ```
 
 | Module | Role |
@@ -33,8 +37,10 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | `svg.py` | Serializes a `Pattern` to SVG (layers, dash styles, labels, embedded config) and reads the config back (`extract_config`). |
 | `dimensions.py` | Preview-only dimension annotations for all three views, measured on the same geometry. |
 | `payload.py` | Payload clearance, per-field maximize, and *Fit box to payload*. |
+| `scad.py` | OpenSCAD model of the interior: the payload space and the end spaces. |
 | `presets.py` | Board sizes for the payload dropdown. |
-| `server.py` | Flask app bound to 127.0.0.1. `/api/render` returns SVG, model, section, info, dimensions and payload summary in one response; it also serves `/api/payload`, `/api/import`, `/api/config` and `/api/defaults`. |
+| `api.py` | The JSON API apart from its transport: request config parsing (`ApiError` carries the status and body of a refusal), `render` (SVG, model, section, info, dimensions and payload summary in one response), the payload actions and the defaults. The Flask server and the in-browser build (`artifact/pb_api.py`) both route to it. |
+| `server.py` | Flask app bound to 127.0.0.1, serving the UI and `/api/*`. |
 | `persistence.py`, `cli.py` | Settings file (`./yanartas-pillowbox.json`), and the `serve` / `generate` commands. |
 
 **Frontend** (`static/`): plain ES modules and custom elements, with no build step.
@@ -45,6 +51,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 - `pb-preview2d` shows the SVG with pan and zoom.
 - `pb-preview3d` uses vendored three.js r160.
 - `pb-section` draws the cross-section.
+- `panzoom.js` is the 2D views' shared wheel, drag and pinch handling.
 - `dims2d.js` draws 2D dimensions at a constant on-screen text size.
 
 The browser never computes geometry: an edit posts the config, and the views redraw from
@@ -55,7 +62,7 @@ One render touches the same body many times, so this keeps a render under about 
 
 ## 3. Test suite architecture
 
-`pytest` with about 390 tests, run in parallel with pytest-xdist (about 10 s), plus
+`pytest` with about 490 tests, run in parallel with pytest-xdist (about 10 s), plus
 `ruff` for linting. `tests/conftest.py` overrides
 `Config.defaults()` to 0.4 mm material, which most expected values assume; the UI default
 is 0.2 mm. `tests/helpers.py` parses SVG paths back into `Line`/`Arc` segments and has
@@ -72,7 +79,9 @@ outputs.
 | `test_svg.py` | SVG conventions (layers, dashes, a single closed cut path, attributes only), round-trip of the embedded config, parsed paths reproducing the geometry, labels. |
 | `test_dimensions.py` | Every dimension measures its parameter and its points lie on, or a stated allowance off, the exported geometry. |
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
+| `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
+| `test_artifact_api.py` | The in-browser API answers every route like the Flask server. |
 
 Configs are parametrized across representative shapes (default, steepest arc, shallow,
 thick material, very large, zero thickness), so invariants are tested away from the

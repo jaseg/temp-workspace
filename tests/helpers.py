@@ -87,11 +87,20 @@ def q(tag: str) -> str:
     return f"{{{SVG_NS}}}{tag}"
 
 
-def polyline(segs: list[Segment], steps: int = 48) -> list[tuple[float, float]]:
+def polyline(segs, steps: int = 48) -> list[tuple[float, float]]:
+    """The segments' points, arcs sampled with ``steps`` chords."""
     pts = [segs[0].start]
     for s in segs:
-        pts.extend(s.sample(steps)[1:])
+        n = steps if isinstance(s, Arc) else 1
+        pts.extend(s.point_at(i / n) for i in range(1, n + 1))
     return pts
+
+
+def is_closed_loop(segs, tol: float = 1e-12) -> bool:
+    """Each segment starts where the previous one ends, the last where the first starts."""
+    return all(
+        math.dist(a.end, b.start) <= tol for a, b in zip(segs, (*segs[1:], segs[0]), strict=True)
+    )
 
 
 def segments_intersect(a, b, c, d, eps: float = 1e-9) -> bool:
