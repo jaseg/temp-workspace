@@ -47,7 +47,15 @@ def test_outline_is_one_closed_path(cfg):
     root = svg_elements(render_svg(cfg))
     cut_layer = root.find(f"{q('g')}[@id='cut']")
     paths = cut_layer.findall(q("path"))
-    assert len(paths) == 1
+    # The outline, plus with widened ends one open slit at each (a wing's end on the inner
+    # flap's cut edge), each cut once.
+    pattern = build_pattern(cfg)
+    assert len(paths) == 1 + len(pattern.slits)
+    assert len(pattern.slits) == (0 if cfg.end_wall_gap == 0 else 2)
+    for path in paths[1:]:
+        cmds, segs = parse_path(path.get("d"))
+        assert cmds.count("M") == 1 and "Z" not in cmds
+        assert math.dist(segs[0].start, segs[-1].end) > 0.1
     d = paths[0].get("d")
     cmds, segs = parse_path(d)
     assert cmds.count("M") == 1 and cmds[0] == "M"

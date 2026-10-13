@@ -172,7 +172,9 @@ planes by `e` accordingly; everything stays an exact isometric folding.
 - **Widened ends.** The two folds meet where `f(x) = level / 2`: over the gap, the front
   panel's fold arc and cross-section run on past both edges (`CrossSection.x_ext/z_ext`,
   the arc continued, valid below 45°) by `spread` on each side. In the pattern these are
-  the front panel's wings, with their own curved folds continuing the panel's. The outer
+  the front panel's wings, with their own curved folds continuing the panel's. At the
+  straight fold the wing's end is the inner flap's cut edge itself: that stretch is a slit
+  (`Pattern.slits`, a cut with material on both sides), written as its own open path. The outer
   flap is a lens between the continued front fold and the lid's fold. `max_lid_offset`
   limits the offset so the continued arc turns at most `MAX_SPREAD_SLOPE`.
 - **Views.** The 3D and section views show the model turned half a turn about its length,
@@ -210,6 +212,6 @@ inner flap's free edge.
 - **Dimensions.** They are computed in Python with measured points on the real geometry,
   or at a documented allowance off it for interior measures. They are drawn as overlays at
   the UI's text size and never exported.
-- **SVG.** The output has one closed cut path. Folds are grouped into
+- **SVG.** The output has one closed cut path (plus the slits, open). Folds are grouped into
   mountain and valley layers, every line is black at 0.1 mm, and labels go in their own
   layer. The full config is embedded as JSON in `<metadata>` for re-import.

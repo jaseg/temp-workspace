@@ -230,8 +230,9 @@ rather than the stacked `))___((`.
   on past both side folds, along its own fold arc continued, until it meets the lid's
   fold. The outer flap closes to a point there again, and nothing needs an extra crease.
   In the pattern the front panel grows two small **wings** over each gap, and its curved
-  fold continues across them. At the straight fold the wing stops a little short of the
-  inner flap's cut edge. Because the outer walls follow the continued arc, they reach
+  fold continues across them. At the straight fold the wing ends on the inner flap's cut
+  edge: a single cut separates the two. In the SVG that shared stretch is a short open
+  **slit** path in the cut layer, next to the closed outline, so it is cut once. Because the outer walls follow the continued arc, they reach
   slightly past the front panel's ends at the sides, so the box is a few millimetres
   longer overall. *Derived geometry* shows how much wider and taller the ends are.
 * The continued arc must turn less than 45°, which limits the lid offset. Steep boxes and

@@ -300,6 +300,9 @@ class Pattern:
     faces: tuple[Face, ...]  # faces of the folded 3D model
     bbox: BBox
     info: dict[str, float]
+    # Cuts inside the outline (open chains with material on both sides): where the front
+    # panel's wing ends on the inner flap's cut edge.
+    slits: tuple[tuple[Segment, ...], ...] = ()
 
     def fold(self, name: str) -> Fold:
         return next(f for f in self.folds if f.name == name)
@@ -511,15 +514,44 @@ def lid_layout(cfg: Config) -> LidLayout | None:
     return LidLayout(level, spread, depth, t == 0 and spread == 0)
 
 
-BAND_CLEARANCE = 0.25  # mm between the widened front panel and the inner flap's cut edge
+@dataclass(frozen=True)
+class _End:
+    """One end of the pattern (top-end coordinates): the outline from the front panel's free
+    edge round to the glue fold, its faces and folds, the inner flap's cut edge (whole), the
+    slit (the part of that edge the wing shares) and the wing's seam with the panel."""
+
+    chain: tuple[Segment, ...]
+    faces: tuple[Face, ...]
+    folds: tuple[Fold, ...]
+    back_cut: tuple[Segment, ...]
+    slit: tuple[Segment, ...]
+    seam_r: tuple[Segment, ...]
 
 
-def _cut_height(cuts: Sequence[Point], u: float) -> float:
-    """A cut edge's (u, offset) samples, interpolated at u."""
-    for (u0, c0), (u1, c1) in itertools.pairwise(cuts):
-        if u0 <= u <= u1:
-            return c0 if u1 == u0 else c0 + (c1 - c0) * (u - u0) / (u1 - u0)
-    return cuts[-1][1]
+def _split_at_x(
+    chain: Sequence[Segment], x: float
+) -> tuple[tuple[Segment, ...], tuple[Segment, ...]]:
+    """An x-monotone chain (left to right) split at ``x``; both parts share the exact point."""
+    for i, seg in enumerate(chain):
+        if not seg.start[0] <= x <= seg.end[0]:
+            continue
+        if x == seg.end[0]:
+            return tuple(chain[: i + 1]), tuple(chain[i + 1 :])
+        if isinstance(seg, Line):
+            k = (x - seg.start[0]) / (seg.end[0] - seg.start[0])
+            q = (x, seg.start[1] + (seg.end[1] - seg.start[1]) * k)
+            first, second = Line(seg.start, q), Line(q, seg.end)
+        else:
+            q = (x, y_on_chain((seg,), x))
+            k = seg.param_of_angle(_angle(seg.center, q))
+            assert k is not None
+            first = replace(seg.sub(0.0, k), start=seg.start, end=q)
+            second = replace(seg.sub(k, 1.0), start=q, end=seg.end)
+        parts = ((*chain[:i], first), (second, *chain[i + 1 :]))
+        return tuple(s for s in parts[0] if s.length > 1e-12), tuple(
+            s for s in parts[1] if s.length > 1e-12
+        )
+    raise ValueError(f"x = {x} outside the chain")
 
 
 def overall_length(cfg: Config) -> float:
@@ -586,49 +618,51 @@ def build_pattern(cfg: Config) -> Pattern:
         return _cut_chain(wf, e, cuts, up=True)
 
     f_ft = arc_from_chord(p["tl"], p["tf"], sf, down)
-    # The front panel's top end: the cut from its free edge's corner around the outer flap
-    # (and lid) to the corner at the straight fold, and its faces and folds.
-    if lid is None:
-        # The outer flap reaches past the corners where the back panel runs on (glued
-        # edge) or bends around the outside (straight fold): short cut steps there.
-        c_left, c_right = front_cuts[0][1], front_cuts[-1][1]
-        free_top = _lines((p["tl"], (0.0, -c_left)))
-        cut_ft = _cut_chain(0.0, 0.0, front_cuts, up=True)
-        step_t = _lines(((wf, -c_right), p["tf"]))
-        top_chain = (*free_top, *cut_ft, *step_t)
-        top_faces = (
-            Face("front-top-flap", "flap", (*top_chain, f_ft.reversed()), 0.0, wf, cut_ft, (f_ft,)),
-        )
-        top_folds: tuple[Fold, ...] = ()
-    else:
+
+    def end(fpc: bool) -> _End:
+        """One end of the pattern, in top-end coordinates (the bottom end is mirrored)."""
+        back_cut = back_end(fpc)
+        if lid is None:
+            # The outer flap reaches past the corners where the back panel runs on (glued
+            # edge) or bends around the outside (straight fold): short cut steps there.
+            c_left, c_right = front_cuts[0][1], front_cuts[-1][1]
+            free_top = _lines((p["tl"], (0.0, -c_left)))
+            cut_ft = _cut_chain(0.0, 0.0, front_cuts, up=True)
+            step_t = _lines(((wf, -c_right), p["tf"]))
+            chain = (*free_top, *cut_ft, *step_t)
+            flap = Face(
+                "front-top-flap", "flap", (*chain, f_ft.reversed()), 0.0, wf, cut_ft, (f_ft,)
+            )
+            return _End((*chain, *back_cut), (flap,), (), back_cut, (), ())
         # The end section: the front panel's fold arc (and cross-section) runs on by
         # ``spread`` past both of its edges (the wings, over the gap only), to where it meets
         # the lid's fold, mirrored about ``y = -drop``: the outer flap is a lens again. At
-        # the straight fold the wing stops short of the inner flap's cut edge, which leaves
-        # the chord there.
+        # the straight fold the wing's end is the inner flap's cut edge: one cut (a slit,
+        # with material on both sides) separates the two.
         dd, sp = lid.drop, lid.spread
-        full = arc_from_chord((-sp, -dd), (wf + sp, -dd), sf + dd, down)
         crease = arc_from_chord((-sp, -dd), (wf + sp, -dd), sf + dd, up)
         lid_edge = lid.edge(sf)
         lid_l, lid_r = Line((-sp, -dd), lid_edge[0].start), Line(lid_edge[-1].end, (wf + sp, -dd))
-        trim = 0.0
-        if sp > 0:
-            covered = [c for u, c in back_cuts if u <= sp]
-            trim = max([*covered, _cut_height(back_cuts, sp)]) + BAND_CLEARANCE
-        corner = (wf, e - trim)
-        if sp > 0:
+        if sp == 0:  # zero thickness, no offset: the lid's fold runs through the corners
+            chain = (*_lines(((0.0, e), p["tl"])), lid_l, *lid_edge, lid_r)
+            chain = (*chain, *_lines((p["tf"], p["tm"])), *back_cut)
+            wings: tuple[Face, ...] = ()
+            arcs: tuple[Segment, ...] = (f_ft,)
+            wing_folds: tuple[Fold, ...] = ()
+            slit: tuple[Segment, ...] = ()
+        else:
+            full = arc_from_chord((-sp, -dd), (wf + sp, -dd), sf + dd, down)
             t0 = full.param_of_angle(_angle(full.center, p["tl"]))
             t1 = full.param_of_angle(_angle(full.center, p["tf"]))
             assert t0 is not None and t1 is not None
             f_left = replace(full.sub(0.0, t0), start=full.start, end=p["tl"])
             f_right = replace(full.sub(t1, 1.0), start=p["tf"], end=full.end)
+            slit, rest = _split_at_x(back_cut, wf + sp)
+            meet = slit[-1].end
             wing_bl, wing_l = Line((0.0, e), (-sp, e)), Line((-sp, e), (-sp, -dd))
-            wing_r, wing_br = (
-                Line((wf + sp, -dd), (wf + sp, e - trim)),
-                Line((wf + sp, e - trim), corner),
-            )
-            seam_l, seam_r = Line(p["tl"], (0.0, e)), Line(corner, p["tf"])
-            top_chain = (wing_bl, wing_l, lid_l, *lid_edge, lid_r, wing_r, wing_br)
+            wing_r = Line((wf + sp, -dd), meet)
+            seam_l, seam_r = Line(p["tl"], (0.0, e)), Line(p["tm"], p["tf"])
+            chain = (wing_bl, wing_l, lid_l, *lid_edge, lid_r, wing_r, *rest)
             wings = (
                 Face(
                     "front-top-left",
@@ -642,38 +676,21 @@ def build_pattern(cfg: Config) -> Pattern:
                 Face(
                     "front-top-right",
                     "panel",
-                    (f_right, wing_r, wing_br, seam_r),
+                    (f_right, wing_r, *rev(slit), seam_r),
                     wf,
                     wf + sp,
                     (f_right,),
-                    (wing_br.reversed(),),
+                    slit,
                 ),
             )
-            arcs: tuple[Segment, ...] = (f_left, f_ft, f_right)
+            arcs = (f_left, f_ft, f_right)
             wing_folds = (
                 Fold("front-top-left", FoldCategory.CURVED, f_left),
                 Fold("front-top-right", FoldCategory.CURVED, f_right),
             )
-        else:  # zero thickness, no offset: the lid's fold runs through the panel's corners
-            top_chain = (
-                *_lines(((0.0, e), p["tl"])),
-                lid_l,
-                *lid_edge,
-                lid_r,
-                *_lines((p["tf"], p["tm"])),
-            )
-            wings, arcs, wing_folds = (), (f_ft,), ()
-        top_faces = (
+        faces = (
             *wings,
-            Face(
-                "front-top-flap",
-                "flap",
-                (crease, *rev(arcs)),
-                -sp,
-                wf + sp,
-                (crease,),
-                arcs,
-            ),
+            Face("front-top-flap", "flap", (crease, *rev(arcs)), -sp, wf + sp, (crease,), arcs),
             Face(
                 "front-top-lid",
                 "lid",
@@ -684,16 +701,17 @@ def build_pattern(cfg: Config) -> Pattern:
                 (crease,),
             ),
         )
-        top_folds = (*wing_folds, Fold("lid-top", FoldCategory.LID, crease))
-        notch = _lines((corner, p["tm"]))
-        top_chain = (*top_chain, *notch)
+        folds = (*wing_folds, Fold("lid-top", FoldCategory.LID, crease))
+        if sp > 0:  # the inner flap's edge as the outline and the slit have it, split
+            back_cut = (*slit, *rest)
+        return _End(chain, faces, folds, back_cut, slit, (seam_r,) if sp > 0 else ())
 
-    cut_bt = back_end(cfg.fpc_cutout in ("front", "both"))
+    top = end(cfg.fpc_cutout in ("front", "both"))
+    bottom = end(cfg.fpc_cutout in ("back", "both"))
     tab = (Line(p["tr"], p["gt"]), Line(p["gt"], p["gb"]), Line(p["gb"], p["br"]))
-    edge_bb = mirror(back_end(cfg.fpc_cutout in ("back", "both")))
-    cut_bb = rev(edge_bb)
     free_edge = Line((0.0, length - e), (0.0, e))
-    outline = Outline((*top_chain, *cut_bt, *tab, *cut_bb, *rev(mirror(top_chain)), free_edge))
+    outline = Outline((*top.chain, *tab, *rev(mirror(bottom.chain)), free_edge))
+    slits = tuple(c for c in (top.slit, mirror(bottom.slit)) if c)
 
     folds = (
         Fold("front-top", FoldCategory.CURVED, f_ft),
@@ -702,30 +720,41 @@ def build_pattern(cfg: Config) -> Pattern:
         Fold("back-bottom", FoldCategory.CURVED, arc_from_chord(p["bm"], p["br"], sb, up)),
         Fold("panels", FoldCategory.STRAIGHT, Line(p["tm"], p["bm"])),
         Fold("glue-tab", FoldCategory.GLUE, Line(p["tr"], p["br"])),
-        *top_folds,
+        *top.folds,
         *(
             Fold(f.name.replace("-top", "-bottom"), f.category, _mirror(f.segment, length))
-            for f in top_folds
+            for f in bottom.folds
         ),
     )
 
     _, f_bt, f_fb, f_bb, f_mid, f_glue = (f.segment for f in folds[:6])
-    # The front panel, fold to fold; with an end wall gap its edges over the gaps adjoin the
-    # wings (seams: neither cut nor fold, the wings are the same surface continued) and the
-    # notch by the inner flap.
-    if lid is None or lid.spread == 0:
-        side_t = _lines((p["tf"], p["tm"]))
-        left_t: tuple[Segment, ...] = _lines((p["tl"], (0.0, e)))
-    else:
-        side_t = (Line(p["tf"], corner), *notch)
-        left_t = (Line(p["tl"], (0.0, e)),)
-    side_b, left_b = rev(mirror(side_t)), rev(mirror(left_t))
+    # The front panel, fold to fold; with an end wall gap its edges over the gaps are cut, or
+    # adjoin the wings (seams: neither cut nor fold, the wings are the same surface).
+    side_t = top.seam_r[0].reversed() if top.seam_r else None
+    side_t_chain = (side_t,) if side_t else _lines((p["tf"], p["tm"]))
+    side_b = (
+        rev(mirror((bottom.seam_r[0].reversed(),)))
+        if bottom.seam_r
+        else rev(mirror(_lines((p["tf"], p["tm"]))))
+    )
+    left_t: tuple[Segment, ...] = _lines((p["tl"], (0.0, e)))
+    left_b = rev(mirror(left_t))
+    cut_bb = rev(mirror(bottom.back_cut))
 
     faces = (
         Face(
             "front-panel",
             "panel",
-            (f_ft, *side_t, f_mid, *side_b, f_fb.reversed(), *rev(left_b), free_edge, *rev(left_t)),
+            (
+                f_ft,
+                *side_t_chain,
+                f_mid,
+                *side_b,
+                f_fb.reversed(),
+                *rev(left_b),
+                free_edge,
+                *rev(left_t),
+            ),
             0.0,
             wf,
             (f_ft,),
@@ -741,10 +770,12 @@ def build_pattern(cfg: Config) -> Pattern:
             (f_bb,),
         ),
         Face("glue-tab", "tab", (*tab, f_glue.reversed()), w2, w2 + g, tab[:1], tab[2:]),
-        *top_faces,
-        *(_mirror_face(f, length, f.name.replace("-top-", "-bottom-")) for f in top_faces),
-        Face("back-top-flap", "flap", (*cut_bt, f_bt.reversed()), wf, w2, cut_bt, (f_bt,)),
-        Face("back-bottom-flap", "flap", (*cut_bb, f_bb), wf, w2, (f_bb,), edge_bb),
+        *top.faces,
+        *(_mirror_face(f, length, f.name.replace("-top-", "-bottom-")) for f in bottom.faces),
+        Face(
+            "back-top-flap", "flap", (*top.back_cut, f_bt.reversed()), wf, w2, top.back_cut, (f_bt,)
+        ),
+        Face("back-bottom-flap", "flap", (*cut_bb, f_bb), wf, w2, (f_bb,), rev(cut_bb)),
     )
     bbox = union_bbox([outline.bbox(), *(f.segment.bbox() for f in folds)])
 
@@ -781,7 +812,7 @@ def build_pattern(cfg: Config) -> Pattern:
         )
         info["end_height_increase"] = -lid.level - body.thickness
     folds = tuple(replace(f, direction=fold_direction(cfg, f.segment, faces)) for f in folds)
-    return Pattern(outline, folds, faces, bbox, info)
+    return Pattern(outline, folds, faces, bbox, info, slits)
 
 
 def _face_at(faces: Sequence[Face], p: Point) -> Face:

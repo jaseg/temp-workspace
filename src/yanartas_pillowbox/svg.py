@@ -156,6 +156,18 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
             **stroke_attrs(dash),
         },
     )
+    # Slits: cuts inside the outline (the wings' ends on the inner flaps' edges), one open
+    # path each, so every cut is made once.
+    for i, slit in enumerate(pattern.slits):
+        ET.SubElement(
+            g,
+            f"{{{SVG_NS}}}path",
+            {
+                "id": f"cut-slit-{i + 1}",
+                "d": path_data(slit, offset, close=False),
+                **stroke_attrs(dash),
+            },
+        )
 
     for direction in FoldDirection:
         folds = [f for f in pattern.folds if f.direction == direction]

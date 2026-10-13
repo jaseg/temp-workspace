@@ -141,13 +141,22 @@ def test_end_sections_widen_the_front_panel(cfg):
         wing = pat.face(name)
         lo, hi = wing.y_range(x)
         assert pat.outline.distance_to((x, lo)) > 1e-3  # the fold
-        assert pat.outline.distance_to((x, hi)) < 1e-9  # cut, at the gap's end
+        # Cut at the gap's end: on the outline, or (right wing) the slit by the inner flap.
+        cuts = [*pat.outline.segments, *(seg for slit in pat.slits for seg in slit)]
+        assert min(seg.distance_to((x, hi)) for seg in cuts) < 1e-9
         assert hi == pytest.approx(e) or name.endswith("right")
-    # Clear of the inner flap: its cut edge stays above the right wing's cut.
+    # At the straight fold the wing ends on the inner flap's cut edge: one cut (a slit,
+    # inside the outline) separates them, from the back panel's corner to the wing's side.
     flap, wing = pat.face("back-top-flap"), pat.face("front-top-right")
     for i in range(1, 50):
         x = wf + sp * i / 50
-        assert flap.y_range(x)[0] > wing.y_range(x)[1] + 0.2
+        assert flap.y_range(x)[0] == pytest.approx(wing.y_range(x)[1], abs=1e-9)
+    slit = pat.slits[0]
+    assert slit[0].start == (wf, e) and slit[-1].end[0] == pytest.approx(wf + sp)
+    assert pat.outline.distance_to(slit[-1].end) < 1e-9  # joins the outline at the wing's side
+    assert pat.outline.distance_to(slit[0].start) > 1e-3  # and ends inside, at the corner
+    bottom = pat.slits[1]
+    assert bottom[0].start == pytest.approx((wf, length - e))
 
 
 def test_outline_is_single_closed_contour(cfg):

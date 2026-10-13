@@ -108,10 +108,14 @@ def test_faces_tile_the_pattern(case):
         loop = face.boundary
         for a, b in zip(loop, (*loop[1:], loop[0]), strict=True):
             assert math.dist(a.end, b.start) < 1e-9, face.name
-    # Every cut segment bounds exactly one face, every fold exactly two.
+    # Every cut segment bounds exactly one face (two along a slit), every fold exactly two.
     for seg in pattern.outline.segments:
         owners = [f.name for f in faces if any(same_segment(seg, s) for s in f.boundary)]
         assert len(owners) == 1, (seg, owners)
+    for slit in pattern.slits:
+        for seg in slit:
+            owners = [f.name for f in faces if any(same_segment(seg, s) for s in f.boundary)]
+            assert len(owners) == 2, (seg, owners)
     for fold in pattern.folds:
         owners = [f.name for f in faces if any(same_segment(fold.segment, s) for s in f.boundary)]
         assert len(owners) == 2, (fold.name, owners)
