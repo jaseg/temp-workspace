@@ -23,7 +23,7 @@ INK_LABEL = f"{{{INKSCAPE_NS}}}label"
 CONFIGS = [
     Config.defaults(),
     Config.defaults().with_values(print_side="inside", glue_tab_taper=0),
-    Config.defaults().with_values(height=12, glue_tab_width=20),
+    Config.defaults().with_values(height=12, glue_tab_width=20, end_wall_gap=0),
     Config.defaults().with_values(
         width=33.3,
         length=77.7,
@@ -157,13 +157,11 @@ def test_fold_paths_are_open_and_single(cfg):
     root = svg_elements(render_svg(cfg))
     els = list(fold_elements(root))
     pattern = build_pattern(cfg)
-    assert len(els) == len(pattern.all_folds)
-    assert len(pattern.wall_folds) == (4 if cfg.interior_walls else 0)  # two per end
+    assert len(els) == len(pattern.folds) == 6
     for el in els:
         cmds, segs = parse_path(el.get("d"))
         assert cmds.count("M") == 1 and "Z" not in cmds
-        # Body folds are one line or arc; the bridge folds one polyline each.
-        assert len(segs) == 1 or el.get("id").startswith(("fold-top-", "fold-bottom-"))
+        assert len(segs) == 1  # one line or arc
 
 
 def _near_bbox(seg, p, tol):
@@ -178,11 +176,9 @@ def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
         _, segs = parse_path(el.get("d"))
         for p in (segs[0].start, segs[-1].end):
             assert min(s.distance_to(p) for s in outline) < 1e-5
-        # (bridge folds are polylines of many short pieces: a few points on each suffice)
-        steps = 40 if len(segs) == 1 else 2
         for seg in segs:
-            for i in range(1, steps):
-                p = seg.point_at(i / steps)
+            for i in range(1, 40):
+                p = seg.point_at(i / 40)
                 near = [s for s in outline if _near_bbox(s, p, 1e-3)]
                 assert min((s.distance_to(p) for s in near), default=1.0) > 1e-3
 
@@ -229,8 +225,8 @@ def _with_meta(text: str) -> str:
 
 
 def test_import_incompatible_version():
-    with pytest.raises(SvgImportError, match="schema version 6"):
-        extract_config(_with_meta(json.dumps({"version": 6, "width": 50})))
+    with pytest.raises(SvgImportError, match="schema version 5"):
+        extract_config(_with_meta(json.dumps({"version": 5, "width": 50})))
     with pytest.raises(SvgImportError, match="no schema version"):
         extract_config(_with_meta(json.dumps({"width": 50})))
 
@@ -258,16 +254,14 @@ def test_print_inside_only_flips_fold_indicators():
     assert extract_config(render_svg(ins_cfg)) == ins_cfg
 
 
-@pytest.mark.parametrize("walls", [False, True])
-def test_face_labels(walls):
+@pytest.mark.parametrize("gap", [0, 10])
+def test_face_labels(gap):
     """A text layer says on the back panel which side of the box the print side ends up on,
     marks the front and back end once each on the front panel (near its curved folds), and
-    tells on every oval panel which way its print side faces: outside for the flaps, inside
-    for the interior walls (flipped when printing on the inside). Text is filled, not
-    stroked, and sits inside its face."""
+    tells on every oval panel which way its print side faces: outside (flipped when printing
+    on the inside). Text is filled, not stroked, and sits inside its face."""
     for side in ("outside", "inside"):
-        other = "inside" if side == "outside" else "outside"
-        cfg = Config.defaults().with_values(print_side=side, interior_walls=walls)
+        cfg = Config.defaults().with_values(print_side=side, end_wall_gap=gap)
         pattern = build_pattern(cfg)
         root = svg_elements(render_svg(cfg, pattern))
         layer = root.find(f"{q('g')}[@id='labels']")
@@ -275,11 +269,11 @@ def test_face_labels(walls):
         texts = [el.text for el in layer.iter(q("text"))]
         assert texts.count("front end") == texts.count("back end") == 1
         assert texts.count(side) == 1 + 4  # back panel and the four flaps
-        assert texts.count(other) == (2 if walls else 0)  # the interior walls
+        assert len(texts) == 2 + 1 + 4
         for el in layer.iter(q("text")):
             assert el.get("fill") == "#000000" and el.get("stroke") == "none"
             assert 0 < float(el.get("font-size")) <= 3
-        faces = {f.name: f for f in (*pattern.faces, *pattern.wall_faces)}
+        faces = {f.name: f for f in pattern.faces}
         for text, (x, y), _ in face_labels(cfg, pattern):
             inside = [
                 n
@@ -293,8 +287,6 @@ def test_face_labels(walls):
                 top, bottom = faces[name].y_range(x)
                 assert min(y - top, bottom - y) < 10  # near the curved fold
                 assert (y - top < bottom - y) == (text == "front end")
-            elif name.endswith("wall"):
-                assert text == other
             else:
                 assert text == side and name in ("back-panel", *(n for n in faces if "flap" in n))
             if name != "front-panel":  # centred on its face

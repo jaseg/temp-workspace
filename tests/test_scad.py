@@ -9,13 +9,14 @@ from helpers import self_intersections
 
 from yanartas_pillowbox import payload
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import _interior, wall_layout
+from yanartas_pillowbox.geometry import _interior
 from yanartas_pillowbox.scad import render_scad
 
 D = Config.defaults()
 CONFIGS = {
     "default": D,
-    "no-walls": D.with_values(interior_walls=False),
+    "stacked": D.with_values(end_wall_gap=0),
+    "wide-gap": D.with_values(end_wall_gap=30, length=70, payload_depth=50),
     "thick": D.with_values(thickness=1.5, width=60, height=24),
     "fpc": D.with_values(fpc_cutout="both"),
 }
@@ -55,7 +56,7 @@ def y_bounds(poly, x):
 def test_source_structure(cfg):
     src = render_scad(cfg)
     polys = polygons(src)
-    walls = cfg.interior_walls
+    walls = cfg.end_wall_gap > 0
     expected = {"main_section", "main_plan"} | ({"end_section", "end_plan"} if walls else set())
     assert set(polys) == expected
     for poly in polys.values():
@@ -72,8 +73,7 @@ CHORD = 0.01
 
 
 def test_main_space_is_the_interior(cfg):
-    """Section: the panels' inner surfaces. Plan, in the middle: the interior length, less
-    the interior walls' offset and thickness at each end."""
+    """Section: the panels' inner surfaces. Plan, in the middle: the interior length."""
     polys = polygons(render_scad(cfg))
     section = polys["main_section"]
     exact = _interior(cfg.body, 1)
@@ -81,33 +81,40 @@ def test_main_space_is_the_interior(cfg):
     assert max(x for x, _ in section) == pytest.approx(max(x for x, _ in exact), abs=1e-4)
     assert y_bounds(section, 0) == pytest.approx([-cfg.height / 2, cfg.height / 2], abs=CHORD)
     half = cfg.length / 2
-    if cfg.interior_walls:
-        half -= cfg.interior_wall_offset + cfg.thickness
     assert y_bounds(polys["main_plan"], 0) == pytest.approx([-half, half], abs=CHORD)
 
 
-def test_end_space_lies_between_flap_and_interior_wall(cfg):
-    if not cfg.interior_walls:
-        pytest.skip("no interior walls")
+def test_end_space_lies_between_the_end_walls(cfg):
+    """In plan, between the inner wall's outer surface and the outer wall's inner surface:
+    the gap along the box in the middle, a thickness beyond the main space everywhere. In
+    section, from the back panel's outer surface (where the outer wall ends) up to the front
+    panel's inner surface, across the box between where those two meet."""
+    if cfg.end_wall_gap == 0:
+        pytest.skip("walls stacked: no end space")
     polys = polygons(render_scad(cfg))
-    t, half = cfg.thickness, cfg.length / 2
-    # In the middle: the offset (the clear gap) along the box, under the bridge across it.
-    assert y_bounds(polys["end_plan"], 0) == pytest.approx(
-        [half - cfg.interior_wall_offset, half], abs=CHORD
-    )
+    t, half, e = cfg.thickness, cfg.length / 2, cfg.end_wall_gap
+    end, main = polys["end_plan"], polys["main_plan"]
+    assert y_bounds(end, 0) == pytest.approx([half + t, half + t + e], abs=CHORD)
     assert y_bounds(polys["end_section"], 0) == pytest.approx(
-        [-cfg.height / 2, cfg.height / 2 - t], abs=CHORD
+        [-cfg.height / 2 - t, cfg.height / 2], abs=CHORD
     )
-    # Across the walls' span, the interior wall's thickness separates it from the main space
-    # (measured along Y: t / cos of the wall's angle).
-    layout = wall_layout(cfg)
-    xs = sorted(cfg.body.back_point(u)[0] for u in (layout.ua, layout.ub))
-    for i in range(1, 20):
-        x, e = xs[0] + (xs[1] - xs[0]) * i / 20, 1e-3
-        end = polys["end_plan"]
-        k = (y_bounds(end, x + e)[0] - y_bounds(end, x - e)[0]) / (2 * e)
-        gap = y_bounds(end, x)[0] - y_bounds(polys["main_plan"], x)[-1]
-        assert gap == pytest.approx(t * math.hypot(1, k), rel=0.02), x
+    body = cfg.body
+    xs = sorted(x for x, _ in polys["end_section"])
+    for x in (xs[0], xs[-1]):  # the section's ends: front inner meets back outer surface
+        front = body.surface_z("front", -t / 2, x)  # (x is written to 1e-4 mm)
+        assert front == pytest.approx(body.surface_z("back", t / 2, x), abs=1e-3)
+    # Across the box, the inner wall's thickness separates the end space from the main space
+    # (measured along Y: t / cos of the wall's angle; away from the tight corners, where this
+    # first-order estimate no longer holds for thick material).
+    lo, hi = body.inner_glue[0], body.inner_fold[0]
+    for i in range(2, 19):
+        x, d = lo + (hi - lo) * i / 20, 1e-3
+        k = (y_bounds(end, x + d)[0] - y_bounds(end, x - d)[0]) / (2 * d)
+        gap = y_bounds(end, x)[0] - y_bounds(main, x)[-1]
+        assert gap == pytest.approx(t * math.hypot(1, k), rel=0.02, abs=1e-4), x
+        # ... and the space is at least the gap long (the outer wall curves away from it).
+        top, bottom = y_bounds(end, x)[0], y_bounds(end, x)[-1]
+        assert bottom - top >= e - 1e-3 - t
 
 
 def test_payload_fits_in_main_space(cfg):

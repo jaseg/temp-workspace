@@ -29,7 +29,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 |---|---|
 | `config.py` | `Config`, a frozen dataclass and the single validated input. It also holds `FieldSpec` metadata that drives the UI form, `from_dict` (the only entry point for untrusted data), cross-field validation, and the schema version (other versions are rejected). |
 | `crosssection.py` | Pure math for the closed body: one panel's cross-section (`CrossSection`), the panel width solver, and `Body`, the material model around the interior (section 4.3). |
-| `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`), the cross-section view data, and the interior walls (`wall_layout`). |
+| `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
 | `svg.py` | Serializes a `Pattern` to SVG (layers, dash styles, labels, embedded config) and reads the config back (`extract_config`). |
 | `dimensions.py` | Preview-only dimension annotations for all three views, measured on the same geometry. |
 | `payload.py` | Payload clearance, per-field maximize, and *Fit box to payload*. |
@@ -50,7 +50,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 The browser never computes geometry: an edit posts the config, and the views redraw from
 the response.
 
-**Caching:** `solve_body` and `wall_layout` are `lru_cache`d on their (hashable) inputs.
+**Caching:** `solve_body` is `lru_cache`d on their (hashable) inputs.
 One render touches the same body many times, so this keeps a render under about 100 ms.
 
 ## 3. Test suite architecture
@@ -67,7 +67,7 @@ outputs.
 | File | What it pins down |
 |---|---|
 | `test_config.py` | Validation messages, limits, the width solve (interior corner to corner), interior height and flap offsets. |
-| `test_geometry.py` | Outline continuity and absence of self-intersections, fold placement, fold directions from both sides, thickness offsets, FPC cutouts, interior wall layout. |
+| `test_geometry.py` | Outline continuity and absence of self-intersections, fold placement, fold directions from both sides, thickness offsets, FPC cutouts, the end wall gap. |
 | `test_model3d.py` | That the 3D model *is* the pattern folded: faces tile the pattern, each mesh triangle is isometric to its flat triangle, faces stay attached along every fold, no hidden creases inside a face, flap edges meet the intended surfaces, the glue tab lies at distance `t`, and the section matches the mesh. |
 | `test_svg.py` | SVG conventions (layers, dashes, a single closed cut path, attributes only), round-trip of the embedded config, parsed paths reproducing the geometry, labels. |
 | `test_dimensions.py` | Every dimension measures its parameter and its points lie on, or a stated allowance off, the exported geometry. |
@@ -88,7 +88,8 @@ Flat coordinates are in mm, with x to the right and y down, as in SVG. From left
 - **Back panel**, width `Wb`. It carries the **inner** flaps.
 - **Glue tab**, width `g`.
 
-The straight edges run from `y = 0` to `y = L`, where `L = length + height + 3t`. Each end
+The straight edges run from `y = 0` to `y = L`, where `L = length + height + 3t` (the front
+panel's are longer by the end wall gap, see 4.4). Each end
 of a panel has a **flap** between two curves through the panel's corners:
 
 - the **curved fold**, a circular arc bowing *into* the panel by its sagitta `s`;
@@ -147,51 +148,43 @@ Inputs are **interior** dimensions, and the mid-surface lies `t/2` outside the i
   `solve_body` finds the front panel's closed width by fixed-point iteration (the
   derivative is about 1), then centres the interior on `X = 0`.
 
-### 4.4 Interior walls (`geometry.wall_layout`)
+### 4.4 End wall gap
 
-Each inner flap's top edge becomes a fold into a **bridge**. The bridge runs along the
-inside of the front panel, with its mid-surface `t` inside the front panel's, then folds
-down into an **interior wall**. The wall reaches the back panel's inner surface.
+Each end has an outer wall (front flap) and an inner wall (back flap), each standing at its
+own panel's crease. To spread them apart (`)_)___(_(` instead of `))___((`), the front panel
+is `2e` longer than the back panel (`e = end_wall_gap`): in flat coordinates the front panel
+spans `0..Lf` and the back panel and glue tab `e..e + L`, with `Lf = L + 2e`
+(`cfg.front_length`, `cfg.edge_length`). `FoldedBox.map` shifts the back flaps' crease
+planes by `e` accordingly; everything stays an exact isometric folding.
 
-The interior wall is the inner flap's **mirror image** in plan (`))__(`). The inner flap's
-wall stands `z(u)` in from the corner line, and the interior wall stands at
-`offset + t + 2s − z(u)` (`bridge_at`). The bridge is therefore `offset + t` long in the
-middle and longer towards its ends, and the walls are closest at the payload's sides.
-
-- **Creases.** Both creases are `Polyline` segments that follow the exact surface. A
-  single circular arc was tried and rejected: with thick board it deviated by millimetres.
-- **Span.** Bridge and wall only span the region where the wall is at least
-  `max(1 mm, 2t, height/10)` high, which keeps them away from the tight corners.
-- **Approximate folding.** This part cannot be folded isometrically, since one bridge
-  cannot lie flat against both curved neighbours. It is therefore left out of the folded
-  mesh and rendered as translucent surfaces.
-- **Bottom end.** The bottom end is the top end mirrored (`_mirror`).
+- **Cut.** The front panel's edge at the straight fold is cut over `0..e` and
+  `L + e..Lf`, continuing the outer flaps' cut step down to the back panel's corners.
+- **Gap.** On the centreline the walls' mid-surfaces are `e + t` apart, a clear gap of `e`.
+  Towards the sides the outer wall curves away a little more.
+- **Open top.** The back panel ends at the inner wall, so the box is open over the gap.
+  The outer flaps' cut edge still follows the back panel's outer surface, extended.
+- **Interior.** The interior, payload clearance and fit are unchanged: they are bounded by
+  the inner walls, centred on the box.
 
 ### 4.5 FPC cutout
 
 `level_cut` finds, by bisection on the level, the horizontal cut that removes exactly
 `width` from the top of a rising-then-falling edge. It sits around the edge's highest
-point, which is slightly off-centre because the edge is not symmetric.
-
-- **Without interior walls,** the cut flattens the inner flap's free edge.
-- **With interior walls,** the same level line replaces the flap-to-bridge crease over the
-  cutout width, and the bridge-to-wall crease is lowered by as much on the wall's side
-  (mirrored about the bridge). Nothing is cut; the wider bridge sags into a trough for
-  the cable.
+point, which is slightly off-centre because the edge is not symmetric. The cut flattens the
+inner flap's free edge.
 
 ## 5. Other algorithms
 
 - **Fold direction.** Classified numerically on the folded model: at a fold's midpoint,
   does the face on one side bend away from the other face's print-side normal (mountain)
-  or towards it (valley)? `print_side = inside` flips the normal. The wall folds use the
-  analytic result (all mountain from the outside).
+  or towards it (valley)? `print_side = inside` flips the normal.
 - **Payload clearance.** This is the true 3D distance to the material's inner surface. For
   a payload inside the box, the distance to the surface equals the minimum distance to the
   *unbounded* cylinders: panels with rulings along Y, end walls with rulings along Z. A
   nearest point that is off the real surface lies outside the box. Each distance is
   therefore 2D, from a centred rectangle to a curve, minus `t/2`. It is computed by
   dense sampling plus golden-section refinement. The end walls use the back panel's crease
-  curve; with interior walls, the mirrored interior wall's curve.
+  curve (the inner walls).
 - **Fit box to payload.** The search runs on a fast approximation: the interior is treated
   as a zero-thickness box of the interior size, so the shape is scale-invariant in
   `r = s/W`, and a closed-form "scale needed" is computed per profile sample. A 1D grid

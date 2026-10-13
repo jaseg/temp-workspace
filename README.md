@@ -91,13 +91,13 @@ the defaults. It never crashes because of the file.
   * **Fit box to payload** (in the body controls) sets width, length and height to the
     smallest box that holds the payload with its margin, minimizing the area of the
     pattern's bounding box.
-    Glue tab and thickness are left alone. Results are rounded to 0.01 mm, always
+    Glue tab, end wall gap and thickness are left alone. Results are rounded to 0.01 mm, always
     towards a box that still fits.
 * **Parameter dimensions:** all three views annotate the inputs they show:
-  * **Pattern:** circumference (both panels, flat), length (along the front panel's
-    midline), height (across an inner flap), and the glue-tab width and taper (both at the
-    tab's bottom end);
-  * **Folded box:** width, length (along the top ridge) and height;
+  * **Pattern:** circumference (both panels, flat), length and end wall gap (along the
+    front panel's midline), height (across an inner flap), and the glue-tab width and taper
+    (both at the tab's bottom end);
+  * **Folded box:** width, length and end wall gap (along the top ridge) and height;
   * **Cross-section:** width, height, and the front panel's arc (part of the
     circumference). This view shades the material at its thickness, the box interior and the
     payload space, and draws the glue tab and, dashed, the payload margin.
@@ -115,12 +115,12 @@ the defaults. It never crashes because of the file.
 * **Download SVG** and **Reset to defaults** are in the top bar.
 * **Download OpenSCAD** saves a model of the box's interior (`.scad`, mm, centred on the
   interior; X across, Y along the length, Z height with the front panel up). It has the
-  main space for the payload, bounded by the panels' inner surfaces and the interior walls
-  (or the inner end flaps), and with interior walls the two end spaces between each inner
-  flap and its interior wall, under the bridge. Each space is a module (`main_space()`,
+  main space for the payload, bounded by the panels' inner surfaces and the inner end walls,
+  and with an end wall gap the two end spaces between each inner and outer end wall, from
+  the front panel to the outside of the box. Each space is a module (`main_space()`,
   `end_space()` / `end_spaces()`), built as the intersection of a cross-section prism and a
-  plan prism. The payload is a `payload()` module, shown only in the preview. The FPC
-  trough and the inner flaps' cut corners are not modelled.
+  plan prism. The payload is a `payload()` module, shown only in the preview. FPC cutouts
+  and the inner flaps' cut corners are not modelled.
 * Light and dark themes follow `prefers-color-scheme`.
 
 ## Parameter reference
@@ -130,17 +130,16 @@ All lengths are in millimetres.
 | Key | Default | Meaning / constraints |
 |---|---|---|
 | `width` | 55 | Interior width of the closed box's cross-section, from fold to fold (between the material's inner corners). 10–1000. This drives the panel size: see *circumference* below. |
-| `length` | 120 | Interior length along the middle of the box, between the end walls: the shortest distance between the curves. 10–2000. The straight edges (corner to corner) are `length + height + 3·thickness` long. |
+| `length` | 120 | Interior length along the middle of the box, between the inner end walls: the shortest distance between the curves. 10–2000. The back panel's straight edges (corner to corner) are `length + height + 3·thickness` long, the front panel's `2·end_wall_gap` longer. |
+| `end_wall_gap` | 10 | Clear gap, in the middle of the box, between each outer end wall and the inner end wall inside it (see *End wall gap* below). 0–500. 0 stacks the two walls of each end on each other. |
 | `height` | 20 | Interior height of the closed box at maximum bulge. At most ≈ 0.46·width (the UI states the exact limit). |
 | `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
-| `payload_depth` | 80 | Payload size along the box length. 0–2000. With interior walls, it has to fit between them. |
+| `payload_depth` | 80 | Payload size along the box length. 0–2000. It has to fit between the inner end walls. |
 | `payload_height` | 13 | Payload size along the box height. 0–2000. |
 | `payload_margin` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than the front panel it is glued onto. |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to half the straight edge − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
-| `interior_walls` | on | Extends each inner flap into a bridge along the front panel and a second, interior end wall (see *Interior walls* below). |
-| `interior_wall_offset` | 10 | Clear gap between the inside of the doubled end wall and the outside of the interior wall. 0–500. In the middle the interior walls are `length − 2·(offset + thickness)` apart; towards the sides they curve in. |
-| `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). With interior walls, it instead straightens the bridge folds (see below). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
+| `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
 | `fpc_cutout_width` | 15 | Width of that flat section. 0 to the inner flaps' width − 1. The cut is level and exactly this wide. The flap's edge is not quite symmetric, so the section sits around its highest point, within about a millimetre of the flap's centre. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
 | `thickness` | 0.2 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
@@ -199,42 +198,32 @@ the panel's flat width). The tool allows `s_f ≤ 0.2·W`, which limits the heig
 0.46·width. The tests check that every 3D face is an isometric image of its pattern face
 and that the faces stay joined along every fold.
 
-#### Interior walls
+#### End wall gap
 
-Seen in a lengthwise cut, each end of the box goes from a doubled wall (`||`) to a doubled
-wall plus an interior wall (`||  |`). On the pattern, each inner (back-panel) flap
-continues past its former cut edge into a **bridge** and then a second oval flap, the
-**interior wall**:
+Seen in a lengthwise cut, each end of the box has an outer end wall (the front panel's
+flap) and an inner end wall (the back panel's flap) with a gap between them: `)_)___(_(`
+rather than the stacked `))___((`.
 
-* The inner flap's top edge becomes a fold where it meets the inside of the front panel.
-  That fold sits at the bridge's mid-surface, one thickness inside the front panel's
-  mid-surface.
-* The bridge runs along the inside of the front panel, then folds down into the interior
-  wall. The interior wall reaches down to the back panel's inner surface.
-* The interior wall is the inner flap's mirror image in plan view: `))__(` rather than
-  `))__)`. The clear gap equals `offset` in the middle and widens towards the sides, and
-  the walls come closest to the payload at its sides.
-* Both folds follow the exact curve as fine polylines, emitted as one dashed SVG path each.
-  Bridge and interior wall are slightly narrower than the inner flap: they stop where the
-  interior wall would be lower than 1 mm, two thicknesses, or a tenth of the height. That
-  leaves some room at the body folds, where the inner flap's edge is cut at the bridge's
-  level instead.
-* Folding them is only approximately isometric, since a bridge can't lie perfectly flat
-  against both curved surfaces at once; the material's flexibility absorbs the difference.
-  The 3D view therefore draws bridges and interior walls as translucent surfaces, like the
-  payload, rather than as folded paper.
-* The payload clearance and *Fit box to payload* count the interior walls, including how
-  far they curve in at the payload's sides.
-* **FPC cutout with interior walls:** nothing is cut. The inner flap's fold into the bridge
-  runs straight (level) across the cutout width instead of following the curve, which
-  lowers the flap's top there. The bridge's fold into the interior wall is lowered by the
-  same amount on the wall's side, so the bridge, a little wider there, sags into a shallow
-  trough that a flat cable passes over, between it and the front panel.
+* Each wall stands at its own panel's curved fold, so the walls are spread apart by making
+  the panels different lengths. The front panel runs on by `end_wall_gap` at each end; the
+  back panel and the glue tab keep the length that `length` and `height` give them, and sit
+  centred on the front panel.
+* In the pattern, the front panel's edge at the straight fold is cut free over the gap at
+  each end, down to the back panel's corner.
+* The walls are `end_wall_gap` apart (clear, material to material) in the middle of the
+  box. The outer wall curves a little further out towards the sides.
+* Between the two walls the box is open over the back panel: the back panel ends at the
+  inner wall. The outer wall still reaches the back panel's outer surface (extended over
+  the gap), so the outside of the box keeps its shape.
+* The folding stays exact: the tests check the folded model with and without a gap.
+* The payload has to fit between the inner walls, as before. *Fit box to payload* keeps the
+  gap and minimizes the pattern including it.
 
 #### Material thickness
 
 `width`, `length` and `height` are the interior. With thickness `t`, the material's
-mid-surface lies `t/2` outside it, and the two flaps of each end lie on top of each other:
+mid-surface lies `t/2` outside it, and with no end wall gap the two flaps of each end lie on
+top of each other:
 
 * The **front** panel's flaps close on the **outside**. Its fold bows in by `height/2`. The
   **back** panel's flaps close on the **inside**, and its fold bows in by `height/2 + t`, so
@@ -252,7 +241,8 @@ mid-surface lies `t/2` outside it, and the two flaps of each end lie on top of e
 * **Width solve:** the interior width runs between the inner corners at the two side folds,
   where the panels' inner surfaces meet. The tool solves for the two panels' flat widths so
   that this is exactly `width` (`crosssection.solve_body`).
-* **Lengths:** the straight edges are `length + height + 3·t` long.
+* **Lengths:** the back panel's straight edges are `length + height + 3·t` long, the front
+  panel's `2·end_wall_gap` longer.
 
 ## Output SVG & line convention
 

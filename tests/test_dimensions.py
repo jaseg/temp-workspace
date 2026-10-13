@@ -7,18 +7,14 @@ from helpers import parse_path, q, svg_elements
 
 from yanartas_pillowbox import dimensions as dm
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import (
-    FoldedBox,
-    build_cross_section,
-    build_pattern,
-    y_on_chain,
-)
+from yanartas_pillowbox.geometry import FoldedBox, build_cross_section, build_pattern
 from yanartas_pillowbox.server import create_app
 from yanartas_pillowbox.svg import render_svg, sheet_offset
 
 D = Config.defaults()
 CONFIGS = {
     "default": D,
+    "stacked": D.with_values(end_wall_gap=0),
     "zero-thickness": D.with_values(thickness=0, glue_tab_width=20),
     "no-taper": D.with_values(glue_tab_taper=0),
     "fpc-front": D.with_values(fpc_cutout="front"),
@@ -55,8 +51,8 @@ def test_pattern_dimensions_cover_the_parameters(cfg):
     expected = {"circumference", "length", "height", "glue_tab_width"}
     if cfg.glue_tab_taper > 0:
         expected.add("glue_tab_taper")
-    if cfg.interior_walls:
-        expected.add("interior_wall_offset")
+    if cfg.end_wall_gap > 0:
+        expected.add("end_wall_gap")
     assert {d.param for d in dims} == expected
 
 
@@ -73,33 +69,22 @@ def test_pattern_dimensions_measure_their_parameter(cfg):
 
 def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
     """Measured points lie on the paths of the downloaded SVG (same coordinates), or, for the
-    interior length and height, inside the folds by the material allowance: the interior
-    length starts 1.5 t inside the front panel's folds (outer wall, then inner wall), the
-    interior height t/2 inside the back panel's fold (its inner surface)."""
+    interior length and height and the end wall gap, inside the folds by the material
+    allowance: the interior length starts e + 1.5 t inside the front panel's folds (outer
+    wall, gap, inner wall), the interior height t/2 inside the back panel's fold (its inner
+    surface), the gap t/2 inside the front panel's fold (the outer wall's inner surface)."""
     pattern = build_pattern(cfg)
     root = svg_elements(render_svg(cfg, pattern))
     segs = [s for el in root.iter(q("path")) for s in parse_path(el.get("d"))[1]]
-    t = cfg.thickness
-    allowance = {("length", 0): 1.5 * t, ("length", 1): 1.5 * t, ("height", 0): t / 2}
-    if cfg.interior_walls:
-        # The offset is the clear gap across the bridge, t/2 inside its two folds; the
-        # height runs to the front panel's inside, t/2 beyond the inner flap's fold.
-        allowance.update({("interior_wall_offset", 0): t / 2, ("interior_wall_offset", 1): t / 2})
-        allowance["height", 1] = t / 2
-        # With an FPC cutout, both measure to where the folds would be without it.
-        x = cfg.body.front.width + cfg.body.back.width / 2
-        plain = build_pattern(cfg.with_values(fpc_cutout="none"))
-
-        def sunk(name):
-            fold, fold0 = (
-                next(f.segment for f in p.wall_folds if f.name == name) for p in (pattern, plain)
-            )
-            return abs(y_on_chain((fold,), x) - y_on_chain((fold0,), x))
-
-        allowance["height", 1] += sunk("top-bridge")
-        allowance["interior_wall_offset", 0] += sunk("bottom-bridge")
-        allowance["interior_wall_offset", 1] += sunk("bottom-wall")
-    elif cfg.fpc_cutout == "both":  # measured to where the edge would be without the cutout
+    t, e = cfg.thickness, cfg.end_wall_gap
+    allowance = {
+        ("length", 0): e + 1.5 * t,
+        ("length", 1): e + 1.5 * t,
+        ("height", 0): t / 2,
+        ("end_wall_gap", 0): t / 2,
+        ("end_wall_gap", 1): e + t / 2,
+    }
+    if cfg.fpc_cutout == "both":  # measured to where the edge would be without the cutout
         x = cfg.body.front.width + cfg.body.back.width / 2
         plain = build_pattern(cfg.with_values(fpc_cutout="none"))
         cut = pattern.face("back-top-flap").y_range(x)[0]
@@ -114,12 +99,29 @@ def test_length_dimension_runs_along_the_midline(cfg):
     pattern = build_pattern(cfg)
     dx, dy = sheet_offset(pattern)
     length = next(d for d in dm.pattern_dimensions(cfg, pattern, (dx, dy)) if d.param == "length")
-    inset = 1.5 * cfg.thickness
+    inset = cfg.end_wall_gap + 1.5 * cfg.thickness
     for p, fold, k in zip(length.points, ("front-top", "front-bottom"), (1, -1), strict=True):
         apex = pattern.fold(fold).segment.point_at(0.5)
         assert p == pytest.approx((apex[0] + dx, apex[1] + dy + k * inset))
     # (drawn beside the midline, clear of the exported "front end"/"back end" labels)
     assert length.at == pytest.approx(cfg.body.front.width * 0.3 + dx)
+
+
+def test_gap_dimension_continues_the_length(cfg):
+    """The end wall gap is measured on the same line as the length, at the bottom end: from
+    the inner wall's outer surface (a thickness beyond the interior's end) to the outer
+    wall's inner surface."""
+    pattern = build_pattern(cfg)
+    offset = sheet_offset(pattern)
+    dims = {d.param: d for d in dm.pattern_dimensions(cfg, pattern, offset)}
+    if cfg.end_wall_gap == 0:
+        assert "end_wall_gap" not in dims
+        return
+    gap, length = dims["end_wall_gap"], dims["length"]
+    assert gap.at == length.at
+    assert gap.points[0][0] == gap.points[1][0] == length.points[1][0]
+    assert min(p[1] for p in gap.points) == pytest.approx(length.points[1][1] + cfg.thickness)
+    assert gap.value == pytest.approx(cfg.end_wall_gap)
 
 
 def test_tab_and_taper_are_on_the_same_side(cfg):
@@ -194,15 +196,23 @@ def test_model_dimensions(cfg):
     box = FoldedBox(cfg)
     body = box.body
     w, edge, s_f, t = body.front.width, cfg.edge_length, body.front.sagitta, cfg.thickness
+    e, front = cfg.end_wall_gap, cfg.front_length
     dims = {d.param: d for d in dm.model_dimensions(cfg)}
-    assert set(dims) == {"length", "width", "height"}
+    assert set(dims) == {"length", "width", "height"} | ({"end_wall_gap"} if e > 0 else set())
 
     length = dims["length"]  # along the front panel's midline, between the inner walls
     assert math.dist(*length.points) == pytest.approx(cfg.length)
-    ends = [box.map("front-panel", (w / 2, y)) for y in (s_f + 1.5 * t, edge - s_f - 1.5 * t)]
+    inset = e + s_f + 1.5 * t
+    ends = [box.map("front-panel", (w / 2, y)) for y in (inset, front - inset)]
     for p, a in zip(length.points, ends, strict=True):
         assert math.dist(p, a) < 1e-9
     assert abs(length.points[0][1]) == pytest.approx(cfg.length / 2)  # the interior's ends
+
+    if e > 0:  # from the inner wall's outer surface to the outer wall's inner surface
+        gap = dims["end_wall_gap"]
+        assert math.dist(*gap.points) == pytest.approx(e)
+        ys = sorted(-p[1] for p in gap.points)
+        assert ys == pytest.approx([cfg.length / 2 + t, cfg.length / 2 + t + e])
 
     height = dims["height"]  # between the panels' inner surfaces on the centreline
     assert math.dist(*height.points) == pytest.approx(cfg.height)
@@ -230,10 +240,10 @@ def test_render_returns_dimensions(tmp_path):
         "height",
         "glue_tab_width",
         "glue_tab_taper",
-        "interior_wall_offset",
+        "end_wall_gap",
     }
     assert {d["param"] for d in dims["section"]} == {"width", "height", "circumference"}
-    assert {d["param"] for d in dims["model"]} == {"width", "length", "height"}
+    assert {d["param"] for d in dims["model"]} == {"width", "length", "height", "end_wall_gap"}
     for view in dims.values():
         for d in view:
             assert d["label"] and d["kind"] and d["points"]

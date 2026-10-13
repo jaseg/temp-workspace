@@ -1,6 +1,6 @@
 """The 3D model must be the 2D pattern, folded: every mesh face is an isometric image of the
 corresponding pattern face, faces stay attached along their folds, and the closed state is
-consistent (seam closes, flaps overlap on the end wall, no extra creases)."""
+consistent (seam closes, flaps stand on their end walls, no extra creases)."""
 
 import itertools
 import math
@@ -21,6 +21,8 @@ from yanartas_pillowbox.geometry import (
 D = Config.defaults()
 CONFIGS = {
     "default": D,
+    "stacked": D.with_values(end_wall_gap=0),
+    "wide-gap": D.with_values(end_wall_gap=35, length=60),
     "thin-material": D.with_values(thickness=0),
     "steepest-arc": D.with_values(width=50, height=max_height(50, 0.4), glue_tab_taper=15),
     "shallow": D.with_values(height=6, length=200, thickness=1),
@@ -90,10 +92,9 @@ def same_segment(a, b, tol=1e-9):
 
 # ------------------------------------------------------------------ the 2D faces tile the pattern
 def test_faces_tile_the_pattern(case):
-    cfg, pattern, _, _ = case
+    _, pattern, _, _ = case
     assert len(pattern.faces) == 7
-    assert len(pattern.wall_faces) == (4 if cfg.interior_walls else 0)
-    faces = pattern.faces + pattern.wall_faces
+    faces = pattern.faces
     for face in faces:  # closed, consistently oriented loops
         loop = face.boundary
         for a, b in zip(loop, (*loop[1:], loop[0]), strict=True):
@@ -102,7 +103,7 @@ def test_faces_tile_the_pattern(case):
     for seg in pattern.outline.segments:
         owners = [f.name for f in faces if any(same_segment(seg, s) for s in f.boundary)]
         assert len(owners) == 1, (seg, owners)
-    for fold in pattern.all_folds:
+    for fold in pattern.folds:
         owners = [f.name for f in faces if any(same_segment(fold.segment, s) for s in f.boundary)]
         assert len(owners) == 2, (fold.name, owners)
     # ... and the face areas add up to the area enclosed by the cut outline.
@@ -221,7 +222,7 @@ def test_box_closes_along_glued_seam(case):
     wf, wb = body.front.width, body.back.width
     front = [body.front_point(wf * i / 4000) for i in range(4001)]
     for i in range(11):
-        y = cfg.edge_length * i / 10
+        y = cfg.end_wall_gap + cfg.edge_length * i / 10  # along the back panel
         edge, fold = box.map("front-panel", (0, y)), box.map("back-panel", (wf + wb, y))
         # The fold's mid-surface point is on the front's tangent at its edge, offset by t.
         s = body.edge_sine
@@ -236,13 +237,14 @@ def test_box_closes_along_glued_seam(case):
         assert d == pytest.approx(t, abs=1e-5), (x, p)
 
 
-def test_flaps_stack_on_the_end_walls(case):
+def test_flaps_stand_on_the_end_walls(case):
     """Each flap stands on its own end wall, the cylinder through its panel's crease; the
-    outer (front) wall lies outside the inner (back) wall, a thickness apart on the
-    centreline."""
+    outer (front) wall lies outside the inner (back) wall, the end wall gap plus a thickness
+    apart on the centreline (mid-surface to mid-surface: a clear gap of the end wall gap)."""
     cfg, pattern, _, parts = case
     box = FoldedBox(cfg)
-    body, t, half = box.body, cfg.thickness, cfg.edge_length / 2
+    body, t, e = box.body, cfg.thickness, cfg.end_wall_gap
+    half, half_front = cfg.edge_length / 2, cfg.front_length / 2
     for end in ("top", "bottom"):
         for side in ("front", "back"):
             part = parts[f"{side}-{end}-flap"]
@@ -251,16 +253,23 @@ def test_flaps_stack_on_the_end_walls(case):
                 crease = box.map(f"{side}-panel", (x, lo if end == "top" else hi))
                 assert p[0] == pytest.approx(crease[0], abs=POS_TOL), (side, end, x)
                 assert p[1] == pytest.approx(crease[1], abs=POS_TOL), (side, end, x)
-    # Outer wall outside the inner wall everywhere across the box (|Y| = half - crease depth,
-    # at the same X) ...
+    # Outer wall at least the gap outside the inner wall everywhere across the box (|Y| =
+    # half its panel's length - crease depth, at the same X) ...
     for i in range(1, 64):
         u = body.front.width * i / 64
         x = body.front_point(u)[0]
-        outer = half - body.front.z(u)
+        outer = half_front - body.front.z(u)
         inner = half - (body.z_shift - body.surface_z("back", 0.0, x))
-        assert inner <= outer + 1e-9
-    # ... and a thickness outside it on the centreline.
-    assert body.back.sagitta - body.front.sagitta == pytest.approx(t)
+        assert inner <= outer - e + 1e-9
+    # ... and the gap plus a thickness outside it on the centreline.
+    top = {
+        side: box.map(f"{side}-top-flap", (x, 0.5 * sum(pattern.face(f"{side}-panel").y_range(x))))
+        for side, x in (
+            ("front", body.front.width / 2),
+            ("back", body.front.width + body.back.width / 2),
+        )
+    }
+    assert top["front"][1] - top["back"][1] == pytest.approx(e + t, abs=1e-9)
 
 
 def _surface_gap(body, panel, offset, x, z):
@@ -277,7 +286,6 @@ def test_flap_edges_meet_the_body_surfaces(case):
     box = FoldedBox(cfg)
     body, t = box.body, cfg.thickness
     wf, wb = body.front.width, body.back.width
-    walls = cfg.interior_walls
     plain = None if cfg.fpc_cutout == "none" else build_pattern(replace(cfg, fpc_cutout="none"))
     for end in ("top", "bottom"):
         for i in range(1, 200):
@@ -291,9 +299,7 @@ def test_flap_edges_meet_the_body_surfaces(case):
             x = wf + wb * i / 200
             lo, hi = pattern.face(f"back-{end}-flap").y_range(x)
             p = box.map(f"back-{end}-flap", (x, lo if end == "top" else hi))
-            # With interior walls the flap's top is the fold into the bridge, whose
-            # mid-surface lies a thickness inside the front panel's.
-            gap = _surface_gap(body, "front", -t if walls else -t / 2, p[0], p[2])
+            gap = _surface_gap(body, "front", -t / 2, p[0], p[2])
             tol = 0.01 + 1e-3 * t
             on_chord = abs(p[2] - body.z_shift) < 1e-6
             if plain is not None:
@@ -321,7 +327,8 @@ def test_closed_dimensions(case):
     # outer flaps' edges flush with the back panel's outer surface, the material below it.
     assert max(zs) == pytest.approx(h / 2 + t / 2, abs=1e-6)
     assert min(zs) == pytest.approx(-(h / 2 + t), abs=0.01)
-    assert max(ys) - min(ys) == pytest.approx(cfg.edge_length, abs=POS_TOL)
+    assert max(ys) - min(ys) == pytest.approx(cfg.front_length, abs=POS_TOL)
+    assert model["bounds"]["length"] == pytest.approx(cfg.front_length)
     assert model["interior"] == {"width": cfg.width, "length": cfg.length, "height": cfg.height}
     assert max(xs) - min(xs) == pytest.approx(model["bounds"]["width"], rel=1e-4)
     assert model["bounds"]["width"] > cfg.width or t == 0

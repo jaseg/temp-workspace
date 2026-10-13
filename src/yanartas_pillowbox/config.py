@@ -17,7 +17,7 @@ from yanartas_pillowbox import crosssection
 
 # Bumped whenever the meaning of saved settings changes; documents of any other version are
 # rejected (no migrations).
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
@@ -111,9 +111,24 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         10,
         2000,
         0.5,
-        help="Interior length along the middle of the box, between the end walls (the "
-        "shortest length between the curves). The straight edges are longer by the height "
-        "plus three times the thickness.",
+        help="Interior length along the middle of the box, between the inner end walls (the "
+        "shortest length between the curves). The back panel's straight edges are longer by "
+        "the height plus three times the thickness, the front panel's by twice the end wall "
+        "gap more.",
+    ),
+    FieldSpec(
+        "end_wall_gap",
+        "End wall gap",
+        "float",
+        "Body",
+        "mm",
+        0,
+        500,
+        0.5,
+        help="Clear gap, in the middle of the box, between each outer end wall (the front "
+        "panel's flap) and the inner end wall inside it (the back panel's flap). The front "
+        "panel runs on past the inner walls to the outer walls; between the two walls the "
+        "box is open over the back panel. 0 stacks the walls on each other.",
     ),
     FieldSpec(
         "height",
@@ -169,27 +184,6 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         1000,
         0.5,
         help="How far each end of the glue tab is cut back along the length.",
-    ),
-    FieldSpec(
-        "interior_walls",
-        "Interior walls",
-        "bool",
-        "Interior walls",
-        help="Extend each inner end flap into a bridge along the front panel and a second "
-        "end wall, standing inside the doubled end wall. The box length stays the space "
-        "between the end walls; the payload has to fit between the interior walls.",
-    ),
-    FieldSpec(
-        "interior_wall_offset",
-        "Interior wall offset",
-        "float",
-        "Interior walls",
-        "mm",
-        0,
-        500,
-        0.5,
-        help="Clear gap between the inside of the doubled end wall and the outside of the "
-        "interior wall.",
     ),
     FieldSpec(
         "fpc_cutout",
@@ -253,6 +247,7 @@ class Config:
     width: float = 55.0
     length: float = 120.0
     height: float = 20.0
+    end_wall_gap: float = 10.0
     # Rectangular payload, inscribed centred in the closed box (preview only, not exported).
     payload_width: float = 30.0
     payload_depth: float = 80.0
@@ -260,8 +255,6 @@ class Config:
     payload_margin: float = 1.0
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
-    interior_walls: bool = True
-    interior_wall_offset: float = 10.0
     fpc_cutout: str = "none"
     fpc_cutout_width: float = 15.0
     thickness: float = 0.2
@@ -275,8 +268,14 @@ class Config:
 
     @property
     def edge_length(self) -> float:
-        """Length of the straight body edges, corner to corner."""
+        """Length of the back panel's straight edges (and the glue tab's), corner to corner."""
         return crosssection.edge_length(self.length, self.height, self.thickness)
+
+    @property
+    def front_length(self) -> float:
+        """Length of the front panel's straight edges, corner to corner: the box overall. The
+        front panel runs on by the end wall gap at each end."""
+        return self.edge_length + 2 * self.end_wall_gap
 
     @property
     def circumference(self) -> float:
@@ -440,32 +439,13 @@ def validate(cfg: Config) -> dict[str, str]:
                 "onto it",
             )
 
-    walls = None
-    if body is not None and cfg.interior_walls and "interior_wall_offset" not in errors:
-        from yanartas_pillowbox.geometry import wall_layout  # geometry imports this module
-
-        room = cfg.length - 2 * (cfg.interior_wall_offset + cfg.thickness)
-        if "length" not in errors and room <= 0:
-            add(
-                "interior_wall_offset",
-                f"leaves no room between the interior walls (at most "
-                f"{_fmt(cfg.length / 2 - cfg.thickness)} mm for this length)",
-            )
-        try:
-            walls = wall_layout(cfg)
-        except ValueError:
-            add("interior_walls", "the box is too low for interior walls")
-
     if body is not None and cfg.fpc_cutout != "none" and "fpc_cutout_width" not in errors:
-        if walls is not None:  # the straightened folds lie within the bridge
-            limit, what = walls.ub - walls.ua - 1, "the interior walls' width"
-            full = walls.ub - walls.ua
-        else:
-            limit, what, full = body.back.width - 1, "the inner flaps' width", body.back.width
+        limit = body.back.width - 1
         if cfg.fpc_cutout_width > limit:
             add(
                 "fpc_cutout_width",
-                f"must be at most {_fmt(limit)} mm ({what}, {_fmt(full)} mm, minus 1 mm)",
+                f"must be at most {_fmt(limit)} mm (the inner flaps' width, "
+                f"{_fmt(body.back.width)} mm, minus 1 mm)",
             )
 
     if "glue_tab_taper" not in errors and not errors.keys() & {"length", "height", "thickness"}:

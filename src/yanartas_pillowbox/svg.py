@@ -26,7 +26,6 @@ from yanartas_pillowbox.geometry import (
     Line,
     Pattern,
     Point,
-    Polyline,
     Segment,
     build_pattern,
 )
@@ -72,9 +71,7 @@ def path_data(segments: list[Segment] | tuple[Segment, ...], offset: Point, clos
 
     parts = [f"M {pt(segments[0].start)}"]
     for seg in segments:
-        if isinstance(seg, Polyline):
-            parts.extend(f"L {pt(q)}" for q in seg.points[1:])
-        elif isinstance(seg, Line):
+        if isinstance(seg, Line):
             parts.append(f"L {pt(seg.end)}")
         elif isinstance(seg, Arc):
             r = fmt(seg.radius)
@@ -161,7 +158,7 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
     )
 
     for direction in FoldDirection:
-        folds = [f for f in pattern.all_folds if f.direction == direction]
+        folds = [f for f in pattern.folds if f.direction == direction]
         if not folds:
             continue
         g, dash = _layer(root, direction)
@@ -190,8 +187,8 @@ def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]
       ends up on;
     * on the front panel, just inside each curved fold, which end of the box that is (front
       end: the top of the pattern, like the FPC cutout setting);
-    * on every oval panel, which way its print side faces once folded. The flaps keep the
-      panels' orientation; the interior walls, two folds further on, face the other way."""
+    * on every oval panel, which way its print side faces once folded (the flaps keep the
+      panels' orientation)."""
     printed_out = cfg.print_side == "outside"
 
     def facing(outward: bool) -> str:
@@ -204,13 +201,13 @@ def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]
     top, bottom = front.y_range(xf)
     out.append(("front end", (xf, top + 2 * LABEL_SIZE), LABEL_SIZE))
     out.append(("back end", (xf, bottom - 2 * LABEL_SIZE), LABEL_SIZE))
-    for face in (*pattern.faces, *pattern.wall_faces):
-        if face.kind not in ("flap", "wall"):
+    for face in pattern.faces:
+        if face.kind != "flap":
             continue
         xm = (face.x0 + face.x1) / 2
         lo, hi = face.y_range(xm)
         size = min(LABEL_SIZE, (hi - lo) / 3)
-        out.append((facing(face.kind == "flap"), (xm, (lo + hi) / 2), size))
+        out.append((facing(True), (xm, (lo + hi) / 2), size))
     return out
 
 

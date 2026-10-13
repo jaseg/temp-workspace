@@ -232,7 +232,7 @@ function pair(a, b) {
 function renderDerived(info, payload) {
   const rows = [
     ["Outside (w × h × l)", `${[info.outer_width, info.outer_height, info.outer_length].map((v) => v.toFixed(2)).join(" × ")} mm`],
-    ["Straight edge (corner to corner)", info.edge_length],
+    ["Front / back straight edge", pair(info.front_edge_length, info.edge_length)],
     ["Circumference", info.circumference],
     ["Front / back panel width", pair(info.front_panel_width, info.back_panel_width)],
     ["Front / back fold sagitta", pair(info.front_fold_sagitta, info.back_fold_sagitta)],

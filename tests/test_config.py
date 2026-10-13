@@ -81,7 +81,6 @@ def test_boundary_values_accepted():
                 "height": 4,
                 "glue_tab_taper": 4,
                 "glue_tab_width": 5,
-                "interior_walls": False,
             }
         ).width
         == 10
@@ -95,6 +94,18 @@ def test_length_is_measured_on_the_midline():
     cfg = Config.from_dict({"length": 100, "height": 24, "thickness": 0.5})
     assert cfg.edge_length == pytest.approx(125.5)
     assert Config.from_dict({"length": 100, "height": 24, "thickness": 0}).edge_length == 124
+
+
+def test_end_wall_gap_lengthens_the_front_panel():
+    """The front panel runs on by the end wall gap at each end; the back panel (and the
+    interior) keep their length."""
+    cfg = Config.from_dict({"length": 100, "height": 24, "thickness": 0.5, "end_wall_gap": 7})
+    assert cfg.edge_length == pytest.approx(125.5)
+    assert cfg.front_length == pytest.approx(139.5)
+    assert cfg.with_values(end_wall_gap=0).front_length == pytest.approx(125.5)
+    assert Config.defaults().end_wall_gap == 10
+    assert "end_wall_gap" in errors_for(end_wall_gap=-1)
+    assert "end_wall_gap" in errors_for(end_wall_gap=501)
 
 
 def test_multiple_errors_reported_together():
@@ -158,7 +169,6 @@ def test_width_drives_the_cross_section(width, arc, t):
             "length": 400,
             "glue_tab_width": 5,
             "thickness": t,
-            "interior_walls": False,
             **arc,
         }
     )
@@ -195,10 +205,7 @@ def test_circumference_is_computed_not_stored():
     assert Config.from_dict({"circumference": 999}) == cfg  # unknown keys are ignored
 
 
-def test_interior_wall_validation():
-    errs = errors_for(interior_wall_offset=60)  # no room left in a 120 mm box
-    assert "interior_wall_offset" in errs
-    errs = errors_for(height=1, thickness=0.4, payload_height=0.5)  # too low for the walls
-    assert "interior_walls" in errs
-    errs = errors_for(fpc_cutout="both", fpc_cutout_width=59)  # wider than the walls
-    assert "fpc_cutout_width" in errs
+def test_old_interior_wall_settings_are_ignored():
+    """Interior walls are gone: their keys are unknown and ignored like any other."""
+    cfg = Config.from_dict({"interior_walls": True, "interior_wall_offset": 3})
+    assert cfg == Config.defaults()

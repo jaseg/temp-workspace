@@ -1,27 +1,29 @@
-"""OpenSCAD model of the box's interior: the main (payload) space, and with interior walls the
-two end spaces between each inner flap and its interior wall.
+"""OpenSCAD model of the box's interior: the main (payload) space, and with an end wall gap
+the two end spaces between each outer end wall and the inner end wall inside it.
 
 Every space is an exact intersection of two prisms, because each of its walls is a cylinder
 ruled along one axis (frame of the 3D model: X across, Y along the length, Z height, centred
 on the interior):
 
 * the cross-section prism (along Y), bounded by the panels' inner surfaces, or for an end
-  space by the bridge's underside and the back panel's inner surface;
+  space by the front panel's inner surface and the back panel's outer surface (there is no
+  back panel over the gap: the space reaches the outside of the box, where the outer end
+  wall ends);
 * the plan prism (along Z), bounded by the end walls' surfaces facing the space.
 
-The FPC trough in a bridge and the inner flaps' cut corners are left out.
+The inner flaps' cut corners and FPC cutouts are left out.
 """
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 from collections.abc import Callable, Sequence
 
 from yanartas_pillowbox import __version__
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.crosssection import Body
-from yanartas_pillowbox.geometry import WallLayout, _interior, _interp, wall_layout
+from yanartas_pillowbox.geometry import _interior
 
 Point = tuple[float, float]
 
@@ -53,66 +55,68 @@ def _offset_curve(mid: Callable[[float], Point], width: float, d: float, ext: fl
     return out
 
 
-def _plan_curves(body: Body, layout: WallLayout | None) -> dict[str, list[Point]]:
-    """Plan curves at the top end (+Y): the inner flap's inner surface, and the interior
-    wall's two surfaces."""
-    half, back, t = body.edge_length / 2, body.back, body.thickness
+def _interp(samples: Sequence[Point], x: float) -> float:
+    """y of the x-sorted polyline at ``x`` (clamped at its ends)."""
+    for (x0, y0), (x1, y1) in itertools.pairwise(samples):
+        if x0 <= x <= x1:
+            return y0 if x1 == x0 else y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return samples[0][1] if x < samples[0][0] else samples[-1][1]
+
+
+def _plan_curves(cfg: Config) -> dict[str, list[Point]]:
+    """Plan curves at the top end (+Y): the inner wall's two surfaces and the outer wall's
+    inner surface."""
+    body, t = cfg.body, cfg.thickness
+    half, front, back = body.edge_length / 2, body.front, body.back
     ext = 2 * (body.inner_fold[0] - body.inner_glue[0])  # far past the interior's corners
 
-    def flap(u: float) -> Point:
+    def inner(u: float) -> Point:
         return (body.back_point(u)[0], half - back.z(u))
 
-    curves = {"flap": _offset_curve(flap, back.width, t / 2, ext)}
-    if layout is not None:
+    def outer(u: float) -> Point:  # the front panel runs on by the gap
+        return (body.front_point(u)[0], half + cfg.end_wall_gap - front.z(u))
 
-        def wall(u: float) -> Point:  # the inner flap's mirror image, layout.strip further in
-            return (body.back_point(u)[0], half - layout.strip - 2 * back.sagitta + back.z(u))
-
-        curves["wall_in"] = _offset_curve(wall, back.width, t / 2, ext)
-        curves["wall_out"] = _offset_curve(wall, back.width, -t / 2, ext)
-    return curves
-
-
-def _span(body: Body, layout: WallLayout) -> tuple[float, float]:
-    """X range of the bridge and interior wall."""
-    xa, xb = body.back_point(layout.ua)[0], body.back_point(layout.ub)[0]
-    return min(xa, xb), max(xa, xb)
+    return {
+        "inner_in": _offset_curve(inner, back.width, t / 2, ext),
+        "inner_out": _offset_curve(inner, back.width, -t / 2, ext),
+        "outer_in": _offset_curve(outer, front.width, t / 2, ext),
+    }
 
 
 def main_plan(cfg: Config) -> list[Point]:
-    """Plan outline of the main space: up to the interior walls (where they are), and to the
-    inner flaps elsewhere; the bottom end mirrors the top."""
-    body = cfg.body
-    layout = wall_layout(cfg)
-    curves = _plan_curves(body, layout)
-    flap = curves["flap"]
-    if layout is None:
-        top = flap
-    else:
-        x0, x1 = _span(body, layout)
-        wall = curves["wall_in"]
-        inside = sorted({x0, x1, *(x for x, _ in wall if x0 < x < x1)})
-        top = [
-            *((x, y) for x, y in flap if x < x0),
-            (x0, _interp(flap, x0)),
-            *((x, _interp(wall, x)) for x in inside),
-            (x1, _interp(flap, x1)),
-            *((x, y) for x, y in flap if x > x1),
-        ]
+    """Plan outline of the main space, between the inner end walls; the bottom end mirrors
+    the top."""
+    top = _plan_curves(cfg)["inner_in"]
     return [*top, *((x, -y) for x, y in reversed(top))]
 
 
+def _end_span(cfg: Config) -> tuple[float, float]:
+    """X range of the end spaces: where the front panel's inner surface lies above the back
+    panel's outer surface."""
+    body, t = cfg.body, cfg.thickness
+
+    def room(x: float) -> float:
+        return body.surface_z("front", -t / 2, x) - body.surface_z("back", t / 2, x)
+
+    def edge(inside: float, outside: float) -> float:
+        for _ in range(80):
+            mid = (inside + outside) / 2
+            inside, outside = (mid, outside) if room(mid) > 0 else (inside, mid)
+        return inside
+
+    x0, x1 = body.inner_glue[0], body.inner_fold[0]
+    reach = x1 - x0
+    return edge(0.0, x0 - reach), edge(0.0, x1 + reach)
+
+
 def end_plan(cfg: Config) -> list[Point]:
-    """Plan outline of the top end space, between the inner flap and the interior wall."""
-    body = cfg.body
-    layout = wall_layout(cfg)
-    assert layout is not None
-    curves = _plan_curves(body, layout)
-    x0, x1 = _span(body, layout)
-    xs = sorted({x0, x1, *(x for x, _ in curves["flap"] if x0 < x < x1)})
+    """Plan outline of the top end space, between the inner and the outer end wall."""
+    curves = _plan_curves(cfg)
+    x0, x1 = _end_span(cfg)
+    xs = sorted({x0, x1, *(x for x, _ in curves["outer_in"] if x0 < x < x1)})
     return [
-        *((x, _interp(curves["wall_out"], x)) for x in xs),
-        *((x, _interp(curves["flap"], x)) for x in reversed(xs)),
+        *((x, _interp(curves["inner_out"], x)) for x in xs),
+        *((x, _interp(curves["outer_in"], x)) for x in reversed(xs)),
     ]
 
 
@@ -122,17 +126,16 @@ def main_section(cfg: Config) -> list[Point]:
 
 
 def end_section(cfg: Config) -> list[Point]:
-    """(X, Z) outline of an end space over the walls' span: from the back panel's inner
-    surface up to the bridge's underside (1.5 t inside the front panel's mid-surface)."""
+    """(X, Z) outline of an end space: from the back panel's outer surface (where the outer
+    end wall ends; the back panel stops at the inner wall) up to the front panel's inner
+    surface."""
     body, t = cfg.body, cfg.thickness
-    layout = wall_layout(cfg)
-    assert layout is not None
-    x0, x1 = _span(body, layout)
+    x0, x1 = _end_span(cfg)
     n = _samples(x1 - x0)
     xs = [x0 + (x1 - x0) * i / n for i in range(n + 1)]
     return [
-        *((x, body.surface_z("back", -t / 2, x)) for x in xs),
-        *((x, body.surface_z("front", -1.5 * t, x)) for x in reversed(xs)),
+        *((x, body.surface_z("back", t / 2, x)) for x in xs),
+        *((x, body.surface_z("front", -t / 2, x)) for x in reversed(xs[1:-1])),
     ]
 
 
@@ -143,9 +146,8 @@ def _poly(pts: Sequence[Point]) -> str:
 
 def render_scad(cfg: Config) -> str:
     """The OpenSCAD source of the interior model."""
-    body = cfg.body
-    layout = wall_layout(cfg)
-    reach = body.edge_length + 2 * cfg.height + 10  # prism lengths: past every bound
+    gap = cfg.end_wall_gap > 0
+    reach = cfg.front_length + 2 * cfg.height + 10  # prism lengths: past every bound
     extrude = f"linear_extrude(height = {reach:.4f}, center = true, convexity = 4)"
     lines = [
         f"// Pillow box interior, generated by yanartas-pillowbox {__version__}. Units: mm.",
@@ -155,8 +157,7 @@ def render_scad(cfg: Config) -> str:
         f" material {cfg.thickness:g} mm.",
         f"// config: {json.dumps(cfg.to_dict(), separators=(',', ':'))}",
         "",
-        "// The space for the payload, bounded by the panels and by the interior walls (or the",
-        "// inner end flaps).",
+        "// The space for the payload, bounded by the panels and the inner end walls.",
         "module main_space() {",
         "  intersection() {",
         f"    rotate([90, 0, 0]) {extrude} main_section();",
@@ -173,10 +174,11 @@ def render_scad(cfg: Config) -> str:
         "}",
         "",
     ]
-    if layout is not None:
+    if gap:
         lines += [
-            "// The space between the inner end flap and the interior wall, under the bridge,",
-            "// at the +Y end (end_spaces() places both).",
+            "// The space between the inner and the outer end wall, from the front panel to the",
+            "// outside of the box (open over the back panel), at the +Y end (end_spaces() places",
+            "// both).",
             "module end_space() {",
             "  intersection() {",
             f"    rotate([90, 0, 0]) {extrude} end_section();",
@@ -207,7 +209,7 @@ def render_scad(cfg: Config) -> str:
         "",
         'color("SkyBlue") main_space();',
     ]
-    if layout is not None:
+    if gap:
         lines.append('color("Orchid") end_spaces();')
     if cfg.payload_width > 0 and cfg.payload_depth > 0 and cfg.payload_height > 0:
         lines.append("%payload();  // preview only")
