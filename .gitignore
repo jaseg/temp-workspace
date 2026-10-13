@@ -7,3 +7,5 @@ dist/
 build/
 *.egg-info/
 /yanartas-pillowbox.json
+/artifact/dist/
+/artifact/.cache/

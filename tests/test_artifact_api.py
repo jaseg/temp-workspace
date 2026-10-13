@@ -1,0 +1,77 @@
+"""The in-browser API (artifact/pb_api.py) answers like the Flask server."""
+
+import importlib.util
+import io
+import json
+from pathlib import Path
+
+import pytest
+
+from yanartas_pillowbox.config import Config
+from yanartas_pillowbox.server import create_app
+from yanartas_pillowbox.svg import render_svg
+
+_spec = importlib.util.spec_from_file_location(
+    "pb_api", Path(__file__).parents[1] / "artifact/pb_api.py"
+)
+pb_api = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(pb_api)
+
+
+@pytest.fixture
+def client(tmp_path):
+    return create_app(tmp_path / "s.json").test_client()
+
+
+def call(method, path, body=None, stored=None):
+    reply = json.loads(pb_api.handle(method, path, body, stored))
+    return reply["status"], reply["body"]
+
+
+def same(flask_response, status, body):
+    assert flask_response.status_code == status
+    if flask_response.mimetype == "application/json":
+        assert flask_response.get_json() == json.loads(body)
+    else:
+        assert flask_response.get_data(as_text=True) == body
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "data"),
+    [
+        ("GET", "/api/defaults", None),
+        ("GET", "/api/config", None),
+        ("PUT", "/api/config", {"config": {"payload_width": 30}}),
+        ("PUT", "/api/config", {"config": {"payload_width": -1}}),
+        ("PUT", "/api/config", {"config": {"version": 1}}),
+        ("POST", "/api/render", {"config": {}}),
+        ("POST", "/api/render", {"config": {"material_thickness": 0.5}}),
+        ("POST", "/api/scad", {"config": {}}),
+        ("POST", "/api/payload", {"config": {}, "action": "fit"}),
+        ("POST", "/api/payload", {"config": {}, "action": "maximize", "field": "payload_width"}),
+        ("POST", "/api/payload", {"config": {}, "action": "bogus"}),
+    ],
+)
+def test_routes_match_server(client, method, path, data):
+    body = None if data is None else json.dumps(data)
+    expected = client.open(path, method=method, data=body, content_type="application/json")
+    same(expected, *call(method, path, body))
+
+
+def test_import_matches_server(client):
+    svg = render_svg(Config.from_dict({"payload_width": 31}))
+    expected = client.post(
+        "/api/import",
+        data={"file": (io.BytesIO(svg.encode()), "box.svg")},
+        content_type="multipart/form-data",
+    )
+    same(expected, *call("POST", "/api/import", svg))
+    assert call("POST", "/api/import", "")[0] == 400
+
+
+def test_stored_config():
+    cfg = Config.from_dict({"payload_width": 33}).to_dict()
+    assert json.loads(call("GET", "/api/config", stored=json.dumps(cfg))[1])["config"] == cfg
+    for bad in ("{", "[]", json.dumps({**cfg, "version": 1})):
+        got = json.loads(call("GET", "/api/config", stored=bad)[1])["config"]
+        assert got == Config.defaults().to_dict()

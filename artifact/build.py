@@ -1,0 +1,174 @@
+"""Build the in-browser (Pyodide) version of the web UI as a static site.
+
+Usage: python artifact/build.py [--out DIR] [--pyodide-tgz FILE]
+
+Writes DIR (default artifact/dist/): the package's geometry modules and pb_api.py, run by
+Pyodide in a web worker (pyworker.js); pyshim.js, which answers the frontend's /api/*
+requests from that worker; and the frontend, unchanged except for the patches below.
+DIR/index.html is the page body for a claude.ai Artifact (the viewer adds the document
+skeleton); DIR/local-test.html is the same page as a full document for local testing
+(python -m http.server -d DIR).
+
+The Pyodide runtime comes from the npm tarball (downloaded to artifact/.cache/ unless
+--pyodide-tgz is given) and is checked against the registry's integrity hash.
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import io
+import re
+import shutil
+import tarfile
+import urllib.request
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+PKG = HERE.parent / "src/yanartas_pillowbox"
+STATIC = PKG / "static"
+
+PYODIDE_VERSION = "0.26.4"
+PYODIDE_URL = f"https://registry.npmjs.org/pyodide/-/pyodide-{PYODIDE_VERSION}.tgz"
+PYODIDE_SHA512 = (
+    "z2CHsjVlhhJi5tYBF0AYAfNEPo3zq/z+xOpFtk1tweJkRaTqU4UK/7pLvo8DBU2VDPH31vB3pSI+8fnoqrVrFg=="
+)
+PYODIDE_FILES = ("pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "pyodide-lock.json")
+
+# The package modules the API needs (no Flask, no file persistence).
+PY_MODULES = (
+    "__init__", "config", "crosssection", "geometry", "svg", "dimensions", "payload",
+    "presets", "scad",
+)  # fmt: skip
+
+
+def patch(text: str, old: str, new: str) -> str:
+    assert text.count(old) == 1, f"patch target found {text.count(old)}x: {old[:60]!r}"
+    return text.replace(old, new)
+
+
+def pyodide_tarball(path: Path | None) -> bytes:
+    if path is None:
+        path = HERE / ".cache" / f"pyodide-{PYODIDE_VERSION}.tgz"
+        if not path.exists():
+            path.parent.mkdir(exist_ok=True)
+            print("downloading", PYODIDE_URL)
+            with urllib.request.urlopen(PYODIDE_URL) as res:
+                path.write_bytes(res.read())
+    data = path.read_bytes()
+    digest = base64.b64encode(hashlib.sha512(data).digest()).decode()
+    if digest != PYODIDE_SHA512:
+        raise SystemExit(f"{path}: sha512 mismatch, not the pyodide {PYODIDE_VERSION} tarball")
+    return data
+
+
+def build(out: Path, tgz: Path | None) -> None:
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
+
+    # Python: the package modules verbatim, plus the API module.
+    (out / "py/yanartas_pillowbox").mkdir(parents=True)
+    for name in PY_MODULES:
+        shutil.copy(PKG / f"{name}.py", out / f"py/yanartas_pillowbox/{name}.py")
+    shutil.copy(HERE / "pb_api.py", out / "py/pb_api.py")
+
+    # Pyodide runtime. Artifacts do not serve .zip files: the standard library ships
+    # base64-encoded as text and pyworker.js hands it to Pyodide as a blob URL.
+    (out / "pyodide").mkdir()
+    with tarfile.open(fileobj=io.BytesIO(pyodide_tarball(tgz)), mode="r:gz") as tar:
+        for name in PYODIDE_FILES:
+            (out / "pyodide" / name).write_bytes(tar.extractfile(f"package/{name}").read())
+        stdlib = tar.extractfile("package/python_stdlib.zip").read()
+    (out / "pyodide/python_stdlib.zip.b64.txt").write_text(base64.b64encode(stdlib).decode())
+
+    for name in ("pyshim.js", "pyworker.js"):
+        shutil.copy(HERE / name, out / name)
+
+    # Frontend: verbatim except for the patches below.
+    (out / "static/js/components").mkdir(parents=True)
+    (out / "static/css").mkdir()
+    for rel in (
+        "js/dims2d.js", "js/lines.js", "js/components/pb-param.js",
+        "js/components/pb-preview2d.js", "js/components/pb-preview3d.js",
+        "js/components/pb-section.js",
+    ):  # fmt: skip
+        shutil.copy(STATIC / rel, out / "static" / rel)
+
+    app = (STATIC / "js/app.js").read_text()
+    app, n = re.subn(
+        r"function saveBlob\(blob, name\) \{\n.*?\n\}\n",
+        "function saveBlob(blob, name) {\n"
+        "  // Artifact build: saved through the viewer's downloads capability (pyshim.js).\n"
+        "  window.pbSave(blob, name);\n}\n",
+        app,
+        count=1,
+        flags=re.S,
+    )
+    assert n == 1, "saveBlob not found in app.js"
+    # The downloads capability only accepts known extensions; OpenSCAD source goes out as text.
+    app = patch(app, 'fileName("-interior.scad")', 'fileName("-interior.scad.txt")')
+    (out / "static/js/app.js").write_text(app)
+
+    # three.js ships as the page's own files: the viewer's CSP allows 'self' scripts but no
+    # CDN, and ignores import maps, so pb-preview3d.js must import it by relative path.
+    (out / "static/vendor/three").mkdir(parents=True)
+    for name in ("three.module.min.js", "OrbitControls.js", "LICENSE"):
+        shutil.copy(STATIC / "vendor/three" / name, out / "static/vendor/three" / name)
+
+    # CSS: follow the viewer's explicit light/dark choice too, not only the OS setting.
+    css = (STATIC / "css/app.css").read_text()
+    m = re.search(
+        r"@media \(prefers-color-scheme: dark\) \{\n  :root \{\n(.*?)\n  \}\n\}\n", css, re.S
+    )
+    assert m, "dark block not found in app.css"
+    dark = m.group(1)
+    css = css.replace(
+        m.group(0),
+        '@media (prefers-color-scheme: dark) {\n  :root:not([data-theme="light"]) {\n'
+        f"{dark}\n    color-scheme: dark;\n  }}\n}}\n"
+        f':root[data-theme="dark"] {{\n{dark}\n  color-scheme: dark;\n}}\n'
+        ':root[data-theme="light"] { color-scheme: light; }\n',
+    )
+    css += (
+        "\n/* Artifact build: keep a 16px side gutter at every width. */\n"
+        ".layout { padding-inline: 16px; }\n"
+    )
+    (out / "static/css/app.css").write_text(css)
+
+    # The page: the repo's index.html body, with the shim loaded before the app. No inline
+    # scripts (the viewer's CSP refuses them).
+    html = (STATIC / "index.html").read_text()
+    body = html[html.index("<body>") + len("<body>") : html.index("</body>")].strip("\n")
+    page = (
+        "<title>Pillow Box Designer</title>\n"
+        '<link rel="stylesheet" href="static/css/app.css">\n'
+        '<script type="module" src="pyshim.js"></script>\n'
+        '<script type="module" src="static/js/app.js"></script>\n'
+        f"{body}\n"
+    )
+    (out / "index.html").write_text(page)
+
+    # Local test page: the same content in a document. A module script runs first, as in
+    # the viewer, so that an import map would be ignored here too.
+    (out / "local-test.html").write_text(
+        '<!doctype html><html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+        "<style>:root{color-scheme:light}body{margin:0}[hidden]{display:none!important}</style>"
+        '<script type="module">/* stands in for the viewer shell */</script>'
+        "</head><body>" + page + "</body></html>"
+    )
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--out", type=Path, default=HERE / "dist", help="output directory")
+    ap.add_argument("--pyodide-tgz", type=Path, help=f"local pyodide-{PYODIDE_VERSION}.tgz")
+    args = ap.parse_args()
+    build(args.out, args.pyodide_tgz)
+    print("built", args.out)
+
+
+if __name__ == "__main__":
+    main()
