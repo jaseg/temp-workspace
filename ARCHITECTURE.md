@@ -161,8 +161,16 @@ planes by `e` accordingly; everything stays an exact isometric folding.
   `L + e..Lf`, continuing the outer flaps' cut step down to the back panel's corners.
 - **Gap.** On the centreline the walls' mid-surfaces are `e + t` apart, a clear gap of `e`.
   Towards the sides the outer wall curves away a little more.
-- **Open top.** The back panel ends at the inner wall, so the box is open over the gap.
-  The outer flaps' cut edge still follows the back panel's outer surface, extended.
+- **Lid.** The back panel ends at the inner wall, so each outer flap carries a lid over the
+  gap (`geometry.lid_layout`). Its fold lies in the plane `y_int + (Z - zs) = level` (45°),
+  so it is the front fold arc mirrored (`y = level - f(x)`), and the lid lies on the
+  cylinder `Z = zs + level - f(x)`, ruled along the box: the front profile turned over.
+  `level` is the highest that keeps the lid's mid-surface at least `t` outside the back
+  panel's everywhere, so the lid touches the back panel near the sides and stands off it by
+  about `t` in the middle (the back panel bows `t` deeper). Its free edge runs
+  `e - t/2 + lid_overlap` beyond the back panel's crease, in folded depth.
+- **Views.** The 3D and section views show the model turned half a turn about its length,
+  back panel (lids) up; the model frame itself keeps the front panel at +Z.
 - **Interior.** The interior, payload clearance and fit are unchanged: they are bounded by
   the inner walls, centred on the box.
 

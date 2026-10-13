@@ -7,7 +7,7 @@ from helpers import parse_path, q, svg_elements
 
 from yanartas_pillowbox import dimensions as dm
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import FoldedBox, build_cross_section, build_pattern
+from yanartas_pillowbox.geometry import FoldedBox, build_cross_section, build_pattern, lid_layout
 from yanartas_pillowbox.server import create_app
 from yanartas_pillowbox.svg import render_svg, sheet_offset
 
@@ -52,7 +52,7 @@ def test_pattern_dimensions_cover_the_parameters(cfg):
     if cfg.glue_tab_taper > 0:
         expected.add("glue_tab_taper")
     if cfg.end_wall_gap > 0:
-        expected.add("end_wall_gap")
+        expected |= {"end_wall_gap", "lid_overlap"}
     assert {d.param for d in dims} == expected
 
 
@@ -83,16 +83,28 @@ def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
         ("height", 0): t / 2,
         ("end_wall_gap", 0): t / 2,
         ("end_wall_gap", 1): e + t / 2,
+        # On the lid, over the inner wall's outer surface: checked below.
+        ("lid_overlap", 1): None,
     }
     if cfg.fpc_cutout == "both":  # measured to where the edge would be without the cutout
         x = cfg.body.front.width + cfg.body.back.width / 2
         plain = build_pattern(cfg.with_values(fpc_cutout="none"))
         cut = pattern.face("back-top-flap").y_range(x)[0]
         allowance["height", 1] = cut - plain.face("back-top-flap").y_range(x)[0]
-    for d in dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern)):
+    dx, dy = sheet_offset(pattern)
+    for d in dm.pattern_dimensions(cfg, pattern, (dx, dy)):
         for i, p in enumerate(d.points):
+            if allowance.get((d.param, i), 0) is None:
+                continue
             dist = min(s.distance_to(p) for s in segs)
             assert dist == pytest.approx(allowance.get((d.param, i), 0), abs=1e-4), (d.param, i)
+        if d.param == "lid_overlap":
+            # From the top lid's free edge into the lid, to where the inner wall's outer
+            # surface lies under it (the lid's depth there, less the overlap).
+            lid, x = lid_layout(cfg), d.points[0][0] - dx
+            depth = next(dd for xx, dd in lid.depth if xx == pytest.approx(x))
+            ys = sorted(q[1] - dy for q in d.points)
+            assert ys == pytest.approx([lid.level - depth, lid.level - depth + cfg.lid_overlap])
 
 
 def test_length_dimension_runs_along_the_midline(cfg):
@@ -195,15 +207,16 @@ def test_section_dimensions(cfg):
 def test_model_dimensions(cfg):
     box = FoldedBox(cfg)
     body = box.body
-    w, edge, s_f, t = body.front.width, cfg.edge_length, body.front.sagitta, cfg.thickness
+    w, edge, t = body.front.width, cfg.edge_length, cfg.thickness
     e, front = cfg.end_wall_gap, cfg.front_length
     dims = {d.param: d for d in dm.model_dimensions(cfg)}
-    assert set(dims) == {"length", "width", "height"} | ({"end_wall_gap"} if e > 0 else set())
+    extra = {"end_wall_gap", "lid_overlap"} if e > 0 else set()
+    assert set(dims) == {"length", "width", "height"} | extra
 
-    length = dims["length"]  # along the front panel's midline, between the inner walls
+    length = dims["length"]  # along the back panel's midline, between the inner walls
     assert math.dist(*length.points) == pytest.approx(cfg.length)
-    inset = e + s_f + 1.5 * t
-    ends = [box.map("front-panel", (w / 2, y)) for y in (inset, front - inset)]
+    inset, wb = e + body.back.sagitta + t / 2, body.back.width
+    ends = [box.map("back-panel", (w + wb / 2, y)) for y in (inset, front - inset)]
     for p, a in zip(length.points, ends, strict=True):
         assert math.dist(p, a) < 1e-9
     assert abs(length.points[0][1]) == pytest.approx(cfg.length / 2)  # the interior's ends
@@ -213,6 +226,12 @@ def test_model_dimensions(cfg):
         assert math.dist(*gap.points) == pytest.approx(e)
         ys = sorted(-p[1] for p in gap.points)
         assert ys == pytest.approx([cfg.length / 2 + t, cfg.length / 2 + t + e])
+        overlap = dims["lid_overlap"]  # along the lid
+        assert math.dist(*overlap.points) == pytest.approx(cfg.lid_overlap)
+        # (drawn on the back panel's side, which the 3D view shows up)
+        for name in ("length", "end_wall_gap", "lid_overlap"):
+            start, end = dims[name].extensions[0]
+            assert end[2] < start[2], name
 
     height = dims["height"]  # between the panels' inner surfaces on the centreline
     assert math.dist(*height.points) == pytest.approx(cfg.height)
@@ -241,9 +260,11 @@ def test_render_returns_dimensions(tmp_path):
         "glue_tab_width",
         "glue_tab_taper",
         "end_wall_gap",
+        "lid_overlap",
     }
     assert {d["param"] for d in dims["section"]} == {"width", "height", "circumference"}
-    assert {d["param"] for d in dims["model"]} == {"width", "length", "height", "end_wall_gap"}
+    model = {"width", "length", "height", "end_wall_gap", "lid_overlap"}
+    assert {d["param"] for d in dims["model"]} == model
     for view in dims.values():
         for d in view:
             assert d["label"] and d["kind"] and d["points"]

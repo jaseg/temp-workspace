@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import FoldedBox, Pattern, Point, Point3
+from yanartas_pillowbox.geometry import FoldedBox, Pattern, Point, Point3, lid_layout
 from yanartas_pillowbox.svg import MARGIN
 
 Coords = tuple[float, ...]
@@ -171,6 +171,21 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 at=wf * 0.3 + dx,  # in line with the length
             )
         )
+    lid = lid_layout(cfg)
+    if lid is not None and cfg.lid_overlap > 0:
+        # Lid overlap, on the top lid at the middle: from its free edge back to where the
+        # inner end wall's outer surface lies under it.
+        y_edge = pattern.face("front-top-lid").y_range(wf / 2)[0]
+        dims.append(
+            Dimension(
+                "lid_overlap",
+                f"overlap {fmt(cfg.lid_overlap)}",
+                "vertical",
+                (p(wf / 2, y_edge), p(wf / 2, y_edge + cfg.lid_overlap)),
+                cfg.lid_overlap,
+                at=wf * 0.3 + dx,
+            )
+        )
     return dims
 
 
@@ -226,11 +241,13 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
 
     dims: list[Dimension] = []
 
-    # Length: along the front panel's midline (its top ridge), between the inner end walls'
-    # inner surfaces, e + 1.5 t inside the front's curved folds; drawn above the box.
-    a = box.map("front-panel", (wf / 2, e + s_f + 1.5 * t))
-    b = box.map("front-panel", (wf / 2, length - e - s_f - 1.5 * t))
-    off = (0.0, 0.0, gap * 0.6)
+    # Length: along the back panel's midline (the ridge on the side the view shows up), between
+    # the inner end walls' inner surfaces, t/2 inside the back panel's curved folds; drawn
+    # beyond the back panel (-Z).
+    wb, s_b = body.back.width, body.back.sagitta
+    a = box.map("back-panel", (wf + wb / 2, e + s_b + t / 2))
+    b = box.map("back-panel", (wf + wb / 2, length - e - s_b - t / 2))
+    off = (0.0, 0.0, -gap * 0.6)
     la, lb = add(a, off), add(b, off)
     dims.append(
         Dimension(
@@ -244,11 +261,13 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
             label_at=tuple((la[i] + lb[i]) / 2 + off[i] * 0.5 for i in range(3)),
         )
     )
-    if e > 0:
-        # End wall gap, in line with the length at the far end (-Y): from the inner wall's
-        # outer surface to the outer wall's inner surface.
-        a = box.map("front-panel", (wf / 2, length - e - s_f - t / 2))
-        b = box.map("front-panel", (wf / 2, length - s_f - t / 2))
+    lid = lid_layout(cfg)
+    if e > 0 and lid is not None:
+        # End wall gap, in line with the length at the far end (-Y), on the centreline under
+        # the lid: from the inner wall's outer surface to the outer wall's inner surface.
+        z = body.z_shift + lid.level - s_f + t / 2  # the lid's inner surface there
+        a = (0.0, -(cfg.length / 2 + t), z)
+        b = (0.0, -(cfg.length / 2 + t + e), z)
         la, lb = add(a, off), add(b, off)
         dims.append(
             Dimension(
@@ -260,6 +279,27 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
                 line=(la, lb),
                 extensions=((a, add(a, off, 1.15)), (b, add(b, off, 1.15))),
                 label_at=tuple((la[i] + lb[i]) / 2 + off[i] * 0.5 for i in range(3)),
+            )
+        )
+    if lid is not None and cfg.lid_overlap > 0:
+        # Lid overlap, on the near end's lid (+Y): from where the inner wall's outer surface
+        # lies under it to its free edge; drawn further out than the length.
+        depth = next(d for x, d in lid.depth if x >= wf / 2)
+        x_mid = next(x for x, _ in lid.depth if x >= wf / 2)
+        a = box.map("front-top-lid", (x_mid, lid.level - depth + cfg.lid_overlap))
+        b = box.map("front-top-lid", (x_mid, lid.level - depth))
+        off2 = tuple(c * 1.6 for c in off)
+        la, lb = add(a, off2), add(b, off2)
+        dims.append(
+            Dimension(
+                "lid_overlap",
+                f"overlap {fmt(cfg.lid_overlap)}",
+                "aligned3d",
+                (a, b),
+                math.dist(a, b),
+                line=(la, lb),
+                extensions=((a, add(a, off2, 1.1)), (b, add(b, off2, 1.1))),
+                label_at=tuple((la[i] + lb[i]) / 2 + off2[i] * 0.3 for i in range(3)),
             )
         )
 

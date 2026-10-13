@@ -157,7 +157,7 @@ def test_fold_paths_are_open_and_single(cfg):
     root = svg_elements(render_svg(cfg))
     els = list(fold_elements(root))
     pattern = build_pattern(cfg)
-    assert len(els) == len(pattern.folds) == 6
+    assert len(els) == len(pattern.folds) == (6 if cfg.end_wall_gap == 0 else 8)  # + lids
     for el in els:
         cmds, segs = parse_path(el.get("d"))
         assert cmds.count("M") == 1 and "Z" not in cmds
@@ -258,8 +258,8 @@ def test_print_inside_only_flips_fold_indicators():
 def test_face_labels(gap):
     """A text layer says on the back panel which side of the box the print side ends up on,
     marks the front and back end once each on the front panel (near its curved folds), and
-    tells on every oval panel which way its print side faces: outside (flipped when printing
-    on the inside). Text is filled, not stroked, and sits inside its face."""
+    tells on every flap and lid which way its print side faces: outside (flipped when
+    printing on the inside). Text is filled, not stroked, and sits inside its face."""
     for side in ("outside", "inside"):
         cfg = Config.defaults().with_values(print_side=side, end_wall_gap=gap)
         pattern = build_pattern(cfg)
@@ -268,8 +268,9 @@ def test_face_labels(gap):
         assert layer.get(INK_LABEL) == "Labels"
         texts = [el.text for el in layer.iter(q("text"))]
         assert texts.count("front end") == texts.count("back end") == 1
-        assert texts.count(side) == 1 + 4  # back panel and the four flaps
-        assert len(texts) == 2 + 1 + 4
+        lids = 2 if gap else 0
+        assert texts.count(side) == 1 + 4 + lids  # back panel, the four flaps, the lids
+        assert len(texts) == 2 + 1 + 4 + lids
         for el in layer.iter(q("text")):
             assert el.get("fill") == "#000000" and el.get("stroke") == "none"
             assert 0 < float(el.get("font-size")) <= 3
@@ -288,6 +289,7 @@ def test_face_labels(gap):
                 assert min(y - top, bottom - y) < 10  # near the curved fold
                 assert (y - top < bottom - y) == (text == "front end")
             else:
-                assert text == side and name in ("back-panel", *(n for n in faces if "flap" in n))
+                names = ("back-panel", *(n for n in faces if "flap" in n or "lid" in n))
+                assert text == side and name in names
             if name != "front-panel":  # centred on its face
                 assert x == pytest.approx((faces[name].x0 + faces[name].x1) / 2)

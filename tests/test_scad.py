@@ -9,7 +9,7 @@ from helpers import self_intersections
 
 from yanartas_pillowbox import payload
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import _interior
+from yanartas_pillowbox.geometry import _interior, lid_layout
 from yanartas_pillowbox.scad import render_scad
 
 D = Config.defaults()
@@ -87,22 +87,25 @@ def test_main_space_is_the_interior(cfg):
 def test_end_space_lies_between_the_end_walls(cfg):
     """In plan, between the inner wall's outer surface and the outer wall's inner surface:
     the gap along the box in the middle, a thickness beyond the main space everywhere. In
-    section, from the back panel's outer surface (where the outer wall ends) up to the front
-    panel's inner surface, across the box between where those two meet."""
+    section, from the lid's inner surface up to the front panel's inner surface, across the
+    lid's width."""
     if cfg.end_wall_gap == 0:
         pytest.skip("walls stacked: no end space")
     polys = polygons(render_scad(cfg))
     t, half, e = cfg.thickness, cfg.length / 2, cfg.end_wall_gap
     end, main = polys["end_plan"], polys["main_plan"]
     assert y_bounds(end, 0) == pytest.approx([half + t, half + t + e], abs=CHORD)
+    body, lid = cfg.body, lid_layout(cfg)
+    # The lid's inner surface, in the middle: half a thickness inside its mid-surface, which
+    # lies the front panel's sagitta below the lid level.
+    lid_inner = body.z_shift + lid.level - body.front.sagitta + t / 2
     assert y_bounds(polys["end_section"], 0) == pytest.approx(
-        [-cfg.height / 2 - t, cfg.height / 2], abs=CHORD
+        [lid_inner, cfg.height / 2], abs=CHORD
     )
-    body = cfg.body
+    assert lid_inner <= -cfg.height / 2 - t + 1e-9  # outside the back panel
     xs = sorted(x for x, _ in polys["end_section"])
-    for x in (xs[0], xs[-1]):  # the section's ends: front inner meets back outer surface
-        front = body.surface_z("front", -t / 2, x)  # (x is written to 1e-4 mm)
-        assert front == pytest.approx(body.surface_z("back", t / 2, x), abs=1e-3)
+    edges = sorted(body.front_point(u)[0] for u in (0.0, body.front.width))
+    assert [xs[0], xs[-1]] == pytest.approx(edges, abs=1e-4)  # the lid's sides
     # Across the box, the inner wall's thickness separates the end space from the main space
     # (measured along Y: t / cos of the wall's angle; away from the tight corners, where this
     # first-order estimate no longer holds for thick material).

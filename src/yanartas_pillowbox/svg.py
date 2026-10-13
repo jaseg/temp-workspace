@@ -187,7 +187,7 @@ def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]
       ends up on;
     * on the front panel, just inside each curved fold, which end of the box that is (front
       end: the top of the pattern, like the FPC cutout setting);
-    * on every oval panel, which way its print side faces once folded (the flaps keep the
+    * on every flap and lid, which way its print side faces once folded (they keep the
       panels' orientation)."""
     printed_out = cfg.print_side == "outside"
 
@@ -202,7 +202,7 @@ def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]
     out.append(("front end", (xf, top + 2 * LABEL_SIZE), LABEL_SIZE))
     out.append(("back end", (xf, bottom - 2 * LABEL_SIZE), LABEL_SIZE))
     for face in pattern.faces:
-        if face.kind != "flap":
+        if face.kind not in ("flap", "lid"):
             continue
         xm = (face.x0 + face.x1) / 2
         lo, hi = face.y_range(xm)

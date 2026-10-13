@@ -128,16 +128,18 @@ export class PbPreview3d extends HTMLElement {
       disposeTree(this.#group);
     }
     const group = new THREE.Group();
-    // Lay the box on the table: model length (Y) -> world X, height (Z) -> world up (Y),
-    // width (X) -> world Z (towards the default camera).
+    // Lay the box on the table, back panel (the lids' side, model -Z) up: model length (Y)
+    // -> world X, height (Z) -> world down (-Y), width (X) -> world -Z.
     group.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
-      new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0)));
-    const paper = { panel: 0xeee6d3, flap: 0xd9cdb2, tab: 0xc9bc9c };
-    // The model is the material's mid-surface: the two flaps of an end lie only a thickness
-    // apart (none at zero thickness), as do the glue tab and the front panel under it. Depth
-    // offsets keep the outer surface on top (front flaps over back flaps, tab over panel).
+      new THREE.Vector3(0, 0, -1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0)));
+    const paper = { panel: 0xeee6d3, flap: 0xd9cdb2, lid: 0xd9cdb2, tab: 0xc9bc9c };
+    // The model is the material's mid-surface: the two flaps of a stacked end lie only a
+    // thickness apart (none at zero thickness), as do the glue tab and the front panel under
+    // it, and the lids and the back panel under them. Depth offsets keep the outer surface on
+    // top (front flaps over back flaps, tab and lids over panels).
     const depthBias = (part) =>
-      part.kind === "tab" ? 1 : part.name.startsWith("back-") && part.kind === "flap" ? 4 : 2;
+      part.kind === "tab" || part.kind === "lid" ? 1
+        : part.name.startsWith("back-") && part.kind === "flap" ? 4 : 2;
     for (const part of model.parts) {
       const geom = new THREE.BufferGeometry();
       geom.setAttribute("position", new THREE.Float32BufferAttribute(part.positions, 3));

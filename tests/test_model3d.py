@@ -16,6 +16,7 @@ from yanartas_pillowbox.geometry import (
     build_cross_section,
     build_model3d,
     build_pattern,
+    lid_layout,
 )
 
 D = Config.defaults()
@@ -92,8 +93,8 @@ def same_segment(a, b, tol=1e-9):
 
 # ------------------------------------------------------------------ the 2D faces tile the pattern
 def test_faces_tile_the_pattern(case):
-    _, pattern, _, _ = case
-    assert len(pattern.faces) == 7
+    cfg, pattern, _, _ = case
+    assert len(pattern.faces) == (7 if cfg.end_wall_gap == 0 else 9)  # + a lid at each end
     faces = pattern.faces
     for face in faces:  # closed, consistently oriented loops
         loop = face.boundary
@@ -277,8 +278,10 @@ def _surface_gap(body, panel, offset, x, z):
 
 
 def test_flap_edges_meet_the_body_surfaces(case):
-    """The outer (front) flaps' cut edge is flush with the back panel's outer surface, the
-    inner (back) flaps' cut edge meets the front panel's inner surface (or, near the
+    """The outer (front) flaps' cut edge is flush with the back panel's outer surface, or
+    with an end wall gap their fold into the lid is where the lid's mid-surface lies on top
+    of the back panel (at least a thickness outside its mid-surface, touching somewhere).
+    The inner (back) flaps' cut edge meets the front panel's inner surface (or, near the
     corners where that dips below, runs along the chord). Exact at the polyline's
     vertices, to well under 0.01 mm in between. An FPC cutout cuts the inner edge back
     further."""
@@ -286,15 +289,27 @@ def test_flap_edges_meet_the_body_surfaces(case):
     box = FoldedBox(cfg)
     body, t = box.body, cfg.thickness
     wf, wb = body.front.width, body.back.width
+    lid = lid_layout(cfg)
     plain = None if cfg.fpc_cutout == "none" else build_pattern(replace(cfg, fpc_cutout="none"))
     for end in ("top", "bottom"):
+        clearances = []
         for i in range(1, 200):
             # Outer flap.
             x = wf * i / 200
             lo, hi = pattern.face(f"front-{end}-flap").y_range(x)
             p = box.map(f"front-{end}-flap", (x, lo if end == "top" else hi))
-            gap = _surface_gap(body, "back", t / 2, p[0], p[2])
-            assert abs(gap) < 0.01 + 1e-3 * t, ("outer", end, x, gap)
+            if lid is None:
+                gap = _surface_gap(body, "back", t / 2, p[0], p[2])
+                assert abs(gap) < 0.01 + 1e-3 * t, ("outer", end, x, gap)
+            else:  # (the back panel's outward normal is -Z)
+                clearances.append(-_surface_gap(body, "back", t, p[0], p[2]))
+                if i == 1:  # also at the corners, where the lid may touch
+                    for xc in (0.0, wf):
+                        q = box.map(
+                            f"front-{end}-flap",
+                            (xc, pattern.face(f"front-{end}-flap").y_range(xc)[end == "bottom"]),
+                        )
+                        clearances.append(-_surface_gap(body, "back", t, q[0], q[2]))
             # Inner flap.
             x = wf + wb * i / 200
             lo, hi = pattern.face(f"back-{end}-flap").y_range(x)
@@ -310,10 +325,47 @@ def test_flap_edges_meet_the_body_surfaces(case):
             assert on_chord or abs(gap) < tol, ("inner", end, x, gap)
             if on_chord:
                 assert gap > -1e-6  # trimmed to the chord only where the surface is lower
-    # At the panels' apexes, exactly: the outer flap reaches Z = -(h/2 + t), the inner +h/2.
-    top_outer = box.map("front-top-flap", (wf / 2, -body.front_cuts[len(body.front_cuts) // 2][1]))
-    expected = body.surface_z("back", t / 2, top_outer[0])
-    assert top_outer[2] == pytest.approx(expected, abs=1e-9)
+        if lid is not None:
+            assert min(clearances) > -1e-3 * t - 1e-9, end
+            assert min(clearances) < 0.01 + 0.05 * t, end  # it rests on the back panel
+    if lid is None:
+        # At the panels' apexes, exactly: the outer flap reaches Z = -(h/2 + t), the inner
+        # +h/2.
+        cut = body.front_cuts[len(body.front_cuts) // 2][1]
+        top_outer = box.map("front-top-flap", (wf / 2, -cut))
+        expected = body.surface_z("back", t / 2, top_outer[0])
+        assert top_outer[2] == pytest.approx(expected, abs=1e-9)
+
+
+def test_lids_cover_the_gap(case):
+    """Each lid lies on the outside of the back panel, never closer than a thickness to its
+    mid-surface, ruled along the box; it starts at the outer wall's top and ends the
+    overlap beyond the inner wall's outer surface (measured along the box)."""
+    cfg, pattern, _, parts = case
+    lid = lid_layout(cfg)
+    if lid is None:
+        assert not [p for p in parts.values() if p["kind"] == "lid"]
+        return
+    box = FoldedBox(cfg)
+    body, t, e = box.body, cfg.thickness, cfg.end_wall_gap
+    half = cfg.edge_length / 2
+    for end, sign in (("top", 1), ("bottom", -1)):
+        part = parts[f"front-{end}-lid"]
+        assert part["kind"] == "lid"
+        face = pattern.face(f"front-{end}-lid")
+        for (x, y), p in zip(pts2(part), pts3(part), strict=True):
+            # On or outside the back panel's outer surface (a thickness out, mid to mid).
+            assert p[2] <= body.surface_z("back", t, p[0]) + POS_TOL, (end, x, y)
+            # Ruled along the box: the height depends on x only.
+            assert p[2] == pytest.approx(body.z_shift + lid.level - body.front.z(x), abs=POS_TOL)
+            lo, hi = face.y_range(x)
+            if abs(y - (lo if end == "top" else hi)) < 1e-9 and 0 < x < body.front.width:
+                # The free edge: the overlap beyond the inner wall's outer surface.
+                inner_wall = half - (body.z_shift - body.surface_z("back", 0.0, p[0]))
+                assert sign * p[1] == pytest.approx(inner_wall + t / 2 - cfg.lid_overlap, abs=1e-5)
+            if abs(y - (hi if end == "top" else lo)) < 1e-9:  # the fold: on the outer wall
+                outer_wall = half + e - body.front.z(x)
+                assert sign * p[1] == pytest.approx(outer_wall, abs=POS_TOL)
 
 
 def test_closed_dimensions(case):
@@ -324,9 +376,16 @@ def test_closed_dimensions(case):
     xs = [p[0] for p in allp]
     t, h = cfg.thickness, cfg.height
     # Mid-surface, centred on the interior: the front panel half the material above it, the
-    # outer flaps' edges flush with the back panel's outer surface, the material below it.
+    # outer flaps' edges flush with the back panel's outer surface, the material below it
+    # (or the lids, on top of the back panel, at their lowest in the middle).
     assert max(zs) == pytest.approx(h / 2 + t / 2, abs=1e-6)
-    assert min(zs) == pytest.approx(-(h / 2 + t), abs=0.01)
+    lid = lid_layout(cfg)
+    if lid is None:
+        assert min(zs) == pytest.approx(-(h / 2 + t), abs=0.01)
+    else:
+        lowest = cfg.body.z_shift + lid.level - cfg.body.front.sagitta
+        assert min(zs) == pytest.approx(lowest, abs=1e-6)
+        assert lowest <= -(h / 2 + 1.5 * t) + 1e-9
     assert max(ys) - min(ys) == pytest.approx(cfg.front_length, abs=POS_TOL)
     assert model["bounds"]["length"] == pytest.approx(cfg.front_length)
     assert model["interior"] == {"width": cfg.width, "length": cfg.length, "height": cfg.height}

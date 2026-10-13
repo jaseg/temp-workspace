@@ -42,6 +42,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from functools import lru_cache
 from typing import Any
 
 from yanartas_pillowbox.config import Config
@@ -221,6 +222,7 @@ class FoldCategory(StrEnum):
     STRAIGHT = "straight"
     CURVED = "curved"
     GLUE = "glue"
+    LID = "lid"  # outer flap -> lid over the end wall gap
 
 
 class FoldDirection(StrEnum):
@@ -405,13 +407,77 @@ def _mirror(seg: Segment, length: float) -> Segment:
     return Arc(m(seg.center), seg.radius, -seg.start_angle, -seg.sweep, m(seg.start), m(seg.end))
 
 
+@dataclass(frozen=True)
+class LidLayout:
+    """The lid over the end wall gap at the top end, in flat coordinates of the front panel
+    (``x``) and folded-model depths (``y_int``: distance from the front panel's top corner
+    line into the box).
+
+    The outer flap's top edge is a fold in the plane ``y_int + (Z - zs) = level``, at 45
+    degrees like the curved folds: in the pattern it is the front fold arc mirrored,
+    ``y = level - f(x)``. Folding across that plane puts the lid on a cylinder ruled along
+    the box, ``Z = zs + level - f(x)``, the front panel's profile turned over; flat ``y``
+    maps to ``y_int = level - y``. ``level`` is the highest that keeps the lid's mid-surface
+    at least a thickness outside the back panel's everywhere (it rests on the back panel).
+    The lid's free edge runs ``depth(x)`` deep (``y = level - depth(x)``): the gap, up to
+    the inner end wall's outer surface, plus the overlap."""
+
+    level: float
+    depth: tuple[Point, ...]  # (x, y_int of the free edge)
+    arc: bool  # the free edge is an exact arc (zero thickness)
+
+    def edge(self, sagitta: float) -> tuple[Segment, ...]:
+        """The free edge in flat coordinates, left to right."""
+        pts = [(x, self.level - d) for x, d in self.depth]
+        if self.arc:
+            return (arc_from_chord(pts[0], pts[-1], sagitta, (0.0, -1.0)),)
+        return tuple(Line(a, b) for a, b in itertools.pairwise(pts) if _dist(a, b) > 1e-12)
+
+
+@lru_cache(maxsize=64)
+def lid_layout(cfg: Config) -> LidLayout | None:
+    """The lid's layout, or None without an end wall gap."""
+    if cfg.end_wall_gap <= 0:
+        return None
+    body, t = cfg.body, cfg.thickness
+    sec, zs = body.front, body.z_shift
+    n = 2 * max(16, min(80, math.ceil(sec.width)))
+    us = [sec.width * i / n for i in range(n + 1)]
+    xs = [body.front_point(u)[0] for u in us]
+    level = min(body.surface_z("back", t, x) - zs + sec.z(u) for u, x in zip(us, xs, strict=True))
+    if t == 0:  # the lid lies on the back panel, whose profile is the front one turned over
+        level = 0.0
+    reach = cfg.end_wall_gap - t / 2 + cfg.lid_overlap
+    if t == 0:  # the back panel is the front one turned over: depths follow the fold arc
+        depth = tuple((u, reach + sec.z(u)) for u in us)
+    else:
+        depth = tuple(
+            (u, reach + zs - body.surface_z("back", 0.0, x)) for u, x in zip(us, xs, strict=True)
+        )
+    return LidLayout(level, depth, t == 0)
+
+
+def _mirror_face(face: Face, length: float, name: str) -> Face:
+    """A top-end face mirrored to the bottom end."""
+    return Face(
+        name,
+        face.kind,
+        tuple(_mirror(seg, length) for seg in face.boundary),
+        face.x0,
+        face.x1,
+        tuple(_mirror(seg, length) for seg in face.upper),
+        tuple(_mirror(seg, length) for seg in face.lower),
+    )
+
+
 def build_pattern(cfg: Config) -> Pattern:
     """Turn a validated config into the flat pattern: one outline and typed folds.
 
     The front panel's straight edges run from ``y = 0`` to ``y = Lf`` (``cfg.front_length``);
     the back panel and the glue tab are ``2 e`` shorter (``e``, the end wall gap): they run
     from ``y = e`` to ``y = e + L`` (``cfg.edge_length``). Each flap's wall stands at its own
-    panel's crease, so the inner walls stand ``e`` inside the outer walls."""
+    panel's crease, so the inner walls stand ``e`` inside the outer walls. With a gap, each
+    outer flap carries a lid over it (``LidLayout``). The bottom end mirrors the top."""
     body = cfg.body
     wf, wb, length = body.front.width, body.back.width, cfg.front_length
     e, edge = cfg.end_wall_gap, cfg.edge_length
@@ -419,10 +485,7 @@ def build_pattern(cfg: Config) -> Pattern:
     g, taper = cfg.glue_tab_width, cfg.glue_tab_taper
     sf, sb = body.front.sagitta, body.back.sagitta
     front_cuts, back_cuts = body.front_cuts, body.back_cuts
-    # The outer flaps reach past the corners where the back panel runs on (glued edge) or
-    # bends around the outside (straight fold): short cut steps there. At the straight fold
-    # the cut runs on down the front panel's edge to the back panel's corner (``side_*``).
-    c_left, c_right = front_cuts[0][1], front_cuts[-1][1]
+    lid = lid_layout(cfg)
 
     up, down = (0.0, -1.0), (0.0, 1.0)
     p = {
@@ -441,53 +504,96 @@ def build_pattern(cfg: Config) -> Pattern:
     def rev(chain: Sequence[Segment]) -> tuple[Segment, ...]:
         return tuple(seg.reversed() for seg in reversed(chain))
 
+    def mirror(chain: Sequence[Segment]) -> tuple[Segment, ...]:
+        return tuple(_mirror(seg, length) for seg in chain)
+
     def back_end(fpc: bool) -> tuple[Segment, ...]:
         """The inner flap's cut edge at the top end, left to right; the FPC cutout cuts its
         top off level."""
         cuts = flatten_cut(back_cuts, cfg.fpc_cutout_width if fpc else 0.0)
         return _cut_chain(wf, e, cuts, up=True)
 
-    fpc = cfg.fpc_cutout
-    cut_ft = _cut_chain(0.0, 0.0, front_cuts, up=True)
-    step_t = _lines(((wf, -c_right), p["tf"]))
+    f_ft = arc_from_chord(p["tl"], p["tf"], sf, down)
+    # The front panel's top end: the cut from its free edge's corner around the outer flap
+    # (and lid) to the corner at the straight fold, and its faces and folds.
+    if lid is None:
+        # The outer flap reaches past the corners where the back panel runs on (glued
+        # edge) or bends around the outside (straight fold): short cut steps there.
+        c_left, c_right = front_cuts[0][1], front_cuts[-1][1]
+        free_top = _lines((p["tl"], (0.0, -c_left)))
+        cut_ft = _cut_chain(0.0, 0.0, front_cuts, up=True)
+        step_t = _lines(((wf, -c_right), p["tf"]))
+        top_chain = (*free_top, *cut_ft, *step_t)
+        top_faces = (
+            Face("front-top-flap", "flap", (*top_chain, f_ft.reversed()), 0.0, wf, cut_ft, (f_ft,)),
+        )
+        top_folds: tuple[Fold, ...] = ()
+    else:
+        k = lid.level
+        crease = arc_from_chord((0.0, k), (wf, k), sf, up)
+        lid_edge = lid.edge(sf)
+        # (at zero thickness the lid's fold runs through the panel's corners: no flap sides)
+        flap_l, flap_r = _lines((p["tl"], (0.0, k))), _lines(((wf, k), p["tf"]))
+        lid_l, lid_r = Line((0.0, k), lid_edge[0].start), Line(lid_edge[-1].end, (wf, k))
+        top_chain = (*flap_l, lid_l, *lid_edge, lid_r, *flap_r)
+        top_faces = (
+            Face(
+                "front-top-flap",
+                "flap",
+                (*flap_l, crease, *flap_r, f_ft.reversed()),
+                0.0,
+                wf,
+                (crease,),
+                (f_ft,),
+            ),
+            Face(
+                "front-top-lid",
+                "lid",
+                (lid_l, *lid_edge, lid_r, crease.reversed()),
+                0.0,
+                wf,
+                lid_edge,
+                (crease,),
+            ),
+        )
+        top_folds = (Fold("lid-top", FoldCategory.LID, crease),)
+
+    # At the straight fold the cut runs on down the front panel's edge to the back panel's
+    # corner (``side_*``), over the end wall gap.
     side_t, side_b = _lines((p["tf"], p["tm"])), _lines((p["bm"], p["bf"]))
-    cut_bt = back_end(fpc in ("front", "both"))
+    cut_bt = back_end(cfg.fpc_cutout in ("front", "both"))
     tab = (Line(p["tr"], p["gt"]), Line(p["gt"], p["gb"]), Line(p["gb"], p["br"]))
-    # The bottom end mirrors the top one about the middle of the box.
-    edge_bb = tuple(_mirror(seg, length) for seg in back_end(fpc in ("back", "both")))
+    edge_bb = mirror(back_end(cfg.fpc_cutout in ("back", "both")))
     cut_bb = rev(edge_bb)
-    step_b = _lines((p["bf"], (wf, length + c_right)))
-    cut_fb = rev(_cut_chain(0.0, length, front_cuts, up=False))
-    free_bottom = _lines(((0.0, length + c_left), p["bl"]))
     free_edge = Line(p["bl"], p["tl"])
-    free_top = _lines((p["tl"], (0.0, -c_left)))
     outline = Outline(
         (
-            *cut_ft,
-            *step_t,
+            *top_chain,
             *side_t,
             *cut_bt,
             *tab,
             *cut_bb,
             *side_b,
-            *step_b,
-            *cut_fb,
-            *free_bottom,
+            *rev(mirror(top_chain)),
             free_edge,
-            *free_top,
         )
     )
 
     folds = (
-        Fold("front-top", FoldCategory.CURVED, arc_from_chord(p["tl"], p["tf"], sf, down)),
+        Fold("front-top", FoldCategory.CURVED, f_ft),
         Fold("back-top", FoldCategory.CURVED, arc_from_chord(p["tm"], p["tr"], sb, down)),
-        Fold("front-bottom", FoldCategory.CURVED, arc_from_chord(p["bl"], p["bf"], sf, up)),
+        Fold("front-bottom", FoldCategory.CURVED, _mirror(f_ft, length)),
         Fold("back-bottom", FoldCategory.CURVED, arc_from_chord(p["bm"], p["br"], sb, up)),
         Fold("panels", FoldCategory.STRAIGHT, Line(p["tm"], p["bm"])),
         Fold("glue-tab", FoldCategory.GLUE, Line(p["tr"], p["br"])),
+        *top_folds,
+        *(
+            Fold(f.name.replace("-top", "-bottom"), f.category, _mirror(f.segment, length))
+            for f in top_folds
+        ),
     )
 
-    f_ft, f_bt, f_fb, f_bb, f_mid, f_glue = (f.segment for f in folds)
+    _, f_bt, f_fb, f_bb, f_mid, f_glue = (f.segment for f in folds[:6])
 
     faces = (
         Face(
@@ -509,25 +615,9 @@ def build_pattern(cfg: Config) -> Pattern:
             (f_bb,),
         ),
         Face("glue-tab", "tab", (*tab, f_glue.reversed()), w2, w2 + g, tab[:1], tab[2:]),
-        Face(
-            "front-top-flap",
-            "flap",
-            (*cut_ft, *step_t, f_ft.reversed(), *free_top),
-            0.0,
-            wf,
-            cut_ft,
-            (f_ft,),
-        ),
+        *top_faces,
+        *(_mirror_face(f, length, f.name.replace("-top-", "-bottom-")) for f in top_faces),
         Face("back-top-flap", "flap", (*cut_bt, f_bt.reversed()), wf, w2, cut_bt, (f_bt,)),
-        Face(
-            "front-bottom-flap",
-            "flap",
-            (f_fb, *step_b, *cut_fb, *free_bottom),
-            0.0,
-            wf,
-            (f_fb,),
-            rev(cut_fb),
-        ),
         Face("back-bottom-flap", "flap", (*cut_bb, f_bb), wf, w2, (f_bb,), edge_bb),
     )
     bbox = union_bbox([outline.bbox(), *(f.segment.bbox() for f in folds)])
@@ -539,7 +629,7 @@ def build_pattern(cfg: Config) -> Pattern:
         "front_fold_sagitta": sf,
         "back_fold_sagitta": sb,
         # Cut edges' furthest reach beyond the chord (outer flaps) and at the centre (inner).
-        "front_cut_sagitta": max(c for _, c in front_cuts),
+        "front_cut_sagitta": max(c for _, c in front_cuts) if lid is None else sf - lid.level,
         "back_cut_sagitta": max(c for _, c in back_cuts),
         "front_fold_radius": circle_radius(wf, sf),
         "back_fold_radius": circle_radius(wb, sb),
@@ -636,6 +726,8 @@ class FoldedBox:
         self.body: Body = cfg.body
         self.length = cfg.front_length
         self.gap = cfg.end_wall_gap
+        lid = lid_layout(cfg)
+        self.lid_level = 0.0 if lid is None else lid.level
 
     def map(self, face: str, p: Point) -> Point3:
         body, length, e = self.body, self.length, self.gap
@@ -649,6 +741,12 @@ class FoldedBox:
             pos = (body.front_x + front.x(x), front.z(x), zs + y)
         elif face == "front-bottom-flap":  # reflected across y + Z = L
             pos = (body.front_x + front.x(x), length - front.z(x), zs + length - y)
+        elif face == "front-top-lid":  # the flap reflected again, across y + Z = level
+            k = self.lid_level
+            pos = (body.front_x + front.x(x), k - y, zs + k - front.z(x))
+        elif face == "front-bottom-lid":
+            k = self.lid_level
+            pos = (body.front_x + front.x(x), 2 * length - k - y, zs + k - front.z(x))
         elif face == "back-panel":
             u = x - front.width
             pos = (body.back_x - back.x(u), y, zs - back.z(u))

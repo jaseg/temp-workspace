@@ -155,7 +155,8 @@ export class PbSection extends HTMLElement {
     this.#info.textContent = `${fmt(width)} × ${fmt(height)} mm`;
     this.#info.title = "Interior width × height. The body has this cross-section everywhere "
       + "between the curved folds.";
-    this.#data = { section, dims, payload };
+    // Drawn back panel up, like the 3D view: the model frame turned 180 degrees.
+    this.#data = { section: turnSection(section), dims: dims.map(turnDim), payload };
     this.#render();
     this.#legend.replaceChildren(legendItem("interior", "Box interior"), legendItem("material", "Material"), legendItem("glue-tab", "Glue tab"));
     if (payload && !payload.empty) {
@@ -266,6 +267,29 @@ export class PbSection extends HTMLElement {
     }
     return { svg, box: [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad] };
   }
+}
+
+/** (x, z) -> (-x, -z): the model frame turned half a turn about the box's length. */
+const turn = ([x, z]) => [-x, -z];
+
+function turnSection(section) {
+  const [x0, z0, x1, z1] = section.bbox;
+  return {
+    ...section,
+    front: section.front.map(turn),
+    back: section.back.map(turn),
+    interior: section.interior.map(turn),
+    glue_tab: section.glue_tab.map(turn),
+    material: section.material.map((band) => band.map(turn)),
+    inner: Object.fromEntries(Object.entries(section.inner).map(([k, v]) => [k, turn(v)])),
+    bbox: [-x1, -z1, -x0, -z0],
+  };
+}
+
+/** A section dimension turned with the section (a rotation keeps "left of the direction of
+ *  travel" on the left, so path offsets stay). */
+function turnDim(d) {
+  return { ...d, points: d.points.map(turn), ...(d.at != null ? { at: -d.at } : {}) };
 }
 
 function legendItem(swatchClass, label) {

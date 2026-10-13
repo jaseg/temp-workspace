@@ -127,8 +127,21 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         0.5,
         help="Clear gap, in the middle of the box, between each outer end wall (the front "
         "panel's flap) and the inner end wall inside it (the back panel's flap). The front "
-        "panel runs on past the inner walls to the outer walls; between the two walls the "
-        "box is open over the back panel. 0 stacks the walls on each other.",
+        "panel runs on past the inner walls to the outer walls, and a lid on each outer flap "
+        "covers the gap. 0 stacks the walls on each other (no lid).",
+    ),
+    FieldSpec(
+        "lid_overlap",
+        "Lid overlap",
+        "float",
+        "Body",
+        "mm",
+        0,
+        200,
+        0.5,
+        help="How far each lid (folded over from the outer end wall's top edge, covering the "
+        "end wall gap) runs on over the outside of the back panel, past the inner end wall. "
+        "Only with an end wall gap.",
     ),
     FieldSpec(
         "height",
@@ -248,6 +261,7 @@ class Config:
     length: float = 120.0
     height: float = 20.0
     end_wall_gap: float = 10.0
+    lid_overlap: float = 5.0
     # Rectangular payload, inscribed centred in the closed box (preview only, not exported).
     payload_width: float = 30.0
     payload_depth: float = 80.0

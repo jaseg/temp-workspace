@@ -66,12 +66,13 @@ the defaults. It never crashes because of the file.
   *Output SVG*). A legend shows the line types; dashes keep their on-screen size at any
   zoom. The backdrop stays light in the dark theme so the black lines remain visible.
 * **Folded box (3D):** an orbitable, shaded view of the closed box, folded exactly from the
-  pattern faces (drag to orbit, scroll to zoom). Fold lines are drawn black, dashed by fold
-  direction. The camera has almost no inertia, and the
+  pattern faces (drag to orbit, scroll to zoom), back panel (with the lids) up. Fold lines
+  are drawn black, dashed by fold direction. The camera has almost no inertia, and the
   dimension labels keep the same on-screen size at any zoom.
 * **Body cross-section:** a 2D section through the closed body, perpendicular to its length.
   The body has this same section everywhere between the curved folds. It shows the closed
-  width and height, and marks the two straight folds where they are seen end-on.
+  width and height, and marks the two straight folds where they are seen end-on. Like the
+  3D view, it shows the back panel up.
 * **Payload:** below the body controls, set the width, depth and height of a rectangular
   payload, and a **margin**: the minimum true distance from any point of the payload to the
   nearest point of the box surface. The payload is drawn centred inside the box in the
@@ -91,13 +92,14 @@ the defaults. It never crashes because of the file.
   * **Fit box to payload** (in the body controls) sets width, length and height to the
     smallest box that holds the payload with its margin, minimizing the area of the
     pattern's bounding box.
-    Glue tab, end wall gap and thickness are left alone. Results are rounded to 0.01 mm, always
+    Glue tab, end wall gap, lid overlap and thickness are left alone. Results are rounded to 0.01 mm, always
     towards a box that still fits.
 * **Parameter dimensions:** all three views annotate the inputs they show:
   * **Pattern:** circumference (both panels, flat), length and end wall gap (along the
-    front panel's midline), height (across an inner flap), and the glue-tab width and taper
-    (both at the tab's bottom end);
-  * **Folded box:** width, length and end wall gap (along the top ridge) and height;
+    front panel's midline), lid overlap (on the top lid), height (across an inner flap),
+    and the glue-tab width and taper (both at the tab's bottom end);
+  * **Folded box:** width, length, end wall gap and lid overlap (along the back panel's
+    ridge, on top) and height;
   * **Cross-section:** width, height, and the front panel's arc (part of the
     circumference). This view shades the material at its thickness, the box interior and the
     payload space, and draws the glue tab and, dashed, the payload margin.
@@ -117,7 +119,7 @@ the defaults. It never crashes because of the file.
   interior; X across, Y along the length, Z height with the front panel up). It has the
   main space for the payload, bounded by the panels' inner surfaces and the inner end walls,
   and with an end wall gap the two end spaces between each inner and outer end wall, from
-  the front panel to the outside of the box. Each space is a module (`main_space()`,
+  the front panel to the lid. Each space is a module (`main_space()`,
   `end_space()` / `end_spaces()`), built as the intersection of a cross-section prism and a
   plan prism. The payload is a `payload()` module, shown only in the preview. FPC cutouts
   and the inner flaps' cut corners are not modelled.
@@ -131,7 +133,8 @@ All lengths are in millimetres.
 |---|---|---|
 | `width` | 55 | Interior width of the closed box's cross-section, from fold to fold (between the material's inner corners). 10–1000. This drives the panel size: see *circumference* below. |
 | `length` | 120 | Interior length along the middle of the box, between the inner end walls: the shortest distance between the curves. 10–2000. The back panel's straight edges (corner to corner) are `length + height + 3·thickness` long, the front panel's `2·end_wall_gap` longer. |
-| `end_wall_gap` | 10 | Clear gap, in the middle of the box, between each outer end wall and the inner end wall inside it (see *End wall gap* below). 0–500. 0 stacks the two walls of each end on each other. |
+| `end_wall_gap` | 10 | Clear gap, in the middle of the box, between each outer end wall and the inner end wall inside it, covered by a lid (see *End wall gap* below). 0–500. 0 stacks the two walls of each end on each other, with no lid. |
+| `lid_overlap` | 5 | How far each lid runs on over the outside of the back panel, past the inner end wall's outer surface (measured along the box). 0–200. Only with an end wall gap. |
 | `height` | 20 | Interior height of the closed box at maximum bulge. At most ≈ 0.46·width (the UI states the exact limit). |
 | `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
 | `payload_depth` | 80 | Payload size along the box length. 0–2000. It has to fit between the inner end walls. |
@@ -212,9 +215,15 @@ rather than the stacked `))___((`.
   each end, down to the back panel's corner.
 * The walls are `end_wall_gap` apart (clear, material to material) in the middle of the
   box. The outer wall curves a little further out towards the sides.
-* Between the two walls the box is open over the back panel: the back panel ends at the
-  inner wall. The outer wall still reaches the back panel's outer surface (extended over
-  the gap), so the outside of the box keeps its shape.
+* The back panel ends at the inner wall, so each outer flap carries a **lid** that covers
+  the gap. The flap's top edge becomes a fold, and the lid folds over onto the outside of
+  the back panel and runs on `lid_overlap` past the inner wall.
+* The lid's fold lies in a plane at 45°, like the curved folds, so the lid folds exactly:
+  in the pattern the fold is the front panel's curved fold turned over (an arc of the
+  same radius, bowing out of the panel). Folded, the lid takes the front panel's profile,
+  turned over. That is about one thickness flatter than the back panel, so the lid touches
+  the back panel towards the sides and stands off it by about a thickness in the middle
+  (0.2 mm at the default thickness); it never cuts into it.
 * The folding stays exact: the tests check the folded model with and without a gap.
 * The payload has to fit between the inner walls, as before. *Fit box to payload* keeps the
   gap and minimizes the pattern including it.

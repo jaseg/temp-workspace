@@ -16,6 +16,7 @@ from yanartas_pillowbox.geometry import (
     arc_from_chord,
     build_pattern,
     fold_direction,
+    lid_layout,
     print_side_normal,
 )
 
@@ -69,7 +70,7 @@ def test_thickness_offsets_folds_and_flaps():
     """With material, the front (outer-flap) fold bows in height/2 and its flaps reach the
     back panel's outer surface; the back (inner-flap) fold bows in t more and its flaps stop
     at the front panel's inner surface."""
-    cfg = Config.defaults().with_values(height=20, thickness=1.0)
+    cfg = Config.defaults().with_values(height=20, thickness=1.0, end_wall_gap=0)  # no lid
     info = build_pattern(cfg).info
     assert (info["front_fold_sagitta"], info["back_fold_sagitta"]) == pytest.approx((10, 11))
     # (on the centreline; the two panels' apexes are a fraction of t apart across the box)
@@ -155,14 +156,17 @@ def test_folds_do_not_overlap_outline(cfg):
             assert pat.outline.distance_to(p) > 1e-3, (fold.name, i)
 
 
-def test_fold_categories():
-    pat = build_pattern(Config.defaults())
+@pytest.mark.parametrize("gap", [0, 10])
+def test_fold_categories(gap):
+    pat = build_pattern(Config.defaults().with_values(end_wall_gap=gap))
     cats = [f.category for f in pat.folds]
     assert cats.count(FoldCategory.CURVED) == 4
     assert cats.count(FoldCategory.STRAIGHT) == 1
     assert cats.count(FoldCategory.GLUE) == 1
+    assert cats.count(FoldCategory.LID) == (2 if gap else 0)  # one lid at each end
     for f in pat.folds:
-        assert isinstance(f.segment, Arc if f.category is FoldCategory.CURVED else Line)
+        straight = f.category in (FoldCategory.STRAIGHT, FoldCategory.GLUE)
+        assert isinstance(f.segment, Line if straight else Arc)
 
 
 def test_bbox_covers_everything(cfg):
@@ -171,8 +175,43 @@ def test_bbox_covers_everything(cfg):
     for p in pat.outline.polyline(64):
         assert x0 - 1e-9 <= p[0] <= x1 + 1e-9 and y0 - 1e-9 <= p[1] <= y1 + 1e-9
     assert x1 - x0 == pytest.approx(cfg.circumference + cfg.glue_tab_width)
-    # The outer flaps stick out furthest.
-    assert y1 - y0 == pytest.approx(cfg.front_length + 2 * cfg.body.front_cut_sagitta)
+    # The outer flaps, or with an end wall gap their lids, stick out furthest.
+    lid = lid_layout(cfg)
+    reach = cfg.body.front_cut_sagitta if lid is None else max(d for _, d in lid.depth) - lid.level
+    assert y1 - y0 == pytest.approx(cfg.front_length + 2 * reach)
+
+
+def test_lid_fold_mirrors_the_front_fold(cfg):
+    """The outer flap's fold into the lid is the front panel's curved fold turned over: an
+    arc of the same radius through the panel's corners' verticals at the lid level, bowing
+    out of the panel. The lid's free edge runs the gap, less half a thickness, plus the
+    overlap beyond the back panel's crease (in folded depth); the top and bottom lids mirror
+    each other."""
+    lid = lid_layout(cfg)
+    pat = build_pattern(cfg)
+    if cfg.end_wall_gap == 0:
+        assert lid is None
+        assert not [f for f in pat.folds if f.category is FoldCategory.LID]
+        return
+    body, t, wf = cfg.body, cfg.thickness, cfg.body.front.width
+    front, crease = pat.fold("front-top").segment, pat.fold("lid-top").segment
+    assert crease.radius == pytest.approx(front.radius)
+    assert crease.start == pytest.approx((0, lid.level)) and crease.end == pytest.approx(
+        (wf, lid.level)
+    )
+    assert crease.point_at(0.5)[1] == pytest.approx(lid.level - body.front.sagitta)
+    assert lid.level <= 0 and (lid.level < -t or t == 0)  # above the flap's old cut edge
+    bottom = pat.fold("lid-bottom").segment
+    assert bottom.point_at(0.5) == pytest.approx(
+        (crease.point_at(0.5)[0], cfg.front_length - crease.point_at(0.5)[1])
+    )
+    lid_face = pat.face("front-top-lid")
+    for x, depth in lid.depth[1:-1]:
+        x3 = body.front_point(x)[0]
+        crease_depth = body.z_shift - body.surface_z("back", 0.0, x3)  # back panel's z(u)
+        expected = cfg.end_wall_gap - t / 2 + cfg.lid_overlap + crease_depth
+        assert depth == pytest.approx(expected, abs=1e-9)
+        assert lid_face.y_range(x)[0] == pytest.approx(lid.level - depth, abs=1e-6)
 
 
 def test_cross_section_is_unit_speed_and_bulges_by_sagitta():

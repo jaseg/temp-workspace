@@ -106,6 +106,8 @@ def test_end_wall_gap_lengthens_the_front_panel():
     assert Config.defaults().end_wall_gap == 10
     assert "end_wall_gap" in errors_for(end_wall_gap=-1)
     assert "end_wall_gap" in errors_for(end_wall_gap=501)
+    assert Config.defaults().lid_overlap == 5
+    assert "lid_overlap" in errors_for(lid_overlap=-1)
 
 
 def test_multiple_errors_reported_together():

@@ -6,9 +6,8 @@ ruled along one axis (frame of the 3D model: X across, Y along the length, Z hei
 on the interior):
 
 * the cross-section prism (along Y), bounded by the panels' inner surfaces, or for an end
-  space by the front panel's inner surface and the back panel's outer surface (there is no
-  back panel over the gap: the space reaches the outside of the box, where the outer end
-  wall ends);
+  space by the front panel's inner surface and the lid's inner surface (the back panel
+  stops at the inner wall; the lid covers the gap);
 * the plan prism (along Z), bounded by the end walls' surfaces facing the space.
 
 The inner flaps' cut corners and FPC cutouts are left out.
@@ -23,7 +22,7 @@ from collections.abc import Callable, Sequence
 
 from yanartas_pillowbox import __version__
 from yanartas_pillowbox.config import Config
-from yanartas_pillowbox.geometry import _interior
+from yanartas_pillowbox.geometry import _interior, lid_layout
 
 Point = tuple[float, float]
 
@@ -90,23 +89,33 @@ def main_plan(cfg: Config) -> list[Point]:
     return [*top, *((x, -y) for x, y in reversed(top))]
 
 
+def _lid_inner(cfg: Config, x: float) -> float:
+    """Z of the lid's inner surface at ``X = x``: the lid is the front panel turned over
+    about ``Z = zs + level / 2`` (``geometry.LidLayout``), its inner surface the image of the
+    front panel's."""
+    body, lid = cfg.body, lid_layout(cfg)
+    assert lid is not None
+    return 2 * body.z_shift + lid.level - body.surface_z("front", -cfg.thickness / 2, x)
+
+
 def _end_span(cfg: Config) -> tuple[float, float]:
-    """X range of the end spaces: where the front panel's inner surface lies above the back
-    panel's outer surface."""
+    """X range of the end spaces: across the lid, as far as the front panel's inner surface
+    lies above the lid's."""
     body, t = cfg.body, cfg.thickness
 
     def room(x: float) -> float:
-        return body.surface_z("front", -t / 2, x) - body.surface_z("back", t / 2, x)
+        return body.surface_z("front", -t / 2, x) - _lid_inner(cfg, x)
 
     def edge(inside: float, outside: float) -> float:
+        if room(outside) > 0:
+            return outside
         for _ in range(80):
             mid = (inside + outside) / 2
             inside, outside = (mid, outside) if room(mid) > 0 else (inside, mid)
         return inside
 
-    x0, x1 = body.inner_glue[0], body.inner_fold[0]
-    reach = x1 - x0
-    return edge(0.0, x0 - reach), edge(0.0, x1 + reach)
+    x0, x1 = body.front_point(0.0)[0], body.front_point(body.front.width)[0]
+    return edge(0.0, x0), edge(0.0, x1)
 
 
 def end_plan(cfg: Config) -> list[Point]:
@@ -126,16 +135,15 @@ def main_section(cfg: Config) -> list[Point]:
 
 
 def end_section(cfg: Config) -> list[Point]:
-    """(X, Z) outline of an end space: from the back panel's outer surface (where the outer
-    end wall ends; the back panel stops at the inner wall) up to the front panel's inner
-    surface."""
+    """(X, Z) outline of an end space: from the lid's inner surface up to the front panel's
+    inner surface."""
     body, t = cfg.body, cfg.thickness
     x0, x1 = _end_span(cfg)
     n = _samples(x1 - x0)
     xs = [x0 + (x1 - x0) * i / n for i in range(n + 1)]
     return [
-        *((x, body.surface_z("back", t / 2, x)) for x in xs),
-        *((x, body.surface_z("front", -t / 2, x)) for x in reversed(xs[1:-1])),
+        *((x, _lid_inner(cfg, x)) for x in xs),
+        *((x, body.surface_z("front", -t / 2, x)) for x in reversed(xs)),
     ]
 
 
@@ -177,8 +185,7 @@ def render_scad(cfg: Config) -> str:
     if gap:
         lines += [
             "// The space between the inner and the outer end wall, from the front panel to the",
-            "// outside of the box (open over the back panel), at the +Y end (end_spaces() places",
-            "// both).",
+            "// lid, at the +Y end (end_spaces() places both).",
             "module end_space() {",
             "  intersection() {",
             f"    rotate([90, 0, 0]) {extrude} end_section();",

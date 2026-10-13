@@ -41,6 +41,7 @@ from yanartas_pillowbox.crosssection import (
     solve_body,
     width_ratio,
 )
+from yanartas_pillowbox.geometry import lid_layout
 
 ROUND = 0.01  # mm: results are rounded to this grid, always towards a fitting box
 SAMPLES = 1000  # curve samples for clearance computations
@@ -194,12 +195,14 @@ def maximize(cfg: Config, field: str) -> Config:
 # ------------------------------------------------------------------------- fit box
 def pattern_area(cfg: Config) -> float:
     """Area of the flat pattern's bounding box: (both panels + glue tab) x (the front panel's
-    edge + both outer flaps, which stick out furthest)."""
+    edge + both outer flaps or lids, which stick out furthest)."""
     return (cfg.circumference + cfg.glue_tab_width) * pattern_height(cfg)
 
 
 def pattern_height(cfg: Config) -> float:
-    return cfg.front_length + 2 * cfg.body.front_cut_sagitta
+    lid = lid_layout(cfg)
+    reach = cfg.body.front_cut_sagitta if lid is None else max(d for _, d in lid.depth) - lid.level
+    return cfg.front_length + 2 * reach
 
 
 def _scale_needed(x: float, z: float, a: float, b: float, m: float) -> float:
@@ -244,9 +247,12 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
         return None
     if base.glue_tab_taper > (length + 2 * sagitta + 3 * t) / 2 - 1:
         return None
-    # The front panel's edge, plus the outer flaps (sagitta + 1.5 t) at both ends.
-    edge = length + 2 * sagitta + 3 * t + 2 * base.end_wall_gap
-    area = (2 * panel + base.glue_tab_width) * (edge + 2 * sagitta + 3 * t)
+    # The front panel's edge, plus at both ends the outer flaps (sagitta + 1.5 t) or, with a
+    # gap, the lids (about the gap, the overlap, the sagitta and 2.5 t beyond the edge).
+    gap = base.end_wall_gap
+    edge = length + 2 * sagitta + 3 * t + 2 * gap
+    reach = sagitta + 1.5 * t if gap <= 0 else gap + base.lid_overlap + sagitta + 2.5 * t
+    area = (2 * panel + base.glue_tab_width) * (edge + 2 * reach)
     return area, width, 2 * sagitta
 
 
