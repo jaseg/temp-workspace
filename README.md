@@ -68,7 +68,7 @@ the defaults. It never crashes because of the file.
   zoom. The backdrop stays light in the dark theme so the black lines remain visible.
 * **Folded box (3D):** an orbitable, shaded view of the closed box, folded exactly from the
   pattern faces (drag to orbit, scroll to zoom), back panel (with the lids) up. Fold lines
-  are drawn black, dashed by fold direction. The inner end flaps, inside the box behind the
+  are drawn black, dashed by fold direction, and the visible cut edges solid. The inner end flaps, inside the box behind the
   end wall gaps, are drawn translucent purple through the paper. The camera has almost no inertia, and the
   dimension labels keep the same on-screen size at any zoom.
 * **Body cross-section:** a 2D section through the closed body, perpendicular to its length.

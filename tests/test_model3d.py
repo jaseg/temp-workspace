@@ -167,6 +167,43 @@ def test_part_outlines_run_along_the_face_boundary(case):
         assert abs(area) / 2 == pytest.approx(abs(loop_area(face.boundary)), rel=0.01), face.name
 
 
+def _dist_to_polyline(q, pts):
+    best = math.inf
+    for a, b in itertools.pairwise(pts):
+        ab = [b[i] - a[i] for i in range(3)]
+        ll = sum(c * c for c in ab)
+        t = 0 if ll == 0 else max(0, min(1, sum((q[i] - a[i]) * ab[i] for i in range(3)) / ll))
+        best = min(best, math.dist(q, [a[i] + t * ab[i] for i in range(3)]))
+    return best
+
+
+def test_cut_edges_are_drawn_where_they_fold_to(case):
+    """The 3D model's ``cuts`` are the pattern's cut edges, folded: every cut segment (the
+    outline, the slits) of a face other than the inner end flaps (drawn through the paper)
+    lies on them, and theirs don't."""
+    cfg, pattern, model, _ = case
+    box = FoldedBox(cfg)
+    cuts = model["cuts"]
+    segments = [*pattern.outline.segments, *(seg for slit in pattern.slits for seg in slit)]
+    for seg in segments:
+        owners = [f for f in pattern.faces if any(same_segment(seg, s) for s in f.boundary)]
+        for t in (0.25, 0.5, 0.75):
+            p = seg.point_at(t)
+            for face in owners:  # (a slit's two sides fold to different places)
+                if face.kind == "flap" and face.name.startswith("back-"):
+                    continue
+                q = box.map(face.name, p)
+                d = min(_dist_to_polyline(q, c) for c in cuts)
+                assert d < 5e-3, (face.name, p, d)  # (chords of 0.25 mm on the curves)
+    # The inner end flaps' own cut edges are not among them.
+    for end in ("top", "bottom"):
+        face = pattern.face(f"back-{end}-flap")
+        x = (face.x0 + face.x1) / 2
+        lo, hi = face.y_range(x)
+        q = box.map(face.name, (x, lo if end == "top" else hi))
+        assert min(_dist_to_polyline(q, c) for c in cuts) > 0.1
+
+
 def test_mesh_is_isometric_to_pattern(case):
     """Folding never stretches: every triangle has the same edge lengths and area in 3D as in
     the flat pattern (up to the chord error of ~1 mm triangles on curved surfaces)."""

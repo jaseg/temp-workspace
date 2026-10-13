@@ -171,6 +171,11 @@ export class PbPreview3d extends HTMLElement {
       const pts = dashSegments(line.points.map((p) => new THREE.Vector3(...p)), dash);
       group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
     }
+    // Cut (open) edges: solid, like the export; hidden behind the paper where out of sight.
+    for (const cut of model.cuts ?? []) {
+      const pts = cut.map((p) => new THREE.Vector3(...p));
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
+    }
     if (payload && !payload.empty) group.add(this.#payloadMesh(payload));
     this.#group = group;
     this.#scene.add(group);

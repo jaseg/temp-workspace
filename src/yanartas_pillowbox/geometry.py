@@ -1025,6 +1025,7 @@ def build_model3d(
 
     x0, z0, x1, z1 = body_bbox(box.body, with_material=False)
     return {
+        "cuts": _cut_edges(pattern, box),
         "units": "mm",
         "parts": parts,
         "lines": lines,
@@ -1035,6 +1036,45 @@ def build_model3d(
         },
         "interior": {"width": cfg.width, "length": cfg.length, "height": cfg.height},
     }
+
+
+def _segment_key(seg: Segment) -> tuple[Point, ...]:
+    """Identifies a segment whichever way round it runs."""
+
+    def r(p: Point) -> Point:
+        return (round(p[0], 6), round(p[1], 6))
+
+    ends = sorted((r(seg.start), r(seg.end)))
+    return (*ends, r(seg.point_at(0.5)))
+
+
+def _cut_edges(pattern: Pattern, box: FoldedBox) -> list[list[list[float]]]:
+    """The cut edges of the closed box as 3D polylines, one per run of cuts along a face's
+    boundary: the outline, and the slits from the wings' side. The inner end flaps, drawn
+    through the paper with their own outline, are left out."""
+    cuts = {_segment_key(seg) for seg in pattern.outline.segments}
+    cuts |= {_segment_key(seg) for slit in pattern.slits for seg in slit}
+    out: list[list[list[float]]] = []
+    for face in pattern.faces:
+        if face.kind == "flap" and face.name.startswith("back-"):
+            continue
+        loop = list(face.boundary)
+        is_cut = [_segment_key(seg) in cuts for seg in loop]
+        if not any(is_cut):
+            continue
+        if not all(is_cut):  # start the walk just after a non-cut segment
+            k = is_cut.index(False)
+            loop, is_cut = loop[k + 1 :] + loop[: k + 1], is_cut[k + 1 :] + is_cut[: k + 1]
+        run: list[list[float]] = []
+        for seg, cut in zip([*loop, None], [*is_cut, False], strict=True):
+            if cut and seg is not None:
+                n = 64 if isinstance(seg, Arc) else max(1, math.ceil(4 * seg.length))
+                pts = [box.map(face.name, seg.point_at(i / n)) for i in range(n + 1)]
+                run.extend([round(c, 6) for c in q] for q in (pts if not run else pts[1:]))
+            elif run:
+                out.append(run)
+                run = []
+    return out
 
 
 def _span(parts: list[dict[str, Any]], axis: int) -> float:
