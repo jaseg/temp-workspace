@@ -502,11 +502,17 @@ def lid_layout(cfg: Config) -> LidLayout | None:
     g_x, p_x = body.glue_point[0], body.fold_point[0]
 
     def crease_depth(x: float) -> float:
-        """Depth of the back panel's crease at flat x (0 beyond the back panel)."""
-        x3 = body.front_x + sec.x_ext(x)
-        if t == 0 and 0 <= x <= sec.width:
+        """Depth of the back panel's crease at flat x; over the wings, beyond the panel's
+        edges, it runs on along the front panel's continued fold arc (so the lid's free edge
+        stays one smooth curve)."""
+        if x < 0:
+            return crease_depth(0.0) + sec.z_ext(x)
+        if x > sec.width:
+            return crease_depth(sec.width) + sec.z_ext(x)
+        if t == 0:
             return sec.z(x)  # the back panel is the front one turned over
-        if not g_x <= x3 <= p_x:
+        x3 = body.front_point(x)[0]
+        if not g_x <= x3 <= p_x:  # pragma: no cover - the back panel spans the front one
             return 0.0
         return max(0.0, zs - body.surface_z("back", 0.0, x3))
 

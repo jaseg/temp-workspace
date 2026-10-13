@@ -67,6 +67,7 @@ export class PbPreview2d extends HTMLElement {
   #zoomed = false;
   #colors = [];
   #drag = null;
+  #pinch = null; // two-finger zoom: start distance, midpoint and view
   #dark = matchMedia("(prefers-color-scheme: dark)");
   #highlight = null;
   #moved = false;
@@ -112,25 +113,56 @@ export class PbPreview2d extends HTMLElement {
       e.preventDefault();
       this.#zoomAt(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)), e);
     }, { passive: false });
+    // Pointers on the stage: one pans; two pinch-zoom about their midpoint (and pan with it).
+    const pointers = new Map();
+    const pinchState = () => {
+      const [a, b] = [...pointers.values()];
+      return { dist: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    };
+    const startDrag = (p) => { this.#drag = { x: p.x, y: p.y, view: [...this.#view] }; };
     this.#stage.addEventListener("pointerdown", (e) => {
       if (!this.#svg || e.button !== 0) return;
       this.#stage.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        this.#pinch = { ...pinchState(), view: [...this.#view] };
+        this.#drag = null;
+        this.#moved = true; // a pinch never counts as a click
+        return;
+      }
+      if (pointers.size > 2) return;
       this.#stage.classList.add("dragging");
-      this.#drag = { x: e.clientX, y: e.clientY, view: [...this.#view] };
+      startDrag(pointers.get(e.pointerId));
       this.#moved = false;
       this.#downParam = e.target.closest?.(".dim")?.dataset.param ?? null;
     });
     this.#stage.addEventListener("pointermove", (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.#pinch && pointers.size >= 2) {
+        const now = pinchState();
+        const start = this.#pinch;
+        if (!now.dist || !start.dist) return;
+        this.#view = [...start.view];
+        this.#zoomAt(start.dist / now.dist, { clientX: start.x, clientY: start.y });
+        this.#panBy(now.x - start.x, now.y - start.y, this.#view);
+        return;
+      }
       if (!this.#drag) return;
-      const scale = this.#unitsPerPixel();
-      const [x, y, w, h] = this.#drag.view;
       if (Math.hypot(e.clientX - this.#drag.x, e.clientY - this.#drag.y) > 3) this.#moved = true;
-      this.#setView([x - (e.clientX - this.#drag.x) * scale, y - (e.clientY - this.#drag.y) * scale, w, h]);
-      this.#zoomed = true;
+      this.#panBy(e.clientX - this.#drag.x, e.clientY - this.#drag.y, this.#drag.view);
     });
-    const endDrag = () => { this.#drag = null; this.#stage.classList.remove("dragging"); };
-    this.#stage.addEventListener("pointerup", endDrag);
-    this.#stage.addEventListener("pointercancel", endDrag);
+    const endPointer = (e) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) this.#pinch = null;
+      if (pointers.size === 1) startDrag([...pointers.values()][0]); // carry on panning
+      if (pointers.size === 0) {
+        this.#drag = null;
+        this.#stage.classList.remove("dragging");
+      }
+    };
+    this.#stage.addEventListener("pointerup", endPointer);
+    this.#stage.addEventListener("pointercancel", endPointer);
     this.#dark.addEventListener("change", () => this.#applyBackdrop());
     new ResizeObserver(() => {
       if (!this.#svg) return;
@@ -227,6 +259,13 @@ export class PbPreview2d extends HTMLElement {
     group.classList.toggle("off", !this.#showDims);
     this.#overlay.append(group);
     highlightDims(this.#svg, this.#highlight);
+  }
+
+  /** Pan by a screen-pixel offset from a given view. */
+  #panBy(dx, dy, [x, y, w, h]) {
+    const scale = this.#unitsPerPixel([x, y, w, h]);
+    this.#setView([x - dx * scale, y - dy * scale, w, h]);
+    this.#zoomed = true;
   }
 
   #unitsPerPixel(view = this.#view) {

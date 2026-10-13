@@ -247,15 +247,37 @@ def test_lid_fold_mirrors_the_front_fold(cfg):
         (crease.point_at(0.5)[0], cfg.front_length - crease.point_at(0.5)[1])
     )
     lid_face = pat.face("front-top-lid")
-    g_x, p_x = body.glue_point[0], body.fold_point[0]
+    wf = body.front.width
+    reach = cfg.end_wall_gap - t / 2 + cfg.lid_overlap
+
+    def back_depth(x):  # the back panel's z(u) at the same X
+        return body.z_shift - body.surface_z("back", 0.0, body.front_point(x)[0])
+
     for x, depth in lid.depth[1:-1]:
-        x3 = body.front_x + body.front.x_ext(x)
-        # The back panel's z(u) at the same X; beyond the back panel the edge runs level.
-        crease_depth = body.z_shift - body.surface_z("back", 0.0, x3) if g_x <= x3 <= p_x else 0
-        crease_depth = max(0.0, crease_depth)
+        if not 0 <= x <= wf:
+            # Over the wings the edge runs on along the continued fold arc: one smooth curve.
+            edge = back_depth(0.0 if x < 0 else wf) + body.front.z_ext(x)
+            assert depth == pytest.approx(reach + edge, abs=1e-9)
+            continue
+        crease_depth = back_depth(x)
         expected = cfg.end_wall_gap - t / 2 + cfg.lid_overlap + crease_depth
         assert depth == pytest.approx(expected, abs=1e-9)
         assert lid_face.y_range(x)[0] == pytest.approx(lid.level - depth, abs=1e-6)
+
+
+def test_lid_edge_is_one_smooth_curve(cfg):
+    """The lid's free edge has no step where the wings begin: its slope carries on across
+    the front panel's edges (exactly at zero thickness, to within a few percent with
+    material)."""
+    lid = lid_layout(cfg)
+    if lid is None or lid.spread == 0:
+        pytest.skip("no wings")
+    wf, d = cfg.body.front.width, lid.depth
+    for corner in (0.0, wf):
+        i = next(k for k, (x, _) in enumerate(d) if x == corner)
+        (xa, a), (xb, b), (xc, c) = d[i - 1], d[i], d[i + 1]
+        before, after = (b - a) / (xb - xa), (c - b) / (xc - xb)
+        assert after == pytest.approx(before, abs=0.05 + 0.1 * cfg.thickness), corner
 
 
 def test_cross_section_is_unit_speed_and_bulges_by_sagitta():

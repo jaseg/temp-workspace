@@ -60,8 +60,9 @@ the defaults. It never crashes because of the file.
   While any value is invalid, the previews keep showing the last valid design and
   *Download* is disabled. Below the form, *Derived geometry* lists the computed fold and cut
   radii, arc length, the straight-edge length, the circumference and the flat panel width.
-* **Pattern (2D):** the exact SVG you will download. Zoom with the wheel or the +/− buttons,
-  drag to pan, and double-click or press *Fit* to reset. The header shows the pattern and
+* **Pattern (2D):** the exact SVG you will download. Zoom with the wheel, the +/− buttons or a
+  two-finger pinch, drag to pan, and double-click or press *Fit* to reset (the
+  cross-section view works the same way). The header shows the pattern and
   sheet sizes. All lines are black, as in the export, and differ only in dashing (see
   *Output SVG*). A legend shows the line types; dashes keep their on-screen size at any
   zoom. The backdrop stays light in the dark theme so the black lines remain visible.
