@@ -21,10 +21,10 @@ is the mid-surface offset by ``t/2``):
 * end walls: in plan (X, Y), from the payload's width x depth to the back panel's crease
   curve. Its closest point to the centre is the inner wall's apex, ``length/2`` away.
 
-The payload fits when ``clearance >= payload_margin``.
+The payload fits when ``clearance >= payload_clearance``.
 
 ``fit_box`` finds the box (width, length, height only) with the smallest pattern bounding box
-that keeps the margin; see there.
+that keeps the clearance; see there.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from yanartas_pillowbox.crosssection import (
     solve_body,
     width_ratio,
 )
-from yanartas_pillowbox.geometry import MAX_SPREAD_SLOPE
+from yanartas_pillowbox.geometry import MAX_SPREAD_SLOPE, max_lid_offset, min_lid_width
 
 ROUND = 0.01  # mm: results are rounded to this grid, always towards a fitting box
 SAMPLES = 1000  # curve samples for clearance computations
@@ -144,7 +144,7 @@ def clearance(cfg: Config) -> float | None:
 
 def fits(cfg: Config, tol: float = 1e-6) -> bool:
     c = clearance(cfg)
-    return c is None or c >= cfg.payload_margin - tol
+    return c is None or c >= cfg.payload_clearance - tol
 
 
 def _floor(v: float) -> float:
@@ -161,20 +161,20 @@ def _r2(v: float) -> float:
 
 # ------------------------------------------------------------------------- maximize
 def maximize(cfg: Config, field: str) -> Config:
-    """Largest value of one payload dimension that keeps the margin in the current box."""
-    m = cfg.payload_margin
+    """Largest value of one payload dimension that keeps the clearance in the current box."""
+    m = cfg.payload_clearance
     body = cfg.body
     if field == "payload_depth":
         if section_clearance(body, cfg.payload_width, cfg.payload_height) < m:
             raise PayloadError(
-                "payload_width", "the payload's width and height already break the margin"
+                "payload_width", "the payload's width and height already break the clearance"
             )
 
         def ok(v: float) -> bool:
             return wall_clearance(body, cfg.payload_width, v) >= m
 
         if not ok(0.0):
-            raise PayloadError("payload_margin", "the margin leaves no room along the length")
+            raise PayloadError("payload_clearance", "the clearance leaves no room along the length")
         limit = cfg.edge_length
     elif field in ("payload_width", "payload_height"):
         other = "payload_height" if field == "payload_width" else "payload_width"
@@ -188,7 +188,7 @@ def maximize(cfg: Config, field: str) -> Config:
 
         if not ok(0.0):
             axis = other.removeprefix("payload_")
-            raise PayloadError(other, f"the payload {axis} leaves no room for the margin")
+            raise PayloadError(other, f"the payload {axis} leaves no room for the clearance")
     else:
         raise PayloadError(field, f"unknown payload field {field!r}")
 
@@ -220,12 +220,12 @@ def _scale_needed(x: float, z: float, a: float, b: float, m: float) -> float:
 
 def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
     """(approximate pattern area, width, height) of the smallest box with sagitta ratio r
-    that keeps the margin, or None if that box violates a constraint on the untouched
+    that keeps the clearance, or None if that box violates a constraint on the untouched
     parameters. Approximates the interior by a zero-thickness box of the interior size."""
     a, b, m, t = (
         base.payload_width / 2,
         base.payload_height / 2,
-        base.payload_margin,
+        base.payload_clearance,
         base.thickness,
     )
     sec = CrossSection(1.0, r)
@@ -261,8 +261,8 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
 
 def _min_width(cfg: Config, height: float, guess: float) -> float | None:
     """Smallest interior width (to 1 um) at which the payload's cross-section keeps the
-    margin, for this height; None if there is none within the width limit."""
-    t, m = cfg.thickness, cfg.payload_margin
+    clearance, for this height; None if there is none within the width limit."""
+    t, m = cfg.thickness, cfg.payload_clearance
     w_max = SPECS_BY_NAME["width"].maximum
 
     def ok(w: float) -> bool:
@@ -287,20 +287,21 @@ def _min_width(cfg: Config, height: float, guess: float) -> float | None:
 
 
 def _fit_length(cfg: Config) -> float:
-    """Box length for the payload depth and margin."""
-    return max(cfg.payload_depth + 2 * cfg.payload_margin, 10.0)
+    """Box length for the payload depth and clearance."""
+    return max(cfg.payload_depth + 2 * cfg.payload_clearance, 10.0)
 
 
 def fit_box(cfg: Config) -> Config:
-    """Box (width, length, height) holding the payload with its margin, with the smallest
-    pattern bounding box. Glue tab and thickness are kept.
+    """Box (width, length, height) holding the payload with its clearance, with the smallest
+    pattern bounding box. Glue tab, thickness and the lids are kept: the box is widened as far
+    as the lid offset needs (see ``geometry.max_lid_offset``).
 
     The height comes from a fast search on an approximation: the interior as a zero-thickness
     box of the interior size, whose cross-section shape depends only on ``r = sagitta / W``
     (a 1D search over ``r``, each ``r`` giving the smallest ``W`` whose profile clears the
-    payload by the margin). The area is flat around its minimum, so the small error in the
+    payload by the clearance). The area is flat around its minimum, so the small error in the
     height costs next to nothing; the width is then solved exactly for that height, and the
-    length grown until the end walls keep the margin."""
+    length grown until the end walls keep the clearance."""
     if is_empty(cfg):
         raise PayloadError("payload_width", "set all three payload dimensions first")
     length = _r2(_ceil(_fit_length(cfg)))
@@ -314,7 +315,7 @@ def fit_box(cfg: Config) -> Config:
     if math.isinf(best):
         raise PayloadError(
             "payload_width",
-            "no valid box holds this payload with the current margin, glue tab and thickness",
+            "no valid box holds this payload with the current clearance, glue tab and thickness",
         )
     cand = _candidate(cfg, r)
     assert cand is not None
@@ -328,13 +329,19 @@ def fit_box(cfg: Config) -> Config:
         raise PayloadError("payload_width", "the fitted box would be wider than the limit")
     out = replace(base, width=_r2(_ceil(exact)))
     for _ in range(1000):
-        try:
-            if fits(out):
-                break
-        except ValueError:  # pragma: no cover - the width only grows
-            pass
-        body, m = out.body, cfg.payload_margin
-        if section_clearance(body, cfg.payload_width, cfg.payload_height) < m:
+        body, m = out.body, cfg.payload_clearance
+        lids_ok = out.end_wall_gap <= 0 or max_lid_offset(body) >= out.lid_offset
+        if lids_ok and fits(out):
+            break
+        if not lids_ok:
+            # Too steep at the sides to widen the ends for the lids: a flatter (wider) box.
+            wide = min_lid_width(out)
+            if wide is None:
+                raise PayloadError(
+                    "lid_offset", "no box within the width limit allows this lid offset"
+                )
+            out = replace(out, width=max(wide, _r2(out.width + ROUND)))
+        elif section_clearance(body, cfg.payload_width, cfg.payload_height) < m:
             out = replace(out, width=_r2(out.width + ROUND))
         else:
             # The end walls' clearance grows by exactly half of what the length grows (the
@@ -356,7 +363,7 @@ def summary(cfg: Config) -> dict[str, object]:
         "width": cfg.payload_width,
         "depth": cfg.payload_depth,
         "height": cfg.payload_height,
-        "margin": cfg.payload_margin,
+        "min_clearance": cfg.payload_clearance,
         "clearance": None if c is None else round(c, 4),
         "empty": is_empty(cfg),
         "fits": fits(cfg),

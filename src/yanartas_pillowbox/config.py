@@ -16,7 +16,7 @@ from yanartas_pillowbox import crosssection
 
 # Bumped whenever the meaning of saved settings changes; documents of any other version are
 # rejected (no migrations).
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
@@ -175,15 +175,15 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         )
     ),
     FieldSpec(
-        "payload_margin",
-        "Payload margin",
+        "payload_clearance",
+        "Payload clearance",
         "float",
         "Payload",
         "mm",
         0,
         100,
         0.25,
-        help="Minimum clearance: the true distance from any point of the payload to the "
+        help="The minimum true distance from any point of the payload to the "
         "nearest point of the box surface.",
     ),
     FieldSpec("glue_tab_width", "Glue-tab width", "float", "Glue tab", "mm", 3, 100, 0.5),
@@ -226,6 +226,113 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "about a millimetre of its centre).",
     ),
     FieldSpec(
+        "fpc_cable",
+        "FPC cable",
+        "choice",
+        "FPC cable",
+        choices=(("none", "None"), ("front", "Front end"), ("back", "Back end")),
+        help="A flat cable of the flex PCB, leaving the middle of that end's inner flap (whose "
+        "top is cut off level over the cable's width) and meandering over the free space "
+        "above it. Every turn folds flat, so the cable becomes one straight strip that runs "
+        "into the box along the inside of the front panel. Front end: the flap at the top of "
+        "the pattern; back end: the one at the bottom.",
+    ),
+    FieldSpec(
+        "fpc_cable_length",
+        "Cable length",
+        "float",
+        "FPC cable",
+        "mm",
+        10,
+        2000,
+        1,
+        help="Along the cable's centreline, from the inner flap's edge to the plug's tip: the "
+        "straight cable's length once its turns are folded flat. Rows that do not fit above "
+        "the rest of the pattern make it taller.",
+    ),
+    FieldSpec(
+        "fpc_pins",
+        "Pin count",
+        "float",
+        "FPC cable",
+        "",
+        2,
+        200,
+        1,
+        help="Contacts of the FPC connector.",
+    ),
+    FieldSpec(
+        "fpc_pitch",
+        "Pin pitch",
+        "float",
+        "FPC cable",
+        "mm",
+        0.1,
+        2.54,
+        0.05,
+    ),
+    FieldSpec(
+        "fpc_edge_margin",
+        "Plug edge margin",
+        "float",
+        "FPC cable",
+        "mm",
+        0,
+        10,
+        0.05,
+        help="From the outermost contacts' centres to the plug's edges. The plug is (pins - 1) "
+        "x pitch + 2 x this wide (standard: one pitch, (pins + 1) x pitch overall).",
+    ),
+    FieldSpec(
+        "fpc_plug_length",
+        "Plug length",
+        "float",
+        "FPC cable",
+        "mm",
+        1,
+        50,
+        0.25,
+        help="Length of the plug at the cable's end: the part that goes into the connector "
+        "(the contacts and the stiffener behind them).",
+    ),
+    FieldSpec(
+        "fpc_cable_inset",
+        "Cable inset",
+        "float",
+        "FPC cable",
+        "mm",
+        0,
+        10,
+        0.05,
+        help="How much narrower than the plug the rest of the cable is on each side (0: the "
+        "same width). The plug's ears then stick out beside the cable.",
+    ),
+    FieldSpec(
+        "fpc_corner_radius",
+        "Cable corner radius",
+        "float",
+        "FPC cable",
+        "mm",
+        0,
+        10,
+        0.1,
+        help="Rounds every corner of the cable's outline, and where it meets the inner flap. "
+        "Smaller where the outline leaves no room (e.g. at the ends of the slots between "
+        "rows: at most half the clearance).",
+    ),
+    FieldSpec(
+        "fpc_cable_gap",
+        "Cable clearance",
+        "float",
+        "FPC cable",
+        "mm",
+        0.1,
+        20,
+        0.1,
+        help="Cut-to-cut distance between the cable's rows, and between the cable and the "
+        "rest of the pattern.",
+    ),
+    FieldSpec(
         "thickness",
         "Material thickness",
         "float",
@@ -257,21 +364,31 @@ SPECS_BY_NAME: dict[str, FieldSpec] = {s.name: s for s in FIELD_SPECS}
 class Config:
     """A complete, validated pillow box configuration. Lengths in mm."""
 
-    width: float = 55.0
-    length: float = 120.0
-    height: float = 20.0
+    # The defaults fit the "Raspberry Pi Model B + HAT" payload preset with its clearance.
+    width: float = 107.0
+    length: float = 101.0
+    height: float = 48.5
     end_wall_gap: float = 10.0
     lid_overlap: float = 5.0
     lid_offset: float = 2.0
     # Rectangular payload, inscribed centred in the closed box (preview only, not exported).
-    payload_width: float = 30.0
-    payload_depth: float = 80.0
-    payload_height: float = 13.0
-    payload_margin: float = 1.0
+    payload_width: float = 56.0
+    payload_depth: float = 85.0
+    payload_height: float = 22.0
+    payload_clearance: float = 8.0
     glue_tab_width: float = 12.0
     glue_tab_taper: float = 9.0
     fpc_cutout: str = "none"
     fpc_cutout_width: float = 15.0
+    fpc_cable: str = "front"
+    fpc_cable_length: float = 120.0
+    fpc_pins: float = 30.0
+    fpc_pitch: float = 0.5
+    fpc_edge_margin: float = 0.5
+    fpc_plug_length: float = 4.0
+    fpc_cable_inset: float = 0.0
+    fpc_corner_radius: float = 1.0
+    fpc_cable_gap: float = 1.0
     thickness: float = 0.2
     print_side: str = "outside"
 
@@ -433,7 +550,8 @@ def validate(cfg: Config) -> dict[str, str]:
         and cfg.end_wall_gap > 0
         and not errors.keys() & {"end_wall_gap", "lid_offset"}
     ):
-        from yanartas_pillowbox.geometry import max_lid_offset  # geometry imports this module
+        # (geometry imports this module)
+        from yanartas_pillowbox.geometry import max_lid_offset, min_lid_width
 
         limit = max_lid_offset(body)
         if limit < 0:
@@ -443,10 +561,12 @@ def validate(cfg: Config) -> dict[str, str]:
                 "gap to 0, or make the box flatter)",
             )
         elif cfg.lid_offset > limit:
+            wide = min_lid_width(cfg)
+            hint = f"; a box at least {_fmt(wide)} mm wide allows it" if wide is not None else ""
             add(
                 "lid_offset",
                 f"must be at most {_fmt(math.floor(limit * 100) / 100)} mm for this box (the "
-                "widened ends would have to turn past 45 degrees at the sides)",
+                f"widened ends would have to turn past 45 degrees at the sides){hint}",
             )
 
     if body is not None and cfg.fpc_cutout != "none" and "fpc_cutout_width" not in errors:
@@ -457,6 +577,40 @@ def validate(cfg: Config) -> dict[str, str]:
                 f"must be at most {_fmt(limit)} mm (the inner flaps' width, "
                 f"{_fmt(body.back.width)} mm, minus 1 mm)",
             )
+
+    fpc_fields = {
+        "fpc_cable",
+        "fpc_cable_length",
+        "fpc_pins",
+        "fpc_pitch",
+        "fpc_edge_margin",
+        "fpc_plug_length",
+        "fpc_cable_inset",
+        "fpc_corner_radius",
+        "fpc_cable_gap",
+    }
+    if cfg.fpc_cable != "none" and "fpc_pins" not in errors and cfg.fpc_pins != int(cfg.fpc_pins):
+        add("fpc_pins", "must be a whole number")
+    if body is not None and cfg.fpc_cable != "none" and not errors.keys() & fpc_fields:
+        from yanartas_pillowbox import fpc  # (fpc imports this module)
+
+        cable_end = "front" if cfg.fpc_cable == "front" else "back"
+        width = fpc.cable_width(cfg)
+        if cfg.fpc_cutout in (cable_end, "both"):
+            add("fpc_cutout", f"the FPC cable already cuts the {cable_end} end's inner flap")
+        elif width <= 0:
+            add("fpc_cable_inset", "leaves no cable: must be less than half the plug's width")
+        elif width > body.back.width - 1:
+            add(
+                "fpc_pins",
+                f"the cable ({_fmt(width)} mm) must be at most {_fmt(body.back.width - 1)} mm "
+                "wide (the inner flaps' width minus 1 mm)",
+            )
+        elif "end_wall_gap" not in errors and "lid_offset" not in errors:
+            try:
+                fpc.layout(cfg)
+            except fpc.CableError as exc:
+                add(exc.field, str(exc))
 
     if "glue_tab_taper" not in errors and not errors.keys() & {"length", "height", "thickness"}:
         max_taper = cfg.edge_length / 2 - 1

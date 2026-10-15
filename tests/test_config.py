@@ -12,7 +12,11 @@ from yanartas_pillowbox.config import (
 )
 from yanartas_pillowbox.crosssection import CrossSection, max_height, panel_width
 
-MAX_H_55 = max_height(55.0, 0.4)  # the default box is 55 mm wide, 0.4 mm material
+D = Config.defaults()
+MAX_H = max_height(D.width, D.thickness)  # the steepest box of the default width
+NARROW = {"width": 55, "height": 20, "fpc_cable": "none"}  # a front panel under the tab limit
+WF = Config.from_dict(NARROW).body.front.width
+MAX_TAPER = D.edge_length / 2 - 1
 
 
 def errors_for(**changes):
@@ -33,7 +37,7 @@ def test_every_field_has_a_spec():
 
 
 def test_missing_fields_use_defaults():
-    assert Config.from_dict({"width": 80}).width == 80
+    assert Config.from_dict({"width": D.width + 10}).width == D.width + 10
     assert Config.from_dict({}) == Config.defaults()
 
 
@@ -48,14 +52,14 @@ def test_missing_fields_use_defaults():
         ({"length": 0}, "length"),
         ({"length": -1}, "length"),
         ({"height": 0}, "height"),
-        ({"height": MAX_H_55 + 0.01}, "height"),  # too steep for a 55 mm wide box
-        ({"glue_tab_width": 60.4}, "glue_tab_width"),  # wider than the front panel (60.33)
+        ({"height": MAX_H + 0.01}, "height"),  # too steep for the default box
+        ({**NARROW, "glue_tab_width": WF + 0.01}, "glue_tab_width"),  # wider than the panel
         ({"thickness": -0.1}, "thickness"),
         ({"thickness": 6}, "thickness"),
         ({"height": 2, "thickness": 1.6}, "thickness"),  # inner flaps would vanish
         ({"glue_tab_width": 1}, "glue_tab_width"),
         ({"glue_tab_taper": -1}, "glue_tab_taper"),
-        ({"glue_tab_taper": 70}, "glue_tab_taper"),  # > edge/2 - 1 = (120 + 20 + 1.2)/2 - 1
+        ({"glue_tab_taper": MAX_TAPER + 0.1}, "glue_tab_taper"),  # > half the edge - 1
         ({"end_wall_gap": -1}, "end_wall_gap"),
         ({"end_wall_gap": 501}, "end_wall_gap"),
         ({"lid_overlap": -1}, "lid_overlap"),
@@ -68,9 +72,11 @@ def test_validation_errors(changes, field):
 
 def test_boundary_values_accepted():
     # (the steepest box is too steep at the sides for lids: no end wall gap)
-    assert Config.from_dict({"height": MAX_H_55, "end_wall_gap": 0}).height == MAX_H_55
-    assert Config.from_dict({"glue_tab_width": 60.3}).glue_tab_width == 60.3
-    assert Config.from_dict({"glue_tab_taper": 69.6}).glue_tab_taper == 69.6
+    assert (
+        Config.from_dict({"height": MAX_H, "end_wall_gap": 0, "fpc_cable": "none"}).height == MAX_H
+    )
+    assert Config.from_dict({**NARROW, "glue_tab_width": WF - 0.01}).glue_tab_width == WF - 0.01
+    assert Config.from_dict({"glue_tab_taper": MAX_TAPER}).glue_tab_taper == MAX_TAPER
     assert Config.from_dict({"glue_tab_taper": 0, "thickness": 0}).thickness == 0
     assert (
         Config.from_dict(
@@ -81,6 +87,7 @@ def test_boundary_values_accepted():
                 "glue_tab_taper": 4,
                 "glue_tab_width": 5,
                 "end_wall_gap": 0,
+                "fpc_cable": "none",
             }
         ).width
         == 10
@@ -91,16 +98,30 @@ def test_length_is_measured_on_the_midline():
     """``length`` runs between the inner end walls on the centreline; the straight edges are
     longer by the height and three thicknesses (inner wall at height/2 + t from the corner
     line, plus half its thickness, at both ends)."""
-    cfg = Config.from_dict({"length": 100, "height": 24, "thickness": 0.5, "lid_offset": 0})
+    cfg = Config.from_dict(
+        {"length": 100, "height": 24, "thickness": 0.5, "lid_offset": 0, "fpc_cable": "none"}
+    )
     assert cfg.edge_length == pytest.approx(125.5)
-    assert Config.from_dict({"length": 100, "height": 24, "thickness": 0}).edge_length == 124
+    assert (
+        Config.from_dict(
+            {"length": 100, "height": 24, "thickness": 0, "fpc_cable": "none"}
+        ).edge_length
+        == 124
+    )
 
 
 def test_end_wall_gap_lengthens_the_front_panel():
     """The front panel runs on by the end wall gap at each end; the back panel (and the
     interior) keep their length."""
     cfg = Config.from_dict(
-        {"length": 100, "height": 24, "thickness": 0.5, "end_wall_gap": 7, "lid_offset": 0}
+        {
+            "length": 100,
+            "height": 24,
+            "thickness": 0.5,
+            "end_wall_gap": 7,
+            "lid_offset": 0,
+            "fpc_cable": "none",
+        }
     )
     assert cfg.edge_length == pytest.approx(125.5)
     assert cfg.front_length == pytest.approx(139.5)
@@ -118,8 +139,15 @@ def test_lid_offset_is_limited_by_the_45_degree_turn():
     assert cfg.with_values(lid_offset=math.floor(limit * 100) / 100)
     errs = errors_for(lid_offset=limit + 0.1)
     assert "lid_offset" in errs and "45 degrees" in errs["lid_offset"]
-    assert "end_wall_gap" in errors_for(height=MAX_H_55)  # steepest box: no room for lids
-    assert Config.from_dict({"height": MAX_H_55, "end_wall_gap": 0})
+    steep = {
+        "width": 55,
+        "height": max_height(55.0, 0.4),
+        "thickness": 0.4,
+        "lid_offset": 0,
+        "fpc_cable": "none",
+    }
+    assert "end_wall_gap" in errors_for(**steep)  # steepest box: no room for lids
+    assert Config.from_dict({**steep, "end_wall_gap": 0})
 
 
 def test_multiple_errors_reported_together():
@@ -153,7 +181,7 @@ def test_unknown_keys_ignored():
 
 def test_cli_value_parsing():
     assert parse_cli_value("width", "80") == 80.0
-    assert parse_cli_value("payload_margin", "2.5") == 2.5
+    assert parse_cli_value("payload_clearance", "2.5") == 2.5
     with pytest.raises(ConfigError):
         parse_cli_value("nope", "1")
     with pytest.raises(ConfigError):
@@ -168,7 +196,7 @@ def test_cli_value_parsing():
         (10, {"height": 3}),
         (300, {"height": 110}),
         (80, {"height": 1}),
-        (55, {"height": MAX_H_55}),
+        (55, {"height": MAX_H}),
     ],
 )
 @pytest.mark.parametrize("t", [0.0, 0.4, 1.5])
@@ -184,6 +212,7 @@ def test_width_drives_the_cross_section(width, arc, t):
             "glue_tab_width": 5,
             "thickness": t,
             "end_wall_gap": 0,  # (lids need a flat enough box)
+            "fpc_cable": "none",
             **arc,
         }
     )
@@ -201,7 +230,7 @@ def test_width_drives_the_cross_section(width, arc, t):
 def test_interior_height_and_flap_offsets():
     """The panels' inner surfaces are height/2 above and below the centre; the outer (front)
     flaps' wall stands t outside the inner (back) flaps' wall."""
-    cfg = Config.from_dict({"height": 18, "thickness": 0.8})
+    cfg = Config.from_dict({"height": 18, "thickness": 0.8, "fpc_cable": "none"})
     body = cfg.body
     front_inner = body.front_point(body.front.width / 2)[1] - 0.4
     back_inner = body.back_point(body.back.width / 2)[1] + 0.4

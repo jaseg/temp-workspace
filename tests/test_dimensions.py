@@ -17,9 +17,11 @@ CONFIGS = {
     "stacked": D.with_values(end_wall_gap=0),
     "zero-thickness": D.with_values(thickness=0, glue_tab_width=20),
     "no-taper": D.with_values(glue_tab_taper=0),
-    "fpc-front": D.with_values(fpc_cutout="front"),
-    "fpc-both": D.with_values(fpc_cutout="both"),
-    "big": D.with_values(width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30),
+    "fpc-front": D.with_values(fpc_cutout="front", fpc_cable="none"),
+    "fpc-both": D.with_values(fpc_cutout="both", fpc_cable="none"),
+    "big": D.with_values(
+        width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30, fpc_cable="none"
+    ),
 }
 
 
@@ -70,16 +72,16 @@ def test_pattern_dimensions_measure_their_parameter(cfg):
 def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
     """Measured points lie on the paths of the downloaded SVG (same coordinates), or, for the
     interior length and height and the end wall gap, inside the folds by the material
-    allowance: the interior length starts e + 1.5 t inside the front panel's folds (outer
-    wall, gap, inner wall), the interior height t/2 inside the back panel's fold (its inner
-    surface), the gap t/2 inside the front panel's fold (the outer wall's inner surface)."""
+    allowance: the interior length and height start t/2 inside the back panel's folds (the
+    inner walls' inner surfaces), the gap t/2 inside the front panel's fold (the outer wall's
+    inner surface)."""
     pattern = build_pattern(cfg)
     root = svg_elements(render_svg(cfg, pattern))
     segs = [s for el in root.iter(q("path")) for s in parse_path(el.get("d"))[1]]
     t, e = cfg.thickness, cfg.end_wall_gap
     allowance = {
-        ("length", 0): e + 1.5 * t,
-        ("length", 1): e + 1.5 * t,
+        ("length", 0): t / 2,
+        ("length", 1): t / 2,
         ("height", 0): t / 2,
         ("end_wall_gap", 0): t / 2,
         ("end_wall_gap", 1): e + t / 2,
@@ -107,32 +109,34 @@ def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
             assert ys == pytest.approx([lid.level - depth, lid.level - depth + cfg.lid_overlap])
 
 
-def test_length_dimension_runs_along_the_midline(cfg):
+def test_length_dimension_runs_along_the_inner_flaps(cfg):
+    """On the back panel's midline, from inner end wall to inner end wall (its flaps)."""
     pattern = build_pattern(cfg)
     dx, dy = sheet_offset(pattern)
     length = next(d for d in dm.pattern_dimensions(cfg, pattern, (dx, dy)) if d.param == "length")
-    inset = cfg.end_wall_gap + 1.5 * cfg.thickness
-    for p, fold, k in zip(length.points, ("front-top", "front-bottom"), (1, -1), strict=True):
+    inset = cfg.thickness / 2
+    for p, fold, k in zip(length.points, ("back-top", "back-bottom"), (1, -1), strict=True):
         apex = pattern.fold(fold).segment.point_at(0.5)
         assert p == pytest.approx((apex[0] + dx, apex[1] + dy + k * inset))
-    # (drawn beside the midline, clear of the exported "front end"/"back end" labels)
-    assert length.at == pytest.approx(cfg.body.front.width * 0.3 + dx)
+    # (drawn beside the midline, clear of the exported labels)
+    body = cfg.body
+    assert length.at == pytest.approx(body.front.width + body.back.width * 0.3 + dx)
 
 
-def test_gap_dimension_continues_the_length(cfg):
-    """The end wall gap is measured on the same line as the length, at the bottom end: from
-    the inner wall's outer surface (a thickness beyond the interior's end) to the outer
-    wall's inner surface."""
+def test_gap_dimension_on_the_front_panel(cfg):
+    """The end wall gap is measured on the front panel's midline at the bottom end: from the
+    inner wall's outer surface (a thickness beyond the interior's end) to the outer wall's
+    inner surface (t/2 inside the front panel's fold)."""
     pattern = build_pattern(cfg)
-    offset = sheet_offset(pattern)
-    dims = {d.param: d for d in dm.pattern_dimensions(cfg, pattern, offset)}
+    dx, dy = sheet_offset(pattern)
+    dims = {d.param: d for d in dm.pattern_dimensions(cfg, pattern, (dx, dy))}
     if cfg.end_wall_gap == 0:
         assert "end_wall_gap" not in dims
         return
-    gap, length = dims["end_wall_gap"], dims["length"]
-    assert gap.at == length.at
-    assert gap.points[0][0] == gap.points[1][0] == length.points[1][0]
-    assert min(p[1] for p in gap.points) == pytest.approx(length.points[1][1] + cfg.thickness)
+    gap = dims["end_wall_gap"]
+    apex = pattern.fold("front-bottom").segment.point_at(0.5)
+    assert gap.points[0] == pytest.approx((apex[0] + dx, apex[1] + dy - cfg.thickness / 2))
+    assert gap.points[0][0] == gap.points[1][0]
     assert gap.value == pytest.approx(cfg.end_wall_gap)
 
 

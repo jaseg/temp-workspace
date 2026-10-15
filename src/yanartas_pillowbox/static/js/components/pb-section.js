@@ -37,17 +37,17 @@ template.innerHTML = `
   ${DIM_STYLE}
   .payload { fill: var(--payload-fill); stroke: var(--accent);
              stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
-  .payload-margin { fill: none; stroke: var(--accent); stroke-width: 1px; stroke-dasharray: 4 3;
+  .payload-clearance { fill: none; stroke: var(--accent); stroke-width: 1px; stroke-dasharray: 4 3;
                     vector-effect: non-scaling-stroke; }
-  .payload-margin.bad { stroke: var(--error); }
+  .payload-clearance.bad { stroke: var(--error); }
   .payload.bad { fill: color-mix(in srgb, var(--error) 22%, transparent); stroke: var(--error); }
   .legend i { width: 14px; height: 9px; display: inline-block; border-radius: 2px; }
   .legend i.interior { background: var(--interior-fill); border: 1px solid var(--text); }
   .legend i.payload { background: var(--payload-fill); border: 1.5px solid var(--accent); }
   .legend i.payload.bad { background: color-mix(in srgb, var(--error) 22%, transparent);
                           border-color: var(--error); }
-  .legend i.margin { height: 0; border-radius: 0; border-top: 1.5px dashed var(--accent); }
-  .legend i.margin.bad { border-top-color: var(--error); }
+  .legend i.clearance { height: 0; border-radius: 0; border-top: 1.5px dashed var(--accent); }
+  .legend i.clearance.bad { border-top-color: var(--error); }
   .legend i.material { background: var(--material-fill); }
   .legend i.glue-tab { height: 0; border-radius: 0; border-top: 1.4px solid var(--glue-color); }
   text { fill: var(--text-muted); font-family: var(--ui-font, system-ui, sans-serif); }
@@ -143,7 +143,7 @@ export class PbSection extends HTMLElement {
       const bad = payload.fits ? "" : " bad";
       this.#legend.append(
         legendItem(`payload${bad}`, payload.fits ? "Payload space" : "Payload space (does not fit)"));
-      if (payload.margin > 0) this.#legend.append(legendItem(`margin${bad}`, "Payload margin"));
+      if (payload.min_clearance > 0) this.#legend.append(legendItem(`clearance${bad}`, "Payload clearance"));
     }
   }
 
@@ -203,11 +203,11 @@ export class PbSection extends HTMLElement {
 
     // Payload: preview only, centred in the section.
     if (payload && !payload.empty) {
-      const { width: pw, height: ph, margin: m } = payload;
+      const { width: pw, height: ph, min_clearance: m } = payload;
       if (m > 0) {
-        // The margin envelope: every point within m of the payload (rounded corners).
+        // The clearance envelope: every point within the clearance of the payload (rounded corners).
         svg.append(el("rect", {
-          class: payload.fits ? "payload-margin" : "payload-margin bad",
+          class: payload.fits ? "payload-clearance" : "payload-clearance bad",
           x: -pw / 2 - m, y: -ph / 2 - m, width: pw + 2 * m, height: ph + 2 * m, rx: m, ry: m,
         }));
       }

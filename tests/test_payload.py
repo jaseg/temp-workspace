@@ -12,7 +12,11 @@ from yanartas_pillowbox.geometry import build_cross_section, build_model3d, buil
 from yanartas_pillowbox.server import create_app
 from yanartas_pillowbox.svg import extract_config, render_svg
 
-D = Config.defaults()
+# The default box, with a payload smaller than the one it was fitted to (room to maximize)
+# and a smaller clearance.
+D = Config.defaults().with_values(
+    payload_width=40, payload_depth=70, payload_height=16, payload_clearance=1
+)
 BOXES = {
     "default": D,
     "wide-flat": D.with_values(
@@ -22,10 +26,16 @@ BOXES = {
         payload_width=75,
         payload_depth=30,
         payload_height=8,
+        fpc_cable="none",
     ),
-    "stacked": D.with_values(end_wall_gap=0, payload_depth=110),
+    "stacked": D.with_values(end_wall_gap=0, payload_depth=80),
     "steep": D.with_values(
-        width=50, height=22.5, payload_width=20, payload_height=15, end_wall_gap=0
+        width=50,
+        height=22.5,
+        payload_width=20,
+        payload_height=15,
+        end_wall_gap=0,
+        fpc_cable="none",
     ),
 }
 PAYLOADS = [(30, 100, 14), (60, 40, 10), (10, 200, 30), (80, 25, 5)]
@@ -93,11 +103,11 @@ def box_point_distance(cfg, p):
 
 MARGIN_CASES = {
     "default": D,
-    "no-margin": D.with_values(payload_margin=0),
+    "no-margin": D.with_values(payload_clearance=0),
     "tight-length": D.with_values(
-        payload_depth=117, payload_height=10, payload_margin=1.5, end_wall_gap=0
+        payload_depth=84, payload_height=10, payload_clearance=1.5, end_wall_gap=0
     ),
-    "tight-walls": D.with_values(payload_depth=82, payload_height=10, payload_margin=0.5),
+    "tight-walls": D.with_values(payload_depth=82, payload_height=10, payload_clearance=0.5),
     "wide": D.with_values(
         width=120,
         height=30,
@@ -105,11 +115,18 @@ MARGIN_CASES = {
         payload_width=90,
         payload_depth=40,
         payload_height=8,
-        payload_margin=2,
+        payload_clearance=2,
+        fpc_cable="none",
     ),
-    "thin-tall": D.with_values(payload_width=6, payload_height=17, payload_margin=0.5),
+    "thin-tall": D.with_values(payload_width=6, payload_height=17, payload_clearance=0.5),
     "thick": D.with_values(
-        thickness=2, height=24, width=70, payload_width=40, payload_height=14, payload_depth=60
+        thickness=2,
+        height=24,
+        width=70,
+        payload_width=40,
+        payload_height=14,
+        payload_depth=60,
+        fpc_cable="none",
     ),
 }
 
@@ -132,12 +149,12 @@ def test_clearance_is_true_distance_to_surface(cfg):
 
 def test_margin_controls_fit():
     c = P.clearance(D)
-    assert P.fits(D.with_values(payload_margin=math.floor(c * 100) / 100))
-    assert not P.fits(D.with_values(payload_margin=c + 0.01))
+    assert P.fits(D.with_values(payload_clearance=math.floor(c * 100) / 100))
+    assert not P.fits(D.with_values(payload_clearance=c + 0.01))
     # End walls: clearance along the length is exactly (length - depth) / 2, whatever the
     # gap to the outer walls.
     for gap in (0, 10, 40):
-        cfg = D.with_values(payload_depth=D.length - 1, payload_margin=0, end_wall_gap=gap)
+        cfg = D.with_values(payload_depth=D.length - 1, payload_clearance=0, end_wall_gap=gap)
         assert P.clearance(cfg) == pytest.approx(0.5)
 
 
@@ -166,7 +183,7 @@ def test_maximize_is_tight(box, field):
 
 def test_maximize_height_touches_the_inner_surface(box):
     """With no margin the largest payload touches the material's inner surface."""
-    box = replace(box, payload_margin=0)
+    box = replace(box, payload_clearance=0)
     out = P.maximize(box, "payload_height")
     assert P.section_clearance(out.body, out.payload_width, out.payload_height) == pytest.approx(
         0, abs=0.011
@@ -175,13 +192,13 @@ def test_maximize_height_touches_the_inner_surface(box):
 
 def test_maximize_depth_is_midline_length(box):
     out = P.maximize(box, "payload_depth")
-    assert out.payload_depth == pytest.approx(box.length - 2 * box.payload_margin)
+    assert out.payload_depth == pytest.approx(box.length - 2 * box.payload_clearance)
 
 
 @pytest.mark.parametrize("field", ["payload_width", "payload_depth", "payload_height"])
 def test_maximize_keeps_margin_exactly(box, field):
     out = P.maximize(box, field)
-    assert P.clearance(out) == pytest.approx(box.payload_margin, abs=0.011)
+    assert P.clearance(out) == pytest.approx(box.payload_clearance, abs=0.011)
 
 
 def test_maximize_impossible():
@@ -191,7 +208,7 @@ def test_maximize_impossible():
     with pytest.raises(P.PayloadError):
         P.maximize(D.with_values(payload_width=D.width), "payload_height")
     with pytest.raises(P.PayloadError) as info:  # cross-section already breaks the margin
-        P.maximize(D.with_values(payload_height=14), "payload_depth")
+        P.maximize(D.with_values(payload_height=D.height - 1), "payload_depth")
     assert info.value.field == "payload_width"
 
 
@@ -211,8 +228,8 @@ def test_fit_box_holds_payload_and_only_touches_body(dims):
     assert_inside_mesh(out)
     unchanged = {"width": out.width, "length": out.length, "height": out.height}
     assert replace(cfg, **unchanged) == out  # glue tab and thickness kept
-    assert out.length == pytest.approx(max(pd + 2 * cfg.payload_margin, 10))
-    assert P.clearance(out) == pytest.approx(cfg.payload_margin, abs=0.011)  # tight
+    assert out.length == pytest.approx(max(pd + 2 * cfg.payload_clearance, 10))
+    assert P.clearance(out) == pytest.approx(cfg.payload_clearance, abs=0.011)  # tight
 
 
 def brute_force_min_area(cfg, n_heights=12):
@@ -225,7 +242,10 @@ def brute_force_min_area(cfg, n_heights=12):
         try:
             if not P.fits(
                 cfg.with_values(
-                    height=height, width=hi, length=cfg.payload_depth + 2 * cfg.payload_margin
+                    height=height,
+                    width=hi,
+                    length=cfg.payload_depth + 2 * cfg.payload_clearance,
+                    fpc_cable="none",
                 )
             ):
                 continue
@@ -236,14 +256,20 @@ def brute_force_min_area(cfg, n_heights=12):
             try:
                 ok = P.fits(
                     cfg.with_values(
-                        height=height, width=mid, length=cfg.payload_depth + 2 * cfg.payload_margin
+                        height=height,
+                        width=mid,
+                        length=cfg.payload_depth + 2 * cfg.payload_clearance,
+                        fpc_cable="none",
                     )
                 )
             except ConfigError:
                 ok = False
             lo, hi = (lo, mid) if ok else (mid, hi)
         cand = cfg.with_values(
-            height=height, width=hi, length=cfg.payload_depth + 2 * cfg.payload_margin
+            height=height,
+            width=hi,
+            length=cfg.payload_depth + 2 * cfg.payload_clearance,
+            fpc_cable="none",
         )
         best = min(best, pattern_area(cand))
     return best
@@ -293,10 +319,10 @@ def test_api(tmp_path):
     assert client.post("/api/payload", json={"config": cfg, "action": "x"}).status_code == 400
     data = client.post("/api/render", json={"config": cfg}).get_json()
     assert data["payload"] == {
-        "width": 30,
-        "depth": 80,
-        "height": 13,
-        "margin": 1,
+        "width": 40,
+        "depth": 70,
+        "height": 16,
+        "min_clearance": 1,
         "clearance": round(P.clearance(D), 4),
         "empty": False,
         "fits": True,

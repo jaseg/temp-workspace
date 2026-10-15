@@ -234,12 +234,12 @@ function renderDerived(info, payload) {
     return [dt, dd];
   }));
   if (!payload.empty) {
-    // True distance from the payload to the box surface; must be at least the margin.
+    // True distance from the payload to the box surface; must be at least the required clearance.
     const c = payload.clearance;
     const dt = Object.assign(document.createElement("dt"), { textContent: "Payload clearance" });
     const dd = Object.assign(document.createElement("dd"), {
       textContent: c < 0 ? "does not fit" : `${c.toFixed(2)} mm`,
-      title: `Margin required: ${payload.margin} mm`,
+      title: `Clearance required: ${payload.min_clearance} mm`,
     });
     if (!payload.fits) dd.classList.add("bad");
     $("#derived").append(dt, dd);

@@ -22,13 +22,14 @@ INK_LABEL = f"{{{INKSCAPE_NS}}}label"
 CONFIGS = [
     Config.defaults(),
     Config.defaults().with_values(print_side="inside", glue_tab_taper=0),
-    Config.defaults().with_values(height=12, glue_tab_width=20, end_wall_gap=0),
+    Config.defaults().with_values(height=12, glue_tab_width=20, end_wall_gap=0, fpc_cable="none"),
     Config.defaults().with_values(
         width=33.3,
         length=77.7,
         height=12.5,
         thickness=0.0,
         glue_tab_taper=0,
+        fpc_cable="none",
     ),
 ]
 
@@ -121,7 +122,8 @@ def test_layers_and_line_styles(cfg):
     valley dashed), one Inkscape layer per line type."""
     pattern = build_pattern(cfg)
     root = svg_elements(render_svg(cfg, pattern))
-    present = {d for d in FoldDirection if any(f.direction == d for f in pattern.folds)}
+    folds = (*pattern.folds, *(pattern.cable.folds if pattern.cable else ()))
+    present = {d for d in FoldDirection if any(f.direction == d for f in folds)}
     layers = [g for g in root.findall(q("g")) if g.get("id") != "labels"]
     assert {g.get("id") for g in layers} == {"cut"} | {LAYERS[d][0] for d in present}
     for g in layers:
@@ -154,8 +156,11 @@ def test_fold_paths_are_open_and_single(cfg):
     root = svg_elements(render_svg(cfg))
     els = list(fold_elements(root))
     pattern = build_pattern(cfg)
-    # + the lids' folds and the front folds continued over the wings, at each end
-    assert len(els) == len(pattern.folds) == (6 if cfg.end_wall_gap == 0 else 12)
+    # + the lids' folds and the front folds continued over the wings, at each end, and the
+    # FPC cable's corners
+    cable = len(pattern.cable.folds) if pattern.cable else 0
+    assert len(els) == len(pattern.folds) + cable
+    assert len(pattern.folds) == (6 if cfg.end_wall_gap == 0 else 12)
     for el in els:
         cmds, segs = parse_path(el.get("d"))
         assert cmds.count("M") == 1 and "Z" not in cmds
@@ -236,9 +241,15 @@ def test_import_corrupt_or_invalid():
 
 def test_print_inside_only_flips_fold_indicators():
     """Printing on the inside keeps the geometry identical and just turns every fold into a
-    valley fold (dashed instead of dash-dot)."""
-    out = svg_elements(render_svg(Config.defaults()))
-    ins_cfg = Config.defaults().with_values(print_side="inside")
+    valley fold (dashed instead of dash-dot); the FPC cable's folds just flip."""
+    with_cable = build_pattern(Config.defaults())
+    flipped = build_pattern(Config.defaults().with_values(print_side="inside"))
+    assert with_cable.cable and flipped.cable
+    for a, b in zip(with_cable.cable.folds, flipped.cable.folds, strict=True):
+        assert a.segment == b.segment and {a.direction, b.direction} == set(FoldDirection)
+    base = Config.defaults().with_values(fpc_cable="none")
+    out = svg_elements(render_svg(base))
+    ins_cfg = base.with_values(print_side="inside")
     ins = svg_elements(render_svg(ins_cfg))
     paths = lambda root: {el.get("id"): el.get("d") for el in root.iter(q("path"))}  # noqa: E731
     assert paths(ins) == paths(out)

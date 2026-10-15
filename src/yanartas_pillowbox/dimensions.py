@@ -94,16 +94,20 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
     def p(x: float, y: float) -> Coords:
         return (x + dx, y + dy)
 
-    # Interior length along the front panel's midline: the inner end walls' inner surfaces
-    # stand e + 1.5 t inside the front panel's curved folds (outer wall, gap, inner wall).
-    ya, yb = e + s_f + 1.5 * t, front_edge - e - s_f - 1.5 * t
+    # Interior length along the back panel's midline, between the inner end walls (its
+    # flaps): their inner surfaces stand t/2 inside the back panel's curved folds.
+    s_b = body.back.sagitta
+    ya, yb = e + s_b + t / 2, e + edge - s_b - t / 2
     # Interior height across a back panel (inner) flap: from t/2 inside the fold (the back
     # panel's inner surface) to the cut edge (the front panel's inner surface). Taken on the
-    # bottom flap if an FPC cutout flattens only the top one; with both flattened, measured
-    # to where the edge would be without the cutout.
+    # bottom flap if an FPC cutout or cable cuts only the top one down; with both cut down,
+    # measured to where the edge would be without the cut.
     xh = wf + wb / 2
-    reach = body.back_cuts[len(body.back_cuts) // 2][1] if cfg.fpc_cutout == "both" else None
-    if cfg.fpc_cutout == "front":
+    cut = {
+        end for end in ("front", "back") if cfg.fpc_cutout in (end, "both") or cfg.fpc_cable == end
+    }
+    reach = body.back_cuts[len(body.back_cuts) // 2][1] if len(cut) == 2 else None
+    if cut == {"front"}:
         y_cut = pattern.face("back-bottom-flap").y_range(xh)[1]
         y_fold = e + edge - body.back.sagitta + t / 2
     else:
@@ -127,9 +131,9 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
             "length",
             f"length {fmt(cfg.length)}",
             "vertical",
-            (p(wf / 2, ya), p(wf / 2, yb)),
+            (p(xh, ya), p(xh, yb)),
             yb - ya,
-            at=wf * 0.3 + dx,  # beside the midline, clear of the exported labels
+            at=wf + wb * 0.3 + dx,  # beside the midline, clear of the exported labels
         ),
         Dimension(
             "height",
@@ -168,7 +172,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 "vertical",
                 (p(wf / 2, yg[0]), p(wf / 2, yg[1])),
                 yg[0] - yg[1],
-                at=wf * 0.3 + dx,  # in line with the length
+                at=wf * 0.3 + dx,  # beside the midline, clear of the exported labels
             )
         )
     lid = lid_layout(cfg)

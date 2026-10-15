@@ -115,8 +115,8 @@ export class PbPreview3d extends HTMLElement {
     new ResizeObserver(() => this.#resize()).observe(this.#stage);
   }
 
-  /** model: {parts:[{name, kind, positions, indices, outline}], lines:[{direction, points}],
-   *  cuts:[[point...]], bounds, interior};
+  /** model: {parts:[{name, kind, positions, indices, outline}], cable:{positions, indices}|null,
+   *  lines:[{direction, points}], cuts:[[point...]], bounds, interior};
    *  dims: parameter dimensions in the model frame (see dimensions.model_dimensions). */
   update(model, dims = [], payload = null) {
     const inside = model.interior;
@@ -160,6 +160,9 @@ export class PbPreview3d extends HTMLElement {
       });
       group.add(new THREE.Mesh(geom, mat));
     }
+    // The FPC cable, folded straight into the box under the front panel: drawn through the
+    // paper like the inner flaps.
+    if (model.cable) group.add(this.#cableMesh(model.cable));
     // Fold lines: black, dashed by fold direction like the export (pattern scaled with size).
     const b0 = model.bounds;
     const k = Math.max(1, Math.hypot(b0.width, b0.length, b0.height) / 150);
@@ -223,6 +226,19 @@ export class PbPreview3d extends HTMLElement {
     edge.renderOrder = 4;
     g.add(fill, edge);
     return g;
+  }
+
+  /** The FPC cable (inside the box): a translucent strip, drawn through the paper. */
+  #cableMesh({ positions, indices }) {
+    const color = this.#dark.matches ? 0xf0b429 : 0xc27c0e;
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    const fill = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({
+      color, opacity: 0.35, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+      transparent: true }));
+    fill.renderOrder = 3;
+    return fill;
   }
 
   /** Emphasise the dimensions of one parameter (or none). */

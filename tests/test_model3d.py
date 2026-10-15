@@ -20,22 +20,28 @@ from yanartas_pillowbox.geometry import (
     max_lid_offset,
 )
 
-D = Config.defaults()
+D = Config.defaults().with_values(fpc_cable="none")  # (the cable: see test_fpc)
 CONFIGS = {
     "default": D,
     "stacked": D.with_values(end_wall_gap=0),
     "wide-gap": D.with_values(end_wall_gap=35, length=60),
     "thin-material": D.with_values(thickness=0),
     "steepest-arc": D.with_values(
-        width=50, height=max_height(50, 0.4), glue_tab_taper=15, end_wall_gap=0
+        width=50,
+        height=max_height(50, 0.4),
+        glue_tab_taper=15,
+        end_wall_gap=0,
+        fpc_cable="none",
     ),
     # The lids as far off the back panel as the end sections can widen (to 45 degrees).
     "max-offset": D.with_values(lid_offset=math.floor(max_lid_offset(D.body) * 100) / 100),
-    "shallow": D.with_values(height=6, length=200, thickness=1),
-    "thick": D.with_values(width=70, height=24, thickness=2, glue_tab_width=15),
+    "shallow": D.with_values(height=6, length=200, thickness=1, fpc_cable="none"),
+    "thick": D.with_values(width=70, height=24, thickness=2, glue_tab_width=15, fpc_cable="none"),
     "fpc": D.with_values(fpc_cutout="both", fpc_cutout_width=20),
     "square-tab": D.with_values(glue_tab_taper=0, glue_tab_width=25),
-    "big": D.with_values(width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30),
+    "big": D.with_values(
+        width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30, fpc_cable="none"
+    ),
 }
 
 LEN_TOL = 2e-3  # relative: chord vs. arc on ~1 mm triangles across the curved cross-section

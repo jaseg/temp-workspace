@@ -13,7 +13,7 @@ def test_generate_defaults(tmp_path):
 
 def test_generate_with_overrides_and_config(tmp_path):
     conf = tmp_path / "c.json"
-    conf.write_text(json.dumps({"width": 80, "height": 30}))
+    conf.write_text(json.dumps({"width": 80, "height": 30, "fpc_cable": "none"}))
     out = tmp_path / "box.svg"
     rc = main(
         [
@@ -35,12 +35,12 @@ def test_generate_with_overrides_and_config(tmp_path):
 
 def test_generate_from_svg(tmp_path):
     first, second = tmp_path / "a.svg", tmp_path / "b.svg"
-    assert main(["generate", "--set", "width=55", "-o", str(first)]) == 0
+    assert main(["generate", "--set", "width=120", "-o", str(first)]) == 0
     assert (
         main(["generate", "--from-svg", str(first), "--set", "length=99", "-o", str(second)]) == 0
     )
     cfg = extract_config(second.read_text())
-    assert (cfg.width, cfg.length) == (55, 99)
+    assert (cfg.width, cfg.length) == (120, 99)
 
 
 def test_generate_errors(tmp_path, capsys):

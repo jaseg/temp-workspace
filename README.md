@@ -143,7 +143,7 @@ All lengths are in millimetres.
 | `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
 | `payload_depth` | 80 | Payload size along the box length. 0–2000. It has to fit between the inner end walls. |
 | `payload_height` | 13 | Payload size along the box height. 0–2000. |
-| `payload_margin` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
+| `payload_clearance` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than the front panel it is glued onto. |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to half the straight edge − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |

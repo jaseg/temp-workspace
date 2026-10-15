@@ -17,8 +17,8 @@ CONFIGS = {
     "default": D,
     "stacked": D.with_values(end_wall_gap=0),
     "wide-gap": D.with_values(end_wall_gap=30, length=70, payload_depth=50),
-    "thick": D.with_values(thickness=1.5, width=60, height=24, lid_offset=1.5),
-    "fpc": D.with_values(fpc_cutout="both"),
+    "thick": D.with_values(thickness=1.5, width=60, height=24, lid_offset=1.5, fpc_cable="none"),
+    "fpc": D.with_values(fpc_cutout="both", fpc_cable="none"),
 }
 
 

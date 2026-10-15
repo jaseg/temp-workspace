@@ -169,8 +169,9 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
             },
         )
 
+    all_folds = (*pattern.folds, *(pattern.cable.folds if pattern.cable else ()))
     for direction in FoldDirection:
-        folds = [f for f in pattern.folds if f.direction == direction]
+        folds = [f for f in all_folds if f.direction == direction]
         if not folds:
             continue
         g, dash = _layer(root, direction)
