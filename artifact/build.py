@@ -39,7 +39,7 @@ PYODIDE_FILES = ("pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "pyodide-l
 
 # The package modules the API needs (no Flask, no file persistence).
 PY_MODULES = (
-    "__init__", "api", "config", "crosssection", "dimensions", "geometry", "payload",
+    "__init__", "api", "config", "crosssection", "dimensions", "fpc", "geometry", "payload",
     "presets", "scad", "svg",
 )  # fmt: skip
 
