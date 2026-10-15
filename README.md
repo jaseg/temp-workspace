@@ -96,7 +96,7 @@ the defaults. It never crashes because of the file.
     pattern's bounding box.
     Glue tab, end wall gap, lid overlap, lid offset and thickness are left alone; the box is
     made as much wider as the lid offset needs. Results are rounded to 0.01 mm, always
-    towards a box that still fits. (The FPC cable's rows are not planned for.)
+    towards a box that still fits.
 * **Parameter dimensions:** all three views annotate the inputs they show:
   * **Pattern:** circumference (both panels, flat), length and end wall gap (along the
     front panel's midline), lid overlap (on the top lid), height (across an inner flap),

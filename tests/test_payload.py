@@ -13,7 +13,8 @@ from yanartas_pillowbox.server import create_app
 from yanartas_pillowbox.svg import extract_config, render_svg
 
 # The default box, with a payload smaller than the one it was fitted to (room to maximize)
-# and a smaller clearance; without the FPC cable, whose rows the box fit does not plan for.
+# and a smaller clearance; without the FPC cable (its rows would count in the pattern area
+# that the box fit tests measure).
 D = Config.defaults().with_values(
     payload_width=40, payload_depth=70, payload_height=16, payload_clearance=1, fpc_cable="none"
 )
