@@ -212,6 +212,12 @@ cable is one straight strip, `fpc_cable_length` long from the flap's edge. The f
 indicators alternate, starting with a mountain fold seen from the print side. The 3D view
 does not show the cable yet.
 
+How the cable's first folds take it into the box (A: the flat pattern; B: the folded first
+corner on the front panel, seen from inside the box; C: a lengthwise section, back panel up
+as in the 3D view; not to scale):
+
+![The FPC cable's first folds](docs/fpc-cable-folds.svg)
+
 ### Geometry model
 
 The flat pattern is laid out as front panel, back panel and then the glue tab, side by side.
