@@ -1,19 +1,26 @@
 """The built-in FPC cable: a flat cable of the flex PCB that leaves one inner flap.
 
-The cable leaves the middle of the inner (back panel's) flap's cut edge. In the pattern it
-runs straight up, away from the flap, for ``gap + inset`` (the stub), turns 90 degrees
-towards the glue tab and meanders in horizontal rows stacked upward (an S), from the wing to
-the glue tab's free edge; the last ``plug_length`` of it is the plug that goes into a ZIF
-connector. Rows past the top of the rest of the pattern grow its bounding box.
+The cable leaves the top of the inner (back panel's) flap's cut edge, cut off level over
+exactly the cable's width (like the FPC cutout): the *junction*; the flap keeps its height.
+In the pattern it runs straight up, away from the flap, for the clearance, the inset and a
+thickness (the stub), turns 90 degrees towards the glue tab and meanders in horizontal rows
+stacked upward (an S), from the wing to the glue tab's free edge; the last ``plug_length``
+of it is the plug that goes into a ZIF connector. Rows past the top of the rest of the
+pattern grow its bounding box.
 
 Every turn is a 90 degree corner whose square (the cable's width on a side) is folded flat
 along its diagonal from the outer to the inner corner, which lays the next run back along
-the one before. The first turn so sends the cable back over the stub; each U-turn between
-rows (two turns) sends it on in the same direction, the next row continuing the one before.
-Folded, the cable is one straight strip (see ``unfold``), ``length`` long from the junction.
+the one before. Each U-turn between rows (two turns) so sends the next row on in the same
+direction as the one before: folded, the cable is one straight strip (see ``unfold``),
+``length`` long from the junction.
 
-The flap's edge is cut off level over exactly the cable's width at its top (like the FPC
-cutout), so that the cable leaves it along a straight line; the flap keeps its height.
+In the box (see ``docs/fpc-cable-folds.svg``), the cable folds 90 degrees into the box at
+the junction, so the stub lies on the inside of the front panel; the first corner folds it
+back towards the inner wall, leaving a triangle of two layers (half the corner square)
+beside the stub; on the first row, a thickness short of the junction, the *wall fold*
+straight across the cable folds it 90 degrees up the inside of the inner wall; it bends
+round towards the back panel (with a radius of half the box's height) and runs on along the
+inside of the back panel.
 
 Pattern coordinates as in ``geometry`` (y down); the layout is made at the top end and
 mirrored to the bottom end like the rest of the pattern.
@@ -69,6 +76,7 @@ class CableLayout:
     outline: tuple[Point, ...]
     plug_corners: frozenset[Point]
     creases: tuple[tuple[Point, Point], ...]
+    wall: tuple[Point, Point]  # the fold straight across the first row, up the inner wall
 
 
 def _unit(a: Point, b: Point) -> Point:
@@ -109,9 +117,10 @@ def meander(
     gap: float,
     inset: float,
     plug_length: float,
+    stub: float,
 ) -> tuple[Point, ...]:
     """Centreline of the cable leaving ``junction`` (level, left to right, at the top end):
-    up the stub, right along the first row to ``x_right``, then rows between ``x_left`` and
+    up the ``stub``, right along the first row to ``x_right``, then rows between ``x_left`` and
     ``x_right`` stacked upward, until the folded cable reaches ``length`` past the junction.
     Rows are ``gap`` apart (the last one a further ``inset``, for the plug's ears); the plug
     always lies on the last row's straight part, past its corner.
@@ -123,7 +132,6 @@ def meander(
     w = x1 - x0
     h = w / 2
     xc = (x0 + x1) / 2
-    stub = gap + inset
     first = h + plug_length  # shortest last row: past the corner square, then the plug
     ends = (x_left + h, x_right - h)  # the turns' centres at each side
     full = ends[1] - ends[0]
@@ -225,6 +233,10 @@ def layout(cfg: Config) -> CableLayout | None:
     junction = ((wf + a, e - cap), (wf + b, e - cap))
     lid = lid_layout(cfg)
     spread = 0.0 if lid is None else lid.spread
+    # The stub clears the flap's edge by the clearance (and the plug's ears), and is a
+    # thickness longer: the first row, folded back over it, folds up the wall a thickness
+    # short of the junction (on the wall's inner surface), clear of the corner square.
+    stub = gap + cfg.fpc_cable_inset + cfg.thickness
     path = meander(
         junction,
         wf + spread + gap,  # clear of the wing (or the outer flap)
@@ -233,11 +245,24 @@ def layout(cfg: Config) -> CableLayout | None:
         gap,
         cfg.fpc_cable_inset,
         cfg.fpc_plug_length,
+        stub,
     )
     pts, plug = outline(path, w, wp, cfg.fpc_plug_length)
     pts = (junction[0], *pts[1:-1], junction[1])  # bit-identical with the flap's edge
+    # The wall fold: on the first row, where (folded back) it gets to a thickness short of
+    # the junction again: the stub and half the width, less a thickness, past its corner.
+    (cx, cy), (ex, _) = path[1], path[2]
+    along = stub + w / 2 - cfg.thickness
+    room = abs(ex - cx) - (w / 2 if len(path) > 3 else cfg.fpc_plug_length)
+    if along > room:
+        raise CableError(
+            "fpc_cable_length",
+            "too short to fold up the inner wall: the first row must reach past the wall fold",
+        )
+    x = cx + along
+    wall = ((x, cy + w / 2), (x, cy - w / 2))
     return CableLayout(
-        w, wp, cfg.fpc_plug_length, (a, b, cap), junction, path, pts, plug, creases(path, w)
+        w, wp, cfg.fpc_plug_length, (a, b, cap), junction, path, pts, plug, creases(path, w), wall
     )
 
 

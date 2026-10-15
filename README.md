@@ -208,9 +208,15 @@ Every corner is a square, the cable's width on a side, folded flat along its dia
 the outer to the inner corner (the fold lines on the cable). That lays the next run back
 along the one before: the first corner turns the cable back over the stub, and each U-turn
 (two corners) sends the next row on in the same direction as the one before. Folded, the
-cable is one straight strip, `fpc_cable_length` long from the flap's edge. The fold
-indicators alternate, starting with a mountain fold seen from the print side. The 3D view
-does not show the cable yet.
+cable is one straight strip, `fpc_cable_length` long from the flap's edge.
+
+In the box, the cable folds 90° into the box along the junction, so the stub lies on the
+inside of the front panel. The first corner folds it back towards the inner wall, leaving a
+two-layer triangle (half the corner square) beside the stub. A fold straight across the first
+row, where it gets back to the wall, turns it 90° up the inside of the inner wall; it bends
+round towards the back panel, with a radius of half the box's height, and runs on along the
+inside of the back panel. The 3D view draws it that way, through the paper, and the fold indicators follow from
+it. A cable longer than that route inside the box runs on through the far end.
 
 How the cable's first folds take it into the box (A: the flat pattern; B: the folded first
 corner on the front panel, seen from inside the box; C: a lengthwise section, back panel up

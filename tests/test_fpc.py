@@ -1,4 +1,4 @@
-"""The built-in FPC cable: its layout in the pattern and its folds."""
+"""The built-in FPC cable: its layout in the pattern, its folds, and where it goes in the box."""
 
 import itertools
 import math
@@ -8,7 +8,14 @@ from helpers import is_closed_loop, polyline, self_intersections
 
 from yanartas_pillowbox import fpc
 from yanartas_pillowbox.config import Config, ConfigError
-from yanartas_pillowbox.geometry import Arc, Line, build_pattern
+from yanartas_pillowbox.geometry import (
+    Arc,
+    FoldDirection,
+    FoldedCable,
+    Line,
+    build_model3d,
+    build_pattern,
+)
 
 D = Config.defaults()
 CONFIGS = {
@@ -49,7 +56,7 @@ def test_folded_cable_is_straight_and_as_long_as_set(cfg):
     the junction's middle, and the tip reaches the set length past the junction."""
     pattern = build_pattern(cfg)
     cable = pattern.cable
-    creases = tuple((f.segment.start, f.segment.end) for f in cable.folds)
+    creases = tuple((f.segment.start, f.segment.end) for f in cable.corners)
     # (the clipped creases lie on the same lines as the layout's)
     x0 = cable.path[0][0]
     for i, p in enumerate(cable.path[1:]):
@@ -64,8 +71,8 @@ def test_corner_creases_lay_each_run_back_along_the_one_before(cfg):
     mirroring the outgoing run across it gives the incoming run, reversed."""
     cable = build_pattern(cfg).cable
     path = cable.path
-    assert len(cable.folds) == len(path) - 2
-    for fold, a, p, b in zip(cable.folds, path, path[1:], path[2:], strict=False):
+    assert len(cable.corners) == len(path) - 2
+    for fold, a, p, b in zip(cable.corners, path, path[1:], path[2:], strict=False):
         assert fold.segment.distance_to(p) < 1e-9  # through the corner's centre
         d_in = _unit(a, p)
         d_out = _unit(p, b)
@@ -206,3 +213,79 @@ def test_validation(changes, field):
 def test_cutout_at_the_other_end_is_fine():
     cfg = D.with_values(fpc_cutout="back")
     assert build_pattern(cfg).cable is not None
+
+
+def test_junction_and_wall_folds(cfg):
+    """The cable folds into the box along the junction, and up the inner wall straight
+    across the first row, where (folded back over the stub) it gets back to a thickness short
+    of the junction."""
+    cable = build_pattern(cfg).cable
+    names = [f.name for f in cable.folds]
+    assert names[:3] == ["cable-junction", "cable-corner-1", "cable-wall"]
+    junction, wall = cable.folds[0].segment, cable.folds[2].segment
+    # The junction fold runs along the junction, out to the (rounded) cut on both sides.
+    (xa, y), (xb, _) = cable.junction
+    assert junction.start[1] == pytest.approx(y) and junction.end[1] == pytest.approx(y)
+    assert (
+        min(junction.start[0], junction.end[0]) <= xa
+        and max(junction.start[0], junction.end[0]) >= xb
+    )
+    # The wall fold: across the first row, at r = -t once straightened.
+    p, q = cable.path[1], cable.path[2]
+    d = _unit(p, q)
+    assert abs((wall.end[0] - wall.start[0]) * d[0] + (wall.end[1] - wall.start[1]) * d[1]) < 1e-9
+    assert wall.length == pytest.approx(cable.width, abs=1e-6)
+    creases = tuple((f.segment.start, f.segment.end) for f in cable.corners)
+    mid = fpc.unfold(wall.point_at(0.5), 1, creases)
+    r = (mid[1] - y) * (1 if cable.end == "top" else -1)
+    assert r == pytest.approx(-cfg.thickness, abs=1e-9)
+
+
+def test_folded_cable_route(cfg):
+    """In the box: the stub (with the first corner's triangle) on the inside of the front
+    panel, from the inner wall into the box by the stub and the cable's width; the rest up
+    the inside of the wall and on along the inside of the back panel, as long as set."""
+    pattern = build_pattern(cfg)
+    folded = FoldedCable(cfg, pattern.cable)
+    t, body = cfg.thickness, cfg.body
+    stub = folded.stub
+    assert stub == pytest.approx(cfg.fpc_cable_gap + cfg.fpc_cable_inset + t + pattern.cable.width)
+    assert folded.section(-stub) == pytest.approx((stub, folded.z_front - t))
+    assert folded.section(-t)[0] == pytest.approx(t)
+    end = folded.section(cfg.fpc_cable_length)
+    if cfg.fpc_cable_length > folded.rise + folded.radius * math.pi / 2:
+        assert end[1] == pytest.approx(folded.z_back)  # on the back panel
+    # Arc length along the section: as long as the cable from the first fold.
+    rs = [-stub + (cfg.fpc_cable_length + stub) * i / 4000 for i in range(4001)]
+    pts = [folded.section(r) for r in rs]
+    length = sum(math.dist(a, b) for a, b in itertools.pairwise(pts))
+    assert length == pytest.approx(cfg.fpc_cable_length + stub, rel=1e-4)
+    # Under the front panel and over the back panel across the cable's width (a chord).
+    x0 = folded.origin[0]
+    for x in (x0 - pattern.cable.width / 2, x0, x0 + pattern.cable.width / 2):
+        assert folded.z_front + t / 2 <= body.surface_z("front", -t / 2, x) + 1e-9
+        assert folded.z_back - t / 2 >= body.surface_z("back", -t / 2, x) - 1e-9
+
+
+def test_cable_in_the_3d_model(cfg):
+    model = build_model3d(cfg)
+    cable = model["cable"]
+    n = len(cable["positions"]) // 3
+    assert n and all(0 <= i < n for i in cable["indices"])
+    # (its fold lines and cut edges with it, not with the box's)
+    assert not [line for line in model["lines"] if line["category"] == "cable"]
+    assert [line["name"] for line in cable["lines"]] == [
+        f.name for f in build_pattern(cfg).cable.folds
+    ]
+    # One cut line along both sides and the plug's end, plus the stub's two sides.
+    assert len(cable["cuts"]) == 3
+
+
+def test_fold_directions_follow_the_route():
+    """Seen from the outside (the print side), the cable folds into the box at the junction
+    (mountain: away from the viewer); printing inside flips every fold."""
+    out = build_pattern(D.with_values(fpc_cable_length=180)).cable
+    ins = build_pattern(D.with_values(fpc_cable_length=180, print_side="inside")).cable
+    assert out.folds[0].direction == FoldDirection.MOUNTAIN
+    for a, b in zip(out.folds, ins.folds, strict=True):
+        assert {a.direction, b.direction} == set(FoldDirection)

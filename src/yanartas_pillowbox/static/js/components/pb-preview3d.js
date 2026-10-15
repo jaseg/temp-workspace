@@ -115,8 +115,8 @@ export class PbPreview3d extends HTMLElement {
     new ResizeObserver(() => this.#resize()).observe(this.#stage);
   }
 
-  /** model: {parts:[{name, kind, positions, indices, outline}], lines:[{direction, points}],
-   *  cuts:[[point...]], bounds, interior};
+  /** model: {parts:[{name, kind, positions, indices, outline}], cable:{positions, indices, cuts, lines}|null,
+   *  lines:[{direction, points}], cuts:[[point...]], bounds, interior};
    *  dims: parameter dimensions in the model frame (see dimensions.model_dimensions). */
   update(model, dims = [], payload = null) {
     const inside = model.interior;
@@ -163,6 +163,8 @@ export class PbPreview3d extends HTMLElement {
     // Fold lines: black, dashed by fold direction like the export (pattern scaled with size).
     const b0 = model.bounds;
     const k = Math.max(1, Math.hypot(b0.width, b0.length, b0.height) / 150);
+    // The FPC cable, folded into the box: drawn through the paper, like the inner flaps.
+    if (model.cable) group.add(this.#cableMesh(model.cable, k));
     const lineMat = new THREE.LineBasicMaterial({ color: 0x111111 });
     for (const line of model.lines) {
       const dash = (DASH_MM[line.direction] ?? [1, 0]).map((v) => v * k);
@@ -222,6 +224,37 @@ export class PbPreview3d extends HTMLElement {
     fill.renderOrder = 3;
     edge.renderOrder = 4;
     g.add(fill, edge);
+    return g;
+  }
+
+  /** The FPC cable (inside the box): a translucent strip with its outline (solid) and
+   *  folds (dashed by direction, scaled by k), all drawn through the paper. */
+  #cableMesh({ positions, indices, cuts, lines }, k) {
+    const color = this.#dark.matches ? 0xf0b429 : 0xc27c0e;
+    const ink = this.#dark.matches ? 0xffd27a : 0x6b3f00;
+    const xray = { depthTest: false, depthWrite: false, transparent: true };
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    const g = new THREE.Group();
+    const fill = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({
+      color, opacity: 0.3, side: THREE.DoubleSide, ...xray }));
+    fill.renderOrder = 3;
+    g.add(fill);
+    const lineMat = new THREE.LineBasicMaterial({ color: ink, opacity: 0.95, ...xray });
+    const v3 = (p) => new THREE.Vector3(...p);
+    for (const cut of cuts) {
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(cut.map(v3)), lineMat);
+      line.renderOrder = 4;
+      g.add(line);
+    }
+    for (const fold of lines) {
+      const dash = (DASH_MM[fold.direction] ?? [1, 0]).map((v) => v * k);
+      const pts = dashSegments(fold.points.map(v3), dash);
+      const segs = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
+      segs.renderOrder = 4;
+      g.add(segs);
+    }
     return g;
   }
 
