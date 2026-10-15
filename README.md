@@ -76,10 +76,10 @@ the defaults. It never crashes because of the file.
   width and height, and marks the two straight folds where they are seen end-on. Like the
   3D view, it shows the back panel up.
 * **Payload:** below the body controls, set the width, depth and height of a rectangular
-  payload, and a **margin**: the minimum true distance from any point of the payload to the
-  nearest point of the box surface. The payload is drawn centred inside the box in the
-  cross-section and 3D views, with the margin envelope dashed in the cross-section. It turns
-  red if the margin is not met. *Derived geometry* shows the actual clearance. It is never drawn in the SVG,
+  payload, and a **clearance**: the minimum true distance from any point of the payload to
+  the nearest point of the box surface. The payload is drawn centred inside the box in the
+  cross-section and 3D views, with the clearance envelope dashed in the cross-section. It
+  turns red if the clearance is not met. *Derived geometry* shows the actual clearance. It is never drawn in the SVG,
   but it is saved with the settings and in the SVG's embedded config. Set any payload
   dimension to 0 to hide it.
   * **Board preset** fills in the payload size of a common development board: Raspberry Pi
@@ -89,13 +89,14 @@ the defaults. It never crashes because of the file.
     are approximate (`presets.py`): heights include connectors and stacked add-on boards, and
     some are estimated, so check your own board. The preset is not a setting; the dropdown
     just shows which preset, if any, matches the current payload size.
-  * **Max** next to each payload field sets it to the largest value that keeps the margin in
-    the current box.
+  * **Max** next to each payload field sets it to the largest value that keeps the clearance
+    in the current box.
   * **Fit box to payload** (in the body controls) sets width, length and height to the
-    smallest box that holds the payload with its margin, minimizing the area of the
+    smallest box that holds the payload with its clearance, minimizing the area of the
     pattern's bounding box.
-    Glue tab, end wall gap, lid overlap, lid offset and thickness are left alone. Results are rounded to 0.01 mm, always
-    towards a box that still fits.
+    Glue tab, end wall gap, lid overlap, lid offset and thickness are left alone; the box is
+    made as much wider as the lid offset needs. Results are rounded to 0.01 mm, always
+    towards a box that still fits. (The FPC cable's rows are not planned for.)
 * **Parameter dimensions:** all three views annotate the inputs they show:
   * **Pattern:** circumference (both panels, flat), length and end wall gap (along the
     front panel's midline), lid overlap (on the top lid), height (across an inner flap),
@@ -105,7 +106,7 @@ the defaults. It never crashes because of the file.
     height;
   * **Cross-section:** width, height, and the front panel's arc (part of the
     circumference). This view shades the material at its thickness, the box interior and the
-    payload space, and draws the glue tab and, dashed, the payload margin.
+    payload space, and draws the glue tab and, dashed, the payload clearance.
 
   Width, length and height are interior dimensions, so where they are measured inside the
   material their end points sit off the drawn lines by the material allowance.
@@ -134,20 +135,29 @@ All lengths are in millimetres.
 
 | Key | Default | Meaning / constraints |
 |---|---|---|
-| `width` | 55 | Interior width of the closed box's cross-section, from fold to fold (between the material's inner corners). 10–1000. This drives the panel size: see *circumference* below. |
-| `length` | 120 | Interior length along the middle of the box, between the inner end walls: the shortest distance between the curves. 10–2000. The back panel's straight edges (corner to corner) are `length + height + 3·thickness` long, the front panel's `2·end_wall_gap` longer. |
+| `width` | 107 | Interior width of the closed box's cross-section, from fold to fold (between the material's inner corners). 10–1000. This drives the panel size: see *circumference* below. |
+| `length` | 101 | Interior length along the middle of the box, between the inner end walls: the shortest distance between the curves. 10–2000. The back panel's straight edges (corner to corner) are `length + height + 3·thickness` long, the front panel's `2·end_wall_gap` longer. |
 | `end_wall_gap` | 10 | Clear gap, in the middle of the box, between each outer end wall and the inner end wall inside it, covered by a lid (see *End wall gap* below). 0–500. 0 stacks the two walls of each end on each other, with no lid. |
 | `lid_overlap` | 5 | How far each lid runs on over the outside of the back panel, past the inner end wall's outer surface (measured along the box). 0–200. Only with an end wall gap. |
 | `lid_offset` | 2 | How far the lids float above the back panel where they come closest; the box's end sections grow by as much in height, and wider to match (see *End wall gap*). 0–100, limited per box: the widened sections may turn at most 45° at the sides, so steep boxes and thick material allow less (the UI states the limit). Only with an end wall gap. |
-| `height` | 20 | Interior height of the closed box at maximum bulge. At most ≈ 0.46·width (the UI states the exact limit). |
-| `payload_width` | 30 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
-| `payload_depth` | 80 | Payload size along the box length. 0–2000. It has to fit between the inner end walls. |
-| `payload_height` | 13 | Payload size along the box height. 0–2000. |
-| `payload_clearance` | 1 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
+| `height` | 48.5 | Interior height of the closed box at maximum bulge. At most ≈ 0.46·width (the UI states the exact limit). |
+| `payload_width` | 56 | Payload size across the box. 0–2000. Preview only (see *Payload*). |
+| `payload_depth` | 85 | Payload size along the box length. 0–2000. It has to fit between the inner end walls. |
+| `payload_height` | 22 | Payload size along the box height. 0–2000. |
+| `payload_clearance` | 8 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
 | `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than the front panel it is glued onto. |
 | `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to half the straight edge − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
 | `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
 | `fpc_cutout_width` | 15 | Width of that flat section. 0 to the inner flaps' width − 1. The cut is level and exactly this wide. The flap's edge is not quite symmetric, so the section sits around its highest point, within about a millimetre of the flap's centre. |
+| `fpc_cable` | `front` | `none`, `front` or `back`: a flat cable of the flex PCB leaving that end's inner flap (see *FPC cable* below). Not with an FPC cutout at the same end. |
+| `fpc_cable_length` | 55 | From the inner flap's edge to the plug's tip, with every corner folded flat. 10–2000. Rows that do not fit beside the rest of the pattern make it taller (the default fits). |
+| `fpc_pins` | 30 | Contacts of the FPC connector, 2–200. |
+| `fpc_pitch` | 0.5 | Contact pitch, 0.1–2.54. |
+| `fpc_edge_margin` | 0.5 | From the outermost contacts' centres to the plug's edges: the plug is `(pins − 1)·pitch + 2·margin` wide (15.5 mm by default, the usual `(pins + 1)·pitch`). |
+| `fpc_plug_length` | 4 | Length of the plug at the cable's end, 1–50. |
+| `fpc_cable_inset` | 0 | How much narrower than the plug the rest of the cable is on each side; the plug's ears then stick out. 0–10. |
+| `fpc_corner_radius` | 1 | Rounds the cable's corners and where it meets the flap (not the plug's). 0–10; smaller where there is no room, e.g. at most half the clearance at the slots between rows. |
+| `fpc_cable_gap` | 1 | Cut-to-cut clearance between the cable's rows, and between the cable and the rest of the pattern. 0.1–20. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
 | `thickness` | 0.2 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
 
@@ -176,12 +186,31 @@ surface is the smaller of two 2D distances, each minus half the thickness:
 This works because the nearest point on an unbounded cylinder that isn't on the real surface
 lies outside the box, so the real surface is crossed first.
 
-*Fit box to payload* sets `length = payload_depth + 2·margin`. It picks the height with a
+*Fit box to payload* sets `length = payload_depth + 2·clearance`. It picks the height with a
 fast search on an approximation: the interior as a zero-thickness box, whose cross-section
 shape depends only on its sagitta/panel ratio. The pattern area is flat around its minimum,
 so the approximation costs next to nothing. It then solves the exact smallest width for that
 height (`payload.py`). The tests check the clearance against a brute-force distance to every
 vertex of a fine 3D mesh.
+
+### FPC cable
+
+The pattern can carry a flat cable for a flex PCB (`fpc.py`). It leaves the top of one inner
+flap, whose edge is cut off level over exactly the cable's width, like the FPC cutout, so the
+cable leaves along a straight line and the flap keeps its height. The cable runs up from the
+flap for the clearance plus the inset (the stub), turns 90° towards the glue tab and then
+meanders in rows stacked upward, from the wing to the glue tab's free edge. The last
+`fpc_plug_length` is the plug, the board shape of the connector end (contacts, soldermask,
+keepouts and stiffener are not drawn). The default length fits beside the rest of the
+pattern; longer cables add rows above it.
+
+Every corner is a square, the cable's width on a side, folded flat along its diagonal from
+the outer to the inner corner (the fold lines on the cable). That lays the next run back
+along the one before: the first corner turns the cable back over the stub, and each U-turn
+(two corners) sends the next row on in the same direction as the one before. Folded, the
+cable is one straight strip, `fpc_cable_length` long from the flap's edge. The fold
+indicators alternate, starting with a mountain fold seen from the print side. The 3D view
+does not show the cable yet.
 
 ### Geometry model
 

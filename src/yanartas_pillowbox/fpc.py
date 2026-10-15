@@ -8,15 +8,12 @@ connector. Rows past the top of the rest of the pattern grow its bounding box.
 
 Every turn is a 90 degree corner whose square (the cable's width on a side) is folded flat
 along its diagonal from the outer to the inner corner, which lays the next run back along
-the one before. The first turn so sends the cable back down over the stub, along the inside
-of the inner end wall; each U-turn between rows (two turns) sends it on in the same
-direction, the next row continuing the one before. Folded, the cable is one straight strip
-(see ``unfold``).
+the one before. The first turn so sends the cable back over the stub; each U-turn between
+rows (two turns) sends it on in the same direction, the next row continuing the one before.
+Folded, the cable is one straight strip (see ``unfold``), ``length`` long from the junction.
 
-The folded first turn stands above the flap's edge by the stub and the cable's width, so the
-flap's top is cut off level that much (and the clearance) below the front panel's inner
-surface, over the cable's width and beyond (like the FPC cutout): the turn fits between the
-inner wall and the front panel.
+The flap's edge is cut off level over exactly the cable's width at its top (like the FPC
+cutout), so that the cable leaves it along a straight line; the flap keeps its height.
 
 Pattern coordinates as in ``geometry`` (y down); the layout is made at the top end and
 mirrored to the bottom end like the rest of the pattern.
@@ -57,7 +54,7 @@ class CableLayout:
     """The cable at the top end, in pattern coordinates.
 
     ``level`` is the inner flap's level cut, (u from, u to, offset) in the flap's cut
-    samples (as ``geometry.level_cut``); the cable leaves its middle part, ``junction``.
+    samples (as ``geometry.level_cut``), exactly as wide as the cable: the ``junction``.
     ``path`` is the centreline, from the junction's middle through every corner's centre to
     the tip; ``outline`` the cut from the junction's left end round the tip back to its right
     end, ``plug_corners`` its corners at the plug (kept sharp); ``creases`` the corners'
@@ -211,40 +208,20 @@ def creases(path: tuple[Point, ...], width: float) -> tuple[tuple[Point, Point],
     return tuple(out)
 
 
-def _offset_at(cuts: tuple[tuple[float, float], ...], u: float) -> float:
-    """The cut edge's offset at u, interpolated between the samples."""
-    for (u0, c0), (u1, c1) in itertools.pairwise(cuts):
-        if u0 <= u <= u1:
-            return c0 if u1 == u0 else c0 + (c1 - c0) * (u - u0) / (u1 - u0)
-    raise ValueError(f"u = {u} outside the edge")
-
-
 @lru_cache(maxsize=64)
 def layout(cfg: Config) -> CableLayout | None:
     """The cable at the top end (also for a cable at the bottom end, which the pattern
     mirrors), or None without one. Raises ``CableError``."""
     if cfg.fpc_cable == "none":
         return None
-    from yanartas_pillowbox.geometry import level_span, lid_layout  # (geometry imports this)
+    from yanartas_pillowbox.geometry import level_cut, lid_layout  # (geometry imports this)
 
     body = cfg.body
-    wf, wb, e, t = body.front.width, body.back.width, cfg.end_wall_gap, cfg.thickness
+    wf, wb, e = body.front.width, body.back.width, cfg.end_wall_gap
     w, wp, gap = cable_width(cfg), plug_width(cfg), cfg.fpc_cable_gap
-    stub = gap + cfg.fpc_cable_inset
-    cuts = body.back_cuts
-    # The cable leaves the flap's middle; the level cut there leaves room under the front
-    # panel's inner surface (which the flap's edge follows) for the folded first turn and
-    # its layers, plus the clearance.
-    a, b = wb / 2 - w / 2, wb / 2 + w / 2
-    top = min(_offset_at(cuts, u) for u in (a, b, *(u for u, _ in cuts if a < u < b)))
-    cap = top - (stub + w + gap + 2 * t)
-    if cap <= 0:
-        raise CableError(
-            "fpc_pins",
-            "the box is too low for the cable's folded first turn (a narrower cable, or a "
-            "taller box)",
-        )
-    ua, ub = level_span(cuts, cap)
+    # The cable leaves the top of the flap's edge, cut off level over exactly its width
+    # (like the FPC cutout): just enough to fold it flat there; the flap keeps its height.
+    a, b, cap = level_cut(body.back_cuts, w)
     junction = ((wf + a, e - cap), (wf + b, e - cap))
     lid = lid_layout(cfg)
     spread = 0.0 if lid is None else lid.spread
@@ -260,7 +237,7 @@ def layout(cfg: Config) -> CableLayout | None:
     pts, plug = outline(path, w, wp, cfg.fpc_plug_length)
     pts = (junction[0], *pts[1:-1], junction[1])  # bit-identical with the flap's edge
     return CableLayout(
-        w, wp, cfg.fpc_plug_length, (ua, ub, cap), junction, path, pts, plug, creases(path, w)
+        w, wp, cfg.fpc_plug_length, (a, b, cap), junction, path, pts, plug, creases(path, w)
     )
 
 

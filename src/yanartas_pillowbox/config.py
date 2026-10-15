@@ -231,11 +231,10 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "choice",
         "FPC cable",
         choices=(("none", "None"), ("front", "Front end"), ("back", "Back end")),
-        help="A flat cable of the flex PCB, leaving the middle of that end's inner flap (whose "
-        "top is cut off level over the cable's width) and meandering over the free space "
-        "above it. Every turn folds flat, so the cable becomes one straight strip that runs "
-        "into the box along the inside of the front panel. Front end: the flap at the top of "
-        "the pattern; back end: the one at the bottom.",
+        help="A flat cable of the flex PCB, leaving the top of that end's inner flap (cut off "
+        "level over the cable's width) and meandering in rows over the free space above it. "
+        "Every corner folds flat along its diagonal, so the cable becomes one straight strip. "
+        "Front end: the flap at the top of the pattern; back end: the one at the bottom.",
     ),
     FieldSpec(
         "fpc_cable_length",
@@ -246,9 +245,8 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         10,
         2000,
         1,
-        help="Along the cable's centreline, from the inner flap's edge to the plug's tip: the "
-        "straight cable's length once its turns are folded flat. Rows that do not fit above "
-        "the rest of the pattern make it taller.",
+        help="From the inner flap's edge to the plug's tip, once every corner is folded flat. "
+        "Rows that do not fit above the rest of the pattern make it taller.",
     ),
     FieldSpec(
         "fpc_pins",
@@ -381,7 +379,7 @@ class Config:
     fpc_cutout: str = "none"
     fpc_cutout_width: float = 15.0
     fpc_cable: str = "front"
-    fpc_cable_length: float = 120.0
+    fpc_cable_length: float = 55.0  # (as long as fits beside the default pattern)
     fpc_pins: float = 30.0
     fpc_pitch: float = 0.5
     fpc_edge_margin: float = 0.5

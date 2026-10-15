@@ -13,9 +13,9 @@ from yanartas_pillowbox.server import create_app
 from yanartas_pillowbox.svg import extract_config, render_svg
 
 # The default box, with a payload smaller than the one it was fitted to (room to maximize)
-# and a smaller clearance.
+# and a smaller clearance; without the FPC cable, whose rows the box fit does not plan for.
 D = Config.defaults().with_values(
-    payload_width=40, payload_depth=70, payload_height=16, payload_clearance=1
+    payload_width=40, payload_depth=70, payload_height=16, payload_clearance=1, fpc_cable="none"
 )
 BOXES = {
     "default": D,
@@ -26,7 +26,6 @@ BOXES = {
         payload_width=75,
         payload_depth=30,
         payload_height=8,
-        fpc_cable="none",
     ),
     "stacked": D.with_values(end_wall_gap=0, payload_depth=80),
     "steep": D.with_values(
@@ -35,7 +34,6 @@ BOXES = {
         payload_width=20,
         payload_height=15,
         end_wall_gap=0,
-        fpc_cable="none",
     ),
 }
 PAYLOADS = [(30, 100, 14), (60, 40, 10), (10, 200, 30), (80, 25, 5)]
@@ -116,7 +114,6 @@ MARGIN_CASES = {
         payload_depth=40,
         payload_height=8,
         payload_clearance=2,
-        fpc_cable="none",
     ),
     "thin-tall": D.with_values(payload_width=6, payload_height=17, payload_clearance=0.5),
     "thick": D.with_values(
@@ -126,7 +123,6 @@ MARGIN_CASES = {
         payload_width=40,
         payload_height=14,
         payload_depth=60,
-        fpc_cable="none",
     ),
 }
 
@@ -245,7 +241,6 @@ def brute_force_min_area(cfg, n_heights=12):
                     height=height,
                     width=hi,
                     length=cfg.payload_depth + 2 * cfg.payload_clearance,
-                    fpc_cable="none",
                 )
             ):
                 continue
@@ -259,7 +254,6 @@ def brute_force_min_area(cfg, n_heights=12):
                         height=height,
                         width=mid,
                         length=cfg.payload_depth + 2 * cfg.payload_clearance,
-                        fpc_cable="none",
                     )
                 )
             except ConfigError:
@@ -269,7 +263,6 @@ def brute_force_min_area(cfg, n_heights=12):
             height=height,
             width=hi,
             length=cfg.payload_depth + 2 * cfg.payload_clearance,
-            fpc_cable="none",
         )
         best = min(best, pattern_area(cand))
     return best

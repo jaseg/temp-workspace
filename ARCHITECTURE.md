@@ -33,6 +33,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 |---|---|
 | `config.py` | `Config`, a frozen dataclass and the single validated input. It also holds `FieldSpec` metadata that drives the UI form, `from_dict` (the only entry point for untrusted data), cross-field validation, and the schema version (other versions are rejected). |
 | `crosssection.py` | Pure math for the closed body: one panel's cross-section (`CrossSection`), the panel width solver, and `Body`, the material model around the interior (section 4.3). |
+| `fpc.py` | The FPC cable's layout at the top end of the pattern: the level cut it leaves the inner flap by, the meander, its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
 | `svg.py` | Serializes a `Pattern` to SVG (layers, dash styles, labels, embedded config) and reads the config back (`extract_config`). |
 | `dimensions.py` | Preview-only dimension annotations for all three views, measured on the same geometry. |
@@ -62,10 +63,11 @@ One render touches the same body many times, so this keeps a render under about 
 
 ## 3. Test suite architecture
 
-`pytest` with about 490 tests, run in parallel with pytest-xdist (about 10 s), plus
-`ruff` for linting. `tests/conftest.py` overrides
-`Config.defaults()` to 0.4 mm material, which most expected values assume; the UI default
-is 0.2 mm. `tests/helpers.py` parses SVG paths back into `Line`/`Arc` segments and has
+`pytest` with about 560 tests, run in parallel with pytest-xdist (a couple of minutes), plus
+`ruff` for linting. The tests use the same defaults as the UI: a box fitting the Raspberry
+Pi Model B + HAT preset in 0.2 mm material, with the FPC cable on. Tests about other parts
+of the geometry switch the cable off where it does not fit or would get in the way.
+`tests/helpers.py` parses SVG paths back into `Line`/`Arc` segments and has
 polygon utilities: exact loop area, self-intersection, point in polygon.
 
 The tests deliberately check properties against independent computations, not snapshot
@@ -78,6 +80,7 @@ outputs.
 | `test_model3d.py` | That the 3D model *is* the pattern folded: faces tile the pattern, each mesh triangle is isometric to its flat triangle, faces stay attached along every fold, no hidden creases inside a face, flap edges meet the intended surfaces, the glue tab lies at distance `t`, and the section matches the mesh. |
 | `test_svg.py` | SVG conventions (layers, dashes, a single closed cut path, attributes only), round-trip of the embedded config, parsed paths reproducing the geometry, labels. |
 | `test_dimensions.py` | Every dimension measures its parameter and its points lie on, or a stated allowance off, the exported geometry. |
+| `test_fpc.py` | The FPC cable: one simple outline, a folded straight strip of the set length, corner creases that lay each run back along the one before and end on the cut, the level cut it leaves the flap by, its clearances, the sharp plug and the rounded other corners, mirroring to the back end, the default fitting the pattern, and validation. |
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
 | `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
