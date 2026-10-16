@@ -189,6 +189,15 @@ planes by `e` accordingly; everything stays an exact isometric folding.
   (`Pattern.slits`, a cut with material on both sides), written as its own open path. The outer
   flap is a lens between the continued front fold and the lid's fold. `max_lid_offset`
   limits the offset so the continued arc turns at most `MAX_SPREAD_SLOPE`.
+- **Lid glue tabs.** Each lid's straight sides (at `x = -spread` and `Wf + spread`, from
+  the crease's ends to the free edge) are glue folds carrying square tabs `g` wide
+  (`lid-tab-{end}-{side}` faces, kind `tab`). Over the inner flap, `_lid_tab_right` butts
+  the tab up against the flap's cut edge where that rises above the crease's end; the
+  piece that leaves beside the wing is cut out (`Pattern.scraps`, a closed loop of slits).
+  In 3D a tab is a flat panel on the wing's tangent plane at the lid's side.
+- **Glue tab taper.** `glue_tab_taper` cuts the body's glue tab back only as far as keeps
+  it, glued from the back panel's end on, off the front panel's fold arc: square where the
+  gap leaves room, at most 45°.
 - **Views.** The 3D and section views show the model turned half a turn about its length,
   back panel (lids) up; the model frame itself keeps the front panel at +Z.
 - **Interior.** The interior, payload clearance and fit are unchanged: they are bounded by

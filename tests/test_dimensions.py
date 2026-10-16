@@ -16,12 +16,10 @@ CONFIGS = {
     "default": D,
     "stacked": D.with_values(end_wall_gap=0),
     "zero-thickness": D.with_values(thickness=0, glue_tab_width=20),
-    "no-taper": D.with_values(glue_tab_taper=0),
+    "tapered": D.with_values(end_wall_gap=3),  # (the default gap needs no taper)
     "fpc-front": D.with_values(fpc_cutout="front", fpc_cable="none"),
     "fpc-both": D.with_values(fpc_cutout="both", fpc_cable="none"),
-    "big": D.with_values(
-        width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30, fpc_cable="none"
-    ),
+    "big": D.with_values(width=300, length=160, height=110, glue_tab_width=40, fpc_cable="none"),
 }
 
 
@@ -50,18 +48,26 @@ def expected_value(cfg, param):
 def test_pattern_dimensions_cover_the_parameters(cfg):
     pattern = build_pattern(cfg)
     dims = dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern))
-    expected = {"circumference", "length", "height", "glue_tab_width"}
-    if cfg.glue_tab_taper > 0:
-        expected.add("glue_tab_taper")
+    expected = {"circumference", "length", "height", "glue_tab_width", None}
+    if taper_dim(dims) is None:
+        expected.remove(None)
     if cfg.end_wall_gap > 0:
         expected |= {"end_wall_gap", "lid_overlap"}
     assert {d.param for d in dims} == expected
+
+
+def taper_dim(dims):
+    """The glue tab's taper: derived (no parameter), only with a taper."""
+    return next((d for d in dims if d.label.startswith("taper")), None)
 
 
 def test_pattern_dimensions_measure_their_parameter(cfg):
     pattern = build_pattern(cfg)
     for d in dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern)):
         assert measured(d) == pytest.approx(d.value, abs=1e-9), d.param
+        if d.param is None:
+            assert d.value == pytest.approx(pattern.info["glue_tab_taper"])
+            continue
         # The height runs to the inner flap's cut edge, which follows the front panel's
         # inner surface: exact on the front panel's apex, a fraction of t off the back's.
         tol = 0.01 * cfg.thickness if d.param == "height" else 1e-9
@@ -143,12 +149,14 @@ def test_gap_dimension_on_the_front_panel(cfg):
 def test_tab_and_taper_are_on_the_same_side(cfg):
     """Both glue-tab dimensions are taken at the tab's bottom end."""
     pattern = build_pattern(cfg)
-    dims = {d.param: d for d in dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern))}
-    if "glue_tab_taper" not in dims:
+    dims = dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern))
+    taper = taper_dim(dims)
+    if taper is None:
         pytest.skip("no taper")
+    width = next(d for d in dims if d.param == "glue_tab_width")
     y_mid = (pattern.bbox[1] + pattern.bbox[3]) / 2 + sheet_offset(pattern)[1]
-    for name in ("glue_tab_width", "glue_tab_taper"):
-        assert all(p[1] > y_mid for p in dims[name].points), name
+    for d in (width, taper):
+        assert all(p[1] > y_mid for p in d.points), d.label
 
 
 def test_outer_pattern_dimensions_are_outside_the_sheet(cfg):
@@ -159,7 +167,7 @@ def test_outer_pattern_dimensions_are_outside_the_sheet(cfg):
     for d in dm.pattern_dimensions(cfg, pattern, sheet_offset(pattern)):
         if d.param in ("circumference", "glue_tab_width"):
             assert d.at > h
-        elif d.param == "glue_tab_taper":
+        elif d is taper_dim([d]):
             assert d.at > w
 
 

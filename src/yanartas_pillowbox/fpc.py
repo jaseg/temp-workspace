@@ -4,10 +4,10 @@ The cable leaves the top of the inner (back panel's) flap's cut edge, cut off le
 exactly the cable's width (like the FPC cutout): the *junction*; the flap keeps its height.
 In the pattern it runs straight up, away from the flap, for the clearance, the inset and a
 thickness (the stub), turns 90 degrees towards the glue tab and meanders in horizontal rows
-stacked upward (an S), between the wing and the glue tab's free edge, as few as fit, its
-turns spread evenly so that its tip ends at the side; the last ``plug_length``
-of it is the plug that goes into a ZIF connector. Rows past the top of the rest of the
-pattern grow its bounding box.
+stacked upward (an S), between the lid's glue tab (or the wing, or the outer flap) and the
+glue tab's free edge, as few as fit, its turns spread evenly so that its tip ends at the side;
+the last ``plug_length`` of it is the plug that goes into a ZIF connector. Rows past the top
+of the rest of the pattern grow its bounding box.
 
 Every turn is a 90 degree corner whose square (the cable's width on a side) is folded flat
 along its diagonal from the outer to the inner corner, which lays the next run back along
@@ -241,14 +241,15 @@ def layout(cfg: Config) -> CableLayout | None:
     a, b, cap = level_cut(body.back_cuts, w)
     junction = ((wf + a, e - cap), (wf + b, e - cap))
     lid = lid_layout(cfg)
-    spread = 0.0 if lid is None else lid.spread
+    # Clear of the wing (or the outer flap) and the lid's glue tab beside it.
+    side = 0.0 if lid is None else lid.spread + cfg.glue_tab_width
     # The stub clears the flap's edge by the clearance (and the plug's ears), and is a
     # thickness longer: the first row, folded back over it, folds up the wall a thickness
     # short of the junction (on the wall's inner surface), clear of the corner square.
     stub = gap + cfg.fpc_cable_inset + cfg.thickness
     path = meander(
         junction,
-        wf + spread + gap,  # clear of the wing (or the outer flap)
+        wf + side + gap,
         wf + wb + cfg.glue_tab_width,  # the glue tab's free edge
         cfg.fpc_cable_length,
         gap,

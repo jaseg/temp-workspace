@@ -240,8 +240,6 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
         return None
     if width > SPECS_BY_NAME["width"].maximum or 2 * sagitta > SPECS_BY_NAME["height"].maximum:
         return None
-    if base.glue_tab_taper > (length + 2 * sagitta + 3 * t) / 2 - 1:
-        return None
     # The lid offset the widened ends allow is about twice the drop at the steepest turn,
     # less the lid's resting level (about -3 t); see geometry.max_lid_offset.
     drop = drop_at_slope(panel, sagitta, MAX_SPREAD_SLOPE)

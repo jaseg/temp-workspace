@@ -21,14 +21,13 @@ INK_LABEL = f"{{{INKSCAPE_NS}}}label"
 
 CONFIGS = [
     Config.defaults(),
-    Config.defaults().with_values(print_side="inside", glue_tab_taper=0),
+    Config.defaults().with_values(print_side="inside"),
     Config.defaults().with_values(height=12, glue_tab_width=20, end_wall_gap=0, fpc_cable="none"),
     Config.defaults().with_values(
         width=33.3,
         length=77.7,
         height=12.5,
         thickness=0.0,
-        glue_tab_taper=0,
         fpc_cable="none",
     ),
 ]
@@ -160,7 +159,7 @@ def test_fold_paths_are_open_and_single(cfg):
     # FPC cable's corners
     cable = len(pattern.cable.folds) if pattern.cable else 0
     assert len(els) == len(pattern.folds) + cable
-    assert len(pattern.folds) == (6 if cfg.end_wall_gap == 0 else 12)
+    assert len(pattern.folds) == (6 if cfg.end_wall_gap == 0 else 16)
     for el in els:
         cmds, segs = parse_path(el.get("d"))
         assert cmds.count("M") == 1 and "Z" not in cmds

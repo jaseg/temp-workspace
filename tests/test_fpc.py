@@ -188,7 +188,8 @@ def test_rows_are_as_few_as_fit_and_their_turns_spread_evenly():
     turns in from their sides alike, so the tip (needing no room for a turn) ends at its side;
     a single row runs to the side before it turns."""
     body, spread = D.body, lid_layout(D).spread
-    left_side = body.front.width + spread + D.fpc_cable_gap  # clear of the wing
+    # Clear of the wing and the lid's glue tab beside it.
+    left_side = body.front.width + spread + D.glue_tab_width + D.fpc_cable_gap
     sides = (left_side, body.front.width + body.back.width + D.glue_tab_width)
     rows = lambda cable: (len(cable.path) - 1) // 2  # noqa: E731
     one = fpc.layout(D.with_values(fpc_cable_length=64))

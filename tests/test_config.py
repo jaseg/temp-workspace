@@ -16,7 +16,6 @@ D = Config.defaults()
 MAX_H = max_height(D.width, D.thickness)  # the steepest box of the default width
 NARROW = {"width": 55, "height": 20, "fpc_cable": "none"}  # a front panel under the tab limit
 WF = Config.from_dict(NARROW).body.front.width
-MAX_TAPER = D.edge_length / 2 - 1
 
 
 def errors_for(**changes):
@@ -58,8 +57,6 @@ def test_missing_fields_use_defaults():
         ({"thickness": 6}, "thickness"),
         ({"height": 2, "thickness": 1.6}, "thickness"),  # inner flaps would vanish
         ({"glue_tab_width": 1}, "glue_tab_width"),
-        ({"glue_tab_taper": -1}, "glue_tab_taper"),
-        ({"glue_tab_taper": MAX_TAPER + 0.1}, "glue_tab_taper"),  # > half the edge - 1
         ({"end_wall_gap": -1}, "end_wall_gap"),
         ({"end_wall_gap": 501}, "end_wall_gap"),
         ({"lid_overlap": -1}, "lid_overlap"),
@@ -76,15 +73,13 @@ def test_boundary_values_accepted():
         Config.from_dict({"height": MAX_H, "end_wall_gap": 0, "fpc_cable": "none"}).height == MAX_H
     )
     assert Config.from_dict({**NARROW, "glue_tab_width": WF - 0.01}).glue_tab_width == WF - 0.01
-    assert Config.from_dict({"glue_tab_taper": MAX_TAPER}).glue_tab_taper == MAX_TAPER
-    assert Config.from_dict({"glue_tab_taper": 0, "thickness": 0}).thickness == 0
+    assert Config.from_dict({"thickness": 0}).thickness == 0
     assert (
         Config.from_dict(
             {
                 "width": 10,
                 "length": 10,
                 "height": 4,
-                "glue_tab_taper": 4,
                 "glue_tab_width": 5,
                 "end_wall_gap": 0,
                 "fpc_cable": "none",

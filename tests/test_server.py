@@ -126,7 +126,7 @@ def test_bad_settings_file_falls_back(settings, content, caplog):
 
 
 def test_save_load_round_trip(settings):
-    cfg = Config.defaults().with_values(length=99.5, glue_tab_taper=3)
+    cfg = Config.defaults().with_values(length=99.5)
     save_config(settings, cfg)
     assert load_config(settings) == cfg
 

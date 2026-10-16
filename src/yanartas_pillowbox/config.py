@@ -16,7 +16,7 @@ from yanartas_pillowbox import crosssection
 
 # Bumped whenever the meaning of saved settings changes; documents of any other version are
 # rejected (no migrations).
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
@@ -186,17 +186,18 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         help="The minimum true distance from any point of the payload to the "
         "nearest point of the box surface.",
     ),
-    FieldSpec("glue_tab_width", "Glue-tab width", "float", "Glue tab", "mm", 3, 100, 0.5),
     FieldSpec(
-        "glue_tab_taper",
-        "Glue-tab end taper",
+        "glue_tab_width",
+        "Glue-tab width",
         "float",
         "Glue tab",
         "mm",
-        0,
-        1000,
+        3,
+        100,
         0.5,
-        help="How far each end of the glue tab is cut back along the length.",
+        help="Width of the glue tab, and of the lids' glue tabs (with an end wall gap). Their "
+        "ends are cut back only as far as needed to stay off the curved folds, at most at 45 "
+        "degrees.",
     ),
     FieldSpec(
         "fpc_cutout",
@@ -375,7 +376,6 @@ class Config:
     payload_height: float = 22.0
     payload_clearance: float = 8.0
     glue_tab_width: float = 12.0
-    glue_tab_taper: float = 9.0
     fpc_cutout: str = "none"
     fpc_cutout_width: float = 15.0
     fpc_cable: str = "front"
@@ -609,15 +609,6 @@ def validate(cfg: Config) -> dict[str, str]:
                 fpc.layout(cfg)
             except fpc.CableError as exc:
                 add(exc.field, str(exc))
-
-    if "glue_tab_taper" not in errors and not errors.keys() & {"length", "height", "thickness"}:
-        max_taper = cfg.edge_length / 2 - 1
-        if cfg.glue_tab_taper > max_taper:
-            add(
-                "glue_tab_taper",
-                f"must be at most {_fmt(max_taper)} mm (half the straight edge, "
-                f"{_fmt(cfg.edge_length)} mm, minus 1 mm)",
-            )
 
     return errors
 

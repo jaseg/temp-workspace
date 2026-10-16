@@ -100,7 +100,7 @@ the defaults. It never crashes because of the file.
 * **Parameter dimensions:** all three views annotate the inputs they show:
   * **Pattern:** circumference (both panels, flat), length and end wall gap (along the
     front panel's midline), lid overlap (on the top lid), height (across an inner flap),
-    and the glue-tab width and taper (both at the tab's bottom end);
+    and the glue-tab width and, if it has one, its taper (both at the tab's bottom end);
   * **Folded box:** width, length, end wall gap and lid overlap (along the back panel's
     ridge, on top), the lid offset (where the lid comes closest to the back panel) and
     height;
@@ -145,8 +145,7 @@ All lengths are in millimetres.
 | `payload_depth` | 85 | Payload size along the box length. 0–2000. It has to fit between the inner end walls. |
 | `payload_height` | 22 | Payload size along the box height. 0–2000. |
 | `payload_clearance` | 8 | Minimum clearance between payload and box surface (true 3D distance). 0–100. |
-| `glue_tab_width` | 12 | Width of the glue tab. 3–100, and narrower than the front panel it is glued onto. |
-| `glue_tab_taper` | 9 | How far each end of the glue tab is cut back along the length. 0 to half the straight edge − 1. Below the *Min. glue-tab taper* shown in the UI, the glued tab reaches past the curved folds near the corners. |
+| `glue_tab_width` | 12 | Width of the glue tab, and of the lids' glue tabs. 3–100, and narrower than the front panel it is glued onto. The tab's ends are cut back only as far as needed to stay off the front panel's curved folds, from square up to 45° (*Glue-tab taper* in the UI); the default end wall gap needs none. |
 | `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
 | `fpc_cutout_width` | 15 | Width of that flat section. 0 to the inner flaps' width − 1. The cut is level and exactly this wide. The flap's edge is not quite symmetric, so the section sits around its highest point, within about a millimetre of the flap's centre. |
 | `fpc_cable` | `front` | `none`, `front` or `back`: a flat cable of the flex PCB leaving that end's inner flap (see *FPC cable* below). Not with an FPC cutout at the same end. |
@@ -199,7 +198,7 @@ The pattern can carry a flat cable for a flex PCB (`fpc.py`). It leaves the top 
 flap, whose edge is cut off level over exactly the cable's width, like the FPC cutout, so the
 cable leaves along a straight line and the flap keeps its height. The cable runs up from the
 flap for the clearance plus the inset (the stub), turns 90° towards the glue tab and then
-meanders in rows stacked upward, from the wing to the glue tab's free edge. The last
+meanders in rows stacked upward, from the lid's glue tab to the glue tab's free edge. The last
 `fpc_plug_length` is the plug, the board shape of the connector end (contacts, soldermask,
 keepouts and stiffener are not drawn). The default length fits beside the rest of the
 pattern; longer cables add rows above it. The cable takes as few rows as fit, with its turns
@@ -264,6 +263,12 @@ rather than the stacked `))___((`.
 * The back panel ends at the inner wall, so each outer flap carries a **lid** that covers
   the gap. The flap's top edge becomes a fold, and the lid folds over onto the outside of
   the back panel and runs on `lid_overlap` past the inner wall.
+* **Lid glue tabs:** outer lids tend to spring back up, so each lid's two straight sides
+  carry a square glue tab, as wide as the body's. It folds round the box's side and is
+  glued onto the outside of the wing and the front panel. Where the inner flap's curved
+  edge rises into the tab beside it, the tab butts up against that edge (one shared cut),
+  and the small piece left between them beside the wing is cut out (a closed slit path).
+  In the 3D view the tabs are drawn as flat panels.
 * The lid's fold lies in a plane at 45°, like the curved folds, so the lid folds exactly:
   in the pattern the fold is the front panel's curved fold turned over (an arc of the
   same radius, bowing out of the panel). Folded, the lid takes the front panel's profile,

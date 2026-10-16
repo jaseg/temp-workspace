@@ -29,7 +29,6 @@ CONFIGS = {
     "steepest-arc": D.with_values(
         width=50,
         height=max_height(50, 0.4),
-        glue_tab_taper=15,
         end_wall_gap=0,
         fpc_cable="none",
     ),
@@ -38,10 +37,8 @@ CONFIGS = {
     "shallow": D.with_values(height=6, length=200, thickness=1, fpc_cable="none"),
     "thick": D.with_values(width=70, height=24, thickness=2, glue_tab_width=15, fpc_cable="none"),
     "fpc": D.with_values(fpc_cutout="both", fpc_cutout_width=20),
-    "square-tab": D.with_values(glue_tab_taper=0, glue_tab_width=25),
-    "big": D.with_values(
-        width=300, length=160, height=110, glue_tab_width=40, glue_tab_taper=30, fpc_cable="none"
-    ),
+    "square-tab": D.with_values(glue_tab_width=25),
+    "big": D.with_values(width=300, length=160, height=110, glue_tab_width=40, fpc_cable="none"),
 }
 
 LEN_TOL = 2e-3  # relative: chord vs. arc on ~1 mm triangles across the curved cross-section
@@ -105,28 +102,31 @@ def same_segment(a, b, tol=1e-9):
 # ------------------------------------------------------------------ the 2D faces tile the pattern
 def test_faces_tile_the_pattern(case):
     cfg, pattern, _, _ = case
-    # + a lid at each end, and the front panel's two wings over each gap
+    # + a lid at each end with a glue tab on each side, and the front panel's two wings
+    # over each gap
     lid = lid_layout(cfg)
-    extra = 0 if lid is None else 2 + (4 if lid.spread > 0 else 0)
+    extra = 0 if lid is None else 6 + (4 if lid.spread > 0 else 0)
     assert len(pattern.faces) == 7 + extra
     faces = pattern.faces
     for face in faces:  # closed, consistently oriented loops
         loop = face.boundary
         for a, b in zip(loop, (*loop[1:], loop[0]), strict=True):
             assert math.dist(a.end, b.start) < 1e-9, face.name
-    # Every cut segment bounds exactly one face (two along a slit), every fold exactly two.
+    # Every cut segment bounds exactly one face (two along a slit, one beside a scrap), every
+    # fold exactly two.
+    scrap = [seg for loop in pattern.scraps for seg in loop]
     for seg in pattern.outline.segments:
         owners = [f.name for f in faces if any(same_segment(seg, s) for s in f.boundary)]
         assert len(owners) == 1, (seg, owners)
     for slit in pattern.slits:
         for seg in slit:
             owners = [f.name for f in faces if any(same_segment(seg, s) for s in f.boundary)]
-            assert len(owners) == 2, (seg, owners)
+            assert len(owners) == 1 + (not any(same_segment(seg, s) for s in scrap)), seg
     for fold in pattern.folds:
         owners = [f.name for f in faces if any(same_segment(fold.segment, s) for s in f.boundary)]
         assert len(owners) == 2, (fold.name, owners)
-    # ... and the face areas add up to the area enclosed by the cut outline.
-    total = sum(abs(loop_area(f.boundary)) for f in faces)
+    # ... and the face areas (and the scraps') add up to the area enclosed by the outline.
+    total = sum(abs(loop_area(loop)) for loop in (*(f.boundary for f in faces), *pattern.scraps))
     assert total == pytest.approx(abs(loop_area(pattern.outline.segments)), rel=1e-9)
 
 
@@ -512,3 +512,32 @@ def point_in_polygon(p, poly):
         if crosses and p[0] < x0 + (p[1] - y0) * (x1 - x0) / (y1 - y0):
             inside = not inside
     return inside
+
+
+def test_lid_glue_tabs_are_flat(case):
+    """In the closed box the lids' glue tabs are flat panels, hinged at the lid's sides (the
+    attachment along folds is checked above)."""
+    cfg, pattern, _, parts = case
+    tabs = [f.name for f in pattern.faces if f.name.startswith("lid-tab-")]
+    assert len(tabs) == (0 if lid_layout(cfg) is None else 4)
+    for name in tabs:
+        pts = pts3(parts[name])
+        a = pts[0]
+        b = max(pts, key=lambda q: math.dist(q, a))
+        c = max(pts, key=lambda q: _off_line(q, a, b))
+        n = _cross(_sub3(b, a), _sub3(c, a))
+        k = math.hypot(*n)
+        for q in pts:
+            assert abs(sum(i * j for i, j in zip(_sub3(q, a), n, strict=True))) / k < 1e-4, name
+
+
+def _sub3(p, q):
+    return tuple(i - j for i, j in zip(p, q, strict=True))
+
+
+def _cross(u, v):
+    return (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+
+
+def _off_line(q, a, b):
+    return math.hypot(*_cross(_sub3(q, a), _sub3(b, a)))

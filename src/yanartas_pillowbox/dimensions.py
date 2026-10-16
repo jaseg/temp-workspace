@@ -84,7 +84,8 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
     material, the measured points sit off the drawn lines by the material allowance."""
     body = cfg.body
     wf, wb = body.front.width, body.back.width
-    edge, g, taper, t = cfg.edge_length, cfg.glue_tab_width, cfg.glue_tab_taper, cfg.thickness
+    edge, g, t = cfg.edge_length, cfg.glue_tab_width, cfg.thickness
+    taper = pattern.info["glue_tab_taper"]
     e, front_edge, s_f = cfg.end_wall_gap, cfg.front_length, body.front.sagitta
     dx, dy = offset
     x0, y0, x1, y1 = pattern.bbox
@@ -153,10 +154,10 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
             at=y1 + dy + gap,
         ),
     ]
-    if taper > 0:
+    if taper > 0.005:
         dims.append(
             Dimension(
-                "glue_tab_taper",
+                None,  # (derived: only as much as the curved folds need)
                 f"taper {fmt(taper)}",
                 "vertical",
                 (p(wf + wb, e + edge), p(wf + wb + g, e + edge - taper)),
