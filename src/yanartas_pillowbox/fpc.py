@@ -122,6 +122,8 @@ def meander(
     """Centreline of the cable leaving ``junction`` (level, left to right, at the top end):
     up the ``stub``, right along the first row to ``x_right``, then rows between ``x_left`` and
     ``x_right`` stacked upward, until the folded cable reaches ``length`` past the junction.
+    A row that turns does so with its corner square inside the sides; the last row's tip may
+    reach the side itself.
     Rows are ``gap`` apart (the last one a further ``inset``, for the plug's ears); the plug
     always lies on the last row's straight part, past its corner.
 
@@ -147,7 +149,7 @@ def meander(
     while True:
         end = ends[1] if right else ends[0]
         run = abs(end - x)
-        if rem <= run:  # the tip lies on this row
+        if rem <= run + h:  # the tip lies on this row: with no turn, it may reach the side
             pts.append((x + rem if right else x - rem, y))
             return tuple(pts)
         if run < w:  # the turn would overlap the corner before it
@@ -155,7 +157,7 @@ def meander(
                 "fpc_cable_length", "no room beside the flap's middle for the cable's first turn"
             )
         pitch = w + gap
-        if rem - run + pitch <= full:  # the next row is the last: room for the plug's ears
+        if rem - run + pitch <= full + h:  # the next row is the last: room for the plug's ears
             pitch += inset
             last = rem - run + pitch
             if last < first:
