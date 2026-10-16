@@ -15,6 +15,7 @@ from yanartas_pillowbox.geometry import (
     Line,
     build_model3d,
     build_pattern,
+    lid_layout,
 )
 
 D = Config.defaults()
@@ -180,6 +181,29 @@ def _mirror(seg, length):
     from yanartas_pillowbox.geometry import _mirror as mirror
 
     return mirror(seg, length)
+
+
+def test_rows_are_as_few_as_fit_and_their_turns_spread_evenly():
+    """Every length takes as few rows as fit with the turns at the sides; the slack moves all
+    turns in from their sides alike, so the tip (needing no room for a turn) ends at its side;
+    a single row runs to the side before it turns."""
+    body, spread = D.body, lid_layout(D).spread
+    left_side = body.front.width + spread + D.fpc_cable_gap  # clear of the wing
+    sides = (left_side, body.front.width + body.back.width + D.glue_tab_width)
+    rows = lambda cable: (len(cable.path) - 1) // 2  # noqa: E731
+    one = fpc.layout(D.with_values(fpc_cable_length=64))
+    assert rows(one) == 1 and sides[1] - one.path[-1][0] < 1
+    for length in (100, 200, 320):
+        cable = fpc.layout(D.with_values(fpc_cable_length=length))
+        turns = [p[0] for p in cable.path[2:-1]]
+        right, left = turns[0::4] + turns[1::4], turns[2::4] + turns[3::4]
+        w = cable.width
+        assert max(right) - min(right) < 1e-9 and max(left or [0]) - min(left or [0]) < 1e-9
+        if left:
+            assert math.isclose(sides[1] - right[0], left[0] - sides[0], abs_tol=1e-9)
+        assert sides[1] - w / 2 - right[0] > 1  # the slack moved the turns in
+        tip = cable.path[-1][0]
+        assert min(abs(tip - sides[0]), abs(tip - sides[1])) < 1e-6
 
 
 def test_default_cable_fits_the_pattern_and_longer_ones_grow_it():

@@ -202,7 +202,8 @@ flap for the clearance plus the inset (the stub), turns 90° towards the glue ta
 meanders in rows stacked upward, from the wing to the glue tab's free edge. The last
 `fpc_plug_length` is the plug, the board shape of the connector end (contacts, soldermask,
 keepouts and stiffener are not drawn). The default length fits beside the rest of the
-pattern; longer cables add rows above it.
+pattern; longer cables add rows above it. The cable takes as few rows as fit, with its turns
+spread evenly: each one sits the same distance in from its side, so the tip ends at its side.
 
 Every corner is a square, the cable's width on a side, folded flat along its diagonal from
 the outer to the inner corner (the fold lines on the cable). That lays the next run back

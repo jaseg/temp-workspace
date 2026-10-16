@@ -4,7 +4,8 @@ The cable leaves the top of the inner (back panel's) flap's cut edge, cut off le
 exactly the cable's width (like the FPC cutout): the *junction*; the flap keeps its height.
 In the pattern it runs straight up, away from the flap, for the clearance, the inset and a
 thickness (the stub), turns 90 degrees towards the glue tab and meanders in horizontal rows
-stacked upward (an S), from the wing to the glue tab's free edge; the last ``plug_length``
+stacked upward (an S), between the wing and the glue tab's free edge, as few as fit, its
+turns spread evenly so that its tip ends at the side; the last ``plug_length``
 of it is the plug that goes into a ZIF connector. Rows past the top of the rest of the
 pattern grow its bounding box.
 
@@ -118,14 +119,17 @@ def meander(
     inset: float,
     plug_length: float,
     stub: float,
+    first_run: float = 0.0,
 ) -> tuple[Point, ...]:
     """Centreline of the cable leaving ``junction`` (level, left to right, at the top end):
-    up the ``stub``, right along the first row to ``x_right``, then rows between ``x_left`` and
-    ``x_right`` stacked upward, until the folded cable reaches ``length`` past the junction.
-    A row that turns does so with its corner square inside the sides; the last row's tip may
-    reach the side itself.
-    Rows are ``gap`` apart (the last one a further ``inset``, for the plug's ears); the plug
-    always lies on the last row's straight part, past its corner.
+    up the ``stub``, right along the first row, then rows stacked upward between ``x_left``
+    and ``x_right``, until the folded cable reaches ``length`` past the junction. Rows are
+    ``gap`` apart (the last one a further ``inset``, for the plug's ears); the plug always
+    lies on the last row's straight part, past its corner.
+
+    The cable takes as few rows as fit, and its turns are spread evenly: every turn moves in
+    from its side by the same amount, so that the tip (which needs no room for a turn) ends
+    at its side. The first row runs at least ``first_run`` from its corner to its turn.
 
     Folded, the first row runs back from the first corner's centre (the stub and half the
     cable's width above the junction); every U-turn takes the row pitch back again (its
@@ -135,46 +139,49 @@ def meander(
     h = w / 2
     xc = (x0 + x1) / 2
     first = h + plug_length  # shortest last row: past the corner square, then the plug
-    ends = (x_left + h, x_right - h)  # the turns' centres at each side
+    ends = (x_left + h, x_right - h)  # the turns' centres at each side, farthest out
     full = ends[1] - ends[0]
-    if full <= w + gap + inset:
+    pitch = w + gap
+    if full <= pitch + inset:
         raise CableError("fpc_cable_length", "no room for the cable's rows beside the flap")
-    pts: list[Point] = [(xc, y0), (xc, y0 - stub - h)]
     rem = length + stub + h  # still to go along the folded cable, from the first corner
     if rem < first:
         raise CableError(
             "fpc_cable_length", f"must be at least {_fmt(first - stub - h)} mm (the plug)"
         )
-    x, y, right = xc, y0 - stub - h, True
-    while True:
-        end = ends[1] if right else ends[0]
-        run = abs(end - x)
-        if rem <= run + h:  # the tip lies on this row: with no turn, it may reach the side
-            pts.append((x + rem if right else x - rem, y))
-            return tuple(pts)
-        if run < w:  # the turn would overlap the corner before it
-            raise CableError(
-                "fpc_cable_length", "no room beside the flap's middle for the cable's first turn"
-            )
-        pitch = w + gap
-        if rem - run + pitch <= full + h:  # the next row is the last: room for the plug's ears
-            pitch += inset
-            last = rem - run + pitch
-            if last < first:
-                # Turn earlier, so that the last row holds the corner and the plug.
-                back = first - last
-                if run - back < w:
-                    raise CableError(
-                        "fpc_cable_length",
-                        f"the cable would end in a turn: make it {_fmt(back)} mm longer or "
-                        f"{_fmt(rem - run + pitch)} mm shorter",
-                    )
-                end += -back if right else back
-                run -= back
+    y = y0 - stub - h
+    pts: list[Point] = [(xc, y0), (xc, y)]
+    head = ends[1] - xc  # the first row, to its turn
+    if rem <= head + h:  # one row, no turn
+        pts.append((xc + rem, y))
+        return tuple(pts)
+    min_head = max(w, first_run)  # the turn clear of the first corner (and the wall fold)
+    if head < min_head:
+        raise CableError(
+            "fpc_cable_length", "no room beside the flap's middle for the cable's first turn"
+        )
+    # The fewest rows n whose folded reach, the tip at its side, holds the cable; then the
+    # slack, spread over the 2 (n - 1) turns: each first row's turn, the two turns of every
+    # middle row and the last row's turn are each that much farther in.
+    reach = head + h - inset  # less a pitch and a full row per further row
+    n = 1 + math.ceil((rem - reach) / (full - pitch))
+    shift = (reach + (n - 1) * (full - pitch) - rem) / (2 * (n - 1))
+    shift = min(shift, head - min_head, (full - w) / 2)  # every row still holds its turns
+    right = True
+    for row in range(n - 1):
+        end = ends[1] - shift if right else ends[0] + shift
         pts.append((end, y))
-        rem -= run - pitch
-        x, y, right = end, y - pitch, not right
-        pts.append((x, y))
+        y -= pitch + (inset if row == n - 2 else 0.0)
+        pts.append((end, y))
+        right = not right
+    # The last row: what is left of the folded cable, past the previous turns.
+    xs = [p[0] for p in pts[1::2]]
+    rem += (n - 1) * pitch + inset
+    rem -= sum(abs(b - a) for a, b in itertools.pairwise(xs))
+    if not first <= rem <= abs((x_right if right else x_left) - xs[-1]) + 1e-9:
+        raise CableError("fpc_cable_length", "the cable's rows do not fit its length")
+    pts.append((xs[-1] + rem if right else xs[-1] - rem, y))
+    return tuple(pts)
 
 
 def outline(
@@ -248,6 +255,7 @@ def layout(cfg: Config) -> CableLayout | None:
         cfg.fpc_cable_inset,
         cfg.fpc_plug_length,
         stub,
+        stub + w - cfg.thickness,  # the first row reaches past the wall fold
     )
     pts, plug = outline(path, w, wp, cfg.fpc_plug_length)
     pts = (junction[0], *pts[1:-1], junction[1])  # bit-identical with the flap's edge
