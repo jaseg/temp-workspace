@@ -47,6 +47,7 @@ namespace LiveViewer.Server
         private readonly PeerPolicy _peers;
         private readonly HostPolicy _hosts;
         private WebServer? _server;
+        private System.Threading.CancellationTokenSource? _stop;
 
         public LiveServer(LiveServerOptions options, ILiveLog log)
         {
@@ -125,17 +126,66 @@ namespace LiveViewer.Server
                 return System.Threading.Tasks.Task.CompletedTask;
             });
 
+            // Dual-stack where IPv6 works, IPv4 only otherwise (Wine and containers don't always have IPv6).
+            EmbedIO.Net.EndPointManager.UseIpv6 = CanBindDualStack();
+
             _hub.Start();
-            server.Start();
+            _stop = new System.Threading.CancellationTokenSource();
+            var run = server.RunAsync(_stop.Token);
+
+            // EmbedIO binds the socket only after reporting "Listening", and a bind failure just ends RunAsync.
+            // Wait for that window to pass so failures surface here instead of being swallowed.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (server.State < WebServerState.Listening && !run.IsCompleted && DateTime.UtcNow < deadline)
+            {
+                System.Threading.Thread.Sleep(5);
+            }
+
+            System.Threading.Tasks.Task.WhenAny(run, System.Threading.Tasks.Task.Delay(250)).Wait();
+            if (run.IsCompleted || server.State != WebServerState.Listening)
+            {
+                _stop.Cancel();
+                server.Dispose();
+                throw new InvalidOperationException($"Couldn't listen on port {_options.Port}.", run.Exception?.GetBaseException());
+            }
+
+            _ = run.ContinueWith(t =>
+            {
+                if (!(_stop?.IsCancellationRequested ?? true))
+                {
+                    _log.Error("Web server stopped unexpectedly", t.Exception?.GetBaseException());
+                }
+            }, System.Threading.Tasks.TaskScheduler.Default);
             _server = server;
-            _log.Info($"Listening on port {_options.Port}. Certificate SHA-256 {CertificateFingerprint}.");
+            _log.Info($"Listening on port {_options.Port} ({(EmbedIO.Net.EndPointManager.UseIpv6 ? "IPv4 and IPv6" : "IPv4")}). Certificate SHA-256 {CertificateFingerprint}.");
         }
 
         public void Dispose()
         {
+            _stop?.Cancel();
             _hub.Dispose();
             _server?.Dispose();
             _server = null;
+        }
+
+        private static bool CanBindDualStack()
+        {
+            if (!Socket.OSSupportsIPv6)
+            {
+                return false;
+            }
+
+            try
+            {
+                using var probe = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
+                probe.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+                probe.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
+                return true;
+            }
+            catch (SocketException)
+            {
+                return false;
+            }
         }
 
         internal static IEnumerable<IPAddress> LocalAddresses()

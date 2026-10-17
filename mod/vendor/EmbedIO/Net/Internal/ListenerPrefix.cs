@@ -6,6 +6,15 @@ namespace EmbedIO.Net.Internal
     {
         public ListenerPrefix(string uri)
         {
+            // LiveViewer patch: newer System.Uri rejects the wildcard hosts "*" and "+"; parse with a placeholder.
+            string? wildcard = null;
+            var schemeEnd = uri.IndexOf("://", StringComparison.Ordinal);
+            if (schemeEnd >= 0 && uri.Length > schemeEnd + 3 && (uri[schemeEnd + 3] == '*' || uri[schemeEnd + 3] == '+'))
+            {
+                wildcard = uri[schemeEnd + 3].ToString();
+                uri = uri.Substring(0, schemeEnd + 3) + "wildcard.invalid" + uri.Substring(schemeEnd + 4);
+            }
+
             var ur = new Uri(uri);
 
             if (uri.StartsWith("https://", StringComparison.Ordinal))
@@ -13,7 +22,7 @@ namespace EmbedIO.Net.Internal
                 Secure = true;
             }
 
-            Host = ur.Host;
+            Host = wildcard ?? ur.Host;
             Port = ur.Port;
             Path = ur.PathAndQuery + ur.Fragment;
 

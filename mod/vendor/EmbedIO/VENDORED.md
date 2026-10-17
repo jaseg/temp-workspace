@@ -28,3 +28,5 @@ All marked with a `LiveViewer patch` comment.
     accepted up to `long.MaxValue`.
   - Frame writes are serialized. `SslStream` doesn't allow concurrent writes, and pong and close frames are
     written from the receive loop.
+- `Net/Internal/ListenerPrefix.cs`: wildcard prefixes (`https://*:port/`) parse again. Newer `System.Uri` rejects `*`
+  as a host name.
