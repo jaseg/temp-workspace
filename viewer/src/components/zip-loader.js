@@ -54,7 +54,7 @@ AFRAME.registerComponent('zip-loader', {
 			this.lastLocalLookupAttemptHash = '';
 		});
 
-		if (!this.data.id && !this.data.hash) {
+		if (!this.data.id && !this.data.hash && !LIVE_MODE) {
 			this.el.sceneEl.addEventListener('replayInfofetched', fetchCallback);
 			this.el.sceneEl.addEventListener('replayfetched', fetchCallback);
 		}
@@ -142,7 +142,10 @@ AFRAME.registerComponent('zip-loader', {
 				event.beatOffsets[mode] = {};
 				event.customData[mode] = {};
 
-				const diffBeatmaps = set._difficultyBeatmaps.sort(d => d._difficultyRank);
+				// Live mode only provides the difficulty being played; skip the others.
+				const diffBeatmaps = set._difficultyBeatmaps
+					.sort(d => d._difficultyRank)
+					.filter(diff => !LIVE_MODE || Object.keys(files).some(f => f.toLowerCase() == diff._beatmapFilename.toLowerCase()));
 				for (let index = 0; index < diffBeatmaps.length; index++) {
 					const diff = diffBeatmaps[index];
 					const fileArray = await files[Object.keys(files).find(f => f.toLowerCase() == diff._beatmapFilename.toLowerCase())].async(

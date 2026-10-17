@@ -8,6 +8,8 @@ AFRAME.registerComponent('pauser', {
 	},
 
 	init: function () {
+		// Live play follows the game: it neither pauses on unfocus nor finishes on its own.
+		if (LIVE_MODE) return;
 		this.pauseGame = this.pauseGame.bind(this);
 		this.songControls = this.el.sceneEl.components['song-controls'];
 		this.replayLoader = this.el.sceneEl.components['replay-loader'];

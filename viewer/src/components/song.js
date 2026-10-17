@@ -412,6 +412,7 @@ AFRAME.registerComponent('song', {
 	},
 
 	getCurrentTime: function () {
+		if (this.liveTime) return this.liveTime();
 		if (this.songStartTime === undefined) return queryParamTime !== undefined ? queryParamTime : 0;
 
 		let lastCurrentTime = this.lastCurrentTime;

@@ -53,3 +53,6 @@ play.html
 
 # Local Netlify folder
 .netlify
+
+# Live build output (served by the Beat Saber mod)
+/dist-live

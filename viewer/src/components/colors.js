@@ -272,6 +272,8 @@ AFRAME.registerComponent('colors', {
 	},
 
 	getColors: function (completion) {
+		// The live page talks to the mod only.
+		if (LIVE_MODE) return;
 		fetch(getApiUrl() + '/user', {credentials: 'include'})
 			.then(response => response.json())
 			.then(async data => {

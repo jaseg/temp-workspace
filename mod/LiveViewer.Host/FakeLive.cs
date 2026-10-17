@@ -22,9 +22,11 @@ namespace LiveViewer.Host
         private readonly SessionInfo _session;
         private readonly IMapFileSource _map;
         private readonly double _speed;
+        private readonly float _startAt;
 
-        public FakeLive(LiveFeed feed, BsorReplay replay, SessionInfo session, IMapFileSource map, double speed)
+        public FakeLive(LiveFeed feed, BsorReplay replay, SessionInfo session, IMapFileSource map, double speed, float startAt = 0)
         {
+            _startAt = startAt;
             _feed = feed;
             _replay = replay;
             _session = session;
@@ -58,7 +60,9 @@ namespace LiveViewer.Host
                 throw new InvalidOperationException("Replay has no frames.");
             }
 
-            var songStart = frames[0].Time;
+            // Starting late skips everything before that point, as if the viewer had joined then.
+            schedule = schedule.Where(item => item.Time >= _startAt).ToList();
+            var songStart = Math.Max(frames[0].Time, _startAt);
             _feed.BeginSession(_session, _map);
 
             var clock = Stopwatch.StartNew();

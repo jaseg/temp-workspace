@@ -1,4 +1,5 @@
 import {clamp} from '../utils';
+import {MAX_EXTRAPOLATION_S} from '../live/session';
 function FindFrameIndexByTime(frames, songTime, startFrom = 0) {
 	var index = startFrom;
 
@@ -69,7 +70,9 @@ AFRAME.registerComponent('replay-player', {
 
 	tock: function (time, delta) {
 		let replay = this.replayDecoder.replay;
-		if (replay && !this.headRotationOffset) {
+		if (replay && replay.live && replay.frames.length < 100) {
+			// Not enough frames yet for the head rotation average.
+		} else if (replay && !this.headRotationOffset) {
 			this.calculateHeadRotationOffset(replay);
 			this.supports360 = replay.info.mode == '360Degree' || replay.info.mode == '90Degree';
 		}
@@ -77,7 +80,15 @@ AFRAME.registerComponent('replay-player', {
 		if (this.song.isPlaying && replay) {
 			const currentTime = this.song.getCurrentTime();
 			const frames = this.replayDecoder.replay.frames;
-			const frameIndex = (this._frameIndex = FindFrameIndexByTime(frames, currentTime, this._frameIndex));
+			if (replay.live) {
+				if (frames.length < 2) return;
+				if (this._frameIndex >= frames.length) this._frameIndex = 0;
+			}
+			let frameIndex = (this._frameIndex = FindFrameIndexByTime(frames, currentTime, this._frameIndex));
+			if (replay.live && frameIndex >= frames.length - 1) {
+				// Newest pose is older than the time we render: extrapolate from the last two poses.
+				frameIndex = frames.length - 2;
+			}
 			const frame = frames[frameIndex];
 			const nextFrame = frames[frameIndex + 1];
 
@@ -98,6 +109,10 @@ AFRAME.registerComponent('replay-player', {
 
 			let height = clamp((replayHeight - 1.8) * 0.5, -0.2, 0.6);
 			let slerpValue = (currentTime - frame.time) / Math.max(1e-6, nextFrame.time - frame.time);
+			if (replay.live) {
+				const span = Math.max(1e-6, nextFrame.time - frame.time);
+				slerpValue = Math.max(0, Math.min(slerpValue, 1 + MAX_EXTRAPOLATION_S / span));
+			}
 
 			this.movementsTock(frame, nextFrame, height, slerpValue, delta);
 		}

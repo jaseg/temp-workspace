@@ -7,6 +7,8 @@ AFRAME.registerComponent('random-replay', {
 	},
 
 	init: function () {
+		// Random replays come from the BeatLeader API; live play has nothing to pick from.
+		if (LIVE_MODE) return;
 		this.songControls = this.el.sceneEl.components['song-controls'];
 		this.replayLoader = this.el.sceneEl.components['replay-loader'];
 		this.settings = this.el.sceneEl.components.settings;
@@ -45,7 +47,7 @@ AFRAME.registerComponent('random-replay', {
 				}
 				randomSourceSelect.disabled = true;
 			};
-			fetch(getApiUrl() + '/user', {credentials: 'include'})
+			(LIVE_MODE ? Promise.resolve({ok: false}) : fetch(getApiUrl() + '/user', {credentials: 'include'}))
 				.then(r => (r.ok ? r.json() : null))
 				.then(data => {
 					if (data && data.player) {

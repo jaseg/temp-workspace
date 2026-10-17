@@ -26,6 +26,7 @@ Options:
   --www <dir>          Serve this directory instead of the embedded test page
   --hostname <name>    Extra accepted host name (repeatable; default beatsaber.local, localhost)
   --speed <x>          Playback speed (default 1)
+  --start <seconds>    Start each run at this song time (for testing song ends)
   --loop               Replay forever
   --auto-approve       Approve every waiting device (testing only)
   --any-address        Accept non-private peers (testing only)
@@ -122,6 +123,7 @@ Console commands while running:
 
             var speed = double.Parse(options.GetValueOrDefault("speed") ?? "1", System.Globalization.CultureInfo.InvariantCulture);
             var loop = options.ContainsKey("loop");
+            var startAt = float.Parse(options.GetValueOrDefault("start") ?? "0", System.Globalization.CultureInfo.InvariantCulture);
             var player = new Thread(() =>
             {
                 do
@@ -133,7 +135,7 @@ Console commands while running:
                     }
 
                     Console.WriteLine("Song starting.");
-                    new FakeLive(server.Feed, replay, session, mapSource, speed).Run(cts.Token);
+                    new FakeLive(server.Feed, replay, session, mapSource, speed, startAt).Run(cts.Token);
                     Console.WriteLine("Song ended.");
                 }
                 while (loop && !cts.IsCancellationRequested);

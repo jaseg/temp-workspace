@@ -17,11 +17,12 @@ import {
 	getCookie,
 } from '../utils';
 import {updateScoringAndTypes} from '../utils/mapPostprocessor';
+import {LiveSession} from '../live/session';
 function floorToTwo(num) {
 	return Math.floor(num * 100) / 100;
 }
 
-function assignNote(replaynote, mapnote) {
+export function assignNote(replaynote, mapnote) {
 	const scoringType = mapnote._scoringType ? mapnote._scoringType + 2 : 3;
 	replaynote.index = mapnote._index;
 	replaynote.colorType = mapnote._type;
@@ -47,6 +48,11 @@ AFRAME.registerComponent('replay-loader', {
 	init: function () {
 		this.replay = null;
 		this.user = null;
+
+		if (LIVE_MODE) {
+			this.live = new LiveSession(this);
+			return;
+		}
 
 		let captureThis = this;
 		if (this.data.link.length) {
@@ -294,37 +300,10 @@ AFRAME.registerComponent('replay-loader', {
 		var noteStructs = new Array();
 		var bombStructs = new Array();
 		for (var i = 0; i < replay.notes.length; i++) {
-			const info = replay.notes[i];
-			let note = {
-				eventType: info.eventType,
-				cutInfo: info.noteCutInfo,
-				spawnTime: info.spawnTime,
-				time: info.eventTime,
-				id: info.noteID,
-				score: info.score,
-				cutPoint: info.noteCutInfo ? info.noteCutInfo.cutPoint : null,
-			};
-
-			if (note.id == -1) {
-				note.eventType = NoteEventType.bomb;
-				note.id += 39;
-				note.score = -4;
-			}
-			if (note.id > 0 && note.id < 100000) {
-				if (note.id % 100 == 99) {
-					note.eventType = NoteEventType.bomb;
-					note.id += 39;
-					note.score = -4;
-				} else if (note.id % 10 == 9) {
-					note.eventType = NoteEventType.bomb;
-					note.id -= 1;
-					note.score = -4;
-				}
-			}
+			const note = noteStructFromEvent(replay.notes[i]);
 			if (note.eventType == NoteEventType.bomb) {
 				bombStructs.push(note);
 			} else {
-				note.isBlock = true;
 				noteStructs.push(note);
 			}
 		}
@@ -437,142 +416,7 @@ AFRAME.registerComponent('replay-loader', {
 			return 0;
 		});
 
-		for (var i = 0; i < allStructs.length; i++) {
-			var note = allStructs[i];
-			note.i = i;
-			if (!note.score) {
-				note.score = ScoreForNote(note.eventType, note.cutInfo, note.scoringType);
-			}
-		}
-
-		if (replay.info.startTime && allStructs.length) {
-			allStructs[0].start = true;
-		}
-
-		var energy = 0.5;
-		var score = 0,
-			maxScore = 0,
-			fcScore = 0,
-			combo = 0,
-			misses = 0;
-		var streak = 0,
-			maxStreak = 0,
-			streakId = -1,
-			maxStreakId = -1;
-
-		var failRecorded = false;
-
-		const maxCounter = new MultiplierCounter();
-		const normalCounter = new MultiplierCounter();
-
-		for (var i = 0; i < allStructs.length; i++) {
-			let note = allStructs[i];
-
-			var scoreForMaxScore = 115;
-			if (note.scoringType == ScoringType.ChainHead) {
-				scoreForMaxScore = 85;
-			} else if (note.scoringType == ScoringType.ChainLink || note.scoringType == ScoringType.ChainLinkArcHead) {
-				scoreForMaxScore = 20;
-			}
-
-			if (note.isBlock) {
-				maxCounter.Increase();
-				maxScore += maxCounter.Multiplier * scoreForMaxScore;
-			}
-
-			if (note.score < 0) {
-				if (note.isBlock) {
-					if (i == 0) {
-						fcScore += maxCounter.Multiplier * scoreForMaxScore;
-					} else {
-						fcScore += (maxCounter.Multiplier * allStructs[i - 1].accuracy * scoreForMaxScore) / 100;
-					}
-				}
-				normalCounter.Decrease();
-				combo = 0;
-				misses++;
-				switch (note.score) {
-					case -2: // badcut
-						if (note.scoringType == ScoringType.ChainLink) {
-							energy -= 0.025;
-						} else {
-							energy -= 0.1;
-						}
-						break;
-					case -3: // miss
-					case -4: // bomb
-						if (note.scoringType == ScoringType.ChainLink) {
-							energy -= 0.03;
-						} else {
-							energy -= 0.15;
-						}
-						break;
-
-					default:
-						break;
-				}
-			} else {
-				normalCounter.Increase();
-				score += normalCounter.Multiplier * note.score;
-				fcScore += maxCounter.Multiplier * note.score;
-
-				if (energy > 0 || (!replay.info.modifiers.includes('NF') && !replay.info.failTime)) {
-					if (note.scoringType == ScoringType.ChainLink) {
-						energy += 1 / 500;
-					} else {
-						energy += 0.01;
-					}
-				}
-				if (energy > 1) {
-					energy = 1;
-				}
-				combo++;
-
-				if (note.scoringType != ScoringType.ChainLink) {
-					if (note.score == 115) {
-						streak++;
-						if (streakId == -1) {
-							streakId = i;
-						}
-					} else if (note.isBlock) {
-						if (streak > maxStreak) {
-							maxStreak = streak;
-							maxStreakId = streakId;
-						}
-						streak = 0;
-						streakId = -1;
-					}
-				}
-			}
-
-			note.multiplier = normalCounter.Multiplier;
-			note.totalScore = score;
-			note.combo = combo;
-			note.misses = misses;
-			note.energy = energy;
-			note.maxScore = scoreForMaxScore;
-
-			if (energy <= 0 && !failRecorded) {
-				failRecorded = true;
-				note.fail = true;
-			}
-
-			if (note.isBlock) {
-				note.accuracy = (note.totalScore / maxScore) * 100;
-				note.fcAccuracy = (fcScore / maxScore) * 100;
-			} else {
-				note.accuracy = i == 0 ? 0 : allStructs[i - 1].accuracy;
-				note.fcAccuracy = i == 0 ? 100 : allStructs[i - 1].fcAccuracy;
-			}
-		}
-		if (streak > maxStreak) {
-			maxStreak = streak;
-			maxStreakId = streakId;
-		}
-
-		if (maxStreakId > -1) {
-			allStructs[maxStreakId].maxStreak = maxStreak;
-		}
+		computeTotals(allStructs, replay);
 
 		this.allStructs = allStructs;
 		this.notes = noteStructs;
@@ -663,6 +507,181 @@ AFRAME.registerComponent('replay-loader', {
 	},
 });
 
+// Fills in the running score, combo, multiplier, energy and accuracy of every struct, in order.
+// allStructs must be sorted by time.
+export function computeTotals(allStructs, replay) {
+	for (var i = 0; i < allStructs.length; i++) {
+		var note = allStructs[i];
+		note.i = i;
+		if (!note.score) {
+			note.score = ScoreForNote(note.eventType, note.cutInfo, note.scoringType);
+		}
+	}
+
+	if (replay.info.startTime && allStructs.length) {
+		allStructs[0].start = true;
+	}
+
+	var energy = 0.5;
+	var score = 0,
+		maxScore = 0,
+		fcScore = 0,
+		combo = 0,
+		misses = 0;
+	var streak = 0,
+		maxStreak = 0,
+		streakId = -1,
+		maxStreakId = -1;
+
+	var failRecorded = false;
+
+	const maxCounter = new MultiplierCounter();
+	const normalCounter = new MultiplierCounter();
+
+	for (var i = 0; i < allStructs.length; i++) {
+		let note = allStructs[i];
+
+		var scoreForMaxScore = 115;
+		if (note.scoringType == ScoringType.ChainHead) {
+			scoreForMaxScore = 85;
+		} else if (note.scoringType == ScoringType.ChainLink || note.scoringType == ScoringType.ChainLinkArcHead) {
+			scoreForMaxScore = 20;
+		}
+
+		if (note.isBlock) {
+			maxCounter.Increase();
+			maxScore += maxCounter.Multiplier * scoreForMaxScore;
+		}
+
+		if (note.score < 0) {
+			if (note.isBlock) {
+				if (i == 0) {
+					fcScore += maxCounter.Multiplier * scoreForMaxScore;
+				} else {
+					fcScore += (maxCounter.Multiplier * allStructs[i - 1].accuracy * scoreForMaxScore) / 100;
+				}
+			}
+			normalCounter.Decrease();
+			combo = 0;
+			misses++;
+			switch (note.score) {
+				case -2: // badcut
+					if (note.scoringType == ScoringType.ChainLink) {
+						energy -= 0.025;
+					} else {
+						energy -= 0.1;
+					}
+					break;
+				case -3: // miss
+				case -4: // bomb
+					if (note.scoringType == ScoringType.ChainLink) {
+						energy -= 0.03;
+					} else {
+						energy -= 0.15;
+					}
+					break;
+
+				default:
+					break;
+			}
+		} else {
+			normalCounter.Increase();
+			score += normalCounter.Multiplier * note.score;
+			fcScore += maxCounter.Multiplier * note.score;
+
+			if (energy > 0 || (!replay.info.modifiers.includes('NF') && !replay.info.failTime)) {
+				if (note.scoringType == ScoringType.ChainLink) {
+					energy += 1 / 500;
+				} else {
+					energy += 0.01;
+				}
+			}
+			if (energy > 1) {
+				energy = 1;
+			}
+			combo++;
+
+			if (note.scoringType != ScoringType.ChainLink) {
+				if (note.score == 115) {
+					streak++;
+					if (streakId == -1) {
+						streakId = i;
+					}
+				} else if (note.isBlock) {
+					if (streak > maxStreak) {
+						maxStreak = streak;
+						maxStreakId = streakId;
+					}
+					streak = 0;
+					streakId = -1;
+				}
+			}
+		}
+
+		note.multiplier = normalCounter.Multiplier;
+		note.totalScore = score;
+		note.combo = combo;
+		note.misses = misses;
+		note.energy = energy;
+		note.maxScore = scoreForMaxScore;
+
+		if (energy <= 0 && !failRecorded) {
+			failRecorded = true;
+			note.fail = true;
+		}
+
+		if (note.isBlock) {
+			note.accuracy = (note.totalScore / maxScore) * 100;
+			note.fcAccuracy = (fcScore / maxScore) * 100;
+		} else {
+			note.accuracy = i == 0 ? 0 : allStructs[i - 1].accuracy;
+			note.fcAccuracy = i == 0 ? 100 : allStructs[i - 1].fcAccuracy;
+		}
+	}
+	if (streak > maxStreak) {
+		maxStreak = streak;
+		maxStreakId = streakId;
+	}
+
+	if (maxStreakId > -1) {
+		allStructs[maxStreakId].maxStreak = maxStreak;
+	}
+}
+
+// Turns a BSOR note event into the struct the viewer scores and renders. Bomb events are recognized by id.
+export function noteStructFromEvent(info) {
+	let note = {
+		eventType: info.eventType,
+		cutInfo: info.noteCutInfo,
+		spawnTime: info.spawnTime,
+		time: info.eventTime,
+		id: info.noteID,
+		score: info.score,
+		cutPoint: info.noteCutInfo ? info.noteCutInfo.cutPoint : null,
+	};
+
+	if (note.id == -1) {
+		note.eventType = NoteEventType.bomb;
+		note.id += 39;
+		note.score = -4;
+	}
+	if (note.id > 0 && note.id < 100000) {
+		if (note.id % 100 == 99) {
+			note.eventType = NoteEventType.bomb;
+			note.id += 39;
+			note.score = -4;
+		} else if (note.id % 10 == 9) {
+			note.eventType = NoteEventType.bomb;
+			note.id -= 1;
+			note.score = -4;
+		}
+	}
+	if (note.eventType != NoteEventType.bomb) {
+		note.isBlock = true;
+	}
+	return note;
+}
+
 function CutScoresForNote(cut, scoringType) {
 	var beforeCutRawScore = 0;
 	if (scoringType != ScoringType.ChainLink && scoringType != ScoringType.ChainLinkArcHead) {
@@ -697,7 +716,7 @@ function CutScoresForNote(cut, scoringType) {
 	return [beforeCutRawScore, afterCutRawScore, cutDistanceRawScore];
 }
 
-function ScoreForNote(eventType, cutInfo, scoringType) {
+export function ScoreForNote(eventType, cutInfo, scoringType) {
 	if (eventType == NoteEventType.good) {
 		const scores = CutScoresForNote(cutInfo, scoringType);
 		const result = scores[0] + scores[1] + scores[2];

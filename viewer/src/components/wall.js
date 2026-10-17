@@ -77,6 +77,7 @@ AFRAME.registerComponent('wall', {
 		this.el.object3D.position.copy(direction.multiplyScalar(-newPosition).add(this.origin));
 		this.lastPosition = newPosition;
 
+		if (LIVE_MODE && !this.hit && !this.liveHitChecked) this.findHit();
 		if (this.hit && currentTime > this.hitWall.time) {
 			this.hit = false;
 			this.el.emit('scoreChanged', {index: this.hitWall.i}, true);
@@ -87,6 +88,24 @@ AFRAME.registerComponent('wall', {
 		this.updatePosition();
 	},
 
+	findHit: function () {
+		const walls = this.replayLoader.walls;
+		const data = this.data;
+		if (!walls) return;
+		const durationSeconds = data.durationSeconds;
+		for (var i = 0; i < walls.length; i++) {
+			if (walls[i].time < data.time + durationSeconds + 0.1 && walls[i].time > data.time - 0.1) {
+				this.hit = true;
+				this.hitWall = walls[i];
+				break;
+			}
+		}
+		// Live: once the wall is behind the player no hit can be recorded for it anymore.
+		if (LIVE_MODE && this.el.sceneEl.components.song.getCurrentTime() > data.time + durationSeconds + 0.5) {
+			this.liveHitChecked = true;
+		}
+	},
+
 	update: function () {
 		const el = this.el;
 		const data = this.data;
@@ -95,18 +114,8 @@ AFRAME.registerComponent('wall', {
 		var length = Math.abs(data.durationSeconds) * movementData.noteJumpMovementSpeed;
 
 		this.hit = false;
-		const walls = this.replayLoader.walls;
-
-		if (walls) {
-			const durationSeconds = this.data.durationSeconds;
-			for (var i = 0; i < walls.length; i++) {
-				if (walls[i].time < data.time + durationSeconds + 0.1 && walls[i].time > data.time - 0.1) {
-					this.hit = true;
-					this.hitWall = walls[i];
-					break;
-				}
-			}
-		}
+		this.liveHitChecked = false;
+		this.findHit();
 
 		const mesh = el.getObject3D('mesh');
 		const material = mesh.material;

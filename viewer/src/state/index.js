@@ -102,7 +102,7 @@ AFRAME.registerState({
 		},
 		controllerType: '',
 		damage: 0,
-		hasReceivedUserGesture: queryParamTime !== undefined,
+		hasReceivedUserGesture: queryParamTime !== undefined || LIVE_MODE,
 		inVR: false,
 		pov: false,
 		isPaused: true, // Playing, but paused.
@@ -258,7 +258,7 @@ AFRAME.registerState({
 		},
 
 		scoreChanged: (state, payload) => {
-			updateScore(state, {index: payload.index}, false);
+			updateScore(state, {index: payload.index}, !!payload.force);
 		},
 
 		victory: function (state) {
@@ -330,6 +330,12 @@ AFRAME.registerState({
 			state.isPaused = false;
 			state.isFinished = false;
 			state.isSongBufferProcessing = true;
+			resetScore(state);
+		},
+
+		// Live mode: a new song started in the game.
+		livesessionstart: state => {
+			state.isFinished = false;
 			resetScore(state);
 		},
 

@@ -1,0 +1,58 @@
+#liveOverlay
+  position fixed
+  inset 0
+  pointer-events none
+  z-index 20
+  display flex
+  align-items center
+  justify-content center
+  font-family 'Segoe UI', system-ui, sans-serif
+  color #fff
+
+#liveOverlay .liveCard
+  pointer-events auto
+  max-width calc(100% - 32px)
+  padding 20px 28px
+  border-radius 12px
+  background rgba(10, 12, 16, 0.82)
+  text-align center
+  box-shadow 0 8px 32px rgba(0, 0, 0, 0.4)
+
+#liveOverlay .liveCard[hidden]
+  display none
+
+#liveOverlay .liveTitle
+  font-size 20px
+  font-weight 600
+
+#liveOverlay .liveCode
+  margin 14px 0 6px
+  font 700 48px/1.1 ui-monospace, 'Cascadia Mono', monospace
+  letter-spacing 6px
+  color #ff4fa3
+
+#liveOverlay .liveCode[hidden]
+  display none
+
+#liveOverlay .liveHint
+  margin-top 6px
+  font-size 14px
+  color #c8cdd4
+
+#liveOverlay .liveStats
+  position fixed
+  top 8px
+  left 8px
+  padding 6px 10px
+  border-radius 6px
+  background rgba(0, 0, 0, 0.6)
+  font 12px/1.4 ui-monospace, monospace
+  white-space pre
+
+#liveOverlay .liveStats[hidden]
+  display none
+
+// Live play can't be scrubbed, sped up or paused: hide those controls.
+body.liveMode
+  #timeline, #controls .playButton, #controls .speedControl, .timeControls
+    display none !important

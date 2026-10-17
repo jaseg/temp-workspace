@@ -30,6 +30,7 @@ nunjucks.addGlobal('DEBUG_INSPECTOR', !!process.env.DEBUG_INSPECTOR);
 nunjucks.addGlobal('HOST', localIP());
 nunjucks.addGlobal('IS_PRODUCTION', isProduction);
 nunjucks.addGlobal('COLORS', COLORS);
+nunjucks.addGlobal('LIVE', !!process.env.LIVE);
 
 // Generate timestamp used to cache-bust the emitted bundle and stylesheet.
 const timestamp = Math.floor(Date.now() / 1000);
@@ -64,6 +65,8 @@ module.exports = {
 	},
 	plugins: [
 		new webpack.ProvidePlugin({Buffer: ['buffer', 'Buffer']}),
+		// LIVE=1 builds the viewer the Beat Saber mod serves for live play (see src/live/).
+		new webpack.DefinePlugin({LIVE_MODE: JSON.stringify(!!process.env.LIVE)}),
 		new MiniCssExtractPlugin({filename: `build/style.${timestamp}.css`}),
 	],
 	module: {

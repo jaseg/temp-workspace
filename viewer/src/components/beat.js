@@ -353,6 +353,12 @@ AFRAME.registerComponent('beat', {
 			}
 			// Check to remove score entity from pool.
 		} else {
+			if (this.replayNote.livePending) {
+				this.findReplayNote();
+				if (!this.replayNote.livePending && this.replayNote.cutInfo && this.replayNote.cutInfo.timeDeviation) {
+					this.replayNote.cutTime = this.replayNote.spawnTime - this.replayNote.cutInfo.timeDeviation;
+				}
+			}
 			if (!this.replayNote.cutPoint && this.currentPositionZ > collisionZThreshold) {
 				this.checkCollisions();
 			}
@@ -539,45 +545,13 @@ AFRAME.registerComponent('beat', {
 		this.hitSaberEl = null;
 
 		// Find corresponding score from replay
-		this.replayNote = null;
 		if (data.type == 'mine') {
 			// Reset mine.
 			this.blockEl.getObject3D('mesh').material = this.el.sceneEl.systems.materials['mineMaterial' + this.data.color];
 			this.blockEl.getObject3D('mesh').material.color = new THREE.Color(settings.settings.bombColor);
 			this.resetMineFragments();
-
-			const bombs = replayLoader.bombs;
-			if (bombs) {
-				for (var i = 0; i < bombs.length; i++) {
-					if (
-						bombs[i].spawnTime < data.time + 0.01 &&
-						bombs[i].spawnTime > data.time - 0.01 &&
-						(!bombs[i].id || bombs[i].id == data.noteId || bombs[i].id == data.noteIdWithScoring)
-					) {
-						this.replayNote = bombs[i];
-						break;
-					}
-				}
-			}
-		} else {
-			const notes = replayLoader.allStructs;
-			const index = this.data.index;
-			var result;
-			for (var i = 0; i < notes.length; i++) {
-				if (notes[i].index == index) {
-					result = notes[i];
-					break;
-				}
-			}
-			this.replayNote = result;
 		}
-
-		if (this.replayNote == null) {
-			this.replayNote = {
-				score: 1,
-				totalScore: -1,
-			};
-		}
+		this.findReplayNote();
 
 		if (
 			replayLoader.challenge &&
@@ -904,7 +878,9 @@ AFRAME.registerComponent('beat', {
 		const timeToScore = this.replayNote.time - getCurrentTime();
 		const payload = {index: this.replayNote.i};
 		const scoreChanged = () => this.el.sceneEl.systems.state.dispatch('scoreChanged', payload);
-		if (timeToScore < 0) {
+		if (LIVE_MODE) {
+			// Live totals are dispatched by the live session as final scores arrive.
+		} else if (timeToScore < 0) {
 			scoreChanged();
 		} else {
 			setTimeout(scoreChanged, timeToScore * 1000);
@@ -1245,6 +1221,49 @@ AFRAME.registerComponent('beat', {
 		this.showScore();
 	},
 
+	findReplayNote: function () {
+		const data = this.data;
+		this.replayNote = null;
+		if (data.type == 'mine') {
+			const bombs = replayLoader.bombs;
+			if (bombs) {
+				for (var i = 0; i < bombs.length; i++) {
+					if (
+						bombs[i].spawnTime < data.time + 0.01 &&
+						bombs[i].spawnTime > data.time - 0.01 &&
+						(!bombs[i].id || bombs[i].id == data.noteId || bombs[i].id == data.noteIdWithScoring)
+					) {
+						this.replayNote = bombs[i];
+						break;
+					}
+				}
+			}
+		} else if (LIVE_MODE) {
+			// Includes cuts whose final score hasn't arrived yet.
+			this.replayNote = replayLoader.live.structForMapIndex(this.data.index);
+		} else {
+			const notes = replayLoader.allStructs;
+			const index = this.data.index;
+			var result;
+			for (var i = 0; i < notes.length; i++) {
+				if (notes[i].index == index) {
+					result = notes[i];
+					break;
+				}
+			}
+			this.replayNote = result;
+		}
+
+		if (this.replayNote == null) {
+			this.replayNote = {
+				score: 1,
+				totalScore: -1,
+				// Live: the outcome isn't known yet when the beat spawns; look again every frame.
+				livePending: LIVE_MODE,
+			};
+		}
+	},
+
 	showScore: function (hand) {
 		if (scoreElements > 50) return;
 		scoreElements++;
@@ -1313,6 +1332,10 @@ AFRAME.registerComponent('beat', {
 			}
 		} else {
 			const scoreEl = this.el.sceneEl.components['pool__beatscoreok'].requestEntity();
+			if (LIVE_MODE) {
+				// The final score arrives after the swing finishes; live mode updates the text then.
+				this.replayNote.scoreEl = scoreEl;
+			}
 			const colorAndScale = this.colorAndScaleForScore(this.replayNote);
 			scoreEl.setAttribute('text', 'value', '' + score);
 
