@@ -48,7 +48,7 @@ Steam Frame — Beat Saber process (Proton)                        LAN browser(s
 - **`LiveViewer.Plugin`** (BSIPA). It contains:
   - the recorder port
   - the lifecycle (menu, song start, song end)
-  - the BSML menu screens: status, URL and QR code, waiting room, approved
+  - the BSML menu screens: status and URLs, waiting room, approved
     devices
 - The game thread only copies poses and events into preallocated structs in a
   lock-free ring buffer, with no allocations, no I/O and no locks on the hot
@@ -200,14 +200,18 @@ decoder helpers still apply. The bandwidth is about 12 KB/s per viewer.
   is taken, it falls back to `beatsaber-2.local`, and so on.
 - It also announces a DNS-SD service `_https._tcp`, named "Beat Saber Live
   (<player>)", with `path=/`.
-- **People type `https://beatsaber.local:4280`.** We stay on port 4280 because
-  Wine runs as an unprivileged user and can't bind 443.
+- **People type `https://beatsaber.local:4280`.** The port is fixed at 4280.
+  - Browsers ignore the port in DNS-SD SRV records, so a URL without a port
+    would need 443.
+  - Wine runs unprivileged and can't bind 443, so we don't try.
+  - A URL without a port is left to the later QR handoff.
 - **Where `.local` names resolve:**
   - out of the box on Windows 10+, macOS, iOS and iPadOS
   - on most desktop Linux distributions, via nss-mdns
   - on Android, it depends on the version and browser
-- **Fallbacks, always shown in the menu:** the IP URL, and a QR code of the
-  IP URL that phones can scan.
+- **Fallback, always shown in the menu:** the IP URL. The player reads it out.
+  The Frame has no screen anyone else can see, so the menu doesn't show QR
+  codes.
 - **On-device risk:** SteamOS probably already runs avahi on UDP 5353. Two
   responders can share the port when both use `SO_REUSEADDR`, but this needs
   checking under Wine. If it fails, we fall back to the Frame's existing avahi
@@ -233,7 +237,7 @@ decoder helpers still apply. The bandwidth is about 12 KB/s per viewer.
    at display.
 3. **Plugin on the Frame (needs SSH).**
    - The recorder port, the lifecycle and map serving.
-   - The BSML screens: status, URL and QR code, waiting room, approved devices.
+   - The BSML screens: status and URLs, waiting room, approved devices.
    - Building against the reference DLLs pulled from the Frame, and checking
      Proton networking and firewall reachability.
 4. **Latency tuning on the real device.** Choose the capture point, measure the
