@@ -124,7 +124,7 @@ export class DemoConnection extends LiveConnection {
 		}
 
 		// The waiting room, with an approval after a moment.
-		this.deliver(new Writer(T.Waiting).str('K7-4Q').buffer(), 400);
+		this.deliver(new Writer(T.Waiting).str('Aztec Istanbul Yucatan').buffer(), 400);
 		setTimeout(() => {
 			this.deliver(new Writer(T.Approved).u8(0).buffer(), 0);
 			setTimeout(() => this.playSong(), 300);

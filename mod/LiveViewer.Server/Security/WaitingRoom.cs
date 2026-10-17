@@ -51,9 +51,6 @@ namespace LiveViewer.Server.Security
         public static readonly TimeSpan PendingLifetime = TimeSpan.FromMinutes(2);
         public static readonly TimeSpan DenyCooldown = TimeSpan.FromMinutes(1);
 
-        // No 0/O, 1/I/L, 2/Z, 5/S, 8/B: codes are read off a browser and compared in a VR menu.
-        private const string CodeAlphabet = "ACDEFGHJKMNPQRTUVWXY34679";
-
         private readonly object _lock = new object();
         private readonly List<PendingDevice> _pending = new List<PendingDevice>();
         private readonly Dictionary<IPAddress, DateTime> _cooldownUntil = new Dictionary<IPAddress, DateTime>();
@@ -236,18 +233,36 @@ namespace LiveViewer.Server.Security
             return device;
         }
 
+        /// <summary>
+        /// Three words from the PGP word list (24 random bits), e.g. "Aztec Istanbul Yucatan". The words are read off
+        /// a browser and compared in a VR menu, so they are easier to check than letters and digits.
+        /// </summary>
         private string NewCode()
         {
             while (true)
             {
-                var bytes = DeviceStore.RandomBytes(4);
-                var chars = bytes.Select(b => CodeAlphabet[b % CodeAlphabet.Length]).ToArray();
-                var code = new string(chars, 0, 2) + "-" + new string(chars, 2, 2);
-                if (_pending.All(p => p.MatchCode != code))
+                var b = DeviceStore.RandomBytes(3);
+                var code = WordList.Even[b[0]] + " " + WordList.Odd[b[1]] + " " + WordList.Even[b[2]];
+                if (_pending.All(p => !SameCode(p.MatchCode, code)))
                 {
                     return code;
                 }
             }
         }
+
+        /// <summary>Finds a pending device by its code, ignoring case and how the words are separated.</summary>
+        public PendingDevice? FindByCode(string code)
+        {
+            var wanted = NormalizeCode(code);
+            lock (_lock)
+            {
+                return _pending.FirstOrDefault(p => NormalizeCode(p.MatchCode) == wanted);
+            }
+        }
+
+        private static bool SameCode(string a, string b) => NormalizeCode(a) == NormalizeCode(b);
+
+        private static string NormalizeCode(string code) =>
+            string.Join(" ", code.ToLowerInvariant().Split(new[] { ' ', '-', '\t' }, StringSplitOptions.RemoveEmptyEntries));
     }
 }

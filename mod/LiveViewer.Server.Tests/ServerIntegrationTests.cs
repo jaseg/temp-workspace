@@ -132,7 +132,7 @@ namespace LiveViewer.Server.Tests
             var waiting = await ExpectAsync(ws, MessageType.Waiting);
             var r = new MessageReader(waiting);
             r.U8();
-            return r.String(16);
+            return r.String(64);
         }
 
         private long PendingId(string code) => _server.WaitingRoom.Pending.Single(p => p.MatchCode == code).ConnectionId;

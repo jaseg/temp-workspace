@@ -9,9 +9,9 @@
 | `tools/browser-smoke.cjs` | Opens the test page in headless Chromium against a running host and reports latency stats. |
 | `tools/viewer-smoke.cjs` | Same for the real viewer (`--www ../viewer/dist`): screenshots, errors, score state, extrapolation horizon. |
 | `tools/viewer-transitions.cjs` | Follows the viewer across several songs (`--loop --start 166`); can approve through the host console via a FIFO. |
+| `PROTOCOL.md` | The WebSocket protocol. |
 
 Both viewer scripts press "Request to watch" first.
-| `PROTOCOL.md` | The WebSocket protocol. |
 
 The BSIPA plugin (`LiveViewer.Plugin`) comes in milestone 3. It needs the game's
 assemblies to build.
@@ -35,7 +35,8 @@ dotnet run --project LiveViewer.Host -c Release -- --replay 8931530 --loop
 - The map is downloaded by hash into `./livedata/maps` unless you pass `--map`.
 
 Open `https://localhost:4280/` and accept the certificate warning. The page
-shows a code; type `a <code>` in the host's console to allow it once, or
+shows a three-word code; type `a <code>` in the host's console to allow it once
+(e.g. `a aztec istanbul yucatan`; case and separators don't matter), or
 `r <code>` to remember the device. `--auto-approve` skips that, for tests.
 
 To serve the real viewer instead of the test page, build it (`cd ../viewer && npm ci && npm run build`) and

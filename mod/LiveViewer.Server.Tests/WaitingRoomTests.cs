@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using LiveViewer.Server.Security;
 using Xunit;
@@ -31,8 +32,8 @@ namespace LiveViewer.Server.Tests
         {
             var order = new List<string>();
             _room.Changed += () => order.Add("changed");
-            _room.Join(1, Ip(1), "x", code => order.Add("code " + code.Length));
-            Assert.Equal(new[] { "code 5", "changed" }, order);
+            _room.Join(1, Ip(1), "x", _ => order.Add("code"));
+            Assert.Equal(new[] { "code", "changed" }, order);
         }
 
         [Fact]
@@ -128,8 +129,39 @@ namespace LiveViewer.Server.Tests
             Assert.Equal(WaitingRoom.MaxPending, codes.Count);
             foreach (var code in codes)
             {
-                Assert.Matches("^[ACDEFGHJKMNPQRTUVWXY34679]{2}-[ACDEFGHJKMNPQRTUVWXY34679]{2}$", code);
+                Assert.Matches("^[A-Za-z]+ [A-Za-z]+ [A-Za-z]+$", code);
+                Assert.Equal(code, _room.FindByCode(code)!.MatchCode);
             }
+        }
+
+        [Fact]
+        public void CodesAlternateTheTwoWordLists()
+        {
+            string? code = null;
+            _room.Join(1, Ip(1), "x", c => code = c);
+            var words = code!.Split(' ');
+            Assert.Contains(words[0], WordList.Even);
+            Assert.Contains(words[1], WordList.Odd);
+            Assert.Contains(words[2], WordList.Even);
+        }
+
+        [Fact]
+        public void FindByCodeIgnoresCaseAndSeparators()
+        {
+            string? code = null;
+            _room.Join(1, Ip(1), "x", c => code = c);
+            var sloppy = "  " + code!.ToUpperInvariant().Replace(" ", " - ") + " ";
+            Assert.Equal(1, _room.FindByCode(sloppy)!.ConnectionId);
+            Assert.Null(_room.FindByCode(code.Split(' ')[0]));
+            Assert.Null(_room.FindByCode(""));
+        }
+
+        [Fact]
+        public void WordListsAreComplete()
+        {
+            Assert.Equal(256, WordList.Even.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Equal(256, WordList.Odd.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Empty(WordList.Even.Intersect(WordList.Odd, StringComparer.OrdinalIgnoreCase));
         }
 
         [Fact]

@@ -45,7 +45,7 @@ client                         server
 | Type | Name | Payload |
 |---|---|---|
 | `0x01` | Welcome | `u16 protocolVersion, us serverTime, str serverName` |
-| `0x02` | Waiting | `str matchCode`. The browser shows the code; the player matches it in the game menu. |
+| `0x02` | Waiting | `str matchCode`: three words from the PGP word list separated by single spaces (even, odd, even list; e.g. `Aztec Istanbul Yucatan`, at most 31 bytes). The browser shows the code; the player matches it in the game menu. |
 | `0x03` | Approved | `u8 hasCredential, [32 bytes credential]`. Store the credential (if present) and send it in later `Hello`s. |
 | `0x04` | Denied | none. Also sent when the waiting room is full, the request expired, or the address is cooling down after a deny. |
 | `0x05` | Revoked | none. The remembered device was revoked: forget the credential. |

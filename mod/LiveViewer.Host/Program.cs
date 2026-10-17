@@ -175,7 +175,7 @@ Console commands while running:
                 }
 
                 var argument = parts.Length > 1 ? parts[1].Trim() : "";
-                var pending = server.WaitingRoom.Pending.FirstOrDefault(p => string.Equals(p.MatchCode, argument, StringComparison.OrdinalIgnoreCase));
+                var pending = server.WaitingRoom.FindByCode(argument);
                 switch (parts[0])
                 {
                     case "q":
@@ -225,7 +225,7 @@ Console commands while running:
 
             foreach (var p in pending)
             {
-                Console.WriteLine($"  waiting {p.MatchCode}  {p.Label}  from {p.Address}  (a/r/d {p.MatchCode})");
+                Console.WriteLine($"  waiting \"{p.MatchCode}\"  {p.Label}  from {p.Address}  (a/r/d {p.MatchCode})");
             }
         }
 

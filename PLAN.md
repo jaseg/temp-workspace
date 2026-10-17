@@ -88,9 +88,9 @@ player approving a device in game.
     careful users can compare it to what the browser shows.
   - Plain HTTP on the port gets no content: we only listen with TLS.
 - **Waiting room instead of tokens.**
-  1. A browser opens the page and connects to `/ws`. It receives a short random
-     **match code** (e.g. `K7-4Q`) and shows "Waiting for approval… code
-     K7-4Q".
+  1. A browser opens the page and connects to `/ws`. It receives a random
+     **match code** of three words from the PGP word list (e.g. `Aztec
+     Istanbul Yucatan`) and shows it while waiting for approval.
   2. The menu's **Waiting room** screen lists pending devices: the match code,
      IP, browser and OS (parsed from the User-Agent, for display only) and age.
      The buttons are **Allow once**, **Allow & remember** and **Deny**.

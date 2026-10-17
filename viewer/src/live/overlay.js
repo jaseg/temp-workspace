@@ -54,7 +54,14 @@ export class LiveOverlay {
 		this.title.textContent = title;
 		this.hint.textContent = hint;
 		this.code.hidden = !code;
-		this.code.textContent = code || '';
+		// One box per word, so a long code wraps between words on narrow screens.
+		this.code.replaceChildren();
+		(code || '').split(' ').forEach((word, i) => {
+			if (i) this.code.append(' ');
+			const span = document.createElement('span');
+			span.textContent = word;
+			this.code.append(span);
+		});
 		this.card.hidden = !title;
 	}
 
