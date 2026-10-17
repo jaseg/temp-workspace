@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>A tiny, cross-platform, module based, MIT-licensed web server. Supporting NET Framework, Net Core, and Mono.</Description>
+    <AssemblyTitle>EmbedIO Web Server</AssemblyTitle>
+    <Authors>Unosquare, and Contributors to EmbedIO</Authors>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>EmbedIO</AssemblyName>
+    <PackageId>EmbedIO</PackageId>
+    <Product>EmbedIO</Product>
+    <Company>Unosquare</Company>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageProjectUrl>http://unosquare.github.io/embedio</PackageProjectUrl>
+    <PackageIconUrl>https://unosquare.github.io/embedio/embedio.png</PackageIconUrl>
+    <RepositoryUrl>https://github.com/unosquare/embedio/</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>webserver websocket webapi http</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' And Exists('NugetSigning.pfx')">
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>NugetSigning.pfx</AssemblyOriginatorKeyFile>
+    <DelaySign>false</DelaySign>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="LICENSE" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Unosquare.Swan.Lite" />
+  </ItemGroup>
+  
+</Project>
