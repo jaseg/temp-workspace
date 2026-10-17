@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="LiveViewer.Server.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="www\**\*" LogicalName="www/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 

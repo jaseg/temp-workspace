@@ -83,9 +83,13 @@ namespace LiveViewer.Server.Security
             }
         }
 
-        public JoinResult Join(long connectionId, IPAddress address, string label, out string matchCode)
+        /// <summary>
+        /// Puts a connection in the waiting room. <paramref name="onPending"/> runs with the match code before anyone
+        /// is notified, so the client is told it's waiting before an approval can possibly be sent to it.
+        /// </summary>
+        public JoinResult Join(long connectionId, IPAddress address, string label, Action<string> onPending)
         {
-            matchCode = "";
+            string matchCode;
             var now = _utcNow();
             lock (_lock)
             {
@@ -120,6 +124,7 @@ namespace LiveViewer.Server.Security
                 });
             }
 
+            onPending(matchCode);
             Changed?.Invoke();
             return JoinResult.Pending;
         }

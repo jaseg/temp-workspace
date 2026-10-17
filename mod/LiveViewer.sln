@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LiveViewer.Server", "LiveVi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LiveViewer.Host", "LiveViewer.Host\LiveViewer.Host.csproj", "{ADD270E7-97BF-40B9-8466-82BACC40891A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LiveViewer.Server.Tests", "LiveViewer.Server.Tests\LiveViewer.Server.Tests.csproj", "{529258B4-4A66-43C4-969F-386F7C086E40}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +34,10 @@ Global
 		{ADD270E7-97BF-40B9-8466-82BACC40891A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ADD270E7-97BF-40B9-8466-82BACC40891A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ADD270E7-97BF-40B9-8466-82BACC40891A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{529258B4-4A66-43C4-969F-386F7C086E40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{529258B4-4A66-43C4-969F-386F7C086E40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{529258B4-4A66-43C4-969F-386F7C086E40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{529258B4-4A66-43C4-969F-386F7C086E40}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{945F218F-9183-441D-9C9E-37A51400984C} = {19D66048-AAE5-4A27-B25A-B69D1AA4F0FB}

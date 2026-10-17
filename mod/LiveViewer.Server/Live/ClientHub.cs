@@ -206,11 +206,13 @@ namespace LiveViewer.Server.Live
                 return;
             }
 
-            var result = _waitingRoom.Join(connection.Id, connection.Address, connection.Label, out var code);
-            if (result == JoinResult.Pending)
+            var result = _waitingRoom.Join(connection.Id, connection.Address, connection.Label, code =>
             {
                 _log.Info($"Client {connection.Id} ({connection.Address}, {connection.Label}) is waiting for approval, code {code}.");
                 connection.EnqueueReliable(Messages.Waiting(code));
+            });
+            if (result == JoinResult.Pending)
+            {
                 return;
             }
 

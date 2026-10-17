@@ -26,7 +26,7 @@ namespace LiveViewer.Server.Live
     {
         public const int MaxQueuedPoses = 4;
         public const int MaxQueuedReliable = 20000;
-        public const int MaxQueuedTransfers = 4;
+        public const int MaxQueuedTransfers = 16;
         public const int MapChunkBytes = 16 * 1024 - 16; // one TLS record with the message header
 
         private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(5);

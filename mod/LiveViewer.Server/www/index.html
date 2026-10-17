@@ -1,1 +1,27 @@
-<!doctype html><title>placeholder</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beat Saber Live</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Beat Saber Live <small>test page</small></h1>
+  <section id="status" class="card">
+    <div id="state">Connecting…</div>
+    <div id="code" hidden></div>
+    <p id="hint"></p>
+  </section>
+  <section id="live" class="card" hidden>
+    <div id="song">No song playing</div>
+    <canvas id="view" width="640" height="360"></canvas>
+    <table id="stats"></table>
+    <button id="maptest" type="button">Download map files</button>
+    <pre id="maplog"></pre>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
