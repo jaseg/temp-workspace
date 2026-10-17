@@ -39,6 +39,28 @@
   font-size 14px
   color #c8cdd4
 
+#liveOverlay .liveRequest
+  margin-top 16px
+  padding 10px 22px
+  border 0
+  border-radius 8px
+  background #ff4fa3
+  color #fff
+  font inherit
+  font-size 16px
+  font-weight 600
+  cursor pointer
+
+#liveOverlay .liveRequest:hover
+  background #ff6bb3
+
+#liveOverlay .liveRequest:focus-visible
+  outline 2px solid #fff
+  outline-offset 2px
+
+#liveOverlay .liveRequest[hidden]
+  display none
+
 #liveOverlay .liveStats
   position fixed
   top 8px
@@ -51,8 +73,3 @@
 
 #liveOverlay .liveStats[hidden]
   display none
-
-// Live play can't be scrubbed, sped up or paused, and has no player avatar: hide those controls.
-body.liveMode
-  #timeline, #controlsPause, .speedSliderContainer, .songEffectiveSpeed, #playerAvatar
-    display none !important

@@ -1,4 +1,4 @@
-// Loads the live viewer (served by a dev host running with --www <viewer/dist-live> --auto-approve) in headless
+// Loads the live viewer (served by a dev host running with --www <viewer/dist> --auto-approve) in headless
 // Chromium, lets it play, then reports errors, live stats and screenshots.
 // Usage: NODE_PATH=$(npm root -g) node tools/viewer-smoke.cjs [url] [seconds] [screenshot-prefix]
 const {chromium} = require('playwright');
@@ -27,9 +27,8 @@ const {chromium} = require('playwright');
 		};
 	});
 	await page.goto(url);
-	// A click is the user gesture browsers require before audio may play.
-	await page.waitForTimeout(3000);
-	await page.mouse.click(640, 300);
+	// "Request to watch" starts the connection; the click also unlocks audio.
+	await page.click('#liveOverlay .liveRequest', {timeout: 20000});
 
 	await page.keyboard.press('l'); // latency readout
 	for (let i = 0; i < seconds; i += 5) {

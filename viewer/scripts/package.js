@@ -1,5 +1,5 @@
-// Collects the files the live viewer needs at runtime into dist-live/, which the Beat Saber mod serves.
-// Run after `LIVE=1 NODE_ENV=production webpack` (npm run build:live does both).
+// Collects the files the viewer needs at runtime into dist/, which the Beat Saber mod serves.
+// Run after the webpack production build (`npm run build` does both).
 //
 // With `--demo <map folder> <replay.bsor>` (after a LIVE_DEMO=1 build) it writes dist-demo/ instead: a fully
 // static page that plays that replay through the live code path, no game or mod needed.
@@ -9,7 +9,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const demoArg = process.argv.indexOf('--demo');
 const demo = demoArg >= 0 ? {map: process.argv[demoArg + 1], replay: process.argv[demoArg + 2]} : null;
-const out = path.join(root, demo ? 'dist-demo' : 'dist-live');
+const out = path.join(root, demo ? 'dist-demo' : 'dist');
 
 fs.rmSync(out, {recursive: true, force: true});
 fs.mkdirSync(out, {recursive: true});
@@ -18,71 +18,23 @@ function copy(from, to = from) {
 	fs.cpSync(path.join(root, from), path.join(out, to), {recursive: true});
 }
 
-let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-if (!html.includes('live-preamble.js')) {
-	throw new Error('index.html is not a live build; run with LIVE=1');
-}
-
-// The mod serves the page with a CSP that forbids inline scripts. Move the templates' inline <script> blocks
-// into a file, and turn inline event handler attributes into data attributes that live-inline.js binds once
-// at load. Only handlers present in this static file are ever bound.
-const inlineScripts = [];
-html = html.replace(/<script>([\s\S]*?)<\/script>/g, (_, code) => {
-	inlineScripts.push(code);
-	return '';
-});
-let handlers = 0;
-html = html.replace(/\son(click|input|change|mousedown)="([^"]*)"/g, (_, event, code) => {
-	handlers++;
-	return ` data-live-on${event}="${code}"`;
-});
-// Handlers are bound from the few shapes the templates use, without eval; anything else fails the build.
-const HANDLER_PATTERNS = [
-	/^(change\w*Tab)\((\d+)\)$/,
-	/^document\.getElementById\('([\w-]+)'\)\.click\(\);?$/,
-	/^event\.preventDefault\(\);?$/,
-	/^this\.style\.setProperty\('--value',this\.value\)$/,
-];
-for (const match of html.matchAll(/data-live-on\w+="([^"]*)"/g)) {
-	if (!HANDLER_PATTERNS.some(p => p.test(match[1]))) throw new Error('Unsupported inline handler: ' + match[1]);
-}
-const binder = `
-function liveHandler(code) {
-	var m;
-	if ((m = /^(change\\w*Tab)\\((\\d+)\\)$/.exec(code))) return function () { window[m[1]](Number(m[2])); };
-	if ((m = /^document\\.getElementById\\('([\\w-]+)'\\)\\.click\\(\\);?$/.exec(code))) return function () { document.getElementById(m[1]).click(); };
-	if (/^event\\.preventDefault\\(\\);?$/.test(code)) return function (e) { e.preventDefault(); };
-	return function () { this.style.setProperty('--value', this.value); };
-}
-document.addEventListener('DOMContentLoaded', function () {
-	['click', 'input', 'change', 'mousedown'].forEach(function (event) {
-		document.querySelectorAll('[data-live-on' + event + ']').forEach(function (el) {
-			var handler = liveHandler(el.getAttribute('data-live-on' + event));
-			el.removeAttribute('data-live-on' + event);
-			el.addEventListener(event, function (e) {
-				return handler.call(el, e);
-			});
-		});
-	});
-});
-`;
-fs.writeFileSync(path.join(out, 'live-inline.js'), inlineScripts.join('\n') + binder);
-html = html.replace('</body>', '<script src="live-inline.js"></script>\n</body>');
+// The mod serves the page with a CSP that forbids inline scripts and event handlers; keep it that way.
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 if (/<script(?![^>]*\ssrc=)/.test(html) || /\son[a-z]+="/.test(html)) {
-	throw new Error('Inline script left in the live index.html');
+	throw new Error('index.html contains an inline script or event handler');
 }
 fs.writeFileSync(path.join(out, 'index.html'), html);
-console.log(`moved ${inlineScripts.length} inline scripts and ${handlers} inline handlers out of index.html`);
 
 // Only the bundle that index.html references.
 for (const match of html.matchAll(/(?:src|href)="(build\/[^"]+)"/g)) {
 	copy(match[1]);
 }
-copy('src/live/preamble.js', 'live-preamble.js');
+copy('src/preamble.js', 'preamble.js');
+
 // A-Frame builds trivial getters with new Function; replace that with a closure so the page needs no eval.
 const aframe = fs.readFileSync(path.join(root, 'vendor/aframe-master.min.js'), 'utf8');
 const evalGetter = 'function wrapper(t){return new Function(["return function "+t+"() {","  return this._"+t,"}"].join("\\n"))()}';
-if (!aframe.includes(evalGetter)) throw new Error('A-Frame getter factory not found; update the patch in package-live.js');
+if (!aframe.includes(evalGetter)) throw new Error('A-Frame getter factory not found; update the patch in scripts/package.js');
 fs.mkdirSync(path.join(out, 'vendor'), {recursive: true});
 fs.writeFileSync(path.join(out, 'vendor/aframe-master.min.js'), aframe.replace(evalGetter, 'function wrapper(t){return function(){return this["_"+t]}}'));
 for (const dir of ['fonts', 'img', 'models', 'shaders', 'sounds']) {
@@ -102,7 +54,7 @@ if (demo) {
 	const infoName = fs.readdirSync(demo.map).find(n => n.toLowerCase() === 'info.dat');
 	const info = JSON.parse(fs.readFileSync(path.join(demo.map, infoName), 'utf8'));
 	const replay = fs.readFileSync(demo.replay);
-	// BSOR info: difficulty and mode are the 13th and 15th strings; read them the simple way.
+	// BSOR info: difficulty and mode are the 13th and 14th strings, with the score (int32) between them.
 	const strings = [];
 	for (let p = 6; strings.length < 15; ) {
 		const n = replay.readInt32LE(p);

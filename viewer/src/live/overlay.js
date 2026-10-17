@@ -29,21 +29,22 @@ export class LiveOverlay {
 				<div class="liveTitle"></div>
 				<div class="liveCode" hidden></div>
 				<div class="liveHint"></div>
+				<button class="liveRequest" type="button" hidden>Request to watch</button>
 			</div>
 			<div class="liveStats" hidden></div>`;
 		document.body.appendChild(root);
-		document.body.classList.add('liveMode');
 		this.root = root;
 		this.card = root.querySelector('.liveCard');
 		this.title = root.querySelector('.liveTitle');
 		this.code = root.querySelector('.liveCode');
 		this.hint = root.querySelector('.liveHint');
 		this.statsEl = root.querySelector('.liveStats');
-		this.connectionState = 'connecting';
-		this.render(STATE_TEXT.connecting);
+		this.requestButton = root.querySelector('.liveRequest');
+		this.connectionState = 'idle';
 
 		document.addEventListener('keydown', e => {
-			if (e.key === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && e.target === document.body) {
+			const typing = e.target.closest && e.target.closest('input, textarea, select');
+			if (e.key === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing) {
 				this.statsEl.hidden = !this.statsEl.hidden;
 			}
 		});
@@ -55,6 +56,24 @@ export class LiveOverlay {
 		this.code.hidden = !code;
 		this.code.textContent = code || '';
 		this.card.hidden = !title;
+	}
+
+	/**
+	 * First screen: the viewer asks to watch with a click. The click is also the user gesture browsers require
+	 * before a page may play audio, so the song can be heard as soon as playback starts.
+	 */
+	showRequest(onRequest) {
+		this.render('Watch live', 'The player approves new viewers in Beat Saber.');
+		this.requestButton.hidden = false;
+		this.requestButton.focus();
+		this.requestButton.addEventListener(
+			'click',
+			() => {
+				this.requestButton.hidden = true;
+				onRequest();
+			},
+			{once: true}
+		);
 	}
 
 	setConnectionState(state, detail) {

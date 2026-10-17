@@ -2,18 +2,13 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "cross-env NODE_ENV=production webpack",
+    "build": "cross-env NODE_ENV=production webpack && node scripts/package.js",
     "start": "cross-env NODE_ENV=development webpack serve",
     "lint": "semistandard | snazzy",
     "lint:fix": "semistandard --fix",
-    "predeploy": "npm run build && shx mkdir -p .ghpages && shx cp -r index.html assets build vendor .ghpages",
-    "deploy": "gh-pages -d .ghpages -r git@github.com:supermedium/beatsaver-viewer.git && shx rm -rf .ghpages",
-    "build:live": "cross-env NODE_ENV=production LIVE=1 webpack && node scripts/package-live.js",
-    "build:demo": "cross-env NODE_ENV=production LIVE_DEMO=1 webpack && node scripts/package-live.js --demo"
+    "build:demo": "cross-env NODE_ENV=production LIVE_DEMO=1 webpack && node scripts/package.js --demo"
   },
   "dependencies": {
-    "drag-drop": "^7.2.0",
-    "jszip": "^3.10.1",
     "nosleep.js": "^0.12.0"
   },
   "devDependencies": {
@@ -26,7 +21,6 @@
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.2",
     "css-minimizer-webpack-plugin": "^8.0.0",
-    "gh-pages": "^6.3.0",
     "mini-css-extract-plugin": "^2.9.2",
     "nunjucks": "^3.2.4",
     "postcss": "^8.4.49",
@@ -50,7 +44,6 @@
     "globals": [
       "AFRAME",
       "THREE",
-      "LIVE_MODE",
       "LIVE_DEMO"
     ],
     "ignore": [

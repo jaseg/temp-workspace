@@ -2,45 +2,6 @@
 const _noteLinesCount = 4;
 const _noteLinesDistance = 0.6;
 
-function getApiUrl() {
-	if (location.host.includes('beatleader.net')) {
-		return 'https://api.beatleader.net';
-	} else if (location.host.includes('beatleader.xyz')) {
-		return 'https://api.beatleader.xyz';
-	}
-	return 'https://api.beatleader.com';
-}
-
-function getWebsiteUrl() {
-	if (location.host.includes('beatleader.net')) {
-		return 'https://beatleader.net';
-	} else if (location.host.includes('beatleader.com')) {
-		return 'https://beatleader.com';
-	}
-	return 'https://beatleader.xyz';
-}
-
-function replaceCdnUrl(url) {
-	if (location.host.includes('beatleader.net')) {
-		return url.replace('beatleader.xyz', 'beatleader.net');
-	} else if (location.host.includes('beatleader.com')) {
-		return url.replace('beatleader.xyz', 'beatleader.com');
-	}
-	return url;
-}
-
-const LeaderboardContexts = {
-	None: 0,
-	General: 1 << 1,
-	NoMods: 1 << 2,
-	NoPause: 1 << 3,
-	Golf: 1 << 4,
-	SCPM: 1 << 5,
-	Speedrun: 1 << 6,
-	SpeedrunBackup: 1 << 7,
-	Funny: 1 << 8,
-};
-
 function getHorizontalPosition(lineIndex) {
 	return (-(_noteLinesCount - 1) * 0.5 + lineIndex) * _noteLinesDistance;
 }
@@ -494,49 +455,7 @@ function getUrlParameter(name, url = window.location.href) {
 	return decodeURIComponent(value.replace(/\+/g, ' '));
 }
 
-function pageInIframe() {
-	return window.location !== window.parent.location;
-}
-
-function setCookie(name, value, seconds) {
-	var expires = '';
-	if (seconds) {
-		var date = new Date();
-		date.setTime(date.getTime() + seconds * 1000);
-		expires = '; expires=' + date.toUTCString();
-	}
-	document.cookie = name + '=' + (value || '') + expires + '; path=/; SameSite=Lax';
-}
-function getCookie(name) {
-	var nameEQ = name + '=';
-	var ca = document.cookie.split(';');
-	for (var i = 0; i < ca.length; i++) {
-		var c = ca[i];
-		while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-		if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
-	}
-	return null;
-}
-
 var cached;
-async function checkAutoplay() {
-	if (cached === undefined) {
-		const dummyAudio = document.createElement('audio');
-		dummyAudio.src = '/assets/sounds/silence.mp3';
-		document.body.appendChild(dummyAudio);
-
-		try {
-			await dummyAudio.play();
-			console.log('Autoplay is enabled');
-			cached = true;
-		} catch (error) {
-			console.log('Autoplay is disabled', error);
-			cached = false;
-		}
-	}
-
-	return cached;
-}
 
 function isFirefox() {
 	return navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
@@ -594,10 +513,6 @@ const DEFAULT_COLORS = {
 	backgroundColor: '#000000',
 };
 
-module.exports.getApiUrl = getApiUrl;
-module.exports.getWebsiteUrl = getWebsiteUrl;
-module.exports.replaceCdnUrl = replaceCdnUrl;
-module.exports.LeaderboardContexts = LeaderboardContexts;
 module.exports.getHorizontalPosition = getHorizontalPosition;
 module.exports.getHorizontalWallPosition = getHorizontalWallPosition;
 module.exports.getVerticalPosition = getVerticalPosition;
@@ -622,10 +537,6 @@ module.exports.rotateAboutPoint = rotateAboutPoint;
 module.exports.LerpUnclamped = LerpUnclamped;
 module.exports.hasTouchScreen = hasTouchScreen;
 module.exports.getUrlParameter = getUrlParameter;
-module.exports.pageInIframe = pageInIframe;
-module.exports.setCookie = setCookie;
-module.exports.getCookie = getCookie;
-module.exports.checkAutoplay = checkAutoplay;
 module.exports.isFirefox = isFirefox;
 module.exports.createSilence = createSilence;
 module.exports.DEFAULT_COLORS = DEFAULT_COLORS;

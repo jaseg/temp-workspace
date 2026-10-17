@@ -1,19 +1,7 @@
 /* global localStorage */
 var utils = require('../utils');
-var {queryParamTime} = require('../query-params');
 
-const DAMAGE_DECAY = 0.25;
-const DAMAGE_MAX = 10;
 let lastMediaMetadata = null;
-
-const DEBUG_CHALLENGE = {
-	author: 'Superman',
-	difficulty: 'Expert',
-	id: '31',
-	image: 'assets/img/molerat.jpg',
-	songName: 'Friday',
-	songSubName: 'Rebecca Black',
-};
 
 const emptyChallenge = {
 	audio: '',
@@ -101,8 +89,6 @@ AFRAME.registerState({
 			avatar: '',
 		},
 		controllerType: '',
-		damage: 0,
-		hasReceivedUserGesture: queryParamTime !== undefined || LIVE_MODE,
 		inVR: false,
 		pov: false,
 		isPaused: true, // Playing, but paused.
@@ -112,41 +98,16 @@ AFRAME.registerState({
 		isSongBufferProcessing: false,
 		useractive: false,
 		showControls: true,
-		wrongMisses: 0,
 		spawnRotation: 0,
 		saberScale: new THREE.Vector3(1, 1, 1),
 		saberGlowScale: new THREE.Vector3(1, 1.1, 1),
 		settings: {headsetOpacity: 0, volume: 0.0},
-		localReplay: !AFRAME.utils.getUrlParameter('id') && !AFRAME.utils.getUrlParameter('hash'),
 		hiddenSaber: '',
 	},
 
 	handlers: {
 		beatloaderpreloadfinish: state => {
 			state.challenge.isBeatsPreloaded = true;
-		},
-
-		songFetched: (state, payload) => {
-			state.challenge.image = payload.image;
-			state.challenge.author = payload.metadata.levelAuthorName;
-
-			state.challenge.songName = payload.metadata.songName;
-			state.challenge.songNameShort = truncate(payload.metadata.songName, 18);
-			state.challenge.songNameMedium = truncate(payload.metadata.songName, 30);
-
-			state.challenge.songSubName = payload.metadata.songSubName || payload.metadata.songAuthorName;
-			state.challenge.songSubNameShort = truncate(state.challenge.songSubName, 21);
-
-			if (payload.leaderboardId) {
-				state.challenge.leaderboardId = payload.leaderboardId;
-			} else {
-				state.challenge.id = payload.id;
-			}
-
-			document.title = `Replay | ${state.player.name} | ${payload.metadata.songName}`;
-			document
-				.querySelector('meta[property="og:title"]')
-				.setAttribute('content', `Replay | ${state.player.name} | ${payload.metadata.songName}`);
 		},
 
 		challengeloadstart: (state, payload) => {
@@ -178,7 +139,7 @@ AFRAME.registerState({
 				state.challenge.image = payload.image;
 			}
 
-			document.title = `Replay | ${state.player.name} | ${payload.info._songName}`;
+			document.title = `${payload.info._songName} | Beat Saber Live`;
 			state.challenge.isLoading = false;
 		},
 
@@ -216,7 +177,6 @@ AFRAME.registerState({
 		},
 
 		replayloadstart: (state, payload) => {
-			state.localReplay = false;
 			state.replay.isLoading = true;
 			state.replay.hasError = false;
 			state.replay.errorText = null;
@@ -225,26 +185,13 @@ AFRAME.registerState({
 		replayloaded: (state, payload) => {
 			state.replay.isLoading = false;
 			state.notes = payload.notes;
-			console.log(state.challenge);
 			if (state.challenge.mode == 'OneSaber') {
 				state.hiddenSaber = payload.leftHanded ? 'right' : 'left';
 			}
 		},
 
-		replayloadfailed: (state, payload) => {
-			state.replay.isLoading = false;
-			state.replay.hasError = true;
-			state.replay.errorText = payload.error;
-			state.localReplay = !AFRAME.utils.getUrlParameter('id') && !AFRAME.utils.getUrlParameter('hash');
-		},
-
 		userloaded: (state, payload) => {
 			state.player = payload;
-
-			document.title = `Replay | ${state.player.name} | ${state.challenge.songName}`;
-			document
-				.querySelector('meta[property="og:title"]')
-				.setAttribute('content', `Replay | ${state.player.name} | ${state.challenge.songName}`);
 		},
 
 		challengeloaderror: (state, payload) => {
@@ -261,108 +208,14 @@ AFRAME.registerState({
 			updateScore(state, {index: payload.index}, !!payload.force);
 		},
 
-		victory: function (state) {
-			state.isVictory = true;
-
-			// Percentage is score divided by total possible score.
-			const accuracy = (state.score.score / (state.challenge.numBeats * 110)) * 100;
-			state.score.accuracy = isNaN(accuracy) ? 0 : accuracy;
-			state.score.score = isNaN(state.score.score) ? 0 : state.score.score;
-
-			if (accuracy >= 95) {
-				state.score.rank = 'S';
-			} else if (accuracy >= 93) {
-				state.score.rank = 'A';
-			} else if (accuracy >= 90) {
-				state.score.rank = 'A-';
-			} else if (accuracy >= 88) {
-				state.score.rank = 'B+';
-			} else if (accuracy >= 83) {
-				state.score.rank = 'B';
-			} else if (accuracy >= 80) {
-				state.score.rank = 'B-';
-			} else if (accuracy >= 78) {
-				state.score.rank = 'C+';
-			} else if (accuracy >= 73) {
-				state.score.rank = 'C';
-			} else if (accuracy >= 70) {
-				state.score.rank = 'C-';
-			} else if (accuracy >= 60) {
-				state.score.rank = 'D';
-			} else {
-				state.score.rank = 'F';
-			}
-
-			computeBeatsText(state);
-		},
-
-		victoryfake: function (state) {
-			state.score.accuracy = '74.99';
-			state.score.rank = 'C';
-		},
-
-		wallhitstart: function (state) {
-			takeDamage(state);
-		},
-
-		/**
-		 * ?debugstate=loading
-		 */
-		debugloading: state => {
-			DEBUG_CHALLENGE.id = '-1';
-			Object.assign(state.challenge, DEBUG_CHALLENGE);
-			state.challenge.isLoading = true;
-		},
-
-		difficultyselect: (state, payload) => {
-			state.challenge.difficulty = payload;
-			state.challenge.isBeatsPreloaded = false;
-			state.isPaused = false;
-			state.isFinished = false;
-		},
-
 		gamemenuresume: state => {
 			state.isPaused = false;
-		},
-
-		gamemenurestart: state => {
-			state.challenge.isBeatsPreloaded = false;
-			state.isPaused = false;
-			state.isFinished = false;
-			state.isSongBufferProcessing = true;
-			resetScore(state);
 		},
 
 		// Live mode: a new song started in the game.
 		livesessionstart: state => {
 			state.isFinished = false;
 			resetScore(state);
-		},
-
-		timechanged: (state, payload) => {
-			state.isFinished = false;
-			let notes = state.notes;
-			for (var i = notes.length; --i > 0; ) {
-				if (notes[i].time < payload.newTime) {
-					updateScore(state, {index: i}, true);
-					return;
-				} else if (i == 1) {
-					resetScore(state);
-					return;
-				}
-			}
-
-			state.score = emptyScore;
-		},
-
-		modeselect: (state, payload) => {
-			state.challenge.mode = payload;
-			state.challenge.isBeatsPreloaded = false;
-			state.isPaused = false;
-			state.isFinished = false;
-
-			state.challenge.difficulties = difficulties[payload];
-			state.challenge.difficulty = state.challenge.difficulties[0]._difficulty;
 		},
 
 		pausegame: state => {
@@ -372,24 +225,12 @@ AFRAME.registerState({
 			state.isPaused = true;
 		},
 
-		finishgame: state => {
-			if (!state.isPlaying) {
-				return;
-			}
-			state.isPaused = true;
-			state.isFinished = true;
-		},
-
 		songprocessingfinish: state => {
 			state.isSongBufferProcessing = false;
 		},
 
 		songprocessingstart: state => {
 			state.isSongBufferProcessing = true;
-		},
-
-		usergesturereceive: state => {
-			state.hasReceivedUserGesture = true;
 		},
 
 		settingsChanged: (state, payload) => {
@@ -411,11 +252,6 @@ AFRAME.registerState({
 			state.useractive = payload.isActive;
 		},
 
-		wrongMiss: (state, payload) => {
-			state.wrongMisses++;
-			console.log('Wrong miss #' + state.wrongMisses);
-		},
-
 		'enter-vr': state => {
 			state.inVR = true;
 		},
@@ -435,9 +271,7 @@ AFRAME.registerState({
 			!state.challenge.isLoading &&
 			!state.replay.isLoading &&
 			!state.challenge.hasLoadError &&
-			!state.replay.hasError &&
-			state.hasReceivedUserGesture &&
-			!state.localReplay;
+			!state.replay.hasError;
 
 		state.showControls = state.useractive || !state.isPlaying;
 	},
@@ -468,8 +302,6 @@ function updateScore(state, payload, force) {
 		state.score.energy = note.energy;
 		state.lastNoteTime = note.time;
 	}
-
-	// console.log(note.totalScore + " - " + note.index + " - " + note.i + " - " + note.time + " - " + payload.index + " - " + note.score);
 }
 
 function resetScore(state) {

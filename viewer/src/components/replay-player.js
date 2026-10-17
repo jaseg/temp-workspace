@@ -59,6 +59,13 @@ AFRAME.registerComponent('replay-player', {
 
 		this._frameIndex = 0;
 		this._heightFrameIndex = 0;
+
+		// Each song starts with a fresh frame list and may be a different mode.
+		this.el.sceneEl.addEventListener('replayloadstart', () => {
+			this.headRotationOffset = null;
+			this._frameIndex = 0;
+			this._heightFrameIndex = 0;
+		});
 	},
 
 	play: function () {
@@ -70,9 +77,8 @@ AFRAME.registerComponent('replay-player', {
 
 	tock: function (time, delta) {
 		let replay = this.replayDecoder.replay;
-		if (replay && replay.live && replay.frames.length < 100) {
-			// Not enough frames yet for the head rotation average.
-		} else if (replay && !this.headRotationOffset) {
+		if (replay && replay.frames.length >= 100 && !this.headRotationOffset) {
+			// Average head rotation, once there are enough frames.
 			this.calculateHeadRotationOffset(replay);
 			this.supports360 = replay.info.mode == '360Degree' || replay.info.mode == '90Degree';
 		}
@@ -80,12 +86,11 @@ AFRAME.registerComponent('replay-player', {
 		if (this.song.isPlaying && replay) {
 			const currentTime = this.song.getCurrentTime();
 			const frames = this.replayDecoder.replay.frames;
-			if (replay.live) {
-				if (frames.length < 2) return;
-				if (this._frameIndex >= frames.length) this._frameIndex = 0;
-			}
+			// Frames grow while the song plays and restart with each song.
+			if (frames.length < 2) return;
+			if (this._frameIndex >= frames.length) this._frameIndex = 0;
 			let frameIndex = (this._frameIndex = FindFrameIndexByTime(frames, currentTime, this._frameIndex));
-			if (replay.live && frameIndex >= frames.length - 1) {
+			if (frameIndex >= frames.length - 1) {
 				// Newest pose is older than the time we render: extrapolate from the last two poses.
 				frameIndex = frames.length - 2;
 			}
@@ -108,11 +113,9 @@ AFRAME.registerComponent('replay-player', {
 			}
 
 			let height = clamp((replayHeight - 1.8) * 0.5, -0.2, 0.6);
-			let slerpValue = (currentTime - frame.time) / Math.max(1e-6, nextFrame.time - frame.time);
-			if (replay.live) {
-				const span = Math.max(1e-6, nextFrame.time - frame.time);
-				slerpValue = Math.max(0, Math.min(slerpValue, 1 + MAX_EXTRAPOLATION_S / span));
-			}
+			// Past the newest pose this extrapolates, bounded so a stalled stream freezes instead of drifting.
+			const span = Math.max(1e-6, nextFrame.time - frame.time);
+			const slerpValue = Math.max(0, Math.min((currentTime - frame.time) / span, 1 + MAX_EXTRAPOLATION_S / span));
 
 			this.movementsTock(frame, nextFrame, height, slerpValue, delta);
 		}
@@ -182,22 +185,19 @@ AFRAME.registerComponent('replay-player', {
 	},
 
 	updateSaber: function (saber, hitbox, frameData, nextFrameData, height, slerpValue) {
-		const showTreecks = this.settings.settings.showTreecks;
-
 		// position
-		const originalPosition = frameData.position;
-		const modifiedPosition = showTreecks && frameData.trickPosition ? frameData.trickPosition : frameData.position;
-		const nextModifiedPosition = showTreecks && nextFrameData.trickPosition ? nextFrameData.trickPosition : nextFrameData.position;
+		const position = frameData.position;
+		const nextPosition = nextFrameData.position;
 
 		const v1 = this.v1;
 		const v2 = this.v2;
 
 		//hitbox position
-		hitbox.position.set(originalPosition.x, originalPosition.y - height, -originalPosition.z);
+		hitbox.position.set(position.x, position.y - height, -position.z);
 
 		// saber position
-		v1.set(modifiedPosition.x, modifiedPosition.y, modifiedPosition.z);
-		v2.set(nextModifiedPosition.x, nextModifiedPosition.y, nextModifiedPosition.z);
+		v1.set(position.x, position.y, position.z);
+		v2.set(nextPosition.x, nextPosition.y, nextPosition.z);
 
 		const lerpPosition = this.v1.lerp(this.v2, slerpValue);
 		saber.position.set(lerpPosition.x, lerpPosition.y - height, -lerpPosition.z);
@@ -207,18 +207,17 @@ AFRAME.registerComponent('replay-player', {
 		const q1 = this.q1;
 		const q2 = this.q2;
 
-		const originalRotation = frameData.rotation;
-		const modifiedRotation = showTreecks && frameData.trickRotation ? frameData.trickRotation : frameData.rotation;
-		const nextModifiedRotation = showTreecks && nextFrameData.trickRotation ? nextFrameData.trickRotation : nextFrameData.rotation;
+		const frameRotation = frameData.rotation;
+		const nextRotation = nextFrameData.rotation;
 
 		// hitbox rotation
-		q1.set(originalRotation.w, originalRotation.z, originalRotation.y, originalRotation.x);
+		q1.set(frameRotation.w, frameRotation.z, frameRotation.y, frameRotation.x);
 		let rotation = euler.setFromQuaternion(q1);
 		hitbox.rotation.set(rotation.x, rotation.y + Math.PI, -rotation.z);
 
 		// saber rotation
-		q1.set(modifiedRotation.w, modifiedRotation.z, modifiedRotation.y, modifiedRotation.x);
-		q2.set(nextModifiedRotation.w, nextModifiedRotation.z, nextModifiedRotation.y, nextModifiedRotation.x);
+		q1.set(frameRotation.w, frameRotation.z, frameRotation.y, frameRotation.x);
+		q2.set(nextRotation.w, nextRotation.z, nextRotation.y, nextRotation.x);
 
 		const lquat = q1.slerp(q2, slerpValue);
 		const slerpRotation = euler.setFromQuaternion(lquat);

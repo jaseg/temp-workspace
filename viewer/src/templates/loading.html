@@ -1,13 +1,13 @@
 <a-entity
 	id="loadingSongInfoContainer"
 	render-order="hud"
-	bind__visible="challenge.isLoading || replay.isLoading || !hasReceivedUserGesture || challenge.hasLoadError || replay.hasError || localReplay"
+	bind__visible="challenge.isLoading || replay.isLoading || challenge.hasLoadError || replay.hasError"
 	position="0 1.5 -1">
 	<a-entity id="loadingSongInfo">
 		<a-entity
 			id="loadingText"
 			mixin="font"
-			bind__text="value: isSongBufferProcessing && 'Processing audio...' || challenge.isLoading && 'Downloading song...' || replay.isLoading && 'Downloading replay...'"
+			bind__text="value: isSongBufferProcessing && 'Processing audio...' || 'Loading map...'"
 			bind__visible="challenge.isLoading || replay.isLoading || isSongBufferProcessing"
 			text="align: center; color: #FAFAFA; wrapCount: 16; width: 0.65"
 			position="0 0.2 0.001"></a-entity>
@@ -40,55 +40,20 @@
 			visible="false">
 		</a-entity>
 
-		<a-entity
-			id="loadingText"
-			mixin="font"
-			bind__text="value: replay.hasError && 'Try another file' || 'BeatSaber replay viewer'"
-			bind__visible="localReplay && !replay.hasError"
-			text="align: center; color: #FAFAFA; wrapCount: 18; width: 0.65"
-			position="0 -0.1 0.001"></a-entity>
-
-		<a-entity
-			id="loadingGestureButton"
-			bind__visible="!challenge.isLoading && !replay.isLoading && !isPlaying && (!hasReceivedUserGesture || localReplay) && !isSongBufferProcessing && !challenge.hasLoadError && !replay.hasError"
-			position="0 -0.31923 0.01">
-			<a-entity
-				id="loadingGestureText"
-				mixin="font"
-				text="align: center; color: #FAFAFA; wrapCount: 15; value: CLICK ANYWHERE TO PLAY"
-				bind__visible="!localReplay"
-				position="0 0.5 0">
-			</a-entity>
-			<a-entity
-				id="loadingGestureText2"
-				mixin="font"
-				text="align: center; color: #FAFAFA; wrapCount: 15; value: DROP YOUR REPLAY HERE"
-				bind__visible="localReplay"
-				position="0 1 0">
-			</a-entity>
-
-			<a-entity
-				id="loadingGestureText3"
-				mixin="font"
-				text="align: center; color: #FAFAFA; wrapCount: 40; value: Click anywhere for the open dialog"
-				bind__visible="localReplay"
-				position="0 0 2">
-			</a-entity>
-		</a-entity>
 	</a-entity>
 </a-entity>
 
 <a-entity
 	mixin="beat"
-	bind__beat="animating: challenge.isLoading || replay.isLoading; visible: challenge.isLoading || replay.isLoading || !hasReceivedUserGesture || challenge.hasLoadError || replay.hasError"
+	bind__beat="animating: challenge.isLoading || replay.isLoading; visible: challenge.isLoading || replay.isLoading || challenge.hasLoadError || replay.hasError"
 	beat="color: blue; type: arrow; loadingCube: true"
 	position="1.0 1.5 -1.0"
-	bind__visible="challenge.isLoading || replay.isLoading || !hasReceivedUserGesture || challenge.hasLoadError || replay.hasError || localReplay"></a-entity>
+	bind__visible="challenge.isLoading || replay.isLoading || challenge.hasLoadError || replay.hasError"></a-entity>
 
 <a-entity
 	mixin="beat"
 	bind__beat="animating: challenge.isLoading || replay.isLoading; 
-              visible: challenge.isLoading || replay.isLoading || !hasReceivedUserGesture || challenge.hasLoadError || replay.hasError"
+              visible: challenge.isLoading || replay.isLoading || challenge.hasLoadError || replay.hasError"
 	beat="color: red; type: arrow; loadingCube: true"
 	position="-1.0 1.5 -1.0"
-	bind__visible="challenge.isLoading || replay.isLoading || !hasReceivedUserGesture || challenge.hasLoadError || replay.hasError || localReplay"></a-entity>
+	bind__visible="challenge.isLoading || replay.isLoading || challenge.hasLoadError || replay.hasError"></a-entity>

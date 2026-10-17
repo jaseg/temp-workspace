@@ -15,6 +15,7 @@ const {chromium} = require('playwright');
 		if (m.type() === 'error' && !m.text().includes('AudioContext')) errors.push('console: ' + m.text());
 	});
 	await page.goto(url);
+	await page.click('#liveOverlay .liveRequest', {timeout: 20000});
 
 	if (fifo) {
 		await page.waitForFunction(() => window.liveSession && window.liveSession.connection.state === 'waiting', null, {timeout: 20000});

@@ -1,111 +1,77 @@
-# Beat Saber Web Replays
+# Beat Saber live viewer
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/08ead0d0-ade4-4f38-8af4-9b6c3c679234/deploy-status)](https://app.netlify.com/sites/musing-aryabhata-6ae6ea/deploys)
+This is the browser side of the live viewer. The Beat Saber mod serves it on the local network, and it renders
+the song being played, in 3D, from the mod's WebSocket stream. The protocol is in
+[`../mod/PROTOCOL.md`](../mod/PROTOCOL.md).
 
-[A-Frame]: https://github.com/nsgolova/ngoframe
-[visit]: https://replay.beatleader.xyz/?scoreId=8931530
+It started as a fork of BeatLeader's [web replay viewer](https://github.com/BeatLeader/BeatSaber-Web-Replays)
+(MIT, A-Frame), imported as a git subtree. It has since been cut down to live play only:
+- No replay or ScoreSaber loading.
+- No BeatLeader API calls.
+- No timeline, seeking, speed or pause.
+- No random replays and no local-file lookup.
 
-Web-based viewer for Beat Saber replays, built with [A-Frame] and JavaScript.
+Upstream changes can no longer be merged wholesale; port the ones we want by hand.
 
-**[CLICK TO VIEW][visit]**
-
-![https://replay.beatleader.xyz/?scoreId=8931530](assets/img/preview.png)
-
-## Community
-
-- [BeatLeader Discord](https://discord.gg/2RG5YVqtG6)
-
-_The Beat Saber Web Replays is an unofficial community project and not officially
-affiliated with Beat Saber._
-
-## Usage
-
-Go to the [BeatLeader](https://beatleader.xyz) and click on dancing pepe icon in the leaderboard.
-
-Or if you have a site, you can I-Frame the viewer and pass a query parameter
-containing the BeatLeader's score ID:
-
-`https://replay.beatleader.xyz/?scoreId=9280912`
-
-To directly link to a sought time, use the `?time` parameter in the URL (milliseconds, int, 0 to song duration):
-
-`https://replay.beatleader.xyz/?scoreId=9280912&time=15000` - 15 sec
-
-To specify replay speed use the `?speed` parameter in the URL (percent, int, 0 to 200):
-
-`https://replay.beatleader.xyz/?scoreId=9280912&speed=50` - 50% speed
-
-To specify notes jump distance use the `?jd` parameter in the URL (meters, float, 5 to 50):
-
-`https://replay.beatleader.xyz/?scoreId=9280912&jd=18.6` - 18.6 JD
-
-To specify replay download link use the `?link` parameter in the URL. Make sure the link(name of the file) contains playerID:
-
-`https://replay.beatleader.xyz/?link=https://cdn.replays.beatleader.xyz/9280912-76561198059961776-ExpertPlus-Standard-13400F5FB2FD19F52E8C7AC48815D12E72FA3B4A.bsor`
-
-## Development
-
-Download repository.
-The best way to download it is to use the "Clone" button in [SourceTree app](https://www.sourcetreeapp.com/)
-
-Go to the project directory in the terminal and type.
-
-```
-npm install
+```sh
+npm ci
+npm run build     # production webpack build, then scripts/package.js -> dist/
 ```
 
-If you don't have NodeJS - download it here first: https://nodejs.org/en/  
-Version 16 or greater (LTS) is recommended; some developers have experienced issues with older Node versions.
+`dist/` (about 7 MB) is what the mod serves. It contains:
+- `index.html`
+- the bundle
+- A-Frame
+- the scene assets
+- Font Awesome
 
-### Starting local build
+There are no CDN references. To try it without the game, use the fake-live host in `../mod/README.md` with
+`--www ../viewer/dist`.
 
-Install netlify-cli(one time setup):
+## Demo build
 
-```bash
-npm install netlify-cli -g
+```sh
+npm run build:demo -- <map folder> <replay.bsor>    # -> dist-demo/
 ```
 
-Start Netlify dev environment(every time):
+`dist-demo/` is a static page that needs no game or mod. An in-page source (`src/live/demo.js`) plays the given
+BeatLeader replay through the same live protocol path, waiting room included.
 
-```bash
-netlify dev
-```
+## How it works
 
-Navigate to [localhost:9999](http://localhost:9999). You should see the app running.
-Website will reload automatically after you save your changes.
+The live code is in `src/live/`. The rest is the replay viewer's scene, reused.
 
-### Contributing
+| File | Role |
+|---|---|
+| `session.js` | `LiveSession`: the stream becomes the `replay`, `allStructs`, `bombs`, `walls` data on the `replay-loader` component, which the scene reads. |
+| `connection.js` | WebSocket, waiting room, remembered-device credential (localStorage), clock-sync pings, map file downloads. |
+| `clock.js` | `ServerClock` maps the mod's microsecond clock to `performance.now()` (lowest-RTT pong of the last 16). `SongClock` turns pose timestamps into a smoothed song time. |
+| `audio.js` | Re-seeks the song audio whenever what is heard drifts more than 40 ms from the live song time. |
+| `overlay.js` | "Request to watch" (the click also unlocks audio), waiting for approval with the match code, song ended. `l` toggles the latency readout. |
+| `demo.js` | In-page replay source for the demo build. |
+| `bsor.js` | BSOR decoder (demo only). |
 
-- Create a fork ("Fork" button on top) or ask me in [Discord](https://discord.gg/2RG5YVqtG6) to add you to this repository as a developer if you plan to contribute often.
-- Create work branch ("nsgolova/lightImprovements" for example). You can push to the master in your fork, but not in the main repository.
-- Commit and push your changes.
-- Open a pull request. Netlify will deploy a stage website for your fork and you can test it out.
-- Your pull request would be merged and changes will deploy to the website!
+**Song start.**
+1. `SessionStart` resets the scene.
+2. The page downloads Info.dat, the played difficulty, the cover and the audio over the WebSocket.
+3. `map-loader` turns them into the challenge.
 
-### A-Frame build (optional)
+**Notes.**
+- **Cut:** a `NoteCut` is matched to its map note immediately, so the beat is cut at once with a provisional
+  score.
+- **Final:** `NoteFinal` completes the score. The note goes into the time-ordered list, and the running totals
+  are recomputed (`computeTotals` in `replay-loader.js`).
+- **Spawned early:** beats spawned before their outcome is known look it up every frame.
 
-This project uses a custom A-Frame fork: https://github.com/nsgolova/ngoframe
-It's prebuilt and can be found in the \vendor folder.
+**Time.**
+- **Song time** comes from the clock-synced pose timestamps, not from the audio (`song.getCurrentTime()`).
+- **Prediction:** the frame rendered at `t` shows song time `t + predict`, 16 ms by default (`?predict=<ms>`,
+  0 disables it). This covers the display pipeline.
+- **Extrapolation:** poses are extrapolated from the last two samples, by at most 50 ms past the newest pose.
 
-To build it
-
-```bash
-npm install
-npm run dist
-```
-
-Copy files from \dist folder of A-Frame to \vendor folder here.
-
-### Replay Format
-
-Uses [Open Replay Format](https://github.com/BeatLeader/BS-Open-Replay)
-
-### Building and running in production mode
-
-By default, Netlify builds the app after every change to this branch in the repository, so all you need is push to git.
-
-## Roadmap
-
-- Settings UI improvement
-- A-Frame update to the latest version
-- Custom saber support
+**Content Security Policy.**
+- The mod serves the page with `script-src 'self'`: no inline scripts, no event-handler attributes, no eval.
+  `scripts/package.js` fails the build if `index.html` has inline script.
+- Bind expressions in the templates are compiled by a small parser in `state-component.js`, not
+  `new Function`.
+- A-Frame's one eval use (a getter factory) is replaced when packaging.

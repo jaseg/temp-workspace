@@ -54,7 +54,7 @@ AFRAME.registerComponent('wall', {
 		this.el.object3D.visible = true;
 
 		var newPosition = 0;
-		
+
 		var moveTime = data.moveTime;
 
 		var timeOffset = data.time - currentTime - movementData.halfJumpDuration - moveTime;
@@ -77,7 +77,8 @@ AFRAME.registerComponent('wall', {
 		this.el.object3D.position.copy(direction.multiplyScalar(-newPosition).add(this.origin));
 		this.lastPosition = newPosition;
 
-		if (LIVE_MODE && !this.hit && !this.liveHitChecked) this.findHit();
+		// The hit may be recorded after the wall spawned.
+		if (!this.hit && !this.liveHitChecked) this.findHit();
 		if (this.hit && currentTime > this.hitWall.time) {
 			this.hit = false;
 			this.el.emit('scoreChanged', {index: this.hitWall.i}, true);
@@ -100,8 +101,8 @@ AFRAME.registerComponent('wall', {
 				break;
 			}
 		}
-		// Live: once the wall is behind the player no hit can be recorded for it anymore.
-		if (LIVE_MODE && this.el.sceneEl.components.song.getCurrentTime() > data.time + durationSeconds + 0.5) {
+		// Once the wall is behind the player no hit can be recorded for it anymore.
+		if (this.el.sceneEl.components.song.getCurrentTime() > data.time + durationSeconds + 0.5) {
 			this.liveHitChecked = true;
 		}
 	},
@@ -120,7 +121,7 @@ AFRAME.registerComponent('wall', {
 		const mesh = el.getObject3D('mesh');
 		const material = mesh.material;
 
-		material.uniforms['highlight'].value = this.hit && this.settings.settings.highlightErrors;
+		material.uniforms['highlight'].value = false;
 		material.uniforms['wallColor'].value = new THREE.Color(data.color ? data.color : this.settings.settings.wallColor);
 		material.uniforms['zeroDuration'].value = data.durationSeconds === 0;
 
@@ -233,7 +234,11 @@ AFRAME.registerComponent('wall', {
 		const currentTime = this.getCurrentTime();
 
 		if (data.movementData.interpolation.updatedThisFrame) {
-			this.el.object3D.scale.set(this.el.object3D.scale.x, this.el.object3D.scale.y, Math.abs(data.durationSeconds) * data.movementData.noteJumpMovementSpeed);
+			this.el.object3D.scale.set(
+				this.el.object3D.scale.x,
+				this.el.object3D.scale.y,
+				Math.abs(data.durationSeconds) * data.movementData.noteJumpMovementSpeed
+			);
 		}
 
 		this.updatePosition();

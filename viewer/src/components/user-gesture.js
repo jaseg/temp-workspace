@@ -1,29 +1,11 @@
-const {getCookie, getUrlParameter, setCookie, checkAutoplay} = require('../utils');
-
 /**
- * Lame Chrome user gesture policy.
+ * Lame Chrome user gesture policy: any click counts as the gesture that unlocks audio. Also tracks whether the
+ * user is active (to show or hide the controls).
  */
 AFRAME.registerComponent('user-gesture', {
 	init: function () {
 		this.userActivity = true;
 		this.userActive = false;
-		this.settings = this.el.sceneEl.components['settings'];
-
-		checkAutoplay().then(canAutoplay => {
-			if (this.settings.shouldAutoplayOnLoad() || getCookie('autoplayReplay')) {
-				if (canAutoplay) {
-					setTimeout(() => {
-						this.el.sceneEl.emit('usergesturereceive', null, false);
-					}, 1001);
-				} else {
-					document.getElementById('autoplayWarning').style.display = 'block';
-					const firefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-					if (firefox) {
-						document.getElementById('firefoxAutoplayWarning').style.display = 'block';
-					}
-				}
-			}
-		});
 	},
 	play: function () {
 		document.addEventListener('click', evt => {

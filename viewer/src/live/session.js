@@ -11,7 +11,7 @@ import {SongClock} from './clock';
 import {LiveOverlay} from './overlay';
 import {LiveAudioSync} from './audio';
 import {assignNote, computeTotals, noteStructFromEvent, ScoreForNote} from '../components/replay-loader';
-import {NoteEventType} from '../open-replay-decoder';
+import {NoteEventType} from './bsor';
 import {Mirror_Horizontal} from '../utils/chirality-support';
 import {updateScoringAndTypes} from '../utils/mapPostprocessor';
 import {difficultyFromName, getUrlParameter, ScoringType} from '../utils';
@@ -59,7 +59,11 @@ export class LiveSession {
 		});
 		this.audio = new LiveAudioSync(this.scene, this);
 		setInterval(() => this.updateStats(), 250);
-		this.connection.connect();
+		this.overlay.showRequest(() => {
+			// Unlocks audio (this runs inside the click) before the waiting room.
+			this.scene.emit('usergesturereceive', null, false);
+			this.connection.connect();
+		});
 	}
 
 	/** Song time for the frame being rendered now. */
@@ -290,11 +294,10 @@ export class LiveSession {
 		}
 		if (sessionId !== this.sessionId) return;
 
-		const zipLoader = this.scene.components['zip-loader'];
-		zipLoader.fetched = true;
-		zipLoader.data.mode = info.mode;
-		zipLoader.data.difficulty = info.difficulty;
-		zipLoader.processInfo(virtualFiles);
+		const mapLoader = this.scene.components['map-loader'];
+		mapLoader.data.mode = info.mode;
+		mapLoader.data.difficulty = info.difficulty;
+		mapLoader.processInfo(virtualFiles);
 	}
 
 	onChallengeLoaded(challenge) {

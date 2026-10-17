@@ -8,7 +8,6 @@ import {
 	rotateAboutPoint,
 	NoteLineLayer,
 	LerpUnclamped,
-	LeaderboardContexts,
 } from '../utils';
 const COLORS = require('../constants/colors.js');
 
@@ -402,15 +401,6 @@ AFRAME.registerComponent('beat', {
 		if (this.smallHitObject) {
 			this.smallHitObject.visible = !this.destroyed && settings.settings.showHitboxes;
 		}
-		if (this.rainbowShader && !this.blockEl.materialToReset && this.blockEl.getObject3D('mesh').material.envMap) {
-			this.blockEl.materialToReset = this.blockEl.getObject3D('mesh').material;
-			const rainbowMaterial = this.el.sceneEl.systems.materials[this.data.color + 'BlockRainbowMaterial'];
-
-			rainbowMaterial.color = new THREE.Color(this.data[this.data.color]);
-			rainbowMaterial.emissive = new THREE.Color(this.data[this.data.color]);
-			this.blockEl.getObject3D('mesh').material = rainbowMaterial;
-		}
-
 		this.returnToPool();
 	},
 
@@ -562,25 +552,8 @@ AFRAME.registerComponent('beat', {
 			this.replayNote.cutTime = this.replayNote.spawnTime - this.replayNote.cutInfo.timeDeviation;
 		}
 
-		if (settings.settings.highlightErrors && this.replayNote && this.replayNote.score < 0) {
-			if (data.type == 'mine') {
-				this.blockEl.getObject3D('mesh').material = this.el.sceneEl.systems.materials['mineMaterialyellow'];
-			} else {
-				this.blockEl.setAttribute('material', `color: yellow; emissive: ${this.data[this.data.color]}; emissiveIntensity: 0.7`);
-			}
-		}
-
-		this.rainbowShader = false;
-		if (settings.settings.highlight115s && this.replayNote && this.replayNote.score == 115) {
-			if (data.type != 'mine') {
-				this.rainbowShader = true;
-			}
-		}
-
 		const replay = replayLoader.replay;
 		const modifiers = replay.info.modifiers;
-
-		this.replayContexts = replay.leaderboardContexts;
 
 		if (modifiers.includes('GN') && settings.settings.showNoteModifierVisuals) {
 			this.blockEl.setAttribute('material', 'visible: ' + (this.data.index == 0));
@@ -859,10 +832,6 @@ AFRAME.registerComponent('beat', {
 
 		this.markCut();
 
-		if (this.replayNote.score > 0) {
-			this.el.emit('wrongMiss', null, true);
-		}
-
 		this.postScoreEvent();
 		this.showScore(hand);
 	},
@@ -876,15 +845,7 @@ AFRAME.registerComponent('beat', {
 	postScoreEvent: function () {
 		if (!this.replayNote.time) return;
 		const timeToScore = this.replayNote.time - getCurrentTime();
-		const payload = {index: this.replayNote.i};
-		const scoreChanged = () => this.el.sceneEl.systems.state.dispatch('scoreChanged', payload);
-		if (LIVE_MODE) {
-			// Live totals are dispatched by the live session as final scores arrive.
-		} else if (timeToScore < 0) {
-			scoreChanged();
-		} else {
-			setTimeout(scoreChanged, timeToScore * 1000);
-		}
+		// Score totals are dispatched by the live session as final scores arrive; this only plays the hitsound.
 		if (
 			this.data.type !== 'sliderchain' &&
 			settings.settings.realHitsounds &&
@@ -1238,28 +1199,17 @@ AFRAME.registerComponent('beat', {
 					}
 				}
 			}
-		} else if (LIVE_MODE) {
+		} else {
 			// Includes cuts whose final score hasn't arrived yet.
 			this.replayNote = replayLoader.live.structForMapIndex(this.data.index);
-		} else {
-			const notes = replayLoader.allStructs;
-			const index = this.data.index;
-			var result;
-			for (var i = 0; i < notes.length; i++) {
-				if (notes[i].index == index) {
-					result = notes[i];
-					break;
-				}
-			}
-			this.replayNote = result;
 		}
 
 		if (this.replayNote == null) {
 			this.replayNote = {
 				score: 1,
 				totalScore: -1,
-				// Live: the outcome isn't known yet when the beat spawns; look again every frame.
-				livePending: LIVE_MODE,
+				// The outcome isn't known yet when the beat spawns; look again every frame.
+				livePending: true,
 			};
 		}
 	},
@@ -1332,10 +1282,8 @@ AFRAME.registerComponent('beat', {
 			}
 		} else {
 			const scoreEl = this.el.sceneEl.components['pool__beatscoreok'].requestEntity();
-			if (LIVE_MODE) {
-				// The final score arrives after the swing finishes; live mode updates the text then.
-				this.replayNote.scoreEl = scoreEl;
-			}
+			// The final score arrives after the swing finishes; the live session updates the text then.
+			this.replayNote.scoreEl = scoreEl;
 			const colorAndScale = this.colorAndScaleForScore(this.replayNote);
 			scoreEl.setAttribute('text', 'value', '' + score);
 
@@ -1402,10 +1350,6 @@ AFRAME.registerComponent('beat', {
 			const judgments = HSVConfig['judgments'];
 			let judgment;
 			var score = (replayNote.score / replayNote.maxScore) * 115;
-
-			if (this.replayContexts && (this.replayContexts & LeaderboardContexts.Golf) == LeaderboardContexts.Golf) {
-				score = 115 - score;
-			}
 
 			for (var i = 0; i <= judgments.length - 1; i++) {
 				if (judgments[i].threshold <= score) {

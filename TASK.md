@@ -40,7 +40,7 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 | `mod/vendor/EmbedIO/` | Vendored EmbedIO with hardening patches (`VENDORED.md`). |
 | `mod/PROTOCOL.md` | WebSocket protocol. |
 | `mod/tools/` | Headless-Chromium smoke tests (test page, live viewer, song transitions). |
-| `viewer/` | BeatLeader/BeatSaber-Web-Replays as a git subtree, with live mode added (`viewer/LIVE.md`). |
+| `viewer/` | Live viewer: a fork of BeatLeader/BeatSaber-Web-Replays (imported as a git subtree), cut down to live play only (`viewer/README.md`). |
 
 ## Status
 
@@ -49,6 +49,7 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 | 1. Server core: TLS, waiting room, device approvals, protocol, limits, tests, fake-live host | Done |
 | 2. Viewer live mode, driven by the fake-live host | Done |
 | 2b. Self-contained demo build (`npm run build:demo`), published as a claude.ai artifact | Done |
+| 2c. Viewer made live-only: replay-mode code removed, "Request to watch" button before the waiting room | Done (demo artifact not yet republished) |
 | 0. On-device spike (needs SSH to a Frame) | Open |
 | 3. BSIPA plugin on the Frame | Open |
 | 4. Latency tuning on the real device | Open |
@@ -72,13 +73,34 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
   - Map file allow-list from the level's info.dat.
   - BSML screens: status and URLs, waiting room (allow once / allow and remember / deny), approved devices with
     revoke.
-  - Embedding `viewer/dist-live` (as a zip resource).
+  - Embedding `viewer/dist` (as a zip resource).
   - Build against the game's reference assemblies from the Frame.
 - **Latency on the device:**
   - Choose the pose capture point (`Application.onBeforeRender` vs after `PlayerTransforms`).
   - Measure Wi-Fi latency.
   - Tune the viewer's prediction (default 16 ms, `?predict=`).
   - Check the game-thread CPU and GC cost.
+
+### Next
+
+- **Waiting-room codes from words.** Replace the alphanumeric match code (e.g. `K7-4Q`) with three words from
+  the wordlist at https://git.yasec.de/jaseg/secure-hid/src/branch/main/fw/src/words.c.
+  - Affects `WaitingRoom.NewCode` on the server.
+  - Affects the `Waiting` message string and the viewer overlay: it may need more room, and the code should still
+    compare easily in the in-game menu.
+  - Update the tests (`CodesAreUniqueAndReadable`).
+- **Custom levels page.** A page listing the custom levels installed on the Frame, with their stats:
+  - From the map: name, author, mapper, BPM, duration, difficulties, NJS, notes.
+  - From BeatLeader: star difficulty and other leaderboard stats per difficulty.
+  - Audio-only preview playback.
+
+  Open questions:
+  - Where it lives: the same approved-device session, or a separate view.
+  - How the mod enumerates levels: SongCore, in the plugin.
+  - How BeatLeader stats are fetched. The browser calling the BeatLeader API needs a CSP exception; a mod-side
+    fetch keeps the page talking to the mod only.
+  - Serving preview audio from any installed level widens the map-file allow-list beyond "current map only";
+    design that boundary explicitly.
 
 ### Software
 
@@ -109,3 +131,11 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 - **The waiting room approves by match code only.** The approval screen shows IP and browser to help, but anyone
   on the LAN can ask, and denial cooldowns are per IP.
 - **The dev host loads `--www` files once at startup.** Restart it after rebuilding the viewer.
+- **Saber colors chosen in the settings are not saved.** The replay viewer synced them to the BeatLeader profile;
+  that is gone. Better: the session should carry the player's color scheme from the game.
+- **Verification of the live-only cut.**
+  - Checked against the fake-live host: smoke test with no page errors, the waiting room approved through the
+    console, three song transitions, and screenshots of the request screen, controls bar, settings and camera
+    panels.
+  - The demo build was rebuilt after the cut but not re-tested, and the published demo artifact still shows the
+    previous version.

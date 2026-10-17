@@ -6,7 +6,7 @@
 // handling. ?latency=<ms> adds simulated network delay (default 5), ?jitter=<ms> random extra delay.
 import {LiveConnection} from './connection';
 import {T} from './protocol';
-import {decode} from '../open-replay-decoder';
+import {decode} from './bsor';
 import {getUrlParameter} from '../utils';
 
 const SWING_RATING_DELAY = 0.3;
@@ -68,7 +68,10 @@ function noteMessage(type, captureUs, note, finalCut) {
 	const w = new Writer(type).i64(captureUs).i32(note.noteID).f32(note.eventTime).f32(note.spawnTime).i32(note.eventType);
 	const c = note.noteCutInfo;
 	if (c) {
-		w.u8(c.speedOK ? 1 : 0).u8(c.directionOK ? 1 : 0).u8(c.saberTypeOK ? 1 : 0).u8(c.wasCutTooSoon ? 1 : 0);
+		w.u8(c.speedOK ? 1 : 0)
+			.u8(c.directionOK ? 1 : 0)
+			.u8(c.saberTypeOK ? 1 : 0)
+			.u8(c.wasCutTooSoon ? 1 : 0);
 		w.f32(c.saberSpeed).vec3(c.saberDir).i32(c.saberType).f32(c.timeDeviation).f32(c.cutDirDeviation);
 		w.vec3(c.cutPoint).vec3(c.cutNormal).f32(c.cutDistanceToCenter).f32(c.cutAngle);
 		// The game only knows the after-cut rating once the swing has finished.
@@ -110,7 +113,14 @@ export class DemoConnection extends LiveConnection {
 		for (let i = 0; i < 8; i++) {
 			const t0 = performance.now();
 			const sr = this.serverNowUs() + this.latencyMs * 500;
-			this.deliver(new Writer(T.Pong).f64(t0).i64(sr).i64(sr + 20).buffer(), this.latencyMs);
+			this.deliver(
+				new Writer(T.Pong)
+					.f64(t0)
+					.i64(sr)
+					.i64(sr + 20)
+					.buffer(),
+				this.latencyMs
+			);
 		}
 
 		// The waiting room, with an approval after a moment.

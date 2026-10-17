@@ -30,7 +30,6 @@ nunjucks.addGlobal('DEBUG_INSPECTOR', !!process.env.DEBUG_INSPECTOR);
 nunjucks.addGlobal('HOST', localIP());
 nunjucks.addGlobal('IS_PRODUCTION', isProduction);
 nunjucks.addGlobal('COLORS', COLORS);
-nunjucks.addGlobal('LIVE', !!process.env.LIVE || !!process.env.LIVE_DEMO);
 nunjucks.addGlobal('LIVE_DEMO', !!process.env.LIVE_DEMO);
 
 // Generate timestamp used to cache-bust the emitted bundle and stylesheet.
@@ -66,9 +65,8 @@ module.exports = {
 	},
 	plugins: [
 		new webpack.ProvidePlugin({Buffer: ['buffer', 'Buffer']}),
-		// LIVE=1 builds the viewer the Beat Saber mod serves for live play (see src/live/).
-		// LIVE_DEMO=1 additionally replaces the connection with an in-page replay (src/live/demo.js).
-		new webpack.DefinePlugin({LIVE_MODE: JSON.stringify(!!process.env.LIVE || !!process.env.LIVE_DEMO), LIVE_DEMO: JSON.stringify(!!process.env.LIVE_DEMO)}),
+		// LIVE_DEMO=1 replaces the connection to the mod with an in-page replay (src/live/demo.js).
+		new webpack.DefinePlugin({LIVE_DEMO: JSON.stringify(!!process.env.LIVE_DEMO)}),
 		new MiniCssExtractPlugin({filename: `build/style.${timestamp}.css`}),
 	],
 	module: {
@@ -82,21 +80,13 @@ module.exports = {
 			{
 				test: /\.styl$/,
 				exclude: /node_modules/,
-				use: [
-					MiniCssExtractPlugin.loader,
-					{loader: 'css-loader', options: {url: false}},
-					'postcss-loader',
-					'stylus-loader',
-				],
+				use: [MiniCssExtractPlugin.loader, {loader: 'css-loader', options: {url: false}}, 'postcss-loader', 'stylus-loader'],
 			},
 		],
 	},
 	optimization: {
 		minimizer: ['...', new CssMinimizerPlugin()],
 	},
-	// lzma-min.js (vendored LZMA worker lib) uses a dynamic require expression
-	// for its worker; the resulting "Critical dependency" warning is benign.
-	ignoreWarnings: [{module: /vendor[\\/]lzma-min\.js/}],
 	resolve: {
 		modules: [path.join(__dirname, 'node_modules')],
 		fallback: {

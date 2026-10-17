@@ -7,8 +7,10 @@
 | `LiveViewer.Server.Tests/` | Unit and integration tests (xunit). The integration tests run the real server over TLS on loopback. |
 | `vendor/EmbedIO/` | Vendored EmbedIO with local hardening patches; see `VENDORED.md`. |
 | `tools/browser-smoke.cjs` | Opens the test page in headless Chromium against a running host and reports latency stats. |
-| `tools/viewer-smoke.cjs` | Same for the real viewer (`--www ../viewer/dist-live`): screenshots, errors, score state, extrapolation horizon. |
+| `tools/viewer-smoke.cjs` | Same for the real viewer (`--www ../viewer/dist`): screenshots, errors, score state, extrapolation horizon. |
 | `tools/viewer-transitions.cjs` | Follows the viewer across several songs (`--loop --start 166`); can approve through the host console via a FIFO. |
+
+Both viewer scripts press "Request to watch" first.
 | `PROTOCOL.md` | The WebSocket protocol. |
 
 The BSIPA plugin (`LiveViewer.Plugin`) comes in milestone 3. It needs the game's
@@ -36,8 +38,8 @@ Open `https://localhost:4280/` and accept the certificate warning. The page
 shows a code; type `a <code>` in the host's console to allow it once, or
 `r <code>` to remember the device. `--auto-approve` skips that, for tests.
 
-To serve the real viewer instead of the test page, build it (`cd ../viewer && npm ci && npm run build:live`) and
-add `--www ../viewer/dist-live`. The host loads the files once at startup, so restart it after rebuilding.
+To serve the real viewer instead of the test page, build it (`cd ../viewer && npm ci && npm run build`) and
+add `--www ../viewer/dist`. The host loads the files once at startup, so restart it after rebuilding.
 
 Smoke test from another shell:
 
