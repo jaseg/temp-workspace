@@ -30,6 +30,7 @@ export class LiveOverlay {
 				<div class="liveCode" hidden></div>
 				<div class="liveHint"></div>
 				<button class="liveRequest" type="button" hidden>Request to watch</button>
+				<button class="liveBrowse" type="button" hidden>Browse levels</button>
 			</div>
 			<div class="liveStats" hidden></div>`;
 		document.body.appendChild(root);
@@ -40,6 +41,8 @@ export class LiveOverlay {
 		this.hint = root.querySelector('.liveHint');
 		this.statsEl = root.querySelector('.liveStats');
 		this.requestButton = root.querySelector('.liveRequest');
+		this.browseButton = root.querySelector('.liveBrowse');
+		this.browseButton.addEventListener('click', () => this.onBrowse && this.onBrowse());
 		this.connectionState = 'idle';
 
 		document.addEventListener('keydown', e => {
@@ -63,6 +66,8 @@ export class LiveOverlay {
 			this.code.append(span);
 		});
 		this.card.hidden = !title;
+		// Between songs the card offers the level browser.
+		this.browseButton.hidden = !(title && this.connectionState === 'approved' && !this.session);
 	}
 
 	/**

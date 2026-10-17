@@ -5,7 +5,7 @@
 // note's cut immediately and its final score 0.3 s later) and feeds them to the real LiveConnection message
 // handling. ?latency=<ms> adds simulated network delay (default 5), ?jitter=<ms> random extra delay.
 import {LiveConnection} from './connection';
-import {T} from './protocol';
+import {T, LevelFile, FileError} from './protocol';
 import {decode} from './bsor';
 import {getUrlParameter} from '../utils';
 
@@ -134,6 +134,30 @@ export class DemoConnection extends LiveConnection {
 	fetchMapFile(sessionId, name) {
 		return fetch('demo/map/' + this.manifest.paths[name]).then(r => {
 			if (!r.ok) throw new Error(`${name}: ${r.status}`);
+			return r.arrayBuffer();
+		});
+	}
+
+	// Level browser: the list, stats, covers and songs packaged by scripts/package.js --levels.
+	levelData() {
+		if (!this.levels) this.levels = fetch('demo/levels.json').then(r => (r.ok ? r.json() : Promise.reject(new Error(r.status))));
+		return this.levels;
+	}
+
+	fetchLevelList() {
+		if (!this.manifest.levels) return Promise.reject(Object.assign(new Error('No levels in this demo'), {code: FileError.notAvailable}));
+		return this.levelData().then(d => d.list);
+	}
+
+	fetchLevelStats(levelId) {
+		return this.levelData().then(d => d.stats[levelId] || Promise.reject(Object.assign(new Error('No stats'), {code: FileError.readFailed})));
+	}
+
+	fetchLevelFile(levelId, kind) {
+		const file = ((this.manifest.levels || {})[kind === LevelFile.cover ? 'covers' : 'audio'] || {})[levelId];
+		if (!file) return Promise.reject(Object.assign(new Error('Not in this demo'), {code: FileError.notAvailable}));
+		return fetch('demo/' + file).then(r => {
+			if (!r.ok) throw new Error(`${file}: ${r.status}`);
 			return r.arrayBuffer();
 		});
 	}

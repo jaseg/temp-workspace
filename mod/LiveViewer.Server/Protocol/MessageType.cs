@@ -30,7 +30,7 @@ namespace LiveViewer.Server.Protocol
         public const byte Pause = 0x25;
         public const byte Resume = 0x26;
 
-        // Map file transfer.
+        // File transfer (map files, level library).
         public const byte MapChunk = 0x30;
         public const byte MapError = 0x31;
 
@@ -38,6 +38,9 @@ namespace LiveViewer.Server.Protocol
         public const byte Hello = 0x81;
         public const byte Ping = 0x82;
         public const byte MapRequest = 0x83;
+        public const byte LevelListRequest = 0x84;
+        public const byte LevelFileRequest = 0x85;
+        public const byte LevelStatsRequest = 0x86;
     }
 
     public enum MapErrorCode : byte

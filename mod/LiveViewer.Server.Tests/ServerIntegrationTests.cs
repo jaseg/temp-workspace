@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
+using LiveViewer.Server.Levels;
 using LiveViewer.Server.Live;
 using LiveViewer.Server.Protocol;
 using Xunit;
@@ -20,10 +21,37 @@ namespace LiveViewer.Server.Tests
         private readonly int _port = FreePort();
         private readonly LiveServer _server;
         private readonly string _mapDir;
+        private readonly string _levelsDir = Directory.CreateTempSubdirectory().FullName;
+        private readonly FakeBeatLeader _beatLeader = new FakeBeatLeader();
+
+        private sealed class FakeBeatLeader : IBeatLeaderApi
+        {
+            public readonly System.Collections.Concurrent.ConcurrentBag<string> Asked = new System.Collections.Concurrent.ConcurrentBag<string>();
+
+            public Task<string?> GetMapByHashAsync(string hash, CancellationToken cancellation)
+            {
+                Asked.Add(hash);
+                return Task.FromResult<string?>("{\"id\":\"abc\",\"difficulties\":[{\"modeName\":\"Standard\",\"difficultyName\":\"Expert\",\"stars\":6.5}]}");
+            }
+        }
 
         public ServerIntegrationTests()
         {
-            _server = new LiveServer(new LiveServerOptions { Port = _port, DataDirectory = _data }, new ConsoleLiveLog());
+            var level = Path.Combine(_levelsDir, "level");
+            Directory.CreateDirectory(level);
+            File.WriteAllText(Path.Combine(level, "Info.dat"), "{\"_songName\":\"Library song\",\"_songFilename\":\"song.ogg\",\"_coverImageFilename\":\"cover.jpg\","
+                + "\"_difficultyBeatmapSets\":[{\"_beatmapCharacteristicName\":\"Standard\",\"_difficultyBeatmaps\":[{\"_difficulty\":\"Expert\",\"_beatmapFilename\":\"Expert.dat\"}]}]}");
+            File.WriteAllText(Path.Combine(level, "Expert.dat"), "{\"_notes\":[]}");
+            File.WriteAllBytes(Path.Combine(level, "song.ogg"), new byte[40_000]);
+            File.WriteAllText(Path.Combine(level, "cover.jpg"), "cover");
+
+            _server = new LiveServer(new LiveServerOptions
+            {
+                Port = _port,
+                DataDirectory = _data,
+                LevelFolders = { _levelsDir },
+                BeatLeader = _beatLeader,
+            }, new ConsoleLiveLog());
             _server.Start();
 
             _mapDir = Directory.CreateTempSubdirectory().FullName;
@@ -210,6 +238,97 @@ namespace LiveViewer.Server.Tests
             await SendAsync(ws, new MessageWriter().U8(MessageType.MapRequest).U16(6).U32(1).String("secret.txt").ToArray());
             var error = await ExpectAsync(ws, MessageType.MapError);
             Assert.Equal((byte) MapErrorCode.NotAvailable, error[3]);
+        }
+
+        /// <summary>Receives a complete file transfer for one request id, or returns the error code.</summary>
+        private static async Task<(byte[]? data, byte error)> ReceiveFileAsync(ClientWebSocket ws, ushort requestId)
+        {
+            byte[]? data = null;
+            var received = 0;
+            while (true)
+            {
+                var message = await ReceiveAsync(ws);
+                Assert.True(message != null, "Connection closed during transfer.");
+                var r = new MessageReader(message!);
+                var type = r.U8();
+                if (type != MessageType.MapChunk && type != MessageType.MapError)
+                {
+                    continue;
+                }
+
+                Assert.Equal(requestId, r.U16());
+                if (type == MessageType.MapError)
+                {
+                    return (null, r.U8());
+                }
+
+                var total = r.U32();
+                var offset = r.U32();
+                data ??= new byte[total];
+                Assert.Equal((uint) received, offset);
+                var chunk = r.Bytes(r.Remaining);
+                chunk.CopyTo(data, offset);
+                received += chunk.Length;
+                if (received >= total)
+                {
+                    return (data, 0);
+                }
+            }
+        }
+
+        private async Task<ClientWebSocket> ApprovedClientAsync()
+        {
+            var ws = await ConnectAsync();
+            var code = await WaitForCodeAsync(ws);
+            _server.WaitingRoom.Approve(PendingId(code), remember: false);
+            await ExpectAsync(ws, MessageType.Idle);
+            return ws;
+        }
+
+        private static byte[] LevelFileRequest(ushort id, byte kind, string level) =>
+            new MessageWriter().U8(MessageType.LevelFileRequest).U16(id).U8(kind).String(level).ToArray();
+
+        [Fact]
+        public async Task LevelLibraryListFilesAndStats()
+        {
+            using var ws = await ApprovedClientAsync();
+
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelListRequest).U16(1).ToArray());
+            var (list, _) = await ReceiveFileAsync(ws, 1);
+            var level = Newtonsoft.Json.Linq.JObject.Parse(System.Text.Encoding.UTF8.GetString(list!))["levels"]![0]!;
+            Assert.Equal("Library song", (string) level["songName"]!);
+            var id = (string) level["id"]!;
+
+            await SendAsync(ws, LevelFileRequest(2, (byte) LevelFileKind.Audio, id));
+            Assert.Equal(40_000, (await ReceiveFileAsync(ws, 2)).data!.Length);
+            await SendAsync(ws, LevelFileRequest(3, (byte) LevelFileKind.Cover, id));
+            Assert.Equal("cover", System.Text.Encoding.UTF8.GetString((await ReceiveFileAsync(ws, 3)).data!));
+
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelStatsRequest).U16(4).String(id).ToArray());
+            var stats = System.Text.Encoding.UTF8.GetString((await ReceiveFileAsync(ws, 4)).data!);
+            Assert.Contains("\"stars\":6.5", stats);
+            Assert.Equal(new[] { id }, _beatLeader.Asked.ToArray());
+
+            // Unknown levels: no file, and BeatLeader is never asked about them.
+            var unknown = new string('0', 40);
+            await SendAsync(ws, LevelFileRequest(5, (byte) LevelFileKind.Audio, unknown));
+            Assert.Equal((byte) MapErrorCode.NotAvailable, (await ReceiveFileAsync(ws, 5)).error);
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelStatsRequest).U16(6).String(unknown).ToArray());
+            Assert.Equal((byte) MapErrorCode.NotAvailable, (await ReceiveFileAsync(ws, 6)).error);
+            Assert.Single(_beatLeader.Asked);
+
+            // Level files are addressed by kind only; anything else is a violation.
+            await SendAsync(ws, LevelFileRequest(7, 3, id));
+            await ExpectClosedAsync(ws);
+        }
+
+        [Fact]
+        public async Task LevelRequestsNeedApproval()
+        {
+            using var ws = await ConnectAsync();
+            await WaitForCodeAsync(ws);
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelListRequest).U16(1).ToArray());
+            await ExpectClosedAsync(ws);
         }
 
         [Fact]

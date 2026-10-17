@@ -37,6 +37,15 @@ npm run build:demo -- <map folder> <replay.bsor>    # -> dist-demo/
 `dist-demo/` is a static page that needs no game or mod. An in-page source (`src/live/demo.js`) plays the given
 BeatLeader replay through the same live protocol path, waiting room included.
 
+To include the level browser, dump a level folder with the dev host and pass it along:
+
+```sh
+dotnet run --project ../mod/LiveViewer.Host -c Release -- --dump-levels levels.json --levels <levels folder>
+npm run build:demo -- <map folder> <replay.bsor> --levels levels.json <levels folder>
+```
+
+Covers are always included; song files only up to 12 MB in total, smallest first.
+
 ## How it works
 
 The live code is in `src/live/`. The rest is the replay viewer's scene, reused.
@@ -48,7 +57,8 @@ The live code is in `src/live/`. The rest is the replay viewer's scene, reused.
 | `clock.js` | `ServerClock` maps the mod's microsecond clock to `performance.now()` (lowest-RTT pong of the last 16). `SongClock` turns pose timestamps into a smoothed song time. |
 | `audio.js` | Re-seeks the song audio whenever what is heard drifts more than 40 ms from the live song time. |
 | `overlay.js` | "Request to watch" (the click also unlocks audio), waiting for approval with the match code, song ended. `l` toggles the latency readout. |
-| `demo.js` | In-page replay source for the demo build. |
+| `levels.js` | The level browser: installed custom levels with map stats, BeatLeader stats (fetched by the mod) and an audio preview. Opens from the idle card, the controls bar, `b`, or `#levels` in the URL. |
+| `demo.js` | In-page replay source for the demo build, including canned level browser data. |
 | `bsor.js` | BSOR decoder (demo only). |
 
 **Song start.**

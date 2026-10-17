@@ -3,12 +3,17 @@
 //
 // With `--demo <map folder> <replay.bsor>` (after a LIVE_DEMO=1 build) it writes dist-demo/ instead: a fully
 // static page that plays that replay through the live code path, no game or mod needed.
+// `--levels <dump.json> <levels folder>` adds a level list for the level browser: the dump comes from
+// `LiveViewer.Host --dump-levels`, covers are copied from the folder, and song files while they fit a small budget.
 const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const demoArg = process.argv.indexOf('--demo');
 const demo = demoArg >= 0 ? {map: process.argv[demoArg + 1], replay: process.argv[demoArg + 2]} : null;
+const levelsArg = process.argv.indexOf('--levels');
+const levels = levelsArg >= 0 ? {dump: process.argv[levelsArg + 1], folder: process.argv[levelsArg + 2]} : null;
+const DEMO_AUDIO_BUDGET = 12 * 1024 * 1024;
 const out = path.join(root, demo ? 'dist-demo' : 'dist');
 
 fs.rmSync(out, {recursive: true, force: true});
@@ -75,11 +80,50 @@ if (demo) {
 	});
 	// Base64 text, so static hosts that only serve text and media types can serve it.
 	fs.writeFileSync(path.join(out, 'demo', 'replay.txt'), replay.toString('base64'));
+	const levelFiles = levels ? packageLevels() : null;
 	fs.writeFileSync(
 		path.join(out, 'demo', 'manifest.json'),
-		JSON.stringify({songName: info._songName, songAuthor: info._songAuthorName, files, paths}, null, 1)
+		JSON.stringify({songName: info._songName, songAuthor: info._songAuthorName, files, paths, levels: levelFiles}, null, 1)
 	);
 	console.log(`demo: ${info._songName} ${mode} ${difficulty}`);
+}
+
+/** Copies covers (and songs, within the budget) for the level browser; returns their paths by level id. */
+function packageLevels() {
+	const dump = JSON.parse(fs.readFileSync(levels.dump, 'utf8'));
+	const dir = path.join(out, 'demo', 'levels');
+	fs.mkdirSync(dir, {recursive: true});
+	const result = {covers: {}, audio: {}};
+	let audioBytes = 0;
+	// Smallest songs first, so the budget covers as many levels as possible.
+	const entries = dump.list.levels
+		.map(level => {
+			const folder = path.join(levels.folder, dump.folders[level.id]);
+			const infoName = fs.readdirSync(folder).find(n => n.toLowerCase() === 'info.dat');
+			const info = JSON.parse(fs.readFileSync(path.join(folder, infoName), 'utf8').replace(/^\uFEFF/, ''));
+			const actual = name => name && fs.readdirSync(folder).find(n => n.toLowerCase() === name.toLowerCase());
+			const cover = actual(info._coverImageFilename || info.coverImageFilename);
+			const audio = actual(info._songFilename || (info.audio && info.audio.songFilename));
+			return {level, folder, cover, audio, audioSize: audio ? fs.statSync(path.join(folder, audio)).size : Infinity};
+		})
+		.sort((a, b) => a.audioSize - b.audioSize);
+	for (const {level, folder, cover, audio, audioSize} of entries) {
+		if (cover) {
+			const name = level.id + (path.extname(cover).toLowerCase() || '.jpg');
+			fs.copyFileSync(path.join(folder, cover), path.join(dir, name));
+			result.covers[level.id] = 'levels/' + name;
+		}
+		if (audio && audioBytes + audioSize <= DEMO_AUDIO_BUDGET) {
+			fs.copyFileSync(path.join(folder, audio), path.join(dir, level.id + '.ogg'));
+			result.audio[level.id] = 'levels/' + level.id + '.ogg';
+			audioBytes += audioSize;
+		}
+		level.hasCover = !!result.covers[level.id];
+		level.hasAudio = !!result.audio[level.id];
+	}
+	fs.writeFileSync(path.join(out, 'demo', 'levels.json'), JSON.stringify({list: dump.list, stats: dump.stats}));
+	console.log(`demo: ${entries.length} levels, ${Object.keys(result.audio).length} with songs (${(audioBytes / 1048576).toFixed(1)} MB)`);
+	return result;
 }
 
 let total = 0;

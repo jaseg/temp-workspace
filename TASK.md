@@ -51,6 +51,7 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 | 2b. Self-contained demo build (`npm run build:demo`), published as a claude.ai artifact | Done |
 | 2c. Viewer made live-only: replay-mode code removed, "Request to watch" button before the waiting room | Done |
 | 2d. Waiting-room codes are three words from the PGP word list | Done |
+| 2e. Level browser: installed custom levels, map and BeatLeader stats, audio preview (dev host and demo) | Done |
 | 0. On-device spike (needs SSH to a Frame) | Open |
 | 3. BSIPA plugin on the Frame | Open |
 | 4. Latency tuning on the real device | Open |
@@ -82,20 +83,21 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
   - Tune the viewer's prediction (default 16 ms, `?predict=`).
   - Check the game-thread CPU and GC cost.
 
-### Next
+### Level browser follow-ups
 
-- **Custom levels page.** A page listing the custom levels installed on the Frame, with their stats:
-  - From the map: name, author, mapper, BPM, duration, difficulties, NJS, notes.
-  - From BeatLeader: star difficulty and other leaderboard stats per difficulty.
-  - Audio-only preview playback.
-
-  Open questions:
-  - Where it lives: the same approved-device session, or a separate view.
-  - How the mod enumerates levels: SongCore, in the plugin.
-  - How BeatLeader stats are fetched. The browser calling the BeatLeader API needs a CSP exception; a mod-side
-    fetch keeps the page talking to the mod only.
-  - Serving preview audio from any installed level widens the map-file allow-list beyond "current map only";
-    design that boundary explicitly.
+- **In the plugin:** point `LiveServerOptions.LevelFolders` at `Beat Saber_Data/CustomLevels` (and
+  `CustomWIPLevels` if wanted; SongCore's extra folders from its config). Add a menu toggle for BeatLeader
+  stats, which sets `LiveServerOptions.BeatLeader`. It's off unless enabled, since it tells BeatLeader which
+  levels viewers look at.
+- **Scan cost on the Frame.** The first scan reads every Info.dat and difficulty file to count notes and compute
+  hashes (8 levels: about 1 s on the dev container). It runs off the game thread, but a large library on the Frame
+  may take a while. Measure it there, and consider a persistent cache keyed by the folder stamp.
+- **v4 hashes.** For v2/v3 Info.dat the hash matches BeatSaver's (checked on 8 real maps). For v4 it hashes
+  Info.dat, the audio data file and each beatmap and lightshow file once, in order; this has not been checked
+  against SongCore with a real v4 map.
+- **Safari / iOS** may not play Ogg Vorbis in `<audio>`. The preview then says the browser can't play the file.
+  The live viewer has the same limitation.
+- **More from BeatLeader**, if wanted: play counts and top scores need more API calls per level.
 
 ### Software
 
@@ -122,7 +124,9 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
   - The viewer extrapolates about 26 ms (median) past the newest pose at 60 fps: the 16 ms prediction, 5 ms
     simulated latency, and up to one pose interval.
 - **Map file allow-list.** The fake-live host allows every file listed in info.dat, all difficulties included. The
-  viewer only requests what it needs.
+  viewer only requests what it needs. (The level library is narrower: cover and song only, by kind.)
+- **The level page also receives the live stream** (poses every frame), since it shares the viewer's connection.
+  That's about 12 KB/s per viewer.
 - **The waiting room approves by match code only.** The approval screen shows IP and browser to help, but anyone
   on the LAN can ask, and denial cooldowns are per IP.
 - **The dev host loads `--www` files once at startup.** Restart it after rebuilding the viewer.

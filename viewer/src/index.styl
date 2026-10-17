@@ -69,9 +69,9 @@ html
 @media screen and (max-width: 450px)
   .desktopControl:not(.controlsFullscreen)
     display: none !important;
-  .controlsSettings.mobileControl, .controlsCamera.mobileControl
+  .controlsSettings.mobileControl, .controlsCamera.mobileControl, .controlsLevels.mobileControl
     display: block !important;
-  .controlsSettings:not(.mobileControl), .controlsCamera:not(.mobileControl)
+  .controlsSettings:not(.mobileControl), .controlsCamera:not(.mobileControl), .controlsLevels:not(.mobileControl)
     display: none !important;
   #controls
     width 360px !important
@@ -208,6 +208,14 @@ html
 
   .controlsFullscreen.mobileControl
     position relative
+
+  .controlsLevels
+    cursor pointer
+    margin 2px 0 0 6px
+    width 22px
+    color white
+    font-size 18px
+    text-align center
 
   .controlsCamera
     cursor pointer

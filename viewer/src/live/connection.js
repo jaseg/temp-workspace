@@ -1,5 +1,5 @@
-// WebSocket connection to the mod: waiting room, clock sync, message dispatch and map file downloads.
-import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest} from './protocol';
+// WebSocket connection to the mod: waiting room, clock sync, message dispatch, map file and level library downloads.
+import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest, levelListRequest, levelFileRequest, levelStatsRequest} from './protocol';
 import {ServerClock} from './clock';
 
 const CREDENTIAL_KEY = 'bslive.credential';
@@ -15,6 +15,10 @@ function loadCredential() {
 	} catch (e) {
 		return null;
 	}
+}
+
+function parseJson(buffer) {
+	return JSON.parse(new TextDecoder().decode(buffer));
 }
 
 function saveCredential(bytes) {
@@ -112,7 +116,9 @@ export class LiveConnection {
 				const t = this.transfers.get(id);
 				if (t) {
 					this.transfers.delete(id);
-					t.reject(new Error(`Map file ${t.name} unavailable (code ${code})`));
+					const error = new Error(`${t.name} unavailable (code ${code})`);
+					error.code = code;
+					t.reject(error);
 				}
 				return;
 			}
@@ -121,13 +127,37 @@ export class LiveConnection {
 		}
 	}
 
-	/** Downloads one file of the current session's map. */
-	fetchMapFile(sessionId, name) {
+	/** Sends a request answered by a file transfer; resolves with the file's bytes (an ArrayBuffer). */
+	request(name, build) {
 		return new Promise((resolve, reject) => {
+			if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+				reject(new Error('Not connected'));
+				return;
+			}
 			const id = this.nextRequestId++ & 0xffff || this.nextRequestId++;
 			this.transfers.set(id, {name, resolve, reject, buffer: null, received: 0});
-			this.ws.send(mapRequest(id, sessionId, name));
+			this.ws.send(build(id));
 		});
+	}
+
+	/** Downloads one file of the current session's map. */
+	fetchMapFile(sessionId, name) {
+		return this.request(`Map file ${name}`, id => mapRequest(id, sessionId, name));
+	}
+
+	/** The installed custom levels (see "Level library" in PROTOCOL.md). */
+	fetchLevelList() {
+		return this.request('Level list', id => levelListRequest(id)).then(parseJson);
+	}
+
+	/** A level's cover or song file (`LevelFile.cover` / `LevelFile.audio`), as an ArrayBuffer. */
+	fetchLevelFile(levelId, kind) {
+		return this.request(`Level file ${kind}`, id => levelFileRequest(id, kind, levelId));
+	}
+
+	/** A level's BeatLeader stats, fetched by the mod. */
+	fetchLevelStats(levelId) {
+		return this.request('Level stats', id => levelStatsRequest(id, levelId)).then(parseJson);
 	}
 
 	onMapChunk(r, data) {

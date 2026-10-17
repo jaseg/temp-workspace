@@ -27,6 +27,7 @@ namespace LiveViewer.Server.Live
         public const int MaxQueuedPoses = 4;
         public const int MaxQueuedReliable = 20000;
         public const int MaxQueuedTransfers = 16;
+        public const int MaxPendingLookups = 8;
         public const int MapChunkBytes = 16 * 1024 - 16; // one TLS record with the message header
 
         private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(5);
@@ -48,6 +49,7 @@ namespace LiveViewer.Server.Live
 
         private bool _closeAfterFlush;
         private int _closed;
+        private int _pendingLookups;
 
         public ClientConnection(IWebSocketContext context, string label, ILiveLog log)
         {
@@ -141,6 +143,23 @@ namespace LiveViewer.Server.Live
             _wake.Release();
             return true;
         }
+
+        /// <summary>
+        /// Reserves a slot for a request answered asynchronously (level list, level file, stats). Bounded per
+        /// connection so a client can't pile up work; release with <see cref="EndLookup"/>.
+        /// </summary>
+        public bool TryBeginLookup()
+        {
+            if (Interlocked.Increment(ref _pendingLookups) <= MaxPendingLookups)
+            {
+                return true;
+            }
+
+            Interlocked.Decrement(ref _pendingLookups);
+            return false;
+        }
+
+        public void EndLookup() => Interlocked.Decrement(ref _pendingLookups);
 
         /// <summary>Sends what's queued (dropping poses and transfers), then closes.</summary>
         public void CloseAfterFlush()
@@ -319,17 +338,20 @@ namespace LiveViewer.Server.Live
         }
     }
 
-    /// <summary>A map file being streamed to one client in chunks.</summary>
+    /// <summary>
+    /// A file being streamed to one client in chunks. Map files are bound to their session and abort when it
+    /// ends; level library files and generated documents are not.
+    /// </summary>
     internal sealed class MapTransfer : IDisposable
     {
         private readonly Stream _stream;
         private readonly ushort _requestId;
-        private readonly uint _sessionId;
+        private readonly uint? _sessionId;
         private readonly uint _length;
         private uint _offset;
         private bool _sentEmpty;
 
-        public MapTransfer(Stream stream, ushort requestId, uint sessionId)
+        public MapTransfer(Stream stream, ushort requestId, uint? sessionId)
         {
             _stream = stream;
             _requestId = requestId;
@@ -340,7 +362,7 @@ namespace LiveViewer.Server.Live
         /// <summary>Reads the next chunk. Returns the message to send (if any) and whether the transfer is finished.</summary>
         public async Task<(byte[]? message, bool done)> NextMessageAsync(byte[] buffer, uint currentSessionId)
         {
-            if (currentSessionId != _sessionId)
+            if (_sessionId.HasValue && currentSessionId != _sessionId.Value)
             {
                 return (Messages.MapError(_requestId, MapErrorCode.NoSession), true);
             }

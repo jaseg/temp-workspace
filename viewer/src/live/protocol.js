@@ -25,7 +25,15 @@ export const T = {
 	Hello: 0x81,
 	Ping: 0x82,
 	MapRequest: 0x83,
+	LevelListRequest: 0x84,
+	LevelFileRequest: 0x85,
+	LevelStatsRequest: 0x86,
 };
+
+export const LevelFile = {cover: 1, audio: 2};
+
+// MapError codes.
+export const FileError = {notAvailable: 1, noSession: 2, readFailed: 3, tooManyRequests: 4};
 
 export const SessionEndReason = {1: 'cleared', 2: 'failed', 3: 'quit', 4: 'restarted'};
 
@@ -149,5 +157,28 @@ export function mapRequest(requestId, sessionId, fileName) {
 		v.setUint32(3, sessionId, true);
 		v.setInt32(7, name.length, true);
 		b.set(name, 11);
+	});
+}
+
+export function levelListRequest(requestId) {
+	return message(T.LevelListRequest, 2, v => v.setUint16(1, requestId, true));
+}
+
+export function levelFileRequest(requestId, kind, levelId) {
+	const id = new TextEncoder().encode(levelId);
+	return message(T.LevelFileRequest, 2 + 1 + 4 + id.length, (v, b) => {
+		v.setUint16(1, requestId, true);
+		v.setUint8(3, kind);
+		v.setInt32(4, id.length, true);
+		b.set(id, 8);
+	});
+}
+
+export function levelStatsRequest(requestId, levelId) {
+	const id = new TextEncoder().encode(levelId);
+	return message(T.LevelStatsRequest, 2 + 4 + id.length, (v, b) => {
+		v.setUint16(1, requestId, true);
+		v.setInt32(3, id.length, true);
+		b.set(id, 7);
 	});
 }

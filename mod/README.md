@@ -8,6 +8,7 @@
 | `vendor/EmbedIO/` | Vendored EmbedIO with local hardening patches; see `VENDORED.md`. |
 | `tools/browser-smoke.cjs` | Opens the test page in headless Chromium against a running host and reports latency stats. |
 | `tools/viewer-smoke.cjs` | Same for the real viewer (`--www ../viewer/dist`): screenshots, errors, score state, extrapolation horizon. |
+| `tools/levels-smoke.cjs` | Checks the level browser (list, covers, BeatLeader stars, details, audio preview) on desktop and phone sizes. |
 | `tools/viewer-transitions.cjs` | Follows the viewer across several songs (`--loop --start 166`); can approve through the host console via a FIFO. |
 | `PROTOCOL.md` | The WebSocket protocol. |
 
@@ -38,6 +39,10 @@ Open `https://localhost:4280/` and accept the certificate warning. The page
 shows a three-word code; type `a <code>` in the host's console to allow it once
 (e.g. `a aztec istanbul yucatan`; case and separators don't matter), or
 `r <code>` to remember the device. `--auto-approve` skips that, for tests.
+
+The level browser lists the levels in `--levels <dir>` (repeatable; default
+`./livedata/maps`, where downloaded maps go) and fetches their BeatLeader stats
+unless you pass `--no-beatleader`.
 
 To serve the real viewer instead of the test page, build it (`cd ../viewer && npm ci && npm run build`) and
 add `--www ../viewer/dist`. The host loads the files once at startup, so restart it after rebuilding.
@@ -72,6 +77,9 @@ NODE_PATH=$(npm root -g) node tools/browser-smoke.cjs https://localhost:4280/ 10
     stored. Revoking a device drops its live connections.
   - Map files: only names listed by the current map, resolved inside the map
     folder, at most 64 MB.
+  - Level library: other installed levels expose only their cover and song
+    file, requested by kind and level hash, never by name. BeatLeader is asked
+    only about installed levels' hashes, by the mod.
 - **The game thread** only writes into a preallocated ring buffer. A slow client
   only loses its own pose frames; a client that can't keep up with events is
   disconnected.

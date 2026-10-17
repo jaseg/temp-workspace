@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.IO;
+using System.Threading.Tasks;
 using EmbedIO.WebSockets;
+using LiveViewer.Server.Levels;
 using LiveViewer.Server.Protocol;
 using LiveViewer.Server.Security;
 
@@ -26,6 +29,8 @@ namespace LiveViewer.Server.Live
         private readonly WaitingRoom _waitingRoom;
         private readonly DeviceStore _devices;
         private readonly ILiveLog _log;
+        private readonly LevelLibrary? _levels;
+        private readonly BeatLeaderStats? _stats;
         private readonly string _serverName;
         private readonly Thread _pump;
         private readonly Timer _expiry;
@@ -35,9 +40,12 @@ namespace LiveViewer.Server.Live
         private bool _inSession;
         private IMapFileSource? _map;
 
-        public ClientHub(LiveFeed feed, WaitingRoom waitingRoom, DeviceStore devices, string serverName, ILiveLog log)
+        public ClientHub(LiveFeed feed, WaitingRoom waitingRoom, DeviceStore devices, string serverName, ILiveLog log,
+            LevelLibrary? levels = null, BeatLeaderStats? stats = null)
         {
             _feed = feed;
+            _levels = levels;
+            _stats = stats;
             _waitingRoom = waitingRoom;
             _devices = devices;
             _serverName = serverName;
@@ -169,6 +177,17 @@ namespace LiveViewer.Server.Live
                     case MessageType.MapRequest:
                         HandleMapRequest(connection, ClientMessages.ParseMapRequest(reader));
                         break;
+                    case MessageType.LevelListRequest:
+                        HandleLevelRequest(connection, ClientMessages.ParseLevelListRequest(reader), null, null);
+                        break;
+                    case MessageType.LevelFileRequest:
+                        var file = ClientMessages.ParseLevelFileRequest(reader);
+                        HandleLevelRequest(connection, file.RequestId, file.LevelId, file.Kind);
+                        break;
+                    case MessageType.LevelStatsRequest:
+                        var stats = ClientMessages.ParseLevelStatsRequest(reader);
+                        HandleLevelRequest(connection, stats.RequestId, stats.LevelId, null);
+                        break;
                     default:
                         throw new ProtocolException("Unknown message type.");
                 }
@@ -252,6 +271,83 @@ namespace LiveViewer.Server.Live
             {
                 transfer.Dispose();
                 connection.EnqueueReliable(Messages.MapError(request.RequestId, MapErrorCode.TooManyRequests));
+            }
+        }
+
+        /// <summary>
+        /// Level library requests: the list (no level id), a level's cover or song (kind), or its BeatLeader stats
+        /// (id, no kind). Answered asynchronously as a file transfer once the library scan is done.
+        /// </summary>
+        private void HandleLevelRequest(ClientConnection connection, ushort requestId, string? levelId, LevelFileKind? kind)
+        {
+            lock (_lock)
+            {
+                if (connection.State != ClientState.Approved)
+                {
+                    throw new ProtocolException("Level request before approval.");
+                }
+            }
+
+            var wantsStats = levelId != null && kind == null;
+            if (_levels == null || !_levels.Enabled || (wantsStats && _stats == null))
+            {
+                connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.NotAvailable));
+                return;
+            }
+
+            if (!connection.TryBeginLookup())
+            {
+                connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.TooManyRequests));
+                return;
+            }
+
+            _ = AnswerLevelRequestAsync(connection, requestId, levelId, kind);
+        }
+
+        private async Task AnswerLevelRequestAsync(ClientConnection connection, ushort requestId, string? levelId, LevelFileKind? kind)
+        {
+            try
+            {
+                var snapshot = await _levels!.GetAsync().ConfigureAwait(false);
+                Stream stream;
+                if (levelId == null)
+                {
+                    stream = new MemoryStream(snapshot.Json, false);
+                }
+                else if (!snapshot.ByHash.ContainsKey(levelId))
+                {
+                    connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.NotAvailable));
+                    return;
+                }
+                else if (kind == null)
+                {
+                    stream = new MemoryStream(await _stats!.GetAsync(levelId).ConfigureAwait(false), false);
+                }
+                else if (!LevelLibrary.TryOpen(snapshot, levelId, kind.Value, out stream))
+                {
+                    connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.NotAvailable));
+                    return;
+                }
+
+                var transfer = new MapTransfer(stream, requestId, null);
+                if (!connection.TryEnqueueTransfer(transfer))
+                {
+                    transfer.Dispose();
+                    connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.TooManyRequests));
+                }
+            }
+            catch (Exception e)
+            {
+                if (levelId == null)
+                {
+                    _log.Error("Level list failed", e);
+                }
+
+                connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.ReadFailed));
+            }
+            finally
+            {
+                connection.EndLookup();
             }
         }
 

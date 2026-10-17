@@ -9,6 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="..\vendor\EmbedIO\EmbedIO.csproj" />
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    <!-- Beat Saber ships Newtonsoft.Json 13 (via BSIPA), so the plugin adds nothing. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>

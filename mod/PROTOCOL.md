@@ -35,7 +35,8 @@ client                         server
 ```
 
 - **Pinging:** `Ping` may be sent at any time after `Hello`.
-- **Map requests:** `MapRequest` is only valid once approved.
+- **Map and level requests:** `MapRequest` and the level library requests are
+  only valid once approved.
 - **Violations:** anything unexpected closes the connection. That includes an
   unknown type, trailing bytes, a second `Hello`, a map request before approval,
   or more than about 20 messages per second.
@@ -60,8 +61,8 @@ client                         server
 | `0x24` | Height | `us capture, f32 height, f32 songTime` |
 | `0x25` | Pause | `us capture, f32 songTime` |
 | `0x26` | Resume | `us capture, f32 songTime` |
-| `0x30` | MapChunk | `u16 requestId, u32 totalLength, u32 offset, bytes...` (the rest of the message). Chunks arrive in order; a zero-length file is one chunk with `totalLength` 0. |
-| `0x31` | MapError | `u16 requestId, u8 code (1 not available, 2 no or other session, 3 read failed, 4 too many requests)` |
+| `0x30` | MapChunk | `u16 requestId, u32 totalLength, u32 offset, bytes...` (the rest of the message). Chunks arrive in order; a zero-length file is one chunk with `totalLength` 0. Answers `MapRequest` and the level library requests. |
+| `0x31` | MapError | `u16 requestId, u8 code (1 not available, 2 no or other session, 3 read failed or BeatLeader unreachable, 4 too many requests)` |
 
 A **BSOR note event** is laid out as:
 
@@ -109,8 +110,63 @@ live data. Poses are never backlogged.
 | `0x81` | Hello | `u16 protocolVersion (1), u8 hasCredential, [32 bytes credential]` |
 | `0x82` | Ping | `f64 clientTime` (e.g. `performance.now()`) |
 | `0x83` | MapRequest | `u16 requestId, u32 sessionId, str fileName (≤ 256 bytes)` |
+| `0x84` | LevelListRequest | `u16 requestId`. Answered with the level list JSON as a file. |
+| `0x85` | LevelFileRequest | `u16 requestId, u8 kind (1 cover, 2 song), str levelId (≤ 64 bytes)` |
+| `0x86` | LevelStatsRequest | `u16 requestId, str levelId (≤ 64 bytes)`. Answered with the stats JSON as a file. |
 
 The maximum inbound message size is 1 KB.
+
+## Level library
+
+The page can list the custom levels installed on the Frame, show their stats and
+play their songs as previews. Level requests are answered asynchronously, as
+file transfers (`MapChunk` / `MapError`), and are not tied to a session. A
+connection may have at most 8 of them in progress.
+
+- **Ids:** a level's id is its hash, as SongCore computes it (lowercase hex
+  SHA-1 of Info.dat and the difficulty files). Duplicate copies of a level are
+  listed once.
+- **Boundary:** for any listed level, only its cover image and song file can be
+  read, by kind, as named by its Info.dat and resolved inside its folder.
+  Difficulty files are available only for the level being played, through
+  `MapRequest`.
+- **BeatLeader stats are fetched by the mod**, so the page never talks to
+  anything but the mod. The mod asks BeatLeader only about hashes of installed
+  levels, at most two requests at a time, and caches the answers for 12 hours
+  (failures for 2 minutes). Stats are off unless the mod enables them.
+- **Rescans:** the list is re-scanned when it's requested and the last scan is
+  more than 30 seconds old; unchanged level folders are not re-read.
+- **Errors:** an unknown id gives `MapError` 1. Level requests when the library
+  or stats are disabled also give 1. Stats when BeatLeader can't be reached give 3.
+
+Level list JSON (strings are escaped so the JSON is inert in HTML; still, the
+page must treat every string as text):
+
+```json
+{"levels": [{
+  "id": "c9c15d3f…", "songName": "…", "songSubName": "…", "songAuthor": "…", "mapper": "…",
+  "environment": "…", "bpm": 154, "duration": 105.43, "previewStart": 60, "previewDuration": 10,
+  "hasCover": true, "hasAudio": true, "added": 1700000000,
+  "difficulties": [{"mode": "Standard", "difficulty": "ExpertPlus", "label": "", "njs": 18, "offset": 0,
+                    "notes": 446, "bombs": 0, "walls": 11, "arcs": 0, "chains": 0}]
+}]}
+```
+
+- `duration` is in seconds; 0 if unknown.
+- `added` is the Unix time Info.dat was last written.
+- Counts are `null` when a difficulty file couldn't be read.
+
+Stats JSON, a subset of BeatLeader's map data, re-encoded by the mod:
+
+```json
+{"found": true, "key": "4adb", "difficulties": [{"mode": "Standard", "difficulty": "ExpertPlus", "status": 3,
+  "stars": 7.5131, "pass": 4.3924, "acc": 8.821, "tech": 7.9199, "predictedAcc": 0.9799, "maxScore": 403075}]}
+```
+
+- `found` is false if BeatLeader doesn't know the map.
+- `status` is BeatLeader's: 0 unranked, 1 nominated, 2 qualified, 3 ranked,
+  4 unrankable, 5 outdated, 6 event, 7 OST.
+- Ratings are `null` when BeatLeader has none.
 
 ## Clock sync
 

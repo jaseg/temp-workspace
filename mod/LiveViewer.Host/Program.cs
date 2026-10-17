@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using LiveViewer.Server;
+using LiveViewer.Server.Levels;
 using LiveViewer.Server.Live;
 using LiveViewer.Server.Protocol;
 using LiveViewer.Server.Web;
@@ -18,6 +19,7 @@ namespace LiveViewer.Host
         private const string Usage = @"LiveViewer.Host: runs the live viewer server outside the game, fed by a BeatLeader replay.
 
 Usage: LiveViewer.Host --replay <file.bsor | https://... | scoreId> [options]
+       LiveViewer.Host --dump-levels <out.json> [--levels <dir>] [--no-beatleader]
 
 Options:
   --map <dir|zip>      Map folder or zip (default: download by hash from BeatLeader/BeatSaver)
@@ -30,6 +32,9 @@ Options:
   --loop               Replay forever
   --auto-approve       Approve every waiting device (testing only)
   --any-address        Accept non-private peers (testing only)
+  --levels <dir>       Folder of custom levels for the level list (repeatable; default <data>/maps)
+  --no-beatleader      Don't fetch BeatLeader stats for the level list
+  --dump-levels <file> Write the level list and BeatLeader stats as JSON, then exit (for the demo build)
 
 Console commands while running:
   l                    List waiting and remembered devices
@@ -51,6 +56,18 @@ Console commands while running:
             Swan.Logging.Logger.NoLogging();
             var log = new ConsoleLiveLog();
             var dataDirectory = Path.GetFullPath(options.GetValueOrDefault("data") ?? "livedata");
+            var levelFolders = Multi(args, "--levels").ToList();
+            if (levelFolders.Count == 0)
+            {
+                levelFolders.Add(Path.Combine(dataDirectory, "maps"));
+            }
+
+            using var beatLeader = options.ContainsKey("no-beatleader") ? null : new BeatLeaderHttpApi();
+            if (options.TryGetValue("dump-levels", out var dumpPath))
+            {
+                await LevelDump.WriteAsync(dumpPath, levelFolders, beatLeader, log);
+                return 0;
+            }
 
             Console.WriteLine("Loading replay...");
             var replay = BsorReplay.Decode(await LoadReplayAsync(options["replay"]));
@@ -86,6 +103,8 @@ Console commands while running:
                 DataDirectory = dataDirectory,
                 AllowAnyAddress = options.ContainsKey("any-address"),
                 Site = options.TryGetValue("www", out var www) ? StaticSite.FromDirectory(www) : null,
+                LevelFolders = levelFolders,
+                BeatLeader = beatLeader,
             };
             foreach (var name in Multi(args, "--hostname"))
             {
@@ -249,7 +268,7 @@ Console commands while running:
 
         private static Dictionary<string, string>? ParseArgs(string[] args)
         {
-            var flags = new HashSet<string> { "loop", "auto-approve", "any-address" };
+            var flags = new HashSet<string> { "loop", "auto-approve", "any-address", "no-beatleader" };
             var result = new Dictionary<string, string>();
             for (var i = 0; i < args.Length; i++)
             {
@@ -273,7 +292,7 @@ Console commands while running:
                 }
             }
 
-            return result.ContainsKey("replay") ? result : null;
+            return result.ContainsKey("replay") || result.ContainsKey("dump-levels") ? result : null;
         }
 
         private static IEnumerable<string> Multi(string[] args, string name)

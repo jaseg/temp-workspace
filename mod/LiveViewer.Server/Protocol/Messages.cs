@@ -119,6 +119,44 @@ namespace LiveViewer.Server.Protocol
             public string FileName;
         }
 
+        public struct LevelRequest
+        {
+            public ushort RequestId;
+            public string LevelId;
+            public Levels.LevelFileKind Kind;
+        }
+
+        public const int MaxLevelIdBytes = 64;
+
+        public static ushort ParseLevelListRequest(MessageReader r)
+        {
+            var requestId = r.U16();
+            r.End();
+            return requestId;
+        }
+
+        public static LevelRequest ParseLevelFileRequest(MessageReader r)
+        {
+            var request = new LevelRequest { RequestId = r.U16() };
+            var kind = r.U8();
+            if (kind != (byte) Levels.LevelFileKind.Cover && kind != (byte) Levels.LevelFileKind.Audio)
+            {
+                throw new ProtocolException("Unknown level file kind.");
+            }
+
+            request.Kind = (Levels.LevelFileKind) kind;
+            request.LevelId = r.String(MaxLevelIdBytes);
+            r.End();
+            return request;
+        }
+
+        public static LevelRequest ParseLevelStatsRequest(MessageReader r)
+        {
+            var request = new LevelRequest { RequestId = r.U16(), LevelId = r.String(MaxLevelIdBytes) };
+            r.End();
+            return request;
+        }
+
         public static Hello ParseHello(MessageReader r)
         {
             var hello = new Hello { ProtocolVersion = r.U16() };

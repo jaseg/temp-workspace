@@ -7,6 +7,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using EmbedIO;
+using LiveViewer.Server.Levels;
 using LiveViewer.Server.Live;
 using LiveViewer.Server.Security;
 using LiveViewer.Server.Web;
@@ -30,6 +31,15 @@ namespace LiveViewer.Server
 
         /// <summary>Allow peers outside private address ranges. Off by default.</summary>
         public bool AllowAnyAddress;
+
+        /// <summary>Folders whose subfolders are custom levels (e.g. Beat Saber_Data/CustomLevels). Empty: no level list.</summary>
+        public List<string> LevelFolders = new List<string>();
+
+        /// <summary>
+        /// Where level stats come from. Null: no BeatLeader stats. Set it to <see cref="BeatLeaderHttpApi"/> to fetch
+        /// them from BeatLeader, which tells BeatLeader the hashes of the levels viewers look at.
+        /// </summary>
+        public IBeatLeaderApi? BeatLeader;
     }
 
     /// <summary>
@@ -60,7 +70,9 @@ namespace LiveViewer.Server
             Feed = new LiveFeed();
             _peers = new PeerPolicy { AllowAnyAddress = options.AllowAnyAddress };
             _hosts = new HostPolicy(options.Port, options.HostNames);
-            _hub = new ClientHub(Feed, WaitingRoom, Devices, options.ServerName, log);
+            Levels = new LevelLibrary(options.LevelFolders, log);
+            _hub = new ClientHub(Feed, WaitingRoom, Devices, options.ServerName, log, Levels,
+                options.BeatLeader != null ? new BeatLeaderStats(options.BeatLeader, log) : null);
 
             Certificate = CertificateStore.LoadOrCreate(options.DataDirectory, options.HostNames, LocalAddresses(), log.Info);
             CertificateFingerprint = CertificateStore.Fingerprint(Certificate);
@@ -71,6 +83,8 @@ namespace LiveViewer.Server
         public WaitingRoom WaitingRoom { get; }
 
         public DeviceStore Devices { get; }
+
+        public LevelLibrary Levels { get; }
 
         public X509Certificate2 Certificate { get; }
 

@@ -43,6 +43,7 @@ AFRAME.registerComponent('hotkey-help', {
 					{keys: ['F'], action: 'Toggle fullscreen'},
 					{keys: ['H'], action: 'Show / Hide controls'},
 					{keys: ['L'], action: 'Show / Hide the latency readout'},
+					{keys: ['B'], action: 'Browse the custom levels'},
 					{keys: ['F2'], action: 'Show this help guide'},
 				],
 			},
