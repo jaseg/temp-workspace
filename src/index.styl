@@ -1,0 +1,1770 @@
+$darkred=#8c1248
+$red=#d11769
+$lightred=#ff3690
+$gray=#CCC
+$white=#FAFAFA
+$font=system-ui, BlinkMacSystemFont, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif
+
+html
+  background #111
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+
+#body:not(.showControls)
+  .povswitch
+    display: none !important;
+  .a-canvas
+    cursor: none !important;
+
+@media screen and (max-width: 700px)
+  #controls
+    width 420px !important
+    left calc(50vw - 220px) !important
+  .patreonColors
+    display: none
+  .povswitch.mobileControl
+    display: block !important;
+  .povswitch:not(.mobileControl)
+    display: none !important;
+  #desktopContainer
+    display: none !important;
+  #songInfoOverlay
+    padding-left: 1px !important;
+    left: 10px !important;
+
+    img
+      height 60px !important;
+      width 60px !important;
+    p
+      font-size 20px !important;
+    #songSubName
+      font-size 15px !important;
+    #difficultyLabel
+      margin-top 2px !important;
+    #songDifficulty
+      font-size 10px !important;
+    #songMode
+      font-size 10px !important;
+    #songCustomDifficulty
+      font-size 10px !important;
+  #playerInfoOverlay
+    padding-left: 1px !important;
+    left: 10px !important;
+
+    img
+      height 60px !important;
+      width 60px !important;
+    #playerName
+      font-size 20px !important;
+    #playerCountry
+      width 16px !important;
+      height 11px !important;
+
+  .controlsMobile
+    display: block !important;
+
+.mobileControl
+    display: none !important;
+
+@media screen and (max-width: 450px)
+  .desktopControl:not(.controlsFullscreen)
+    display: none !important;
+  .controlsSettings.mobileControl, .controlsCamera.mobileControl
+    display: block !important;
+  .controlsSettings:not(.mobileControl), .controlsCamera:not(.mobileControl)
+    display: none !important;
+  #controls
+    width 360px !important
+    left calc(50vw - 188px) !important
+
+@media screen and (max-width: 374px)
+  .povswitch.mobileControl
+    display: block !important;
+  .povswitch:not(.mobileControl)
+    display: none !important;
+
+@media screen and (max-width: 380px)
+  .controlsFullscreen.mobileControl
+    display: block !important;
+  .controlsFullscreen:not(.mobileControl)
+    display: none !important;
+  #controls
+    width 328px !important
+    left calc(50vw - 175px) !important
+
+#controls
+  align-items center
+  background rgba(0, 0, 0, 0.85)
+  border-radius 10px
+  display none
+  font-family $font
+  left calc(50vw - 260px)
+  margin 0 auto 10px auto
+  padding 10px
+  position fixed
+  width 520px
+  z-index 99999999
+
+  &.challengeLoaded
+    display flex
+
+  #controlsVolume
+    cursor pointer
+    padding 3px 10px 0 3px
+    img
+      height 20px
+      width 20px
+
+  #volumeSliderContainer
+    background rgba(0, 0, 0, 0.85)
+    border-radius 0 5px 5px 0
+    bottom 110px
+    cursor pointer
+    display none
+    left -46px
+    position absolute
+    transform rotate(-90deg)
+    z-index 999999999
+    transition: 0.2s all;
+
+    input
+      cursor pointer
+      padding 0
+      width 100px
+      transform rotate(0deg)
+
+    #mixer
+      text-decoration: none;
+      border: none;
+      margin-right: 7px
+      margin-left: 7px
+      width: 18px;
+      height: 18px;
+      font-size: 16px;
+      color: #fff;
+      border-radius: 5px;
+      box-shadow: 7px 6px 28px 1px rgba(0, 0, 0, 0.24);
+      cursor: pointer;
+      outline: none;
+      display: flex
+      justify-content: center
+
+      .fas
+        font-size: 12px
+        color: black
+        margin-top: 2px
+              
+    #mixer.selected
+      background-color: rgb(0, 89, 255) 
+      box-shadow: 3px 2px 22px 1px rgba(0, 0, 0, 0.24);
+      margin-left: 14px;
+
+      .fas
+        color: white
+
+    .volumeHide
+      display: none !important
+
+    #mixerContainer .fas
+        margin: 10px
+    
+    #mixerContainer .settingRange
+      margin auto
+
+    #mixerContainer > div
+      grid-auto-rows: 1fr
+      align-items: center
+
+  .controlsSettings
+    margin: 6px 16px 0 8px;
+    right: 24px;
+    width: 24px;
+    cursor: pointer;
+    img
+      height 20px
+      width 20px
+
+  .inFullscreen
+    .enterFullscreen
+      display none
+    .exitFullscreen
+      display block
+  .exitFullscreen
+        display none
+
+  .controlsFullscreen.inFullscreen
+      margin 0px 0px 0 0px
+
+  .controlsFullscreen
+    cursor pointer
+    margin 6px 0px 0 0px
+    position: absolute
+    right: -4px
+    width: 40px
+    svg
+      fill: white
+      height 26px
+      width 26px
+
+  .controlsFullscreen.mobileControl
+    position relative
+
+  .controlsCamera
+    cursor pointer
+    margin 6px 0px 0 6px
+    right 93px
+    width 25px
+    img
+      height 30px
+      width 26px
+
+  .controlsMobile
+    cursor: pointer;
+    margin: 4px 0 0 0;
+    right: 68px;
+    width: 21px;
+    display: none
+    img
+      height 30px
+      width 26px
+
+  #settingsContainer
+    background: rgba(0,0,0,0.85)
+    border-radius 5px
+    bottom 60px
+    display none
+    grid-template-columns: 1fr 1fr
+    right 0px
+    position absolute
+    z-index 999999999
+    width: 360px
+    overflow: hidden
+
+    input
+      cursor pointer
+      padding 0
+      width 100px
+      border-radius 0
+
+  .generalSettingsContainer
+    display grid
+    grid-template-columns: 1fr 1fr
+
+  #cameraSettingsContainer
+    background rgba(0,0,0,0.85)
+    border-radius 5px
+    bottom 60px
+    display none
+    right 0px
+    position absolute
+    z-index 999999999
+    width: 330px
+    text-align: center;
+
+    input
+      cursor pointer
+      padding 0
+      width 90%
+
+    .settingHeader
+      color: #bdbdbd;
+      margin-bottom: 5px;
+
+    .toggleButton
+      text-align: left
+
+  #cameraPositionContainer,
+  #cameraSaveContainer
+    align-items: center;
+    justify-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    display: flex;
+    grid-gap: 0.5em;
+    margin: 10px 0px;
+    width: 10em;
+
+  #mobileContainer
+    padding 0.5em
+    .speedSliderContainer
+      height 2.4em
+      background transparent !important
+
+  .speedSliderContainer
+    border-radius 0 5px 5px 0
+    cursor pointer
+    display none
+    margin-left -6px
+    z-index 99
+    display block
+
+    input
+      --value: 1;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      cursor pointer
+      margin-left: -1px
+      width 104px
+      height: 28px
+      margin-top 3px
+      margin-bottom -10px
+      padding 0
+      background transparent
+      z-index 100
+      touch-action none
+
+    input[type=range]::-webkit-slider-runnable-track
+      height: 8px
+      border: none
+      border-radius: 10px
+      background: #4776e6 /* fallback for old browsers */
+      background:
+        linear-gradient(to right, transparent 0%, transparent calc((var(--value) / 2) * 100%), white calc((var(--value) / 2) * 100%), white 100%),
+        linear-gradient(to right, #8e54e9, #dd1853);
+
+    input[type=range]::-moz-range-track
+      height: 8px
+      border: none
+      border-radius: 10px
+      background: #4776e6 /* fallback for old browsers */
+      background:
+        linear-gradient(to right, transparent 0%, transparent calc((var(--value) / 2) * 100%), white calc((var(--value) / 2) * 100%), white 100%),
+        linear-gradient(to right, #8e54e9, #dd1853);
+
+    input[type=range]::-moz-range-thumb
+      -moz-appearance: none;
+      border-radius: 50%;
+      height: 15px;
+      width: 15px;
+      max-width: 80px;
+      border: none;
+      position: relative;
+      background-color: #1d1c25;
+      cursor: -moz-grab;
+      -moz-transition: border 1000ms ease;
+      transition: border 1000ms ease;
+
+    input[type=range]::-webkit-slider-thumb
+      -webkit-appearance: none;
+      height: 15px
+      width: 15px
+      margin-top: -3.5px
+      border-radius: 50%
+      border: 1px solid white
+      background-color: #1d1c25
+      z-index: 1
+
+  #pause
+    cursor pointer
+    display flex
+    padding-right 10px
+    opacity 0
+    transition opacity .5s
+    &:hover #pauseSymbol
+      fill $red
+
+  #logo
+    margin-right 10px
+    img
+      height 32px
+      width 32px
+
+	#timeline
+    height 12px
+    width 160px
+
+    &:hover #timelineLine
+      height 6px
+      background $red
+      margin-top 3px
+
+  #timelineLine
+    height 2px
+    background $darkred
+    border-radius 2px
+    margin-top 5px
+    transition background 0.2s, height 0.2s, margin-top 0.2s
+
+  #playhead
+    background $white
+    position relative
+    border-radius 2px 0 0 2px
+    height 100%
+    width 0%
+
+#songTime
+  color $gray
+  font-size 11px
+  margin-left 15px
+  margin-right 0
+  width 70px
+
+.songSpeed
+  color $gray
+  font-size 11px
+  align-self baseline
+  margin-right 1em
+  width 10px
+
+.songEffectiveSpeed
+  color: #ffcf66;
+  font-size: 11px;
+  align-self: baseline;
+  width: auto;
+  position: absolute;
+  top: 0;
+  right: 101px;
+
+.delaySliderContainer {
+  display: flex;
+  align-items: center;
+}
+
+#delaySlider {
+  position: relative;
+  z-index: 2;
+}
+
+.songDelay
+  color $gray
+  font-size 11px
+  align-self baseline
+  margin-right 1em
+  width 10px
+  position absolute
+  bottom 9px
+  left 21px
+  transform rotateZ(90deg)
+
+#mobileContainer
+  background rgba(0, 0, 0, 0.85)
+  border-radius 5px
+  bottom 60px
+  display none
+  right 0px
+  position absolute
+  z-index 5
+  text-align: center;
+  align-items: center;
+
+  input
+    cursor pointer
+    padding 0
+    width 90%
+
+  .settingHeader
+    color: #bdbdbd;
+    margin-bottom: 5px;
+
+  .toggleButton
+    text-align: left
+
+#controlsModes,
+#controlsDifficultyOptions
+  background #020202
+  border 1px solid $gray
+  border-radius 5px
+  bottom 50px
+  color $white
+  display none
+  flex-direction column
+  font-family $font
+  font-size 11px
+  list-style none
+  margin 0
+  opacity 0
+  padding 0
+  position absolute
+  right 50px
+  transition all .2s
+  li
+    cursor pointer
+    padding 10px
+    min-width 65px
+    transition all .1s
+    &:hover
+      color $red
+
+#skipIntro
+  background: #000000;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  bottom: 50px;
+  color: #fafafa;
+  flex-direction: column;
+  font-family: system-ui, BlinkMacSystemFont, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 11px;
+  list-style: none;
+  padding: 10px;
+  position: absolute;
+  transition: all 0.2s;
+  cursor pointer
+  left 2px
+  &:hover
+    color: red
+
+#controlsModes
+  right 142px
+
+.modeOptionsActive
+  #controlsModes
+    display flex
+    opacity 1
+
+.difficultyOptionsActive
+  #controlsDifficultyOptions
+    display flex
+    opacity 1
+
+#timeline
+  cursor pointer
+  position relative
+  touch-action none
+
+#timelineHover
+  bottom 0
+  color $white
+  font-size 11px
+  display none
+  padding 5px
+  position absolute
+  z-index 2
+  &.timelineHoverActive
+    display block
+
+#timelineCursor
+  height 40px
+  bottom 0
+  width 1px
+  position absolute
+  display none
+  background-color #0dcef0c2
+  z-index 2
+
+#vrButton
+  background url(assets/img/enter-vr-button-background.png) no-repeat
+  background-size cover
+  border 0
+  bottom 25px
+  cursor pointer
+  height 23.5px
+  position absolute
+  right 30px
+  width 42px
+  z-index 9999999
+
+  &.a-hidden
+    visibility hidden
+
+  &:active
+    border 0
+
+  &:hover
+    background-position 0 -25px
+
+.discord-link
+  transition: 0.6s top, 0.6s right;
+  -webkit-transition: 0.6s top, 0.6s right;
+  -moz-transition: 0.6s top, 0.6s right;
+  -ms-transition: 0.6s top, 0.6s right;
+  -o-transition: 0.6s top, 0.6s right;
+
+.patreon-link
+  transition: 0.6s top, 0.6s right;
+  -webkit-transition: 0.6s top, 0.6s right;
+  -moz-transition: 0.6s top, 0.6s right;
+  -ms-transition: 0.6s top, 0.6s right;
+  -o-transition: 0.6s top, 0.6s right;
+
+.patreon-logo
+  transform: translateX(658.5px) translateY(-458px) rotate(45deg);
+
+#controls
+  bottom -60px
+  -webkit-transition: bottom 0.5s;
+  -moz-transition: bottom 0.5s;
+  -ms-transition: bottom 0.5s;
+  -o-transition: bottom 0.5s;
+  transition: bottom 0.5s;
+
+#songInfoOverlay
+  top: -130px
+  -webkit-transition: top 0.5s;
+  -moz-transition: top 0.5s;
+  -ms-transition: top 0.5s;
+  -o-transition: top 0.5s;
+  transition: top 0.5s;
+
+#playerInfoOverlay
+  bottom: -130px
+  -webkit-transition: bottom 0.5s;
+  -moz-transition: bottom 0.5s;
+  -ms-transition: bottom 0.5s;
+  -o-transition: bottom 0.5s;
+  transition: bottom 0.5s;
+
+.showControls
+  -webkit-transition: top 0.5s bottom 0.5s;
+  -moz-transition: top 0.5s bottom 0.5s;
+  -ms-transition: top 0.5s bottom 0.5s;
+  -o-transition: top 0.5s bottom 0.5s;
+  transition: top 0.5s bottom 0.5s;
+  #controls
+    bottom 0
+  #songInfoOverlay
+    top: 30px
+  #playerInfoOverlay
+    bottom: 80px
+  #controls
+    #cameraSettingsContainer
+      &.settingsActive
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    #settingsContainer
+      &.settingsActive
+        display block
+    #volumeSliderContainer
+      &.volumeActive
+        display flex
+        align-items center
+        padding-right 8px
+    #mobileContainer
+      &.settingsActive
+        display flex
+
+.isPlaying
+  .discord-link
+    top: -80px !important
+    right -80px !important 
+  .patreon-link
+    top: -80px !important
+    right -80px !important 
+  #controls,
+  #controls #pause
+    opacity 1
+
+.a-loader-title
+  display none !important
+
+#breakWarning
+  background #111
+  border-radius 5px
+  color #FAFAFA
+  font-family $font
+  font-size 18px
+  left 0
+  margin 0 15%
+  opacity 0.75
+  padding 10px
+  position fixed
+  right 0
+  text-align center
+  z-index 999999999
+  top 20px
+
+#songInfoOverlay
+  align-items top
+  display none
+  padding-left: 5px
+  position absolute
+  left: 20px
+
+  img
+    height 100px
+    width 100px
+
+  p
+    font-size 20px
+    font-family $font
+    margin 0
+    text-shadow 0 0 2px #000
+  #songInfo
+    display flex
+    flex-direction column
+    padding-left 5px
+    margin-top -7px
+  #songName
+    color $gray
+    font-weight bold
+    font-size 25px
+    padding-left 5px
+  #songSubName
+    color #94828d
+    padding-left 5px
+  #difficultyLabel
+    display flex
+    margin-top 5px
+  #songDifficulty
+    color #ffffff
+    font-size 15px
+    margin-left 5px
+
+    padding 2px 5px 3px 5px
+    border-radius: 4px
+  #songMode
+    color #ffffff
+    font-size 15px
+    margin-left 5px
+    display none
+    padding 2px 5px 3px 5px
+    border-radius: 4px
+    background-color orange
+  #songCustomDifficulty
+    color #ffffff
+    font-size 15px
+    padding 2px 8px
+    max-width 300px
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+  #modifiers
+    color #ffffff
+    font-size 15px
+    margin-left 5px
+    margin-top 5px
+  #outdatedMap
+    color red
+    font-size 15px
+    margin-left 5px
+    margin-top 5px
+    display none
+
+  #songInfoSelect
+    align-items center
+    display flex
+    padding-left: 5px
+
+  #controlsDifficulty,
+  #controlsMode
+    border 1px solid $gray
+    border-radius 5px
+    color $gray
+    cursor pointer
+    font-size 11px
+    padding 5px 10px
+    text-align center
+    transition all .1s
+    max-width: 100px
+    max-height: 28px
+    overflow: hidden
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    p
+      font-family $font
+
+  #controlsMode
+    margin-right 5px
+
+#playerInfoOverlay
+  align-items top
+  display none
+  padding-left: 5px
+  position absolute
+  left: 20px
+
+  img
+    height 100px
+    width 100px
+
+  p
+    font-size 20px
+    font-family $font
+    margin 0
+    text-shadow 0 0 2px #000
+  #playerInfo
+    display flex
+    flex-direction column
+    padding-left 5px
+    margin-top -7px
+  #playerName
+    color $gray
+    font-weight bold
+    font-size 25px
+    padding-left 5px
+  #playerCountry
+    width 25px
+    height 16px
+    padding-left 5px
+    padding-top 5px
+
+.povswitch
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20245.82%20141.73%22%3E%3Cdefs%3E%3Cstyle%3E.a%7Bfill%3A%23fff%3Bfill-rule%3Aevenodd%3B%7D%3C%2Fstyle%3E%3C%2Fdefs%3E%3Ctitle%3Emask%3C%2Ftitle%3E%3Cpath%20class%3D%22a%22%20d%3D%22M175.56%2C111.37c-22.52%2C0-40.77-18.84-40.77-42.07S153%2C27.24%2C175.56%2C27.24s40.77%2C18.84%2C40.77%2C42.07S198.08%2C111.37%2C175.56%2C111.37ZM26.84%2C69.31c0-23.23%2C18.25-42.07%2C40.77-42.07s40.77%2C18.84%2C40.77%2C42.07-18.26%2C42.07-40.77%2C42.07S26.84%2C92.54%2C26.84%2C69.31ZM27.27%2C0C11.54%2C0%2C0%2C12.34%2C0%2C28.58V110.9c0%2C16.24%2C11.54%2C30.83%2C27.27%2C30.83H99.57c2.17%2C0%2C4.19-1.83%2C5.4-3.7L116.47%2C118a8%2C8%2C0%2C0%2C1%2C12.52-.18l11.51%2C20.34c1.2%2C1.86%2C3.22%2C3.61%2C5.39%2C3.61h72.29c15.74%2C0%2C27.63-14.6%2C27.63-30.83V28.58C245.82%2C12.34%2C233.93%2C0%2C218.19%2C0H27.27Z%22%2F%3E%3C%2Fsvg%3E") 50% 50%/70% 70% no-repeat rgba(0,0,0,.35);
+  border: 0;
+  bottom: 10px;
+  cursor: pointer;
+  min-width: 50px;
+  min-height: 30px;
+  padding-right: 5%;
+  padding-top: 4%;
+  position: absolute;
+  right: 10px;
+  transition: background-color .05s ease;
+  -webkit-transition: background-color .05s ease;
+  z-index: 9999;
+  border-radius: 8px;
+
+.povswitch.mobileControl
+  position relative
+  right 0
+  bottom 0
+
+.povswitch:hover {
+  background-color: #FF94C8;
+}
+
+#settings {
+  position: absolute;
+  right: 130px;
+  bottom: 15px;
+  font-family $font
+  font-size 11px
+}
+
+input[type=range].settingRange
+  display: inline-block
+  -webkit-appearance: none
+  appearance: none
+  height: 24px
+  padding: 0;
+  margin: 0;
+  margin-left: 0.3em;
+  font: inherit;
+  outline: none;
+  color: #069
+  background: transparent;
+  box-sizing: border-box;
+  transition: opacity .2s;
+  cursor: pointer;
+  touch-action: none;
+
+/* Input range Chrome */
+input[type=range].settingRange::-webkit-slider-runnable-track
+  border: none;
+  height: 4px
+  border-radius: 2px;
+  background-color: #3f3f3f;
+
+
+input[type=range].settingRange::-webkit-slider-thumb
+  -webkit-appearance: none;
+  height: 15px
+  width: 15px
+  margin-top: -5.5px
+  border: none
+  border-radius: 50%
+  background-color: rgb(142,84,233);
+
+
+/* Input range Firefox */
+input[type=range].settingRange::-moz-range-track
+  border: none;
+  height: 4px
+  border-radius: 2px;
+  background-color: #3f3f3f;
+
+input[type=range].settingRange::-moz-range-thumb
+  height: 15px
+  width: 15px
+  border: none
+  border-radius: 50%
+  background-color: rgb(142,84,233);
+
+input[type=range].settingRange::-moz-range-progress
+  height: 4px;
+  background: transparent;
+
+@media (pointer: coarse)
+  input[type=range].settingRange
+    height: 36px
+    margin-top: -6px
+    margin-bottom: -6px
+
+  input[type=range].settingRange::-webkit-slider-thumb
+    height: 20px
+    width: 20px
+    margin-top: -8px
+
+  input[type=range].settingRange::-moz-range-thumb
+    height: 20px
+    width: 20px
+
+  #controls .speedSliderContainer input
+    height: 36px
+    margin-top: -1px
+    margin-bottom: -14px
+
+  #controls .speedSliderContainer input[type=range]::-webkit-slider-thumb
+    height: 20px
+    width: 20px
+    margin-top: -6px
+
+  #controls .speedSliderContainer input[type=range]::-moz-range-thumb
+    height: 20px
+    width: 20px
+
+.settingButton
+    border: none;
+    border-radius: 4px
+    color: white
+    padding: 4px
+    cursor: pointer
+    background-color: #3f3f3f
+
+.settingButton:disabled, button[disabled]
+    color: #6a6a6a
+
+.localMapsButtons
+    margin-top: 0.4em
+    margin-left: 0.3em
+    width: 14em
+    display: flex
+    flex-direction: column
+    gap: 0.25em
+
+#selectCustomLevelsFolder,
+#clearCustomLevelsFolder
+    font-size: 12px
+    text-align: left
+    width: 100%
+
+#customLevelsFolderStatus
+    color: #c8c8c8
+    font-size: 10px
+    margin: 2px 0 0 2px
+    max-width: 220px
+    overflow-wrap: anywhere
+    white-space: normal
+    line-height: 1.2
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 17px;
+  margin-left: 4px;
+  margin-right: 2px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #3f3f3f;
+  -webkit-transition: 0.1s;
+  transition: 0.1s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 13px;
+  width: 15px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #6e6e6e;
+  -webkit-transition: 0.1s;
+  transition: 0.1s;
+}
+
+input:checked + .slider {
+  background-color: #2f712d;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(13px);
+  -ms-transform: translateX(13px);
+  transform: translateX(13px);
+  background-color: #5ddd59;
+}
+
+/* Rounded sliders */
+.slider.round, .slider.round:before {
+  border-radius: 4px;
+}
+
+.toggleButtonLabel {
+  top: -2px;
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 17px;
+  color: $white;
+  font-size 11px
+}
+
+.toggleButtonContainer {
+  height: 0.9em;
+}
+
+.missMark {
+  width: 10px;
+  height: 10px;
+  position: absolute;
+  z-index: 2;
+ -webkit-transition: all 0.3s ease 0s;
+     transition: all 0.3s ease 0s;
+     bottom: -5px
+}
+
+.missMark:hover {
+  width: 15px;
+  height: 15px;
+  z-index: 3;
+}
+
+.timeline-filter {
+  position: absolute;
+  -webkit-transition: bottom 0.3s ease 0s;
+  transition: bottom 0.3s ease 0s;
+  bottom: -40px
+  z-index: 1;
+  overflow: hidden;
+}
+
+.acc-canvas-filter {
+  height: 0px
+  opacity: 0
+  -webkit-transition: all 0.3s ease 0s;
+  transition: all 0.3s ease 0s;
+}
+
+.acc-canvas {
+  -webkit-transition: all 0.3s ease 0s;
+  transition: all 0.3s ease 0s;
+  position: relative
+  opacity: 0
+  height: 0px
+  bottom: 0px
+     
+}
+
+.markers-canvas { 
+  position: absolute;
+  left: 0;
+  bottom: -5px;
+  height: 40px;
+  z-index: 8;
+  -webkit-transition: all 0.3s ease 0s;
+  transition: all 0.3s ease 0s;
+}
+
+#timeline:hover {
+  .missMark {
+    bottom: var(--hover-bottom);
+  }
+
+  .acc-canvas {
+    height: 150px !important;
+    bottom: 40px !important;
+    opacity: 1 !important;
+  }
+
+  .timeline-filter {
+    bottom: 3px !important;
+  }
+
+  .acc-canvas-filter {
+    height: 150px !important;
+    opacity: 1 !important;
+  }
+
+  #timelineCursor {
+    display: block;
+  }
+
+  .markers-canvas {
+    bottom: 8px;
+  }
+}
+
+#ctxMenu {
+  display: none;
+  position: absolute;
+  overflow: hidden;
+  border-radius: 6px;
+  background: rgba(28,28,28,0.9);
+  text-shadow: 0 0 2px rgb(0 0 0 / 50%);
+  -webkit-transition: opacity .1s cubic-bezier(0,0,0.2,1);
+  transition: opacity .1s cubic-bezier(0,0,0.2,1);
+  z-index: 9999;
+  font-size: 0.8em;
+}
+
+.panel-menu {
+    padding: 4px 0;
+    display: table;
+    width: 100%;
+    color: #eee;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+.menuitem {
+    display: table-row;
+    cursor: default;
+    outline: none;
+    height: 20px;
+}
+
+.menuitem:hover {
+    background: rgba(102, 102, 102, 0.9);
+}
+
+.menuitem-icon {
+    display: table-cell;
+    vertical-align: middle;
+    padding: 0 5px;
+}
+
+.menuitem-content {
+    text-align: right;
+    display: table-cell;
+    vertical-align: middle;
+    padding: 0 10px;
+}
+
+.menuitem-label {
+    font-weight: 500;
+    padding-left: 0;
+    display: table-cell;
+    vertical-align: middle;
+    padding: 0 10px;
+}
+
+.btn {
+	position: relative;
+  display:inline-block;
+	width: 30px;
+	height: 30px;
+	cursor: pointer;
+	transition: border 0.1s ease-in-out;
+  bottom: 3px;
+  right: 10px;
+}
+
+.btn:hover .bar {
+	background-color: #555;
+}
+
+.btn .bar {
+	display: inline-block;
+	position: absolute;
+	top: 10px;
+	left: 0;
+	width: 2px;
+	height: 20px;
+	border-radius: 3px;
+	background-color: white;
+	transform-origin: center;
+	transition: transform 0.4s ease-in-out, background 0.1s ease-in-out;
+}
+
+.btn.pause .bar-1 {
+	transform: translateX(13.5px) translateY(0px) rotate(0deg);
+}
+
+.btn.pause .bar-2 {
+	transform: translateX(24px) translateY(0px) rotate(0deg);
+}
+
+.btn.pause .bar-3 {
+	transform: translateX(13.5px) translateY(0px) rotate(0deg);
+}
+
+.btn.play .bar-1 {
+	transform: translateX(20px) translateY(-6px) rotate(-55deg);
+}
+
+.btn.play .bar-2 {
+	transform: translateX(20px) translateY(5px) rotate(-125deg);
+}
+
+.btn.play .bar-3 {
+	transform: translateX(12.5px) translateY(0px) rotate(0deg);
+}
+
+.range__tick {
+  fill: #a0a0a0;
+}
+
+.range__point
+  fill: #a0a0a0;
+  font-size: 10px
+  white-space: pre
+  pointer-events: auto
+  &:hover
+    fill: red
+
+.range__point_delay
+  fill: #a0a0a0;
+  font-size: 10px
+  white-space: pre
+  pointer-events: auto
+  &:hover
+    fill: red
+
+.rangeTicks {
+  position: absolute
+  bottom: 35px
+  margin-left: 1.5px
+  width: 100px
+}
+
+.rangePoints {
+  position: absolute
+  bottom: 2px
+  margin-left: 1.5px
+  width: 100px;
+  z-index: 101;
+  pointer-events: none;
+}
+
+.range__tick:first-child {
+  -webkit-transform: translateX(2px);
+  -moz-transform: translateX(2px);
+  -ms-transform: translateX(2px);
+  -o-transform: translateX(2px);
+  transform: translateX(2px);
+}
+.range__tick:last-child {
+  -webkit-transform: translateX(-3px);
+  -moz-transform: translateX(-3px);
+  -ms-transform: translateX(-3px);
+  -o-transform: translateX(-3px);
+  transform: translateX(-3px);
+}
+
+.rangePointsSvg {
+  margin-left: -6px
+  -webkit-transform: translateY(-6px);
+  -moz-transform: translateY(-6px);
+  -ms-transform: translateY(-6px);
+  -o-transform: translateY(-6px);
+  transform: translateY(-6px);
+}
+
+.jd__tick {
+  fill: #a0a0a0;
+  -webkit-transform: translateX(2px);
+  -moz-transform: translateX(2px);
+  -ms-transform: translateX(2px);
+  -o-transform: translateX(2px);
+  transform: translateX(2px);
+}
+
+.jd__point
+  fill: #a0a0a0;
+  font-size: 10px
+  white-space: pre
+  &:hover
+    fill: red
+
+.vnjsjd__tick {
+  fill: red;
+  -webkit-transform: translateX(2px);
+  -moz-transform: translateX(2px);
+  -ms-transform: translateX(2px);
+  -o-transform: translateX(2px);
+  transform: translateX(2px);
+}
+
+.vnjsjd__point
+  fill: red;
+  font-size: 10px
+  white-space: pre
+
+.rangeTicksDelay {
+  position: absolute;
+  bottom: 20px;
+  margin-left: 1.5px;
+  width: 100px;
+}
+
+.rangePointsDelay {
+  position: absolute
+  bottom: -13px
+  margin-left: 1.5px
+  width: 100px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+#jdRangePoint {
+  -webkit-transform: translateY(-8px);
+  -moz-transform: translateY(-8px);
+  -ms-transform: translateY(-8px);
+  -o-transform: translateY(-8px);
+  transform: translateY(-8px);
+}
+
+#exportSettings {
+  font-size: 12px
+}
+
+#importSettings {
+  font-size: 11.8px
+}
+
+.orthographicFullscreen
+  cursor pointer
+  position: absolute
+  width: 1.5%
+  svg
+    fill: white
+    height 100%
+    width 100%
+  .exitFullscreen
+      display none
+
+#body:not(.showControls) .orthographicFullscreen
+    .enterFullscreen
+      display none
+    .exitFullscreen
+      display none
+.orthographicFullscreen.inFullscreen
+    .enterFullscreen
+      display none
+    .exitFullscreen
+      display block
+
+#hitsounds-button
+    margin-top: 0.3em
+    margin-left: 0.3em
+    font-size: 12px
+    width: 9.6em !important
+    overflow: hidden
+
+
+#resetHitsounds
+    display: none
+    color: white
+    font-size: 13px
+    margin-left: 20px
+    cursor: pointer
+
+#randomReplay
+    display: flex;
+    position: absolute;
+    bottom: 80px;
+    background-color: black;
+    left: 55%;
+    padding: 10px;
+    border-radius: 12px;
+    max-width: 290px;
+    z-index: 10000;
+
+#randomReplayInfo
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 10px;
+    margin-left: 10px;
+
+#randomReplayImage
+    width: 60px;
+    height: 60px;
+
+#randomReplayNext
+    color: white
+#randomReplayPlayerName
+    color: white
+#randomReplaySongName
+    color: white
+
+#autoplayWarning
+  color: white;
+  font-size: 12px;
+  width: 300px;
+  display: block;
+
+.tab-container {
+  display: flex;
+}
+
+.tab-buttons {
+  width: 95px
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(13, 13, 13, 0.40)
+}
+
+.tab-button {
+  padding: 10px;
+  border: none;
+  color: white;
+  background-color: transparent
+  cursor: pointer;
+  transition: background-color 0.3s;
+  width: 100px;
+}
+
+.tab-button.active {
+  background-color: rgba(142,84,233,0.70);
+}
+
+.tab-content {
+  flex-grow: 1;
+  padding: 8px;
+}
+
+.camera-tab-pane {
+  width: 10em;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+.playback-tab-container
+  display: flex
+  flex-direction: column
+
+.playback-tab-buttons
+  display: flex
+  gap: 4px
+  border-bottom: 1px solid #3f3f3f
+  margin-bottom: 6px
+
+.playback-tab-button
+  padding: 6px 8px
+  border: none
+  color: white
+  background-color: transparent
+  cursor: pointer
+  transition: background-color 0.3s
+  font-size: 11px
+
+.playback-tab-button.active
+  background-color: rgba(142,84,233,0.70)
+  border-radius: 4px 4px 0 0
+
+.playback-tab-content
+  flex-grow: 1
+
+.playback-tab-pane
+  display: none
+
+.playback-tab-pane.active
+  display: block
+
+.orthoSettingsContainer {
+  display: flex;
+  width: 14em;
+}
+
+.patreonColors {
+  color: white; 
+  width: 100px; 
+  font-size: 0.7em; 
+  padding-bottom: 0.4em
+}
+
+.hiddenMark {
+  display: none;
+}
+
+// Hotkey notification popup
+.hotkey-notification
+  position: fixed
+  bottom: 120px
+  left: 50%
+  transform: translateX(-50%)
+  background: rgba(0, 0, 0, 0.2)
+  border-radius: 16px
+  padding: 20px 30px
+  display: flex
+  flex-direction: column
+  align-items: center
+  justify-content: center
+  gap: 12px
+  z-index: 999999999
+  min-width: 200px
+  backdrop-filter: blur(10px)
+  transition: opacity 0.2s ease, transform 0.2s ease
+  pointer-events: none
+  
+  &.hidden
+    opacity: 0
+    transform: translateX(-50%) translateY(20px)
+    
+  &.visible
+    opacity: 1
+    transform: translateX(-50%) translateY(0)
+  
+  .hotkey-icon
+    font-size: 36px
+    color: $red
+    
+  .hotkey-text
+    font-family: $font
+    font-size: 18px
+    font-weight: 500
+    color: $white
+    text-align: center
+    white-space: nowrap
+  
+  .hotkey-note
+    font-family: $font
+    font-size: 11px
+    color: rgba(255, 255, 255, 0.4)
+    text-align: center
+    margin-top: 4px
+    
+    kbd
+      display: inline-block
+      padding: 2px 5px
+      font-family: $font
+      font-size: 10px
+      font-weight: 600
+      color: rgba(255, 255, 255, 0.6)
+      background: rgba(255, 255, 255, 0.08)
+      border: 1px solid rgba(255, 255, 255, 0.15)
+      border-radius: 3px
+      margin: 0 2px
+
+// Hotkey help overlay
+.hotkey-help-overlay
+  position: fixed
+  top: 0
+  left: 0
+  width: 100%
+  height: 100%
+  background: rgba(0, 0, 0, 0.9)
+  backdrop-filter: blur(10px)
+  z-index: 9999999999
+  display: flex
+  align-items: center
+  justify-content: center
+  transition: opacity 0.3s ease
+  
+  &.hidden
+    opacity: 0
+    pointer-events: none
+    
+  &.visible
+    opacity: 1
+    pointer-events: all
+
+.hotkey-help-content
+  width: 80%
+  height: 80%
+  max-width: 1200px
+  max-height: 900px
+  background: rgba(20, 20, 20, 0.95)
+  border-radius: 20px
+  border: 2px solid rgba(209, 23, 105, 0.3)
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5)
+  display: flex
+  flex-direction: column
+  overflow: hidden
+  animation: slideIn 0.3s ease
+
+@keyframes slideIn
+  from
+    transform: scale(0.95)
+    opacity: 0
+  to
+    transform: scale(1)
+    opacity: 1
+
+.hotkey-help-header
+  padding: 30px 40px
+  background: linear-gradient(135deg, rgba(209, 23, 105, 0.2) 0%, rgba(140, 18, 72, 0.2) 100%)
+  border-bottom: 2px solid rgba(209, 23, 105, 0.3)
+  display: flex
+  justify-content: space-between
+  align-items: center
+  
+  h1
+    font-family: $font
+    font-size: 32px
+    font-weight: 700
+    color: $white
+    margin: 0
+    display: flex
+    align-items: center
+    gap: 15px
+    
+    i
+      color: $red
+
+.hotkey-help-close
+  background: none
+  border: none
+  color: $white
+  font-size: 28px
+  cursor: pointer
+  padding: 5px 10px
+  border-radius: 8px
+  transition: background 0.2s ease, color 0.2s ease
+  
+  &:hover
+    background: rgba(209, 23, 105, 0.2)
+    color: $red
+
+.hotkey-help-sections
+  flex: 1
+  overflow-y: auto
+  padding: 40px
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr))
+  gap: 30px
+  align-content: start
+
+.hotkey-help-section
+  h2
+    font-family: $font
+    font-size: 20px
+    font-weight: 600
+    color: $red
+    margin: 0 0 15px 0
+    display: flex
+    align-items: center
+    gap: 10px
+
+.hotkey-help-table
+  width: 100%
+  border-collapse: separate
+  border-spacing: 0 8px
+  
+  tr
+    background: rgba(255, 255, 255, 0.03)
+    transition: background 0.2s ease
+    
+    &:hover
+      background: rgba(209, 23, 105, 0.1)
+  
+  td
+    padding: 12px 15px
+    font-family: $font
+    
+    &:first-child
+      border-radius: 8px 0 0 8px
+    
+    &:last-child
+      border-radius: 0 8px 8px 0
+
+.hotkey-keys
+  white-space: nowrap
+  width: 40%
+  
+  kbd
+    display: inline-block
+    padding: 6px 12px
+    font-family: $font
+    font-size: 13px
+    font-weight: 600
+    color: $white
+    background: rgba(255, 255, 255, 0.1)
+    border: 2px solid rgba(255, 255, 255, 0.2)
+    border-radius: 6px
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.2)
+    margin: 0 4px
+    min-width: 30px
+    text-align: center
+
+.hotkey-action
+  color: $gray
+  font-size: 14px
+
+.hotkey-help-footer
+  padding: 20px 40px
+  background: rgba(0, 0, 0, 0.3)
+  border-top: 1px solid rgba(255, 255, 255, 0.1)
+  text-align: center
+  
+  p
+    margin: 0
+    font-family: $font
+    font-size: 14px
+    color: $gray
+    display: flex
+    align-items: center
+    justify-content: center
+    gap: 8px
+    
+    i
+      color: $red
+    
+    kbd
+      display: inline-block
+      padding: 4px 8px
+      font-family: $font
+      font-size: 12px
+      font-weight: 600
+      color: $white
+      background: rgba(255, 255, 255, 0.1)
+      border: 1px solid rgba(255, 255, 255, 0.2)
+      border-radius: 4px
+      margin: 0 2px
+
+// Scrollbar styling for help overlay
+.hotkey-help-sections::-webkit-scrollbar
+  width: 10px
+
+.hotkey-help-sections::-webkit-scrollbar-track
+  background: rgba(0, 0, 0, 0.3)
+  border-radius: 5px
+
+.hotkey-help-sections::-webkit-scrollbar-thumb
+  background: rgba(209, 23, 105, 0.5)
+  border-radius: 5px
+  
+  &:hover
+    background: rgba(209, 23, 105, 0.7)
+
+// Mobile responsive
+@media screen and (max-width: 900px)
+  .hotkey-help-content
+    width: 95%
+    height: 95%
+  
+  .hotkey-help-sections
+    grid-template-columns: 1fr
+    padding: 20px
+    gap: 20px
+  
+  .hotkey-help-header
+    padding: 20px
+    
+    h1
+      font-size: 24px
+
+@media screen and (max-width: 500px)
+  .hotkey-help-header h1
+    font-size: 20px
+    
+    i
+      display: none
+  
+  .hotkey-help-close
+    font-size: 20px
+  
+  .hotkey-help-table td
+    padding: 8px 10px
+    font-size: 12px
+  
+  .hotkey-keys kbd
+    padding: 4px 8px
+    font-size: 11px

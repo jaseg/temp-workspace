@@ -1,0 +1,77 @@
+<a-entity id="stage">
+	<a-entity
+		id="audioColumns"
+		bind__visible="settings.showAudioColumns"
+		audio-columns="analyser: #audioAnalyser; height: 28; mirror: 18; scale: 9; thickness: 0.6; separation: 0.55"
+		position="0 -19 5"></a-entity>
+
+	<a-entity
+		id="twister"
+		position="0 0 -35"
+		rotation="90 0 0"
+		bind__visible="settings.showTwister"
+		bind__twister="enabled: isPlaying; visible: settings.showTwister"></a-entity>
+
+	<a-entity
+		id="substage"
+		animation__rotationY="property: object3D.rotation.y; from: 0; to: 0; dur: 600; easing: easeInOutQuad; startEvents: spawnRotationStart"
+		position="0 -1 0">
+		<a-entity
+			bind__visible="settings.showPlatform"
+			render-order="background"
+			id="stageObj"
+			obj-model="obj: #stageNormalObj"
+			materials="name: stageNormal"></a-entity>
+
+		<!-- Lasers left. -->
+		<a-entity
+			id="leftStageLasers"
+			render-order="middle"
+			bind__visible="settings.showLasers"
+			stage-lasers="side: left"
+			bind__stage-lasers="rotating: isPlaying && !settings.noEffects">
+			<a-entity obj-model="obj: #leftLaserObj" materials="name: stageAdditive" position="-5 2 -40" scale="1 5 1"></a-entity>
+			<a-entity obj-model="obj: #leftLaserObj" materials="name: stageAdditive" position="-5 2 -44" scale="1 5 1"></a-entity>
+			<a-entity obj-model="obj: #leftLaserObj" materials="name: stageAdditive" position="-5 2 -48" scale="1 5 1"></a-entity>
+			<a-entity obj-model="obj: #leftLaserObj" materials="name: stageAdditive" position="-5 2 -52" scale="1 5 1"></a-entity>
+			<a-entity obj-model="obj: #leftLaserObj" materials="name: stageAdditive" position="-5 2 -56" scale="1 5 1"></a-entity>
+		</a-entity>
+
+		<!-- Lasers right. -->
+		<a-entity
+			id="rightStageLasers"
+			render-order="middle"
+			bind__visible="settings.showLasers"
+			stage-lasers="side: right"
+			bind__stage-lasers="rotating: isPlaying && !settings.noEffects">
+			<a-entity obj-model="obj: #rightLaserObj" materials="name: stageAdditive" position="5 2 -40" scale="1 5 1"></a-entity>
+			<a-entity obj-model="obj: #rightLaserObj" materials="name: stageAdditive" position="5 2 -44" scale="1 5 1"></a-entity>
+			<a-entity obj-model="obj: #rightLaserObj" materials="name: stageAdditive" position="5 2 -48" scale="1 5 1"></a-entity>
+			<a-entity obj-model="obj: #rightLaserObj" materials="name: stageAdditive" position="5 2 -52" scale="1 5 1"></a-entity>
+			<a-entity obj-model="obj: #rightLaserObj" materials="name: stageAdditive" position="5 2 -56" scale="1 5 1"></a-entity>
+		</a-entity>
+
+		<a-entity
+			bind__visible="settings.showPlatform"
+			render-order="additive"
+			id="stageadditiveobj"
+			obj-model="obj: #stageAdditiveObj"
+			materials="name: stageAdditive"></a-entity>
+	</a-entity>
+	<a-entity
+		id="lightFixture"
+		bind__visible="settings.showLight"
+		animation__rotationY="property: object3D.rotation.y; from: 0; to: 0; dur: 600; easing: easeInOutQuad; startEvents: spawnRotationStart">
+		<a-entity light="type: point; intensity: 10" position="-8 4 2"> </a-entity>
+		<a-entity light="type: point; intensity: 10" position="8 4 2"> </a-entity>
+	</a-entity>
+
+	<a-entity
+		id="floor"
+		data-saber-particles
+		bind__visible="settings.showFloor"
+		geometry="primitive: plane; width: 3; height: 2"
+		rotation="-90 0 0"
+		material="shader: floorShader; normalMap: #floorNormalsImg; envMap: #floorEnvImg; hitLeft: -999 0 0; hitRight: -999 0 0"
+		raycastable-game></a-entity>
+</a-entity>

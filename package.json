@@ -1,0 +1,59 @@
+{
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cross-env NODE_ENV=production webpack",
+    "start": "cross-env NODE_ENV=development webpack serve",
+    "lint": "semistandard | snazzy",
+    "lint:fix": "semistandard --fix",
+    "predeploy": "npm run build && shx mkdir -p .ghpages && shx cp -r index.html assets build vendor .ghpages",
+    "deploy": "gh-pages -d .ghpages -r git@github.com:supermedium/beatsaver-viewer.git && shx rm -rf .ghpages"
+  },
+  "dependencies": {
+    "drag-drop": "^7.2.0",
+    "jszip": "^3.10.1",
+    "nosleep.js": "^0.12.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
+    "autoprefixer": "^10.4.20",
+    "babel-loader": "^9.2.1",
+    "buffer": "^6.0.3",
+    "cross-env": "^7.0.3",
+    "css-loader": "^7.1.2",
+    "css-minimizer-webpack-plugin": "^8.0.0",
+    "gh-pages": "^6.3.0",
+    "mini-css-extract-plugin": "^2.9.2",
+    "nunjucks": "^3.2.4",
+    "postcss": "^8.4.49",
+    "postcss-loader": "^8.1.1",
+    "semistandard": "^17.0.0",
+    "shx": "^0.3.4",
+    "snazzy": "^9.0.0",
+    "style-loader": "^4.0.0",
+    "stylus": "^0.64.0",
+    "stylus-loader": "^8.1.0",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.0"
+  },
+  "overrides": {
+    "sockjs": {
+      "uuid": "^11.1.1"
+    }
+  },
+  "semistandard": {
+    "globals": [
+      "AFRAME",
+      "THREE"
+    ],
+    "ignore": [
+      "build/**",
+      "vendor/**"
+    ]
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
