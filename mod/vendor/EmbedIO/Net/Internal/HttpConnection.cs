@@ -24,42 +24,67 @@ namespace EmbedIO.Net.Internal
         private RequestStream? _iStream;
         private ResponseStream? _oStream;
         private bool _contextBound;
-        private int _sTimeout = 90000; // 90k ms for first request, 15k ms from then on        
+        private int _sTimeout;        
         private HttpListener? _lastListener;
         private InputState _inputState = InputState.RequestLine;
         private LineState _lineState = LineState.None;
         private int _position;
         private string? _errorMessage;
 
-        public HttpConnection(Socket sock, EndPointListener epl)
+        private HttpConnection(Socket sock, EndPointListener epl, Stream stream)
         {
             _sock = sock;
             _epl = epl;
             IsSecure = epl.Secure;
             LocalEndPoint = (IPEndPoint) sock.LocalEndPoint;
             RemoteEndPoint = (IPEndPoint) sock.RemoteEndPoint;
-
-            Stream = new NetworkStream(sock, false);
-            if (IsSecure)
-            {
-                var sslStream = new SslStream(Stream, true);
-
-                try
-                {
-                    sslStream.AuthenticateAsServer(epl.Listener.Certificate);
-                }
-                catch
-                {
-                    CloseSocket();
-                    throw;
-                }
-
-                Stream = sslStream;
-            }
+            Stream = stream;
+            _sTimeout = (int) epl.Listener.FirstRequestTimeout.TotalMilliseconds;
 
             _timer = new Timer(OnTimeout, null, Timeout.Infinite, Timeout.Infinite);
             _context = null!; // Silence warning about uninitialized field - _context will be initialized by the Init method
             Init();
+        }
+
+        // LiveViewer patch: asynchronous TLS handshake with a timeout and a pluggable TLS implementation.
+        public static async Task<HttpConnection> CreateAsync(Socket sock, EndPointListener epl)
+        {
+            Stream stream = new NetworkStream(sock, false);
+            if (epl.Secure)
+            {
+                var listener = epl.Listener;
+                using var cts = new CancellationTokenSource(listener.TlsHandshakeTimeout);
+                using var closeOnTimeout = cts.Token.Register(() => sock.Close());
+                try
+                {
+                    var factory = listener.TlsStreamFactory;
+                    if (factory != null)
+                    {
+                        stream = await factory(stream, listener.Certificate!, cts.Token).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        var sslStream = new SslStream(stream, true);
+                        await sslStream.AuthenticateAsServerAsync(listener.Certificate).ConfigureAwait(false);
+                        stream = sslStream;
+                    }
+                }
+                catch
+                {
+                    stream.Dispose();
+                    sock.Close();
+                    throw;
+                }
+
+                if (cts.IsCancellationRequested)
+                {
+                    stream.Dispose();
+                    sock.Close();
+                    throw new TimeoutException("TLS handshake timed out.");
+                }
+            }
+
+            return new HttpConnection(sock, epl, stream);
         }
 
         public int Reuses { get; private set; }
@@ -71,6 +96,8 @@ namespace EmbedIO.Net.Internal
         public IPEndPoint RemoteEndPoint { get; }
 
         public bool IsSecure { get; }
+
+        public int MaxWebSocketMessageBytes => _epl.Listener.MaxWebSocketMessageBytes;
 
         public ListenerPrefix? Prefix { get; set; }
 
@@ -95,7 +122,7 @@ namespace EmbedIO.Net.Internal
             {
                 if (Reuses == 1)
                 {
-                    _sTimeout = 15000;
+                    _sTimeout = (int) _epl.Listener.KeepAliveTimeout.TotalMilliseconds;
                 }
 
                 _ = _timer.Change(_sTimeout, Timeout.Infinite);
@@ -198,7 +225,8 @@ namespace EmbedIO.Net.Internal
 
         private async Task OnReadInternal(int offset)
         {
-            _ = _timer.Change(Timeout.Infinite, Timeout.Infinite);
+            // LiveViewer patch: the request timeout keeps running until the whole header has arrived, so a client
+            // can't hold the connection open by trickling bytes.
 
             // Continue reading until full header is received.
             // Especially important for multipart requests when the second part of the header arrives after a tiny delay
@@ -208,7 +236,7 @@ namespace EmbedIO.Net.Internal
                 try
                 {
                     await _ms.WriteAsync(_buffer, 0, offset).ConfigureAwait(false);
-                    if (_ms.Length > 32768)
+                    if (_ms.Length > _epl.Listener.MaxRequestHeaderBytes)
                     {
                         Close(true);
                         return;
@@ -230,6 +258,8 @@ namespace EmbedIO.Net.Internal
 
                 if (ProcessInput(_ms))
                 {
+                    _ = _timer.Change(Timeout.Infinite, Timeout.Infinite);
+
                     if (_errorMessage is null)
                     {
                         _context.HttpListenerRequest.FinishInitialization();

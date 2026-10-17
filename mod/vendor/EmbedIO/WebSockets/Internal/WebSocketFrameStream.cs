@@ -23,6 +23,11 @@ namespace EmbedIO.WebSockets.Internal
             var frame = ProcessHeader(await _stream.ReadBytesAsync(2).ConfigureAwait(false));
 
             await ReadExtendedPayloadLengthAsync(frame).ConfigureAwait(false);
+
+            // LiveViewer patch: refuse oversized frames before allocating their payload.
+            if (frame.FullPayloadLength > (ulong)webSocket.MaxInboundMessageBytes)
+                throw new WebSocketException(CloseStatusCode.TooBig, "A frame has a long payload length.");
+
             await ReadMaskingKeyAsync(frame).ConfigureAwait(false);
             await ReadPayloadDataAsync(frame).ConfigureAwait(false);
 

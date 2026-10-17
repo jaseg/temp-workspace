@@ -251,15 +251,41 @@ namespace EmbedIO.Net.Internal
                 return;
             }
 
+            _ = epl.SetupConnectionAsync(accepted);
+        }
+
+        // LiveViewer patch: filter peers before reading anything and run the TLS handshake asynchronously with a
+        // timeout, so slow or silent clients can neither block the accept path nor tie up thread pool threads.
+        private async System.Threading.Tasks.Task SetupConnectionAsync(Socket accepted)
+        {
             HttpConnection conn;
             try
             {
-                conn = new HttpConnection(accepted, epl);
+                var filter = Listener.AcceptFilter;
+                if (filter != null && !filter((IPEndPoint) accepted.RemoteEndPoint))
+                {
+                    accepted.Dispose();
+                    return;
+                }
+
+                accepted.NoDelay = Listener.NoDelay;
+                conn = await HttpConnection.CreateAsync(accepted, this).ConfigureAwait(false);
             }
             catch
             {
+                try
+                {
+                    accepted.Dispose();
+                }
+                catch
+                {
+                    // ignored
+                }
+
                 return;
             }
+
+            var epl = this;
 
             lock (epl._unregistered)
             {

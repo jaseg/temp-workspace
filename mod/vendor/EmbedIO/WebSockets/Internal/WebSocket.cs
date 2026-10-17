@@ -35,12 +35,16 @@ namespace EmbedIO.WebSockets.Internal
         private AutoResetEvent? _receivePong;
         private Stream? _stream;
 
-        private WebSocket(HttpConnection connection)
+        private WebSocket(HttpConnection connection, int maxInboundMessageBytes)
         {
+            MaxInboundMessageBytes = maxInboundMessageBytes;
             _closeConnection = connection.ForceClose;
             _stream = connection.Stream;
             _readyState = WebSocketState.Open;
         }
+
+        // LiveViewer patch: upper bound for inbound frames and reassembled fragmented messages.
+        internal int MaxInboundMessageBytes { get; }
 
         ~WebSocket()
         {
@@ -230,7 +234,7 @@ namespace EmbedIO.WebSockets.Internal
             // Signal the original response that headers have been sent.
             httpContext.HttpListenerResponse.HeadersSent = true;
 
-            var socket = new WebSocket(httpContext.Connection);
+            var socket = new WebSocket(httpContext.Connection, httpContext.Connection.MaxWebSocketMessageBytes);
             socket.Open();
             return socket;
         }
@@ -242,7 +246,7 @@ namespace EmbedIO.WebSockets.Internal
                 return false;
             }
 
-            await _stream.WriteAsync(frameAsBytes, 0, frameAsBytes.Length).ConfigureAwait(false);
+            await WriteSerializedAsync(frameAsBytes).ConfigureAwait(false);
 
             return _receivePong != null && _receivePong.WaitOne(timeout);
         }
@@ -316,7 +320,7 @@ namespace EmbedIO.WebSockets.Internal
 
             if (sent)
             {
-                await _stream.WriteAsync(frameAsBytes, 0, frameAsBytes.Length, cancellationToken).ConfigureAwait(false);
+                await WriteSerializedAsync(frameAsBytes).ConfigureAwait(false);
             }
 
             if (receive && sent)
@@ -408,6 +412,11 @@ namespace EmbedIO.WebSockets.Internal
 
                 _fragmentsBuffer = new FragmentBuffer(frame.Opcode, frame.IsCompressed);
                 InContinuation = true;
+            }
+
+            if ((ulong)_fragmentsBuffer.Length + frame.PayloadData.Length > (ulong)MaxInboundMessageBytes)
+            {
+                throw new WebSocketException(CloseStatusCode.TooBig, "A fragmented message is too big.");
             }
 
             _fragmentsBuffer.AddPayload(frame.PayloadData.ApplicationData);
@@ -510,8 +519,24 @@ namespace EmbedIO.WebSockets.Internal
                 }
             }
 
-            var frameAsBytes = frame.ToArray();
-            return _stream.WriteAsync(frameAsBytes, 0, frameAsBytes.Length);
+            return WriteSerializedAsync(frame.ToArray());
+        }
+
+        // LiveViewer patch: frames are written one at a time. Streams such as SslStream don't support concurrent
+        // writes, and control frames (pong, close) are sent from the receive loop while the application sends data.
+        private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
+
+        private async Task WriteSerializedAsync(byte[] frameAsBytes)
+        {
+            await _writeLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await _stream.WriteAsync(frameAsBytes, 0, frameAsBytes.Length).ConfigureAwait(false);
+            }
+            finally
+            {
+                _ = _writeLock.Release();
+            }
         }
 
         private void StartReceiving()

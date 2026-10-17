@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using IPEndPoint = System.Net.IPEndPoint;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,6 +57,49 @@ namespace EmbedIO.Net
         /// The certificate.
         /// </value>
         internal X509Certificate? Certificate { get; }
+
+        // LiveViewer patch: connection hardening and TLS hooks. See VENDORED.md.
+
+        /// <summary>
+        /// Called for every accepted socket before any byte is read; returning <c>false</c> closes the socket.
+        /// </summary>
+        public Func<IPEndPoint, bool>? AcceptFilter { get; set; }
+
+        /// <summary>
+        /// Performs the server side of the TLS handshake on the given network stream and returns the stream to use.
+        /// When <c>null</c>, <see cref="System.Net.Security.SslStream"/> is used.
+        /// </summary>
+        public Func<Stream, X509Certificate, CancellationToken, Task<Stream>>? TlsStreamFactory { get; set; }
+
+        /// <summary>
+        /// Maximum time a client may take to complete the TLS handshake.
+        /// </summary>
+        public TimeSpan TlsHandshakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Maximum time a client may take to send a complete request header (first request on a connection).
+        /// </summary>
+        public TimeSpan FirstRequestTimeout { get; set; } = TimeSpan.FromSeconds(90);
+
+        /// <summary>
+        /// Maximum time a keep-alive connection may stay idle, and to send the header of later requests.
+        /// </summary>
+        public TimeSpan KeepAliveTimeout { get; set; } = TimeSpan.FromSeconds(15);
+
+        /// <summary>
+        /// Maximum size of a request header in bytes.
+        /// </summary>
+        public int MaxRequestHeaderBytes { get; set; } = 32768;
+
+        /// <summary>
+        /// Maximum size of an inbound WebSocket frame or reassembled fragmented message, in bytes.
+        /// </summary>
+        public int MaxWebSocketMessageBytes { get; set; } = 1024 * 1024;
+
+        /// <summary>
+        /// Sets <see cref="System.Net.Sockets.Socket.NoDelay"/> on accepted sockets.
+        /// </summary>
+        public bool NoDelay { get; set; } = true;
 
         /// <inheritdoc />
         public void Start()
