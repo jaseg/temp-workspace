@@ -47,7 +47,7 @@ namespace LiveViewer.Server.Web
 
             var headers = context.Response.Headers;
             headers["Content-Security-Policy"] =
-                "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
+                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
                 "img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; " +
                 $"connect-src 'self' blob: wss://{host}; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
             headers["X-Content-Type-Options"] = "nosniff";

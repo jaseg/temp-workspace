@@ -8,7 +8,8 @@
     "lint:fix": "semistandard --fix",
     "predeploy": "npm run build && shx mkdir -p .ghpages && shx cp -r index.html assets build vendor .ghpages",
     "deploy": "gh-pages -d .ghpages -r git@github.com:supermedium/beatsaver-viewer.git && shx rm -rf .ghpages",
-    "build:live": "cross-env NODE_ENV=production LIVE=1 webpack && node scripts/package-live.js"
+    "build:live": "cross-env NODE_ENV=production LIVE=1 webpack && node scripts/package-live.js",
+    "build:demo": "cross-env NODE_ENV=production LIVE_DEMO=1 webpack && node scripts/package-live.js --demo"
   },
   "dependencies": {
     "drag-drop": "^7.2.0",
@@ -49,7 +50,8 @@
     "globals": [
       "AFRAME",
       "THREE",
-      "LIVE_MODE"
+      "LIVE_MODE",
+      "LIVE_DEMO"
     ],
     "ignore": [
       "build/**",

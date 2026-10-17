@@ -11,11 +11,21 @@ const {chromium} = require('playwright');
 	const browser = await chromium.launch({args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']});
 	const page = await browser.newPage({ignoreHTTPSErrors: true, viewport: {width: Number(process.env.VW || 1280), height: Number(process.env.VH || 720)}});
 	const errors = [];
-	page.on('pageerror', e => errors.push('pageerror: ' + (e.stack || e)));
+	page.on('pageerror', e => errors.push('pageerror: ' + (e.stack || e).split('\n').slice(0, 4).join(' | ')));
 	page.on('console', m => {
 		if ((m.type() === 'error' || m.type() === 'warning') && !m.text().startsWith('THREE.WebGL')) errors.push(m.type() + ': ' + m.text());
 	});
 	page.on('requestfailed', r => errors.push('requestfailed: ' + r.url() + ' ' + (r.failure() && r.failure().errorText)));
+	const events = [];
+	await page.exposeFunction('__logEvent', e => events.push(e));
+	await page.addInitScript(() => {
+		const watched = ['replayloadstart', 'replayloaded', 'challengeloadend', 'songprocessingstart', 'songprocessingfinish', 'usergesturereceive', 'gamemenuresume', 'gamemenurestart', 'pausegame', 'finishgame', 'audioanalysersource'];
+		const orig = EventTarget.prototype.dispatchEvent;
+		EventTarget.prototype.dispatchEvent = function (e) {
+			if (watched.includes(e.type)) window.__logEvent(Math.round(performance.now()) + ' ' + e.type);
+			return orig.call(this, e);
+		};
+	});
 	await page.goto(url);
 	// A click is the user gesture browsers require before audio may play.
 	await page.waitForTimeout(3000);
@@ -58,11 +68,14 @@ const {chromium} = require('playwright');
 			isPlaying: state.isPlaying,
 			flags: {isPaused: state.isPaused, songBuffer: state.isSongBufferProcessing, replayLoading: state.replay && state.replay.isLoading, localReplay: state.localReplay, gesture: state.hasReceivedUserGesture, loadError: state.challenge.hasLoadError},
 			notesLen: state.notes ? state.notes.length : null,
+			songSource: !!(scene && scene.components.song.source),
+			beatsProcessed: !!(scene && scene.components['beat-generator'].beatDataProcessed),
 			challengeLoading: state.challenge.isLoading,
 			beatsOnScreen: document.querySelectorAll('#beatContainer > [beat]').length,
 		};
 	});
 	console.log(JSON.stringify(result, null, 2));
+	console.log('events: ' + events.join(', '));
 	console.log(errors.slice(0, 40).join('\n'));
 	await browser.close();
 })();

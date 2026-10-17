@@ -1338,6 +1338,8 @@ AFRAME.registerComponent('song-controls', {
 	},
 
 	makeTimelineOverlay: function (replayData, songDuration, target) {
+		// The timeline graph needs the whole replay; live play has no timeline.
+		if (LIVE_MODE) return;
 		const notes = replayData.notes;
 		const pauses = replayData.replay.pauses;
 
@@ -1709,7 +1711,9 @@ AFRAME.registerComponent('song-controls', {
 			this.el.sceneEl.emit('timechanged', {newTime: this.song.getCurrentTime()}, null);
 		}
 
-		this.timelineFilter.style.width = this.timeline.getBoundingClientRect().width * percent + 'px';
+		if (this.timelineFilter) {
+			this.timelineFilter.style.width = this.timeline.getBoundingClientRect().width * percent + 'px';
+		}
 
 		if (this.song.speed > 0 && 'mediaSession' in navigator) {
 			navigator.mediaSession.setPositionState({

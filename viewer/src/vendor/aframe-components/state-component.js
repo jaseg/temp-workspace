@@ -92,11 +92,161 @@ var selectFunctions = {};
  */
 function select(state, selector, item) {
   if (!selectFunctions[selector]) {
-    selectFunctions[selector] = new Function('state', 'item', 'return ' + generateExpression(selector) + ';');
+    selectFunctions[selector] = compileExpression(selector);
   }
   return selectFunctions[selector](state, item);
 }
 module.exports.select = select;
+
+/**
+ * Compiles a bind expression (a small subset of JavaScript: state paths, number and string literals,
+ * ! - + * / % comparisons && || ?: and parentheses) into a function, without eval, so the page runs
+ * under a Content-Security-Policy without 'unsafe-eval'. Root names resolve against the state, except
+ * `item` (bind-for items).
+ */
+function compileExpression(source) {
+  var tokens = tokenizeExpression(source);
+  var pos = 0;
+
+  function peek() { return tokens[pos]; }
+  function take(value) {
+    var token = tokens[pos];
+    if (value !== undefined && (!token || token.value !== value)) {
+      throw new Error('Unexpected ' + (token ? token.value : 'end') + ' in bind expression: ' + source);
+    }
+    pos++;
+    return token;
+  }
+  function isOp(value) { var t = peek(); return t && t.type === 'op' && t.value === value; }
+
+  function parseTernary() {
+    var cond = parseBinary(0);
+    if (!isOp('?')) { return cond; }
+    take('?');
+    var yes = parseTernary();
+    take(':');
+    var no = parseTernary();
+    return function (s, i) { return cond(s, i) ? yes(s, i) : no(s, i); };
+  }
+
+  var LEVELS = [['||'], ['&&'], ['===', '!==', '==', '!='], ['<=', '>=', '<', '>'], ['+', '-'], ['*', '/', '%']];
+  var BINARY = {
+    '||': function (a, b) { return a || b; },
+    '&&': function (a, b) { return a && b; },
+    '===': function (a, b) { return a === b; },
+    '!==': function (a, b) { return a !== b; },
+    '==': function (a, b) { return a == b; }, // eslint-disable-line eqeqeq
+    '!=': function (a, b) { return a != b; }, // eslint-disable-line eqeqeq
+    '<=': function (a, b) { return a <= b; },
+    '>=': function (a, b) { return a >= b; },
+    '<': function (a, b) { return a < b; },
+    '>': function (a, b) { return a > b; },
+    '+': function (a, b) { return a + b; },
+    '-': function (a, b) { return a - b; },
+    '*': function (a, b) { return a * b; },
+    '/': function (a, b) { return a / b; },
+    '%': function (a, b) { return a % b; }
+  };
+
+  function parseBinary(level) {
+    if (level === LEVELS.length) { return parseUnary(); }
+    var left = parseBinary(level + 1);
+    while (peek() && peek().type === 'op' && LEVELS[level].indexOf(peek().value) !== -1) {
+      var op = take().value;
+      var right = parseBinary(level + 1);
+      left = (function (l, r, op) {
+        if (op === '||') { return function (s, i) { return l(s, i) || r(s, i); }; }
+        if (op === '&&') { return function (s, i) { return l(s, i) && r(s, i); }; }
+        var fn = BINARY[op];
+        return function (s, i) { return fn(l(s, i), r(s, i)); };
+      })(left, right, op);
+    }
+    return left;
+  }
+
+  function parseUnary() {
+    if (isOp('!')) { take(); var a = parseUnary(); return function (s, i) { return !a(s, i); }; }
+    if (isOp('-')) { take(); var b = parseUnary(); return function (s, i) { return -b(s, i); }; }
+    return parsePrimary();
+  }
+
+  function parsePrimary() {
+    var token = take();
+    if (!token) { throw new Error('Unexpected end of bind expression: ' + source); }
+    if (token.type === 'number' || token.type === 'string') {
+      var value = token.value;
+      return function () { return value; };
+    }
+    if (token.type === 'op' && token.value === '(') {
+      var inner = parseTernary();
+      take(')');
+      return inner;
+    }
+    if (token.type === 'name') {
+      if (token.value === 'true') { return function () { return true; }; }
+      if (token.value === 'false') { return function () { return false; }; }
+      if (token.value === 'null') { return function () { return null; }; }
+      var path = [token.value];
+      while (isOp('.')) { take(); path.push(take().value); }
+      return function (s, i) {
+        var obj = path[0] === 'item' ? i : s[path[0]];
+        for (var k = 1; k < path.length && obj !== undefined && obj !== null; k++) { obj = obj[path[k]]; }
+        return obj;
+      };
+    }
+    throw new Error('Unexpected ' + token.value + ' in bind expression: ' + source);
+  }
+
+  var fn = parseTernary();
+  if (pos !== tokens.length) { throw new Error('Unexpected ' + tokens[pos].value + ' in bind expression: ' + source); }
+  return fn;
+}
+module.exports.compileExpression = compileExpression;
+
+var OPERATORS = ['===', '!==', '==', '!=', '<=', '>=', '&&', '||', '<', '>', '+', '-', '*', '/', '%', '!', '?', ':', '(', ')', '.'];
+function tokenizeExpression(source) {
+  var tokens = [];
+  var i = 0;
+  while (i < source.length) {
+    var c = source[i];
+    if (/\s/.test(c)) { i++; continue; }
+    var m;
+    if ((m = /^\d+(\.\d+)?/.exec(source.slice(i)))) {
+      tokens.push({type: 'number', value: parseFloat(m[0])});
+      i += m[0].length;
+      continue;
+    }
+    if ((m = /^[A-Za-z_$][\w$-]*/.exec(source.slice(i)))) {
+      tokens.push({type: 'name', value: m[0]});
+      i += m[0].length;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      var str = '';
+      i++;
+      while (i < source.length && source[i] !== c) {
+        if (source[i] === '\\' && i + 1 < source.length) {
+          var e = source[i + 1];
+          str += e === 'n' ? '\n' : e === 't' ? '\t' : e;
+          i += 2;
+        } else {
+          str += source[i++];
+        }
+      }
+      i++;
+      tokens.push({type: 'string', value: str});
+      continue;
+    }
+    var op = null;
+    for (var k = 0; k < OPERATORS.length; k++) {
+      if (source.substr(i, OPERATORS[k].length) === OPERATORS[k]) { op = OPERATORS[k]; break; }
+    }
+    if (!op) { throw new Error('Unexpected character ' + c + ' in bind expression: ' + source); }
+    tokens.push({type: 'op', value: op});
+    i += op.length;
+  }
+  return tokens;
+}
 
 var DOT_NOTATION_RE = /\.([A-Za-z][\w_-]*)/g;
 var WHITESPACE_RE = /\s/g;

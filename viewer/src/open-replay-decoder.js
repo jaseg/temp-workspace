@@ -501,3 +501,4 @@ function DecodeTrickFrame(dataView) {
 
 module.exports.checkBSOR = checkBSOR;
 module.exports.NoteEventType = NoteEventType;
+module.exports.decode = decode;

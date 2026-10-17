@@ -6,6 +6,7 @@
 
 import {T, Reader, SessionEndReason, readNoteEvent} from './protocol';
 import {LiveConnection} from './connection';
+import {DemoConnection} from './demo';
 import {SongClock} from './clock';
 import {LiveOverlay} from './overlay';
 import {LiveAudioSync} from './audio';
@@ -38,7 +39,7 @@ export class LiveSession {
 		this.loader = replayLoader;
 		this.scene = replayLoader.el.sceneEl;
 		this.overlay = new LiveOverlay();
-		this.connection = new LiveConnection({
+		this.connection = new (LIVE_DEMO ? DemoConnection : LiveConnection)({
 			state: (state, detail) => this.onConnectionState(state, detail),
 			message: (type, reader, receivedAt) => this.onMessage(type, reader, receivedAt),
 		});
@@ -76,7 +77,26 @@ export class LiveSession {
 		return (this.currentSongTime() - frames[frames.length - 1].time) * 1000;
 	}
 
+	// Live play must never stay stuck behind the audio pipeline's "processing" flag: once the map is loaded
+	// and the flag has been up for a while, clear it. Live timing doesn't depend on the audio. (Seen rarely in headless tests; cause not pinned down.)
+	checkStuckProcessing() {
+		const state = this.scene.systems.state.state;
+		const song = this.scene.components.song;
+		if (!this.active || !this.challengeLoaded || !state.isSongBufferProcessing || !song) {
+			this.processingSince = null;
+			return;
+		}
+		const now = performance.now();
+		if (this.processingSince == null) this.processingSince = now;
+		if (now - this.processingSince > 3000) {
+			console.warn('[live] audio processing flag stuck; clearing it');
+			this.processingSince = null;
+			this.scene.emit('songprocessingfinish', null, false);
+		}
+	}
+
 	updateStats() {
+		this.checkStuckProcessing();
 		const clock = this.connection.clock;
 		const frames = this.replay ? this.replay.frames : [];
 		const last = frames[frames.length - 1];

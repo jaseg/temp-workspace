@@ -56,3 +56,4 @@ play.html
 
 # Live build output (served by the Beat Saber mod)
 /dist-live
+/dist-demo
