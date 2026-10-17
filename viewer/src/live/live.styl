@@ -52,7 +52,7 @@
 #liveOverlay .liveStats[hidden]
   display none
 
-// Live play can't be scrubbed, sped up or paused: hide those controls.
+// Live play can't be scrubbed, sped up or paused, and has no player avatar: hide those controls.
 body.liveMode
-  #timeline, #controls .playButton, #controls .speedControl, .timeControls
+  #timeline, #controlsPause, .speedSliderContainer, .songEffectiveSpeed, #playerAvatar
     display none !important
