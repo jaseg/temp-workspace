@@ -62,7 +62,7 @@ const {chromium} = require('playwright');
 			poses: s && s.stats.poses,
 			rttMs: s && s.connection.clock.rttMs,
 			songTime: s && s.currentSongTime(),
-			audio: s && {context: document.querySelector('a-scene').components.song.context.state, driftMs: s.audio.lastDrift === null ? null : s.audio.lastDrift * 1000},
+			audio: s && {context: document.querySelector('a-scene').components.song.context.state, driftMs: s.audio.lastDrift === null ? null : s.audio.lastDrift * 1000, correction: s.audio.correction, seeks: s.audio.seeks},
 			scored: s && s.loader.allStructs.length,
 			score: state.score && {score: state.score.score, combo: state.score.combo, accuracy: state.score.accuracy, misses: state.score.misses},
 			isPlaying: state.isPlaying,

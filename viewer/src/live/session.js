@@ -121,7 +121,7 @@ export class LiveSession {
 			`newest pose  ${fmt(ageMs)} ms old`,
 			`predict      ${this.predictMs} ms`,
 			`horizon      ${fmt(this.horizonMs())} ms`,
-			`audio drift  ${this.audio.lastDrift === null ? '–' : (this.audio.lastDrift * 1000).toFixed(1)} ms`,
+			`audio drift  ${this.audio.lastDrift === null ? '–' : (this.audio.lastDrift * 1000).toFixed(1)} ms, rate ${(this.audio.correction * 100).toFixed(1)} %, ${this.audio.seeks} seeks`,
 			`song time    ${fmt(this.active ? this.currentSongTime() : null)} s`,
 		]);
 	}

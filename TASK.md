@@ -111,8 +111,6 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 - **Map colors** (estimate below, option 1 recommended): not started.
 - **Reconnect handling.** After a dropped connection the viewer re-downloads the whole map. Keep the files when the
   session id and hash are unchanged.
-- **Audio sync.** It re-seeks when the drift exceeds 40 ms, which is audible. Consider small playback-rate
-  adjustments instead.
 - **Scan cost:** 19 levels take 1.9 s on the Frame on first scan. A persistent cache keyed by the folder stamp
   would help large libraries.
 - **Safari / iOS** may not play Ogg Vorbis in `<audio>` (preview and live song).
