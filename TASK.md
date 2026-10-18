@@ -54,9 +54,8 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
   screen, so the main menu (menu screen, suggestion pack) needs someone to put the headset on.
 - **Network:** the firewall allows TCP/UDP 1024–65535 on wlan0; avahi already announces `frame.local`, so
   `https://frame.local:4280/` works without our own mDNS.
-- **Levels:** this instance has its own `CustomLevels` (19 levels). BSManager's shared maps
-  (`SharedContent/SharedMaps`, 73 levels) are linked only into the Steam install; turning on map sharing for the
-  1.44.1 instance in BSManager would make them playable and listed.
+- **Levels:** the instance's `CustomLevels` links to BSManager's shared maps (1841 levels; map sharing turned on by
+  the owner).
 
 ## Status
 
@@ -78,42 +77,33 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 
 ### On the Frame (needs someone in the headset)
 
-- **Recorder:** play a custom level and watch it live . Check
-  poses, cuts, misses, walls, pause/resume, end reasons, the player's name and late join.
-- **Menu screen:** the Live Viewer button, waiting room approval (allow once / always / deny), remembered devices,
-  the BeatLeader toggle. Then turn `DevAutoApprove` off in `UserData/LiveViewer.json`.
-- **Suggestion pack:** check that "Suggested by viewers" appears in Custom Levels, updates when viewers change
-  the list, and doesn't disturb level selection (it calls SongCore's `RefreshLevelPacks`).
-- **SongCore folders:** check the level browser picks up the folders SongCore loads (log line "Level folders: …").
+- **Checked in the headset (2026-10-18):** live view of real play (notes, walls, sabers, cover, modifiers, the
+  Steam player name), pause/resume, the level browser with 1841 shared levels, the "Suggested by viewers" pack,
+  no out-of-memory kill after the scan fix.
+- **Deployed, not yet seen in the headset:** the approval list updating while the Live Viewer screen is open,
+  the paused overlay, arcs and chains, the pack's cover, the level list's "still loading" state.
+- **Not checked yet:** end reasons, late join, BeatLeader's own UI and score upload with the ARM64 `yoga.dll`,
+  the Ogg fallback on a real older Safari.
 - **Latency:**
   - Pose capture point: now Zenject `LateTick`, like BeatLeader. Compare with `Application.onBeforeRender`.
   - Measure Wi-Fi latency and the game-thread cost (CPU, GC) at 120 Hz.
   - Tune the viewer's prediction (default 16 ms, `?predict=`).
 
-### Decisions and setup for the owner
+### Decisions for the owner
 
-- **Shared maps:** turn on map sharing for the 1.44.1 instance in BSManager (or approve doing it), so the 73
-  shared levels are playable and listed. It changes files outside the instance folder.
-- **Upstream BeatLeader mod:** replaced the 1.40.2 build with `BeatLeader-0.10.0-bs1.42+.zip` and an ARM64
-  `yoga.dll` (`frame/yoga-arm64/`). It now starts. Check in the headset that its UI shows and a score uploads.
-- **CI:** tier 1 (every push: C# tests, viewer build, dev host + browser smoke tests with checked-in fixtures);
-  tier 2 (build against each game version's assemblies, check reflected field names); tier 3 (self-hosted runner
-  playing a replay in each game version without VR and comparing the stream); tier 4 (the same nightly on the
-  Frame). Not started.
+- **CI** (on hold): tier 1 (every push: C# tests, viewer build, dev host + browser smoke tests with checked-in
+  fixtures); tier 2 (build against each game version's assemblies, check reflected field names); tier 3
+  (self-hosted runner playing a replay in each game version without VR and comparing the stream); tier 4 (the
+  same nightly on the Frame).
+- **Upstreaming the BeatLeader fix** (ARM64 `yoga.dll`): not started.
+- **Map colors** (estimate below, option 1 recommended): not started.
 
 ### Software
 
-- **Not needed after all:** our own mDNS responder (avahi announces `frame.local`). A DNS-SD service record would
-  only help apps that browse for services, not browsers.
-- **Certificate regeneration** from the menu.
-- **Playlist:** maybe remove a level automatically once the player has played it; the in-game pack could
-  also be a `.bplist` playlist if PlaylistManager is installed. Older entries keep the name their viewer had then.
-- **Map colors** (estimate below, option 1 recommended): not started.
-- **Reconnect handling.** After a dropped connection the viewer re-downloads the whole map. Keep the files when the
-  session id and hash are unchanged.
-- **Scan cost:** 19 levels take 1.9 s on the Frame on first scan. A persistent cache keyed by the folder stamp
-  would help large libraries.
 - **QR handoff mode** (later; see `PLAN.md`).
+- **Not doing:** certificate management from the menu, a `.bplist` of the viewer playlist (owner's decisions);
+  our own mDNS responder (avahi already announces `frame.local`); arc and chain counts in the level details
+  (in the game they'd need the difficulty files read).
 
 ### Map colors and environments: estimate
 
@@ -162,8 +152,11 @@ environments.
   - In the container, the server-side path measured a median 0.6 ms from capture to receipt in the browser.
   - The viewer extrapolates about 26 ms (median) past the newest pose at 60 fps: the 16 ms prediction, 5 ms
     simulated latency, and up to one pose interval.
-- **Map file allow-list.** The fake-live host allows every file listed in info.dat, all difficulties included. The
-  viewer only requests what it needs. (The level library is narrower: cover and song only, by kind.)
+- **Unexplained out-of-memory kill at 12:12 on 2026-10-18.** The level-scan cause (fixed) doesn't explain it: the
+  scan found no levels then. It happened during the SongCore file-blacklist reconnect loop, fixed since; map
+  transfers are gone, and 190 reconnects against the dev host left the server's memory flat.
+- **CSP warning in Firefox** about a blocked inline script: the page has none, and Chromium reports nothing;
+  probably injected by a browser extension. Harmless.
 - **The level page also receives the live stream** (poses every frame), since it shares the viewer's connection.
   That's about 12 KB/s per viewer.
 - **The waiting room approves by match code only.** The approval screen shows IP and browser to help, but anyone
