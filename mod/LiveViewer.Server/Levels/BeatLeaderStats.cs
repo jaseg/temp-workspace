@@ -62,7 +62,7 @@ namespace LiveViewer.Server.Levels
     /// </summary>
     public sealed class BeatLeaderStats
     {
-        public static readonly TimeSpan CacheFor = TimeSpan.FromHours(12);
+        public static readonly TimeSpan CacheFor = TimeSpan.FromDays(3.1);
         public static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(2);
 
         private readonly object _lock = new object();
