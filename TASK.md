@@ -34,13 +34,29 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 
 | Path | What |
 |---|---|
-| `mod/LiveViewer.Server/` | Web server the mod hosts (netstandard2.0, no game references). Contains the waiting room, protocol, live feed and an embedded test page. |
+| `mod/LiveViewer.Server/` | Web server the mod hosts (netstandard2.0, no game references). Contains the waiting room, protocol, live feed, level library, suggestions and an embedded test page. |
+| `mod/LiveViewer.Plugin/` | The BSIPA plugin (net472): runs the server in the game, streams gameplay, menu screen, in-game suggestion pack. Builds against `mod/refs/` (game assemblies, not in git; see `mod/README.md`). |
 | `mod/LiveViewer.Host/` | Development host: runs the server outside the game and streams a `.bsor` replay in real time ("fake live"). |
 | `mod/LiveViewer.Server.Tests/` | xunit unit and integration tests (TLS on loopback). |
 | `mod/vendor/EmbedIO/` | Vendored EmbedIO with hardening patches (`VENDORED.md`). |
 | `mod/PROTOCOL.md` | WebSocket protocol. |
-| `mod/tools/` | Headless-Chromium smoke tests (test page, live viewer, song transitions). |
+| `mod/tools/` | Headless-Chromium smoke tests (test page, live viewer, song transitions, level browser, suggestions). |
 | `viewer/` | Live viewer: a fork of BeatLeader/BeatSaber-Web-Replays (imported as a git subtree), cut down to live play only (`viewer/README.md`). |
+
+## The Frame
+
+- **Target:** the BSManager instance `~/.local/share/BSManager/BSInstances/1.44.1` (native ARM64 via bs-arm64
+  v0.3.2, Proton 11.0 ARM64, BSIPA, SiraUtil, BSML, SongCore). The Steam folder itself holds an unmodded x64 1.45.3.
+  Changes on the Frame outside the instance folder need the owner's explicit approval.
+- **Deploy:** copy `package/Plugins` and `package/Libs` into the instance, then start it with
+  `bs-arm64.sh launch <instance>` (from `~/.local/share/BSManager/cache/bs-arm64/bs-arm64-v0.3.2-proton-11.0-2c`).
+  Logs: `<instance>/Logs/`. Started over SSH with nobody in the headset, the game stops at the health-warning
+  screen, so the main menu (menu screen, suggestion pack, DevAutoPlayLevel) needs someone to put the headset on.
+- **Network:** the firewall allows TCP/UDP 1024–65535 on wlan0; avahi already announces `frame.local`, so
+  `https://frame.local:4280/` works without our own mDNS.
+- **Levels:** this instance has its own `CustomLevels` (19 levels). BSManager's shared maps
+  (`SharedContent/SharedMaps`, 73 levels) are linked only into the Steam install; turning on map sharing for the
+  1.44.1 instance in BSManager would make them playable and listed.
 
 ## Status
 
@@ -51,65 +67,76 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 | 2b. Self-contained demo build (`npm run build:demo`), published as a claude.ai artifact | Done |
 | 2c. Viewer made live-only: replay-mode code removed, "Request to watch" button before the waiting room | Done |
 | 2d. Waiting-room codes are three words from the PGP word list | Done |
-| 2e. Level browser: installed custom levels, map and BeatLeader stats, audio preview (dev host and demo) | Done |
-| 0. On-device spike (needs SSH to a Frame) | Open |
-| 3. BSIPA plugin on the Frame | Open |
+| 2e. Level browser: installed custom levels, map and BeatLeader stats, audio preview | Done, checked on the Frame |
+| 2f. Top bar (Live / Levels), shared level suggestions, "Suggested by viewers" pack in the game | Web side checked on the Frame; in-game pack untested |
+| 0. On-device spike: server in the game under Proton (TLS, wss, binding) | Done |
+| 3. BSIPA plugin on the Frame | Server and level browser work in the game; recorder and menu screen built, untested in game |
 | 4. Latency tuning on the real device | Open |
 | 5. Polish | Open |
 
 ## Outstanding tasks
 
-### Needs the Frame (milestones 0, 3, 4)
+### On the Frame (needs someone in the headset)
 
-- **Spike inside the game's Mono under Proton:**
-  - `SslStream` server mode with our certificate. Fallback: BouncyCastle TLS through EmbedIO's
-    `TlsStreamFactory` hook.
-  - EmbedIO serving wss.
-  - Wine networking and binding.
-  - mDNS coexisting with SteamOS's avahi on UDP 5353.
-  - Firewall for TCP 4280 and UDP 5353.
-- **mDNS / DNS-SD announcement** (Makaretu.Dns.Multicast). Not implemented yet.
-- **`LiveViewer.Plugin` (BSIPA):**
-  - Port of BeatLeader's `ReplayRecorder`: poses every frame, note cut (immediate) and final (after the swing
-    rating), walls, height, pause/resume, session start/end.
-  - Map file allow-list from the level's info.dat.
-  - BSML screens: status and URLs, waiting room (allow once / allow and remember / deny), approved devices with
-    revoke.
-  - Embedding `viewer/dist` (as a zip resource).
-  - Build against the game's reference assemblies from the Frame.
-- **Latency on the device:**
-  - Choose the pose capture point (`Application.onBeforeRender` vs after `PlayerTransforms`).
-  - Measure Wi-Fi latency.
+- **Recorder:** play a custom level and watch it live (or set `DevAutoPlayLevel` and put the headset on). Check
+  poses, cuts, misses, walls, pause/resume, end reasons, the player's name and late join.
+- **Menu screen:** the Live Viewer button, waiting room approval (allow once / always / deny), remembered devices,
+  the BeatLeader toggle. Then turn `DevAutoApprove` off in `UserData/LiveViewer.json`.
+- **Suggestion pack:** check that "Suggested by viewers" appears in Custom Levels, updates when viewers change
+  the list, and doesn't disturb level selection (it calls SongCore's `RefreshLevelPacks`).
+- **SongCore folders:** check the level browser picks up the folders SongCore loads (log line "Level folders: …").
+- **Latency:**
+  - Pose capture point: now Zenject `LateTick`, like BeatLeader. Compare with `Application.onBeforeRender`.
+  - Measure Wi-Fi latency and the game-thread cost (CPU, GC) at 120 Hz.
   - Tune the viewer's prediction (default 16 ms, `?predict=`).
-  - Check the game-thread CPU and GC cost.
-
-### Level browser follow-ups
-
-- **In the plugin:** point `LiveServerOptions.LevelFolders` at `Beat Saber_Data/CustomLevels` (and
-  `CustomWIPLevels` if wanted; SongCore's extra folders from its config). Add a menu toggle for BeatLeader
-  stats, which sets `LiveServerOptions.BeatLeader`. It's off unless enabled, since it tells BeatLeader which
-  levels viewers look at.
-- **Scan cost on the Frame.** The first scan reads every Info.dat and difficulty file to count notes and compute
-  hashes (8 levels: about 1 s on the dev container). It runs off the game thread, but a large library on the Frame
-  may take a while. Measure it there, and consider a persistent cache keyed by the folder stamp.
-- **v4 hashes.** For v2/v3 Info.dat the hash matches BeatSaver's (checked on 8 real maps). For v4 it hashes
-  Info.dat, the audio data file and each beatmap and lightshow file once, in order; this has not been checked
-  against SongCore with a real v4 map.
-- **Safari / iOS** may not play Ogg Vorbis in `<audio>`. The preview then says the browser can't play the file.
-  The live viewer has the same limitation.
-- **More from BeatLeader**, if wanted: play counts and top scores need more API calls per level.
 
 ### Software
 
-- **`gameVersion` in the session.** Add it to the server's `SessionInfo` and the SessionStart JSON. The viewer's
-  note-id matching depends on it for chains on game versions ≥ 1.29; the fake-live host passes nothing today.
-- **Certificate regeneration** from the menu, and showing its fingerprint there.
+- **Not needed after all:** our own mDNS responder (avahi announces `frame.local`). A DNS-SD service record would
+  only help apps that browse for services, not browsers.
+- **Certificate regeneration** from the menu.
+- **Suggestions:** maybe remove a suggestion automatically once the player has played it; the in-game pack could
+  also be a `.bplist` playlist if PlaylistManager is installed.
 - **Reconnect handling.** After a dropped connection the viewer re-downloads the whole map. Keep the files when the
   session id and hash are unchanged.
 - **Audio sync.** It re-seeks when the drift exceeds 40 ms, which is audible. Consider small playback-rate
-  adjustments instead. It is also untested with the `<audio>` element path used at speeds other than 1.
-- **Late join:** check the score and combo shown when joining mid-song against the game's own numbers.
+  adjustments instead.
+- **Scan cost:** 19 levels take 1.9 s on the Frame on first scan. A persistent cache keyed by the folder stamp
+  would help large libraries.
+- **Safari / iOS** may not play Ogg Vorbis in `<audio>` (preview and live song).
 - **QR handoff mode** (later; see `PLAN.md`).
+
+### Map colors and environments: estimate
+
+What the viewer does today:
+
+- **Colors:** fixed defaults from BeatLeader's viewer (red/blue notes and sabers, pink/blue lights), changeable in
+  the viewer's settings panel. Map color schemes (v2 `_customData` colors, `_colorSchemes`, v4 `colorSchemes`) are
+  parsed for v4 Info.dat but never applied, and the player's own color override in the game isn't sent.
+- **Environment:** one generic stage for every map (floor, two laser columns, rings, background, tunnel). The map's
+  environment name is ignored.
+- **Lighting:** v2 basic events (types 0–4, 8, 9, 12, 13) flash, fade and spin the generic stage; v3 basic events
+  are converted to those. v3 group lighting (`lightColorEventBoxGroups` etc.) is ignored, and v4 lightshow files are
+  not loaded at all, so most recent maps show a static stage.
+
+Options, cheapest first:
+
+1. **Correct colors, about 1–2 days.** The mod sends the game's resolved color scheme
+   (`GameplayCoreSceneSetupData.colorScheme`: sabers, lights 0/1 and boost, walls) in SessionStart. It is
+   what the player actually sees: their override, else the map's scheme, else the environment's. The viewer
+   applies it to notes, sabers, trails, walls and lights; its color code already updates at runtime. The level
+   browser could show each map's own scheme as swatches (half a day, optional).
+2. **Lighting for recent maps on the generic stage, about 1–2 weeks.** Load v4 lightshow files (already in the
+   session's file list) and v3 event boxes, and map group lighting (filters, distributions, easing) onto the
+   stage's few light groups. Right colors and rhythm, not the real layout. Chroma per-light colors: 2–3 more days.
+3. **Real environments: weeks, and a licensing problem.** The game's environment models are Beat Games' assets in
+   Unity bundles; they can't be shipped with the viewer, and converting them from the game files inside the mod
+   is heavy and fragile. The realistic route is hand-built look-alikes with the right light groups and IDs, about
+   3–5 days each once option 2 exists, starting with the few environments most custom maps use. Vivify and other
+   custom environments are out of reach.
+
+Recommendation: option 1 now, option 2 if lightshows matter, option 3 only for the two or three most used
+environments.
 
 ## Known issues
 
