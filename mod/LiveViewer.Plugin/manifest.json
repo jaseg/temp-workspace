@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bsmg/BSIPA-MetadataFileSchema/master/Schema.json",
+  "id": "LiveViewer",
+  "name": "Live Viewer",
+  "author": "jaseg",
+  "version": "0.1.0",
+  "gameVersion": "1.44.1",
+  "description": "Watch your game live in 3D in a browser on the local network.",
+  "dependsOn": {
+    "BSIPA": "^4.3.0",
+    "SiraUtil": "^3.1.0",
+    "SongCore": "^3.14.0",
+    "BeatSaberMarkupLanguage": "^1.12.0"
+  }
+}

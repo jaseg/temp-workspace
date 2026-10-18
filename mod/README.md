@@ -5,6 +5,7 @@
 | `LiveViewer.Server/` | The web server the mod hosts. `netstandard2.0` with **no Unity or game references**. Includes the waiting room, protocol, live feed and an embedded test page (`www/`). |
 | `LiveViewer.Host/` | Development host (`net8.0`). Runs the server outside the game and plays a BeatLeader replay into it in real time ("fake live"). |
 | `LiveViewer.Server.Tests/` | Unit and integration tests (xunit). The integration tests run the real server over TLS on loopback. |
+| `LiveViewer.Plugin/` | The BSIPA plugin (`net472`): starts the server, streams gameplay (`Recording/`, adapted from BeatLeader's ReplayRecorder) and adds the "Live Viewer" menu screen (`UI/`). |
 | `vendor/EmbedIO/` | Vendored EmbedIO with local hardening patches; see `VENDORED.md`. |
 | `tools/browser-smoke.cjs` | Opens the test page in headless Chromium against a running host and reports latency stats. |
 | `tools/viewer-smoke.cjs` | Same for the real viewer (`--www ../viewer/dist`): screenshots, errors, score state, extrapolation horizon. |
@@ -14,9 +15,6 @@
 
 Both viewer scripts press "Request to watch" first.
 
-The BSIPA plugin (`LiveViewer.Plugin`) comes in milestone 3. It needs the game's
-assemblies to build.
-
 ## Build and test
 
 You need the .NET 8 SDK.
@@ -25,6 +23,31 @@ You need the .NET 8 SDK.
 dotnet build LiveViewer.sln -c Release
 dotnet test LiveViewer.Server.Tests
 ```
+
+## Plugin
+
+The plugin builds against the game's own assemblies, which aren't in the repository. Copy them from a
+Beat Saber 1.44.1 install with BSIPA, SiraUtil, SongCore and BSML into `refs/` (gitignored), for example from
+the Frame's BSManager instance:
+
+```sh
+I=.local/share/BSManager/BSInstances/1.44.1
+rsync -a --include='*.dll' --exclude='*' "steamos@frame:$I/Beat Saber_Data/Managed/" refs/Managed/
+rsync -a --include='*.dll' --exclude='*' "steamos@frame:$I/Plugins/" refs/Plugins/
+rsync -a "steamos@frame:$I/Libs/" refs/Libs/
+```
+
+Build the viewer first (`npm run build` in `../viewer`); the plugin embeds `viewer/dist` as a zip. Then
+`dotnet build LiveViewer.Plugin -c Release` writes `LiveViewer.Plugin/bin/Release/net472/package/`, whose
+`Plugins/` and `Libs/` go into the game folder.
+
+Settings are in `UserData/LiveViewer.json`; the certificate and remembered devices in `UserData/LiveViewer/`.
+`BeatLeaderStats` can also be switched from the menu screen. Two settings exist for testing on the device
+without anyone in the headset and must stay off otherwise:
+
+- `DevAutoApprove`: lets every waiting browser in.
+- `DevAutoPlayLevel`: `"<hash>"` or `"<hash> <Difficulty>"`; plays that level with No Fail once the main menu
+  is up.
 
 ## Fake live
 

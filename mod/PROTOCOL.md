@@ -82,7 +82,7 @@ f32 cutDistanceToCenter, f32 cutAngle, f32 beforeCutRating, f32 afterCutRating
   "hash": "…", "songName": "…", "songSubName": "…", "songAuthor": "…", "mapper": "…",
   "difficulty": "ExpertPlus", "mode": "Standard", "environment": "…", "modifiers": "FS,NF",
   "playerName": "…", "leftHanded": false, "playerHeight": 1.75, "jumpDistance": 18.6,
-  "noteJumpSpeed": 18, "startTime": 0, "songSpeed": 1,
+  "noteJumpSpeed": 18, "startTime": 0, "songSpeed": 1, "gameVersion": "1.44.1",
   "files": { "info": "Info.dat", "difficulty": "ExpertPlus.dat", "audio": "song.egg", "cover": "cover.jpg" }
 }
 ```

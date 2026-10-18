@@ -73,6 +73,16 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
+        public void HashesInfoDatTextWithoutByteOrderMark()
+        {
+            var dir = Level("bom", ("Info.dat", V2Info), ("Expert.dat", V2Difficulty), ("ExpertPlus.dat", V3Difficulty));
+            var info = Path.Combine(dir, "Info.dat");
+            File.WriteAllBytes(info, new byte[] { 0xEF, 0xBB, 0xBF }.Concat(File.ReadAllBytes(info)).ToArray());
+
+            Assert.Equal(Sha1(V2Info, V2Difficulty, V3Difficulty), LevelReader.Read(dir)!.Hash);
+        }
+
+        [Fact]
         public void ReadsV4Info()
         {
             const string info = @"{""version"":""4.0.0"",""song"":{""title"":""Four"",""subTitle"":""S"",""author"":""A""},
@@ -90,7 +100,8 @@ namespace LiveViewer.Server.Tests
                 ("Lights.dat", "lights"), ("song.ogg", "x"));
             var level = LevelReader.Read(dir)!;
 
-            Assert.Equal(Sha1(info, "bpm", v4, "lights", "{}"), level.Hash);
+            // Like SongCore: audio data, then each difficulty's beatmap and lightshow, a shared lightshow twice.
+            Assert.Equal(Sha1(info, "bpm", v4, "lights", "{}", "lights"), level.Hash);
             Assert.Equal(("Four", "One, Two", "WeaveEnvironment", 200.0, 201.5), (level.SongName, level.Mapper, level.Environment, level.Bpm, level.Duration));
             Assert.Null(level.CoverFile); // listed but missing
             Assert.Equal((1, 0, 1, 2, 1), (level.Difficulties[0].Notes, level.Difficulties[0].Bombs, level.Difficulties[0].Walls, level.Difficulties[0].Arcs, level.Difficulties[0].Chains));
@@ -176,9 +187,33 @@ namespace LiveViewer.Server.Tests
             Page(44100 * 3, new byte[100]);
             File.WriteAllBytes(path, bytes.ToArray());
 
-            Assert.Equal(3.0, OggDuration.TryRead(path), 3);
+            Assert.Equal(3.0, AudioDuration.TryRead(path), 3);
             File.WriteAllText(path, "RIFF....WAVE");
-            Assert.Equal(0, OggDuration.TryRead(path));
+            Assert.Equal(0, AudioDuration.TryRead(path));
+        }
+
+        [Fact]
+        public void ReadsWavDuration()
+        {
+            var path = Path.Combine(_root, "song.wav");
+            var wav = new List<byte>();
+            wav.AddRange(Encoding.ASCII.GetBytes("RIFF"));
+            wav.AddRange(BitConverter.GetBytes(0));
+            wav.AddRange(Encoding.ASCII.GetBytes("WAVEfmt "));
+            wav.AddRange(BitConverter.GetBytes(16));
+            wav.AddRange(new byte[] { 1, 0, 2, 0 });
+            wav.AddRange(BitConverter.GetBytes(44100));
+            wav.AddRange(BitConverter.GetBytes(44100 * 4));
+            wav.AddRange(new byte[] { 4, 0, 16, 0 });
+            wav.AddRange(Encoding.ASCII.GetBytes("LIST"));
+            wav.AddRange(BitConverter.GetBytes(3));
+            wav.AddRange(new byte[4]); // odd chunk plus its pad byte
+            wav.AddRange(Encoding.ASCII.GetBytes("data"));
+            wav.AddRange(BitConverter.GetBytes(44100 * 4 * 2));
+            wav.AddRange(new byte[44100 * 4 * 2]);
+            File.WriteAllBytes(path, wav.ToArray());
+
+            Assert.Equal(2.0, AudioDuration.TryRead(path), 3);
         }
 
         private sealed class FakeApi : IBeatLeaderApi

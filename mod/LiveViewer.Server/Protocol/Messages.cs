@@ -52,6 +52,7 @@ namespace LiveViewer.Server.Protocol
                 .Field("noteJumpSpeed", info.NoteJumpSpeed)
                 .Field("startTime", info.StartTime)
                 .Field("songSpeed", info.SongSpeed)
+                .Field("gameVersion", info.GameVersion)
                 .Field("files", info.Files)
                 .ToString();
             return new MessageWriter(512).U8(MessageType.SessionStart).U32(sessionId).String(json).ToArray();

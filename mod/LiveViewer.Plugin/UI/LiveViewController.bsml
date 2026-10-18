@@ -1,0 +1,44 @@
+<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xsi:noNamespaceSchemaLocation='https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd'>
+  <vertical horizontal-fit='Unconstrained' vertical-fit='Unconstrained' pad='3' spacing='1' child-align='UpperCenter' child-expand-height='false'>
+    <text text='~status-text' font-size='4.5' align='Center' word-wrapping='true' rich-text='true' />
+    <text text='~fingerprint-text' font-size='2.8' align='Center' color='#aaaaaa' />
+
+    <text text='Waiting to watch' font-size='4.5' align='Left' color='#ffd060' active='~has-pending' />
+    <text text='Nobody is waiting. Viewers who open the address above and ask to watch show up here with three words, which their screen shows too.'
+          font-size='3' align='Center' word-wrapping='true' color='#bbbbbb' active='~no-pending' />
+    <custom-list id='pending-list' contents='pending' visible-cells='4' cell-size='8.5' clickable-cells='false' stick-scrolling='true' active='~has-pending' pref-height='34'>
+      <horizontal pad-left='2' pad-right='2' spacing='1' child-expand-width='false' child-align='MiddleLeft'>
+        <vertical pref-width='70' child-align='MiddleLeft' spacing='-1'>
+          <text text='~code' font-size='4.2' rich-text='true' />
+          <text text='~detail' font-size='2.6' color='#aaaaaa' />
+        </vertical>
+        <button text='Allow once' on-click='allow-once' pref-width='22' pref-height='7' />
+        <button text='Always allow' on-click='allow-always' pref-width='24' pref-height='7' />
+        <button text='Deny' on-click='deny' pref-width='14' pref-height='7' />
+      </horizontal>
+    </custom-list>
+
+    <horizontal spacing='2' pad-top='1'>
+      <text text='~devices-text' font-size='3.2' align='Left' />
+      <button text='Remembered devices…' click-event='show-devices' pref-height='7' active='~has-devices' />
+      <toggle-setting text='BeatLeader star ratings' value='beatleader' apply-on-change='true' bind-value='true'
+                      hover-hint='Level browser: fetch star ratings from BeatLeader. Tells BeatLeader which levels viewers look at. Applies after a restart.' />
+    </horizontal>
+  </vertical>
+
+  <modal id='devices-modal' show-event='show-devices' hide-event='hide-devices' size-delta-x='110' size-delta-y='62' move-to-center='true' click-off-closes='true'>
+    <vertical pad='2' spacing='1' child-expand-height='false'>
+      <text text='Remembered devices' font-size='4.5' align='Center' />
+      <custom-list id='devices-list' contents='devices' visible-cells='5' cell-size='8' clickable-cells='false' pref-height='42'>
+        <horizontal pad-left='2' pad-right='2' child-expand-width='false' child-align='MiddleLeft'>
+          <vertical pref-width='80' child-align='MiddleLeft' spacing='-1'>
+            <text text='~label' font-size='3.6' />
+            <text text='~seen' font-size='2.6' color='#aaaaaa' />
+          </vertical>
+          <button text='Forget' on-click='revoke' pref-width='18' pref-height='7' />
+        </horizontal>
+      </custom-list>
+      <button text='Close' click-event='hide-devices' pref-width='24' />
+    </vertical>
+  </modal>
+</bg>

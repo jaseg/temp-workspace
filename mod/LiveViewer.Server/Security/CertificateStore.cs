@@ -119,7 +119,9 @@ namespace LiveViewer.Server.Security
 
             var certificate = generator.Generate(new Asn1SignatureFactory("SHA256WITHRSA", keyPair.Private, random));
 
-            var store = new Pkcs12StoreBuilder().Build();
+            // DER, not BouncyCastle's default BER with indefinite lengths: Mono's PKCS#12 parser only reads DER
+            // ("Unable to decode certificate" in the game).
+            var store = new Pkcs12StoreBuilder().SetUseDerEncoding(true).Build();
             store.SetKeyEntry("server", new AsymmetricKeyEntry(keyPair.Private), new[] { new X509CertificateEntry(certificate) });
             using var stream = new MemoryStream();
             store.Save(stream, Password.ToCharArray(), random);

@@ -93,9 +93,10 @@ Console commands while running:
                 NoteJumpSpeed = map.NoteJumpSpeed,
                 StartTime = info.StartTime,
                 SongSpeed = info.Speed > 0 ? info.Speed : 1,
+                GameVersion = info.GameVersion,
                 Files = map.Files,
             };
-            var mapSource = new MapDirectory(map.Directory, map.Files.Values);
+            var mapSource = map.Source;
 
             var serverOptions = new LiveServerOptions
             {

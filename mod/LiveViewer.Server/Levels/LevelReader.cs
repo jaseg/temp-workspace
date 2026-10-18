@@ -81,11 +81,14 @@ namespace LiveViewer.Server.Levels
                 return null;
             }
 
-            var infoBytes = File.ReadAllBytes(infoPath);
+            // SongCore hashes the text as the game read it (File.ReadAllText: BOM stripped, invalid UTF-8 replaced),
+            // re-encoded as UTF-8, not the raw file.
+            var infoText = File.ReadAllText(infoPath);
+            var infoBytes = System.Text.Encoding.UTF8.GetBytes(infoText);
             JObject root;
             try
             {
-                root = JObject.Parse(System.Text.Encoding.UTF8.GetString(infoBytes));
+                root = JObject.Parse(infoText);
             }
             catch (JsonException)
             {
@@ -102,7 +105,7 @@ namespace LiveViewer.Server.Levels
                 Added = new DateTimeOffset(infoFile.LastWriteTimeUtc).ToUnixTimeSeconds(),
             };
 
-            // Files hashed after Info.dat, in SongCore's order.
+            // Files hashed after Info.dat, in SongCore's order. A file listed twice is hashed twice, as SongCore does.
             var hashed = new List<string>();
             var difficultyFiles = new List<(DifficultyInfo info, string? file)>();
 
@@ -176,13 +179,7 @@ namespace LiveViewer.Server.Levels
                 {
                     var file = Actual(Str(d, "beatmapDataFilename"));
                     var lightshow = Actual(Str(d, "lightshowDataFilename"));
-                    foreach (var f in new[] { file, lightshow })
-                    {
-                        if (f != null && !hashed.Contains(f))
-                        {
-                            hashed.Add(f);
-                        }
-                    }
+                    hashed.AddRange(new[] { file, lightshow }.Where(f => f != null)!);
 
                     if (d["beatmapAuthors"] is JObject authors && authors["mappers"] is JArray names)
                     {
@@ -237,7 +234,7 @@ namespace LiveViewer.Server.Levels
 
             if (level.Duration <= 0 && level.AudioFile != null)
             {
-                level.Duration = OggDuration.TryRead(Path.Combine(directory, level.AudioFile));
+                level.Duration = AudioDuration.TryRead(Path.Combine(directory, level.AudioFile));
             }
 
             return level;
@@ -365,7 +362,8 @@ namespace LiveViewer.Server.Levels
     }
 
     /// <summary>Song length of an Ogg Vorbis file (.ogg / .egg) from its headers, without decoding.</summary>
-    internal static class OggDuration
+    /// <summary>Song length from an Ogg Vorbis (.ogg/.egg) or WAV file's headers, without decoding.</summary>
+    internal static class AudioDuration
     {
         public static double TryRead(string path)
         {
@@ -375,6 +373,12 @@ namespace LiveViewer.Server.Levels
                 {
                     var head = new byte[Math.Min(stream.Length, 4096)];
                     ReadFully(stream, head);
+                    if (head.Length >= 12 && System.Text.Encoding.ASCII.GetString(head, 0, 4) == "RIFF"
+                        && System.Text.Encoding.ASCII.GetString(head, 8, 4) == "WAVE")
+                    {
+                        return WavDuration(head, stream.Length);
+                    }
+
                     var rate = SampleRate(head);
                     if (rate <= 0)
                     {
@@ -398,6 +402,31 @@ namespace LiveViewer.Server.Levels
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException)
             {
+            }
+
+            return 0;
+        }
+
+        private static double WavDuration(byte[] head, long fileLength)
+        {
+            // Chunks after "RIFF<size>WAVE": "fmt " holds the byte rate; the "data" chunk's size gives the length.
+            long byteRate = 0;
+            for (var at = 12; at + 8 <= head.Length;)
+            {
+                var id = System.Text.Encoding.ASCII.GetString(head, at, 4);
+                var size = BitConverter.ToUInt32(head, at + 4);
+                if (id == "fmt " && at + 20 <= head.Length)
+                {
+                    byteRate = BitConverter.ToUInt32(head, at + 16);
+                }
+                else if (id == "data")
+                {
+                    // Some writers leave the size at 0 or 0xFFFFFFFF; then the data runs to the end of the file.
+                    var bytes = size == 0 || size == uint.MaxValue ? fileLength - at - 8 : Math.Min(size, fileLength - at - 8);
+                    return byteRate > 0 ? bytes / (double) byteRate : 0;
+                }
+
+                at += 8 + (int) Math.Min(size + (size & 1), int.MaxValue - at - 8);
             }
 
             return 0;

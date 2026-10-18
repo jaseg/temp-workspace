@@ -1,11 +1,14 @@
 // Opens the level browser of the live viewer (dev host running with --www <viewer/dist> --auto-approve and
 // --levels <dir>), checks the list, covers, BeatLeader stats and an audio preview, and takes screenshots.
-// Usage: NODE_PATH=$(npm root -g) node tools/levels-smoke.cjs [url] [screenshot-prefix]
+// Usage: NODE_PATH=$(npm root -g) node tools/levels-smoke.cjs [url] [screenshot-prefix] [search]
+// NO_STATS=1: the server has BeatLeader stats off (the plugin's default), so don't expect star ratings.
 const {chromium} = require('playwright');
 
 (async () => {
 	const url = process.argv[2] || 'https://localhost:4280/';
 	const shots = process.argv[3] || 'levels';
+	const search = process.argv[4] || 'deja';
+	const stats = !process.env.NO_STATS;
 	const browser = await chromium.launch({args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required']});
 	const errors = [];
 	for (const [width, height, name] of [[1280, 800, 'desktop'], [390, 760, 'phone']]) {
@@ -19,7 +22,9 @@ const {chromium} = require('playwright');
 		await page.waitForSelector('#levelBrowser:not([hidden]) .lbLevel', {timeout: 20000});
 		// Covers and stats load lazily for visible rows.
 		await page.waitForFunction(() => document.querySelectorAll('#levelBrowser .lbCover img:not([hidden])').length >= 3, null, {timeout: 20000});
-		await page.waitForFunction(() => document.querySelectorAll('#levelBrowser .lbStars').length >= 3, null, {timeout: 30000}).catch(() => errors.push(`${name}: no stars shown`));
+		if (stats) {
+			await page.waitForFunction(() => document.querySelectorAll('#levelBrowser .lbStars').length >= 3, null, {timeout: 30000}).catch(() => errors.push(`${name}: no stars shown`));
+		}
 		const summary = await page.evaluate(() => ({
 			count: document.querySelector('#levelBrowser .lbCount').textContent,
 			rows: [...document.querySelectorAll('#levelBrowser .lbLevel')].slice(0, 3).map(r => r.querySelector('.lbName').textContent + ' | ' + r.querySelector('.lbChips').textContent),
@@ -28,10 +33,10 @@ const {chromium} = require('playwright');
 		await page.screenshot({path: `${shots}-${name}-list.png`});
 
 		// Search, expand, preview.
-		await page.fill('#levelBrowser .lbSearch', 'deja');
+		await page.fill('#levelBrowser .lbSearch', search);
 		const row = page.locator('#levelBrowser .lbLevel').first();
 		await row.click();
-		await page.waitForFunction(() => /Ranked|Unranked/.test(document.querySelector('#levelBrowser .lbDetails:not([hidden])')?.textContent || ''), null, {timeout: 15000});
+		await page.waitForFunction(stats => (stats ? /Ranked|Unranked/ : /Notes/).test(document.querySelector('#levelBrowser .lbDetails:not([hidden])')?.textContent || ''), stats, {timeout: 15000});
 		await row.locator('.lbPlay').click();
 		await page.waitForFunction(() => document.querySelector('#levelBrowser .lbLevel.playing'), null, {timeout: 15000});
 		await page.waitForTimeout(2500);

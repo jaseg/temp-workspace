@@ -443,7 +443,9 @@ export class LevelBrowser {
 		const length = level.previewDuration > 0 ? level.previewDuration : 10;
 		let begin = level.previewStart > 0 ? level.previewStart : 0;
 		const volume = Math.max(0.1, parseFloat((document.getElementById('musicSlider') || {}).value) || 0.5);
-		preview.url = URL.createObjectURL(new Blob([buffer], {type: 'audio/ogg'}));
+		// Custom levels ship Ogg Vorbis, or WAV for a few converted official songs.
+		const wav = new TextDecoder().decode(new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength))) === 'RIFF';
+		preview.url = URL.createObjectURL(new Blob([buffer], {type: wav ? 'audio/wav' : 'audio/ogg'}));
 		audio.addEventListener('loadedmetadata', () => {
 			begin = Math.min(begin, Math.max(0, audio.duration - length));
 			audio.currentTime = begin;

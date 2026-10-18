@@ -1,0 +1,343 @@
+using System;
+using System.Collections.Generic;
+using IPA.Utilities;
+using LiveViewer.Server.Live;
+using LiveViewer.Server.Protocol;
+using UnityEngine;
+using Zenject;
+using Pose = LiveViewer.Server.Protocol.Pose;
+
+namespace LiveViewer.Plugin.Recording
+{
+    /// <summary>
+    /// Streams one play of a level into the server's <see cref="LiveFeed"/>. Adapted from BeatLeader's
+    /// ReplayRecorder (MIT, https://github.com/BeatLeader/beatleader-mod): the same capture points and ids, but every
+    /// event goes out as it happens instead of into a replay file. Runs on the game thread only.
+    /// </summary>
+    internal sealed class LiveRecorder : IInitializable, IDisposable, ILateTickable
+    {
+        private readonly LiveFeed _feed;
+        private readonly LiveService _service;
+        private readonly GameplayCoreSceneSetupData _setup;
+        private readonly SaberManager _saberManager;
+        private readonly PlayerTransforms _playerTransforms;
+        private readonly BeatmapObjectManager _beatmapObjectManager;
+        private readonly AudioTimeSyncController _timeSync;
+        private readonly ScoreController _scoreController;
+        private readonly PlayerHeadAndObstacleInteraction _headObstacles;
+        private readonly GameEnergyCounter _energyCounter;
+        private readonly IVariableMovementDataProvider _movementData;
+        private readonly StandardLevelScenesTransitionSetupDataSO _transitionSetup;
+        private readonly PauseController? _pauseController;
+        private readonly PlayerHeightDetector? _heightDetector;
+        private readonly PlayerDataModel _playerData;
+
+        // Note and wall ids as in BeatLeader's recorder, kept per object so each later event can find them.
+        private readonly Dictionary<NoteData, NoteEvent> _notes = new Dictionary<NoteData, NoteEvent>();
+        private readonly Dictionary<ObstacleController, WallEvent> _walls = new Dictionary<ObstacleController, WallEvent>();
+
+        private Transform? _origin, _head, _leftSaber, _rightSaber;
+        private SessionInfo? _session;
+        private IMapFileSource? _map;
+        private bool _started, _ended, _paused, _inWall;
+        private WallEvent _currentWall;
+
+        public LiveRecorder(
+            LiveService service,
+            GameplayCoreSceneSetupData setup,
+            SaberManager saberManager,
+            PlayerTransforms playerTransforms,
+            BeatmapObjectManager beatmapObjectManager,
+            AudioTimeSyncController timeSync,
+            ScoreController scoreController,
+            PlayerHeadAndObstacleInteraction headObstacles,
+            GameEnergyCounter energyCounter,
+            IVariableMovementDataProvider movementData,
+            StandardLevelScenesTransitionSetupDataSO transitionSetup,
+            PlayerDataModel playerData,
+            [InjectOptional] PauseController? pauseController,
+            [InjectOptional] PlayerHeightDetector? heightDetector)
+        {
+            _service = service;
+            _feed = service.Server!.Feed;
+            _setup = setup;
+            _saberManager = saberManager;
+            _playerTransforms = playerTransforms;
+            _beatmapObjectManager = beatmapObjectManager;
+            _timeSync = timeSync;
+            _scoreController = scoreController;
+            _headObstacles = headObstacles;
+            _energyCounter = energyCounter;
+            _movementData = movementData;
+            _transitionSetup = transitionSetup;
+            _playerData = playerData;
+            _pauseController = pauseController;
+            _heightDetector = heightDetector;
+        }
+
+        public void Initialize()
+        {
+            var playerName = _service.Config.PlayerName;
+            if (string.IsNullOrEmpty(playerName))
+            {
+                playerName = _playerData.playerData.playerName ?? "";
+            }
+
+            var level = SessionBuilder.TryDescribe(_setup, playerName, out var map, out var reason);
+            if (level == null)
+            {
+                Plugin.Log?.Info("Not streaming this level: " + reason);
+                _ended = true;
+                return;
+            }
+
+            _session = level;
+            _map = map;
+            _beatmapObjectManager.noteWasAddedEvent += OnNoteWasAdded;
+            _beatmapObjectManager.noteWasCutEvent += OnNoteWasCut;
+            _beatmapObjectManager.obstacleWasSpawnedEvent += OnObstacleWasSpawned;
+            _scoreController.scoringForNoteFinishedEvent += OnScoringFinished;
+            _headObstacles.headDidEnterObstacleEvent += OnHeadEnteredObstacle;
+            _transitionSetup.didFinishEvent += OnLevelFinished;
+            if (_pauseController != null)
+            {
+                _pauseController.didPauseEvent += OnPause;
+                _pauseController.didResumeEvent += OnResume;
+            }
+
+            if (_heightDetector != null)
+            {
+                _heightDetector.playerHeightDidChangeEvent += OnPlayerHeightChanged;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_session == null)
+            {
+                return;
+            }
+
+            _beatmapObjectManager.noteWasAddedEvent -= OnNoteWasAdded;
+            _beatmapObjectManager.noteWasCutEvent -= OnNoteWasCut;
+            _beatmapObjectManager.obstacleWasSpawnedEvent -= OnObstacleWasSpawned;
+            _scoreController.scoringForNoteFinishedEvent -= OnScoringFinished;
+            _headObstacles.headDidEnterObstacleEvent -= OnHeadEnteredObstacle;
+            _transitionSetup.didFinishEvent -= OnLevelFinished;
+            if (_pauseController != null)
+            {
+                _pauseController.didPauseEvent -= OnPause;
+                _pauseController.didResumeEvent -= OnResume;
+            }
+
+            if (_heightDetector != null)
+            {
+                _heightDetector.playerHeightDidChangeEvent -= OnPlayerHeightChanged;
+            }
+
+            // Torn down without a result (e.g. the game quit from the pause menu in a way that skipped didFinish).
+            End(SessionEndReason.Quit);
+        }
+
+        public void LateTick()
+        {
+            if (_ended || _paused)
+            {
+                return;
+            }
+
+            if (!_started)
+            {
+                // The jump distance is known once the spawn controller has initialised, which happens before the
+                // first gameplay frame.
+                _session!.JumpDistance = _movementData.jumpDistance;
+                _feed.BeginSession(_session, _map!);
+                _started = true;
+                _origin = _playerTransforms.GetField<Transform, PlayerTransforms>("_originParentTransform");
+                _head = _playerTransforms.GetField<Transform, PlayerTransforms>("_headTransform");
+                _leftSaber = _saberManager.leftSaber.transform;
+                _rightSaber = _saberManager.rightSaber.transform;
+            }
+
+            var origin = _origin!;
+            _feed.Pose(LiveClock.NowUs(), _timeSync.songTime,
+                Local(origin, _head!), Local(origin, _leftSaber!), Local(origin, _rightSaber!));
+
+            if (_inWall && !_headObstacles.playerHeadIsInObstacle)
+            {
+                // Like BeatLeader: a wall event carries the energy left once the head is out of the wall again.
+                _inWall = false;
+                _currentWall.Energy = _energyCounter.energy;
+                _feed.Wall(LiveClock.NowUs(), _currentWall);
+            }
+        }
+
+        private static Pose Local(Transform origin, Transform t)
+        {
+            var p = origin.InverseTransformPoint(t.position);
+            var r = Quaternion.Inverse(origin.rotation) * t.rotation;
+            return new Pose(new Vec3(p.x, p.y, p.z), new Quat(r.x, r.y, r.z, r.w));
+        }
+
+        private static Vec3 V(Vector3 v) => new Vec3(v.x, v.y, v.z);
+
+        private void OnNoteWasAdded(NoteData noteData, NoteSpawnData spawnData)
+        {
+            _notes[noteData] = new NoteEvent
+            {
+                NoteId = ((int) noteData.scoringType + 2) * 10000
+                         + noteData.lineIndex * 1000
+                         + (int) noteData.noteLineLayer * 100
+                         + (int) noteData.colorType * 10
+                         + (int) noteData.cutDirection,
+                SpawnTime = noteData.time,
+            };
+        }
+
+        private void OnNoteWasCut(NoteController noteController, in global::NoteCutInfo info)
+        {
+            if (!_started || _ended || !_notes.TryGetValue(info.noteData, out var note))
+            {
+                return;
+            }
+
+            note.EventTime = _timeSync.songTime;
+            note.EventType = info.noteData.colorType == ColorType.None ? NoteEventType.Bomb
+                : info.allIsOK ? NoteEventType.Good : NoteEventType.Bad;
+            note.CutInfo = new LiveViewer.Server.Protocol.NoteCutInfo
+            {
+                SpeedOk = info.speedOK,
+                DirectionOk = info.directionOK,
+                SaberTypeOk = info.saberTypeOK,
+                WasCutTooSoon = info.wasCutTooSoon,
+                SaberSpeed = info.saberSpeed,
+                SaberDirection = V(info.saberDir),
+                SaberType = (int) info.saberType,
+                TimeDeviation = info.timeDeviation,
+                CutDirectionDeviation = info.cutDirDeviation,
+                CutPoint = V(info.cutPoint),
+                CutNormal = V(info.cutNormal),
+                CutDistanceToCenter = info.cutDistanceToCenter,
+                CutAngle = info.cutAngle,
+            };
+            _notes[info.noteData] = note;
+
+            // The immediate event shows the cut right away; its swing rating is still incomplete. Bad cuts and bombs
+            // are final already (their scoring finishes in the same frame) and only go out from OnScoringFinished.
+            if (note.EventType == NoteEventType.Good)
+            {
+                _feed.Note(false, LiveClock.NowUs(), note);
+            }
+        }
+
+        private void OnScoringFinished(ScoringElement element)
+        {
+            var noteData = element.noteData;
+            if (!_started || _ended || !_notes.TryGetValue(noteData, out var note))
+            {
+                return;
+            }
+
+            var isBomb = noteData.colorType == ColorType.None;
+            switch (element)
+            {
+                case MissScoringElement _:
+                    if (isBomb || noteData.scoringType == NoteData.ScoringType.NoScore)
+                    {
+                        return;
+                    }
+
+                    note.EventType = NoteEventType.Miss;
+                    note.EventTime = _timeSync.songTime;
+                    break;
+                case BadCutScoringElement _:
+                    note.EventType = isBomb ? NoteEventType.Bomb : NoteEventType.Bad;
+                    break;
+                case GoodCutScoringElement good:
+                    note.EventType = NoteEventType.Good;
+                    note.CutInfo.BeforeCutRating = good.cutScoreBuffer.beforeCutSwingRating;
+                    note.CutInfo.AfterCutRating = good.cutScoreBuffer.afterCutSwingRating;
+                    break;
+                default:
+                    return;
+            }
+
+            _notes.Remove(noteData);
+            _feed.Note(true, LiveClock.NowUs(), note);
+        }
+
+        private void OnObstacleWasSpawned(ObstacleController obstacle)
+        {
+            var data = obstacle.obstacleData;
+            _walls[obstacle] = new WallEvent
+            {
+                WallId = data.lineIndex * 100 + (int) data.type * 10 + data.width,
+                SpawnTime = data.time,
+            };
+        }
+
+        private void OnHeadEnteredObstacle(ObstacleController obstacle)
+        {
+            if (!_started || _ended || _inWall || !_walls.TryGetValue(obstacle, out var wall))
+            {
+                return;
+            }
+
+            wall.Time = _timeSync.songTime;
+            _currentWall = wall;
+            _inWall = true;
+        }
+
+        private void OnPause()
+        {
+            if (!_started || _ended)
+            {
+                return;
+            }
+
+            _paused = true;
+            _feed.Pause(LiveClock.NowUs(), _timeSync.songTime);
+        }
+
+        private void OnResume()
+        {
+            if (!_paused || _ended)
+            {
+                return;
+            }
+
+            _paused = false;
+            _feed.Resume(LiveClock.NowUs(), _timeSync.songTime);
+        }
+
+        private void OnPlayerHeightChanged(float height)
+        {
+            if (_started && !_ended)
+            {
+                _feed.Height(LiveClock.NowUs(), height, _timeSync.songTime);
+            }
+        }
+
+        private void OnLevelFinished(StandardLevelScenesTransitionSetupDataSO data, LevelCompletionResults results)
+        {
+            End(results.levelEndAction == LevelCompletionResults.LevelEndAction.Restart ? SessionEndReason.Restarted
+                : results.levelEndStateType == LevelCompletionResults.LevelEndStateType.Cleared ? SessionEndReason.Cleared
+                : results.levelEndStateType == LevelCompletionResults.LevelEndStateType.Failed ? SessionEndReason.Failed
+                : SessionEndReason.Quit);
+        }
+
+        private void End(SessionEndReason reason)
+        {
+            if (_ended)
+            {
+                return;
+            }
+
+            _ended = true;
+            if (_started)
+            {
+                _feed.EndSession(reason, _timeSync.songTime);
+            }
+        }
+    }
+}

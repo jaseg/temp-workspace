@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The BSIPA plugin. Builds against the game's assemblies, copied from a Beat Saber 1.44.1 install into
+    mod/refs (Managed/, Plugins/, Libs/; see README). Set BeatSaberRefs to use another location.
+    Output: bin/<config>/package/ with Plugins/ and Libs/, ready to copy into the game folder.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>LiveViewer</AssemblyName>
+    <RootNamespace>LiveViewer.Plugin</RootNamespace>
+    <Version>0.1.0</Version>
+    <BeatSaberRefs Condition="'$(BeatSaberRefs)' == ''">$(MSBuildThisFileDirectory)..\refs</BeatSaberRefs>
+    <ViewerDist Condition="'$(ViewerDist)' == ''">$(MSBuildThisFileDirectory)..\..\viewer\dist</ViewerDist>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <ProjectReference Include="..\LiveViewer.Server\LiveViewer.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <GameReference Include="Main;Core;GameplayCore;BeatmapCore;DataModels;HMLib;HMUI;Zenject;Zenject-usage;Unity.TextMeshPro;UnityEngine;UnityEngine.CoreModule;UnityEngine.UI;UnityEngine.UIModule;UnityEngine.XRModule;UnityEngine.VRModule;UnityEngine.AudioModule;BGLib.UnityExtension;BGLib.Polyglot;BeatSaber.ViewSystem;Colors" Dir="Managed" />
+    <GameReference Include="IPA.Loader" Dir="Managed" />
+    <GameReference Include="SiraUtil;SongCore;BSML" Dir="Plugins" />
+    <GameReference Include="0Harmony;Hive.Versioning" Dir="Libs" />
+    <Reference Include="@(GameReference)">
+      <HintPath>$(BeatSaberRefs)\%(Dir)\%(Identity).dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- The game ships Newtonsoft.Json 13 (BSIPA). -->
+    <PackageReference Update="Newtonsoft.Json" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="manifest.json" />
+    <EmbeddedResource Include="UI\*.bsml" LogicalName="LiveViewer.Plugin.UI.%(Filename).bsml" />
+    <EmbeddedResource Include="$(IntermediateOutputPath)viewer.zip" LogicalName="viewer.zip" Condition="Exists('$(ViewerDist)')" />
+  </ItemGroup>
+
+  <!-- The viewer bundle (npm run build in viewer/) is embedded as one zip. -->
+  <Target Name="ZipViewer" BeforeTargets="PrepareForBuild" Condition="Exists('$(ViewerDist)')">
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <ZipDirectory SourceDirectory="$(ViewerDist)" DestinationFile="$(IntermediateOutputPath)viewer.zip" Overwrite="true" />
+  </Target>
+
+  <Target Name="WarnNoViewer" BeforeTargets="Build" Condition="!Exists('$(ViewerDist)')">
+    <Warning Text="viewer/dist not found: the plugin will serve the embedded test page. Run 'npm run build' in viewer/ first." />
+  </Target>
+
+  <Target Name="Package" AfterTargets="Build">
+    <ItemGroup>
+      <PackageLib Include="$(OutDir)LiveViewer.Server.dll;$(OutDir)EmbedIO.dll;$(OutDir)Swan.Lite.dll;$(OutDir)BouncyCastle.Cryptography.dll" />
+    </ItemGroup>
+    <RemoveDir Directories="$(OutDir)package" />
+    <Copy SourceFiles="$(OutDir)LiveViewer.dll;$(OutDir)LiveViewer.pdb" DestinationFolder="$(OutDir)package\Plugins" />
+    <Copy SourceFiles="@(PackageLib)" DestinationFolder="$(OutDir)package\Libs" />
+  </Target>
+
+</Project>

@@ -111,6 +111,9 @@ namespace LiveViewer.Server.Protocol
         public float StartTime;
         public float SongSpeed = 1f;
 
+        /// <summary>The game version, e.g. "1.44.1". The viewer matches chain notes differently from 1.29 on.</summary>
+        public string GameVersion = "";
+
         /// <summary>Map file roles ("info", "difficulty", "audio", "cover", ...) to file names.</summary>
         public Dictionary<string, string> Files = new Dictionary<string, string>();
     }
