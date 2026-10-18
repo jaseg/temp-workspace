@@ -113,8 +113,11 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 
 ## Known issues
 
-- **Flaky test.** `ServerIntegrationTests.RememberedDeviceReconnectsWithoutWaitingAndCanBeRevoked` sometimes times
-  out (5 s receive) under heavy CPU load. It passes otherwise; not investigated yet.
+- **Flaky test, fixed.** `RememberedDeviceReconnectsWithoutWaitingAndCanBeRevoked` timed out under CPU load
+  (3 failures in 30 runs). The cause was in EmbedIO: a client's first message could be dropped before the module
+  subscribed to it, and the dispatcher could leave a message queued until the next frame (see `VENDORED.md`).
+  After the fix: 0 failures in 45 runs under the same load. Real browsers were affected too: an unlucky page stayed
+  at "Connecting".
 - **Stuck "processing audio" flag.** Rarely, the viewer's `isSongBufferProcessing` stayed set after a song loaded,
   which stops playback. It was seen in a few headless test runs and couldn't be reproduced on demand. A watchdog in
   `LiveSession.checkStuckProcessing` clears it after 3 s; the cause is not known.
