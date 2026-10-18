@@ -198,11 +198,19 @@ namespace LiveViewer.Server.Levels
                     }
                 }
 
-                var task = FetchAsync(hash);
+                var task = FetchAndSaveAsync(hash);
                 _cache[hash] = (now, task);
-                _ = task.ContinueWith(t => ScheduleSave(), TaskContinuationOptions.OnlyOnRanToCompletion);
                 return task;
             }
+        }
+
+        // Marks the cache changed before the caller sees the result, so a Flush (or Dispose) after awaiting it
+        // includes the entry.
+        private async Task<byte[]> FetchAndSaveAsync(string hash)
+        {
+            var result = await FetchAsync(hash).ConfigureAwait(false);
+            ScheduleSave();
+            return result;
         }
 
         private void ScheduleSave()
@@ -217,7 +225,14 @@ namespace LiveViewer.Server.Levels
                 _dirty = true;
             }
 
-            _saveTimer.Change(SaveDelay, Timeout.InfiniteTimeSpan);
+            try
+            {
+                _saveTimer.Change(SaveDelay, Timeout.InfiniteTimeSpan);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Disposed: Dispose has written the file.
+            }
         }
 
         private async Task<byte[]> FetchAsync(string hash)
