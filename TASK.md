@@ -90,13 +90,27 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
   - Measure Wi-Fi latency and the game-thread cost (CPU, GC) at 120 Hz.
   - Tune the viewer's prediction (default 16 ms, `?predict=`).
 
+### Decisions and setup for the owner
+
+- **Shared maps:** turn on map sharing for the 1.44.1 instance in BSManager (or approve doing it), so the 73
+  shared levels are playable and listed. It changes files outside the instance folder.
+- **Upstream BeatLeader mod** fails on this instance: the installed 0.10.0 is the 1.40.2 build
+  (`MissingFieldException: TMP_Asset.hashCode`); 1.44.1 needs `BeatLeader-0.10.0-bs1.42+.zip`. Its UI library
+  also ships an x64-only `Libs/Native/yoga.dll`, which the ARM64 game can't load; it needs a Windows ARM64 build
+  of Yoga. Then check in the headset that the UI shows and a score uploads.
+- **CI:** tier 1 (every push: C# tests, viewer build, dev host + browser smoke tests with checked-in fixtures);
+  tier 2 (build against each game version's assemblies, check reflected field names); tier 3 (self-hosted runner
+  playing a replay in each game version without VR and comparing the stream); tier 4 (the same nightly on the
+  Frame). Not started.
+
 ### Software
 
 - **Not needed after all:** our own mDNS responder (avahi announces `frame.local`). A DNS-SD service record would
   only help apps that browse for services, not browsers.
 - **Certificate regeneration** from the menu.
-- **Suggestions:** maybe remove a suggestion automatically once the player has played it; the in-game pack could
-  also be a `.bplist` playlist if PlaylistManager is installed.
+- **Playlist:** maybe remove a level automatically once the player has played it; the in-game pack could
+  also be a `.bplist` playlist if PlaylistManager is installed. Older entries keep the name their viewer had then.
+- **Map colors** (estimate below, option 1 recommended): not started.
 - **Reconnect handling.** After a dropped connection the viewer re-downloads the whole map. Keep the files when the
   session id and hash are unchanged.
 - **Audio sync.** It re-seeks when the drift exceeds 40 ms, which is audible. Consider small playback-rate
