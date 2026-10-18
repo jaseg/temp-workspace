@@ -3,6 +3,7 @@
 // real CSP. Then checks that a normal browser never loads the decoder. Needs a running server with auto-approval and
 // a level named "When Doves Cry" (or pass another name). Don't run it with Playwright's bypassCSP.
 // Usage: NODE_PATH=$(npm root -g) node tools/ogg-fallback-smoke.cjs [url] [level name]
+// NO_SONG=1: the server isn't playing a song (e.g. the game in its menu); only the hit sound and preview are checked.
 const {chromium} = require('playwright');
 const poll = async (page, fn, arg, ms = 30000) => {
 	for (const end = Date.now() + ms; Date.now() < end; await page.waitForTimeout(250)) if (await page.evaluate(fn, arg)) return true;
@@ -31,7 +32,7 @@ const poll = async (page, fn, arg, ms = 30000) => {
 		}
 		await page.goto(url);
 		await page.click('.liveRequest');
-		const song = await poll(page, () => {
+		const song = process.env.NO_SONG ? false : await poll(page, () => {
 			const s = window.liveSession;
 			const songEl = document.querySelector('a-scene').components.song;
 			return s && s.active && songEl.source && s.audio.lastDrift !== null && (songEl.source.buffer ? 'buffer' : 'element');
@@ -49,12 +50,12 @@ const poll = async (page, fn, arg, ms = 30000) => {
 			const p = window.liveSession.levels.preview;
 			return p ? (p.source ? 'Web Audio (decoded)' : '<audio> element') : 'none';
 		});
-		const songPath = await page.evaluate(() => (document.querySelector('a-scene').components.song.source.buffer ? 'decoded buffer' : 'media element'));
-		const drift = await page.evaluate(() => window.liveSession.audio.lastDrift * 1000);
+		const songPath = song && (await page.evaluate(() => (document.querySelector('a-scene').components.song.source.buffer ? 'decoded buffer' : 'media element')));
+		const drift = song ? await page.evaluate(() => window.liveSession.audio.lastDrift * 1000) : null;
 		const result = {song: song && songPath, driftMs: Math.round(drift), hitSound: hit, preview: preview && how, decoderLoaded: decoderLoads.length > 0, errors: errors.filter(e => !/AudioContext was not allowed/.test(e)).slice(0, 3)};
 		console.log(tag, result);
 		const ok = oldSafari
-			? result.song === 'decoded buffer' && result.preview === 'Web Audio (decoded)' && result.decoderLoaded
+			? (process.env.NO_SONG || result.song === 'decoded buffer') && result.preview === 'Web Audio (decoded)' && result.decoderLoaded
 			: result.preview === '<audio> element' && !result.decoderLoaded;
 		if (!ok || !hit || result.errors.length) failed = true;
 		await page.close();
