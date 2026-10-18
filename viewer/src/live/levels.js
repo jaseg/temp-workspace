@@ -162,7 +162,8 @@ export class LevelBrowser {
 			this.coverQueue.clear();
 			this.statsQueue.clear();
 			if (this.isOpen) this.setStatus('Not connected to Beat Saber.');
-		} else if (this.isOpen) {
+		} else {
+			// Loaded right away, so the top bar can show how many levels there are.
 			this.load();
 		}
 	}
@@ -278,6 +279,7 @@ export class LevelBrowser {
 			}));
 			this.setStatus(this.levels.length ? '' : 'No custom levels found.');
 			this.render();
+			if (this.onChange) this.onChange();
 		} catch (e) {
 			this.setStatus(
 				e.code === FileError.notAvailable ? 'The mod has no level folder configured.' : `Couldn't load the level list (${e.message}).`

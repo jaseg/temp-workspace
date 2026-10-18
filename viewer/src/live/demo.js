@@ -128,6 +128,7 @@ export class DemoConnection extends LiveConnection {
 		this.deliver(new Writer(T.Waiting).str(name).buffer(), 400);
 		setTimeout(() => {
 			this.deliver(new Writer(T.Approved).u8(0).buffer(), 0);
+			this.deliver(new Writer(T.Name).str(this.name).buffer(), 0);
 			this.sendSuggestions();
 			setTimeout(() => this.playSong(), 300);
 		}, 2500);
@@ -174,6 +175,11 @@ export class DemoConnection extends LiveConnection {
 		this.suggestions = (this.suggestions || []).filter(s => s.id !== levelId);
 		if (add) this.suggestions.push({id: levelId, by: this.name, added: Math.floor(Date.now() / 1000)});
 		this.sendSuggestions();
+		return true;
+	}
+
+	rename(name) {
+		this.deliver(new Writer(T.Name).str(name.slice(0, 32)).buffer());
 		return true;
 	}
 

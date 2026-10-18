@@ -67,3 +67,49 @@
 
   button[aria-pressed='true'] .navBadge
     background rgba(0, 0, 0, 0.25)
+
+#liveNav .navName
+  display flex
+  align-items center
+  margin-left 6px
+  padding-left 6px
+  border-left 1px solid #2d333d
+
+  button
+    max-width 180px
+    color #e8ebef
+    font-weight 500
+
+    span
+      overflow hidden
+      text-overflow ellipsis
+      white-space nowrap
+
+    i
+      font-size 12px
+      color #8b93a0
+
+  button[hidden], form[hidden]
+    display none
+
+  input
+    width 150px
+    height 30px
+    padding 0 10px
+    border 1px solid #ff4fa3
+    border-radius 8px
+    background #0e1116
+    color #fff
+    font inherit
+    font-weight 500
+    outline none
+
+@media (max-width: 480px)
+  #liveNav button
+    padding 0 10px
+
+  #liveNav .navName button
+    max-width 96px
+
+  #liveNav .navName input
+    width 110px

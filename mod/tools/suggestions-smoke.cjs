@@ -18,7 +18,7 @@ const {chromium} = require('playwright');
 		return page;
 	};
 	const badge = page => page.evaluate(() => {
-		const b = document.querySelector('#liveNav .navBadge');
+		const b = document.querySelector('#liveNav button:nth-child(3) .navBadge');
 		return b.hidden ? 0 : Number(b.textContent);
 	});
 	const check = (ok, message) => ok || errors.push(message);
@@ -35,8 +35,8 @@ const {chromium} = require('playwright');
 	check((await row.locator('.lbPlay').textContent()) === 'Preview', 'a: preview button not labelled "Preview"');
 	const widthBefore = (await row.locator('.lbSuggest').boundingBox()).width;
 	await row.locator('.lbSuggest').click();
-	await a.waitForFunction(n => document.querySelector('#liveNav .navBadge').textContent === String(n), start + 1, {timeout: 10000});
-	await b.waitForFunction(n => document.querySelector('#liveNav .navBadge').textContent === String(n), start + 1, {timeout: 10000})
+	await a.waitForFunction(n => document.querySelector('#liveNav button:nth-child(3) .navBadge').textContent === String(n), start + 1, {timeout: 10000});
+	await b.waitForFunction(n => document.querySelector('#liveNav button:nth-child(3) .navBadge').textContent === String(n), start + 1, {timeout: 10000})
 		.catch(() => errors.push("b: didn't see a's suggestion"));
 	check((await row.locator('.lbSuggest').getAttribute('data-state')) === 'on', 'a: button not showing "In playlist"');
 	const widthAfter = (await row.locator('.lbSuggest').boundingBox()).width;
@@ -51,7 +51,7 @@ const {chromium} = require('playwright');
 	await b.screenshot({path: `${shots}-b-suggested.png`});
 	await suggested.locator('.lbSuggest').click();
 	await a.waitForFunction(n => {
-		const el = document.querySelector('#liveNav .navBadge');
+		const el = document.querySelector('#liveNav button:nth-child(3) .navBadge');
 		return (el.hidden ? 0 : Number(el.textContent)) === n;
 	}, start, {timeout: 10000}).catch(() => errors.push("a: didn't see b's removal"));
 

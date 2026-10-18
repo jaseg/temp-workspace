@@ -30,6 +30,8 @@ const {chromium} = require('playwright');
 			rows: [...document.querySelectorAll('#levelBrowser .lbLevel')].slice(0, 3).map(r => r.querySelector('.lbName').textContent + ' | ' + r.querySelector('.lbChips').textContent),
 		}));
 		console.log(name, JSON.stringify(summary));
+		const badge = await page.textContent('#liveNav button:nth-child(2) .navBadge');
+		if (!summary.title.startsWith(`${badge} level`)) errors.push(`${name}: Levels tab shows ${badge}, header "${summary.title}"`);
 		await page.screenshot({path: `${shots}-${name}-list.png`});
 
 		// Search, expand, preview.

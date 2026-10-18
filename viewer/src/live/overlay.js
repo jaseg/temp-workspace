@@ -1,34 +1,7 @@
 // DOM overlay for live mode: the name and "Request to watch" screen, waiting room, connection state, song state and a
 // latency readout.
-import {EVEN, ODD} from './words';
+import {loadName, saveName, tidyName, randomName, MAX_NAME_LENGTH} from './name';
 require('./live.styl');
-
-const NAME_KEY = 'bslive.name';
-
-function loadName() {
-	try {
-		return localStorage.getItem(NAME_KEY) || '';
-	} catch (e) {
-		return '';
-	}
-}
-
-function saveName(name) {
-	try {
-		if (name) localStorage.setItem(NAME_KEY, name);
-		else localStorage.removeItem(NAME_KEY);
-	} catch (e) {
-		// Storage unavailable: the field just starts empty next time.
-	}
-}
-
-const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1);
-
-/** Two random words from the PGP word list (an even and an odd one), e.g. "Aztec Istanbul". */
-function randomName() {
-	const bytes = crypto.getRandomValues(new Uint8Array(2));
-	return `${capitalize(EVEN[bytes[0]])} ${capitalize(ODD[bytes[1]])}`;
-}
 
 const STATE_TEXT = {
 	connecting: 'Connecting to Beat Saber…',
@@ -60,7 +33,7 @@ export class LiveOverlay {
 				<div class="liveHint"></div>
 				<form class="liveRequestForm" hidden>
 					<label class="liveNameLabel" for="liveNameInput">Your name</label>
-					<input id="liveNameInput" class="liveNameInput" type="text" maxlength="32" autocomplete="nickname" spellcheck="false">
+					<input id="liveNameInput" class="liveNameInput" type="text" autocomplete="nickname" spellcheck="false">
 					<button class="liveRequest" type="submit">Request to watch</button>
 				</form>
 			</div>
@@ -74,6 +47,7 @@ export class LiveOverlay {
 		this.statsEl = root.querySelector('.liveStats');
 		this.requestForm = root.querySelector('.liveRequestForm');
 		this.nameInput = root.querySelector('.liveNameInput');
+		this.nameInput.maxLength = MAX_NAME_LENGTH;
 		this.requestButton = root.querySelector('.liveRequest');
 		this.connectionState = 'idle';
 
@@ -115,7 +89,7 @@ export class LiveOverlay {
 			'submit',
 			e => {
 				e.preventDefault();
-				const typed = this.nameInput.value.trim().replace(/\s+/g, ' ');
+				const typed = tidyName(this.nameInput.value);
 				saveName(typed);
 				this.requestForm.hidden = true;
 				onRequest(typed || this.nameInput.placeholder);

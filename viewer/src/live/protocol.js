@@ -10,6 +10,7 @@ export const T = {
 	Denied: 0x04,
 	Revoked: 0x05,
 	Pong: 0x06,
+	Name: 0x07,
 	SessionStart: 0x10,
 	SessionEnd: 0x11,
 	Idle: 0x12,
@@ -32,6 +33,7 @@ export const T = {
 	SuggestionAdd: 0x87,
 	SuggestionRemove: 0x88,
 	SuggestionMove: 0x89,
+	Rename: 0x8a,
 };
 
 export const LevelFile = {cover: 1, audio: 2};
@@ -205,5 +207,13 @@ export function suggestionMove(levelId, index) {
 		v.setInt32(1, id.length, true);
 		b.set(id, 5);
 		v.setUint16(5 + id.length, index, true);
+	});
+}
+
+export function rename(name) {
+	const bytes = new TextEncoder().encode(name).slice(0, 128);
+	return message(T.Rename, 4 + bytes.length, (v, b) => {
+		v.setInt32(1, bytes.length, true);
+		b.set(bytes, 5);
 	});
 }

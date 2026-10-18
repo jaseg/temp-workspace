@@ -154,9 +154,14 @@ namespace LiveViewer.Server.Tests
             return w.String(name).ToArray();
         }
 
-        private async Task<string> WaitForCodeAsync(ClientWebSocket ws)
+        private async Task<string> WaitForNameAsync(ClientWebSocket ws)
         {
             await SendAsync(ws, Hello());
+            return await WaitingNameAsync(ws);
+        }
+
+        private static async Task<string> WaitingNameAsync(ClientWebSocket ws)
+        {
             var waiting = await ExpectAsync(ws, MessageType.Waiting);
             var r = new MessageReader(waiting);
             r.U8();
@@ -193,7 +198,7 @@ namespace LiveViewer.Server.Tests
         {
             using var ws = await ConnectAsync();
             await ExpectAsync(ws, MessageType.Welcome);
-            var code = await WaitForCodeAsync(ws);
+            var name = await WaitForNameAsync(ws);
 
             // Nothing live is sent before approval.
             _server.Feed.BeginSession(new SessionInfo { SongName = "Test", Files = { ["audio"] = "song.egg" } },
@@ -203,12 +208,14 @@ namespace LiveViewer.Server.Tests
             _server.Feed.Note(true, LiveClock.NowUs(), new NoteEvent { NoteId = 7, EventType = NoteEventType.Miss });
             await Task.Delay(200);
 
-            Assert.True(_server.WaitingRoom.Approve(PendingId(code), remember: true));
+            Assert.True(_server.WaitingRoom.Approve(PendingId(name), remember: true));
             var approved = await ExpectAsync(ws, MessageType.Approved);
             Assert.Equal(1, approved[1]);
             Assert.Equal(34, approved.Length);
 
-            // The suggestion list, then the backlog: session start and the earlier note event (poses aren't backlogged).
+            // The name in effect, the suggestion list, then the backlog: session start and the earlier note event
+            // (poses aren't backlogged).
+            Assert.Equal(MessageType.Name, (await ReceiveAsync(ws))![0]);
             Assert.Equal(MessageType.Suggestions, (await ReceiveAsync(ws))![0]);
             Assert.Equal(MessageType.SessionStart, (await ReceiveAsync(ws))![0]);
             Assert.Equal(MessageType.NoteFinal, (await ReceiveAsync(ws))![0]);
@@ -280,8 +287,8 @@ namespace LiveViewer.Server.Tests
         private async Task<ClientWebSocket> ApprovedClientAsync()
         {
             var ws = await ConnectAsync();
-            var code = await WaitForCodeAsync(ws);
-            _server.WaitingRoom.Approve(PendingId(code), remember: false);
+            var name = await WaitForNameAsync(ws);
+            _server.WaitingRoom.Approve(PendingId(name), remember: false);
             await ExpectAsync(ws, MessageType.Idle);
             return ws;
         }
@@ -359,8 +366,8 @@ namespace LiveViewer.Server.Tests
             await SendAsync(a, Suggestion(true, id));
             await ExpectSuggestionsAsync(a);
             using var c = await ConnectAsync();
-            var code = await WaitForCodeAsync(c);
-            _server.WaitingRoom.Approve(PendingId(code), remember: false);
+            var name = await WaitForNameAsync(c);
+            _server.WaitingRoom.Approve(PendingId(name), remember: false);
             Assert.Equal(new[] { id }, await ExpectSuggestionsAsync(c));
 
             // Moving: a second suggestion, moved to the top, reaches everyone; a move to where it is already
@@ -380,11 +387,48 @@ namespace LiveViewer.Server.Tests
             await ExpectClosedAsync(b);
         }
 
+        private static async Task<string> ExpectNameAsync(ClientWebSocket ws)
+        {
+            var r = new MessageReader(await ExpectAsync(ws, MessageType.Name));
+            r.U8();
+            return r.String(128);
+        }
+
+        [Fact]
+        public async Task ViewersCanRenameThemselves()
+        {
+            using var ws = await ConnectAsync();
+            await SendAsync(ws, Hello(name: "  Ada \t Lovelace "));
+            Assert.Equal("Ada Lovelace", await WaitingNameAsync(ws));
+            _server.WaitingRoom.Approve(PendingId("Ada Lovelace"), remember: false);
+            Assert.Equal("Ada Lovelace", await ExpectNameAsync(ws));
+
+            await SendAsync(ws, new MessageWriter().U8(MessageType.Rename).String("Grace\u0000 Hopper").ToArray());
+            Assert.Equal("Grace Hopper", await ExpectNameAsync(ws));
+
+            // New suggestions carry the new name.
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelListRequest).U16(1).ToArray());
+            var (list, _) = await ReceiveFileAsync(ws, 1);
+            var id = (string) Newtonsoft.Json.Linq.JObject.Parse(System.Text.Encoding.UTF8.GetString(list!))["levels"]![0]!["id"]!;
+            await SendAsync(ws, Suggestion(true, id));
+            await ExpectSuggestionsAsync(ws);
+            Assert.Equal("Grace Hopper", _server.Suggestions.List().Single().By);
+        }
+
+        [Fact]
+        public async Task RenameNeedsApproval()
+        {
+            using var ws = await ConnectAsync();
+            await WaitForNameAsync(ws);
+            await SendAsync(ws, new MessageWriter().U8(MessageType.Rename).String("x").ToArray());
+            await ExpectClosedAsync(ws);
+        }
+
         [Fact]
         public async Task LevelRequestsNeedApproval()
         {
             using var ws = await ConnectAsync();
-            await WaitForCodeAsync(ws);
+            await WaitForNameAsync(ws);
             await SendAsync(ws, new MessageWriter().U8(MessageType.LevelListRequest).U16(1).ToArray());
             await ExpectClosedAsync(ws);
         }
@@ -395,8 +439,8 @@ namespace LiveViewer.Server.Tests
             byte[] credential;
             using (var first = await ConnectAsync())
             {
-                var code = await WaitForCodeAsync(first);
-                _server.WaitingRoom.Approve(PendingId(code), remember: true);
+                var name = await WaitForNameAsync(first);
+                _server.WaitingRoom.Approve(PendingId(name), remember: true);
                 credential = (await ExpectAsync(first, MessageType.Approved)).Skip(2).ToArray();
             }
 
@@ -420,8 +464,8 @@ namespace LiveViewer.Server.Tests
         public async Task DeniedClientIsClosed()
         {
             using var ws = await ConnectAsync();
-            var code = await WaitForCodeAsync(ws);
-            _server.WaitingRoom.Deny(PendingId(code));
+            var name = await WaitForNameAsync(ws);
+            _server.WaitingRoom.Deny(PendingId(name));
             await ExpectAsync(ws, MessageType.Denied);
             await ExpectClosedAsync(ws);
         }

@@ -45,9 +45,10 @@ export class LiveSession {
 			state: (state, detail) => this.onConnectionState(state, detail),
 			message: (type, reader, receivedAt) => this.onMessage(type, reader, receivedAt),
 			suggestions: doc => this.levels.setSuggestions(doc),
+			name: name => this.nav.setName(name),
 		});
 		this.levels = new LevelBrowser(this.connection);
-		this.nav = new LiveNav(this.levels);
+		this.nav = new LiveNav(this.levels, this.connection);
 		this.nav.setLive(false);
 		this.songClock = new SongClock(this.connection.clock);
 		// ?predict=<ms> overrides the display-latency prediction (0 disables it).

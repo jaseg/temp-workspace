@@ -29,9 +29,9 @@ client                         server
   ── connect ──────────────────►
   ◄──────────────────── Welcome
   ── Hello{credential?, name} ─►
-       credential valid → Approved{} + current state
+       credential valid → Approved{} + Name + current state
        otherwise        → Waiting{name} ... (player decides in game) ...
-                          → Approved{credential?} + current state | Denied + close
+                          → Approved{credential?} + Name + current state | Denied + close
 ```
 
 - **Pinging:** `Ping` may be sent at any time after `Hello`.
@@ -51,6 +51,7 @@ client                         server
 | `0x04` | Denied | none. Also sent when the waiting room is full, the request expired, or the address is cooling down after a deny. |
 | `0x05` | Revoked | none. The remembered device was revoked: forget the credential. |
 | `0x06` | Pong | `f64 clientTime (echoed), us serverReceive, us serverSend` |
+| `0x07` | Name | `str name`: the viewer's name as the server uses it. Sent right after `Approved` and in answer to every `Rename`. |
 | `0x10` | SessionStart | `u32 sessionId, str json`. The JSON fields are below. |
 | `0x11` | SessionEnd | `u32 sessionId, u8 reason (1 cleared, 2 failed, 3 quit, 4 restarted), f32 songTime` |
 | `0x12` | Idle | none. Sent after approval when no song is being played. |
@@ -117,6 +118,7 @@ live data. Poses are never backlogged.
 | `0x87` | SuggestionAdd | `str levelId`: 40 lowercase hex digits, else a protocol violation. |
 | `0x88` | SuggestionRemove | `str levelId`, as above. |
 | `0x89` | SuggestionMove | `str levelId, u16 index`: move the entry so it ends up at `index` (0 = first; larger values mean last). |
+| `0x8A` | Rename | `str name (≤ 128 bytes)`, approved viewers only. Cleaned up like the `Hello` name (not numbered); answered with `Name`. Shares the suggestion rate limit; suggestions made earlier keep the old name. |
 
 The maximum inbound message size is 1 KB.
 

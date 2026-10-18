@@ -16,6 +16,10 @@ namespace LiveViewer.Server.Protocol
         public static byte[] Waiting(string name) =>
             new MessageWriter().U8(MessageType.Waiting).String(name).ToArray();
 
+        /// <summary>The viewer's name as the server uses it (after approval and after Rename).</summary>
+        public static byte[] Name(string name) =>
+            new MessageWriter().U8(MessageType.Name).String(name).ToArray();
+
         public static byte[] Approved(byte[]? credential)
         {
             var w = new MessageWriter().U8(MessageType.Approved).Bool(credential != null);
@@ -172,6 +176,13 @@ namespace LiveViewer.Server.Protocol
             }
 
             return id;
+        }
+
+        public static string ParseRename(MessageReader r)
+        {
+            var name = r.String(MaxNameBytes);
+            r.End();
+            return name;
         }
 
         /// <summary>SuggestionMove: a level id and the position it should end up at.</summary>

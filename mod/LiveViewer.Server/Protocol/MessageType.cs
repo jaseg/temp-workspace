@@ -15,6 +15,7 @@ namespace LiveViewer.Server.Protocol
         public const byte Denied = 0x04;
         public const byte Revoked = 0x05;
         public const byte Pong = 0x06;
+        public const byte Name = 0x07;
 
         // Session lifecycle.
         public const byte SessionStart = 0x10;
@@ -47,6 +48,7 @@ namespace LiveViewer.Server.Protocol
         public const byte SuggestionAdd = 0x87;
         public const byte SuggestionRemove = 0x88;
         public const byte SuggestionMove = 0x89;
+        public const byte Rename = 0x8A;
     }
 
     public enum MapErrorCode : byte

@@ -1,5 +1,5 @@
 // WebSocket connection to the mod: waiting room, clock sync, message dispatch, map file and level library downloads.
-import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest, levelListRequest, levelFileRequest, levelStatsRequest, suggestionChange, suggestionMove} from './protocol';
+import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest, levelListRequest, levelFileRequest, levelStatsRequest, suggestionChange, suggestionMove, rename} from './protocol';
 import {ServerClock} from './clock';
 
 const CREDENTIAL_KEY = 'bslive.credential';
@@ -31,7 +31,7 @@ function saveCredential(bytes) {
 }
 
 /**
- * Events (via `handlers`): state(state, detail), message(type, reader, receivedAt), suggestions(doc).
+ * Events (via `handlers`): state(state, detail), message(type, reader, receivedAt), suggestions(doc), name(name).
  * States: connecting, waiting (detail.name: the name the player sees), approved, denied, revoked, disconnected.
  */
 export class LiveConnection {
@@ -104,6 +104,11 @@ export class LiveConnection {
 				saveCredential(null);
 				this.setState('revoked');
 				return;
+			case T.Name:
+				// The name as the server uses it; reconnects send it again.
+				this.name = r.str();
+				this.handlers.name(this.name);
+				return;
 			case T.Pong: {
 				const t0 = r.f64();
 				this.clock.addPong(t0, receivedAt, r.i64(), r.i64());
@@ -171,6 +176,13 @@ export class LiveConnection {
 	suggest(levelId, add) {
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
 		this.ws.send(suggestionChange(add, levelId));
+		return true;
+	}
+
+	/** Asks to be called `name` from now on. The mod answers with the name in effect (a `name` event). */
+	rename(name) {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+		this.ws.send(rename(name));
 		return true;
 	}
 

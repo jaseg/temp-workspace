@@ -204,6 +204,9 @@ namespace LiveViewer.Server.Live
                     case MessageType.SuggestionRemove:
                         HandleSuggestion(connection, data[0] == MessageType.SuggestionAdd, ClientMessages.ParseSuggestionChange(reader));
                         break;
+                    case MessageType.Rename:
+                        HandleRename(connection, ClientMessages.ParseRename(reader));
+                        break;
                     case MessageType.SuggestionMove:
                         var (moveId, moveIndex) = ClientMessages.ParseSuggestionMove(reader);
                         HandleSuggestionMove(connection, moveId, moveIndex);
@@ -405,6 +408,30 @@ namespace LiveViewer.Server.Live
             _ = AddSuggestionAsync(connection, levelId);
         }
 
+        private void HandleRename(ClientConnection connection, string name)
+        {
+            lock (_lock)
+            {
+                if (connection.State != ClientState.Approved)
+                {
+                    throw new ProtocolException("Rename before approval.");
+                }
+            }
+
+            // Same budget as suggestion changes; the viewer is told the name in effect either way.
+            if (connection.TryConsumeSuggestionToken())
+            {
+                var clean = WaitingRoom.CleanName(name, connection.Id);
+                if (clean != connection.Name)
+                {
+                    _log.Info($"Client {connection.Id} ({connection.Address}) renamed \"{connection.Name}\" to \"{clean}\".");
+                    connection.Name = clean;
+                }
+            }
+
+            connection.EnqueueReliable(Messages.Name(connection.Name));
+        }
+
         private void HandleSuggestionMove(ClientConnection connection, string levelId, int index)
         {
             lock (_lock)
@@ -522,6 +549,7 @@ namespace LiveViewer.Server.Live
 
                 connection.State = ClientState.Approved;
                 connection.EnqueueReliable(Messages.Approved(credential));
+                connection.EnqueueReliable(Messages.Name(connection.Name));
                 SendSuggestions(connection);
                 if (_inSession)
                 {
