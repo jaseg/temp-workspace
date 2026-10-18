@@ -372,7 +372,9 @@ AFRAME.registerComponent('beat-generator', {
 					this.generateWall(obstacles[i]);
 				}
 			} else {
-				if (noteTime > prevBeatsTime && noteTime <= beatsTime) {
+				// Live walls arrive when the game spawns them, which can be after this window has passed: any wall
+				// that is due and not over yet is spawned (it's placed by its time, so a late one is in the right spot).
+				if (noteTime <= beatsTime && noteTime + noteDuration > songTime) {
 					this.generateWall(obstacles[i]);
 				}
 			}

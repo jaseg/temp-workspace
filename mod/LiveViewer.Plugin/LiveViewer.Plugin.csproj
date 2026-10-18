@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <GameReference Include="Main;Core;GameplayCore;BeatmapCore;DataModels;HMLib;HMUI;Zenject;Zenject-usage;Unity.TextMeshPro;UnityEngine;UnityEngine.CoreModule;UnityEngine.UI;UnityEngine.UIModule;UnityEngine.XRModule;UnityEngine.VRModule;UnityEngine.AudioModule;BGLib.UnityExtension;BGLib.Polyglot;BeatSaber.ViewSystem;Colors" Dir="Managed" />
+    <GameReference Include="Main;Core;GameplayCore;BeatmapCore;DataModels;HMLib;HMUI;Zenject;Zenject-usage;Unity.TextMeshPro;UnityEngine;UnityEngine.CoreModule;UnityEngine.UI;UnityEngine.UIModule;UnityEngine.XRModule;UnityEngine.VRModule;UnityEngine.AudioModule;BGLib.UnityExtension;BGLib.Polyglot;BeatSaber.ViewSystem;Colors;OculusStudios.Platform.Core" Dir="Managed" />
     <GameReference Include="IPA.Loader" Dir="Managed" />
     <GameReference Include="SiraUtil;SongCore;BSML" Dir="Plugins" />
     <GameReference Include="0Harmony;Hive.Versioning" Dir="Libs" />

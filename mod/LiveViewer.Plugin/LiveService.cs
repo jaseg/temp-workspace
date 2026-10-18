@@ -32,6 +32,9 @@ namespace LiveViewer.Plugin
 
         public PluginConfig Config => _config;
 
+        /// <summary>The player's platform (Steam) name, once the menu has read it; empty before.</summary>
+        public string PlatformPlayerName { get; set; } = "";
+
         /// <summary>Set once the server listens; read from the game thread before feeding it.</summary>
         public bool Running => _running;
 

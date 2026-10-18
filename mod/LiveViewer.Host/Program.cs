@@ -145,6 +145,7 @@ Console commands while running:
 
             var speed = double.Parse(options.GetValueOrDefault("speed") ?? "1", System.Globalization.CultureInfo.InvariantCulture);
             var loop = options.ContainsKey("loop");
+            var spawnLead = float.Parse(options.GetValueOrDefault("spawn-lead") ?? "3", System.Globalization.CultureInfo.InvariantCulture);
             var wait = double.Parse(options.GetValueOrDefault("wait") ?? "3", System.Globalization.CultureInfo.InvariantCulture);
             var startAt = float.Parse(options.GetValueOrDefault("start") ?? "0", System.Globalization.CultureInfo.InvariantCulture);
             var player = new Thread(() =>
@@ -158,7 +159,7 @@ Console commands while running:
                     }
 
                     Console.WriteLine("Song starting.");
-                    new FakeLive(server.Feed, replay, session, mapSource, noteSpawns, wallSpawns, speed, startAt).Run(cts.Token);
+                    new FakeLive(server.Feed, replay, session, mapSource, noteSpawns, wallSpawns, speed, startAt) { SpawnLead = spawnLead }.Run(cts.Token);
                     Console.WriteLine("Song ended.");
                 }
                 while (loop && !cts.IsCancellationRequested);

@@ -78,8 +78,14 @@ namespace LiveViewer.Plugin.Recording
 
         public void Initialize()
         {
+            // The configured name, else the Steam name, else the game's own (a placeholder in the ARM64 build).
             var playerName = _service.Config.PlayerName;
             if (string.IsNullOrEmpty(playerName))
+            {
+                playerName = _service.PlatformPlayerName;
+            }
+
+            if (string.IsNullOrEmpty(playerName) && _playerData.playerData.playerName != "<NO NAME!>")
             {
                 playerName = _playerData.playerData.playerName ?? "";
             }

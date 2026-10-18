@@ -5,6 +5,10 @@
   top 8px
   left 50%
   transform translateX(-50%)
+  // Centred with left 50%, the bar may otherwise only take half the window and squeeze the name.
+  width max-content
+  max-width calc(100vw - 16px)
+  box-sizing border-box
   z-index 2147483001
   display flex
   gap 2px
@@ -76,7 +80,7 @@
   border-left 1px solid #2d333d
 
   button
-    max-width 180px
+    max-width 340px
     color #e8ebef
     font-weight 500
 

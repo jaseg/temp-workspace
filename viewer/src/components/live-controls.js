@@ -8,6 +8,25 @@ const deviceHasTouchScreen = utils.hasTouchScreen();
 // Hotkeys are ignored while typing into a form control.
 const isTyping = e => e.target.closest && e.target.closest('input, textarea, select');
 
+// The game's modifier codes, as the session lists them.
+const MODIFIER_NAMES = {
+	DA: 'Disappearing Arrows',
+	FS: 'Faster Song',
+	SS: 'Slower Song',
+	SF: 'Super Fast Song',
+	GN: 'Ghost Notes',
+	NA: 'No Arrows',
+	NB: 'No Bombs',
+	NF: 'No Fail',
+	NO: 'No Walls',
+	SA: 'Strict Angles',
+	SC: 'Small Notes',
+	PM: 'Pro Mode',
+	CS: 'Fail on Saber Clash',
+	IF: 'One Life',
+	BE: 'Four Lives',
+};
+
 const DIFFICULTIES = {
 	Easy: {name: 'Easy', color: 'MediumSeaGreen'},
 	Normal: {name: 'Normal', color: '#59b0f4'},
@@ -118,7 +137,8 @@ AFRAME.registerComponent('live-controls', {
 		const info = challenge.info;
 		// The controls bar appears once there is a song.
 		document.getElementById('controls').classList.add('challengeLoaded');
-		document.getElementById('songImage').src = challenge.image;
+		// The live session sets the cover itself, once it has loaded (see LiveSession.loadCover).
+		if (challenge.image) document.getElementById('songImage').src = challenge.image;
 		const name = document.getElementById('songName');
 		name.textContent = info._songName;
 		name.setAttribute('title', info._songName);
@@ -145,7 +165,8 @@ AFRAME.registerComponent('live-controls', {
 		modeEl.style.display = challenge.mode !== 'Standard' ? 'block' : 'none';
 
 		const replay = this.el.sceneEl.components['replay-loader'].replay;
-		document.getElementById('modifiers').textContent = replay ? replay.info.modifiers : '';
+		const modifiers = replay && replay.info.modifiers ? replay.info.modifiers.split(',') : [];
+		document.getElementById('modifiers').textContent = modifiers.map(m => MODIFIER_NAMES[m] || m).join(', ');
 		document.getElementById('songInfoOverlay').style.display = 'flex';
 
 		this.applyEnvironmentRemoval(challenge);

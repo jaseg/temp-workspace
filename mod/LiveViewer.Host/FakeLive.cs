@@ -17,8 +17,11 @@ namespace LiveViewer.Host
         /// <summary>How long after a good cut the game finishes the swing rating (approximation).</summary>
         public const float SwingRatingDelay = 0.3f;
 
-        /// <summary>How long before its time a note or wall is spawned; more than the game's jump and move time.</summary>
-        public const float SpawnLead = 3f;
+        /// <summary>
+        /// How long before its time a note or wall is spawned. The game spawns them about a half jump plus the move
+        /// time early (around 1 s); less than that tests late arrivals.
+        /// </summary>
+        public float SpawnLead { get; set; } = 3f;
 
         private readonly LiveFeed _feed;
         private readonly BsorReplay _replay;

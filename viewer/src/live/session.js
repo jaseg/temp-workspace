@@ -4,7 +4,7 @@
 // (replay, allStructs, bombs, walls); in live mode those arrays grow while the song plays instead of
 // being loaded up front.
 
-import {T, Reader, SessionEndReason, readNoteEvent} from './protocol';
+import {T, Reader, SessionEndReason, readNoteEvent, LevelFile} from './protocol';
 import {LiveConnection} from './connection';
 import {DemoConnection} from './demo';
 import {SongClock} from './clock';
@@ -302,6 +302,7 @@ export class LiveSession {
 		if (!this.selectedAudio || !this.selectedAudio.src.endsWith(info.audioUrl)) {
 			this.onSongSelected(info);
 		}
+		this.loadCover(sessionId, info.hash);
 		const map = {_events: [], _notes: [], _chains: [], _sliders: [], _burstSliders: [], _obstacles: [], _njsEvents: []};
 		this.liveMap = map;
 		this.nextMapIndex = 0;
@@ -328,6 +329,25 @@ export class LiveSession {
 			},
 			mappingExtensions: {isEnabled: false},
 		}, false);
+	}
+
+	/** The cover comes from the level library (the session doesn't send files); levels it doesn't list have none. */
+	async loadCover(sessionId, hash) {
+		const image = document.getElementById('songImage');
+		if (this.coverUrl) URL.revokeObjectURL(this.coverUrl);
+		this.coverUrl = null;
+		image.removeAttribute('src');
+		image.style.visibility = 'hidden';
+		let buffer;
+		try {
+			buffer = await this.connection.fetchLevelFile(String(hash).toLowerCase(), LevelFile.cover);
+		} catch (e) {
+			return;
+		}
+		if (sessionId !== this.sessionId) return;
+		this.coverUrl = URL.createObjectURL(new Blob([buffer]));
+		image.src = this.coverUrl;
+		image.style.visibility = '';
 	}
 
 	onChallengeLoaded(challenge) {

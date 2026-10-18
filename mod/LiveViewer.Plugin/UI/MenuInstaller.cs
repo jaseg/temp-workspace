@@ -16,6 +16,43 @@ namespace LiveViewer.Plugin.UI
             Container.BindInterfacesTo<MenuButtonManager>().AsSingle();
             Container.BindInterfacesTo<SuggestionPack>().AsSingle();
             Container.BindInterfacesTo<SongSelectionStreamer>().AsSingle();
+            Container.BindInterfacesTo<PlatformPlayerName>().AsSingle();
+        }
+    }
+
+    /// <summary>
+    /// The player's name from the platform (Steam). The game's own player name is the placeholder "&lt;NO NAME!&gt;"
+    /// in the ARM64 build, so the recorder prefers this one.
+    /// </summary>
+    internal sealed class PlatformPlayerName : IInitializable
+    {
+        private readonly LiveService _service;
+        private readonly OculusStudios.Platform.Core.IPlatform? _platform;
+
+        public PlatformPlayerName(LiveService service, [InjectOptional] OculusStudios.Platform.Core.IPlatform? platform)
+        {
+            _service = service;
+            _platform = platform;
+        }
+
+        public void Initialize()
+        {
+            try
+            {
+                var user = _platform?.user;
+                var name = user?.displayName;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    _service.PlatformPlayerName = name!;
+                }
+
+                Plugin.Log?.Info(_platform == null ? "No platform to read the player name from."
+                    : string.IsNullOrWhiteSpace(name) ? "The platform has no player name." : "Player name from the platform: " + name);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log?.Info("No platform player name: " + e.Message);
+            }
         }
     }
 
