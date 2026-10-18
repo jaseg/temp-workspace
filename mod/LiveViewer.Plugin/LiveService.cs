@@ -103,6 +103,7 @@ namespace LiveViewer.Plugin
                 };
 
                 server.Levels.Known = SongCoreLevels.Describe;
+                server.Levels.Ready = () => SongCore.Loader.AreSongsLoaded && !SongCore.Loader.AreSongsLoading;
                 server.Start();
                 lock (_lock)
                 {

@@ -171,7 +171,10 @@ page must treat every string as text):
 
 - `duration` is in seconds; 0 if unknown.
 - `added` is the Unix time Info.dat was last written.
-- Counts are `null` when a difficulty file couldn't be read.
+- Counts are `null` when they aren't known (a difficulty file that couldn't be read; in the game, a difficulty
+  the game's level data has no counts for). In the game they come from SongCore and the game, never from the
+  level's files.
+- `"loading": true` (with no levels) means the game hasn't loaded its levels yet; ask again in a few seconds.
 
 Stats JSON, a subset of BeatLeader's map data, re-encoded by the mod:
 

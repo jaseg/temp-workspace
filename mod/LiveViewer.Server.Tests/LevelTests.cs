@@ -163,6 +163,24 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
+        public void LibrarySaysLoadingUntilTheGameIsReady()
+        {
+            Level("one", ("Info.dat", V2Info), ("Expert.dat", V2Difficulty));
+            var ready = false;
+            var library = new LevelLibrary(new[] { _root }, new ConsoleLiveLog()) { Ready = () => ready };
+
+            var loading = JObject.Parse(Encoding.UTF8.GetString(library.GetAsync().Result.Json));
+            Assert.True((bool) loading["loading"]!);
+            Assert.Empty((JArray) loading["levels"]!);
+
+            // Not kept: the next request scans again.
+            ready = true;
+            var snapshot = library.GetAsync().Result;
+            Assert.Single(snapshot.Levels);
+            Assert.Null(JObject.Parse(Encoding.UTF8.GetString(snapshot.Json))["loading"]);
+        }
+
+        [Fact]
         public void LibraryListsEachHashOnceAsJson()
         {
             Level("one", ("Info.dat", V2Info.Replace("Song", "<b>Song</b>")), ("Expert.dat", V2Difficulty));

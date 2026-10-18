@@ -13,6 +13,7 @@ const SHORT = {Easy: 'E', Normal: 'N', Hard: 'H', Expert: 'Ex', ExpertPlus: 'E+'
 const STATUS = {1: 'Nominated', 2: 'Qualified', 3: 'Ranked', 4: 'Unrankable', 5: 'Outdated', 6: 'Event', 7: 'OST'};
 const MAX_COVERS = 200; // cached cover images (object URLs)
 const PREFETCH_ROWS = 20; // covers loaded ahead of the rows in view
+const LOADING_RETRY_MS = 5000; // while the game is still loading its levels
 const FADE_S = 1;
 
 function el(tag, className, text) {
@@ -275,6 +276,13 @@ export class LevelBrowser {
 		if (!this.levels.length) this.setStatus('Loading levels…');
 		try {
 			const list = await this.connection.fetchLevelList();
+			if (list.loading) {
+				// The game loads its levels when its main menu first shows; ask again shortly.
+				this.setStatus('Beat Saber is still loading its levels…');
+				clearTimeout(this.retryTimer);
+				this.retryTimer = setTimeout(() => this.available && this.load(), LOADING_RETRY_MS);
+				return;
+			}
 			this.levels = (list.levels || []).map(level => ({
 				...level,
 				difficulties: [...(level.difficulties || [])].sort((a, b) => difficultyOrder(a) - difficultyOrder(b)),

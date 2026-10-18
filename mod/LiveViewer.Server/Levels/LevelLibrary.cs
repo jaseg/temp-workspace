@@ -51,6 +51,12 @@ namespace LiveViewer.Server.Levels
         /// </summary>
         public Func<string, KnownLevel?>? Known { get; set; }
 
+        /// <summary>
+        /// When set and false, the game hasn't loaded its levels yet: the list is empty and says it's loading, and the
+        /// next request scans again.
+        /// </summary>
+        public Func<bool>? Ready { get; set; }
+
         /// <summary>A level id as the protocol uses it: the lowercase hex SHA-1 SongCore computes.</summary>
         public static bool IsLevelId(string? id) =>
             id != null && id.Length == 40 && id.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
@@ -116,6 +122,16 @@ namespace LiveViewer.Server.Levels
 
         private Snapshot Scan()
         {
+            if (Ready != null && !Ready())
+            {
+                lock (_lock)
+                {
+                    _scannedUtc = DateTime.MinValue;
+                }
+
+                return new Snapshot { Json = ToJson(Array.Empty<LevelInfo>(), loading: true) };
+            }
+
             var started = DateTime.UtcNow;
             var levels = new List<LevelInfo>();
             var seen = new HashSet<string>();
@@ -232,7 +248,7 @@ namespace LiveViewer.Server.Levels
             return level;
         }
 
-        internal static byte[] ToJson(IEnumerable<LevelInfo> levels)
+        internal static byte[] ToJson(IEnumerable<LevelInfo> levels, bool loading = false)
         {
             var sw = new StringWriter();
             using (var w = new JsonTextWriter(sw) { StringEscapeHandling = StringEscapeHandling.EscapeHtml })
@@ -280,6 +296,12 @@ namespace LiveViewer.Server.Levels
                 }
 
                 w.WriteEndArray();
+                if (loading)
+                {
+                    w.WritePropertyName("loading");
+                    w.WriteValue(true);
+                }
+
                 w.WriteEndObject();
             }
 
