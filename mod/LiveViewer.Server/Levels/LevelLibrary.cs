@@ -272,8 +272,6 @@ namespace LiveViewer.Server.Levels
                         Count(w, "notes", d.Notes);
                         Count(w, "bombs", d.Bombs);
                         Count(w, "walls", d.Walls);
-                        Count(w, "arcs", d.Arcs);
-                        Count(w, "chains", d.Chains);
                         w.WriteEndObject();
                     }
 

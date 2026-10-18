@@ -67,9 +67,9 @@ namespace LiveViewer.Server.Tests
 
             var expert = level.Difficulties[0];
             Assert.Equal(("Standard", "Expert", "Hard one", 16.0, -0.5), (expert.Mode, expert.Difficulty, expert.Label, expert.NoteJumpSpeed, expert.Offset));
-            Assert.Equal((3, 1, 1, 1, 0), (expert.Notes, expert.Bombs, expert.Walls, expert.Arcs, expert.Chains));
+            Assert.Equal((3, 1, 1), (expert.Notes, expert.Bombs, expert.Walls));
             var plus = level.Difficulties[1];
-            Assert.Equal((2, 1, 3, 0, 1), (plus.Notes, plus.Bombs, plus.Walls, plus.Arcs, plus.Chains));
+            Assert.Equal((2, 1, 3), (plus.Notes, plus.Bombs, plus.Walls));
         }
 
         [Fact]
@@ -104,7 +104,7 @@ namespace LiveViewer.Server.Tests
             Assert.Equal(Sha1(info, "bpm", v4, "lights", "{}", "lights"), level.Hash);
             Assert.Equal(("Four", "One, Two", "WeaveEnvironment", 200.0, 201.5), (level.SongName, level.Mapper, level.Environment, level.Bpm, level.Duration));
             Assert.Null(level.CoverFile); // listed but missing
-            Assert.Equal((1, 0, 1, 2, 1), (level.Difficulties[0].Notes, level.Difficulties[0].Bombs, level.Difficulties[0].Walls, level.Difficulties[0].Arcs, level.Difficulties[0].Chains));
+            Assert.Equal((1, 0, 1), (level.Difficulties[0].Notes, level.Difficulties[0].Bombs, level.Difficulties[0].Walls));
             Assert.Equal(0, level.Difficulties[1].Notes);
         }
 

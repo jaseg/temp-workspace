@@ -165,7 +165,7 @@ page must treat every string as text):
   "environment": "…", "bpm": 154, "duration": 105.43, "previewStart": 60, "previewDuration": 10,
   "hasCover": true, "hasAudio": true, "added": 1700000000,
   "difficulties": [{"mode": "Standard", "difficulty": "ExpertPlus", "label": "", "njs": 18, "offset": 0,
-                    "notes": 446, "bombs": 0, "walls": 11, "arcs": 0, "chains": 0}]
+                    "notes": 446, "bombs": 0, "walls": 11}]
 }]}
 ```
 

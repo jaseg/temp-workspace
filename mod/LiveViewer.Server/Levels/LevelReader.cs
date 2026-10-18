@@ -50,8 +50,6 @@ namespace LiveViewer.Server.Levels
         public int Notes = -1;
         public int Bombs = -1;
         public int Walls = -1;
-        public int Arcs = -1;
-        public int Chains = -1;
     }
 
     /// <summary>
@@ -290,7 +288,7 @@ namespace LiveViewer.Server.Levels
             return level;
         }
 
-        /// <summary>Counts notes, bombs, walls, arcs and chains in a v2, v3 or v4 difficulty file, streaming.</summary>
+        /// <summary>Counts notes, bombs and walls in a v2, v3 or v4 difficulty file, streaming (outside the game only).</summary>
         internal static void CountObjects(string path, DifficultyInfo info)
         {
             try
@@ -300,7 +298,7 @@ namespace LiveViewer.Server.Levels
                     return;
                 }
 
-                int notes = 0, bombs = 0, walls = 0, arcs = 0, chains = 0;
+                int notes = 0, bombs = 0, walls = 0;
                 using (var reader = new JsonTextReader(new StreamReader(path)))
                 {
                     if (!reader.Read() || reader.TokenType != JsonToken.StartObject)
@@ -351,15 +349,6 @@ namespace LiveViewer.Server.Levels
                             case "obstacles":
                                 walls += CountElements(reader);
                                 break;
-                            case "_sliders":
-                            case "sliders":
-                            case "arcs":
-                                arcs += CountElements(reader);
-                                break;
-                            case "burstSliders":
-                            case "chains":
-                                chains += CountElements(reader);
-                                break;
                             default:
                                 reader.Skip();
                                 break;
@@ -370,8 +359,6 @@ namespace LiveViewer.Server.Levels
                 info.Notes = notes;
                 info.Bombs = bombs;
                 info.Walls = walls;
-                info.Arcs = arcs;
-                info.Chains = chains;
             }
             catch (Exception e) when (e is IOException || e is JsonException || e is UnauthorizedAccessException)
             {
