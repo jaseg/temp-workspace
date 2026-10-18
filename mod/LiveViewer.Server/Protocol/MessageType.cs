@@ -59,6 +59,9 @@ namespace LiveViewer.Server.Protocol
         NotAvailable = 1,
         ReadFailed = 3,
         TooManyRequests = 4,
+
+        /// <summary>The player is in a song; asked again once it's over (see LiveServer.InGameplay).</summary>
+        Busy = 5,
     }
 
     public enum SessionEndReason : byte

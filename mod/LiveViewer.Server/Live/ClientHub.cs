@@ -23,6 +23,9 @@ namespace LiveViewer.Server.Live
         public const int MaxPreAdmissionConnectionsPerAddress = 4;
         public const int MaxBacklog = 200_000;
 
+        /// <summary>See <see cref="LiveServer.InGameplay"/>.</summary>
+        public volatile bool InGameplay;
+
         private readonly object _lock = new object();
         private readonly Dictionary<string, ClientConnection> _byContext = new Dictionary<string, ClientConnection>();
         private readonly List<byte[]> _backlog = new List<byte[]>();
@@ -309,6 +312,12 @@ namespace LiveViewer.Server.Live
                 return;
             }
 
+            if (InGameplay && levelId != null)
+            {
+                connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.Busy));
+                return;
+            }
+
             if (!connection.TryBeginLookup())
             {
                 connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.TooManyRequests));
@@ -322,7 +331,14 @@ namespace LiveViewer.Server.Live
         {
             try
             {
-                var snapshot = await _levels!.GetAsync().ConfigureAwait(false);
+                // During a song, the list as last scanned (scanning allocates); before the first scan, ask later.
+                var snapshot = InGameplay ? _levels!.Current : await _levels!.GetAsync().ConfigureAwait(false);
+                if (snapshot == null)
+                {
+                    connection.EnqueueReliable(Messages.MapError(requestId, MapErrorCode.Busy));
+                    return;
+                }
+
                 Stream stream;
                 if (levelId == null)
                 {
@@ -442,9 +458,10 @@ namespace LiveViewer.Server.Live
         {
             try
             {
-                // Only installed levels can be suggested: the game can't show anything else.
-                var snapshot = await _levels!.GetAsync().ConfigureAwait(false);
-                if (snapshot.ByHash.ContainsKey(levelId) && _suggestions!.Add(levelId, connection.Name))
+                // Only installed levels can be suggested: the game can't show anything else. During a song, checked
+                // against the last scan (scanning allocates).
+                var snapshot = InGameplay ? _levels!.Current : await _levels!.GetAsync().ConfigureAwait(false);
+                if (snapshot != null && snapshot.ByHash.ContainsKey(levelId) && _suggestions!.Add(levelId, connection.Name))
                 {
                     _log.Info($"Client {connection.Id} ({connection.Address}) suggested level {levelId}.");
                     return;

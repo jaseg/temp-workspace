@@ -218,6 +218,7 @@ export class LiveSession {
 	startSession(sessionId, info) {
 		this.sessionId = sessionId;
 		this.active = true;
+		this.levels.setSongPlaying(true);
 		this.stats.sessions++;
 		this.info = info;
 		this.challengeLoaded = false;
@@ -281,6 +282,7 @@ export class LiveSession {
 
 	endSession(reason) {
 		this.nav.setLive(false);
+		this.levels.setSongPlaying(false);
 		if (!this.active) {
 			this.overlay.setIdle(reason);
 			return;

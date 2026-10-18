@@ -66,7 +66,7 @@ client                         server
 | `0x28` | WallSpawn | `us capture, i32 wallId, f32 time, f32 duration, i32 lineIndex, i32 lineLayer, i32 width, i32 height`. Sent when the game spawns the already-modified obstacle. |
 | `0x29` | SliderSpawn | `us capture, u8 kind (0 arc, 1 chain), i32 colorType, f32 time, i32 lineIndex, i32 lineLayer, i32 cutDirection, f32 tailTime, i32 tailLineIndex, i32 tailLineLayer, i32 tailCutDirection, f32 headControlPointLengthMultiplier, f32 tailControlPointLengthMultiplier, i32 midAnchorMode, u8 hasTailNote, i32 sliceCount, f32 squishAmount`. An arc or chain from the game's level data (after modifiers and mirroring), sent about 3 s before its time since the game has no spawn event for chains. Arcs use the multipliers, mid-anchor mode and hasTailNote; chains the slice count (segments including the head) and squish. A chain's links still arrive as NoteSpawn (scoring type 5 or 8) and only carry their note ids; the viewer draws the links from the chain.
 | `0x30` | MapChunk | `u16 requestId, u32 totalLength, u32 offset, bytes...` (the rest of the message). Chunks arrive in order; a zero-length file is one chunk with `totalLength` 0. Answers level-library requests only. |
-| `0x31` | MapError | `u16 requestId, u8 code (1 not available, 3 read failed or BeatLeader unreachable, 4 too many requests)` |
+| `0x31` | MapError | `u16 requestId, u8 code (1 not available, 3 read failed or BeatLeader unreachable, 4 too many requests, 5 busy: the player is in a song, ask again once it's over)` |
 | `0x40` | Suggestions | `str json`: the whole suggestion list (see "Suggestions"). Sent right after `Approved`, to everyone whenever it changes, and to a sender whose change wasn't applied. |
 
 A **BSOR note event** is laid out as:
@@ -153,6 +153,10 @@ connection may have at most 8 of them in progress.
   (failures for 2 minutes), across restarts in `UserData/LiveViewer/beatleader-cache.tsv`. The plugin fetches stats unless the player switches them off.
 - **Rescans:** the list is re-scanned when it's requested and the last scan is
   more than 30 seconds old; unchanged level folders are not re-read.
+- **During a song** the game turns its garbage collector off, so everything the
+  mod allocates stays until the song ends. Level file and stats requests are
+  answered with `MapError` 5 then, and the list is the last scan (5 if there is
+  none yet). The live stream and the song audio are served as usual.
 - **Errors:** an unknown id gives `MapError` 1. Level requests when the library
   or stats are disabled also give 1. Stats when BeatLeader can't be reached give 3.
 

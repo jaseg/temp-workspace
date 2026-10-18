@@ -87,6 +87,9 @@ namespace LiveViewer.Plugin.Recording
 
         public void Initialize()
         {
+            // The game's garbage collector is off during songs (HMLib's DisableGCWhileEnabled), streamed or not.
+            _service.Server!.InGameplay = true;
+
             // The configured name, else the Steam name, else the game's own (a placeholder in the ARM64 build).
             var playerName = _service.Config.PlayerName;
             if (string.IsNullOrEmpty(playerName))
@@ -130,6 +133,7 @@ namespace LiveViewer.Plugin.Recording
 
         public void Dispose()
         {
+            _service.Server!.InGameplay = false;
             if (_session == null)
             {
                 return;

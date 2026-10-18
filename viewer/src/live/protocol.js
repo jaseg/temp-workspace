@@ -42,7 +42,8 @@ export const T = {
 export const LevelFile = {cover: 1, audio: 2};
 
 // MapError codes.
-export const FileError = {notAvailable: 1, noSession: 2, readFailed: 3, tooManyRequests: 4};
+// busy: the player is in a song, when the game keeps all memory allocated; ask again once it's over.
+export const FileError = {notAvailable: 1, readFailed: 3, tooManyRequests: 4, busy: 5};
 
 export const SessionEndReason = {1: 'cleared', 2: 'failed', 3: 'quit', 4: 'restarted'};
 

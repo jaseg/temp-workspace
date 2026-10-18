@@ -30,6 +30,10 @@ Options:
   --speed <x>          Playback speed (default 1)
   --start <seconds>    Start each run at this song time (for testing song ends)
   --loop               Replay forever
+  --wait <seconds>     Pause before each run, with the song selected as in the game's menu (default 3)
+  --idle               Only select the song, never play it (like the game's menu)
+  --spawn-lead <s>     Send notes and walls this long before their time (default 3; the game: about 1)
+  --gameplay-busy      Refuse level browser work while the song plays, as the game does
   --auto-approve       Approve every waiting device (testing only)
   --any-address        Accept non-private peers (testing only)
   --levels <dir>       Folder of custom levels for the level list (repeatable; default <data>/maps)
@@ -145,6 +149,8 @@ Console commands while running:
 
             var speed = double.Parse(options.GetValueOrDefault("speed") ?? "1", System.Globalization.CultureInfo.InvariantCulture);
             var loop = options.ContainsKey("loop");
+            // Like the game: no level browser work while a song plays (the game's garbage collector is off then).
+            var gameplayBusy = options.ContainsKey("gameplay-busy");
             var spawnLead = float.Parse(options.GetValueOrDefault("spawn-lead") ?? "3", System.Globalization.CultureInfo.InvariantCulture);
             var wait = double.Parse(options.GetValueOrDefault("wait") ?? "3", System.Globalization.CultureInfo.InvariantCulture);
             var startAt = float.Parse(options.GetValueOrDefault("start") ?? "0", System.Globalization.CultureInfo.InvariantCulture);
@@ -159,7 +165,9 @@ Console commands while running:
                     }
 
                     Console.WriteLine("Song starting.");
+                    server.InGameplay = gameplayBusy;
                     new FakeLive(server.Feed, replay, session, mapSource, noteSpawns, wallSpawns, sliderSpawns, speed, startAt) { SpawnLead = spawnLead }.Run(cts.Token);
+                    server.InGameplay = false;
                     Console.WriteLine("Song ended.");
                 }
                 while (loop && !cts.IsCancellationRequested);
@@ -286,7 +294,7 @@ Console commands while running:
 
         private static Dictionary<string, string>? ParseArgs(string[] args)
         {
-            var flags = new HashSet<string> { "loop", "auto-approve", "any-address", "no-beatleader" };
+            var flags = new HashSet<string> { "loop", "auto-approve", "any-address", "no-beatleader", "idle", "gameplay-busy" };
             var result = new Dictionary<string, string>();
             for (var i = 0; i < args.Length; i++)
             {

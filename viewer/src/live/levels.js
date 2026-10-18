@@ -14,6 +14,7 @@ const STATUS = {1: 'Nominated', 2: 'Qualified', 3: 'Ranked', 4: 'Unrankable', 5:
 const MAX_COVERS = 200; // cached cover images (object URLs)
 const PREFETCH_ROWS = 20; // covers loaded ahead of the rows in view
 const LOADING_RETRY_MS = 5000; // while the game is still loading its levels
+const BUSY_RETRY_MS = 15000; // a song the page doesn't know about (not streamed) keeps the game busy
 const FADE_S = 1;
 
 function el(tag, className, text) {
@@ -80,6 +81,11 @@ export class LevelBrowser {
 		this.connection = connection;
 		this.levels = [];
 		this.rows = new Map(); // level id -> row element
+		// While the player is in a song the game's garbage collector is off, so the mod refuses level files and
+		// stats (FileError.busy) until it's over; what was asked for meanwhile is asked again then.
+		this.songPlaying = false;
+		this.deferred = new Set(); // level ids whose cover or stats wait for the song to end
+		this.listDeferred = false;
 		this.stats = new Map(); // level id -> stats document, or null while loading/unavailable
 		this.covers = new Map(); // level id -> object URL (insertion order = age)
 		this.statsEnabled = true;
@@ -292,8 +298,16 @@ export class LevelBrowser {
 			this.render();
 			if (this.onChange) this.onChange();
 		} catch (e) {
+			if (e.code === FileError.busy) {
+				this.listDeferred = true;
+				this.deferUntilSongEnds();
+			}
 			this.setStatus(
-				e.code === FileError.notAvailable ? 'The mod has no level folder configured.' : `Couldn't load the level list (${e.message}).`
+				e.code === FileError.busy
+					? 'The level list is available once the current song is over.'
+					: e.code === FileError.notAvailable
+					? 'The mod has no level folder configured.'
+					: `Couldn't load the level list (${e.message}).`
 			);
 		} finally {
 			this.loading = false;
@@ -457,6 +471,7 @@ export class LevelBrowser {
 			if (!details.hidden) this.renderDetails(level, details);
 		});
 		row.refs = {img, chips, play, suggest, suggested, progress, details, handle, order, orderButtons};
+		this.renderPreviewButton(row);
 		this.renderChips(level, row);
 		this.renderSuggest(row);
 		return row;
@@ -649,6 +664,41 @@ export class LevelBrowser {
 		}
 	}
 
+	/** The player started or finished a song (from the live session). */
+	setSongPlaying(playing) {
+		this.songPlaying = playing;
+		for (const row of this.rows.values()) this.renderPreviewButton(row);
+		if (!playing) this.retryDeferred();
+	}
+
+	/** Answered busy while the page thought no song was playing: try again a little later. */
+	deferUntilSongEnds(id) {
+		if (id) this.deferred.add(id);
+		if (this.songPlaying) return;
+		clearTimeout(this.busyTimer);
+		this.busyTimer = setTimeout(() => this.retryDeferred(), BUSY_RETRY_MS);
+	}
+
+	retryDeferred() {
+		clearTimeout(this.busyTimer);
+		const ids = [...this.deferred];
+		this.deferred.clear();
+		for (const id of ids) {
+			if (this.stats.get(id) === null) this.stats.delete(id);
+			this.retryCover(id);
+		}
+		if (this.listDeferred && this.available) {
+			this.listDeferred = false;
+			this.load();
+		}
+	}
+
+	renderPreviewButton(row) {
+		if (!row.refs || !row.refs.play || (this.preview && this.preview.row === row)) return;
+		row.refs.play.disabled = this.songPlaying;
+		row.refs.play.title = this.songPlaying ? 'Song previews are available between songs' : '';
+	}
+
 	/** Drops covers queued but not loaded; their rows ask again when they're next in view. */
 	dropQueuedCovers() {
 		this.coverQueue.clear();
@@ -682,7 +732,17 @@ export class LevelBrowser {
 		}
 		let blob = await getCover(level.id);
 		if (!blob) {
-			const buffer = await this.connection.fetchLevelFile(level.id, LevelFile.cover);
+			if (this.songPlaying) {
+				this.deferUntilSongEnds(level.id);
+				return;
+			}
+			let buffer;
+			try {
+				buffer = await this.connection.fetchLevelFile(level.id, LevelFile.cover);
+			} catch (e) {
+				if (e.code === FileError.busy) this.deferUntilSongEnds(level.id);
+				throw e;
+			}
 			blob = new Blob([buffer]);
 			putCover(level.id, buffer);
 		}
@@ -711,10 +771,18 @@ export class LevelBrowser {
 			this.stats.delete(level.id);
 			return;
 		}
+		if (this.songPlaying) {
+			this.deferUntilSongEnds(level.id);
+			return;
+		}
 		let stats;
 		try {
 			stats = await this.connection.fetchLevelStats(level.id);
 		} catch (e) {
+			if (e.code === FileError.busy) {
+				this.deferUntilSongEnds(level.id);
+				return;
+			}
 			if (e.code === FileError.notAvailable) {
 				this.statsEnabled = false;
 				this.statsQueue.clear();
@@ -751,7 +819,8 @@ export class LevelBrowser {
 		} catch (e) {
 			row.classList.remove('loading');
 			if (this.preview === preview) this.stopPreview();
-			row.refs.play.title = `Couldn't load the song (${e.message})`;
+			row.refs.play.title =
+				e.code === FileError.busy ? 'Song previews are available between songs' : `Couldn't load the song (${e.message})`;
 			return;
 		}
 		row.classList.remove('loading');

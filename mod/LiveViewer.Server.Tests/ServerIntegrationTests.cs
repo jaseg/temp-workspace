@@ -384,6 +384,36 @@ namespace LiveViewer.Server.Tests
             await ExpectClosedAsync(ws);
         }
 
+        [Fact]
+        public async Task LevelBrowserWaitsWhileThePlayerIsInASong()
+        {
+            using var ws = await ApprovedClientAsync();
+
+            // No scan during a song: before the first one, the list is busy too.
+            _server.InGameplay = true;
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelListRequest).U16(1).ToArray());
+            Assert.Equal((byte) MapErrorCode.Busy, (await ReceiveFileAsync(ws, 1)).error);
+
+            _server.InGameplay = false;
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelListRequest).U16(2).ToArray());
+            var (list, _) = await ReceiveFileAsync(ws, 2);
+            var id = (string) Newtonsoft.Json.Linq.JObject.Parse(System.Text.Encoding.UTF8.GetString(list!))["levels"]![0]!["id"]!;
+
+            // In the next song: the list as last scanned, but no files or stats.
+            _server.InGameplay = true;
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelListRequest).U16(3).ToArray());
+            Assert.Equal(list, (await ReceiveFileAsync(ws, 3)).data);
+            await SendAsync(ws, LevelFileRequest(4, (byte) LevelFileKind.Cover, id));
+            Assert.Equal((byte) MapErrorCode.Busy, (await ReceiveFileAsync(ws, 4)).error);
+            await SendAsync(ws, new MessageWriter().U8(MessageType.LevelStatsRequest).U16(5).String(id).ToArray());
+            Assert.Equal((byte) MapErrorCode.Busy, (await ReceiveFileAsync(ws, 5)).error);
+            Assert.Empty(_beatLeader.Asked);
+
+            _server.InGameplay = false;
+            await SendAsync(ws, LevelFileRequest(6, (byte) LevelFileKind.Cover, id));
+            Assert.Equal("cover", System.Text.Encoding.UTF8.GetString((await ReceiveFileAsync(ws, 6)).data!));
+        }
+
         private static async Task<string[]> ExpectSuggestionsAsync(ClientWebSocket ws)
         {
             var message = await ExpectAsync(ws, MessageType.Suggestions);

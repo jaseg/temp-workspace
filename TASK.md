@@ -152,9 +152,12 @@ environments.
   - In the container, the server-side path measured a median 0.6 ms from capture to receipt in the browser.
   - The viewer extrapolates about 26 ms (median) past the newest pose at 60 fps: the 16 ms prediction, 5 ms
     simulated latency, and up to one pose interval.
-- **Unexplained out-of-memory kill at 12:12 on 2026-10-18.** The level-scan cause (fixed) doesn't explain it: the
-  scan found no levels then. It happened during the SongCore file-blacklist reconnect loop, fixed since; map
-  transfers are gone, and 190 reconnects against the dev host left the server's memory flat.
+- **The game's garbage collector is off during songs** (HMLib's `DisableGCWhileEnabled`, pause included), so
+  everything the mod allocates then stays until the song ends. That explains both out-of-memory kills on
+  2026-10-18: the level scan (13:21) and the SongCore reconnect loop (12:12) ran during songs. The level browser
+  now waits for the song to end (MapError 5, "busy"); the live stream and the song audio for late viewers still
+  allocate a little per message. Measured on the Frame: the managed heap grew about 13 MB per minute with one
+  viewer in a long pause, mostly not the mod's.
 - **CSP warning in Firefox** about a blocked inline script: the page has none, and Chromium reports nothing;
   probably injected by a browser extension. Harmless.
 - **The level page also receives the live stream** (poses every frame), since it shares the viewer's connection.

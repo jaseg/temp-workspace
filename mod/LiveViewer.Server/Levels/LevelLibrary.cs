@@ -93,6 +93,18 @@ namespace LiveViewer.Server.Levels
         }
 
         /// <summary>The current level list, scanning first if there is none or it's stale.</summary>
+        /// <summary>The last finished scan, without starting one; null if there's none yet.</summary>
+        public Snapshot? Current
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _scan != null && _scan.Status == TaskStatus.RanToCompletion ? _scan.Result : null;
+                }
+            }
+        }
+
         public Task<Snapshot> GetAsync()
         {
             lock (_lock)

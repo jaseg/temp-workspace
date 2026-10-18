@@ -104,6 +104,17 @@ namespace LiveViewer.Server
 
         public int ConnectedViewers => _hub.ApprovedCount;
 
+        /// <summary>
+        /// Set by the game while a song runs. The game turns its garbage collector off then, so anything allocated
+        /// stays until the song ends: the level browser's work (scans, covers, song previews, BeatLeader lookups) waits
+        /// until then. The live stream and the song audio for viewers joining late are still served.
+        /// </summary>
+        public bool InGameplay
+        {
+            get => _hub.InGameplay;
+            set => _hub.InGameplay = value;
+        }
+
         /// <summary>URLs to show the player: the configured names first, then each LAN address.</summary>
         public IReadOnlyList<string> Urls =>
             _options.HostNames.Where(n => n != "localhost").Select(n => $"https://{n}:{_options.Port}/")
