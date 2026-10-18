@@ -42,9 +42,11 @@ const evalGetter = 'function wrapper(t){return new Function(["return function "+
 if (!aframe.includes(evalGetter)) throw new Error('A-Frame getter factory not found; update the patch in scripts/package.js');
 fs.mkdirSync(path.join(out, 'vendor'), {recursive: true});
 fs.writeFileSync(path.join(out, 'vendor/aframe-master.min.js'), aframe.replace(evalGetter, 'function wrapper(t){return function(){return this["_"+t]}}'));
-for (const dir of ['fonts', 'img', 'models', 'shaders', 'sounds']) {
+// Shaders and the default hit sound are bundled by webpack; the rest is loaded at runtime.
+for (const dir of ['fonts', 'img', 'models']) {
 	copy(path.join('assets', dir));
 }
+copy('assets/sounds/silence.mp3');
 // Blender source files aren't loaded by the page.
 for (const f of fs.readdirSync(path.join(out, 'assets/models'))) {
 	if (f.endsWith('.blend')) fs.rmSync(path.join(out, 'assets/models', f));

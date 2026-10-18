@@ -16,6 +16,7 @@ const {chromium} = require('playwright');
 		if ((m.type() === 'error' || m.type() === 'warning') && !m.text().startsWith('THREE.WebGL')) errors.push(m.type() + ': ' + m.text());
 	});
 	page.on('requestfailed', r => errors.push('requestfailed: ' + r.url() + ' ' + (r.failure() && r.failure().errorText)));
+	page.on('response', r => r.status() >= 400 && errors.push(`HTTP ${r.status()}: ${r.url()}`));
 	const events = [];
 	await page.exposeFunction('__logEvent', e => events.push(e));
 	await page.addInitScript(() => {

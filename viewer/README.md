@@ -18,7 +18,7 @@ npm ci
 npm run build     # production webpack build, then scripts/package.js -> dist/
 ```
 
-`dist/` (about 7 MB) is what the mod serves. It contains:
+`dist/` (about 5 MB) is what the mod serves. It contains:
 - `index.html`
 - the bundle
 - A-Frame
