@@ -67,6 +67,15 @@ namespace LiveViewer.Server.Levels
         /// <summary>Returns null if the folder has no readable Info.dat.</summary>
         public static LevelInfo? Read(string directory)
         {
+            // Difficulty and audio files are files the game's level loader may guard (see GameFileAccess).
+            using (GameFileAccess.Enter())
+            {
+                return ReadLevel(directory);
+            }
+        }
+
+        private static LevelInfo? ReadLevel(string directory)
+        {
             var files = System.IO.Directory.EnumerateFiles(directory).Select(Path.GetFileName).ToList();
             var infoName = files.FirstOrDefault(n => string.Equals(n, "info.dat", StringComparison.OrdinalIgnoreCase));
             if (infoName == null)

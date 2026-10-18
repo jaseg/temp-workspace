@@ -1,6 +1,6 @@
 // Binary protocol of the mod's live server. Layouts are documented in mod/PROTOCOL.md.
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 export const SUBPROTOCOL = 'bslive.v1';
 
 export const T = {
@@ -14,6 +14,7 @@ export const T = {
 	SessionStart: 0x10,
 	SessionEnd: 0x11,
 	Idle: 0x12,
+	SongSelected: 0x13,
 	Pose: 0x20,
 	NoteCut: 0x21,
 	NoteFinal: 0x22,
@@ -21,12 +22,13 @@ export const T = {
 	Height: 0x24,
 	Pause: 0x25,
 	Resume: 0x26,
+	NoteSpawn: 0x27,
+	WallSpawn: 0x28,
 	MapChunk: 0x30,
 	MapError: 0x31,
 	Suggestions: 0x40,
 	Hello: 0x81,
 	Ping: 0x82,
-	MapRequest: 0x83,
 	LevelListRequest: 0x84,
 	LevelFileRequest: 0x85,
 	LevelStatsRequest: 0x86,
@@ -158,16 +160,6 @@ export function hello(credential, name) {
 
 export function ping(clientTime) {
 	return message(T.Ping, 8, v => v.setFloat64(1, clientTime, true));
-}
-
-export function mapRequest(requestId, sessionId, fileName) {
-	const name = new TextEncoder().encode(fileName);
-	return message(T.MapRequest, 2 + 4 + 4 + name.length, (v, b) => {
-		v.setUint16(1, requestId, true);
-		v.setUint32(3, sessionId, true);
-		v.setInt32(7, name.length, true);
-		b.set(name, 11);
-	});
 }
 
 export function levelListRequest(requestId) {

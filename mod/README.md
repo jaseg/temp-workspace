@@ -90,7 +90,8 @@ NODE_PATH=$(npm root -g) node tools/browser-smoke.cjs https://localhost:4280/ 10
     second.
   - Every message is parsed strictly; anything unexpected closes the
     connection.
-  - At most 16 connections in total, 4 per address.
+  - At most 64 approved viewers. Before approval, at most 16 sockets in total and
+    4 per address may wait, and each must send its hello within 10 seconds.
 - **Access:** nothing beyond the static page and the waiting room until the
   player approves the device in game.
   - Remembered devices hold a random 256-bit credential, and only its SHA-256 is

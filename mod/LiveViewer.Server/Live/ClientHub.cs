@@ -18,8 +18,9 @@ namespace LiveViewer.Server.Live
     /// </summary>
     internal sealed class ClientHub : IDisposable
     {
-        public const int MaxConnections = 16;
-        public const int MaxConnectionsPerAddress = 4;
+        public const int MaxApprovedConnections = 64;
+        public const int MaxPreAdmissionConnections = 16;
+        public const int MaxPreAdmissionConnectionsPerAddress = 4;
         public const int MaxBacklog = 200_000;
 
         private readonly object _lock = new object();
@@ -33,6 +34,8 @@ namespace LiveViewer.Server.Live
         private readonly BeatLeaderStats? _stats;
         private readonly Suggestions? _suggestions;
         private readonly string _serverName;
+        private readonly AudioStreamState _audio;
+        private readonly TimeSpan _helloTimeout;
         private readonly Thread _pump;
         private readonly Timer _expiry;
         private volatile bool _stopping;
@@ -40,11 +43,19 @@ namespace LiveViewer.Server.Live
         private uint _sessionId;
         private bool _inSession;
         private string _sessionHash = "";
-        private IMapFileSource? _map;
+        private byte[]? _selectedSongMessage;
+        private string _selectedSongHash = "";
+        private string _audioUrl = "";
 
         public ClientHub(LiveFeed feed, WaitingRoom waitingRoom, DeviceStore devices, string serverName, ILiveLog log,
-            LevelLibrary? levels = null, BeatLeaderStats? stats = null, Suggestions? suggestions = null)
+            TimeSpan helloTimeout, AudioStreamState audio, LevelLibrary? levels = null, BeatLeaderStats? stats = null,
+            Suggestions? suggestions = null)
         {
+            if (helloTimeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(helloTimeout));
+            }
+
             _feed = feed;
             _levels = levels;
             _stats = stats;
@@ -52,6 +63,8 @@ namespace LiveViewer.Server.Live
             _waitingRoom = waitingRoom;
             _devices = devices;
             _serverName = serverName;
+            _audio = audio;
+            _helloTimeout = helloTimeout;
             _log = log;
             _waitingRoom.Decided += OnDecided;
             _devices.Revoked += OnRevoked;
@@ -115,11 +128,13 @@ namespace LiveViewer.Server.Live
             var connection = new ClientConnection(context, DescribeUserAgent(userAgent), _log);
             lock (_lock)
             {
-                var total = _byContext.Count;
-                var sameAddress = _byContext.Values.Count(c => c.Address.Equals(connection.Address));
-                if (total >= MaxConnections || sameAddress >= MaxConnectionsPerAddress)
+                var awaitingAdmission = _byContext.Values.Count(c => c.State != ClientState.Approved);
+                var sameAddress = _byContext.Values.Count(c =>
+                    c.State != ClientState.Approved && c.Address.Equals(connection.Address));
+                if (awaitingAdmission >= MaxPreAdmissionConnections ||
+                    sameAddress >= MaxPreAdmissionConnectionsPerAddress)
                 {
-                    _log.Warn($"Refusing connection from {connection.Address}: too many connections.");
+                    _log.Warn($"Refusing pre-admission connection from {connection.Address}: too many connections.");
                     _ = connection.AbortAsync();
                     return;
                 }
@@ -127,8 +142,9 @@ namespace LiveViewer.Server.Live
                 _byContext[context.Id] = connection;
             }
 
-            _ = connection.RunSendLoopAsync(() => Volatile.Read(ref _sessionId));
+            _ = connection.RunSendLoopAsync();
             connection.EnqueueReliable(Messages.Welcome(LiveClock.NowUs(), _serverName));
+            _ = EnforceHelloDeadlineAsync(connection);
         }
 
         public void OnDisconnected(IWebSocketContext context)
@@ -183,12 +199,10 @@ namespace LiveViewer.Server.Live
                         HandleHello(connection, ClientMessages.ParseHello(reader));
                         break;
                     case MessageType.Ping:
+                        RequireHello(connection);
                         var clientTime = ClientMessages.ParsePing(reader);
                         var received = LiveClock.NowUs();
                         connection.EnqueueReliable(Messages.Pong(clientTime, received, LiveClock.NowUs()));
-                        break;
-                    case MessageType.MapRequest:
-                        HandleMapRequest(connection, ClientMessages.ParseMapRequest(reader));
                         break;
                     case MessageType.LevelListRequest:
                         HandleLevelRequest(connection, ClientMessages.ParseLevelListRequest(reader), null, null);
@@ -241,13 +255,22 @@ namespace LiveViewer.Server.Live
             }
 
             connection.Name = WaitingRoom.CleanName(hello.Name, connection.Id);
-            var device = hello.Credential != null ? _devices.Match(hello.Credential) : null;
-            if (device != null)
+            if (hello.Credential != null)
             {
-                connection.DeviceId = device.Id;
-                _log.Info($"Client {connection.Id} ({connection.Address}) authenticated as remembered device \"{device.Label}\".");
-                Subscribe(connection, null);
-                return;
+                var admitted = _devices.TryAuthenticate(hello.Credential,
+                    device => TrySubscribe(connection, null, device.Id), out var device);
+                if (admitted)
+                {
+                    _log.Info($"Client {connection.Id} ({connection.Address}) authenticated as remembered device \"{device!.Label}\".");
+                    return;
+                }
+
+                if (device != null)
+                {
+                    _log.Warn($"Client {connection.Id} ({connection.Address}) could not be admitted: viewer limit reached.");
+                    Reject(connection, Messages.Denied());
+                    return;
+                }
             }
 
             var result = _waitingRoom.Join(connection.Id, connection.Address, connection.Name, connection.Label, name =>
@@ -263,41 +286,6 @@ namespace LiveViewer.Server.Live
 
             _log.Info($"Client {connection.Id} ({connection.Address}) can't join the waiting room: {result}.");
             Reject(connection, Messages.Denied());
-        }
-
-        private void HandleMapRequest(ClientConnection connection, ClientMessages.MapRequest request)
-        {
-            IMapFileSource? map;
-            uint sessionId;
-            lock (_lock)
-            {
-                if (connection.State != ClientState.Approved)
-                {
-                    throw new ProtocolException("Map request before approval.");
-                }
-
-                map = _inSession ? _map : null;
-                sessionId = _sessionId;
-            }
-
-            if (map == null || request.SessionId != sessionId)
-            {
-                connection.EnqueueReliable(Messages.MapError(request.RequestId, MapErrorCode.NoSession));
-                return;
-            }
-
-            if (!map.TryOpen(request.FileName, out var stream))
-            {
-                connection.EnqueueReliable(Messages.MapError(request.RequestId, MapErrorCode.NotAvailable));
-                return;
-            }
-
-            var transfer = new MapTransfer(stream, request.RequestId, sessionId);
-            if (!connection.TryEnqueueTransfer(transfer))
-            {
-                transfer.Dispose();
-                connection.EnqueueReliable(Messages.MapError(request.RequestId, MapErrorCode.TooManyRequests));
-            }
         }
 
         /// <summary>
@@ -355,7 +343,7 @@ namespace LiveViewer.Server.Live
                     return;
                 }
 
-                var transfer = new MapTransfer(stream, requestId, null);
+                var transfer = new MapTransfer(stream, requestId);
                 if (!connection.TryEnqueueTransfer(transfer))
                 {
                     transfer.Dispose();
@@ -507,9 +495,20 @@ namespace LiveViewer.Server.Live
 
             if (decision.Kind == DecisionKind.Approved)
             {
-                connection.DeviceId = decision.Device?.Id;
-                _log.Info($"Client {connection.Id} ({connection.Address}) approved{(decision.Device != null ? " and remembered" : "")}.");
-                Subscribe(connection, decision.Credential);
+                if (TrySubscribe(connection, decision.Credential, decision.Device?.Id))
+                {
+                    _log.Info($"Client {connection.Id} ({connection.Address}) approved{(decision.Device != null ? " and remembered" : "")}.");
+                }
+                else
+                {
+                    if (decision.Device != null)
+                    {
+                        _devices.Remove(decision.Device.Id);
+                    }
+
+                    _log.Warn($"Client {connection.Id} ({connection.Address}) could not be admitted: viewer limit reached.");
+                    Reject(connection, Messages.Denied());
+                }
             }
             else
             {
@@ -539,19 +538,29 @@ namespace LiveViewer.Server.Live
         }
 
         /// <summary>Marks a client approved and queues the current state; from then on it receives broadcasts.</summary>
-        private void Subscribe(ClientConnection connection, byte[]? credential)
+        private bool TrySubscribe(ClientConnection connection, byte[]? credential, string? deviceId)
         {
             lock (_lock)
             {
                 if (connection.State != ClientState.Pending)
                 {
-                    return;
+                    return false;
                 }
 
+                if (_byContext.Values.Count(c => c.State == ClientState.Approved) >= MaxApprovedConnections)
+                {
+                    return false;
+                }
+
+                connection.DeviceId = deviceId;
                 connection.State = ClientState.Approved;
                 connection.EnqueueReliable(Messages.Approved(credential));
                 connection.EnqueueReliable(Messages.Name(connection.Name));
                 SendSuggestions(connection);
+                if (_selectedSongMessage != null)
+                {
+                    connection.EnqueueReliable(_selectedSongMessage);
+                }
                 if (_inSession)
                 {
                     foreach (var message in _backlog)
@@ -563,7 +572,38 @@ namespace LiveViewer.Server.Live
                 {
                     connection.EnqueueReliable(Messages.Idle());
                 }
+
+                return true;
             }
+        }
+
+        private void RequireHello(ClientConnection connection)
+        {
+            lock (_lock)
+            {
+                if (connection.State == ClientState.Connected || connection.State == ClientState.Closing)
+                {
+                    throw new ProtocolException("Message before hello.");
+                }
+            }
+        }
+
+        private async Task EnforceHelloDeadlineAsync(ClientConnection connection)
+        {
+            await Task.Delay(_helloTimeout).ConfigureAwait(false);
+            lock (_lock)
+            {
+                if (!_byContext.TryGetValue(connection.ContextId, out var current) ||
+                    !ReferenceEquals(current, connection) || connection.State != ClientState.Connected)
+                {
+                    return;
+                }
+
+                connection.State = ClientState.Closing;
+            }
+
+            _log.Warn($"Client {connection.Id} ({connection.Address}) did not send hello within {_helloTimeout.TotalSeconds:g} seconds.");
+            await connection.AbortAsync().ConfigureAwait(false);
         }
 
         private void Reject(ClientConnection connection, byte[] message)
@@ -615,13 +655,30 @@ namespace LiveViewer.Server.Live
         {
             switch (e.Kind)
             {
+                case LiveFeed.Kind.SongSelected:
+                    lock (_lock)
+                    {
+                        var selected = e.Selection!;
+                        // Gameplay setup repeats the menu selection. Keep the existing capability alive so a
+                        // browser which is already preloading it cannot race a token replacement at song start.
+                        if (_audioUrl.Length == 0 || !string.Equals(_selectedSongHash, selected.Hash, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _audioUrl = _audio.Select(selected.Audio);
+                            _selectedSongHash = selected.Hash;
+                        }
+                        _selectedSongMessage = Messages.SongSelected(_audioUrl, selected.Hash, selected.SongName,
+                            selected.SongSubName, selected.SongAuthor, selected.BeatsPerMinute);
+                        foreach (var c in Approved()) c.EnqueueReliable(_selectedSongMessage);
+                    }
+                    return;
+
                 case LiveFeed.Kind.SessionStart:
                     lock (_lock)
                     {
                         _sessionId++;
                         _inSession = true;
                         _sessionHash = e.Session!.Hash;
-                        _map = e.Map;
+                        e.Session!.AudioUrl = _audioUrl;
                         _backlog.Clear();
                         var message = Messages.SessionStart(_sessionId, e.Session!);
                         _backlog.Add(message);
@@ -646,7 +703,6 @@ namespace LiveViewer.Server.Live
 
                         hash = _sessionHash;
                         _inSession = false;
-                        _map = null;
                         _backlog.Clear();
                         var message = Messages.SessionEnd(_sessionId, e.EndReason, e.SongTime);
                         foreach (var c in Approved())
@@ -674,6 +730,12 @@ namespace LiveViewer.Server.Live
                 case LiveFeed.Kind.NoteCut:
                 case LiveFeed.Kind.NoteFinal:
                     Messages.Note(w, e.Kind == LiveFeed.Kind.NoteFinal, e.CaptureUs, e.Note);
+                    break;
+                case LiveFeed.Kind.NoteSpawn:
+                    Messages.NoteSpawn(w, e.CaptureUs, e.NoteSpawn);
+                    break;
+                case LiveFeed.Kind.WallSpawn:
+                    Messages.WallSpawn(w, e.CaptureUs, e.WallSpawn);
                     break;
                 case LiveFeed.Kind.Wall:
                     Messages.Wall(w, e.CaptureUs, e.Wall);

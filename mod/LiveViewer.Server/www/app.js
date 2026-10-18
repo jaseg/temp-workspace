@@ -5,10 +5,10 @@
 (function () {
 	const T = {
 		Welcome: 0x01, Waiting: 0x02, Approved: 0x03, Denied: 0x04, Revoked: 0x05, Pong: 0x06,
-		SessionStart: 0x10, SessionEnd: 0x11, Idle: 0x12,
+		SessionStart: 0x10, SessionEnd: 0x11, Idle: 0x12, SongSelected: 0x13,
 		Pose: 0x20, NoteCut: 0x21, NoteFinal: 0x22, Wall: 0x23, Height: 0x24, Pause: 0x25, Resume: 0x26,
 		MapChunk: 0x30, MapError: 0x31,
-		Hello: 0x81, Ping: 0x82, MapRequest: 0x83,
+		Hello: 0x81, Ping: 0x82,
 	};
 	const CREDENTIAL_KEY = 'bslive.credential';
 
@@ -19,7 +19,6 @@
 		rttMs: null, offsetUs: null,
 		receiveAgeMs: null, displayAgeMs: null, maxReceiveAgeMs: 0,
 		lastPose: null, lastPoseReceivedAt: 0,
-		maps: {},
 	};
 	window.liveStats = stats; // for automated tests
 
@@ -69,8 +68,6 @@
 	let ws = null;
 	let pingTimer = null;
 	const pongs = [];
-	let nextRequestId = 1;
-	const transfers = {};
 
 	function connect() {
 		stats.state = 'connecting';
@@ -79,11 +76,11 @@
 		ws.binaryType = 'arraybuffer';
 		ws.onopen = () => {
 			const credential = loadCredential();
-			// Protocol 2: the test page always waits under the name "Test page".
+			// The test page always waits under the name "Test page".
 			const name = new TextEncoder().encode('Test page');
 			const at = 4 + (credential ? 32 : 0);
 			ws.send(message(T.Hello, at + 3 + name.length, (v, b) => {
-				v.setUint16(1, 2, true);
+				v.setUint16(1, 3, true);
 				v.setUint8(3, credential ? 1 : 0);
 				if (credential) b.set(credential, 4);
 				v.setInt32(at, name.length, true);
@@ -134,17 +131,11 @@
 				break;
 			case T.SessionEnd: stats.session = null; break;
 			case T.Idle: stats.session = null; break;
+			case T.SongSelected: stats.selectedSong = JSON.parse(r.str()); break;
 			case T.Pose: onPose(r); break;
 			case T.NoteCut: stats.noteCuts++; break;
 			case T.NoteFinal: stats.noteFinals++; break;
 			case T.Wall: stats.walls++; break;
-			case T.MapChunk: onMapChunk(r, data); break;
-			case T.MapError: {
-				const id = r.u16(), code = r.u8();
-				const t = transfers[id];
-				if (t) { log(`${t.name}: error ${code}`); delete transfers[id]; }
-				break;
-			}
 		}
 		if (type !== T.Pose) render();
 	}
@@ -178,39 +169,6 @@
 			stats.maxReceiveAgeMs = Math.max(stats.maxReceiveAgeMs, stats.receiveAgeMs);
 		}
 	}
-
-	// ---- map download test ----
-	function requestMapFiles() {
-		if (!stats.session) return log('No session.');
-		for (const [role, name] of Object.entries(stats.session.files)) {
-			const id = nextRequestId++ & 0xffff;
-			const nameBytes = new TextEncoder().encode(name);
-			transfers[id] = {name: `${role} (${name})`, parts: [], received: 0, started: performance.now()};
-			ws.send(message(T.MapRequest, 2 + 4 + 4 + nameBytes.length, (v, b) => {
-				v.setUint16(1, id, true);
-				v.setUint32(3, stats.sessionId, true);
-				v.setInt32(7, nameBytes.length, true);
-				b.set(nameBytes, 11);
-			}));
-		}
-	}
-
-	function onMapChunk(r, data) {
-		const id = r.u16(), total = r.u32(), offset = r.u32();
-		const t = transfers[id];
-		if (!t) return;
-		const chunk = new Uint8Array(data, r.p);
-		t.parts.push(chunk.slice());
-		t.received += chunk.length;
-		if (t.received >= total) {
-			const ms = performance.now() - t.started;
-			stats.maps[t.name] = total;
-			log(`${t.name}: ${total} bytes in ${ms.toFixed(0)} ms`);
-			delete transfers[id];
-		}
-	}
-
-	function log(line) { $('maplog').textContent += line + '\n'; }
 
 	// ---- rendering ----
 	function render() {
@@ -301,7 +259,6 @@
 		requestAnimationFrame(draw);
 	}
 
-	$('maptest').addEventListener('click', requestMapFiles);
 	render();
 	connect();
 	requestAnimationFrame(draw);

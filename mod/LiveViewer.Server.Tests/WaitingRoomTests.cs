@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
 using LiveViewer.Server.Security;
 using Xunit;
 
@@ -159,6 +161,43 @@ namespace LiveViewer.Server.Tests
             Assert.DoesNotContain('\n', label);
             Assert.DoesNotContain('\0', label);
             Assert.True(label.Length <= 64);
+        }
+
+        [Fact]
+        public async Task CredentialRegistrationIsAtomicWithRevocation()
+        {
+            var device = _devices.Add("Viewer", out var credential);
+            using var registrationEntered = new ManualResetEventSlim();
+            using var finishRegistration = new ManualResetEventSlim();
+            using var removalStarted = new ManualResetEventSlim();
+
+            var authenticate = Task.Run(() =>
+            {
+                var success = _devices.TryAuthenticate(credential, matched =>
+                {
+                    Assert.Equal(device.Id, matched.Id);
+                    registrationEntered.Set();
+                    Assert.True(finishRegistration.Wait(TimeSpan.FromSeconds(5)));
+                    return true;
+                }, out var matchedDevice);
+                return (success, matchedDevice);
+            });
+
+            Assert.True(registrationEntered.Wait(TimeSpan.FromSeconds(5)));
+            var remove = Task.Run(() =>
+            {
+                removalStarted.Set();
+                return _devices.Remove(device.Id);
+            });
+            Assert.True(removalStarted.Wait(TimeSpan.FromSeconds(5)));
+            Assert.NotSame(remove, await Task.WhenAny(remove, Task.Delay(100)));
+
+            finishRegistration.Set();
+            var result = await authenticate;
+            Assert.True(result.success);
+            Assert.Equal(device.Id, result.matchedDevice!.Id);
+            Assert.True(await remove);
+            Assert.Null(_devices.Match(credential));
         }
     }
 }

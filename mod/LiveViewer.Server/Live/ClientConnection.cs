@@ -221,7 +221,7 @@ namespace LiveViewer.Server.Live
             return true;
         }
 
-        public async Task RunSendLoopAsync(Func<uint> currentSessionId)
+        public async Task RunSendLoopAsync()
         {
             var chunk = new byte[MapChunkBytes];
             try
@@ -269,7 +269,7 @@ namespace LiveViewer.Server.Live
                             break;
                         }
 
-                        var (next, done) = await transfer.NextMessageAsync(chunk, currentSessionId()).ConfigureAwait(false);
+                        var (next, done) = await transfer.NextMessageAsync(chunk).ConfigureAwait(false);
                         if (done)
                         {
                             lock (_lock)
@@ -363,34 +363,26 @@ namespace LiveViewer.Server.Live
     }
 
     /// <summary>
-    /// A file being streamed to one client in chunks. Map files are bound to their session and abort when it
-    /// ends; level library files and generated documents are not.
+    /// A level library file or generated document being streamed to one client in chunks.
     /// </summary>
     internal sealed class MapTransfer : IDisposable
     {
         private readonly Stream _stream;
         private readonly ushort _requestId;
-        private readonly uint? _sessionId;
         private readonly uint _length;
         private uint _offset;
         private bool _sentEmpty;
 
-        public MapTransfer(Stream stream, ushort requestId, uint? sessionId)
+        public MapTransfer(Stream stream, ushort requestId)
         {
             _stream = stream;
             _requestId = requestId;
-            _sessionId = sessionId;
             _length = (uint) Math.Min(stream.Length, MapDirectory.MaxFileBytes);
         }
 
         /// <summary>Reads the next chunk. Returns the message to send (if any) and whether the transfer is finished.</summary>
-        public async Task<(byte[]? message, bool done)> NextMessageAsync(byte[] buffer, uint currentSessionId)
+        public async Task<(byte[]? message, bool done)> NextMessageAsync(byte[] buffer)
         {
-            if (_sessionId.HasValue && currentSessionId != _sessionId.Value)
-            {
-                return (Messages.MapError(_requestId, MapErrorCode.NoSession), true);
-            }
-
             if (_length == 0)
             {
                 // Zero-length file: one empty chunk tells the client it's complete.
@@ -402,7 +394,14 @@ namespace LiveViewer.Server.Live
             try
             {
                 var want = (int) Math.Min(buffer.Length, _length - _offset);
-                var read = await _stream.ReadAsync(buffer, 0, want).ConfigureAwait(false);
+                Task<int> pending;
+                using (GameFileAccess.Enter())
+                {
+                    // The permission flows into the read's async work, captured when it starts.
+                    pending = _stream.ReadAsync(buffer, 0, want);
+                }
+
+                var read = await pending.ConfigureAwait(false);
                 if (read <= 0)
                 {
                     return (Messages.MapError(_requestId, MapErrorCode.ReadFailed), true);
@@ -412,8 +411,9 @@ namespace LiveViewer.Server.Live
                 _offset += (uint) read;
                 return (message, _offset >= _length);
             }
-            catch (IOException)
+            catch (Exception e) when (!(e is OperationCanceledException))
             {
+                // Any read failure ends this transfer only, not the connection (e.g. a game mod refusing the read).
                 return (Messages.MapError(_requestId, MapErrorCode.ReadFailed), true);
             }
         }

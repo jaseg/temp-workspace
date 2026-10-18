@@ -32,6 +32,7 @@ AFRAME.registerComponent('particleplayer', {
 		img: {type: 'selector'},
 		interpolate: {default: false},
 		loop: {default: 'false'},
+		opacity: {default: 1, min: 0, max: 1},
 		on: {default: 'init'},
 		poolSize: {default: 5, type: 'int'}, // number of simultaneous particle systems
 		protation: {type: 'vec3'},

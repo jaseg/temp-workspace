@@ -28,6 +28,7 @@ AFRAME.registerComponent('multiplier-ring', {
 	schema: {
 		combo: {default: 0},
 		multiplier: {default: 1},
+		visible: {default: true},
 	},
 
 	init: function () {
@@ -43,6 +44,7 @@ AFRAME.registerComponent('multiplier-ring', {
 	},
 
 	update: function () {
+		this.el.object3D.visible = this.data.visible;
 		this.updateRing();
 	},
 

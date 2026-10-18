@@ -124,12 +124,6 @@ namespace LiveViewer.Server.Tests
             Assert.Throws<ProtocolException>(() => ClientMessages.ParseHello(new MessageReader(new byte[] { 1, 0, 0, 9 })));
             Assert.Throws<ProtocolException>(() => ClientMessages.ParseHello(new MessageReader(new byte[] { 1, 0, 1, 1, 2 })));
             Assert.Throws<ProtocolException>(() => ClientMessages.ParsePing(new MessageReader(new MessageWriter().F64(double.NaN).ToArray())));
-            Assert.Throws<ProtocolException>(() => ClientMessages.ParseMapRequest(new MessageReader(
-                new MessageWriter().U16(1).U32(1).I32(10_000).ToArray())));
-            Assert.Throws<ProtocolException>(() => ClientMessages.ParseMapRequest(new MessageReader(
-                new MessageWriter().U16(1).U32(1).I32(-1).ToArray())));
-            Assert.Throws<ProtocolException>(() => ClientMessages.ParseMapRequest(new MessageReader(
-                new MessageWriter().U16(1).U32(1).I32(2).U8(0xC3).U8(0x28).ToArray()))); // invalid UTF-8
         }
 
         [Fact]
@@ -144,7 +138,6 @@ namespace LiveViewer.Server.Tests
                          {
                              r => ClientMessages.ParseHello(r),
                              r => ClientMessages.ParsePing(r),
-                             r => ClientMessages.ParseMapRequest(r),
                          })
                 {
                     try

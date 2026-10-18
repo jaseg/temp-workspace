@@ -11,7 +11,12 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Resolve the machine's LAN address for the dev-server A-Frame template branch.
 function localIP() {
-	const nets = os.networkInterfaces();
+	let nets;
+	try {
+		nets = os.networkInterfaces();
+	} catch (e) {
+		return 'localhost';
+	}
 	for (const name of Object.keys(nets)) {
 		for (const net of nets[name] || []) {
 			if (net.family === 'IPv4' && !net.internal) {

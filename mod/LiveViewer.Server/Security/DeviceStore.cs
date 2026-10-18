@@ -84,17 +84,29 @@ namespace LiveViewer.Server.Security
 
         public ApprovedDevice? Match(byte[] credential)
         {
+            TryAuthenticate(credential, _ => true, out var device);
+            return device;
+        }
+
+        /// <summary>
+        /// Matches a credential and registers the live connection while removal is excluded. The callback must not
+        /// call back into this store. This closes the gap in which a device could be revoked after matching but before
+        /// its connection became visible to the revocation handler.
+        /// </summary>
+        internal bool TryAuthenticate(byte[] credential, Func<ApprovedDevice, bool> register, out ApprovedDevice? device)
+        {
             var hash = Hash(credential);
             lock (_lock)
             {
-                var device = _devices.FirstOrDefault(d => FixedTimeEquals(d.CredentialHash, hash));
-                if (device != null)
+                device = _devices.FirstOrDefault(d => FixedTimeEquals(d.CredentialHash, hash));
+                if (device == null || !register(device))
                 {
-                    device.LastSeenUtc = DateTime.UtcNow;
-                    Save();
+                    return false;
                 }
 
-                return device;
+                device.LastSeenUtc = DateTime.UtcNow;
+                Save();
+                return true;
             }
         }
 

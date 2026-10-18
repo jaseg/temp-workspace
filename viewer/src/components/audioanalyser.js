@@ -46,10 +46,11 @@ AFRAME.registerComponent('audioanalyser', {
 		this.volume = 0;
 		this.xhr = null;
 
-		this.initContext();
+		this.context = null;
 	},
 
 	update: function (oldData) {
+		if (!this.context) return;
 		var analyser = this.analyser;
 		var data = this.data;
 
@@ -73,6 +74,7 @@ AFRAME.registerComponent('audioanalyser', {
 	 * Update spectrum on each frame.
 	 */
 	tick: function (t, dt) {
+		if (!this.analyser) return;
 		var data = this.data;
 		var volume;
 
@@ -120,6 +122,7 @@ AFRAME.registerComponent('audioanalyser', {
 	},
 
 	initContext: function () {
+		if (this.context) return this.context;
 		var data = this.data;
 		var analyser;
 		var gainNode;
@@ -140,9 +143,15 @@ AFRAME.registerComponent('audioanalyser', {
 		analyser.smoothingTimeConstant = data.smoothingTimeConstant;
 		this.levels = new Uint8Array(analyser.frequencyBinCount);
 		this.waveform = new Uint8Array(analyser.fftSize);
+		return this.context;
+	},
+
+	ensureContext: function () {
+		return this.initContext();
 	},
 
 	refreshSource: function (speed) {
+		this.ensureContext();
 		if (this.data.bufferedAudioOnly) {
 			this.getBufferSource().then(bufferSource => {
 				this.el.emit(
@@ -153,6 +162,10 @@ AFRAME.registerComponent('audioanalyser', {
 			});
 		} else {
 			this.getMediaSource().then(source => {
+				if (this.audio && this.audio.dataset && this.audio.dataset.liveStream) {
+					this.el.emit('audioanalysersource', {source, mediaSource: source, audio: this.audio, duration: this.audio.duration}, false);
+					return;
+				}
 				if (this.audio && this.audio.duration && this.audio.duration > 0 && this.audio.duration <= 1800) {
 					if (this.data.pitchCompensation && speed >= this.data.pitchCompensationTreshold) {
 						this.el.emit(
@@ -227,12 +240,12 @@ AFRAME.registerComponent('audioanalyser', {
 	},
 
 	suspendContext: function () {
-		this.context.suspend();
+		if (this.context) this.context.suspend();
 	},
 
 	resumeContext: function () {
 		if (!this.firefoxZeroed) {
-			this.context.resume();
+			this.ensureContext().resume();
 		}
 	},
 
@@ -252,6 +265,7 @@ AFRAME.registerComponent('audioanalyser', {
 	 * Fetch and parse buffer to audio buffer. Resolve a source.
 	 */
 	fetchAudioBuffer: function (src) {
+		if (src && src.constructor !== String) src = src.src;
 		// From cache.
 		if (audioBufferCache[src]) {
 			if (audioBufferCache[src].constructor === Promise) {
@@ -323,7 +337,7 @@ AFRAME.registerComponent('audioanalyser', {
 			if (captureThis.data.src.constructor === String) {
 				captureThis.audio = document.createElement('audio');
 				captureThis.audio.crossOrigin = 'anonymous';
-				captureThis.audio.preload = 'metadata';
+				captureThis.audio.preload = 'auto';
 				captureThis.audio.setAttribute('src', captureThis.data.src);
 			} else {
 				captureThis.audio = captureThis.data.src;

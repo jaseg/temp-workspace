@@ -225,8 +225,11 @@ AFRAME.registerComponent('live-controls', {
 		const settings = this.settings;
 
 		const volumeHandler = () => {
-			this.song.audioAnalyser.gainNode.gain.cancelScheduledValues(0);
-			this.song.audioAnalyser.gainNode.gain.value = musicSlider.value;
+			const gainNode = this.song.audioAnalyser.gainNode;
+			if (gainNode) {
+				gainNode.gain.cancelScheduledValues(0);
+				gainNode.gain.value = musicSlider.value;
+			}
 			settings.settings.volume = musicSlider.value;
 			settings.settings.hitSoundVolume = hitsoundSlider.value;
 			settings.sync();

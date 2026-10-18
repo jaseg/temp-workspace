@@ -55,7 +55,11 @@ namespace LiveViewer.Server.Live
                     return false;
                 }
 
-                stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 16384, useAsync: true);
+                using (GameFileAccess.Enter())
+                {
+                    stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 16384, useAsync: true);
+                }
+
                 return true;
             }
             catch (IOException)

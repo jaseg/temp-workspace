@@ -35,10 +35,11 @@ namespace LiveViewer.Plugin.Recording
         // Note and wall ids as in BeatLeader's recorder, kept per object so each later event can find them.
         private readonly Dictionary<NoteData, NoteEvent> _notes = new Dictionary<NoteData, NoteEvent>();
         private readonly Dictionary<ObstacleController, WallEvent> _walls = new Dictionary<ObstacleController, WallEvent>();
+        private readonly List<NoteSpawn> _pendingNotes = new List<NoteSpawn>();
+        private readonly List<WallSpawn> _pendingWalls = new List<WallSpawn>();
 
         private Transform? _origin, _head, _leftSaber, _rightSaber;
         private SessionInfo? _session;
-        private IMapFileSource? _map;
         private bool _started, _ended, _paused, _inWall;
         private WallEvent _currentWall;
 
@@ -83,7 +84,7 @@ namespace LiveViewer.Plugin.Recording
                 playerName = _playerData.playerData.playerName ?? "";
             }
 
-            var level = SessionBuilder.TryDescribe(_setup, playerName, out var map, out var reason);
+            var level = SessionBuilder.TryDescribe(_setup, playerName, out var selection, out var reason);
             if (level == null)
             {
                 Plugin.Log?.Info("Not streaming this level: " + reason);
@@ -92,7 +93,7 @@ namespace LiveViewer.Plugin.Recording
             }
 
             _session = level;
-            _map = map;
+            _feed.SelectSong(selection!);
             _beatmapObjectManager.noteWasAddedEvent += OnNoteWasAdded;
             _beatmapObjectManager.noteWasCutEvent += OnNoteWasCut;
             _beatmapObjectManager.obstacleWasSpawnedEvent += OnObstacleWasSpawned;
@@ -151,8 +152,12 @@ namespace LiveViewer.Plugin.Recording
                 // The jump distance is known once the spawn controller has initialised, which happens before the
                 // first gameplay frame.
                 _session!.JumpDistance = _movementData.jumpDistance;
-                _feed.BeginSession(_session, _map!);
+                _feed.BeginSession(_session);
                 _started = true;
+                foreach (var note in _pendingNotes) _feed.SpawnNote(LiveClock.NowUs(), note);
+                foreach (var wall in _pendingWalls) _feed.SpawnWall(LiveClock.NowUs(), wall);
+                _pendingNotes.Clear();
+                _pendingWalls.Clear();
                 _origin = _playerTransforms.GetField<Transform, PlayerTransforms>("_originParentTransform");
                 _head = _playerTransforms.GetField<Transform, PlayerTransforms>("_headTransform");
                 _leftSaber = _saberManager.leftSaber.transform;
@@ -183,7 +188,7 @@ namespace LiveViewer.Plugin.Recording
 
         private void OnNoteWasAdded(NoteData noteData, NoteSpawnData spawnData)
         {
-            _notes[noteData] = new NoteEvent
+            var note = new NoteEvent
             {
                 NoteId = ((int) noteData.scoringType + 2) * 10000
                          + noteData.lineIndex * 1000
@@ -192,6 +197,24 @@ namespace LiveViewer.Plugin.Recording
                          + (int) noteData.cutDirection,
                 SpawnTime = noteData.time,
             };
+            _notes[noteData] = note;
+            var spawn = new NoteSpawn
+            {
+                NoteId = note.NoteId,
+                Time = noteData.time,
+                LineIndex = noteData.lineIndex,
+                LineLayer = (int) noteData.noteLineLayer,
+                BeforeJumpLineLayer = (int) noteData.beforeJumpNoteLineLayer,
+                ColorType = (int) noteData.colorType,
+                CutDirection = (int) noteData.cutDirection,
+                ScoringType = (int) noteData.scoringType,
+                CutDirectionAngleOffset = noteData.cutDirectionAngleOffset,
+                HasFlip = noteData.flipLineIndex >= 0,
+                FlipLineIndex = noteData.flipLineIndex,
+                FlipYSide = noteData.flipYSide,
+            };
+            if (_started) _feed.SpawnNote(LiveClock.NowUs(), spawn);
+            else _pendingNotes.Add(spawn);
         }
 
         private void OnNoteWasCut(NoteController noteController, in global::NoteCutInfo info)
@@ -274,6 +297,18 @@ namespace LiveViewer.Plugin.Recording
                 WallId = data.lineIndex * 100 + (int) data.type * 10 + data.width,
                 SpawnTime = data.time,
             };
+            var spawn = new WallSpawn
+            {
+                WallId = data.lineIndex * 100 + (int) data.type * 10 + data.width,
+                Time = data.time,
+                Duration = data.duration,
+                LineIndex = data.lineIndex,
+                LineLayer = (int) data.lineLayer,
+                Width = data.width,
+                Height = data.height,
+            };
+            if (_started) _feed.SpawnWall(LiveClock.NowUs(), spawn);
+            else _pendingWalls.Add(spawn);
         }
 
         private void OnHeadEnteredObstacle(ObstacleController obstacle)

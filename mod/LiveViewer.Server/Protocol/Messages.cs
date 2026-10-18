@@ -55,10 +55,11 @@ namespace LiveViewer.Server.Protocol
                 .Field("playerHeight", info.PlayerHeight)
                 .Field("jumpDistance", info.JumpDistance)
                 .Field("noteJumpSpeed", info.NoteJumpSpeed)
+                .Field("beatsPerMinute", info.BeatsPerMinute)
                 .Field("startTime", info.StartTime)
                 .Field("songSpeed", info.SongSpeed)
                 .Field("gameVersion", info.GameVersion)
-                .Field("files", info.Files)
+                .Field("audioUrl", info.AudioUrl)
                 .ToString();
             return new MessageWriter(512).U8(MessageType.SessionStart).U32(sessionId).String(json).ToArray();
         }
@@ -67,6 +68,20 @@ namespace LiveViewer.Server.Protocol
             new MessageWriter(16).U8(MessageType.SessionEnd).U32(sessionId).U8((byte) reason).F32(songTime).ToArray();
 
         public static byte[] Idle() => new[] { MessageType.Idle };
+
+        public static byte[] SongSelected(string audioUrl, string hash, string songName, string songSubName,
+            string songAuthor, float beatsPerMinute)
+        {
+            var json = new JsonObjectWriter()
+                .Field("audioUrl", audioUrl)
+                .Field("hash", hash)
+                .Field("songName", songName)
+                .Field("songSubName", songSubName)
+                .Field("songAuthor", songAuthor)
+                .Field("beatsPerMinute", beatsPerMinute)
+                .ToString();
+            return new MessageWriter(256).U8(MessageType.SongSelected).String(json).ToArray();
+        }
 
         public static void Pose(MessageWriter w, long captureUs, float songTime, in Pose head, in Pose left, in Pose right) =>
             w.Reset().U8(MessageType.Pose).I64(captureUs).F32(songTime).Pose(head).Pose(left).Pose(right);
@@ -91,6 +106,16 @@ namespace LiveViewer.Server.Protocol
 
         public static void Wall(MessageWriter w, long captureUs, in WallEvent e) =>
             w.Reset().U8(MessageType.Wall).I64(captureUs).I32(e.WallId).F32(e.Energy).F32(e.Time).F32(e.SpawnTime);
+
+        public static void NoteSpawn(MessageWriter w, long captureUs, in NoteSpawn e) =>
+            w.Reset().U8(MessageType.NoteSpawn).I64(captureUs).I32(e.NoteId).F32(e.Time)
+                .I32(e.LineIndex).I32(e.LineLayer).I32(e.BeforeJumpLineLayer)
+                .I32(e.ColorType).I32(e.CutDirection).I32(e.ScoringType)
+                .F32(e.CutDirectionAngleOffset).Bool(e.HasFlip).I32(e.FlipLineIndex).F32(e.FlipYSide);
+
+        public static void WallSpawn(MessageWriter w, long captureUs, in WallSpawn e) =>
+            w.Reset().U8(MessageType.WallSpawn).I64(captureUs).I32(e.WallId).F32(e.Time).F32(e.Duration)
+                .I32(e.LineIndex).I32(e.LineLayer).I32(e.Width).I32(e.Height);
 
         public static void Height(MessageWriter w, long captureUs, float height, float songTime) =>
             w.Reset().U8(MessageType.Height).I64(captureUs).F32(height).F32(songTime);
@@ -126,13 +151,6 @@ namespace LiveViewer.Server.Protocol
         }
 
         public const int MaxNameBytes = 128;
-
-        public struct MapRequest
-        {
-            public ushort RequestId;
-            public uint SessionId;
-            public string FileName;
-        }
 
         public struct LevelRequest
         {
@@ -237,17 +255,6 @@ namespace LiveViewer.Server.Protocol
             return t;
         }
 
-        public static MapRequest ParseMapRequest(MessageReader r)
-        {
-            var request = new MapRequest
-            {
-                RequestId = r.U16(),
-                SessionId = r.U32(),
-                FileName = r.String(Messages.MaxFileNameBytes),
-            };
-            r.End();
-            return request;
-        }
 
         /// <summary>Upper bound for any client message; the WebSocket layer rejects larger frames.</summary>
         public static readonly int MaxMessageBytes = Math.Max(1 + 2 + 1 + Messages.CredentialBytes, 1 + 2 + 4 + 4 + Messages.MaxFileNameBytes);

@@ -17,15 +17,23 @@ namespace LiveViewer.Host
         /// <summary>How long after a good cut the game finishes the swing rating (approximation).</summary>
         public const float SwingRatingDelay = 0.3f;
 
+        /// <summary>How long before its time a note or wall is spawned; more than the game's jump and move time.</summary>
+        public const float SpawnLead = 3f;
+
         private readonly LiveFeed _feed;
         private readonly BsorReplay _replay;
         private readonly SessionInfo _session;
         private readonly IMapFileSource _map;
         private readonly double _speed;
         private readonly float _startAt;
+        private readonly List<NoteSpawn> _noteSpawns;
+        private readonly List<WallSpawn> _wallSpawns;
 
-        public FakeLive(LiveFeed feed, BsorReplay replay, SessionInfo session, IMapFileSource map, double speed, float startAt = 0)
+        public FakeLive(LiveFeed feed, BsorReplay replay, SessionInfo session, IMapFileSource map,
+            List<NoteSpawn> noteSpawns, List<WallSpawn> wallSpawns, double speed, float startAt = 0)
         {
+            _noteSpawns = noteSpawns;
+            _wallSpawns = wallSpawns;
             _startAt = startAt;
             _feed = feed;
             _replay = replay;
@@ -42,6 +50,8 @@ namespace LiveViewer.Host
             Wall,
             Height,
             Pause,
+            NoteSpawn,
+            WallSpawn,
         }
 
         private struct Scheduled
@@ -61,8 +71,10 @@ namespace LiveViewer.Host
             }
 
             // Starting late skips everything before that point, as if the viewer had joined then.
-            schedule = schedule.Where(item => item.Time >= _startAt).ToList();
             var songStart = Math.Max(frames[0].Time, _startAt);
+            schedule = schedule.Where(item => item.Time >= _startAt || IsSpawn(item.Kind) && item.Time + SpawnLead >= _startAt)
+                .Select(item => IsSpawn(item.Kind) && item.Time < songStart ? new Scheduled { Time = songStart, Kind = item.Kind, Index = item.Index } : item)
+                .ToList();
             _feed.BeginSession(_session, _map);
 
             var clock = Stopwatch.StartNew();
@@ -112,6 +124,12 @@ namespace LiveViewer.Host
 
                         _feed.Resume(LiveClock.NowUs(), p.Time);
                         break;
+                    case Kind.NoteSpawn:
+                        _feed.SpawnNote(now, _noteSpawns[item.Index]);
+                        break;
+                    case Kind.WallSpawn:
+                        _feed.SpawnWall(now, _wallSpawns[item.Index]);
+                        break;
                 }
             }
 
@@ -156,11 +174,23 @@ namespace LiveViewer.Host
                 items.Add(new Scheduled { Time = _replay.Pauses[i].Time, Kind = Kind.Pause, Index = i });
             }
 
+            for (var i = 0; i < _noteSpawns.Count; i++)
+            {
+                items.Add(new Scheduled { Time = _noteSpawns[i].Time - SpawnLead, Kind = Kind.NoteSpawn, Index = i });
+            }
+
+            for (var i = 0; i < _wallSpawns.Count; i++)
+            {
+                items.Add(new Scheduled { Time = _wallSpawns[i].Time - SpawnLead, Kind = Kind.WallSpawn, Index = i });
+            }
+
             // Stable order: events at the same time keep their kind order (pose first).
             return items.Select((item, order) => (item, order))
                 .OrderBy(x => x.item.Time).ThenBy(x => x.order)
                 .Select(x => x.item).ToList();
         }
+
+        private static bool IsSpawn(Kind kind) => kind == Kind.NoteSpawn || kind == Kind.WallSpawn;
 
         /// <summary>Sleeps until shortly before the deadline, then spins, for sub-millisecond release times.</summary>
         private static bool WaitUntil(Stopwatch clock, double seconds, CancellationToken token)

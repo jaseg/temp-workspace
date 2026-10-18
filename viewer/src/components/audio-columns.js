@@ -42,6 +42,7 @@ AFRAME.registerComponent('audio-columns', {
 	},
 
 	tick: function () {
+		if (!this.analyser.levels) return; // no audio graph before the first user gesture
 		// Step by 2 since we create one box of each side per level.
 		for (let i = 0; i < this.frequencyBinCount * 2; i += 2) {
 			let yScale = this.data.height / 2 + (this.analyser.levels[Math.floor(i / 2)] / 256.0) * this.data.scale;

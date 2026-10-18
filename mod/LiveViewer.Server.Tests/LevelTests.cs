@@ -237,6 +237,27 @@ namespace LiveViewer.Server.Tests
             Assert.Equal("2314", string.Concat(new Suggestions(Path.Combine(_root, "order.tsv")).List().Select(e => e.Id.Substring(39))));
         }
 
+        private sealed class RefusingStream : MemoryStream
+        {
+            public RefusingStream() : base(new byte[100])
+            {
+            }
+
+            public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+                throw new InvalidOperationException("File is blacklisted");
+        }
+
+        [Fact]
+        public async Task FailedReadEndsOnlyTheTransfer()
+        {
+            // A game mod refusing the read (SongCore's file blacklist) must give an error for this file, not an
+            // exception that ends the connection's send loop.
+            using var transfer = new LiveViewer.Server.Live.MapTransfer(new RefusingStream(), 7);
+            var (message, done) = await transfer.NextMessageAsync(new byte[64]);
+            Assert.True(done);
+            Assert.Equal(LiveViewer.Server.Protocol.MessageType.MapError, message![0]);
+        }
+
         [Fact]
         public void ReadsWavDuration()
         {

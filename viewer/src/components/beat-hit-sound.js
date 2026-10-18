@@ -13,14 +13,13 @@ AFRAME.registerComponent('beat-hit-sound', {
 		if (typeof AudioContext !== 'undefined') {
 			contextConfig.sampleRate = 44100;
 		}
-		this.context = new (window.webkitAudioContext || window.AudioContext)(contextConfig);
+		this.contextConfig = contextConfig;
+		this.context = null;
 
 		this.settings = this.el.sceneEl.components['settings'];
 		this.song = this.el.sceneEl.components.song;
 
-		this.gainNode = this.context.createGain();
-		this.gainNode.connect(this.context.destination);
-		this.setVolume(this.settings.settings.hitSoundVolume);
+		this.pendingVolume = this.settings.settings.hitSoundVolume;
 		this.sources = [];
 
 		this.beatGenerator = this.el.sceneEl.components['beat-generator'];
@@ -51,23 +50,33 @@ AFRAME.registerComponent('beat-hit-sound', {
 			});
 		}
 
-		this.refreshBuffer();
 		// Start initial interval
 		this.checkInterval = setInterval(() => {
 			this.checkStaticHitsound();
 		}, 10);
 	},
 
+	ensureContext: function () {
+		if (this.context) return this.context;
+		this.context = new (window.webkitAudioContext || window.AudioContext)(this.contextConfig);
+		this.gainNode = this.context.createGain();
+		this.gainNode.connect(this.context.destination);
+		this.setVolume(this.pendingVolume);
+		this.refreshBuffer();
+		return this.context;
+	},
+
 	suspendContext: function () {
-		this.context.suspend();
+		if (this.context) this.context.suspend();
 	},
 
 	resumeContext: function () {
-		this.context.resume();
+		this.ensureContext().resume();
 	},
 
 	setVolume: function (value) {
-		this.gainNode.gain.value = value * 0.3;
+		this.pendingVolume = value;
+		if (this.gainNode) this.gainNode.gain.value = value * 0.3;
 	},
 
 	refreshBuffer: function () {
@@ -96,6 +105,7 @@ AFRAME.registerComponent('beat-hit-sound', {
 	},
 
 	playSound: function () {
+		if (!this.context) return;
 		var source = this.sources.pop();
 		if (source == null) return;
 

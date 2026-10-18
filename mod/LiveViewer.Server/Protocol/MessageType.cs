@@ -6,7 +6,7 @@ namespace LiveViewer.Server.Protocol
     /// </summary>
     public static class MessageType
     {
-        public const ushort ProtocolVersion = 2;
+        public const ushort ProtocolVersion = 3;
 
         // Connection and waiting room.
         public const byte Welcome = 0x01;
@@ -21,6 +21,7 @@ namespace LiveViewer.Server.Protocol
         public const byte SessionStart = 0x10;
         public const byte SessionEnd = 0x11;
         public const byte Idle = 0x12;
+        public const byte SongSelected = 0x13;
 
         // Live data.
         public const byte Pose = 0x20;
@@ -30,6 +31,8 @@ namespace LiveViewer.Server.Protocol
         public const byte Height = 0x24;
         public const byte Pause = 0x25;
         public const byte Resume = 0x26;
+        public const byte NoteSpawn = 0x27;
+        public const byte WallSpawn = 0x28;
 
         // File transfer (map files, level library).
         public const byte MapChunk = 0x30;
@@ -41,7 +44,6 @@ namespace LiveViewer.Server.Protocol
         // Client to server.
         public const byte Hello = 0x81;
         public const byte Ping = 0x82;
-        public const byte MapRequest = 0x83;
         public const byte LevelListRequest = 0x84;
         public const byte LevelFileRequest = 0x85;
         public const byte LevelStatsRequest = 0x86;
@@ -54,7 +56,6 @@ namespace LiveViewer.Server.Protocol
     public enum MapErrorCode : byte
     {
         NotAvailable = 1,
-        NoSession = 2,
         ReadFailed = 3,
         TooManyRequests = 4,
     }

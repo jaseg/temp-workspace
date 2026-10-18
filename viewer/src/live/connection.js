@@ -1,5 +1,5 @@
 // WebSocket connection to the mod: waiting room, clock sync, message dispatch, map file and level library downloads.
-import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest, levelListRequest, levelFileRequest, levelStatsRequest, suggestionChange, suggestionMove, rename} from './protocol';
+import {T, Reader, SUBPROTOCOL, hello, ping, levelListRequest, levelFileRequest, levelStatsRequest, suggestionChange, suggestionMove, rename} from './protocol';
 import {ServerClock} from './clock';
 
 const CREDENTIAL_KEY = 'bslive.credential';
@@ -155,11 +155,6 @@ export class LiveConnection {
 			this.transfers.set(id, {name, resolve, reject, buffer: null, received: 0});
 			this.ws.send(build(id));
 		});
-	}
-
-	/** Downloads one file of the current session's map. */
-	fetchMapFile(sessionId, name) {
-		return this.request(`Map file ${name}`, id => mapRequest(id, sessionId, name));
 	}
 
 	/** The installed custom levels (see "Level library" in PROTOCOL.md). */

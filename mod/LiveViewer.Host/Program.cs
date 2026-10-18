@@ -97,6 +97,8 @@ Console commands while running:
                 Files = map.Files,
             };
             var mapSource = map.Source;
+            var (noteSpawns, wallSpawns) = MapObjects.Read(map);
+            session.BeatsPerMinute = map.BeatsPerMinute;
 
             var serverOptions = new LiveServerOptions
             {
@@ -155,7 +157,7 @@ Console commands while running:
                     }
 
                     Console.WriteLine("Song starting.");
-                    new FakeLive(server.Feed, replay, session, mapSource, speed, startAt).Run(cts.Token);
+                    new FakeLive(server.Feed, replay, session, mapSource, noteSpawns, wallSpawns, speed, startAt).Run(cts.Token);
                     Console.WriteLine("Song ended.");
                 }
                 while (loop && !cts.IsCancellationRequested);

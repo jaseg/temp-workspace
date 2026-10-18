@@ -15,6 +15,7 @@ namespace LiveViewer.Plugin
     public sealed class Plugin
     {
         private readonly LiveService _service;
+        private readonly MemoryProbe _memory;
 
         internal static IPALogger? Log { get; private set; }
 
@@ -22,8 +23,10 @@ namespace LiveViewer.Plugin
         public Plugin(IPALogger logger, [IPAConfig.Name("LiveViewer")] IPAConfig config, Zenjector zenjector)
         {
             Log = logger;
+            SongCoreFileAccess.Install(logger);
             var settings = config.Generated<PluginConfig>();
             _service = new LiveService(settings, logger);
+            _memory = new MemoryProbe(logger);
             zenjector.UseLogger(logger);
             zenjector.Install(Location.App, container => container.BindInstance(_service).AsSingle());
             zenjector.Install<MenuInstaller>(Location.Menu);
@@ -40,6 +43,10 @@ namespace LiveViewer.Plugin
         public void OnStart() => _service.StartInBackground();
 
         [OnExit]
-        public void OnExit() => _service.Dispose();
+        public void OnExit()
+        {
+            _memory.Dispose();
+            _service.Dispose();
+        }
     }
 }

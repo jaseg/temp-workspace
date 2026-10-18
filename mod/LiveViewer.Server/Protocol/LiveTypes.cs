@@ -80,6 +80,35 @@ namespace LiveViewer.Server.Protocol
         public bool HasCutInfo => EventType == NoteEventType.Good || EventType == NoteEventType.Bad;
     }
 
+    /// <summary>A note as it is spawned by the game, in the game's already-modified beatmap.</summary>
+    public struct NoteSpawn
+    {
+        public int NoteId;
+        public float Time;
+        public int LineIndex;
+        public int LineLayer;
+        public int BeforeJumpLineLayer;
+        public int ColorType;
+        public int CutDirection;
+        public int ScoringType;
+        public float CutDirectionAngleOffset;
+        public int FlipLineIndex;
+        public float FlipYSide;
+        public bool HasFlip;
+    }
+
+    /// <summary>An obstacle as it is spawned by the game.</summary>
+    public struct WallSpawn
+    {
+        public int WallId;
+        public float Time;
+        public float Duration;
+        public int LineIndex;
+        public int LineLayer;
+        public int Width;
+        public int Height;
+    }
+
     /// <summary>Same fields and order as a BSOR wall event.</summary>
     public struct WallEvent
     {
@@ -108,13 +137,17 @@ namespace LiveViewer.Server.Protocol
         public float PlayerHeight;
         public float JumpDistance;
         public float NoteJumpSpeed;
+        public float BeatsPerMinute;
         public float StartTime;
         public float SongSpeed = 1f;
 
         /// <summary>The game version, e.g. "1.44.1". The viewer matches chain notes differently from 1.29 on.</summary>
         public string GameVersion = "";
 
-        /// <summary>Map file roles ("info", "difficulty", "audio", "cover", ...) to file names.</summary>
+        /// <summary>Tokenized, same-origin URL of the progressively streamed song audio.</summary>
+        public string AudioUrl = "";
+
+        /// <summary>Host-side compatibility metadata; never serialized to viewers.</summary>
         public Dictionary<string, string> Files = new Dictionary<string, string>();
     }
 }

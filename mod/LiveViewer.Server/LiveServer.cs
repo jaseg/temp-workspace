@@ -26,6 +26,9 @@ namespace LiveViewer.Server
 
         public string ServerName = "Beat Saber Live";
 
+        /// <summary>How long a WebSocket may remain open without identifying itself.</summary>
+        public TimeSpan HelloTimeout = TimeSpan.FromSeconds(10);
+
         /// <summary>Viewer files to serve; defaults to the embedded test page.</summary>
         public StaticSite? Site;
 
@@ -57,6 +60,7 @@ namespace LiveViewer.Server
         private readonly BeatLeaderStats? _stats;
         private readonly PeerPolicy _peers;
         private readonly HostPolicy _hosts;
+        private readonly AudioStreamState _audio;
         private WebServer? _server;
         private System.Threading.CancellationTokenSource? _stop;
 
@@ -69,6 +73,7 @@ namespace LiveViewer.Server
             Devices = new DeviceStore(Path.Combine(options.DataDirectory, "devices.tsv"));
             WaitingRoom = new WaitingRoom(Devices);
             Feed = new LiveFeed();
+            _audio = new AudioStreamState();
             _peers = new PeerPolicy { AllowAnyAddress = options.AllowAnyAddress };
             _hosts = new HostPolicy(options.Port, options.HostNames);
             Levels = new LevelLibrary(options.LevelFolders, log);
@@ -76,7 +81,7 @@ namespace LiveViewer.Server
             _stats = options.BeatLeader != null
                 ? new BeatLeaderStats(options.BeatLeader, log, cachePath: Path.Combine(options.DataDirectory, "beatleader-cache.tsv"))
                 : null;
-            _hub = new ClientHub(Feed, WaitingRoom, Devices, options.ServerName, log, Levels, _stats, Suggestions);
+            _hub = new ClientHub(Feed, WaitingRoom, Devices, options.ServerName, log, options.HelloTimeout, _audio, Levels, _stats, Suggestions);
 
             Certificate = CertificateStore.LoadOrCreate(options.DataDirectory, options.HostNames, LocalAddresses(), log.Info);
             CertificateFingerprint = CertificateStore.Fingerprint(Certificate);
@@ -134,6 +139,7 @@ namespace LiveViewer.Server
             server
                 .WithModule(new GuardModule(_hosts, WebSocketPath))
                 .WithModule(new LiveSocketModule(WebSocketPath, _hub))
+                .WithModule(new AudioStreamModule(_audio))
                 .WithModule(new StaticSiteModule(_options.Site ?? StaticSite.FromEmbeddedTestPage()));
             server.HandleHttpException((context, exception) =>
             {

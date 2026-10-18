@@ -1,4 +1,4 @@
-# Live protocol (v1)
+# Live protocol (v3)
 
 There is one WebSocket at `wss://<host>:4280/ws`, with subprotocol `bslive.v1`.
 
@@ -35,10 +35,9 @@ client                         server
 ```
 
 - **Pinging:** `Ping` may be sent at any time after `Hello`.
-- **Map and level requests:** `MapRequest` and the level library requests are
-  only valid once approved.
+- **Level requests:** level-library requests are only valid once approved.
 - **Violations:** anything unexpected closes the connection. That includes an
-  unknown type, trailing bytes, a second `Hello`, a map request before approval,
+  unknown type, trailing bytes, a second `Hello`, a request before approval,
   or more than about 20 messages per second.
 
 ## Server → client
@@ -55,6 +54,7 @@ client                         server
 | `0x10` | SessionStart | `u32 sessionId, str json`. The JSON fields are below. |
 | `0x11` | SessionEnd | `u32 sessionId, u8 reason (1 cleared, 2 failed, 3 quit, 4 restarted), f32 songTime` |
 | `0x12` | Idle | none. Sent after approval when no song is being played. |
+| `0x13` | SongSelected | `str json`: `audioUrl`, `hash`, `songName`, `songSubName`, `songAuthor`, and `beatsPerMinute`. Sent to approved viewers as soon as a custom song/difficulty is selected in the game menu. |
 | `0x20` | Pose | `us capture, f32 songTime, pose head, pose left, pose right`. Sent once per rendered game frame. |
 | `0x21` | NoteCut | `us capture` + BSOR note event. Sent immediately when a note is cut, missed or a bomb is hit; for cuts, `afterCutRating` is still incomplete. |
 | `0x22` | NoteFinal | `us capture` + BSOR note event, final. Sent once the swing rating completes (cuts) or immediately (misses, bombs). |
@@ -62,8 +62,10 @@ client                         server
 | `0x24` | Height | `us capture, f32 height, f32 songTime` |
 | `0x25` | Pause | `us capture, f32 songTime` |
 | `0x26` | Resume | `us capture, f32 songTime` |
-| `0x30` | MapChunk | `u16 requestId, u32 totalLength, u32 offset, bytes...` (the rest of the message). Chunks arrive in order; a zero-length file is one chunk with `totalLength` 0. Answers `MapRequest` and the level library requests. |
-| `0x31` | MapError | `u16 requestId, u8 code (1 not available, 2 no or other session, 3 read failed or BeatLeader unreachable, 4 too many requests)` |
+| `0x27` | NoteSpawn | `us capture, i32 noteId, f32 time, i32 lineIndex, i32 lineLayer, i32 beforeJumpLineLayer, i32 colorType, i32 cutDirection, i32 scoringType, f32 cutDirectionAngleOffset, u8 hasFlip, i32 flipLineIndex, f32 flipYSide`. Sent when the game spawns the already-modified note. |
+| `0x28` | WallSpawn | `us capture, i32 wallId, f32 time, f32 duration, i32 lineIndex, i32 lineLayer, i32 width, i32 height`. Sent when the game spawns the already-modified obstacle. |
+| `0x30` | MapChunk | `u16 requestId, u32 totalLength, u32 offset, bytes...` (the rest of the message). Chunks arrive in order; a zero-length file is one chunk with `totalLength` 0. Answers level-library requests only. |
+| `0x31` | MapError | `u16 requestId, u8 code (1 not available, 3 read failed or BeatLeader unreachable, 4 too many requests)` |
 | `0x40` | Suggestions | `str json`: the whole suggestion list (see "Suggestions"). Sent right after `Approved`, to everyone whenever it changes, and to a sender whose change wasn't applied. |
 
 A **BSOR note event** is laid out as:
@@ -84,17 +86,27 @@ f32 cutDistanceToCenter, f32 cutAngle, f32 beforeCutRating, f32 afterCutRating
   "hash": "…", "songName": "…", "songSubName": "…", "songAuthor": "…", "mapper": "…",
   "difficulty": "ExpertPlus", "mode": "Standard", "environment": "…", "modifiers": "FS,NF",
   "playerName": "…", "leftHanded": false, "playerHeight": 1.75, "jumpDistance": 18.6,
-  "noteJumpSpeed": 18, "startTime": 0, "songSpeed": 1, "gameVersion": "1.44.1",
-  "files": { "info": "Info.dat", "difficulty": "ExpertPlus.dat", "audio": "song.egg", "cover": "cover.jpg" }
+  "noteJumpSpeed": 18, "beatsPerMinute": 154, "startTime": 0, "songSpeed": 1,
+  "gameVersion": "1.44.1", "audioUrl": "/audio/unguessable-token"
 }
 ```
 
-`files` maps roles to the exact names to use in `MapRequest`. Other names are
-refused.
+No level or cover file is sent for gameplay. `audioUrl` is the same short-lived
+capability URL announced by `SongSelected`.
+
+### Song audio
+
+The browser starts loading `audioUrl` on `SongSelected`, before gameplay. The
+same-origin HTTPS endpoint supports `GET`, `HEAD`, and one standard byte range
+(`206 Partial Content`, `Accept-Ranges: bytes`), allowing a media element to
+decode the beginning while later bytes are still arriving and to seek without
+downloading the whole file first. Tokens contain 192 random bits, are disclosed
+only after approval, and are invalidated when another song is selected.
 
 ### Late join
 
-On approval during a song, the client receives `Approved`, then `SessionStart`,
+On approval during a song, the client receives `Approved`, the current
+`SongSelected`, then `SessionStart`,
 then every non-pose event of the session so far, in order. After that it gets
 live data. Poses are never backlogged.
 
@@ -102,16 +114,14 @@ live data. Poses are never backlogged.
 
 - Order of priority, per client: waiting-room and session messages and events
   first, then poses (only the newest 4 are kept when a client falls behind),
-  then map chunks (16 KB each).
-- A slow map download never delays live data by more than one chunk.
+  then level-library chunks (16 KB each).
 
 ## Client → server
 
 | Type | Name | Payload |
 |---|---|---|
-| `0x81` | Hello | `u16 protocolVersion (2), u8 hasCredential, [32 bytes credential], str name (≤ 128 bytes)`. The name is what the viewer typed, or the two words the page suggested. It is shown to the player for approval and with the viewer's suggestions. |
+| `0x81` | Hello | `u16 protocolVersion (3), u8 hasCredential, [32 bytes credential], str name (≤ 128 bytes)`. The name is what the viewer typed, or the two words the page suggested. It is shown to the player for approval and with the viewer's suggestions. |
 | `0x82` | Ping | `f64 clientTime` (e.g. `performance.now()`) |
-| `0x83` | MapRequest | `u16 requestId, u32 sessionId, str fileName (≤ 256 bytes)` |
 | `0x84` | LevelListRequest | `u16 requestId`. Answered with the level list JSON as a file. |
 | `0x85` | LevelFileRequest | `u16 requestId, u8 kind (1 cover, 2 song), str levelId (≤ 64 bytes)` |
 | `0x86` | LevelStatsRequest | `u16 requestId, str levelId (≤ 64 bytes)`. Answered with the stats JSON as a file. |
@@ -134,8 +144,8 @@ connection may have at most 8 of them in progress.
   listed once.
 - **Boundary:** for any listed level, only its cover image and song file can be
   read, by kind, as named by its Info.dat and resolved inside its folder.
-  Difficulty files are available only for the level being played, through
-  `MapRequest`.
+  Gameplay difficulty files are never exposed; notes and obstacles arrive as
+  live spawn messages.
 - **BeatLeader stats are fetched by the mod**, so the page never talks to
   anything but the mod. The mod asks BeatLeader only about hashes of installed
   levels, at most two requests at a time, and caches the answers for 3.1 days

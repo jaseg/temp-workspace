@@ -2,6 +2,7 @@ using System;
 using BeatSaberMarkupLanguage;
 using BeatSaberMarkupLanguage.MenuButtons;
 using HMUI;
+using LiveViewer.Plugin.Recording;
 using Zenject;
 
 namespace LiveViewer.Plugin.UI
@@ -14,6 +15,37 @@ namespace LiveViewer.Plugin.UI
             Container.Bind<LiveFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             Container.BindInterfacesTo<MenuButtonManager>().AsSingle();
             Container.BindInterfacesTo<SuggestionPack>().AsSingle();
+            Container.BindInterfacesTo<SongSelectionStreamer>().AsSingle();
+        }
+    }
+
+    /// <summary>Publishes the selected custom song while the player is still in the menu.</summary>
+    internal sealed class SongSelectionStreamer : IInitializable, IDisposable
+    {
+        private readonly LiveService _service;
+        private readonly LevelSelectionNavigationController _navigation;
+
+        public SongSelectionStreamer(LiveService service, LevelSelectionNavigationController navigation)
+        {
+            _service = service;
+            _navigation = navigation;
+        }
+
+        public void Initialize()
+        {
+            _navigation.didChangeDifficultyBeatmapEvent += OnSelectionChanged;
+            OnSelectionChanged(_navigation);
+        }
+
+        public void Dispose() => _navigation.didChangeDifficultyBeatmapEvent -= OnSelectionChanged;
+
+        private void OnSelectionChanged(LevelSelectionNavigationController navigation)
+        {
+            var server = _service.Server;
+            if (server != null && SessionBuilder.TryDescribeSelection(navigation.beatmapKey, navigation.beatmapLevel, out var selection))
+            {
+                server.Feed.SelectSong(selection!);
+            }
         }
     }
 

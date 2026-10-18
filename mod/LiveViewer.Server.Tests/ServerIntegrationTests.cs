@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Threading;
@@ -10,6 +12,7 @@ using System.Threading.Tasks;
 using LiveViewer.Server.Levels;
 using LiveViewer.Server.Live;
 using LiveViewer.Server.Protocol;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace LiveViewer.Server.Tests
@@ -71,17 +74,19 @@ namespace LiveViewer.Server.Tests
             return port;
         }
 
-        private async Task<ClientWebSocket> ConnectAsync(string? origin = "default")
+        private Task<ClientWebSocket> ConnectAsync(string? origin = "default") => ConnectAsync(_port, origin);
+
+        private static async Task<ClientWebSocket> ConnectAsync(int port, string? origin = "default")
         {
             var ws = new ClientWebSocket();
             ws.Options.RemoteCertificateValidationCallback = (_, _, _, _) => true;
             ws.Options.AddSubProtocol("bslive.v1");
             if (origin != null)
             {
-                ws.Options.SetRequestHeader("Origin", origin == "default" ? $"https://localhost:{_port}" : origin);
+                ws.Options.SetRequestHeader("Origin", origin == "default" ? $"https://localhost:{port}" : origin);
             }
 
-            await ws.ConnectAsync(new Uri($"wss://localhost:{_port}/ws"), CancellationToken.None);
+            await ws.ConnectAsync(new Uri($"wss://localhost:{port}/ws"), CancellationToken.None);
             return ws;
         }
 
@@ -178,6 +183,57 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
+        public async Task ClosesSocketsThatDoNotSendHelloInTime()
+        {
+            var port = FreePort();
+            var data = Directory.CreateTempSubdirectory().FullName;
+            using var server = new LiveServer(new LiveServerOptions
+            {
+                Port = port,
+                DataDirectory = data,
+                HelloTimeout = TimeSpan.FromMilliseconds(100),
+            }, new ConsoleLiveLog());
+            server.Start();
+
+            using var ws = await ConnectAsync(port);
+            await ExpectAsync(ws, MessageType.Welcome);
+            await ExpectClosedAsync(ws);
+        }
+
+        [Fact]
+        public async Task Allows64ApprovedViewersButNoMore()
+        {
+            var viewers = new List<ClientWebSocket>();
+            try
+            {
+                for (var i = 0; i < ClientHub.MaxApprovedConnections; i++)
+                {
+                    var ws = await ConnectAsync();
+                    viewers.Add(ws);
+                    var name = await WaitForNameAsync(ws);
+                    Assert.True(_server.WaitingRoom.Approve(PendingId(name), remember: false));
+                    await ExpectAsync(ws, MessageType.Idle);
+                }
+
+                Assert.Equal(64, _server.ConnectedViewers);
+
+                using var overflow = await ConnectAsync();
+                var overflowName = await WaitForNameAsync(overflow);
+                Assert.True(_server.WaitingRoom.Approve(PendingId(overflowName), remember: false));
+                await ExpectAsync(overflow, MessageType.Denied);
+                await ExpectClosedAsync(overflow);
+                Assert.Equal(64, _server.ConnectedViewers);
+            }
+            finally
+            {
+                foreach (var viewer in viewers)
+                {
+                    viewer.Dispose();
+                }
+            }
+        }
+
+        [Fact]
         public async Task RejectsForeignHostOverHttp()
         {
             using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true, UseProxy = false };
@@ -213,10 +269,13 @@ namespace LiveViewer.Server.Tests
             Assert.Equal(1, approved[1]);
             Assert.Equal(34, approved.Length);
 
-            // The name in effect, the suggestion list, then the backlog: session start and the earlier note event
+            // The name in effect, suggestion list and selected audio, then the backlog: session start and note event
             // (poses aren't backlogged).
             Assert.Equal(MessageType.Name, (await ReceiveAsync(ws))![0]);
             Assert.Equal(MessageType.Suggestions, (await ReceiveAsync(ws))![0]);
+            var selected = new MessageReader((await ReceiveAsync(ws))!);
+            Assert.Equal(MessageType.SongSelected, selected.U8());
+            var audioUrl = (string) JObject.Parse(selected.String(4096))["audioUrl"]!;
             Assert.Equal(MessageType.SessionStart, (await ReceiveAsync(ws))![0]);
             Assert.Equal(MessageType.NoteFinal, (await ReceiveAsync(ws))![0]);
 
@@ -230,22 +289,17 @@ namespace LiveViewer.Server.Tests
             pong.U8();
             Assert.Equal(123.5, pong.F64());
 
-            // Map transfer: allowed file, unlisted file.
-            await SendAsync(ws, new MessageWriter().U8(MessageType.MapRequest).U16(5).U32(1).String("song.egg").ToArray());
-            var received = 0;
-            while (received < 100_000)
-            {
-                var chunk = new MessageReader(await ExpectAsync(ws, MessageType.MapChunk));
-                chunk.U8();
-                Assert.Equal(5, chunk.U16());
-                Assert.Equal(100_000u, chunk.U32());
-                Assert.Equal((uint) received, chunk.U32());
-                received += chunk.Remaining;
-            }
-
-            await SendAsync(ws, new MessageWriter().U8(MessageType.MapRequest).U16(6).U32(1).String("secret.txt").ToArray());
-            var error = await ExpectAsync(ws, MessageType.MapError);
-            Assert.Equal((byte) MapErrorCode.NotAvailable, error[3]);
+            // The approved client gets a range-capable audio URL; no map file is exposed.
+            using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true, UseProxy = false };
+            using var http = new HttpClient(handler);
+            var request = new HttpRequestMessage(HttpMethod.Get, $"https://localhost:{_port}{audioUrl}");
+            request.Headers.Range = new RangeHeaderValue(100, 199);
+            var response = await http.SendAsync(request);
+            Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
+            Assert.Equal("bytes", response.Headers.AcceptRanges.Single());
+            Assert.Equal(100, (await response.Content.ReadAsByteArrayAsync()).Length);
+            Assert.Equal(HttpStatusCode.NotFound,
+                (await http.GetAsync($"https://localhost:{_port}/audio/00000000000000000000000000000000")).StatusCode);
         }
 
         /// <summary>Receives a complete file transfer for one request id, or returns the error code.</summary>
@@ -500,7 +554,8 @@ namespace LiveViewer.Server.Tests
         }
 
         [Theory]
-        [InlineData("map request before approval")]
+        [InlineData("level request before approval")]
+        [InlineData("ping before hello")]
         [InlineData("text frame")]
         [InlineData("unknown type")]
         [InlineData("duplicate hello")]
@@ -512,9 +567,12 @@ namespace LiveViewer.Server.Tests
             await ExpectAsync(ws, MessageType.Welcome);
             switch (violation)
             {
-                case "map request before approval":
+                case "level request before approval":
                     await SendAsync(ws, Hello());
-                    await SendAsync(ws, new MessageWriter().U8(MessageType.MapRequest).U16(1).U32(1).String("Info.dat").ToArray());
+                    await SendAsync(ws, new MessageWriter().U8(MessageType.LevelListRequest).U16(1).ToArray());
+                    break;
+                case "ping before hello":
+                    await SendAsync(ws, new MessageWriter().U8(MessageType.Ping).F64(1).ToArray());
                     break;
                 case "text frame":
                     await ws.SendAsync(new byte[] { 0x82 }, WebSocketMessageType.Text, true, CancellationToken.None);

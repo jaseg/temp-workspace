@@ -14,8 +14,6 @@ import {LiveNav} from './nav';
 import {LiveAudioSync} from './audio';
 import {assignNote, computeTotals, noteStructFromEvent, ScoreForNote} from '../components/replay-loader';
 import {NoteEventType} from './bsor';
-import {Mirror_Horizontal} from '../utils/chirality-support';
-import {updateScoringAndTypes} from '../utils/mapPostprocessor';
 import {difficultyFromName, getUrlParameter, ScoringType} from '../utils';
 
 // How far ahead of "now" a rendered frame is shown, i.e. the display pipeline latency we predict across.
@@ -146,6 +144,9 @@ export class LiveSession {
 
 	onMessage(type, r, receivedAt) {
 		switch (type) {
+			case T.SongSelected:
+				this.onSongSelected(JSON.parse(r.str()));
+				return;
 			case T.SessionStart:
 				this.startSession(r.u32(), JSON.parse(r.str()));
 				return;
@@ -165,6 +166,12 @@ export class LiveSession {
 		switch (type) {
 			case T.Pose:
 				this.onPose(captureUs, r, receivedAt);
+				return;
+			case T.NoteSpawn:
+				this.onNoteSpawn(r);
+				return;
+			case T.WallSpawn:
+				this.onWallSpawn(r);
 				return;
 			case T.NoteCut:
 				this.onNoteEvent(readNoteEvent(r), false);
@@ -254,7 +261,7 @@ export class LiveSession {
 			null
 		);
 		this.scene.emit('userloaded', {name: info.playerName, avatar: '', country: '', countryIcon: '', profileLink: '', id: ''}, null);
-		this.loadMap(sessionId, info);
+		this.loadLiveChallenge(sessionId, info);
 	}
 
 	endSession(reason) {
@@ -270,47 +277,57 @@ export class LiveSession {
 		}
 	}
 
-	// ---- map ----
+	// ---- progressively streamed audio and live beatmap ----
 
-	async loadMap(sessionId, info) {
+	onSongSelected(info) {
+		if (!info.audioUrl) return;
+		if (this.selectedAudio && this.selectedAudio.src.endsWith(info.audioUrl)) return;
+		if (this.selectedAudio) {
+			this.selectedAudio.pause();
+			this.selectedAudio.removeAttribute('src');
+			this.selectedAudio.load();
+		}
+		const audio = document.createElement('audio');
+		audio.preload = 'auto';
+		audio.crossOrigin = 'anonymous';
+		audio.dataset.liveStream = 'true';
+		audio.src = info.audioUrl;
+		audio.load();
+		this.selectedAudio = audio;
+		this.selectedSong = info;
+	}
+
+	loadLiveChallenge(sessionId, info) {
 		this.scene.emit('challengeloadstart', null, false);
-		const files = info.files || {};
-		// Only what the selected difficulty needs: other difficulties can be large and aren't shown.
-		const wanted = ['info', 'difficulty', 'audioData', 'lightshow', 'cover', 'audio'].filter(role => files[role]);
-		const cache = new Map();
-		const fetchFile = name => {
-			if (!cache.has(name)) cache.set(name, this.connection.fetchMapFile(sessionId, name));
-			return cache.get(name);
-		};
-		// Request everything at once; the server sends files in request order, the big audio last.
-		wanted.forEach(role => fetchFile(files[role]));
-
-		const virtualFiles = {};
-		for (const role of wanted) {
-			const name = files[role];
-			virtualFiles[name] = {
-				name,
-				async: async type => {
-					const buffer = await fetchFile(name);
-					if (type === 'string') return new TextDecoder().decode(buffer);
-					if (type === 'uint8array') return new Uint8Array(buffer);
-					return buffer;
-				},
-			};
+		if (!this.selectedAudio || !this.selectedAudio.src.endsWith(info.audioUrl)) {
+			this.onSongSelected(info);
 		}
-
-		try {
-			await fetchFile(files.info);
-		} catch (e) {
-			if (sessionId === this.sessionId) this.scene.emit('challengeloaderror', {text: 'Could not load the map from the game: ' + e.message});
-			return;
-		}
-		if (sessionId !== this.sessionId) return;
-
-		const mapLoader = this.scene.components['map-loader'];
-		mapLoader.data.mode = info.mode;
-		mapLoader.data.difficulty = info.difficulty;
-		mapLoader.processInfo(virtualFiles);
+		const map = {_events: [], _notes: [], _chains: [], _sliders: [], _burstSliders: [], _obstacles: [], _njsEvents: []};
+		this.liveMap = map;
+		this.nextMapIndex = 0;
+		const byMode = {[info.mode]: {[info.difficulty]: map}};
+		const values = {[info.mode]: {[info.difficulty]: info.noteJumpSpeed || 0}};
+		const offsets = {[info.mode]: {[info.difficulty]: 0}};
+		const customData = {[info.mode]: {[info.difficulty]: {}}};
+		this.scene.emit('challengeloadend', {
+			audio: this.selectedAudio,
+			beatmaps: byMode,
+			beatSpeeds: values,
+			beatOffsets: offsets,
+			difficulties: {[info.mode]: [{_difficulty: info.difficulty}]},
+			customData,
+			image: '',
+			id: info.hash,
+			mode: info.mode,
+			difficulty: info.difficulty,
+			info: {
+				_songName: info.songName,
+				_songSubName: info.songSubName,
+				_songAuthorName: info.songAuthor,
+				_beatsPerMinute: info.beatsPerMinute || 120,
+			},
+			mappingExtensions: {isEnabled: false},
+		}, false);
 	}
 
 	onChallengeLoaded(challenge) {
@@ -321,11 +338,6 @@ export class LiveSession {
 
 		const map = challenge.beatmaps[challenge.mode][challenge.difficulty];
 		if (!map) return;
-		loader.applyModifiers(map, this.replay);
-		if (this.info.leftHanded) {
-			Mirror_Horizontal(map, 4, true, false);
-			updateScoringAndTypes(map);
-		}
 		loader.setIds(map, this.replay);
 		this.mapNotes = []
 			.concat(map._notes, map._chains)
@@ -344,6 +356,53 @@ export class LiveSession {
 	}
 
 	// ---- live data ----
+
+	onNoteSpawn(r) {
+		const serverId = r.i32();
+		const time = r.f32();
+		const note = {
+			_time: time * (this.info.beatsPerMinute || 120) / 60,
+			_songTime: time,
+			_lineIndex: r.i32(),
+			_lineLayer: r.i32(),
+			_beforeJumpLineLayer: r.i32(),
+			_type: r.i32(),
+			_cutDirection: r.i32(),
+			_scoringType: r.i32(),
+			cutDirectionAngleOffset: r.f32(),
+			_index: this.nextMapIndex++,
+		};
+		const hasFlip = r.bool();
+		const flipLineIndex = r.i32();
+		const flipYSide = r.f32();
+		if (note._type < 0) note._type = 3;
+		if (hasFlip) {
+			note._flipLineIndex = flipLineIndex;
+			note._flipYSide = flipYSide;
+		}
+		this.loader.setIds({_notes: [note], _chains: []}, this.replay);
+		// Use the game's exact id as the primary match key; the computed alternatives remain for compatibility.
+		note._idWithScoring = serverId;
+		this.liveMap._notes.push(note);
+		if (note._type === 0 || note._type === 1) this.mapNotes.push(note);
+	}
+
+	onWallSpawn(r) {
+		r.i32(); // wall id is used by outcome messages, not rendering
+		const time = r.f32();
+		const duration = r.f32();
+		const wall = {
+			_time: time * (this.info.beatsPerMinute || 120) / 60,
+			_songTime: time,
+			_duration: duration * (this.info.beatsPerMinute || 120) / 60,
+			_songDuration: duration,
+			_lineIndex: r.i32(),
+			_lineLayer: r.i32(),
+			_width: r.i32(),
+			_height: r.i32(),
+		};
+		this.liveMap._obstacles.push(wall);
+	}
 
 	onPose(captureUs, r, receivedAt) {
 		const songTime = r.f32();

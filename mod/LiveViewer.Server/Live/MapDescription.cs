@@ -16,6 +16,7 @@ namespace LiveViewer.Server.Live
         public string Directory = "";
         public Dictionary<string, string> Files = new Dictionary<string, string>();
         public float NoteJumpSpeed;
+        public float BeatsPerMinute;
         public string SongSubName = "";
         public string SongAuthor = "";
 
@@ -58,6 +59,7 @@ namespace LiveViewer.Server.Live
                 Add("cover", Str(root, "_coverImageFilename"));
                 map.SongSubName = Str(root, "_songSubName") ?? "";
                 map.SongAuthor = Str(root, "_songAuthorName") ?? "";
+                map.BeatsPerMinute = Num(root, "_beatsPerMinute");
                 foreach (var set in sets.OfType<JObject>())
                 {
                     var characteristic = Str(set, "_beatmapCharacteristicName") ?? "";
@@ -81,6 +83,7 @@ namespace LiveViewer.Server.Live
                 {
                     Add("audio", Str(audio, "songFilename"));
                     Add("audioData", Str(audio, "audioDataFilename"));
+                    map.BeatsPerMinute = Num(audio, "bpm");
                 }
 
                 Add("cover", Str(root, "coverImageFilename"));

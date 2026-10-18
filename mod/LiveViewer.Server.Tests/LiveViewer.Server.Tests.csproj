@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\LiveViewer.Host\LiveViewer.Host.csproj" />
     <ProjectReference Include="..\LiveViewer.Server\LiveViewer.Server.csproj" />
   </ItemGroup>
 

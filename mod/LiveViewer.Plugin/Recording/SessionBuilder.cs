@@ -13,9 +13,9 @@ namespace LiveViewer.Plugin.Recording
         private const string CustomLevelPrefix = "custom_level_";
 
         /// <summary>Returns null for anything but a SongCore custom level with a readable Info.dat.</summary>
-        public static SessionInfo? TryDescribe(GameplayCoreSceneSetupData setup, string playerName, out IMapFileSource? map, out string reason)
+        public static SessionInfo? TryDescribe(GameplayCoreSceneSetupData setup, string playerName, out SongSelection? selection, out string reason)
         {
-            map = null;
+            selection = null;
             var key = setup.beatmapKey;
             var level = setup.beatmapLevel;
             if (level == null || !key.levelId.StartsWith(CustomLevelPrefix, StringComparison.Ordinal))
@@ -24,39 +24,14 @@ namespace LiveViewer.Plugin.Recording
                 return null;
             }
 
-            var loader = SongCore.Loader.CustomLevelLoader;
-            var saveData = loader != null
-                ? loader.GetField<Dictionary<string, CustomLevelLoader.LoadedSaveData>, CustomLevelLoader>("_loadedBeatmapSaveData")
-                : null;
-            var folder = saveData != null && saveData.TryGetValue(key.levelId, out var loaded)
-                ? loaded.customLevelFolderInfo.folderPath
-                : null;
-            if (string.IsNullOrEmpty(folder))
-            {
-                reason = "SongCore doesn't know the level's folder";
-                return null;
-            }
-
             var mode = key.beatmapCharacteristic.serializedName;
             var difficulty = key.difficulty.ToString();
-            MapDescription description;
-            try
+            if (!TryRead(key.levelId, mode, difficulty, out var description, out reason))
             {
-                description = MapDescription.Read(folder!, mode, difficulty);
-            }
-            catch (Exception e)
-            {
-                reason = "couldn't read its Info.dat: " + e.Message;
                 return null;
             }
 
-            if (!description.Files.ContainsKey("difficulty"))
-            {
-                reason = $"Info.dat has no {mode} {difficulty} file";
-                return null;
-            }
-
-            map = description.Source;
+            selection = Selection(key.levelId, level, description!);
             var settings = setup.playerSpecificSettings;
             var practice = setup.practiceSettings;
             var hash = key.levelId.Substring(CustomLevelPrefix.Length);
@@ -77,14 +52,78 @@ namespace LiveViewer.Plugin.Recording
                 PlayerName = playerName,
                 LeftHanded = settings.leftHanded,
                 PlayerHeight = settings.automaticPlayerHeight ? 0 : settings.playerHeight,
-                NoteJumpSpeed = description.NoteJumpSpeed,
+                NoteJumpSpeed = description!.NoteJumpSpeed,
+                BeatsPerMinute = level.beatsPerMinute,
                 StartTime = practice?.startSongTime ?? 0,
                 SongSpeed = practice != null && practice.songSpeedMul > 0
                     ? practice.songSpeedMul
                     : setup.gameplayModifiers.songSpeedMul,
                 GameVersion = Application.version.Split('_')[0],
-                Files = description.Files,
             };
+        }
+
+        public static bool TryDescribeSelection(BeatmapKey key, BeatmapLevel level, out SongSelection? selection)
+        {
+            selection = null;
+            if (level == null || !key.levelId.StartsWith(CustomLevelPrefix, StringComparison.Ordinal)) return false;
+            if (!TryRead(key.levelId, key.beatmapCharacteristic.serializedName, key.difficulty.ToString(),
+                    out var description, out _)) return false;
+            selection = Selection(key.levelId, level, description!);
+            return true;
+        }
+
+        private static SongSelection Selection(string levelId, BeatmapLevel level, MapDescription description)
+        {
+            var hash = levelId.Substring(CustomLevelPrefix.Length);
+            var space = hash.IndexOf(' ');
+            var source = description.Source;
+            return new SongSelection
+            {
+                Hash = space > 0 ? hash.Substring(0, space) : hash,
+                SongName = level.songName ?? "",
+                SongSubName = level.songSubName ?? "",
+                SongAuthor = level.songAuthorName ?? "",
+                BeatsPerMinute = level.beatsPerMinute,
+                Audio = new MapAudioFile(source, description.Files["audio"]),
+            };
+        }
+
+        private static bool TryRead(string levelId, string mode, string difficulty,
+            out MapDescription? description, out string reason)
+        {
+            description = null;
+            var loader = SongCore.Loader.CustomLevelLoader;
+            var saveData = loader != null
+                ? loader.GetField<Dictionary<string, CustomLevelLoader.LoadedSaveData>, CustomLevelLoader>("_loadedBeatmapSaveData")
+                : null;
+            var folder = saveData != null && saveData.TryGetValue(levelId, out var loaded)
+                ? loaded.customLevelFolderInfo.folderPath
+                : null;
+            if (string.IsNullOrEmpty(folder))
+            {
+                reason = "SongCore doesn't know the level's folder";
+                return false;
+            }
+
+            try
+            {
+                description = MapDescription.Read(folder!, mode, difficulty);
+            }
+            catch (Exception e)
+            {
+                reason = "couldn't read its Info.dat: " + e.Message;
+                return false;
+            }
+
+            if (!description.Files.ContainsKey("difficulty") || !description.Files.ContainsKey("audio"))
+            {
+                reason = $"Info.dat has no {mode} {difficulty} map or song audio";
+                description = null;
+                return false;
+            }
+
+            reason = "";
+            return true;
         }
 
         private static IEnumerable<string> Modifiers(GameplayModifiers m)

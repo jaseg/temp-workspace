@@ -53,7 +53,7 @@ The live code is in `src/live/`. The rest is the replay viewer's scene, reused.
 | File | Role |
 |---|---|
 | `session.js` | `LiveSession`: the stream becomes the `replay`, `allStructs`, `bombs`, `walls` data on the `replay-loader` component, which the scene reads. |
-| `connection.js` | WebSocket, waiting room, remembered-device credential (localStorage), clock-sync pings, map file downloads. |
+| `connection.js` | WebSocket, waiting room, remembered-device credential (localStorage), clock-sync pings, and level-browser file downloads. |
 | `clock.js` | `ServerClock` maps the mod's microsecond clock to `performance.now()` (lowest-RTT pong of the last 16). `SongClock` turns pose timestamps into a smoothed song time. |
 | `audio.js` | Re-seeks the song audio whenever what is heard drifts more than 40 ms from the live song time. |
 | `overlay.js` | "Request to watch" (the click also unlocks audio), waiting for approval with the match code, song ended. `l` toggles the latency readout. |
@@ -62,9 +62,9 @@ The live code is in `src/live/`. The rest is the replay viewer's scene, reused.
 | `bsor.js` | BSOR decoder (demo only). |
 
 **Song start.**
-1. `SessionStart` resets the scene.
-2. The page downloads Info.dat, the played difficulty, the cover and the audio over the WebSocket.
-3. `map-loader` turns them into the challenge.
+1. `SongSelected` starts a range-capable HTTPS audio request while the player is still in the menu.
+2. `SessionStart` resets the scene and creates an empty live challenge; no map or cover is transferred.
+3. `NoteSpawn` and `WallSpawn` append the game-created objects as they are spawned, alongside the pose stream.
 
 **Notes.**
 - **Cut:** a `NoteCut` is matched to its map note immediately, so the beat is cut at once with a provisional

@@ -38,7 +38,7 @@ AFRAME.registerComponent('song', {
 	init: function () {
 		this.analyserSetter = {};
 		this.audioAnalyser = this.data.analyserEl.components.audioanalyser;
-		this.context = this.audioAnalyser.context;
+		this.context = null;
 		this.isPlaying = false;
 		this.songLoadingIndicator = document.getElementById('songLoadingIndicator');
 		this.speed = 1; // set by the live session for speed modifiers
@@ -46,8 +46,6 @@ AFRAME.registerComponent('song', {
 		this.audio = document.createElement('audio');
 		this.audio.volume = utils.isFirefox() ? 0.0001 : 0; // Firefox really does not like zeros
 		this.settings = this.el.sceneEl.components.settings;
-
-		this.audioAnalyser.gainNode.gain.value = this.settings.settings.volume || BASE_VOLUME;
 
 		this.el.addEventListener('wallhitstart', this.onWallHitStart.bind(this));
 		this.el.addEventListener('wallhitend', this.onWallHitEnd.bind(this));
@@ -57,6 +55,12 @@ AFRAME.registerComponent('song', {
 				this.hitSound = this.el.components['beat-hit-sound'];
 			}
 			this.hasReceivedUserGesture = true;
+			if (!this.context) {
+				// The audio graph exists from the first gesture on (browsers block audio before one).
+				this.context = this.audioAnalyser.ensureContext();
+				this.audioAnalyser.gainNode.gain.value = this.settings.settings.volume || BASE_VOLUME;
+			}
+			this.hitSound.ensureContext();
 
 			this.audioAnalyser.suspendContext();
 			this.audioAnalyser.resumeContext();
@@ -202,12 +206,14 @@ AFRAME.registerComponent('song', {
 	},
 
 	onWallHitStart: function () {
+		if (!this.context) return;
 		const gain = this.audioAnalyser.gainNode.gain;
 		const volume = this.el.sceneEl.components.settings.settings.volume || BASE_VOLUME;
 		gain.linearRampToValueAtTime(0.35 * volume, this.context.currentTime + 0.1);
 	},
 
 	onWallHitEnd: function () {
+		if (!this.context) return;
 		const gain = this.audioAnalyser.gainNode.gain;
 		const volume = this.el.sceneEl.components.settings.settings.volume || BASE_VOLUME;
 		gain.linearRampToValueAtTime(volume, this.context.currentTime + 0.1);

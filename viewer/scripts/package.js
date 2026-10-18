@@ -23,6 +23,11 @@ function copy(from, to = from) {
 	fs.cpSync(path.join(root, from), path.join(out, to), {recursive: true});
 }
 
+function copyWithSourceMap(from, to = from) {
+	copy(from, to);
+	if (fs.existsSync(path.join(root, from + '.map'))) copy(from + '.map', to + '.map');
+}
+
 // The mod serves the page with a CSP that forbids inline scripts and event handlers; keep it that way.
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 if (/<script(?![^>]*\ssrc=)/.test(html) || /\son[a-z]+="/.test(html)) {
@@ -32,11 +37,11 @@ fs.writeFileSync(path.join(out, 'index.html'), html);
 
 // Only the bundle that index.html references, and the parts it loads on demand (same build timestamp).
 for (const match of html.matchAll(/(?:src|href)="(build\/[^"]+)"/g)) {
-	copy(match[1]);
+	copyWithSourceMap(match[1]);
 	const stamp = match[1].match(/\.(\d+)\.js$/);
 	if (stamp) {
 		for (const name of fs.readdirSync(path.join(root, 'build'))) {
-			if (name.endsWith(`.${stamp[1]}.js`) && !match[1].endsWith(name)) copy(path.join('build', name));
+			if (name.endsWith(`.${stamp[1]}.js`) && !match[1].endsWith(name)) copyWithSourceMap(path.join('build', name));
 		}
 	}
 }
@@ -47,7 +52,11 @@ const aframe = fs.readFileSync(path.join(root, 'vendor/aframe-master.min.js'), '
 const evalGetter = 'function wrapper(t){return new Function(["return function "+t+"() {","  return this._"+t,"}"].join("\\n"))()}';
 if (!aframe.includes(evalGetter)) throw new Error('A-Frame getter factory not found; update the patch in scripts/package.js');
 fs.mkdirSync(path.join(out, 'vendor'), {recursive: true});
-fs.writeFileSync(path.join(out, 'vendor/aframe-master.min.js'), aframe.replace(evalGetter, 'function wrapper(t){return function(){return this["_"+t]}}'));
+const patchedAframe = aframe
+	.replace(evalGetter, 'function wrapper(t){return function(){return this["_"+t]}}')
+	.replace('resetMesh:function(){this.el.removeObject3D("mesh")}', 'resetMesh:function(){this.el.getObject3D("mesh")&&this.el.removeObject3D("mesh")}')
+	.replace(/\n\/\/# sourceMappingURL=aframe-master\.min\.js\.map\s*$/, '');
+fs.writeFileSync(path.join(out, 'vendor/aframe-master.min.js'), patchedAframe);
 // Shaders and the default hit sound are bundled by webpack; the rest is loaded at runtime.
 for (const dir of ['fonts', 'img', 'models']) {
 	copy(path.join('assets', dir));
@@ -91,7 +100,7 @@ if (demo) {
 	const levelFiles = levels ? packageLevels() : null;
 	fs.writeFileSync(
 		path.join(out, 'demo', 'manifest.json'),
-		JSON.stringify({songName: info._songName, songAuthor: info._songAuthorName, files, paths, levels: levelFiles}, null, 1)
+		JSON.stringify({songName: info._songName, songAuthor: info._songAuthorName, bpm: info._beatsPerMinute || (info.audio && info.audio.bpm) || 120, files, paths, levels: levelFiles}, null, 1)
 	);
 	console.log(`demo: ${info._songName} ${mode} ${difficulty}`);
 }

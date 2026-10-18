@@ -134,13 +134,6 @@ export class DemoConnection extends LiveConnection {
 		}, 2500);
 	}
 
-	fetchMapFile(sessionId, name) {
-		return fetch('demo/map/' + this.manifest.paths[name]).then(r => {
-			if (!r.ok) throw new Error(`${name}: ${r.status}`);
-			return r.arrayBuffer();
-		});
-	}
-
 	// Level browser: the list, stats, covers and songs packaged by scripts/package.js --levels.
 	levelData() {
 		if (!this.levels) this.levels = fetch('demo/levels.json').then(r => (r.ok ? r.json() : Promise.reject(new Error(r.status))));
@@ -194,6 +187,7 @@ export class DemoConnection extends LiveConnection {
 		const replay = this.replay;
 		const info = replay.info;
 		const id = ++this.sessionId;
+		const audioUrl = 'demo/map/' + this.manifest.paths[this.manifest.files.audio];
 		const session = {
 			hash: info.hash,
 			songName: this.manifest.songName,
@@ -209,12 +203,33 @@ export class DemoConnection extends LiveConnection {
 			playerHeight: info.height,
 			jumpDistance: info.jumpDistance,
 			noteJumpSpeed: 0,
+			beatsPerMinute: this.manifest.bpm || 120,
 			startTime: info.startTime,
 			songSpeed: info.speed > 0 ? info.speed : 1,
 			gameVersion: info.gameVersion,
-			files: this.manifest.files,
+			audioUrl,
 		};
+		this.deliver(new Writer(T.SongSelected).str(JSON.stringify({...session, audioUrl})).buffer());
 		this.deliver(new Writer(T.SessionStart).u32(id).str(JSON.stringify(session)).buffer());
+
+		// Demo replays have no live game object callbacks, so reconstruct the basic spawn records from BSOR ids.
+		replay.notes.forEach(n => {
+			const base = Math.abs(n.noteID) % 10000;
+			const line = Math.floor(base / 1000);
+			const layer = Math.floor((base % 1000) / 100);
+			const color = n.eventType === 3 ? -1 : Math.floor((base % 100) / 10);
+			const direction = base % 10;
+			const scoring = Math.floor(Math.abs(n.noteID) / 10000) - 2;
+			this.deliver(new Writer(T.NoteSpawn).i64(this.serverNowUs()).i32(n.noteID).f32(n.spawnTime)
+				.i32(line).i32(layer).i32(layer).i32(color).i32(direction).i32(scoring).f32(0)
+				.u8(0).i32(-1).f32(0).buffer());
+		});
+		replay.walls.forEach(w => {
+			const line = Math.floor(w.wallID / 100);
+			const width = w.wallID % 10;
+			this.deliver(new Writer(T.WallSpawn).i64(this.serverNowUs()).i32(w.wallID).f32(w.spawnTime).f32(1)
+				.i32(line).i32(0).i32(width).i32(3).buffer());
+		});
 
 		// Everything the game would send, ordered by song time.
 		const events = [];

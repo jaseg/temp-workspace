@@ -15,7 +15,10 @@ namespace LiveViewer.Server.Live
             None,
             SessionStart,
             SessionEnd,
+            SongSelected,
             Pose,
+            NoteSpawn,
+            WallSpawn,
             NoteCut,
             NoteFinal,
             Wall,
@@ -31,11 +34,13 @@ namespace LiveViewer.Server.Live
             public float SongTime;
             public Pose Head, Left, Right;
             public NoteEvent Note;
+            public NoteSpawn NoteSpawn;
             public WallEvent Wall;
+            public WallSpawn WallSpawn;
             public float Height;
             public SessionEndReason EndReason;
             public SessionInfo? Session;
-            public IMapFileSource? Map;
+            public SongSelection? Selection;
         }
 
         private const int Capacity = 4096; // power of two; about 40 s of poses at 100 Hz
@@ -50,7 +55,7 @@ namespace LiveViewer.Server.Live
 
         internal SemaphoreSlim Signal => _signal;
 
-        public void BeginSession(SessionInfo info, IMapFileSource map)
+        public void BeginSession(SessionInfo info)
         {
             if (!TryClaim(Kind.SessionStart, out var index))
             {
@@ -59,7 +64,32 @@ namespace LiveViewer.Server.Live
 
             ref var e = ref _ring[index];
             e.Session = info;
-            e.Map = map;
+            Publish();
+        }
+
+        /// <summary>Compatibility helper for non-game hosts: publishes the map's audio, but no map data.</summary>
+        public void BeginSession(SessionInfo info, IMapFileSource map)
+        {
+            if (info.Files.TryGetValue("audio", out var audio))
+            {
+                SelectSong(new SongSelection
+                {
+                    Hash = info.Hash,
+                    SongName = info.SongName,
+                    SongSubName = info.SongSubName,
+                    SongAuthor = info.SongAuthor,
+                    BeatsPerMinute = info.BeatsPerMinute,
+                    Audio = new MapAudioFile(map, audio),
+                });
+            }
+            BeginSession(info);
+        }
+
+        /// <summary>Makes a selected song available to approved browsers immediately, before gameplay starts.</summary>
+        public void SelectSong(SongSelection selection)
+        {
+            if (!TryClaim(Kind.SongSelected, out var index)) return;
+            _ring[index].Selection = selection;
             Publish();
         }
 
@@ -107,6 +137,24 @@ namespace LiveViewer.Server.Live
             ref var e = ref _ring[index];
             e.CaptureUs = captureUs;
             e.Note = note;
+            Publish();
+        }
+
+        public void SpawnNote(long captureUs, in NoteSpawn note)
+        {
+            if (!TryClaim(Kind.NoteSpawn, out var index)) return;
+            ref var e = ref _ring[index];
+            e.CaptureUs = captureUs;
+            e.NoteSpawn = note;
+            Publish();
+        }
+
+        public void SpawnWall(long captureUs, in WallSpawn wall)
+        {
+            if (!TryClaim(Kind.WallSpawn, out var index)) return;
+            ref var e = ref _ring[index];
+            e.CaptureUs = captureUs;
+            e.WallSpawn = wall;
             Publish();
         }
 
@@ -188,7 +236,7 @@ namespace LiveViewer.Server.Live
             ref var slot = ref _ring[tail & (Capacity - 1)];
             entry = slot;
             slot.Session = null;
-            slot.Map = null;
+            slot.Selection = null;
             Volatile.Write(ref _tail, tail + 1);
             return true;
         }
