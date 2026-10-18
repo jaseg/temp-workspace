@@ -395,6 +395,35 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
+        public async Task PlayedLevelsLeaveThePlaylist()
+        {
+            using var ws = await ApprovedClientAsync();
+            var (played, other) = (new string('a', 40), new string('b', 40));
+            _server.Suggestions.Add(played, "test");
+            _server.Suggestions.Add(other, "test");
+            await ExpectSuggestionsAsync(ws);
+            await ExpectSuggestionsAsync(ws);
+            var map = new MapDirectory(_mapDir, new[] { "Info.dat" });
+
+            async Task PlayAsync(SessionEndReason reason)
+            {
+                // The game's level ids carry the hash in upper case.
+                _server.Feed.BeginSession(new SessionInfo { Hash = played.ToUpperInvariant(), SongName = "Test" }, map);
+                _server.Feed.EndSession(reason, 10f);
+                await ExpectAsync(ws, MessageType.SessionEnd);
+            }
+
+            // Quitting or restarting keeps the level in the playlist.
+            await PlayAsync(SessionEndReason.Quit);
+            await PlayAsync(SessionEndReason.Restarted);
+            Assert.Equal(2, _server.Suggestions.List().Count);
+
+            // Finishing it (cleared or failed) removes it, and everyone is told.
+            await PlayAsync(SessionEndReason.Failed);
+            Assert.Equal(new[] { other }, await ExpectSuggestionsAsync(ws));
+        }
+
+        [Fact]
         public async Task ViewersCanRenameThemselves()
         {
             using var ws = await ConnectAsync();

@@ -181,6 +181,7 @@ pack ("Suggested by viewers") and keeps it across restarts.
 
 - Any approved viewer can add, remove or move any entry. Only installed levels can be added; at most 100 entries.
   New entries go to the end. The game's level pack uses the same order.
+- A level leaves the list once the player finishes it, cleared or failed (not when quitting or restarting).
 - Changes are rate-limited per connection (20 in a row, then one per second). A change that isn't applied (not
   installed, already there, list full, nothing to move, rate limit) is answered with the unchanged list.
 - `by` is the suggesting viewer's name (from `Hello`), for display only.

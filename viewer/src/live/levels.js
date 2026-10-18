@@ -347,7 +347,7 @@ export class LevelBrowser {
 			this.view === 'playlist' && !this.canReorder && pool.length > 1
 				? 'Clear the search to reorder.'
 				: this.view === 'playlist'
-				? 'Shared by all viewers; the player sees it in Beat Saber as “Suggested by viewers”, in this order. Drag ⠿ or use the arrows to reorder.'
+				? 'Shared by all viewers; the player sees it in Beat Saber as “Suggested by viewers”, in this order, and levels leave it once played. Drag ⠿ or use the arrows to reorder.'
 				: 'Add levels to the playlist to suggest them to the player.';
 	}
 

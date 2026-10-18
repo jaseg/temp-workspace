@@ -39,6 +39,7 @@ namespace LiveViewer.Server.Live
 
         private uint _sessionId;
         private bool _inSession;
+        private string _sessionHash = "";
         private IMapFileSource? _map;
 
         public ClientHub(LiveFeed feed, WaitingRoom waitingRoom, DeviceStore devices, string serverName, ILiveLog log,
@@ -619,6 +620,7 @@ namespace LiveViewer.Server.Live
                     {
                         _sessionId++;
                         _inSession = true;
+                        _sessionHash = e.Session!.Hash;
                         _map = e.Map;
                         _backlog.Clear();
                         var message = Messages.SessionStart(_sessionId, e.Session!);
@@ -634,6 +636,7 @@ namespace LiveViewer.Server.Live
                     return;
 
                 case LiveFeed.Kind.SessionEnd:
+                    string hash;
                     lock (_lock)
                     {
                         if (!_inSession)
@@ -641,6 +644,7 @@ namespace LiveViewer.Server.Live
                             return;
                         }
 
+                        hash = _sessionHash;
                         _inSession = false;
                         _map = null;
                         _backlog.Clear();
@@ -650,6 +654,14 @@ namespace LiveViewer.Server.Live
                             c.ClearPoses();
                             c.EnqueueReliable(message);
                         }
+                    }
+
+                    // A played level leaves the playlist: finished, whether cleared or failed. Quitting or restarting
+                    // keeps it. The game's ids are upper-case hashes; the playlist's are lower case.
+                    if ((e.EndReason == SessionEndReason.Cleared || e.EndReason == SessionEndReason.Failed)
+                        && _suggestions != null && _suggestions.Remove(hash.ToLowerInvariant()))
+                    {
+                        _log.Info($"Played level {hash} removed from the playlist.");
                     }
 
                     return;
