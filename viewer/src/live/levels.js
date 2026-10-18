@@ -4,6 +4,7 @@
 //
 // Level data comes from downloaded maps and is untrusted: it is only ever put into the page as text.
 import {LevelFile, FileError} from './protocol';
+import {getCover, putCover} from './cover-cache';
 import {isOgg, canPlayOgg, decodeAudio} from './ogg';
 require('./levels.styl');
 
@@ -11,6 +12,7 @@ const DIFFICULTIES = ['Easy', 'Normal', 'Hard', 'Expert', 'ExpertPlus'];
 const SHORT = {Easy: 'E', Normal: 'N', Hard: 'H', Expert: 'Ex', ExpertPlus: 'E+'};
 const STATUS = {1: 'Nominated', 2: 'Qualified', 3: 'Ranked', 4: 'Unrankable', 5: 'Outdated', 6: 'Event', 7: 'OST'};
 const MAX_COVERS = 200; // cached cover images (object URLs)
+const PREFETCH_ROWS = 20; // covers loaded ahead of the rows in view
 const FADE_S = 1;
 
 function el(tag, className, text) {
@@ -160,7 +162,7 @@ export class LevelBrowser {
 		this.available = available;
 		if (!available) {
 			this.stopPreview();
-			this.coverQueue.clear();
+			this.dropQueuedCovers();
 			this.statsQueue.clear();
 			if (this.isOpen) this.setStatus('Not connected to Beat Saber.');
 		} else {
@@ -187,7 +189,7 @@ export class LevelBrowser {
 		this.root.hidden = true;
 		if (this.onChange) this.onChange();
 		this.stopPreview();
-		this.coverQueue.clear();
+		this.dropQueuedCovers();
 		this.statsQueue.clear();
 		// Requests that were queued but not sent are dropped; let rows ask again next time.
 		for (const [id, stats] of this.stats) if (stats === null) this.stats.delete(id);
@@ -620,33 +622,74 @@ export class LevelBrowser {
 	// ---- lazy loading of covers and stats for visible rows ----
 
 	onVisible(entries) {
-		for (const entry of entries) {
-			if (!entry.isIntersecting) continue;
-			const row = entry.target;
+		const visible = entries.filter(e => e.isIntersecting).map(e => e.target);
+		for (const row of visible) {
 			const level = row.level;
 			this.observer.unobserve(row);
-			if (level.hasCover && !this.covers.has(level.id) && !row.coverRequested) {
-				row.coverRequested = true;
-				this.coverQueue.push(() => this.loadCover(level));
-			}
+			this.requestCover(row);
 			if (this.statsEnabled && !level.missing && !this.stats.has(level.id)) {
 				this.stats.set(level.id, null);
 				this.statsQueue.push(() => this.loadStats(level));
 			}
 		}
+		// Then the covers of the next rows, after the ones in view.
+		for (const row of visible) {
+			let next = row.nextElementSibling;
+			for (let i = 0; next && i < PREFETCH_ROWS; i++, next = next.nextElementSibling) {
+				if (next.level) this.requestCover(next);
+			}
+		}
+	}
+
+	/** Drops covers queued but not loaded; their rows ask again when they're next in view. */
+	dropQueuedCovers() {
+		this.coverQueue.clear();
+		for (const row of this.rows.values()) {
+			if (row.coverRequested && !this.covers.has(row.level.id)) {
+				row.coverRequested = false;
+				this.observer.observe(row);
+			}
+		}
+	}
+
+	/** Lets a row ask for its cover again when it's next in view. */
+	retryCover(id) {
+		const row = this.rows.get(id);
+		if (!row) return;
+		row.coverRequested = false;
+		this.observer.observe(row);
+	}
+
+	requestCover(row) {
+		const level = row.level;
+		if (!level.hasCover || this.covers.has(level.id) || row.coverRequested) return;
+		row.coverRequested = true;
+		this.coverQueue.push(() => this.loadCover(level));
 	}
 
 	async loadCover(level) {
-		if (!this.isOpen || !this.available) return;
-		const buffer = await this.connection.fetchLevelFile(level.id, LevelFile.cover);
-		const url = URL.createObjectURL(new Blob([buffer]));
+		if (!this.isOpen || !this.available) {
+			this.retryCover(level.id);
+			return;
+		}
+		let blob = await getCover(level.id);
+		if (!blob) {
+			const buffer = await this.connection.fetchLevelFile(level.id, LevelFile.cover);
+			blob = new Blob([buffer]);
+			putCover(level.id, buffer);
+		}
+		const url = URL.createObjectURL(blob);
 		this.covers.set(level.id, url);
 		if (this.covers.size > MAX_COVERS) {
 			const [oldId, oldUrl] = this.covers.entries().next().value;
 			this.covers.delete(oldId);
 			URL.revokeObjectURL(oldUrl);
 			const oldRow = this.rows.get(oldId);
-			if (oldRow) oldRow.coverRequested = false;
+			if (oldRow) {
+				oldRow.refs.img.hidden = true;
+				oldRow.refs.img.removeAttribute('src');
+				this.retryCover(oldId);
+			}
 		}
 		const row = this.rows.get(level.id);
 		if (row) {
