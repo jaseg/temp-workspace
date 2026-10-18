@@ -33,11 +33,14 @@ const {chromium} = require('playwright');
 	const name = (await a.locator('#levelBrowser .lbLevel:has(.lbSuggest:not(.on)) .lbName').first().textContent()).trim();
 	const row = a.locator('#levelBrowser .lbLevel', {hasText: name}).first();
 	check((await row.locator('.lbPlay').textContent()) === 'Preview', 'a: preview button not labelled "Preview"');
+	const widthBefore = (await row.locator('.lbSuggest').boundingBox()).width;
 	await row.locator('.lbSuggest').click();
 	await a.waitForFunction(n => document.querySelector('#liveNav .navBadge').textContent === String(n), start + 1, {timeout: 10000});
 	await b.waitForFunction(n => document.querySelector('#liveNav .navBadge').textContent === String(n), start + 1, {timeout: 10000})
 		.catch(() => errors.push("b: didn't see a's suggestion"));
-	check((await row.locator('.lbSuggest').textContent()).includes('Suggested'), 'a: button not showing "Suggested"');
+	check((await row.locator('.lbSuggest').getAttribute('data-state')) === 'on', 'a: button not showing "Suggested"');
+	const widthAfter = (await row.locator('.lbSuggest').boundingBox()).width;
+	check(Math.abs(widthAfter - widthBefore) < 0.5, `a: suggest button changed width (${widthBefore} -> ${widthAfter})`);
 	await a.screenshot({path: `${shots}-a-all.png`});
 
 	// B: the Suggested tab lists it with who suggested it; remove it there.

@@ -42,7 +42,7 @@ Build the viewer first (`npm run build` in `../viewer`); the plugin embeds `view
 `Plugins/` and `Libs/` go into the game folder.
 
 Settings are in `UserData/LiveViewer.json`; the certificate and remembered devices in `UserData/LiveViewer/`.
-`BeatLeaderStats` can also be switched from the menu screen. Two settings exist for testing on the device
+`BeatLeaderStats` (on by default) can also be switched from the menu screen. Two settings exist for testing on the device
 without anyone in the headset and must stay off otherwise:
 
 - `DevAutoApprove`: lets every waiting browser in.

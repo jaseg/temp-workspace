@@ -7,10 +7,10 @@ namespace LiveViewer.Plugin
         public virtual bool Enabled { get; set; } = true;
 
         /// <summary>
-        /// Fetch BeatLeader star ratings for the level browser. Off by default: it tells BeatLeader the hashes of the
-        /// levels viewers look at.
+        /// Fetch BeatLeader star ratings for the level browser. This tells BeatLeader the hashes of the levels viewers
+        /// look at; it can be switched off in the menu.
         /// </summary>
-        public virtual bool BeatLeaderStats { get; set; }
+        public virtual bool BeatLeaderStats { get; set; } = true;
 
         /// <summary>Shown to viewers as the player's name. Empty: the name the game knows.</summary>
         public virtual string PlayerName { get; set; } = "";

@@ -403,8 +403,18 @@ export class LevelBrowser {
 			e.stopPropagation();
 			this.togglePreview(level, row);
 		});
+		// All labels share one grid cell, so the button is as wide as the longest and doesn't jump when toggled.
 		const suggest = el('button', 'lbSuggest');
 		suggest.type = 'button';
+		for (const [state, label] of [
+			['add', 'Suggest'],
+			['on', '✓ Suggested'],
+			['remove', 'Remove'],
+		]) {
+			const span = el('span', null, label);
+			span.dataset.state = state;
+			suggest.append(span);
+		}
 		suggest.addEventListener('click', e => {
 			e.stopPropagation();
 			this.toggleSuggestion(level.id);
@@ -458,7 +468,7 @@ export class LevelBrowser {
 		const pending = this.pending.has(row.level.id);
 		suggest.disabled = pending;
 		suggest.classList.toggle('on', !!entry);
-		suggest.textContent = entry ? (this.view === 'suggested' ? 'Remove' : '✓ Suggested') : 'Suggest';
+		suggest.dataset.state = entry ? (this.view === 'suggested' ? 'remove' : 'on') : 'add';
 		suggest.title = entry ? 'Remove from the suggestions for the player' : 'Suggest this level to the player (shows up in Beat Saber)';
 		suggested.textContent = entry ? `Suggested by ${entry.by || 'a viewer'}, ${formatAgo(entry.added)}` : '';
 		suggested.hidden = !entry;
