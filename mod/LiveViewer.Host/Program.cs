@@ -145,13 +145,14 @@ Console commands while running:
 
             var speed = double.Parse(options.GetValueOrDefault("speed") ?? "1", System.Globalization.CultureInfo.InvariantCulture);
             var loop = options.ContainsKey("loop");
+            var wait = double.Parse(options.GetValueOrDefault("wait") ?? "3", System.Globalization.CultureInfo.InvariantCulture);
             var startAt = float.Parse(options.GetValueOrDefault("start") ?? "0", System.Globalization.CultureInfo.InvariantCulture);
             var player = new Thread(() =>
             {
                 do
                 {
                     // Give viewers a moment to connect before the song starts.
-                    if (cts.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(3)))
+                    if (cts.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(wait)))
                     {
                         return;
                     }
@@ -162,7 +163,20 @@ Console commands while running:
                 }
                 while (loop && !cts.IsCancellationRequested);
             }) { IsBackground = true, Name = "Fake live" };
-            player.Start();
+            // Like the game's menu: the song is selected before it's played (with --idle, it never is).
+            server.Feed.SelectSong(new SongSelection
+            {
+                Hash = session.Hash,
+                SongName = session.SongName,
+                SongSubName = session.SongSubName,
+                SongAuthor = session.SongAuthor,
+                BeatsPerMinute = session.BeatsPerMinute,
+                Audio = new MapAudioFile(mapSource, map.Files["audio"]),
+            });
+            if (!options.ContainsKey("idle"))
+            {
+                player.Start();
+            }
 
             // Keep serving after the song ends so the page stays reachable; quit with q or Ctrl+C.
             _ = Task.Run(() => CommandLoop(server, cts));

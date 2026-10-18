@@ -228,7 +228,9 @@ namespace LiveViewer.Server
                 yield break;
             }
 
-            foreach (var nic in interfaces)
+            // Interfaces with a gateway (the network people are on) first; on the Frame, its own access point
+            // for the streaming link comes without one.
+            foreach (var nic in interfaces.OrderBy(n => HasGateway(n) ? 0 : 1))
             {
                 if (nic.OperationalStatus != OperationalStatus.Up)
                 {
@@ -244,6 +246,18 @@ namespace LiveViewer.Server
                         yield return address;
                     }
                 }
+            }
+        }
+
+        private static bool HasGateway(NetworkInterface nic)
+        {
+            try
+            {
+                return nic.GetIPProperties().GatewayAddresses.Any(g => !g.Address.Equals(IPAddress.Any) && !g.Address.Equals(IPAddress.IPv6Any));
+            }
+            catch (NetworkInformationException)
+            {
+                return false;
             }
         }
     }
