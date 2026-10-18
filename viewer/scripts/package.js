@@ -30,9 +30,15 @@ if (/<script(?![^>]*\ssrc=)/.test(html) || /\son[a-z]+="/.test(html)) {
 }
 fs.writeFileSync(path.join(out, 'index.html'), html);
 
-// Only the bundle that index.html references.
+// Only the bundle that index.html references, and the parts it loads on demand (same build timestamp).
 for (const match of html.matchAll(/(?:src|href)="(build\/[^"]+)"/g)) {
 	copy(match[1]);
+	const stamp = match[1].match(/\.(\d+)\.js$/);
+	if (stamp) {
+		for (const name of fs.readdirSync(path.join(root, 'build'))) {
+			if (name.endsWith(`.${stamp[1]}.js`) && !match[1].endsWith(name)) copy(path.join('build', name));
+		}
+	}
 }
 copy('src/preamble.js', 'preamble.js');
 

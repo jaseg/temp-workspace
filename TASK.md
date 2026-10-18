@@ -113,7 +113,6 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
   session id and hash are unchanged.
 - **Scan cost:** 19 levels take 1.9 s on the Frame on first scan. A persistent cache keyed by the folder stamp
   would help large libraries.
-- **Safari / iOS** may not play Ogg Vorbis in `<audio>` (preview and live song).
 - **QR handoff mode** (later; see `PLAN.md`).
 
 ### Map colors and environments: estimate

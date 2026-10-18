@@ -1,3 +1,4 @@
+import {decodeAudio} from '../live/ogg';
 if (typeof AFRAME === 'undefined') {
 	throw new Error('Component attempted to register before AFRAME was available.');
 }
@@ -9,7 +10,7 @@ var audioBufferCache = {};
  */
 AFRAME.registerComponent('audioanalyser', {
 	schema: {
-		isSafari: {default: false},
+		bufferedAudioOnly: {default: false},
 		pitchCompensationTreshold: {default: 0.1},
 		beatDetectionDecay: {default: 0.99},
 		beatDetectionMinVolume: {default: 15},
@@ -142,7 +143,7 @@ AFRAME.registerComponent('audioanalyser', {
 	},
 
 	refreshSource: function (speed) {
-		if (this.data.isSafari) {
+		if (this.data.bufferedAudioOnly) {
 			this.getBufferSource().then(bufferSource => {
 				this.el.emit(
 					'audioanalysersource',
@@ -272,18 +273,12 @@ AFRAME.registerComponent('audioanalyser', {
 			xhr.open('GET', src);
 			xhr.responseType = 'arraybuffer';
 			xhr.addEventListener('load', () => {
-				// Support Webkit with callback.
-				function cb(audioBuffer) {
-					audioBufferCache[src] = audioBuffer;
-					resolve(audioBuffer);
-				}
-				var res = this.context[this.data.isSafari ? 'decodeOggData' : 'decodeAudioData'](xhr.response, cb);
-				if (!res && this.data.isSafari) {
-					res = this.context['decodeAudioData'](xhr.response, cb);
-				}
-				if (res && res.constructor === Promise) {
-					res.then(cb).catch(console.error);
-				}
+				decodeAudio(this.context, xhr.response)
+					.then(audioBuffer => {
+						audioBufferCache[src] = audioBuffer;
+						resolve(audioBuffer);
+					})
+					.catch(console.error);
 			});
 			xhr.send();
 		});

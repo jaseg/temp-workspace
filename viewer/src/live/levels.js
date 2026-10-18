@@ -4,6 +4,7 @@
 //
 // Level data comes from downloaded maps and is untrusted: it is only ever put into the page as text.
 import {LevelFile, FileError} from './protocol';
+import {isOgg, canPlayOgg, decodeAudio} from './ogg';
 require('./levels.styl');
 
 const DIFFICULTIES = ['Easy', 'Normal', 'Hard', 'Expert', 'ExpertPlus'];
@@ -688,7 +689,9 @@ export class LevelBrowser {
 		const audio = new Audio('assets/sounds/silence.mp3');
 		audio.volume = 0;
 		audio.play().catch(() => {});
-		const preview = {level, row, audio, url: null, timer: null};
+		// The Web Audio fallback for browsers without Ogg (old Safari) also needs the gesture to start its context.
+		const context = this.audioContext();
+		const preview = {level, row, audio, context, url: null, timer: null, source: null};
 		this.preview = preview;
 		row.classList.add('loading');
 		let buffer;
@@ -706,6 +709,10 @@ export class LevelBrowser {
 		const length = level.previewDuration > 0 ? level.previewDuration : 10;
 		let begin = level.previewStart > 0 ? level.previewStart : 0;
 		const volume = Math.max(0.1, parseFloat((document.getElementById('musicSlider') || {}).value) || 0.5);
+		if (isOgg(buffer) && !canPlayOgg()) {
+			this.playDecoded(preview, buffer, begin, length, volume);
+			return;
+		}
 		// Custom levels ship Ogg Vorbis, or WAV for a few converted official songs.
 		const wav = new TextDecoder().decode(new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength))) === 'RIFF';
 		preview.url = URL.createObjectURL(new Blob([buffer], {type: wav ? 'audio/wav' : 'audio/ogg'}));
@@ -717,17 +724,23 @@ export class LevelBrowser {
 		audio.addEventListener('ended', () => this.preview === preview && this.stopPreview());
 		audio.addEventListener('error', () => {
 			if (this.preview !== preview) return;
+			if (isOgg(buffer) && !preview.triedDecoding) {
+				// Partial Ogg support (Safari before 18.4 on some systems): decode it ourselves instead.
+				preview.triedDecoding = true;
+				clearTimeout(preview.timer);
+				audio.removeAttribute('src');
+				this.playDecoded(preview, buffer, begin, length, volume);
+				return;
+			}
 			this.stopPreview();
 			row.refs.play.title = "This browser can't play the song file";
 		});
 		audio.src = preview.url;
-		row.classList.add('playing');
-		row.refs.play.textContent = 'Stop';
-		row.refs.play.title = 'Stop the preview';
+		this.showPlaying(row);
 
 		// Fade in, play the preview section, fade out.
 		const tick = () => {
-			if (this.preview !== preview) return;
+			if (this.preview !== preview || preview.triedDecoding) return;
 			const t = audio.currentTime - begin;
 			const fade = Math.min(1, Math.max(0, t / FADE_S), Math.max(0, (length - t) / FADE_S));
 			audio.volume = volume * fade;
@@ -738,11 +751,75 @@ export class LevelBrowser {
 		tick();
 	}
 
+	audioContext() {
+		if (!this.context) this.context = new (window.AudioContext || window.webkitAudioContext)();
+		this.context.resume().catch(() => {});
+		return this.context;
+	}
+
+	showPlaying(row) {
+		row.classList.add('playing');
+		row.refs.play.textContent = 'Stop';
+		row.refs.play.title = 'Stop the preview';
+	}
+
+	/** Plays the preview section through Web Audio, decoding the song with the WebAssembly fallback if needed. */
+	async playDecoded(preview, buffer, begin, length, volume) {
+		const {row, context} = preview;
+		row.classList.add('loading');
+		let song;
+		try {
+			song = await decodeAudio(context, buffer);
+		} catch (e) {
+			if (this.preview === preview) this.stopPreview();
+			row.refs.play.title = `Couldn't decode the song (${e.message})`;
+			return;
+		} finally {
+			row.classList.remove('loading');
+		}
+		if (this.preview !== preview) return;
+
+		begin = Math.min(begin, Math.max(0, song.duration - length));
+		const gain = context.createGain();
+		gain.connect(context.destination);
+		const source = context.createBufferSource();
+		source.buffer = song;
+		source.connect(gain);
+		// Fade in, play the preview section, fade out, all scheduled on the audio clock.
+		const start = context.currentTime + 0.05;
+		gain.gain.setValueAtTime(0, start);
+		gain.gain.linearRampToValueAtTime(volume, start + FADE_S);
+		gain.gain.setValueAtTime(volume, start + Math.max(FADE_S, length - FADE_S));
+		gain.gain.linearRampToValueAtTime(0, start + length);
+		source.start(start, begin, length);
+		source.onended = () => this.preview === preview && this.stopPreview();
+		preview.source = source;
+		preview.gain = gain;
+		this.showPlaying(row);
+
+		const tick = () => {
+			if (this.preview !== preview) return;
+			const t = context.currentTime - start;
+			row.refs.progress.style.width = `${Math.min(100, Math.max(0, (t / length) * 100))}%`;
+			preview.timer = setTimeout(tick, 50);
+		};
+		tick();
+	}
+
 	stopPreview() {
 		const preview = this.preview;
 		if (!preview) return;
 		this.preview = null;
 		clearTimeout(preview.timer);
+		if (preview.source) {
+			preview.source.onended = null;
+			try {
+				preview.source.stop();
+			} catch (e) {
+				// Already ended.
+			}
+			preview.gain.disconnect();
+		}
 		preview.audio.pause();
 		preview.audio.removeAttribute('src');
 		if (preview.url) URL.revokeObjectURL(preview.url);

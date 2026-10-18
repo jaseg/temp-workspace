@@ -61,6 +61,9 @@ module.exports = {
 	output: {
 		path: __dirname,
 		filename: `build/build.${timestamp}.js`,
+		// Code loaded on demand (the Ogg decoder for old Safari), next to the bundle; paths relative to the page.
+		chunkFilename: `build/[name].${timestamp}.js`,
+		publicPath: '',
 		clean: false,
 	},
 	plugins: [

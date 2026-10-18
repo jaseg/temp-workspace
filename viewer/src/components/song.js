@@ -3,7 +3,10 @@ const utils = require('../utils');
 const GAME_OVER_LENGTH = 3.5;
 const ONCE = {once: true};
 const BASE_VOLUME = 0.35;
-const isSafari = navigator.userAgent.toLowerCase().indexOf('safari') !== -1 && navigator.userAgent.toLowerCase().indexOf('chrome') === -1;
+const {canPlayOgg} = require('../live/ogg');
+// Safari (media element quirks) and browsers without Ogg Vorbis play songs from a decoded buffer (live/ogg.js).
+const bufferedAudioOnly =
+	(navigator.userAgent.toLowerCase().indexOf('safari') !== -1 && navigator.userAgent.toLowerCase().indexOf('chrome') === -1) || !canPlayOgg();
 
 /**
  * Active challenge song / audio.
@@ -90,7 +93,7 @@ AFRAME.registerComponent('song', {
 			return;
 		}
 
-		this.isBufferSource = isSafari || !data.pitchCompensation;
+		this.isBufferSource = bufferedAudioOnly || !data.pitchCompensation;
 
 		// Resume.
 		if (oldData.isPaused && !data.isPaused) {
@@ -166,7 +169,7 @@ AFRAME.registerComponent('song', {
 					if (evt.detail.audio) {
 						this.audio = evt.detail.audio;
 					}
-					if (isSafari) {
+					if (bufferedAudioOnly) {
 						this.audio.src = utils.createSilence(this.duration);
 					}
 					resolve(this.source);

@@ -32,16 +32,11 @@ const emptyScore = {
 	misses: 0,
 };
 
-const isSafari = navigator.userAgent.toLowerCase().indexOf('safari') !== -1 && navigator.userAgent.toLowerCase().indexOf('chrome') === -1;
+const {canPlayOgg} = require('../live/ogg');
 
-if (isSafari) {
-	var module = require('../lib/oggdec');
-	const decodeOggData = module().decodeOggData;
-	const decodeAudioData = (data, completion) => {
-		decodeOggData(data).then(completion);
-	};
-	(window.AudioContext || window.webkitAudioContext).prototype.decodeOggData = decodeAudioData;
-}
+// Safari (media element quirks) and browsers without Ogg Vorbis play songs from a decoded buffer (live/ogg.js).
+const bufferedAudioOnly =
+	(navigator.userAgent.toLowerCase().indexOf('safari') !== -1 && navigator.userAgent.toLowerCase().indexOf('chrome') === -1) || !canPlayOgg();
 
 let beatmaps;
 let difficulties;
@@ -94,7 +89,7 @@ AFRAME.registerState({
 		isPaused: true, // Playing, but paused.
 		isPlaying: false, // Actively playing.
 		isFinished: false,
-		isSafari: isSafari,
+		bufferedAudioOnly: bufferedAudioOnly,
 		isSongBufferProcessing: false,
 		useractive: false,
 		showControls: true,

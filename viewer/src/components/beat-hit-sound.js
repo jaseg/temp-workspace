@@ -1,6 +1,6 @@
+import {decodeAudio} from '../live/ogg';
 var sourceCreatedCallback;
 
-const isSafari = navigator.userAgent.toLowerCase().indexOf('safari') !== -1 && navigator.userAgent.toLowerCase().indexOf('chrome') === -1;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 AFRAME.registerComponent('beat-hit-sound', {
@@ -71,10 +71,10 @@ AFRAME.registerComponent('beat-hit-sound', {
 	},
 
 	refreshBuffer: function () {
-		var buffer = Buffer.from(this.settings.settings.hitSound, 'base64');
+		var bytes = Buffer.from(this.settings.settings.hitSound, 'base64');
 		const captureThis = this;
 
-		this.context[isSafari ? 'decodeOggData' : 'decodeAudioData'](buffer.buffer, function (buffer) {
+		decodeAudio(this.context, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length)).then(function (buffer) {
 			captureThis.sources = [];
 			for (let index = 0; index < 100; index++) {
 				var source = captureThis.context.createBufferSource();
