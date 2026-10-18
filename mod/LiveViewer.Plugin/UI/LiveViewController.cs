@@ -104,12 +104,15 @@ namespace LiveViewer.Plugin.UI
                 return;
             }
 
-            _pendingList?.TableView.ReloadData();
-            _devicesList?.TableView.ReloadData();
-            foreach (var name in new[] { "status-text", "fingerprint-text", "has-pending", "no-pending", "has-devices", "devices-text" })
+            // BSML matches change notifications by member name, not by UIValue id. Lists are shown before they're
+            // reloaded: reloading an inactive table doesn't create its cells.
+            foreach (var name in new[] { nameof(StatusText), nameof(FingerprintText), nameof(HasPending), nameof(NoPending), nameof(HasDevices), nameof(DevicesText) })
             {
                 NotifyPropertyChanged(name);
             }
+
+            _pendingList?.TableView.ReloadData();
+            _devicesList?.TableView.ReloadData();
         }
 
         protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
