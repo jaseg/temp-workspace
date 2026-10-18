@@ -19,6 +19,7 @@ namespace LiveViewer.Server.Live
             Pose,
             NoteSpawn,
             WallSpawn,
+            SliderSpawn,
             NoteCut,
             NoteFinal,
             Wall,
@@ -37,6 +38,7 @@ namespace LiveViewer.Server.Live
             public NoteSpawn NoteSpawn;
             public WallEvent Wall;
             public WallSpawn WallSpawn;
+            public SliderSpawn SliderSpawn;
             public float Height;
             public SessionEndReason EndReason;
             public SessionInfo? Session;
@@ -155,6 +157,15 @@ namespace LiveViewer.Server.Live
             ref var e = ref _ring[index];
             e.CaptureUs = captureUs;
             e.WallSpawn = wall;
+            Publish();
+        }
+
+        public void SpawnSlider(long captureUs, in SliderSpawn slider)
+        {
+            if (!TryClaim(Kind.SliderSpawn, out var index)) return;
+            ref var e = ref _ring[index];
+            e.CaptureUs = captureUs;
+            e.SliderSpawn = slider;
             Publish();
         }
 

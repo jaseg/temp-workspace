@@ -9,9 +9,9 @@ using Newtonsoft.Json.Linq;
 namespace LiveViewer.Host
 {
     /// <summary>
-    /// Notes and walls of the replayed difficulty, as the game would spawn them. The game sends what it spawns; the
-    /// fake-live host has only the map, so it reads the difficulty file (v2, v3 or v4) at the map's base BPM. Arcs
-    /// and chains are left out, and every note gets the normal scoring type.
+    /// Notes, walls, arcs and chains of the replayed difficulty, as the game would send them. The game sends what it
+    /// spawns; the fake-live host has only the map, so it reads the difficulty file (v2, v3 or v4) at the map's base
+    /// BPM. Every note gets the normal scoring type, and chain links aren't sent as notes.
     /// </summary>
     public static class MapObjects
     {
@@ -19,19 +19,21 @@ namespace LiveViewer.Host
         private const int ColorNone = -1;
         private const int CutAny = 8;
 
-        public static (List<NoteSpawn> notes, List<WallSpawn> walls) Read(MapDescription map)
+        public static (List<NoteSpawn> notes, List<WallSpawn> walls, List<SliderSpawn> sliders) Read(MapDescription map)
         {
             var notes = new List<NoteSpawn>();
             var walls = new List<WallSpawn>();
+            var sliders = new List<SliderSpawn>();
             if (!map.Files.TryGetValue("difficulty", out var file) || map.BeatsPerMinute <= 0)
             {
-                return (notes, walls);
+                return (notes, walls, sliders);
             }
 
             var root = JObject.Parse(File.ReadAllText(Path.Combine(map.Directory, file)));
             var secondsPerBeat = 60f / map.BeatsPerMinute;
             float Seconds(JToken? beats) => (beats?.Value<float>() ?? 0) * secondsPerBeat;
             int Int(JToken? t) => t?.Value<int>() ?? 0;
+            float Float(JToken? t) => t?.Value<float>() ?? 0;
             JArray Array(string name) => root[name] as JArray ?? new JArray();
 
             if (root["_notes"] != null || root["_obstacles"] != null)
@@ -71,6 +73,36 @@ namespace LiveViewer.Host
                     var d = Data("obstaclesData", o);
                     walls.Add(Wall(Seconds(o["b"]), Seconds(d["d"]), Int(d["x"]), Int(d["y"]), Int(d["w"]), Int(d["h"])));
                 }
+
+                // Arcs and chains point at color note data for their head (and an arc's tail).
+                JObject At(string name, JToken? index) => Array(name).ElementAtOrDefault(Int(index)) as JObject ?? new JObject();
+                foreach (var a in Array("arcs").OfType<JObject>())
+                {
+                    var head = At("colorNotesData", a["hi"]);
+                    var tail = At("colorNotesData", a["ti"]);
+                    var arc = At("arcsData", a["ai"]);
+                    sliders.Add(new SliderSpawn
+                    {
+                        Kind = SliderKind.Arc, ColorType = Int(head["c"]),
+                        Time = Seconds(a["hb"]), LineIndex = Int(head["x"]), LineLayer = Int(head["y"]), CutDirection = Int(head["d"]),
+                        TailTime = Seconds(a["tb"]), TailLineIndex = Int(tail["x"]), TailLineLayer = Int(tail["y"]), TailCutDirection = Int(tail["d"]),
+                        HeadControlPointLengthMultiplier = Float(arc["m"]), TailControlPointLengthMultiplier = Float(arc["tm"]),
+                        MidAnchorMode = Int(arc["a"]), HasTailNote = true,
+                    });
+                }
+
+                foreach (var c in Array("chains").OfType<JObject>())
+                {
+                    var head = At("colorNotesData", c["i"]);
+                    var chain = At("chainsData", c["ci"]);
+                    sliders.Add(new SliderSpawn
+                    {
+                        Kind = SliderKind.Chain, ColorType = Int(head["c"]),
+                        Time = Seconds(c["hb"]), LineIndex = Int(head["x"]), LineLayer = Int(head["y"]), CutDirection = Int(head["d"]),
+                        TailTime = Seconds(c["tb"]), TailLineIndex = Int(chain["tx"]), TailLineLayer = Int(chain["ty"]),
+                        SliceCount = Int(chain["c"]), SquishAmount = Float(chain["s"]),
+                    });
+                }
             }
             else
             {
@@ -88,11 +120,35 @@ namespace LiveViewer.Host
                 {
                     walls.Add(Wall(Seconds(o["b"]), Seconds(o["d"]), Int(o["x"]), Int(o["y"]), Int(o["w"]), Int(o["h"])));
                 }
+
+                foreach (var a in Array("sliders").OfType<JObject>())
+                {
+                    sliders.Add(new SliderSpawn
+                    {
+                        Kind = SliderKind.Arc, ColorType = Int(a["c"]),
+                        Time = Seconds(a["b"]), LineIndex = Int(a["x"]), LineLayer = Int(a["y"]), CutDirection = Int(a["d"]),
+                        TailTime = Seconds(a["tb"]), TailLineIndex = Int(a["tx"]), TailLineLayer = Int(a["ty"]), TailCutDirection = Int(a["tc"]),
+                        HeadControlPointLengthMultiplier = Float(a["mu"]), TailControlPointLengthMultiplier = Float(a["tmu"]),
+                        MidAnchorMode = Int(a["m"]), HasTailNote = true,
+                    });
+                }
+
+                foreach (var c in Array("burstSliders").OfType<JObject>())
+                {
+                    sliders.Add(new SliderSpawn
+                    {
+                        Kind = SliderKind.Chain, ColorType = Int(c["c"]),
+                        Time = Seconds(c["b"]), LineIndex = Int(c["x"]), LineLayer = Int(c["y"]), CutDirection = Int(c["d"]),
+                        TailTime = Seconds(c["tb"]), TailLineIndex = Int(c["tx"]), TailLineLayer = Int(c["ty"]),
+                        SliceCount = Int(c["sc"]), SquishAmount = Float(c["s"]),
+                    });
+                }
             }
 
             notes.Sort((a, b) => a.Time.CompareTo(b.Time));
             walls.Sort((a, b) => a.Time.CompareTo(b.Time));
-            return (notes, walls);
+            sliders.Sort((a, b) => a.Time.CompareTo(b.Time));
+            return (notes, walls, sliders);
         }
 
         private static NoteSpawn Note(float time, int line, int layer, int color, int direction, int angle, bool bomb)

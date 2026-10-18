@@ -737,6 +737,9 @@ namespace LiveViewer.Server.Live
                 case LiveFeed.Kind.WallSpawn:
                     Messages.WallSpawn(w, e.CaptureUs, e.WallSpawn);
                     break;
+                case LiveFeed.Kind.SliderSpawn:
+                    Messages.SliderSpawn(w, e.CaptureUs, e.SliderSpawn);
+                    break;
                 case LiveFeed.Kind.Wall:
                     Messages.Wall(w, e.CaptureUs, e.Wall);
                     break;

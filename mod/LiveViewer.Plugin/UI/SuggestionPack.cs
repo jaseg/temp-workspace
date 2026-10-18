@@ -93,6 +93,34 @@ namespace LiveViewer.Plugin.UI
             }
         }
 
+        /// <summary>The pack's cover (UI/SuggestedCover.svg, rendered to PNG). Game thread only.</summary>
+        private static Sprite? LoadCover()
+        {
+            try
+            {
+                using var stream = typeof(SuggestionPack).Assembly.GetManifestResourceStream("LiveViewer.Plugin.UI.SuggestedCover.png");
+                if (stream == null)
+                {
+                    return null;
+                }
+
+                var bytes = new byte[stream.Length];
+                stream.Read(bytes, 0, bytes.Length);
+                var texture = new Texture2D(2, 2);
+                if (!texture.LoadImage(bytes))
+                {
+                    return null;
+                }
+
+                return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+            }
+            catch (Exception e)
+            {
+                Plugin.Log?.Warn("Can't load the suggestion pack's cover: " + e.Message);
+                return null;
+            }
+        }
+
         private static void UpdatePack(Server.LiveServer server)
         {
             var repository = SongCore.Loader.CustomLevelsRepository;
@@ -108,7 +136,7 @@ namespace LiveViewer.Plugin.UI
                 .ToArray();
             if (_pack == null)
             {
-                _pack = new SongCoreCustomBeatmapLevelPack(PackId, "Suggested by viewers", SongCore.Loader.defaultCoverImage, levels, "Suggested");
+                _pack = new SongCoreCustomBeatmapLevelPack(PackId, "Suggested by viewers", LoadCover() ?? SongCore.Loader.defaultCoverImage, levels, "Suggested");
             }
             else
             {

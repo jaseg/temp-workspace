@@ -114,6 +114,12 @@ export class LiveOverlay {
 		this.render('');
 	}
 
+	/** The player paused the song in the game (shown until they resume or the song ends). */
+	setPaused(paused) {
+		if (!this.session) return;
+		this.render(paused ? 'Paused' : '', paused ? 'The player paused the song.' : '');
+	}
+
 	setEnded(reason, info) {
 		this.session = null;
 		const song = info ? `${info.songName} (${info.difficulty})` : '';

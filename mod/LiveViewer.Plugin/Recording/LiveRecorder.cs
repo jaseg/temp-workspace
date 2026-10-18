@@ -31,6 +31,13 @@ namespace LiveViewer.Plugin.Recording
         private readonly PauseController? _pauseController;
         private readonly PlayerHeightDetector? _heightDetector;
         private readonly PlayerDataModel _playerData;
+        private readonly IReadonlyBeatmapData _beatmapData;
+
+        // Arcs and chains go out this long before their time: earlier than the game spawns them (its jump and move
+        // time), as the game has no spawn event for chains. Sorted by time; _nextSlider is the first not sent yet.
+        private const float SliderLead = 3f;
+        private readonly List<SliderSpawn> _sliders = new List<SliderSpawn>();
+        private int _nextSlider;
 
         // Note and wall ids as in BeatLeader's recorder, kept per object so each later event can find them.
         private readonly Dictionary<NoteData, NoteEvent> _notes = new Dictionary<NoteData, NoteEvent>();
@@ -56,6 +63,7 @@ namespace LiveViewer.Plugin.Recording
             IVariableMovementDataProvider movementData,
             StandardLevelScenesTransitionSetupDataSO transitionSetup,
             PlayerDataModel playerData,
+            IReadonlyBeatmapData beatmapData,
             [InjectOptional] PauseController? pauseController,
             [InjectOptional] PlayerHeightDetector? heightDetector)
         {
@@ -72,6 +80,7 @@ namespace LiveViewer.Plugin.Recording
             _movementData = movementData;
             _transitionSetup = transitionSetup;
             _playerData = playerData;
+            _beatmapData = beatmapData;
             _pauseController = pauseController;
             _heightDetector = heightDetector;
         }
@@ -99,6 +108,7 @@ namespace LiveViewer.Plugin.Recording
             }
 
             _session = level;
+            CollectSliders();
             _feed.SelectSong(selection!);
             _beatmapObjectManager.noteWasAddedEvent += OnNoteWasAdded;
             _beatmapObjectManager.noteWasCutEvent += OnNoteWasCut;
@@ -170,6 +180,18 @@ namespace LiveViewer.Plugin.Recording
                 _rightSaber = _saberManager.rightSaber.transform;
             }
 
+            var songTime = _timeSync.songTime;
+            while (_nextSlider < _sliders.Count && _sliders[_nextSlider].Time - SliderLead <= songTime)
+            {
+                // Arcs and chains already over (e.g. a practice start time) are skipped.
+                if (_sliders[_nextSlider].TailTime >= songTime)
+                {
+                    _feed.SpawnSlider(LiveClock.NowUs(), _sliders[_nextSlider]);
+                }
+
+                _nextSlider++;
+            }
+
             var origin = _origin!;
             _feed.Pose(LiveClock.NowUs(), _timeSync.songTime,
                 Local(origin, _head!), Local(origin, _leftSaber!), Local(origin, _rightSaber!));
@@ -181,6 +203,35 @@ namespace LiveViewer.Plugin.Recording
                 _currentWall.Energy = _energyCounter.energy;
                 _feed.Wall(LiveClock.NowUs(), _currentWall);
             }
+        }
+
+        private void CollectSliders()
+        {
+            foreach (var data in _beatmapData.GetBeatmapDataItems<SliderData>(0))
+            {
+                var chain = data.sliderType == SliderData.Type.Burst;
+                _sliders.Add(new SliderSpawn
+                {
+                    Kind = chain ? SliderKind.Chain : SliderKind.Arc,
+                    ColorType = (int) data.colorType,
+                    Time = data.time,
+                    LineIndex = data.headLineIndex,
+                    LineLayer = (int) data.headLineLayer,
+                    CutDirection = (int) data.headCutDirection,
+                    TailTime = data.tailTime,
+                    TailLineIndex = data.tailLineIndex,
+                    TailLineLayer = (int) data.tailLineLayer,
+                    TailCutDirection = (int) data.tailCutDirection,
+                    HeadControlPointLengthMultiplier = data.headControlPointLengthMultiplier,
+                    TailControlPointLengthMultiplier = data.tailControlPointLengthMultiplier,
+                    MidAnchorMode = (int) data.midAnchorMode,
+                    HasTailNote = data.hasTailNote,
+                    SliceCount = data.sliceCount,
+                    SquishAmount = data.squishAmount,
+                });
+            }
+
+            _sliders.Sort((a, b) => a.Time.CompareTo(b.Time));
         }
 
         private static Pose Local(Transform origin, Transform t)

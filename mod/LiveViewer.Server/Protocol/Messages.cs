@@ -117,6 +117,13 @@ namespace LiveViewer.Server.Protocol
             w.Reset().U8(MessageType.WallSpawn).I64(captureUs).I32(e.WallId).F32(e.Time).F32(e.Duration)
                 .I32(e.LineIndex).I32(e.LineLayer).I32(e.Width).I32(e.Height);
 
+        public static void SliderSpawn(MessageWriter w, long captureUs, in SliderSpawn e) =>
+            w.Reset().U8(MessageType.SliderSpawn).I64(captureUs).U8((byte) e.Kind).I32(e.ColorType)
+                .F32(e.Time).I32(e.LineIndex).I32(e.LineLayer).I32(e.CutDirection)
+                .F32(e.TailTime).I32(e.TailLineIndex).I32(e.TailLineLayer).I32(e.TailCutDirection)
+                .F32(e.HeadControlPointLengthMultiplier).F32(e.TailControlPointLengthMultiplier).I32(e.MidAnchorMode)
+                .Bool(e.HasTailNote).I32(e.SliceCount).F32(e.SquishAmount);
+
         public static void Height(MessageWriter w, long captureUs, float height, float songTime) =>
             w.Reset().U8(MessageType.Height).I64(captureUs).F32(height).F32(songTime);
 

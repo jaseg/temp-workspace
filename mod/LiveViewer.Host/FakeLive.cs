@@ -31,10 +31,12 @@ namespace LiveViewer.Host
         private readonly float _startAt;
         private readonly List<NoteSpawn> _noteSpawns;
         private readonly List<WallSpawn> _wallSpawns;
+        private readonly List<SliderSpawn> _sliderSpawns;
 
         public FakeLive(LiveFeed feed, BsorReplay replay, SessionInfo session, IMapFileSource map,
-            List<NoteSpawn> noteSpawns, List<WallSpawn> wallSpawns, double speed, float startAt = 0)
+            List<NoteSpawn> noteSpawns, List<WallSpawn> wallSpawns, List<SliderSpawn> sliderSpawns, double speed, float startAt = 0)
         {
+            _sliderSpawns = sliderSpawns;
             _noteSpawns = noteSpawns;
             _wallSpawns = wallSpawns;
             _startAt = startAt;
@@ -55,6 +57,7 @@ namespace LiveViewer.Host
             Pause,
             NoteSpawn,
             WallSpawn,
+            SliderSpawn,
         }
 
         private struct Scheduled
@@ -133,6 +136,9 @@ namespace LiveViewer.Host
                     case Kind.WallSpawn:
                         _feed.SpawnWall(now, _wallSpawns[item.Index]);
                         break;
+                    case Kind.SliderSpawn:
+                        _feed.SpawnSlider(now, _sliderSpawns[item.Index]);
+                        break;
                 }
             }
 
@@ -187,13 +193,19 @@ namespace LiveViewer.Host
                 items.Add(new Scheduled { Time = _wallSpawns[i].Time - SpawnLead, Kind = Kind.WallSpawn, Index = i });
             }
 
+            for (var i = 0; i < _sliderSpawns.Count; i++)
+            {
+                // Like the game's recorder: arcs and chains go out ahead of the notes.
+                items.Add(new Scheduled { Time = _sliderSpawns[i].Time - Math.Max(SpawnLead, 3f), Kind = Kind.SliderSpawn, Index = i });
+            }
+
             // Stable order: events at the same time keep their kind order (pose first).
             return items.Select((item, order) => (item, order))
                 .OrderBy(x => x.item.Time).ThenBy(x => x.order)
                 .Select(x => x.item).ToList();
         }
 
-        private static bool IsSpawn(Kind kind) => kind == Kind.NoteSpawn || kind == Kind.WallSpawn;
+        private static bool IsSpawn(Kind kind) => kind == Kind.NoteSpawn || kind == Kind.WallSpawn || kind == Kind.SliderSpawn;
 
         /// <summary>Sleeps until shortly before the deadline, then spins, for sub-millisecond release times.</summary>
         private static bool WaitUntil(Stopwatch clock, double seconds, CancellationToken token)

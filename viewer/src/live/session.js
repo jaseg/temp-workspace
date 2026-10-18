@@ -34,6 +34,16 @@ function maxScoreFor(scoringType) {
 	return 115;
 }
 
+/** Whether a spawned note is the head of a chain: same color, time and position. */
+function isChainHead(note, chain) {
+	return (
+		note._type === chain._type &&
+		Math.abs(note._songTime - chain._songTime) < 0.002 &&
+		note._lineIndex === chain._lineIndex &&
+		note._lineLayer === chain._lineLayer
+	);
+}
+
 export class LiveSession {
 	constructor(replayLoader) {
 		this.loader = replayLoader;
@@ -173,6 +183,9 @@ export class LiveSession {
 			case T.WallSpawn:
 				this.onWallSpawn(r);
 				return;
+			case T.SliderSpawn:
+				this.onSliderSpawn(r);
+				return;
 			case T.NoteCut:
 				this.onNoteEvent(readNoteEvent(r), false);
 				return;
@@ -189,11 +202,13 @@ export class LiveSession {
 				const time = r.f32();
 				this.songClock.pause(time);
 				this.replay.pauses.push({duration: 0, time});
+				this.overlay.setPaused(true);
 				return;
 			}
 			case T.Resume:
 				r.f32();
 				this.songClock.resume();
+				this.overlay.setPaused(false);
 				return;
 		}
 	}
@@ -400,11 +415,85 @@ export class LiveSession {
 			note._flipLineIndex = flipLineIndex;
 			note._flipYSide = flipYSide;
 		}
+		if (note._scoringType === ScoringType.ChainLink || note._scoringType === ScoringType.ChainLinkArcHead) {
+			// Chain links are drawn from their chain (onSliderSpawn); the game's note only lends its exact id.
+			const link = this.liveMap._chains.find(
+				l => l._type === note._type && l._gameId === undefined && Math.abs(l._songTime - note._songTime) < 0.002
+			);
+			if (link) link._idWithScoring = link._gameId = serverId;
+			return;
+		}
 		this.loader.setIds({_notes: [note], _chains: []}, this.replay);
 		// Use the game's exact id as the primary match key; the computed alternatives remain for compatibility.
 		note._idWithScoring = serverId;
+		const chain = this.liveMap._burstSliders.find(c => !c.head && isChainHead(note, c));
+		if (chain) this.attachChainHead(note, chain);
 		this.liveMap._notes.push(note);
 		if (note._type === 0 || note._type === 1) this.mapNotes.push(note);
+	}
+
+	/** An arc or a chain (times in seconds), in the map loader's v3 field names. */
+	onSliderSpawn(r) {
+		const beats = this.beatsPerSecond();
+		const chain = r.u8() === 1;
+		const slider = {_type: r.i32()};
+		slider._songTime = r.f32();
+		slider._lineIndex = r.i32();
+		slider._lineLayer = r.i32();
+		slider._cutDirection = r.i32();
+		slider._songTailTime = r.f32();
+		slider._tailLineIndex = r.i32();
+		slider._tailLineLayer = r.i32();
+		slider._tailCutDirection = r.i32();
+		slider._headControlPointLengthMultiplier = r.f32();
+		slider._tailControlPointLengthMultiplier = r.f32();
+		slider._arcMidAnchorMode = r.i32();
+		const hasTailNote = r.bool();
+		slider._sliceCount = r.i32();
+		slider._squishAmount = r.f32();
+		slider._time = slider._songTime * beats;
+		slider._tailTime = slider._songTailTime * beats;
+
+		if (!chain) {
+			delete slider._sliceCount;
+			delete slider._squishAmount;
+			slider.tail = hasTailNote ? {} : null; // only its presence matters for drawing
+			this.liveMap._sliders.push(slider);
+			return;
+		}
+
+		// Like the map loader: the head is a note of its own, the other segments are links between head and tail.
+		delete slider._headControlPointLengthMultiplier;
+		delete slider._tailControlPointLengthMultiplier;
+		delete slider._arcMidAnchorMode;
+		this.liveMap._burstSliders.push(slider);
+		const head = this.liveMap._notes.find(n => !n.sliderhead && isChainHead(n, slider));
+		if (head) this.attachChainHead(head, slider);
+		for (let i = 1; i < slider._sliceCount; ++i) {
+			const t = i / (slider._sliceCount - 1);
+			const link = Object.assign({}, slider, {
+				_headCutDirection: slider._cutDirection,
+				_cutDirection: 8,
+				_scoringType: ScoringType.ChainLink,
+				_sliceIndex: i,
+				_time: slider._time + (slider._tailTime - slider._time) * t,
+				_songTime: slider._songTime + (slider._songTailTime - slider._songTime) * t,
+				_songTailTime: slider._songTailTime,
+				_index: this.nextMapIndex++,
+			});
+			this.loader.setIds({_notes: [], _chains: [link]}, this.replay);
+			this.liveMap._chains.push(link);
+			this.mapNotes.push(link);
+		}
+	}
+
+	attachChainHead(note, chain) {
+		note.sliderhead = chain;
+		chain.head = note;
+	}
+
+	beatsPerSecond() {
+		return (this.info.beatsPerMinute || 120) / 60;
 	}
 
 	onWallSpawn(r) {

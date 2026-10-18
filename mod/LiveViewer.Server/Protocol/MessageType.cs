@@ -33,6 +33,7 @@ namespace LiveViewer.Server.Protocol
         public const byte Resume = 0x26;
         public const byte NoteSpawn = 0x27;
         public const byte WallSpawn = 0x28;
+        public const byte SliderSpawn = 0x29;
 
         // File transfer (map files, level library).
         public const byte MapChunk = 0x30;

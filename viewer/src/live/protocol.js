@@ -24,6 +24,7 @@ export const T = {
 	Resume: 0x26,
 	NoteSpawn: 0x27,
 	WallSpawn: 0x28,
+	SliderSpawn: 0x29,
 	MapChunk: 0x30,
 	MapError: 0x31,
 	Suggestions: 0x40,

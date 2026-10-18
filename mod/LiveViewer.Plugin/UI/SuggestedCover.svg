@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Cover of the in-game "Suggested by viewers" pack. Rendered to SuggestedCover.png (rsvg-convert). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2030"/>
+      <stop offset="1" stop-color="#3a1030"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff6fb5"/>
+      <stop offset="1" stop-color="#ff3b8a"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bg)"/>
+  <!-- list lines -->
+  <g fill="#ffffff" opacity="0.92" transform="translate(0 29)">
+    <rect x="44" y="62" width="112" height="16" rx="8"/>
+    <rect x="44" y="102" width="112" height="16" rx="8"/>
+    <rect x="44" y="142" width="64" height="16" rx="8"/>
+  </g>
+  <!-- note -->
+  <g fill="url(#accent)" transform="translate(0 29)">
+    <rect x="186" y="62" width="14" height="104" rx="4"/>
+    <path d="M200 62 c18 6 30 16 30 34 c-8 -10 -18 -14 -30 -14 z"/>
+    <ellipse cx="174" cy="170" rx="28" ry="22"/>
+  </g>
+</svg>

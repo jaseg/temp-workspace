@@ -109,6 +109,37 @@ namespace LiveViewer.Server.Protocol
         public int Height;
     }
 
+    public enum SliderKind : byte
+    {
+        Arc = 0,
+        Chain = 1,
+    }
+
+    /// <summary>An arc or chain, as in the game's level data (after modifiers and mirroring). Times in seconds.</summary>
+    public struct SliderSpawn
+    {
+        public SliderKind Kind;
+        public int ColorType;
+        public float Time;
+        public int LineIndex;
+        public int LineLayer;
+        public int CutDirection;
+        public float TailTime;
+        public int TailLineIndex;
+        public int TailLineLayer;
+        public int TailCutDirection;
+
+        /// <summary>Arcs only.</summary>
+        public float HeadControlPointLengthMultiplier;
+        public float TailControlPointLengthMultiplier;
+        public int MidAnchorMode;
+        public bool HasTailNote;
+
+        /// <summary>Chains only: the number of segments including the head, and how squished they are.</summary>
+        public int SliceCount;
+        public float SquishAmount;
+    }
+
     /// <summary>Same fields and order as a BSOR wall event.</summary>
     public struct WallEvent
     {
