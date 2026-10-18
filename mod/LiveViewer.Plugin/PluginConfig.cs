@@ -20,11 +20,5 @@ namespace LiveViewer.Plugin
         /// the level list. Never on by default and not settable from the menu.
         /// </summary>
         public virtual bool DevAutoApprove { get; set; }
-
-        /// <summary>
-        /// Testing only: a level hash (optionally followed by a space and a difficulty) to play with No Fail once the
-        /// main menu is up, once per game start. Empty: off.
-        /// </summary>
-        public virtual string DevAutoPlayLevel { get; set; } = "";
     }
 }

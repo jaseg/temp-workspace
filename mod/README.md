@@ -43,12 +43,8 @@ Build the viewer first (`npm run build` in `../viewer`); the plugin embeds `view
 `Plugins/` and `Libs/` go into the game folder.
 
 Settings are in `UserData/LiveViewer.json`; the certificate and remembered devices in `UserData/LiveViewer/`.
-`BeatLeaderStats` (on by default) can also be switched from the menu screen. Two settings exist for testing on the device
-without anyone in the headset and must stay off otherwise:
-
-- `DevAutoApprove`: lets every waiting browser in.
-- `DevAutoPlayLevel`: `"<hash>"` or `"<hash> <Difficulty>"`; plays that level with No Fail once the main menu
-  is up.
+`BeatLeaderStats` (on by default) can also be switched from the menu screen. `DevAutoApprove` lets every waiting
+browser in without asking; it's for testing on the device without anyone in the headset and must stay off otherwise.
 
 ## Fake live
 

@@ -51,7 +51,7 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 - **Deploy:** copy `package/Plugins` and `package/Libs` into the instance, then start it with
   `bs-arm64.sh launch <instance>` (from `~/.local/share/BSManager/cache/bs-arm64/bs-arm64-v0.3.2-proton-11.0-2c`).
   Logs: `<instance>/Logs/`. Started over SSH with nobody in the headset, the game stops at the health-warning
-  screen, so the main menu (menu screen, suggestion pack, DevAutoPlayLevel) needs someone to put the headset on.
+  screen, so the main menu (menu screen, suggestion pack) needs someone to put the headset on.
 - **Network:** the firewall allows TCP/UDP 1024–65535 on wlan0; avahi already announces `frame.local`, so
   `https://frame.local:4280/` works without our own mDNS.
 - **Levels:** this instance has its own `CustomLevels` (19 levels). BSManager's shared maps
@@ -78,7 +78,7 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 
 ### On the Frame (needs someone in the headset)
 
-- **Recorder:** play a custom level and watch it live (or set `DevAutoPlayLevel` and put the headset on). Check
+- **Recorder:** play a custom level and watch it live . Check
   poses, cuts, misses, walls, pause/resume, end reasons, the player's name and late join.
 - **Menu screen:** the Live Viewer button, waiting room approval (allow once / always / deny), remembered devices,
   the BeatLeader toggle. Then turn `DevAutoApprove` off in `UserData/LiveViewer.json`.
