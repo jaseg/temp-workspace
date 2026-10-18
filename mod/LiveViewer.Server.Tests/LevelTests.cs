@@ -140,6 +140,29 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
+        public void KnownLevelsAreReadFromInfoDatOnly()
+        {
+            // The game knows hash, counts and length: the difficulty and audio files aren't read (here they're
+            // garbage), and folders the game doesn't know aren't listed.
+            var known = Level("known", ("Info.dat", V2Info), ("Expert.dat", "{garbage"), ("song.egg", "not ogg"));
+            Level("unknown", ("Info.dat", V2Info.Replace("Song", "Other")), ("Expert.dat", V2Difficulty));
+            var hash = new string('a', 40);
+            var library = new LevelLibrary(new[] { _root }, new ConsoleLiveLog())
+            {
+                Known = folder => folder == known
+                    ? new KnownLevel { Hash = hash, Duration = 61.5, Counts = { ["standard/expert"] = (7, 2, 3) } }
+                    : null,
+            };
+            var snapshot = library.GetAsync().Result;
+
+            var level = Assert.Single(snapshot.Levels);
+            Assert.Equal(hash, level.Hash);
+            Assert.Equal(61.5, level.Duration);
+            Assert.Equal((7, 2, 3), (level.Difficulties[0].Notes, level.Difficulties[0].Bombs, level.Difficulties[0].Walls));
+            Assert.Equal(-1, level.Difficulties[1].Notes);
+        }
+
+        [Fact]
         public void LibraryListsEachHashOnceAsJson()
         {
             Level("one", ("Info.dat", V2Info.Replace("Song", "<b>Song</b>")), ("Expert.dat", V2Difficulty));

@@ -99,6 +99,7 @@ namespace LiveViewer.Plugin
                     }
                 };
 
+                server.Levels.Known = SongCoreLevels.Describe;
                 server.Start();
                 lock (_lock)
                 {

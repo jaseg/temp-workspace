@@ -45,6 +45,12 @@ namespace LiveViewer.Server.Levels
 
         public bool Enabled => _roots.Count > 0;
 
+        /// <summary>
+        /// When set, describes level folders from what the game already loaded (see <see cref="KnownLevel"/>); a
+        /// folder it returns null for isn't listed, and is looked at again on the next scan. Called on a scan thread.
+        /// </summary>
+        public Func<string, KnownLevel?>? Known { get; set; }
+
         /// <summary>A level id as the protocol uses it: the lowercase hex SHA-1 SongCore computes.</summary>
         public static bool IsLevelId(string? id) =>
             id != null && id.Length == 40 && id.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
@@ -196,10 +202,21 @@ namespace LiveViewer.Server.Levels
                 }
             }
 
+            var describe = Known;
+            KnownLevel? known = null;
+            if (describe != null)
+            {
+                known = describe(folder);
+                if (known == null)
+                {
+                    return null;
+                }
+            }
+
             LevelInfo? level = null;
             try
             {
-                level = LevelReader.Read(folder);
+                level = LevelReader.Read(folder, known);
             }
             catch (Exception e)
             {

@@ -55,6 +55,23 @@ namespace LiveViewer.Server.Levels
     }
 
     /// <summary>
+    /// What the game already knows about a level folder (in the game: SongCore's hash and the game's object counts),
+    /// so reading the folder needs only Info.dat. Hashing and counting otherwise read every difficulty file, which in
+    /// the game's garbage collector grows the heap by gigabytes over a large library.
+    /// </summary>
+    public sealed class KnownLevel
+    {
+        public string Hash = "";
+
+        /// <summary>Song length in seconds, 0 if unknown.</summary>
+        public double Duration;
+
+        /// <summary>Object counts by "Mode/Difficulty" (as named in Info.dat), compared ignoring case.</summary>
+        public Dictionary<string, (int notes, int bombs, int walls)> Counts =
+            new Dictionary<string, (int, int, int)>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Reads a level folder: Info.dat (v2, v3 or v4), object counts from each difficulty file, the SongCore hash and
     /// the song length. Everything here is untrusted input from downloaded maps, so sizes are capped and every
     /// field is optional.
@@ -64,17 +81,20 @@ namespace LiveViewer.Server.Levels
         public const long MaxInfoBytes = 1024 * 1024;
         public const long MaxDifficultyBytes = 64L * 1024 * 1024;
 
-        /// <summary>Returns null if the folder has no readable Info.dat.</summary>
-        public static LevelInfo? Read(string directory)
+        /// <summary>
+        /// Returns null if the folder has no readable Info.dat. With <paramref name="known"/>, takes the hash, counts
+        /// and length from it instead of reading the difficulty and audio files.
+        /// </summary>
+        public static LevelInfo? Read(string directory, KnownLevel? known = null)
         {
             // Difficulty and audio files are files the game's level loader may guard (see GameFileAccess).
             using (GameFileAccess.Enter())
             {
-                return ReadLevel(directory);
+                return ReadLevel(directory, known);
             }
         }
 
-        private static LevelInfo? ReadLevel(string directory)
+        private static LevelInfo? ReadLevel(string directory, KnownLevel? known)
         {
             var files = System.IO.Directory.EnumerateFiles(directory).Select(Path.GetFileName).ToList();
             var infoName = files.FirstOrDefault(n => string.Equals(n, "info.dat", StringComparison.OrdinalIgnoreCase));
@@ -210,6 +230,27 @@ namespace LiveViewer.Server.Levels
             else
             {
                 return null;
+            }
+
+            if (known != null)
+            {
+                level.Hash = known.Hash;
+                foreach (var (info, _) in difficultyFiles)
+                {
+                    if (known.Counts.TryGetValue(info.Mode + "/" + info.Difficulty, out var counts))
+                    {
+                        (info.Notes, info.Bombs, info.Walls) = counts;
+                    }
+
+                    level.Difficulties.Add(info);
+                }
+
+                if (known.Duration > 0)
+                {
+                    level.Duration = known.Duration;
+                }
+
+                return level;
             }
 
             using (var sha = SHA1.Create())
