@@ -54,6 +54,7 @@ namespace LiveViewer.Server
         private readonly LiveServerOptions _options;
         private readonly ILiveLog _log;
         private readonly ClientHub _hub;
+        private readonly BeatLeaderStats? _stats;
         private readonly PeerPolicy _peers;
         private readonly HostPolicy _hosts;
         private WebServer? _server;
@@ -72,8 +73,10 @@ namespace LiveViewer.Server
             _hosts = new HostPolicy(options.Port, options.HostNames);
             Levels = new LevelLibrary(options.LevelFolders, log);
             Suggestions = new Suggestions(Path.Combine(options.DataDirectory, "suggestions.tsv"));
-            _hub = new ClientHub(Feed, WaitingRoom, Devices, options.ServerName, log, Levels,
-                options.BeatLeader != null ? new BeatLeaderStats(options.BeatLeader, log) : null, Suggestions);
+            _stats = options.BeatLeader != null
+                ? new BeatLeaderStats(options.BeatLeader, log, cachePath: Path.Combine(options.DataDirectory, "beatleader-cache.tsv"))
+                : null;
+            _hub = new ClientHub(Feed, WaitingRoom, Devices, options.ServerName, log, Levels, _stats, Suggestions);
 
             Certificate = CertificateStore.LoadOrCreate(options.DataDirectory, options.HostNames, LocalAddresses(), log.Info);
             CertificateFingerprint = CertificateStore.Fingerprint(Certificate);
@@ -182,6 +185,7 @@ namespace LiveViewer.Server
         {
             _stop?.Cancel();
             _hub.Dispose();
+            _stats?.Dispose();
             _server?.Dispose();
             _server = null;
         }

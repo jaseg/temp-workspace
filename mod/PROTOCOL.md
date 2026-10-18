@@ -139,7 +139,7 @@ connection may have at most 8 of them in progress.
 - **BeatLeader stats are fetched by the mod**, so the page never talks to
   anything but the mod. The mod asks BeatLeader only about hashes of installed
   levels, at most two requests at a time, and caches the answers for 3.1 days
-  (failures for 2 minutes). The plugin fetches stats unless the player switches them off.
+  (failures for 2 minutes), across restarts in `UserData/LiveViewer/beatleader-cache.tsv`. The plugin fetches stats unless the player switches them off.
 - **Rescans:** the list is re-scanned when it's requested and the last scan is
   more than 30 seconds old; unchanged level folders are not re-read.
 - **Errors:** an unknown id gives `MapError` 1. Level requests when the library

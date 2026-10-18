@@ -296,6 +296,41 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
+        public async Task StatsCacheSurvivesRestarts()
+        {
+            var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var path = Path.Combine(_root, "beatleader-cache.tsv");
+            var (a, b, c) = (new string('a', 40), new string('b', 40), new string('c', 40));
+            var api = new FakeApi { Respond = h => h == c ? throw new InvalidOperationException("offline") : "{\"id\":\"" + h.Substring(0, 3) + "\"}" };
+            using (var stats = new BeatLeaderStats(api, new ConsoleLiveLog(), () => now, path))
+            {
+                await stats.GetAsync(a);
+                now += TimeSpan.FromDays(1);
+                await stats.GetAsync(b);
+                await Assert.ThrowsAsync<InvalidOperationException>(() => stats.GetAsync(c));
+            } // Dispose writes the file
+
+            // A restart: cached successes are served without asking BeatLeader; failures aren't kept.
+            File.AppendAllText(path, "garbage\n" + new string('d', 40) + "\tnot a date\tAAAA\n");
+            api.Calls = 0;
+            using (var stats = new BeatLeaderStats(api, new ConsoleLiveLog(), () => now, path))
+            {
+                Assert.Contains("\"aaa\"", Encoding.UTF8.GetString(await stats.GetAsync(a)));
+                Assert.Contains("\"bbb\"", Encoding.UTF8.GetString(await stats.GetAsync(b)));
+                Assert.Equal(0, api.Calls);
+            }
+
+            // Entries expire by the time they were fetched, also across restarts.
+            now += BeatLeaderStats.CacheFor - TimeSpan.FromDays(1);
+            using (var stats = new BeatLeaderStats(api, new ConsoleLiveLog(), () => now, path))
+            {
+                await stats.GetAsync(a);
+                await stats.GetAsync(b);
+                Assert.Equal(1, api.Calls); // a is too old now, b isn't
+            }
+        }
+
+        [Fact]
         public async Task StatsAreCachedAndFailuresRetriedLater()
         {
             var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);

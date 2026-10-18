@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -58,12 +60,17 @@ namespace LiveViewer.Server.Levels
     /// <summary>
     /// Per-level BeatLeader stats (star ratings, ranked status), fetched by the mod so the page only ever talks to
     /// the mod. Results are cached: successes for <see cref="CacheFor"/>, failures for <see cref="RetryAfter"/>.
-    /// At most two requests run at once.
+    /// With a cache file, successes survive restarts: they're written a few seconds after they arrive and on
+    /// <see cref="Flush"/>. At most two requests run at once.
     /// </summary>
-    public sealed class BeatLeaderStats
+    public sealed class BeatLeaderStats : IDisposable
     {
         public static readonly TimeSpan CacheFor = TimeSpan.FromDays(3.1);
         public static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(2);
+        public static readonly TimeSpan SaveDelay = TimeSpan.FromSeconds(5);
+
+        /// <summary>Larger entries in the cache file are ignored (a summary is well under 1 KB).</summary>
+        public const int MaxEntryBytes = 64 * 1024;
 
         private readonly object _lock = new object();
         private readonly Dictionary<string, (DateTime fetchedUtc, Task<byte[]> result)> _cache = new Dictionary<string, (DateTime, Task<byte[]>)>();
@@ -71,12 +78,104 @@ namespace LiveViewer.Server.Levels
         private readonly IBeatLeaderApi _api;
         private readonly ILiveLog _log;
         private readonly Func<DateTime> _utcNow;
+        private readonly string? _path;
+        private readonly Timer _saveTimer;
+        private bool _dirty;
 
-        public BeatLeaderStats(IBeatLeaderApi api, ILiveLog log, Func<DateTime>? utcNow = null)
+        /// <param name="cachePath">File to keep successful lookups in across restarts, or <c>null</c>.</param>
+        public BeatLeaderStats(IBeatLeaderApi api, ILiveLog log, Func<DateTime>? utcNow = null, string? cachePath = null)
         {
             _api = api;
             _log = log;
             _utcNow = utcNow ?? (() => DateTime.UtcNow);
+            _path = cachePath;
+            _saveTimer = new Timer(_ => Flush(), null, Timeout.Infinite, Timeout.Infinite);
+            if (_path != null && File.Exists(_path))
+            {
+                Load(_path);
+            }
+        }
+
+        public void Dispose()
+        {
+            _saveTimer.Dispose();
+            Flush();
+        }
+
+        /// <summary>Writes the cache file now if anything changed. Thread-safe.</summary>
+        public void Flush()
+        {
+            if (_path == null)
+            {
+                return;
+            }
+
+            List<string> lines;
+            lock (_lock)
+            {
+                if (!_dirty)
+                {
+                    return;
+                }
+
+                _dirty = false;
+                var now = _utcNow();
+                lines = _cache
+                    .Where(e => e.Value.result.Status == TaskStatus.RanToCompletion && now - e.Value.fetchedUtc < CacheFor)
+                    .Select(e => string.Join("\t", e.Key, e.Value.fetchedUtc.ToString("o", CultureInfo.InvariantCulture),
+                        Convert.ToBase64String(e.Value.result.Result)))
+                    .ToList();
+            }
+
+            try
+            {
+                var tmp = _path + ".tmp";
+                File.WriteAllLines(tmp, lines, new UTF8Encoding(false));
+                if (File.Exists(_path))
+                {
+                    File.Delete(_path);
+                }
+
+                File.Move(tmp, _path);
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                _log.Warn("Couldn't save the BeatLeader stats cache: " + e.Message);
+            }
+        }
+
+        private void Load(string path)
+        {
+            var now = _utcNow();
+            try
+            {
+                foreach (var line in File.ReadAllLines(path, Encoding.UTF8))
+                {
+                    var parts = line.Split('\t');
+                    if (parts.Length != 3 || !LevelLibrary.IsLevelId(parts[0]) || parts[2].Length > MaxEntryBytes * 4 / 3 + 4
+                        || !DateTime.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var fetched)
+                        || fetched > now || now - fetched >= CacheFor)
+                    {
+                        continue;
+                    }
+
+                    byte[] summary;
+                    try
+                    {
+                        summary = Convert.FromBase64String(parts[2]);
+                    }
+                    catch (FormatException)
+                    {
+                        continue;
+                    }
+
+                    _cache[parts[0]] = (fetched, Task.FromResult(summary));
+                }
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                _log.Warn("Couldn't read the BeatLeader stats cache: " + e.Message);
+            }
         }
 
         /// <summary>
@@ -101,8 +200,24 @@ namespace LiveViewer.Server.Levels
 
                 var task = FetchAsync(hash);
                 _cache[hash] = (now, task);
+                _ = task.ContinueWith(t => ScheduleSave(), TaskContinuationOptions.OnlyOnRanToCompletion);
                 return task;
             }
+        }
+
+        private void ScheduleSave()
+        {
+            if (_path == null)
+            {
+                return;
+            }
+
+            lock (_lock)
+            {
+                _dirty = true;
+            }
+
+            _saveTimer.Change(SaveDelay, Timeout.InfiniteTimeSpan);
         }
 
         private async Task<byte[]> FetchAsync(string hash)
