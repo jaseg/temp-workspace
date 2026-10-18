@@ -396,7 +396,15 @@ namespace LiveViewer.Server.Tests
                     await SendAsync(ws, Hello());
                     break;
                 case "oversized":
-                    await SendAsync(ws, new byte[64 * 1024]);
+                    try
+                    {
+                        await SendAsync(ws, new byte[64 * 1024]);
+                    }
+                    catch (WebSocketException)
+                    {
+                        // The server refuses the frame by its header and may close before the client has written it all.
+                    }
+
                     break;
                 case "flood":
                     for (var i = 0; i < 200 && ws.State == WebSocketState.Open; i++)

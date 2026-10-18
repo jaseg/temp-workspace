@@ -29,9 +29,13 @@ namespace EmbedIO.WebSockets.Internal
         private readonly TimeSpan _waitTime = TimeSpan.FromSeconds(1);
 
         private volatile WebSocketState _readyState;
-        private AutoResetEvent? _exitReceiving;
+        // LiveViewer patch: the close handshake awaits the receive loop's exit instead of blocking a thread on an
+        // AutoResetEvent; under load, blocked closes starved the thread pool and delayed every other connection.
+        private TaskCompletionSource<bool>? _exitReceiving;
         private FragmentBuffer? _fragmentsBuffer;
-        private volatile bool _inMessage;
+        // LiveViewer patch: 1 while one thread drains the message queue. Upstream's check-then-set bool lost
+        // wakeups: a message queued while the previous drain was finishing stayed queued until the next frame.
+        private int _dispatching;
         private AutoResetEvent? _receivePong;
         private Stream? _stream;
 
@@ -54,7 +58,31 @@ namespace EmbedIO.WebSockets.Internal
         /// <summary>
         /// Occurs when the <see cref="WebSocket"/> receives a message.
         /// </summary>
-        public event EventHandler<MessageEventArgs>? OnMessage;
+        // LiveViewer patch: messages are held until a handler is attached. Receiving starts during the handshake,
+        // before WebSocketModule subscribes, and upstream dropped whatever arrived in between (a client's first
+        // message, sent right after connecting).
+        private EventHandler<MessageEventArgs>? _onMessage;
+
+        public event EventHandler<MessageEventArgs>? OnMessage
+        {
+            add
+            {
+                lock (_stateSyncRoot)
+                {
+                    _onMessage += value;
+                }
+
+                Message();
+            }
+
+            remove
+            {
+                lock (_stateSyncRoot)
+                {
+                    _onMessage -= value;
+                }
+            }
+        }
 
         /// <inheritdoc />
         public WebSocketState State => _readyState;
@@ -323,9 +351,10 @@ namespace EmbedIO.WebSockets.Internal
                 await WriteSerializedAsync(frameAsBytes).ConfigureAwait(false);
             }
 
-            if (receive && sent)
+            var exitReceiving = _exitReceiving;
+            if (receive && sent && exitReceiving != null)
             {
-                _ = _exitReceiving?.WaitOne(_waitTime);
+                await Task.WhenAny(exitReceiving.Task, Task.Delay(_waitTime)).ConfigureAwait(false);
             }
         }
 
@@ -337,51 +366,34 @@ namespace EmbedIO.WebSockets.Internal
 
         private void Message()
         {
-            if (_inMessage || _messageEventQueue.IsEmpty || _readyState != WebSocketState.Open)
+            // One drainer at a time, in order. After releasing the flag, look again: a message queued between the
+            // last dequeue and the release would otherwise wait for the next frame.
+            while (_readyState == WebSocketState.Open && _onMessage != null && Interlocked.CompareExchange(ref _dispatching, 1, 0) == 0)
             {
-                return;
-            }
+                while (_readyState == WebSocketState.Open && _messageEventQueue.TryDequeue(out var e))
+                {
+                    try
+                    {
+                        _onMessage?.Invoke(this, e);
+                    }
+                    catch (Exception ex)
+                    {
+                        ex.Log(nameof(WebSocket));
+                    }
+                }
 
-            _inMessage = true;
-
-            if (_messageEventQueue.TryDequeue(out var e))
-            {
-                Messages(e);
+                Volatile.Write(ref _dispatching, 0);
+                if (_messageEventQueue.IsEmpty)
+                {
+                    return;
+                }
             }
-        }
-
-        private void Messages(MessageEventArgs e)
-        {
-            try
-            {
-                OnMessage?.Invoke(this, e);
-            }
-            catch (Exception ex)
-            {
-                ex.Log(nameof(WebSocket));
-            }
-
-            if (!_messageEventQueue.TryDequeue(out e) || _readyState != WebSocketState.Open)
-            {
-                _inMessage = false;
-                return;
-            }
-
-            _ = Task.Run(() => Messages(e));
         }
 
         private void Open()
         {
-            _inMessage = true;
             StartReceiving();
-
-            if (!_messageEventQueue.TryDequeue(out var e) || _readyState != WebSocketState.Open)
-            {
-                _inMessage = false;
-                return;
-            }
-
-            Messages(e);
+            Message();
         }
 
         private Task ProcessCloseFrame(WebSocketFrame frame) => InternalCloseAsync(frame.PayloadData, !frame.PayloadData.HasReservedCode, false);
@@ -499,12 +511,7 @@ namespace EmbedIO.WebSockets.Internal
                 _receivePong = null;
             }
 
-            if (_exitReceiving == null)
-            {
-                return;
-            }
-
-            _exitReceiving.Dispose();
+            _ = _exitReceiving?.TrySetResult(true);
             _exitReceiving = null;
         }
         
@@ -546,7 +553,7 @@ namespace EmbedIO.WebSockets.Internal
                 // do nothing
             }
 
-            _exitReceiving = new AutoResetEvent(false);
+            _exitReceiving = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             _receivePong = new AutoResetEvent(false);
 
             var frameStream = new WebSocketFrameStream(_stream);
@@ -568,7 +575,7 @@ namespace EmbedIO.WebSockets.Internal
 
                         if (!result || _readyState == WebSocketState.Closed)
                         {
-                            _ = _exitReceiving?.Set();
+                            _ = _exitReceiving?.TrySetResult(true);
 
                             return;
                         }

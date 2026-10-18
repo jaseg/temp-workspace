@@ -28,5 +28,12 @@ All marked with a `LiveViewer patch` comment.
     accepted up to `long.MaxValue`.
   - Frame writes are serialized. `SslStream` doesn't allow concurrent writes, and pong and close frames are
     written from the receive loop.
+  - Received messages are dispatched by one drainer at a time, in order. Upstream's check-then-set flag could
+    leave a message queued until the next frame arrived.
+  - Messages are held until `OnMessage` has a handler. Receiving starts during the handshake, before
+    `WebSocketModule` subscribes, and upstream dropped a first message that arrived in between.
+  - The close handshake awaits the peer's close frame (up to 1 s) instead of blocking a thread pool thread on an
+    `AutoResetEvent`. Under CPU load, a few blocked closes starved the pool and delayed other connections by
+    seconds.
 - `Net/Internal/ListenerPrefix.cs`: wildcard prefixes (`https://*:port/`) parse again. Newer `System.Uri` rejects `*`
   as a host name.
