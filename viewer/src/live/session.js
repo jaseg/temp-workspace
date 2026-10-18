@@ -10,6 +10,7 @@ import {DemoConnection} from './demo';
 import {SongClock} from './clock';
 import {LiveOverlay} from './overlay';
 import {LevelBrowser} from './levels';
+import {LiveNav} from './nav';
 import {LiveAudioSync} from './audio';
 import {assignNote, computeTotals, noteStructFromEvent, ScoreForNote} from '../components/replay-loader';
 import {NoteEventType} from './bsor';
@@ -43,9 +44,11 @@ export class LiveSession {
 		this.connection = new (LIVE_DEMO ? DemoConnection : LiveConnection)({
 			state: (state, detail) => this.onConnectionState(state, detail),
 			message: (type, reader, receivedAt) => this.onMessage(type, reader, receivedAt),
+			suggestions: doc => this.levels.setSuggestions(doc),
 		});
 		this.levels = new LevelBrowser(this.connection);
-		this.overlay.onBrowse = () => this.levels.open();
+		this.nav = new LiveNav(this.levels);
+		this.nav.setLive(false);
 		this.songClock = new SongClock(this.connection.clock);
 		// ?predict=<ms> overrides the display-latency prediction (0 disables it).
 		const predict = parseFloat(getUrlParameter('predict'));
@@ -132,6 +135,7 @@ export class LiveSession {
 	onConnectionState(state, detail) {
 		this.overlay.setConnectionState(state, detail);
 		this.levels.setAvailable(state === 'approved');
+		this.nav.setAvailable(state === 'approved');
 		// #levels opens the level browser as soon as the device is approved.
 		if (state === 'approved' && location.hash === '#levels' && !this.levels.isOpen) this.levels.open();
 		if (state === 'disconnected') {
@@ -237,6 +241,7 @@ export class LiveSession {
 		loader.walls = [];
 
 		this.overlay.setSession(info);
+		this.nav.setLive(true);
 		this.scene.emit(
 			'replayfetched',
 			{
@@ -252,6 +257,7 @@ export class LiveSession {
 	}
 
 	endSession(reason) {
+		this.nav.setLive(false);
 		if (!this.active) {
 			this.overlay.setIdle(reason);
 			return;

@@ -1,5 +1,5 @@
 // WebSocket connection to the mod: waiting room, clock sync, message dispatch, map file and level library downloads.
-import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest, levelListRequest, levelFileRequest, levelStatsRequest} from './protocol';
+import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest, levelListRequest, levelFileRequest, levelStatsRequest, suggestionChange} from './protocol';
 import {ServerClock} from './clock';
 
 const CREDENTIAL_KEY = 'bslive.credential';
@@ -31,7 +31,7 @@ function saveCredential(bytes) {
 }
 
 /**
- * Events (via `handlers`): state(state, detail), message(type, reader, receivedAt).
+ * Events (via `handlers`): state(state, detail), message(type, reader, receivedAt), suggestions(doc).
  * States: connecting, waiting (detail.code), approved, denied, revoked, disconnected.
  */
 export class LiveConnection {
@@ -110,6 +110,16 @@ export class LiveConnection {
 			case T.MapChunk:
 				this.onMapChunk(r, data);
 				return;
+			case T.Suggestions: {
+				let doc;
+				try {
+					doc = JSON.parse(r.str());
+				} catch (e) {
+					return;
+				}
+				this.handlers.suggestions(doc);
+				return;
+			}
 			case T.MapError: {
 				const id = r.u16();
 				const code = r.u8();
@@ -153,6 +163,13 @@ export class LiveConnection {
 	/** A level's cover or song file (`LevelFile.cover` / `LevelFile.audio`), as an ArrayBuffer. */
 	fetchLevelFile(levelId, kind) {
 		return this.request(`Level file ${kind}`, id => levelFileRequest(id, kind, levelId));
+	}
+
+	/** Adds or removes a suggested level. The mod answers with the new list (a `suggestions` event). */
+	suggest(levelId, add) {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+		this.ws.send(suggestionChange(add, levelId));
+		return true;
 	}
 
 	/** A level's BeatLeader stats, fetched by the mod. */

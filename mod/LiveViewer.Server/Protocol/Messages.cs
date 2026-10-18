@@ -102,6 +102,10 @@ namespace LiveViewer.Server.Protocol
 
         public static byte[] MapError(ushort requestId, MapErrorCode code) =>
             new MessageWriter(4).U8(MessageType.MapError).U16(requestId).U8((byte) code).ToArray();
+
+        /// <summary>The whole suggestion list (UTF-8 JSON from <see cref="Levels.Suggestions.Json"/>).</summary>
+        public static byte[] Suggestions(byte[] json) =>
+            new MessageWriter(5 + json.Length).U8(MessageType.Suggestions).I32(json.Length).Bytes(json).ToArray();
     }
 
     /// <summary>Parsed client-to-server messages. Anything that doesn't parse exactly is a protocol violation.</summary>
@@ -149,6 +153,19 @@ namespace LiveViewer.Server.Protocol
             request.LevelId = r.String(MaxLevelIdBytes);
             r.End();
             return request;
+        }
+
+        /// <summary>SuggestionAdd and SuggestionRemove: a level id, which must look like one.</summary>
+        public static string ParseSuggestionChange(MessageReader r)
+        {
+            var id = r.String(MaxLevelIdBytes);
+            r.End();
+            if (!Levels.LevelLibrary.IsLevelId(id))
+            {
+                throw new ProtocolException("Malformed level id.");
+            }
+
+            return id;
         }
 
         public static LevelRequest ParseLevelStatsRequest(MessageReader r)

@@ -193,6 +193,29 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
+        public void SuggestionsPersistAndAreBounded()
+        {
+            var path = Path.Combine(_root, "suggestions.tsv");
+            var store = new Suggestions(path);
+            var ids = Enumerable.Range(0, Suggestions.MaxSuggestions + 1).Select(i => i.ToString("x40")).ToList();
+            Assert.True(store.Add(ids[0], "Firefox\ton <Linux>"));
+            Assert.False(store.Add(ids[0], "again"));
+            foreach (var id in ids.Skip(1).Take(Suggestions.MaxSuggestions - 1))
+            {
+                Assert.True(store.Add(id, "x"));
+            }
+
+            Assert.False(store.Add(ids[Suggestions.MaxSuggestions], "x"));
+            Assert.True(store.Remove(ids[1]));
+            Assert.False(store.Remove(ids[1]));
+
+            var reloaded = new Suggestions(path).List();
+            Assert.Equal(Suggestions.MaxSuggestions - 1, reloaded.Count);
+            Assert.Equal((ids[0], "Firefoxon <Linux>"), (reloaded[0].Id, reloaded[0].By)); // control characters dropped
+            Assert.Contains("\\u003cLinux\\u003e", Encoding.UTF8.GetString(new Suggestions(path).Json()));
+        }
+
+        [Fact]
         public void ReadsWavDuration()
         {
             var path = Path.Combine(_root, "song.wav");

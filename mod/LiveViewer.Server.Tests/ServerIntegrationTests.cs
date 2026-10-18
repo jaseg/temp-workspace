@@ -208,7 +208,8 @@ namespace LiveViewer.Server.Tests
             Assert.Equal(1, approved[1]);
             Assert.Equal(34, approved.Length);
 
-            // Backlog: session start, then the earlier note event (poses aren't backlogged).
+            // The suggestion list, then the backlog: session start and the earlier note event (poses aren't backlogged).
+            Assert.Equal(MessageType.Suggestions, (await ReceiveAsync(ws))![0]);
             Assert.Equal(MessageType.SessionStart, (await ReceiveAsync(ws))![0]);
             Assert.Equal(MessageType.NoteFinal, (await ReceiveAsync(ws))![0]);
 
@@ -320,6 +321,51 @@ namespace LiveViewer.Server.Tests
             // Level files are addressed by kind only; anything else is a violation.
             await SendAsync(ws, LevelFileRequest(7, 3, id));
             await ExpectClosedAsync(ws);
+        }
+
+        private static async Task<string[]> ExpectSuggestionsAsync(ClientWebSocket ws)
+        {
+            var message = await ExpectAsync(ws, MessageType.Suggestions);
+            var json = Newtonsoft.Json.Linq.JObject.Parse(System.Text.Encoding.UTF8.GetString(message, 5, message.Length - 5));
+            return json["levels"]!.Select(l => (string) l["id"]!).ToArray();
+        }
+
+        private static byte[] Suggestion(bool add, string id) =>
+            new MessageWriter().U8(add ? MessageType.SuggestionAdd : MessageType.SuggestionRemove).String(id).ToArray();
+
+        [Fact]
+        public async Task SuggestionsAreSharedBetweenViewers()
+        {
+            using var a = await ApprovedClientAsync();
+            using var b = await ApprovedClientAsync();
+            await SendAsync(a, new MessageWriter().U8(MessageType.LevelListRequest).U16(1).ToArray());
+            var (list, _) = await ReceiveFileAsync(a, 1);
+            var id = (string) Newtonsoft.Json.Linq.JObject.Parse(System.Text.Encoding.UTF8.GetString(list!))["levels"]![0]!["id"]!;
+
+            await SendAsync(a, Suggestion(true, id));
+            Assert.Equal(new[] { id }, await ExpectSuggestionsAsync(a));
+            Assert.Equal(new[] { id }, await ExpectSuggestionsAsync(b));
+            Assert.Equal(id, _server.Suggestions.List().Single().Id);
+
+            // A level that isn't installed isn't added; the sender gets the real list back.
+            await SendAsync(a, Suggestion(true, new string('0', 40)));
+            Assert.Equal(new[] { id }, await ExpectSuggestionsAsync(a));
+
+            await SendAsync(b, Suggestion(false, id));
+            Assert.Empty(await ExpectSuggestionsAsync(a));
+            Assert.Empty(await ExpectSuggestionsAsync(b));
+
+            // A new viewer gets the list right after approval.
+            await SendAsync(a, Suggestion(true, id));
+            await ExpectSuggestionsAsync(a);
+            using var c = await ConnectAsync();
+            var code = await WaitForCodeAsync(c);
+            _server.WaitingRoom.Approve(PendingId(code), remember: false);
+            Assert.Equal(new[] { id }, await ExpectSuggestionsAsync(c));
+
+            // Ids must look like level hashes.
+            await SendAsync(b, Suggestion(true, "../../etc"));
+            await ExpectClosedAsync(b);
         }
 
         [Fact]

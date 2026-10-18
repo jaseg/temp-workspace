@@ -31,6 +31,7 @@ namespace LiveViewer.Server.Live
         private readonly ILiveLog _log;
         private readonly LevelLibrary? _levels;
         private readonly BeatLeaderStats? _stats;
+        private readonly Suggestions? _suggestions;
         private readonly string _serverName;
         private readonly Thread _pump;
         private readonly Timer _expiry;
@@ -41,17 +42,23 @@ namespace LiveViewer.Server.Live
         private IMapFileSource? _map;
 
         public ClientHub(LiveFeed feed, WaitingRoom waitingRoom, DeviceStore devices, string serverName, ILiveLog log,
-            LevelLibrary? levels = null, BeatLeaderStats? stats = null)
+            LevelLibrary? levels = null, BeatLeaderStats? stats = null, Suggestions? suggestions = null)
         {
             _feed = feed;
             _levels = levels;
             _stats = stats;
+            _suggestions = suggestions;
             _waitingRoom = waitingRoom;
             _devices = devices;
             _serverName = serverName;
             _log = log;
             _waitingRoom.Decided += OnDecided;
             _devices.Revoked += OnRevoked;
+            if (_suggestions != null)
+            {
+                _suggestions.Changed += OnSuggestionsChanged;
+            }
+
             _pump = new Thread(PumpLoop) { IsBackground = true, Name = "LiveViewer feed pump" };
             _expiry = new Timer(_ => SafeExpire(), null, Timeout.Infinite, Timeout.Infinite);
         }
@@ -80,6 +87,11 @@ namespace LiveViewer.Server.Live
             _expiry.Dispose();
             _waitingRoom.Decided -= OnDecided;
             _devices.Revoked -= OnRevoked;
+            if (_suggestions != null)
+            {
+                _suggestions.Changed -= OnSuggestionsChanged;
+            }
+
             List<ClientConnection> all;
             lock (_lock)
             {
@@ -187,6 +199,10 @@ namespace LiveViewer.Server.Live
                     case MessageType.LevelStatsRequest:
                         var stats = ClientMessages.ParseLevelStatsRequest(reader);
                         HandleLevelRequest(connection, stats.RequestId, stats.LevelId, null);
+                        break;
+                    case MessageType.SuggestionAdd:
+                    case MessageType.SuggestionRemove:
+                        HandleSuggestion(connection, data[0] == MessageType.SuggestionAdd, ClientMessages.ParseSuggestionChange(reader));
                         break;
                     default:
                         throw new ProtocolException("Unknown message type.");
@@ -351,6 +367,78 @@ namespace LiveViewer.Server.Live
             }
         }
 
+        // ---- Suggestions ----
+
+        private void HandleSuggestion(ClientConnection connection, bool add, string levelId)
+        {
+            lock (_lock)
+            {
+                if (connection.State != ClientState.Approved)
+                {
+                    throw new ProtocolException("Suggestion before approval.");
+                }
+            }
+
+            if (_suggestions == null || _levels == null || !_levels.Enabled || !connection.TryConsumeSuggestionToken())
+            {
+                // Not applied: the sender gets the unchanged list back so its page shows the real state.
+                SendSuggestions(connection);
+                return;
+            }
+
+            if (!add)
+            {
+                if (!_suggestions.Remove(levelId))
+                {
+                    SendSuggestions(connection);
+                }
+
+                return;
+            }
+
+            _ = AddSuggestionAsync(connection, levelId);
+        }
+
+        private async Task AddSuggestionAsync(ClientConnection connection, string levelId)
+        {
+            try
+            {
+                // Only installed levels can be suggested: the game can't show anything else.
+                var snapshot = await _levels!.GetAsync().ConfigureAwait(false);
+                if (snapshot.ByHash.ContainsKey(levelId) && _suggestions!.Add(levelId, connection.Label))
+                {
+                    _log.Info($"Client {connection.Id} ({connection.Address}) suggested level {levelId}.");
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                _log.Error("Adding a suggestion failed", e);
+            }
+
+            SendSuggestions(connection);
+        }
+
+        private void SendSuggestions(ClientConnection connection)
+        {
+            if (_suggestions != null)
+            {
+                connection.EnqueueReliable(Messages.Suggestions(_suggestions.Json()));
+            }
+        }
+
+        private void OnSuggestionsChanged()
+        {
+            var message = Messages.Suggestions(_suggestions!.Json());
+            lock (_lock)
+            {
+                foreach (var c in Approved())
+                {
+                    c.EnqueueReliable(message);
+                }
+            }
+        }
+
         // ---- Approval ----
 
         private void OnDecided(Decision decision)
@@ -411,6 +499,7 @@ namespace LiveViewer.Server.Live
 
                 connection.State = ClientState.Approved;
                 connection.EnqueueReliable(Messages.Approved(credential));
+                SendSuggestions(connection);
                 if (_inSession)
                 {
                     foreach (var message in _backlog)

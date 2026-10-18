@@ -63,6 +63,7 @@ client                         server
 | `0x26` | Resume | `us capture, f32 songTime` |
 | `0x30` | MapChunk | `u16 requestId, u32 totalLength, u32 offset, bytes...` (the rest of the message). Chunks arrive in order; a zero-length file is one chunk with `totalLength` 0. Answers `MapRequest` and the level library requests. |
 | `0x31` | MapError | `u16 requestId, u8 code (1 not available, 2 no or other session, 3 read failed or BeatLeader unreachable, 4 too many requests)` |
+| `0x40` | Suggestions | `str json`: the whole suggestion list (see "Suggestions"). Sent right after `Approved`, to everyone whenever it changes, and to a sender whose change wasn't applied. |
 
 A **BSOR note event** is laid out as:
 
@@ -113,6 +114,8 @@ live data. Poses are never backlogged.
 | `0x84` | LevelListRequest | `u16 requestId`. Answered with the level list JSON as a file. |
 | `0x85` | LevelFileRequest | `u16 requestId, u8 kind (1 cover, 2 song), str levelId (≤ 64 bytes)` |
 | `0x86` | LevelStatsRequest | `u16 requestId, str levelId (≤ 64 bytes)`. Answered with the stats JSON as a file. |
+| `0x87` | SuggestionAdd | `str levelId`: 40 lowercase hex digits, else a protocol violation. |
+| `0x88` | SuggestionRemove | `str levelId`, as above. |
 
 The maximum inbound message size is 1 KB.
 
@@ -167,6 +170,22 @@ Stats JSON, a subset of BeatLeader's map data, re-encoded by the mod:
 - `status` is BeatLeader's: 0 unranked, 1 nominated, 2 qualified, 3 ranked,
   4 unrankable, 5 outdated, 6 event, 7 OST.
 - Ratings are `null` when BeatLeader has none.
+
+## Suggestions
+
+Approved viewers share one list of levels they suggest to the player. The mod shows it in the game as a level
+pack ("Suggested by viewers") and keeps it across restarts.
+
+- Any approved viewer can add or remove any entry. Only installed levels can be added; at most 100 entries.
+- Changes are rate-limited per connection (10 in a row, then one every 2 s). A change that isn't applied (not
+  installed, already there, list full, rate limit) is answered with the unchanged list.
+- `by` is the suggesting browser's description ("Firefox on Linux"), for display only.
+
+```json
+{"levels": [{"id": "c9c15d3f…", "by": "Firefox on Linux", "added": 1700000000}], "max": 100}
+```
+
+Entries stay listed if their level is deleted; the page should show them as unavailable.
 
 ## Clock sync
 

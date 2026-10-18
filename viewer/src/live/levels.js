@@ -1,5 +1,6 @@
 // Level browser: the custom levels installed on the Frame, with their map stats, BeatLeader stats (fetched by the
-// mod) and an audio-only preview. Everything comes over the live connection; nothing is fetched from elsewhere.
+// mod), an audio-only preview and the shared list of levels viewers suggest to the player. Everything comes over the
+// live connection; nothing is fetched from elsewhere.
 //
 // Level data comes from downloaded maps and is untrusted: it is only ever put into the page as text.
 import {LevelFile, FileError} from './protocol';
@@ -22,6 +23,14 @@ function formatTime(seconds) {
 	if (!(seconds > 0)) return '-:--';
 	const s = Math.round(seconds);
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function formatAgo(unixSeconds) {
+	const s = Date.now() / 1000 - unixSeconds;
+	if (s < 60) return 'just now';
+	if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+	if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+	return `${Math.floor(s / 86400)} d ago`;
 }
 
 function formatNumber(x, digits = 0) {
@@ -74,6 +83,11 @@ export class LevelBrowser {
 		this.statsQueue = new Queue(2);
 		this.available = false;
 		this.preview = null;
+		this.view = 'all'; // or 'suggested'
+		this.suggestions = []; // [{id, by, added}], oldest first, as the mod sends them
+		this.suggestionMax = 100;
+		this.pending = new Set(); // level ids with a suggestion change sent but not answered yet
+		this.onChange = null; // called when the browser opens or closes, or the suggestions change
 		this.build();
 	}
 
@@ -108,30 +122,41 @@ export class LevelBrowser {
 			this.sort.append(option);
 		}
 		this.sort.addEventListener('change', () => this.render());
-		const close = el('button', 'lbClose', '×');
-		close.type = 'button';
-		close.title = 'Close (Esc)';
-		close.addEventListener('click', () => this.close());
-		header.append(title, this.search, this.sort, close);
+		header.append(title, this.search, this.sort);
+
+		const tabs = el('div', 'lbTabs');
+		tabs.setAttribute('role', 'tablist');
+		this.tabAll = el('button', 'lbTab', 'All levels');
+		this.tabSuggested = el('button', 'lbTab');
+		for (const [tab, view] of [
+			[this.tabAll, 'all'],
+			[this.tabSuggested, 'suggested'],
+		]) {
+			tab.type = 'button';
+			tab.setAttribute('role', 'tab');
+			tab.addEventListener('click', () => this.setView(view));
+		}
+		tabs.append(this.tabAll, this.tabSuggested);
+		this.tabHint = el('span', 'lbTabHint', 'Suggested levels show up for the player in Beat Saber.');
+		tabs.append(this.tabHint);
+		header.append(tabs);
 
 		this.statusEl = el('div', 'lbStatus');
 		this.list = el('ul', 'lbList');
 		root.append(header, this.statusEl, this.list);
 
-		// Keys typed here are for the browser, not the scene's hotkeys.
+		// Keys typed here are for the browser, not the scene's hotkeys. Escape goes back to the live view.
 		root.addEventListener('keydown', e => {
 			if (e.key === 'Escape') this.close();
 			e.stopPropagation();
 		});
 		document.body.appendChild(root);
 		this.root = root;
+		this.renderTabs();
 
 		this.observer = new IntersectionObserver(entries => this.onVisible(entries), {root: this.list, rootMargin: '200px'});
 
-		// The controls bar's level button, and B, toggle the browser.
-		document.addEventListener('click', e => {
-			if (e.target.closest && e.target.closest('.controlsLevels')) this.toggle();
-		});
+		// B toggles the browser (the top bar's buttons do the same).
 		document.addEventListener('keydown', e => {
 			const typing = e.target.closest && e.target.closest('input, textarea, select');
 			if ((e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey && !e.altKey && !typing) this.toggle();
@@ -155,20 +180,69 @@ export class LevelBrowser {
 		}
 	}
 
+	get suggestionCount() {
+		return this.suggestions.length;
+	}
+
 	open() {
+		if (this.isOpen) return;
 		this.root.hidden = false;
 		this.search.focus();
 		if (this.available) this.load();
 		else this.setStatus('Not connected to Beat Saber.');
+		if (this.onChange) this.onChange();
 	}
 
 	close() {
+		if (!this.isOpen) return;
 		this.root.hidden = true;
+		if (this.onChange) this.onChange();
 		this.stopPreview();
 		this.coverQueue.clear();
 		this.statsQueue.clear();
 		// Requests that were queued but not sent are dropped; let rows ask again next time.
 		for (const [id, stats] of this.stats) if (stats === null) this.stats.delete(id);
+	}
+
+	setView(view) {
+		this.view = view;
+		this.renderTabs();
+		this.render();
+		this.list.scrollTop = 0;
+	}
+
+	renderTabs() {
+		this.tabAll.setAttribute('aria-selected', String(this.view === 'all'));
+		this.tabSuggested.setAttribute('aria-selected', String(this.view === 'suggested'));
+		this.tabSuggested.textContent = `Suggested (${this.suggestions.length})`;
+	}
+
+	/** The mod's suggestion list (see "Suggestions" in PROTOCOL.md): on approval and after every change. */
+	setSuggestions(doc) {
+		this.suggestions = Array.isArray(doc.levels) ? doc.levels.filter(s => typeof s.id === 'string') : [];
+		this.suggestionMax = doc.max || this.suggestionMax;
+		this.pending.clear();
+		this.renderTabs();
+		for (const row of this.rows.values()) this.renderSuggest(row);
+		if (this.view === 'suggested' && this.isOpen) this.render();
+		if (this.onChange) this.onChange();
+	}
+
+	suggestion(levelId) {
+		return this.suggestions.find(s => s.id === levelId);
+	}
+
+	toggleSuggestion(levelId) {
+		if (this.pending.has(levelId)) return;
+		const add = !this.suggestion(levelId);
+		if (add && this.suggestions.length >= this.suggestionMax) {
+			this.setStatus(`The suggestion list is full (${this.suggestionMax}). Remove one first.`);
+			return;
+		}
+		if (!this.connection.suggest(levelId, add)) return;
+		this.pending.add(levelId);
+		const row = this.rows.get(levelId);
+		if (row) this.renderSuggest(row);
 	}
 
 	toggle() {
@@ -212,7 +286,15 @@ export class LevelBrowser {
 	render() {
 		const query = this.search.value.trim().toLowerCase();
 		const words = query ? query.split(/\s+/) : [];
-		const levels = this.levels.filter(l => words.every(w => l.search.includes(w)));
+		let pool = this.levels;
+		if (this.view === 'suggested') {
+			// Suggested levels that are no longer installed still get a row, so they can be removed.
+			const byId = new Map(this.levels.map(l => [l.id, l]));
+			pool = this.suggestions.map(
+				s => byId.get(s.id) || {id: s.id, missing: true, songName: 'Level no longer installed', songSubName: '', songAuthor: '', mapper: '', difficulties: [], search: '', added: 0, bpm: 0, duration: 0}
+			);
+		}
+		const levels = pool.filter(l => words.every(w => l.search.includes(w)));
 		const text = (a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'});
 		const by = {
 			added: (a, b) => b.added - a.added,
@@ -223,15 +305,24 @@ export class LevelBrowser {
 			bpm: (a, b) => b.bpm - a.bpm,
 			duration: (a, b) => b.duration - a.duration,
 		}[this.sort.value];
-		levels.sort((a, b) => by(a, b) || text(a.songName, b.songName));
+		// The suggestion list keeps its own order (oldest first, like the playlist in the game).
+		if (this.view === 'all') levels.sort((a, b) => by(a, b) || text(a.songName, b.songName));
+		this.sort.disabled = this.view !== 'all';
 
-		this.countEl.textContent = words.length ? `${levels.length} of ${this.levels.length}` : `${this.levels.length}`;
+		this.countEl.textContent = words.length ? `${levels.length} of ${pool.length}` : `${pool.length}`;
+		if (this.view === 'suggested' && !pool.length && this.levels.length) {
+			this.setStatus('No suggestions yet. Use “Suggest” on a level to add it to the player’s list in Beat Saber.');
+		} else if (this.statusEl.textContent.startsWith('No suggestions yet')) {
+			this.setStatus('');
+		}
 		this.observer.disconnect();
 		const rows = levels.map(level => {
 			let row = this.rows.get(level.id);
 			if (!row || row.level !== level) {
 				row = this.buildRow(level);
 				this.rows.set(level.id, row);
+			} else {
+				this.renderSuggest(row); // the label depends on the view
 			}
 			this.observer.observe(row);
 			return row;
@@ -263,28 +354,54 @@ export class LevelBrowser {
 		const chips = el('div', 'lbChips');
 		main.append(name, meta, chips);
 
-		const play = el('button', 'lbPlay');
+		const suggested = el('div', 'lbSuggested');
+
+		const actions = el('div', 'lbActions');
+		const play = el('button', 'lbPlay', 'Preview');
 		play.type = 'button';
 		play.disabled = !level.hasAudio;
-		play.title = level.hasAudio ? 'Play preview' : 'No song file';
+		play.title = level.hasAudio ? 'Listen to the preview section' : 'No song file';
 		play.addEventListener('click', e => {
 			e.stopPropagation();
 			this.togglePreview(level, row);
 		});
+		const suggest = el('button', 'lbSuggest');
+		suggest.type = 'button';
+		suggest.addEventListener('click', e => {
+			e.stopPropagation();
+			this.toggleSuggestion(level.id);
+		});
+		actions.append(play, suggest);
+		if (level.missing) play.hidden = true;
+		main.append(suggested);
 		const progress = el('div', 'lbProgress');
 
 		const details = el('div', 'lbDetails');
 		details.hidden = true;
 
-		row.append(cover, main, play, progress, details);
+		row.append(cover, main, actions, progress, details);
 		row.addEventListener('click', () => {
+			if (level.missing) return;
 			details.hidden = !details.hidden;
 			row.classList.toggle('expanded', !details.hidden);
 			if (!details.hidden) this.renderDetails(level, details);
 		});
-		row.refs = {img, chips, play, progress, details};
+		row.refs = {img, chips, play, suggest, suggested, progress, details};
 		this.renderChips(level, row);
+		this.renderSuggest(row);
 		return row;
+	}
+
+	renderSuggest(row) {
+		const {suggest, suggested} = row.refs;
+		const entry = this.suggestion(row.level.id);
+		const pending = this.pending.has(row.level.id);
+		suggest.disabled = pending;
+		suggest.classList.toggle('on', !!entry);
+		suggest.textContent = entry ? (this.view === 'suggested' ? 'Remove' : '✓ Suggested') : 'Suggest';
+		suggest.title = entry ? 'Remove from the suggestions for the player' : 'Suggest this level to the player (shows up in Beat Saber)';
+		suggested.textContent = entry ? `Suggested by ${entry.by || 'a viewer'}, ${formatAgo(entry.added)}` : '';
+		suggested.hidden = !entry;
 	}
 
 	statsFor(level, d) {
@@ -365,7 +482,7 @@ export class LevelBrowser {
 				row.coverRequested = true;
 				this.coverQueue.push(() => this.loadCover(level));
 			}
-			if (this.statsEnabled && !this.stats.has(level.id)) {
+			if (this.statsEnabled && !level.missing && !this.stats.has(level.id)) {
 				this.stats.set(level.id, null);
 				this.statsQueue.push(() => this.loadStats(level));
 			}
@@ -459,7 +576,8 @@ export class LevelBrowser {
 		});
 		audio.src = preview.url;
 		row.classList.add('playing');
-		row.refs.play.title = 'Stop preview';
+		row.refs.play.textContent = 'Stop';
+		row.refs.play.title = 'Stop the preview';
 
 		// Fade in, play the preview section, fade out.
 		const tick = () => {
@@ -484,6 +602,7 @@ export class LevelBrowser {
 		if (preview.url) URL.revokeObjectURL(preview.url);
 		preview.row.classList.remove('playing', 'loading');
 		preview.row.refs.progress.style.width = '0';
-		if (preview.row.refs.play.title === 'Stop preview') preview.row.refs.play.title = 'Play preview';
+		preview.row.refs.play.textContent = 'Preview';
+		if (preview.row.refs.play.title === 'Stop the preview') preview.row.refs.play.title = 'Listen to the preview section';
 	}
 }

@@ -1,0 +1,69 @@
+// Top bar (nav.js). Above the level browser, which starts below it.
+
+#liveNav
+  position fixed
+  top 8px
+  left 50%
+  transform translateX(-50%)
+  z-index 2147483001
+  display flex
+  gap 2px
+  padding 3px
+  border-radius 10px
+  background rgba(21, 25, 32, 0.9)
+  box-shadow 0 4px 16px rgba(0, 0, 0, 0.35)
+  font 600 14px/1 'Segoe UI', system-ui, sans-serif
+
+  &[hidden]
+    display none
+
+  button
+    display flex
+    align-items center
+    gap 6px
+    height 32px
+    padding 0 16px
+    border 0
+    border-radius 8px
+    background transparent
+    color #b8bfca
+    font inherit
+    cursor pointer
+
+    &:hover
+      color #fff
+
+    &[aria-pressed='true']
+      background #ff4fa3
+      color #fff
+
+    &:focus-visible
+      outline 2px solid #fff
+      outline-offset 1px
+
+  .navDot
+    width 8px
+    height 8px
+    border-radius 50%
+    background #ff3b3b
+    box-shadow 0 0 6px #ff3b3b
+
+  .navDot[hidden], .navBadge[hidden]
+    display none
+
+  .navBadge
+    min-width 18px
+    padding 2px 5px
+    border-radius 9px
+    background rgba(255, 255, 255, 0.18)
+    color #fff
+    font-size 12px
+    box-sizing border-box
+    text-align center
+
+  button[aria-pressed='true'] .navDot
+    background #fff
+    box-shadow none
+
+  button[aria-pressed='true'] .navBadge
+    background rgba(0, 0, 0, 0.25)

@@ -13,6 +13,7 @@ namespace LiveViewer.Plugin.UI
             Container.Bind<LiveViewController>().FromNewComponentAsViewController().AsSingle();
             Container.Bind<LiveFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             Container.BindInterfacesTo<MenuButtonManager>().AsSingle();
+            Container.BindInterfacesTo<SuggestionPack>().AsSingle();
             Container.BindInterfacesTo<DevAutoPlay>().AsSingle();
         }
     }

@@ -22,12 +22,15 @@ export const T = {
 	Resume: 0x26,
 	MapChunk: 0x30,
 	MapError: 0x31,
+	Suggestions: 0x40,
 	Hello: 0x81,
 	Ping: 0x82,
 	MapRequest: 0x83,
 	LevelListRequest: 0x84,
 	LevelFileRequest: 0x85,
 	LevelStatsRequest: 0x86,
+	SuggestionAdd: 0x87,
+	SuggestionRemove: 0x88,
 };
 
 export const LevelFile = {cover: 1, audio: 2};
@@ -180,5 +183,13 @@ export function levelStatsRequest(requestId, levelId) {
 		v.setUint16(1, requestId, true);
 		v.setInt32(3, id.length, true);
 		b.set(id, 7);
+	});
+}
+
+export function suggestionChange(add, levelId) {
+	const id = new TextEncoder().encode(levelId);
+	return message(add ? T.SuggestionAdd : T.SuggestionRemove, 4 + id.length, (v, b) => {
+		v.setInt32(1, id.length, true);
+		b.set(id, 5);
 	});
 }

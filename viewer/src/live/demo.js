@@ -127,6 +127,7 @@ export class DemoConnection extends LiveConnection {
 		this.deliver(new Writer(T.Waiting).str('Aztec Istanbul Yucatan').buffer(), 400);
 		setTimeout(() => {
 			this.deliver(new Writer(T.Approved).u8(0).buffer(), 0);
+			this.sendSuggestions();
 			setTimeout(() => this.playSong(), 300);
 		}, 2500);
 	}
@@ -160,6 +161,19 @@ export class DemoConnection extends LiveConnection {
 			if (!r.ok) throw new Error(`${file}: ${r.status}`);
 			return r.arrayBuffer();
 		});
+	}
+
+	// Suggestions: kept in this page only (the real mod shares them between all viewers).
+	sendSuggestions() {
+		this.suggestions = this.suggestions || [];
+		this.deliver(new Writer(T.Suggestions).str(JSON.stringify({levels: this.suggestions, max: 100})).buffer());
+	}
+
+	suggest(levelId, add) {
+		this.suggestions = (this.suggestions || []).filter(s => s.id !== levelId);
+		if (add) this.suggestions.push({id: levelId, by: 'this demo', added: Math.floor(Date.now() / 1000)});
+		this.sendSuggestions();
+		return true;
 	}
 
 	playSong() {

@@ -9,7 +9,8 @@ accent = #ff4fa3
 #levelBrowser
   position fixed
   inset 0
-  z-index 2147483000 // above the controls bar and its panels
+  padding-top 48px // below the top bar (nav.styl)
+  z-index 2147483000 // above the controls bar and its panels; the top bar is above this
   display flex
   flex-direction column
   background rgba(8, 10, 14, 0.94)
@@ -55,16 +56,35 @@ accent = #ff4fa3
   flex 1 1 220px
   min-width 0
 
-#levelBrowser .lbClose
-  width 34px
-  height 34px
+#levelBrowser .lbSort:disabled
+  opacity 0.5
+
+#levelBrowser .lbTabs
+  display flex
+  flex-wrap wrap
+  align-items center
+  gap 4px 6px
+  width 100%
+
+#levelBrowser .lbTab
+  height 30px
+  padding 0 12px
   border 0
-  border-radius 8px
+  border-radius 15px
   background #232933
-  color #fff
-  font-size 22px
-  line-height 1
+  color #b8bfca
+  font inherit
+  font-weight 600
   cursor pointer
+
+  &[aria-selected='true']
+    background #e8ebef
+    color #111
+
+#levelBrowser .lbTabHint
+  margin-left 6px
+  color #8b93a0
+  font-size 12px
 
 #levelBrowser .lbStatus
   max-width 960px
@@ -88,7 +108,7 @@ accent = #ff4fa3
 #levelBrowser .lbLevel
   position relative
   display grid
-  grid-template-columns 64px 1fr 44px
+  grid-template-columns 64px 1fr auto
   gap 4px 12px
   align-items center
   padding 10px
@@ -182,36 +202,53 @@ accent = #ff4fa3
 #levelBrowser .dExpertPlus
   color diffExpertPlus
 
-#levelBrowser .lbPlay
-  width 40px
-  height 40px
-  border 0
-  border-radius 50%
-  background accent
-  cursor pointer
-  position relative
+#levelBrowser .lbActions
+  display flex
+  gap 6px
 
-  // Play triangle; a square while playing.
-  &::before
-    content ''
-    position absolute
-    left 15px
-    top 12px
-    border-style solid
-    border-width 8px 0 8px 13px
-    border-color transparent transparent transparent #fff
+#levelBrowser .lbPlay, #levelBrowser .lbSuggest
+  min-width 84px
+  height 34px
+  padding 0 12px
+  border 0
+  border-radius 17px
+  font inherit
+  font-weight 600
+  white-space nowrap
+  cursor pointer
 
   &:disabled
-    background #2d333d
     cursor default
+    opacity 0.5
 
-#levelBrowser .lbLevel.playing .lbPlay::before
-  left 13px
-  top 13px
-  width 14px
-  height 14px
-  border 0
-  background #fff
+  &[hidden]
+    display none
+
+#levelBrowser .lbPlay
+  background accent
+  color #fff
+
+#levelBrowser .lbLevel.playing .lbPlay
+  background #e8ebef
+  color #111
+
+#levelBrowser .lbSuggest
+  background #232933
+  color #e8ebef
+  box-shadow inset 0 0 0 1px #3a414d
+
+  &.on
+    background rgba(255, 79, 163, 0.15)
+    color accent
+    box-shadow inset 0 0 0 1px accent
+
+#levelBrowser .lbSuggested
+  margin-top 4px
+  color accent
+  font-size 12px
+
+  &[hidden]
+    display none
 
 #levelBrowser .lbLevel.loading .lbPlay
   animation lbPulse 0.8s ease-in-out infinite alternate
@@ -262,9 +299,22 @@ accent = #ff4fa3
   color #8b93a0
   font-size 12px
 
+@media (max-width: 600px)
+  #levelBrowser .lbActions
+    flex-direction column
+
+  #levelBrowser .lbPlay, #levelBrowser .lbSuggest
+    min-width 0
+    height 30px
+    padding 0 10px
+    font-size 13px
+
+  #levelBrowser .lbTabHint
+    display none
+
 @media (max-width: 480px)
   #levelBrowser .lbLevel
-    grid-template-columns 48px 1fr 40px
+    grid-template-columns 48px 1fr auto
     padding 8px 4px
 
   #levelBrowser .lbCover

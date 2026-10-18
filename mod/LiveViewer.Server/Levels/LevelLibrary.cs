@@ -31,7 +31,7 @@ namespace LiveViewer.Server.Levels
         public static readonly TimeSpan RescanAfter = TimeSpan.FromSeconds(30);
 
         private readonly object _lock = new object();
-        private readonly IReadOnlyList<string> _roots;
+        private volatile IReadOnlyList<string> _roots;
         private readonly ILiveLog _log;
         private readonly Dictionary<string, (string stamp, LevelInfo? level)> _byFolder = new Dictionary<string, (string, LevelInfo?)>();
         private Task<Snapshot>? _scan;
@@ -44,6 +44,32 @@ namespace LiveViewer.Server.Levels
         }
 
         public bool Enabled => _roots.Count > 0;
+
+        /// <summary>A level id as the protocol uses it: the lowercase hex SHA-1 SongCore computes.</summary>
+        public static bool IsLevelId(string? id) =>
+            id != null && id.Length == 40 && id.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+
+        /// <summary>
+        /// Replaces the level folders (e.g. once the game's level loader has read its folder list). The next request
+        /// rescans; levels in folders that stay are not re-read.
+        /// </summary>
+        public void SetRoots(IEnumerable<string> roots)
+        {
+            var list = roots.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            lock (_lock)
+            {
+                if (list.SequenceEqual(_roots, StringComparer.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                _roots = list;
+                _scannedUtc = DateTime.MinValue; // stale, also if a scan is running now
+
+            }
+
+            _log.Info("Level folders: " + string.Join(", ", list));
+        }
 
         public sealed class Snapshot
         {
@@ -87,7 +113,8 @@ namespace LiveViewer.Server.Levels
             var started = DateTime.UtcNow;
             var levels = new List<LevelInfo>();
             var seen = new HashSet<string>();
-            foreach (var root in _roots)
+            var roots = _roots;
+            foreach (var root in roots)
             {
                 IEnumerable<string> folders;
                 try
@@ -123,7 +150,8 @@ namespace LiveViewer.Server.Levels
                     _byFolder.Remove(gone);
                 }
 
-                _scannedUtc = DateTime.UtcNow;
+                // If the folders changed during the scan, the next request scans again.
+                _scannedUtc = ReferenceEquals(roots, _roots) ? DateTime.UtcNow : DateTime.MinValue;
             }
 
             var snapshot = new Snapshot { Levels = levels };

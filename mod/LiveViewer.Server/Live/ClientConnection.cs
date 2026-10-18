@@ -47,6 +47,12 @@ namespace LiveViewer.Server.Live
         private double _tokens = MaxTokens;
         private long _tokensUpdatedUs = LiveClock.NowUs();
 
+        // Suggestion changes: a few in a row, then one every two seconds.
+        private const double SuggestionsPerSecond = 0.5;
+        private const double MaxSuggestionTokens = 10;
+        private double _suggestionTokens = MaxSuggestionTokens;
+        private long _suggestionTokensUpdatedUs = LiveClock.NowUs();
+
         private bool _closeAfterFlush;
         private int _closed;
         private int _pendingLookups;
@@ -182,19 +188,33 @@ namespace LiveViewer.Server.Live
         /// <summary>Token-bucket check for inbound messages.</summary>
         public bool TryConsumeInboundToken()
         {
-            var now = LiveClock.NowUs();
             lock (_lock)
             {
-                _tokens = Math.Min(MaxTokens, _tokens + (now - _tokensUpdatedUs) / 1e6 * TokensPerSecond);
-                _tokensUpdatedUs = now;
-                if (_tokens < 1)
-                {
-                    return false;
-                }
-
-                _tokens -= 1;
-                return true;
+                return TryConsume(ref _tokens, ref _tokensUpdatedUs, TokensPerSecond, MaxTokens);
             }
+        }
+
+        /// <summary>Token-bucket check for adding or removing a suggestion.</summary>
+        public bool TryConsumeSuggestionToken()
+        {
+            lock (_lock)
+            {
+                return TryConsume(ref _suggestionTokens, ref _suggestionTokensUpdatedUs, SuggestionsPerSecond, MaxSuggestionTokens);
+            }
+        }
+
+        private static bool TryConsume(ref double tokens, ref long updatedUs, double perSecond, double max)
+        {
+            var now = LiveClock.NowUs();
+            tokens = Math.Min(max, tokens + (now - updatedUs) / 1e6 * perSecond);
+            updatedUs = now;
+            if (tokens < 1)
+            {
+                return false;
+            }
+
+            tokens -= 1;
+            return true;
         }
 
         public async Task RunSendLoopAsync(Func<uint> currentSessionId)

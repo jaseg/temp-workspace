@@ -71,8 +71,9 @@ namespace LiveViewer.Server
             _peers = new PeerPolicy { AllowAnyAddress = options.AllowAnyAddress };
             _hosts = new HostPolicy(options.Port, options.HostNames);
             Levels = new LevelLibrary(options.LevelFolders, log);
+            Suggestions = new Suggestions(Path.Combine(options.DataDirectory, "suggestions.tsv"));
             _hub = new ClientHub(Feed, WaitingRoom, Devices, options.ServerName, log, Levels,
-                options.BeatLeader != null ? new BeatLeaderStats(options.BeatLeader, log) : null);
+                options.BeatLeader != null ? new BeatLeaderStats(options.BeatLeader, log) : null, Suggestions);
 
             Certificate = CertificateStore.LoadOrCreate(options.DataDirectory, options.HostNames, LocalAddresses(), log.Info);
             CertificateFingerprint = CertificateStore.Fingerprint(Certificate);
@@ -85,6 +86,9 @@ namespace LiveViewer.Server
         public DeviceStore Devices { get; }
 
         public LevelLibrary Levels { get; }
+
+        /// <summary>Levels viewers suggest; the plugin shows them as a level pack in the game.</summary>
+        public Suggestions Suggestions { get; }
 
         public X509Certificate2 Certificate { get; }
 
