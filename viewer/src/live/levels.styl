@@ -38,11 +38,6 @@ accent = #ff4fa3
   font-weight 600
   white-space nowrap
 
-#levelBrowser .lbCount
-  color #8b93a0
-  font-weight 400
-  font-size 15px
-
 #levelBrowser .lbSearch, #levelBrowser .lbSort
   height 34px
   padding 0 10px
@@ -59,30 +54,8 @@ accent = #ff4fa3
 #levelBrowser .lbSort:disabled
   opacity 0.5
 
-#levelBrowser .lbTabs
-  display flex
-  flex-wrap wrap
-  align-items center
-  gap 4px 6px
+#levelBrowser .lbHint
   width 100%
-
-#levelBrowser .lbTab
-  height 30px
-  padding 0 12px
-  border 0
-  border-radius 15px
-  background #232933
-  color #b8bfca
-  font inherit
-  font-weight 600
-  cursor pointer
-
-  &[aria-selected='true']
-    background #e8ebef
-    color #111
-
-#levelBrowser .lbTabHint
-  margin-left 6px
   color #8b93a0
   font-size 12px
 
@@ -254,7 +227,7 @@ accent = #ff4fa3
   flex-wrap wrap
   justify-content flex-end
   gap 6px
-  max-width 200px
+  max-width 280px
 
 #levelBrowser .lbOrder
   display flex
@@ -405,8 +378,6 @@ accent = #ff4fa3
     padding 0 10px
     font-size 13px
 
-  #levelBrowser .lbTabHint
-    display none
 
 @media (max-width: 480px)
   #levelBrowser .lbLevel

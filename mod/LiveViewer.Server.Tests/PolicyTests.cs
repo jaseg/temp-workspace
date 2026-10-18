@@ -109,10 +109,11 @@ namespace LiveViewer.Server.Tests
         [Fact]
         public void ParsesHello()
         {
-            var bytes = new MessageWriter().U16(1).U8(1).Bytes(new byte[32]).ToArray();
+            var bytes = new MessageWriter().U16(2).U8(1).Bytes(new byte[32]).String("Ada").ToArray();
             var hello = ClientMessages.ParseHello(new MessageReader(bytes));
-            Assert.Equal(1, hello.ProtocolVersion);
+            Assert.Equal(2, hello.ProtocolVersion);
             Assert.NotNull(hello.Credential);
+            Assert.Equal("Ada", hello.Name);
         }
 
         [Fact]

@@ -4,7 +4,7 @@
     <text text='~fingerprint-text' font-size='2.8' align='Center' color='#aaaaaa' />
 
     <text text='Waiting to watch' font-size='4.5' align='Left' color='#ffd060' active='~has-pending' />
-    <text text='Nobody is waiting. Viewers who open the address above and ask to watch show up here with three words, which their screen shows too.'
+    <text text='Nobody is waiting. Viewers who open the address above and ask to watch show up here with the name they entered.'
           font-size='3' align='Center' word-wrapping='true' color='#bbbbbb' active='~no-pending' />
     <custom-list id='pending-list' contents='pending' visible-cells='4' cell-size='8.5' clickable-cells='false' stick-scrolling='true' active='~has-pending' pref-height='34'>
       <horizontal pad-left='2' pad-right='2' spacing='1' child-expand-width='false' child-align='MiddleLeft'>

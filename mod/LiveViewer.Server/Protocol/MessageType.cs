@@ -6,7 +6,7 @@ namespace LiveViewer.Server.Protocol
     /// </summary>
     public static class MessageType
     {
-        public const ushort ProtocolVersion = 1;
+        public const ushort ProtocolVersion = 2;
 
         // Connection and waiting room.
         public const byte Welcome = 0x01;

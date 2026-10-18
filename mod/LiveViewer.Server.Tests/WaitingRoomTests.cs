@@ -24,16 +24,16 @@ namespace LiveViewer.Server.Tests
 
         private JoinResult Join(long id, int ip)
         {
-            return _room.Join(id, Ip(ip), "Chrome on Android", _ => { });
+            return _room.Join(id, Ip(ip), "Viewer", "Chrome on Android", _ => { });
         }
 
         [Fact]
-        public void TellsTheClientItsCodeBeforeAnnouncing()
+        public void TellsTheClientItsNameBeforeAnnouncing()
         {
             var order = new List<string>();
             _room.Changed += () => order.Add("changed");
-            _room.Join(1, Ip(1), "x", _ => order.Add("code"));
-            Assert.Equal(new[] { "code", "changed" }, order);
+            _room.Join(1, Ip(1), "Ada", "x", _ => order.Add("name"));
+            Assert.Equal(new[] { "name", "changed" }, order);
         }
 
         [Fact]
@@ -118,56 +118,43 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
-        public void CodesAreUniqueAndReadable()
+        public void NamesAreMadeUniqueAmongWaitingDevices()
         {
-            var codes = new HashSet<string>();
-            for (var i = 0; i < WaitingRoom.MaxPending; i++)
-            {
-                _room.Join(i, Ip(i), "x", code => codes.Add(code));
-            }
+            var names = new List<string>();
+            _room.Join(1, Ip(1), "Ada", "x", names.Add);
+            _room.Join(2, Ip(2), " ada ", "x", names.Add);
+            _room.Join(3, Ip(3), "ADA", "x", names.Add);
+            _room.Join(4, Ip(4), new string('b', 40), "x", names.Add);
+            Assert.Equal(new[] { "Ada", "ada 2", "ADA 3", new string('b', WaitingRoom.MaxNameLength) }, names);
 
-            Assert.Equal(WaitingRoom.MaxPending, codes.Count);
-            foreach (var code in codes)
-            {
-                Assert.Matches("^[A-Za-z]+ [A-Za-z]+ [A-Za-z]+$", code);
-                Assert.Equal(code, _room.FindByCode(code)!.MatchCode);
-            }
+            // Once the first Ada is gone, the name is free again.
+            _room.Leave(1);
+            _room.Join(5, Ip(5), "Ada", "x", names.Add);
+            Assert.Equal("Ada", names.Last());
         }
 
         [Fact]
-        public void CodesAlternateTheTwoWordLists()
+        public void NamesAreCleanedUp()
         {
-            string? code = null;
-            _room.Join(1, Ip(1), "x", c => code = c);
-            var words = code!.Split(' ');
-            Assert.Contains(words[0], WordList.Even);
-            Assert.Contains(words[1], WordList.Odd);
-            Assert.Contains(words[2], WordList.Even);
+            Assert.Equal("Ada Lovelace", WaitingRoom.CleanName("  Ada\t\n Lovelace\u0000 ", 7));
+            Assert.Equal("Viewer 7", WaitingRoom.CleanName(" \u0001 ", 7));
+            Assert.Equal("Ada", WaitingRoom.CleanName("Ada\ud83d\ude00", 7)); // emoji dropped
+            Assert.Equal(WaitingRoom.MaxNameLength, WaitingRoom.CleanName(new string('x', 100), 7).Length);
         }
 
         [Fact]
-        public void FindByCodeIgnoresCaseAndSeparators()
+        public void FindByNameIgnoresCaseAndSpaces()
         {
-            string? code = null;
-            _room.Join(1, Ip(1), "x", c => code = c);
-            var sloppy = "  " + code!.ToUpperInvariant().Replace(" ", " - ") + " ";
-            Assert.Equal(1, _room.FindByCode(sloppy)!.ConnectionId);
-            Assert.Null(_room.FindByCode(code.Split(' ')[0]));
-            Assert.Null(_room.FindByCode(""));
-        }
-
-        [Fact]
-        public void WordListsAreComplete()
-        {
-            Assert.Equal(256, WordList.Even.Distinct(StringComparer.OrdinalIgnoreCase).Count());
-            Assert.Equal(256, WordList.Odd.Distinct(StringComparer.OrdinalIgnoreCase).Count());
-            Assert.Empty(WordList.Even.Intersect(WordList.Odd, StringComparer.OrdinalIgnoreCase));
+            _room.Join(1, Ip(1), "Aztec Istanbul", "x", _ => { });
+            Assert.Equal(1, _room.FindByName("  aztec   ISTANBUL ")!.ConnectionId);
+            Assert.Null(_room.FindByName("Aztec"));
+            Assert.Null(_room.FindByName(""));
         }
 
         [Fact]
         public void LabelsAreSanitized()
         {
-            _room.Join(1, Ip(1), "evil\u0000\nlabel" + new string('x', 200), _ => { });
+            _room.Join(1, Ip(1), "Ada", "evil\u0000\nlabel" + new string('x', 200), _ => { });
             var label = Assert.Single(_room.Pending).Label;
             Assert.DoesNotContain('\n', label);
             Assert.DoesNotContain('\0', label);

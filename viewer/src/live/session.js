@@ -65,10 +65,10 @@ export class LiveSession {
 		});
 		this.audio = new LiveAudioSync(this.scene, this);
 		setInterval(() => this.updateStats(), 250);
-		this.overlay.showRequest(() => {
+		this.overlay.showRequest(name => {
 			// Unlocks audio (this runs inside the click) before the waiting room.
 			this.scene.emit('usergesturereceive', null, false);
-			this.connection.connect();
+			this.connection.connect(name);
 		});
 	}
 

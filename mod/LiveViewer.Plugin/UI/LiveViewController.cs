@@ -159,7 +159,7 @@ namespace LiveViewer.Plugin.UI
             }
 
             [UIValue("code")]
-            private string Code => "<b>" + Escape(_device.MatchCode) + "</b>";
+            private string Code => "<b>" + Escape(_device.Name) + "</b>";
 
             [UIValue("detail")]
             private string Detail => Escape(_device.Label) + "  ·  " + _device.Address + "  ·  " + Ago(_device.SinceUtc);

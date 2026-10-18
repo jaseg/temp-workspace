@@ -8,8 +8,13 @@ namespace LiveViewer.Server.Security
     public sealed class PendingDevice
     {
         public long ConnectionId;
-        public string MatchCode = "";
+
+        /// <summary>The name the viewer chose, unique among waiting devices. The player approves by this name.</summary>
+        public string Name = "";
+
         public IPAddress Address = IPAddress.None;
+
+        /// <summary>The browser ("Firefox on Linux"), for display.</summary>
         public string Label = "";
         public DateTime SinceUtc;
     }
@@ -80,13 +85,15 @@ namespace LiveViewer.Server.Security
             }
         }
 
+        public const int MaxNameLength = 32;
+
         /// <summary>
-        /// Puts a connection in the waiting room. <paramref name="onPending"/> runs with the match code before anyone
-        /// is notified, so the client is told it's waiting before an approval can possibly be sent to it.
+        /// Puts a connection in the waiting room under <paramref name="name"/> (cleaned up, and numbered if another
+        /// waiting device has it). <paramref name="onPending"/> runs with the final name before anyone is notified, so
+        /// the client is told it's waiting before an approval can possibly be sent to it.
         /// </summary>
-        public JoinResult Join(long connectionId, IPAddress address, string label, Action<string> onPending)
+        public JoinResult Join(long connectionId, IPAddress address, string name, string label, Action<string> onPending)
         {
-            string matchCode;
             var now = _utcNow();
             lock (_lock)
             {
@@ -110,18 +117,18 @@ namespace LiveViewer.Server.Security
                     return JoinResult.RoomFull;
                 }
 
-                matchCode = NewCode();
+                name = UniqueName(CleanName(name, connectionId));
                 _pending.Add(new PendingDevice
                 {
                     ConnectionId = connectionId,
-                    MatchCode = matchCode,
+                    Name = name,
                     Address = address,
                     Label = DeviceStore.Sanitize(label),
                     SinceUtc = now,
                 });
             }
 
-            onPending(matchCode);
+            onPending(name);
             Changed?.Invoke();
             return JoinResult.Pending;
         }
@@ -143,7 +150,7 @@ namespace LiveViewer.Server.Security
             var decision = new Decision { ConnectionId = connectionId, Kind = DecisionKind.Approved };
             if (remember)
             {
-                decision.Device = _devices.Add(device.Label, out var credential);
+                decision.Device = _devices.Add(device.Name + " · " + device.Label, out var credential);
                 decision.Credential = credential;
             }
 
@@ -234,35 +241,56 @@ namespace LiveViewer.Server.Security
         }
 
         /// <summary>
-        /// Three words from the PGP word list (24 random bits), e.g. "Aztec Istanbul Yucatan". The words are read off
-        /// a browser and compared in a VR menu, so they are easier to check than letters and digits.
+        /// A display name: whitespace runs become one space; control characters and characters outside the basic
+        /// plane (emoji, which the game's font can't show) are dropped; at most <see cref="MaxNameLength"/>
+        /// characters. Empty names become "Viewer &lt;n&gt;".
         /// </summary>
-        private string NewCode()
+        public static string CleanName(string? name, long connectionId)
         {
-            while (true)
+            var sb = new System.Text.StringBuilder();
+            foreach (var c in name ?? "")
             {
-                var b = DeviceStore.RandomBytes(3);
-                var code = WordList.Even[b[0]] + " " + WordList.Odd[b[1]] + " " + WordList.Even[b[2]];
-                if (_pending.All(p => !SameCode(p.MatchCode, code)))
+                if (char.IsWhiteSpace(c))
                 {
-                    return code;
+                    if (sb.Length > 0 && sb[sb.Length - 1] != ' ')
+                    {
+                        sb.Append(' ');
+                    }
+                }
+                else if (!char.IsControl(c) && !char.IsSurrogate(c) && sb.Length < MaxNameLength)
+                {
+                    sb.Append(c);
                 }
             }
+
+            var clean = sb.ToString().Trim();
+            return clean.Length > 0 ? clean : "Viewer " + connectionId;
         }
 
-        /// <summary>Finds a pending device by its code, ignoring case and how the words are separated.</summary>
-        public PendingDevice? FindByCode(string code)
+        /// <summary>Finds a waiting device by name, ignoring case and extra spaces.</summary>
+        public PendingDevice? FindByName(string name)
         {
-            var wanted = NormalizeCode(code);
+            var wanted = Normalize(name);
             lock (_lock)
             {
-                return _pending.FirstOrDefault(p => NormalizeCode(p.MatchCode) == wanted);
+                return _pending.FirstOrDefault(p => Normalize(p.Name) == wanted);
             }
         }
 
-        private static bool SameCode(string a, string b) => NormalizeCode(a) == NormalizeCode(b);
+        // Called with the lock held. "Alex" becomes "Alex 2" if another waiting device is called "Alex".
+        private string UniqueName(string name)
+        {
+            var candidate = name;
+            for (var n = 2; _pending.Any(p => Normalize(p.Name) == Normalize(candidate)); n++)
+            {
+                var suffix = " " + n;
+                candidate = (name.Length + suffix.Length > MaxNameLength ? name.Substring(0, MaxNameLength - suffix.Length) : name) + suffix;
+            }
 
-        private static string NormalizeCode(string code) =>
-            string.Join(" ", code.ToLowerInvariant().Split(new[] { ' ', '-', '\t' }, StringSplitOptions.RemoveEmptyEntries));
+            return candidate;
+        }
+
+        private static string Normalize(string name) =>
+            string.Join(" ", name.ToLowerInvariant().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries));
     }
 }

@@ -42,8 +42,42 @@
   font-size 14px
   color #c8cdd4
 
+#liveOverlay .liveRequestForm
+  display flex
+  flex-direction column
+  align-items stretch
+  gap 8px
+  width 280px
+  max-width 100%
+  margin 16px auto 0
+  text-align left
+
+#liveOverlay .liveRequestForm[hidden]
+  display none
+
+#liveOverlay .liveNameLabel
+  font-size 13px
+  color #c8cdd4
+
+#liveOverlay .liveNameInput
+  height 40px
+  padding 0 12px
+  border 1px solid #3a414d
+  border-radius 8px
+  background #151920
+  color #fff
+  font inherit
+  font-size 16px // 16px keeps phones from zooming in on focus
+
+  &::placeholder
+    color #6b7380
+
+  &:focus
+    outline none
+    border-color #ff4fa3
+
 #liveOverlay .liveRequest
-  margin-top 16px
+  margin-top 8px
   padding 10px 22px
   border 0
   border-radius 8px
@@ -60,9 +94,6 @@
 #liveOverlay .liveRequest:focus-visible
   outline 2px solid #fff
   outline-offset 2px
-
-#liveOverlay .liveRequest[hidden]
-  display none
 
 #liveOverlay .liveStats
   position fixed

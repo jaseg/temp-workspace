@@ -28,9 +28,9 @@ viewer's existing BSOR conversion applies.
 client                         server
   ── connect ──────────────────►
   ◄──────────────────── Welcome
-  ── Hello{credential?} ───────►
+  ── Hello{credential?, name} ─►
        credential valid → Approved{} + current state
-       otherwise        → Waiting{code} ... (player decides in game) ...
+       otherwise        → Waiting{name} ... (player decides in game) ...
                           → Approved{credential?} + current state | Denied + close
 ```
 
@@ -46,7 +46,7 @@ client                         server
 | Type | Name | Payload |
 |---|---|---|
 | `0x01` | Welcome | `u16 protocolVersion, us serverTime, str serverName` |
-| `0x02` | Waiting | `str matchCode`: three words from the PGP word list separated by single spaces (even, odd, even list; e.g. `Aztec Istanbul Yucatan`, at most 31 bytes). The browser shows the code; the player matches it in the game menu. |
+| `0x02` | Waiting | `str name`: the name the device waits under, as the player sees it in the game menu. It is the name from `Hello`, cleaned up (whitespace collapsed, control characters and emoji dropped, at most 32 characters, "Viewer <n>" if empty) and numbered ("Ada 2") if another waiting device has it. |
 | `0x03` | Approved | `u8 hasCredential, [32 bytes credential]`. Store the credential (if present) and send it in later `Hello`s. |
 | `0x04` | Denied | none. Also sent when the waiting room is full, the request expired, or the address is cooling down after a deny. |
 | `0x05` | Revoked | none. The remembered device was revoked: forget the credential. |
@@ -108,7 +108,7 @@ live data. Poses are never backlogged.
 
 | Type | Name | Payload |
 |---|---|---|
-| `0x81` | Hello | `u16 protocolVersion (1), u8 hasCredential, [32 bytes credential]` |
+| `0x81` | Hello | `u16 protocolVersion (2), u8 hasCredential, [32 bytes credential], str name (≤ 128 bytes)`. The name is what the viewer typed, or the two words the page suggested. It is shown to the player for approval and with the viewer's suggestions. |
 | `0x82` | Ping | `f64 clientTime` (e.g. `performance.now()`) |
 | `0x83` | MapRequest | `u16 requestId, u32 sessionId, str fileName (≤ 256 bytes)` |
 | `0x84` | LevelListRequest | `u16 requestId`. Answered with the level list JSON as a file. |
@@ -181,10 +181,10 @@ pack ("Suggested by viewers") and keeps it across restarts.
   New entries go to the end. The game's level pack uses the same order.
 - Changes are rate-limited per connection (20 in a row, then one per second). A change that isn't applied (not
   installed, already there, list full, nothing to move, rate limit) is answered with the unchanged list.
-- `by` is the suggesting browser's description ("Firefox on Linux"), for display only.
+- `by` is the suggesting viewer's name (from `Hello`), for display only.
 
 ```json
-{"levels": [{"id": "c9c15d3f…", "by": "Firefox on Linux", "added": 1700000000}], "max": 100}
+{"levels": [{"id": "c9c15d3f…", "by": "Aztec Istanbul", "added": 1700000000}], "max": 100}
 ```
 
 Entries stay listed if their level is deleted; the page should show them as unavailable.

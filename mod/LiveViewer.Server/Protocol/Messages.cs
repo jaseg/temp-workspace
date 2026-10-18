@@ -12,8 +12,9 @@ namespace LiveViewer.Server.Protocol
             new MessageWriter().U8(MessageType.Welcome).U16(MessageType.ProtocolVersion).I64(serverTimeUs)
                 .String(serverName).ToArray();
 
-        public static byte[] Waiting(string matchCode) =>
-            new MessageWriter().U8(MessageType.Waiting).String(matchCode).ToArray();
+        /// <summary>In the waiting room, under this name (the one the viewer asked for, made unique).</summary>
+        public static byte[] Waiting(string name) =>
+            new MessageWriter().U8(MessageType.Waiting).String(name).ToArray();
 
         public static byte[] Approved(byte[]? credential)
         {
@@ -115,7 +116,12 @@ namespace LiveViewer.Server.Protocol
         {
             public ushort ProtocolVersion;
             public byte[]? Credential;
+
+            /// <summary>The name the viewer entered, as sent (unsanitized).</summary>
+            public string Name;
         }
+
+        public const int MaxNameBytes = 128;
 
         public struct MapRequest
         {
@@ -203,6 +209,7 @@ namespace LiveViewer.Server.Protocol
                 hello.Credential = r.Bytes(Messages.CredentialBytes);
             }
 
+            hello.Name = r.String(MaxNameBytes);
             r.End();
             return hello;
         }

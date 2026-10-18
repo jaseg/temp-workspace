@@ -38,17 +38,16 @@ const {chromium} = require('playwright');
 	await a.waitForFunction(n => document.querySelector('#liveNav .navBadge').textContent === String(n), start + 1, {timeout: 10000});
 	await b.waitForFunction(n => document.querySelector('#liveNav .navBadge').textContent === String(n), start + 1, {timeout: 10000})
 		.catch(() => errors.push("b: didn't see a's suggestion"));
-	check((await row.locator('.lbSuggest').getAttribute('data-state')) === 'on', 'a: button not showing "Suggested"');
+	check((await row.locator('.lbSuggest').getAttribute('data-state')) === 'on', 'a: button not showing "In playlist"');
 	const widthAfter = (await row.locator('.lbSuggest').boundingBox()).width;
 	check(Math.abs(widthAfter - widthBefore) < 0.5, `a: suggest button changed width (${widthBefore} -> ${widthAfter})`);
 	await a.screenshot({path: `${shots}-a-all.png`});
 
-	// B: the Suggested tab lists it with who suggested it; remove it there.
-	await b.click('#liveNav button:nth-child(2)');
-	await b.click('#levelBrowser .lbTab:nth-child(2)');
+	// B: the Playlist tab lists it with who added it; remove it there.
+	await b.click('#liveNav button:nth-child(3)'); // Playlist
 	const suggested = b.locator('#levelBrowser .lbLevel', {hasText: name});
 	await suggested.waitFor({timeout: 10000});
-	check(/Suggested by/.test(await suggested.locator('.lbSuggested').textContent()), 'b: no "Suggested by" line');
+	check(/Added by/.test(await suggested.locator('.lbSuggested').textContent()), 'b: no "Added by" line');
 	await b.screenshot({path: `${shots}-b-suggested.png`});
 	await suggested.locator('.lbSuggest').click();
 	await a.waitForFunction(n => {
@@ -83,7 +82,9 @@ const {chromium} = require('playwright');
 	await (await bRow(three[0])).locator('.lbMove-bottom').click();
 	await same([three[1], three[2], three[0]], 'to bottom');
 
-	// Drag the last of the three above the other two (B is phone-sized: drag with touch-like pointer moves).
+	// Drag the last of the three above the other two (B is phone-sized). Other entries may come first, so bring the
+	// rows into view: the drag is done with real pointer positions.
+	await (await bRow(three[1])).evaluate(row => row.scrollIntoView({block: 'start'}));
 	const source = await (await bRow(three[2])).locator('.lbHandle').boundingBox();
 	const dest = await (await bRow(three[1])).boundingBox();
 	await b.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
@@ -98,7 +99,7 @@ const {chromium} = require('playwright');
 	check(await b.locator('#levelBrowser .lbMove-up:not([disabled])').count() === 0, 'b: move buttons enabled during a search');
 	await b.fill('#levelBrowser .lbSearch', '');
 	await b.screenshot({path: `${shots}-b-reorder.png`});
-	await a.click('#levelBrowser .lbTab:nth-child(2)');
+	await a.click('#liveNav button:nth-child(3)');
 	await a.screenshot({path: `${shots}-a-reorder.png`});
 	for (const id of three) {
 		await a.evaluate(i => window.liveSession.connection.suggest(i, false), id);

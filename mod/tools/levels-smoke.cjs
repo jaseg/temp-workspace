@@ -26,7 +26,7 @@ const {chromium} = require('playwright');
 			await page.waitForFunction(() => document.querySelectorAll('#levelBrowser .lbStars').length >= 3, null, {timeout: 30000}).catch(() => errors.push(`${name}: no stars shown`));
 		}
 		const summary = await page.evaluate(() => ({
-			count: document.querySelector('#levelBrowser .lbCount').textContent,
+			title: document.querySelector('#levelBrowser .lbTitle').textContent,
 			rows: [...document.querySelectorAll('#levelBrowser .lbLevel')].slice(0, 3).map(r => r.querySelector('.lbName').textContent + ' | ' + r.querySelector('.lbChips').textContent),
 		}));
 		console.log(name, JSON.stringify(summary));

@@ -38,9 +38,9 @@ Options:
 
 Console commands while running:
   l                    List waiting and remembered devices
-  a <code>             Allow once
-  r <code>             Allow and remember
-  d <code>             Deny
+  a <name>             Allow once
+  r <name>             Allow and remember
+  d <name>             Deny
   revoke <id>          Forget a remembered device
   q                    Quit";
 
@@ -195,7 +195,7 @@ Console commands while running:
                 }
 
                 var argument = parts.Length > 1 ? parts[1].Trim() : "";
-                var pending = server.WaitingRoom.FindByCode(argument);
+                var pending = server.WaitingRoom.FindByName(argument);
                 switch (parts[0])
                 {
                     case "q":
@@ -213,14 +213,14 @@ Console commands while running:
                     case "r":
                         if (pending == null || !server.WaitingRoom.Approve(pending.ConnectionId, parts[0] == "r"))
                         {
-                            Console.WriteLine("No waiting device with that code.");
+                            Console.WriteLine("No waiting device with that name.");
                         }
 
                         break;
                     case "d":
                         if (pending == null || !server.WaitingRoom.Deny(pending.ConnectionId))
                         {
-                            Console.WriteLine("No waiting device with that code.");
+                            Console.WriteLine("No waiting device with that name.");
                         }
 
                         break;
@@ -228,7 +228,7 @@ Console commands while running:
                         Console.WriteLine(server.Devices.Remove(argument) ? "Revoked." : "No such device.");
                         break;
                     default:
-                        Console.WriteLine("Commands: l, a <code>, r <code>, d <code>, revoke <id>, q");
+                        Console.WriteLine("Commands: l, a <name>, r <name>, d <name>, revoke <id>, q");
                         break;
                 }
             }
@@ -245,7 +245,7 @@ Console commands while running:
 
             foreach (var p in pending)
             {
-                Console.WriteLine($"  waiting \"{p.MatchCode}\"  {p.Label}  from {p.Address}  (a/r/d {p.MatchCode})");
+                Console.WriteLine($"  waiting \"{p.Name}\"  {p.Label}  from {p.Address}  (a/r/d {p.Name})");
             }
         }
 

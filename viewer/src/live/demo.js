@@ -97,7 +97,8 @@ export class DemoConnection extends LiveConnection {
 		setTimeout(() => this.onMessage(buffer, performance.now()), delayMs);
 	}
 
-	async connect() {
+	async connect(name = this.name) {
+		this.name = name;
 		this.setState('connecting');
 		const [manifest, replay] = await Promise.all([
 			fetch('demo/manifest.json').then(r => r.json()),
@@ -124,7 +125,7 @@ export class DemoConnection extends LiveConnection {
 		}
 
 		// The waiting room, with an approval after a moment.
-		this.deliver(new Writer(T.Waiting).str('Aztec Istanbul Yucatan').buffer(), 400);
+		this.deliver(new Writer(T.Waiting).str(name).buffer(), 400);
 		setTimeout(() => {
 			this.deliver(new Writer(T.Approved).u8(0).buffer(), 0);
 			this.sendSuggestions();
@@ -171,7 +172,7 @@ export class DemoConnection extends LiveConnection {
 
 	suggest(levelId, add) {
 		this.suggestions = (this.suggestions || []).filter(s => s.id !== levelId);
-		if (add) this.suggestions.push({id: levelId, by: 'this demo', added: Math.floor(Date.now() / 1000)});
+		if (add) this.suggestions.push({id: levelId, by: this.name, added: Math.floor(Date.now() / 1000)});
 		this.sendSuggestions();
 		return true;
 	}

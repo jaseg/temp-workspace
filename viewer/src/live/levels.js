@@ -83,7 +83,7 @@ export class LevelBrowser {
 		this.statsQueue = new Queue(2);
 		this.available = false;
 		this.preview = null;
-		this.view = 'all'; // or 'suggested'
+		this.view = 'levels'; // or 'playlist': the shared suggestion list
 		this.suggestions = []; // [{id, by, added}], oldest first, as the mod sends them
 		this.suggestionMax = 100;
 		this.pending = new Set(); // level ids with a suggestion change sent but not answered yet
@@ -98,12 +98,12 @@ export class LevelBrowser {
 		root.id = 'levelBrowser';
 		root.hidden = true;
 		root.setAttribute('role', 'dialog');
-		root.setAttribute('aria-label', 'Custom levels');
+		root.setAttribute('aria-label', 'Levels');
 
 		const header = el('div', 'lbHeader');
-		const title = el('h2', 'lbTitle', 'Custom levels');
-		this.countEl = el('span', 'lbCount');
-		title.append(' ', this.countEl);
+		// "19 levels", "3 of 19 levels" while searching, "Playlist · 3 levels".
+		const title = el('h2', 'lbTitle');
+		this.titleEl = title;
 		this.search = el('input', 'lbSearch');
 		this.search.type = 'search';
 		this.search.placeholder = 'Search song, artist or mapper';
@@ -126,22 +126,8 @@ export class LevelBrowser {
 		this.sort.addEventListener('change', () => this.render());
 		header.append(title, this.search, this.sort);
 
-		const tabs = el('div', 'lbTabs');
-		tabs.setAttribute('role', 'tablist');
-		this.tabAll = el('button', 'lbTab', 'All levels');
-		this.tabSuggested = el('button', 'lbTab');
-		for (const [tab, view] of [
-			[this.tabAll, 'all'],
-			[this.tabSuggested, 'suggested'],
-		]) {
-			tab.type = 'button';
-			tab.setAttribute('role', 'tab');
-			tab.addEventListener('click', () => this.setView(view));
-		}
-		tabs.append(this.tabAll, this.tabSuggested);
-		this.tabHint = el('span', 'lbTabHint', 'Suggested levels show up for the player in Beat Saber.');
-		tabs.append(this.tabHint);
-		header.append(tabs);
+		this.hint = el('div', 'lbHint');
+		header.append(this.hint);
 
 		this.statusEl = el('div', 'lbStatus');
 		this.list = el('ul', 'lbList');
@@ -154,7 +140,6 @@ export class LevelBrowser {
 		});
 		document.body.appendChild(root);
 		this.root = root;
-		this.renderTabs();
 
 		this.observer = new IntersectionObserver(entries => this.onVisible(entries), {root: this.list, rootMargin: '200px'});
 
@@ -206,17 +191,18 @@ export class LevelBrowser {
 		for (const [id, stats] of this.stats) if (stats === null) this.stats.delete(id);
 	}
 
-	setView(view) {
-		this.view = view;
-		this.renderTabs();
-		this.render();
-		this.list.scrollTop = 0;
-	}
-
-	renderTabs() {
-		this.tabAll.setAttribute('aria-selected', String(this.view === 'all'));
-		this.tabSuggested.setAttribute('aria-selected', String(this.view === 'suggested'));
-		this.tabSuggested.textContent = `Suggested (${this.suggestions.length})`;
+	/** Shows the levels or the playlist (opening the browser if needed). */
+	show(view) {
+		if (view !== this.view) {
+			this.view = view;
+			this.list.scrollTop = 0;
+			if (this.isOpen) this.render();
+		}
+		if (this.isOpen) {
+			if (this.onChange) this.onChange();
+		} else {
+			this.open();
+		}
 	}
 
 	/** The mod's suggestion list (see "Suggestions" in PROTOCOL.md): on approval and after every change. */
@@ -228,9 +214,8 @@ export class LevelBrowser {
 		this.suggestions = Array.isArray(doc.levels) ? doc.levels.filter(s => typeof s.id === 'string') : [];
 		this.suggestionMax = doc.max || this.suggestionMax;
 		this.pending.clear();
-		this.renderTabs();
 		for (const row of this.rows.values()) this.renderSuggest(row);
-		if (this.view === 'suggested' && this.isOpen) this.render();
+		if (this.view === 'playlist' && this.isOpen) this.render();
 		if (this.onChange) this.onChange();
 	}
 
@@ -242,7 +227,7 @@ export class LevelBrowser {
 		if (this.pending.has(levelId)) return;
 		const add = !this.suggestion(levelId);
 		if (add && this.suggestions.length >= this.suggestionMax) {
-			this.setStatus(`The suggestion list is full (${this.suggestionMax}). Remove one first.`);
+			this.setStatus(`The playlist is full (${this.suggestionMax} levels). Remove one first.`);
 			return;
 		}
 		if (!this.connection.suggest(levelId, add)) return;
@@ -251,9 +236,9 @@ export class LevelBrowser {
 		if (row) this.renderSuggest(row);
 	}
 
-	/** Can the Suggested list be reordered right now? Not while a search filters it: positions would be ambiguous. */
+	/** Can the playlist be reordered right now? Not while a search filters it: positions would be ambiguous. */
 	get canReorder() {
-		return this.view === 'suggested' && !this.search.value.trim();
+		return this.view === 'playlist' && !this.search.value.trim();
 	}
 
 	/** Moves a suggestion to position `index` of the shared list, here at once and then on the mod. */
@@ -312,8 +297,8 @@ export class LevelBrowser {
 		const query = this.search.value.trim().toLowerCase();
 		const words = query ? query.split(/\s+/) : [];
 		let pool = this.levels;
-		if (this.view === 'suggested') {
-			// Suggested levels that are no longer installed still get a row, so they can be removed.
+		if (this.view === 'playlist') {
+			// Playlist entries whose level is no longer installed still get a row, so they can be removed.
 			const byId = new Map(this.levels.map(l => [l.id, l]));
 			pool = this.suggestions.map(
 				s => byId.get(s.id) || {id: s.id, missing: true, songName: 'Level no longer installed', songSubName: '', songAuthor: '', mapper: '', difficulties: [], search: '', added: 0, bpm: 0, duration: 0}
@@ -331,13 +316,15 @@ export class LevelBrowser {
 			duration: (a, b) => b.duration - a.duration,
 		}[this.sort.value];
 		// The suggestion list keeps its own order (oldest first, like the playlist in the game).
-		if (this.view === 'all') levels.sort((a, b) => by(a, b) || text(a.songName, b.songName));
-		this.sort.disabled = this.view !== 'all';
+		if (this.view === 'levels') levels.sort((a, b) => by(a, b) || text(a.songName, b.songName));
+		this.sort.disabled = this.view !== 'levels';
 
-		this.countEl.textContent = words.length ? `${levels.length} of ${pool.length}` : `${pool.length}`;
-		if (this.view === 'suggested' && !pool.length && this.levels.length) {
-			this.setStatus('No suggestions yet. Use “Suggest” on a level to add it to the player’s list in Beat Saber.');
-		} else if (this.statusEl.textContent.startsWith('No suggestions yet')) {
+		const count = words.length ? `${levels.length} of ${pool.length}` : `${pool.length}`;
+		const noun = pool.length === 1 ? 'level' : 'levels';
+		this.titleEl.textContent = this.view === 'playlist' ? `Playlist · ${count} ${noun}` : `${count} ${noun}`;
+		if (this.view === 'playlist' && !pool.length && this.levels.length) {
+			this.setStatus('The playlist is empty. Use “Add to playlist” on a level to suggest it to the player.');
+		} else if (this.statusEl.textContent.startsWith('The playlist is empty')) {
 			this.setStatus('');
 		}
 		this.observer.disconnect();
@@ -353,13 +340,13 @@ export class LevelBrowser {
 			return row;
 		});
 		this.list.replaceChildren(...rows);
-		this.list.classList.toggle('reorder', this.view === 'suggested');
-		this.tabHint.textContent =
-			this.view === 'suggested' && !this.canReorder && pool.length > 1
+		this.list.classList.toggle('reorder', this.view === 'playlist');
+		this.hint.textContent =
+			this.view === 'playlist' && !this.canReorder && pool.length > 1
 				? 'Clear the search to reorder.'
-				: this.view === 'suggested'
-				? 'Same order for everyone, and in the game. Drag ⠿ or use the arrows to reorder.'
-				: 'Suggested levels show up for the player in Beat Saber.';
+				: this.view === 'playlist'
+				? 'Shared by all viewers; the player sees it in Beat Saber as “Suggested by viewers”, in this order. Drag ⠿ or use the arrows to reorder.'
+				: 'Add levels to the playlist to suggest them to the player.';
 	}
 
 	buildRow(level) {
@@ -407,8 +394,8 @@ export class LevelBrowser {
 		const suggest = el('button', 'lbSuggest');
 		suggest.type = 'button';
 		for (const [state, label] of [
-			['add', 'Suggest'],
-			['on', '✓ Suggested'],
+			['add', 'Add to playlist'],
+			['on', '✓ In playlist'],
 			['remove', 'Remove'],
 		]) {
 			const span = el('span', null, label);
@@ -468,14 +455,14 @@ export class LevelBrowser {
 		const pending = this.pending.has(row.level.id);
 		suggest.disabled = pending;
 		suggest.classList.toggle('on', !!entry);
-		suggest.dataset.state = entry ? (this.view === 'suggested' ? 'remove' : 'on') : 'add';
-		suggest.title = entry ? 'Remove from the suggestions for the player' : 'Suggest this level to the player (shows up in Beat Saber)';
-		suggested.textContent = entry ? `Suggested by ${entry.by || 'a viewer'}, ${formatAgo(entry.added)}` : '';
+		suggest.dataset.state = entry ? (this.view === 'playlist' ? 'remove' : 'on') : 'add';
+		suggest.title = entry ? 'Remove from the playlist' : 'Suggest this level to the player: adds it to the shared playlist, which shows up in Beat Saber';
+		suggested.textContent = entry ? `Added by ${entry.by || 'a viewer'}, ${formatAgo(entry.added)}` : '';
 		suggested.hidden = !entry;
 
 		const {order, orderButtons} = row.refs;
 		const index = this.suggestions.indexOf(entry);
-		const reorder = this.view === 'suggested' && !!entry;
+		const reorder = this.view === 'playlist' && !!entry;
 		order.hidden = !reorder;
 		row.classList.toggle('reorderable', reorder && this.canReorder);
 		const last = this.suggestions.length - 1;

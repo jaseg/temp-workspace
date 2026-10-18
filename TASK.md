@@ -66,9 +66,9 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 | 2. Viewer live mode, driven by the fake-live host | Done |
 | 2b. Self-contained demo build (`npm run build:demo`), published as a claude.ai artifact | Done |
 | 2c. Viewer made live-only: replay-mode code removed, "Request to watch" button before the waiting room | Done |
-| 2d. Waiting-room codes are three words from the PGP word list | Done |
+| 2d. Viewers enter a name on the start screen (two random words suggested); the player approves by name | Done |
 | 2e. Level browser: installed custom levels, map and BeatLeader stats, audio preview | Done, checked on the Frame |
-| 2f. Top bar (Live / Levels), shared level suggestions, "Suggested by viewers" pack in the game | Web side checked on the Frame; in-game pack untested |
+| 2f. Top bar (Live / Levels / Playlist), shared, reorderable playlist of suggestions, "Suggested by viewers" pack in the game | Web side checked on the Frame; in-game pack untested |
 | 0. On-device spike: server in the game under Proton (TLS, wss, binding) | Done |
 | 3. BSIPA plugin on the Frame | Server and level browser work in the game; recorder and menu screen built, untested in game |
 | 4. Latency tuning on the real device | Open |

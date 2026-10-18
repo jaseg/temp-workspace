@@ -236,6 +236,7 @@ namespace LiveViewer.Server.Live
                 connection.State = ClientState.Pending;
             }
 
+            connection.Name = WaitingRoom.CleanName(hello.Name, connection.Id);
             var device = hello.Credential != null ? _devices.Match(hello.Credential) : null;
             if (device != null)
             {
@@ -245,10 +246,11 @@ namespace LiveViewer.Server.Live
                 return;
             }
 
-            var result = _waitingRoom.Join(connection.Id, connection.Address, connection.Label, code =>
+            var result = _waitingRoom.Join(connection.Id, connection.Address, connection.Name, connection.Label, name =>
             {
-                _log.Info($"Client {connection.Id} ({connection.Address}, {connection.Label}) is waiting for approval, code {code}.");
-                connection.EnqueueReliable(Messages.Waiting(code));
+                connection.Name = name;
+                _log.Info($"Client {connection.Id} ({connection.Address}, {connection.Label}) is waiting for approval as \"{name}\".");
+                connection.EnqueueReliable(Messages.Waiting(name));
             });
             if (result == JoinResult.Pending)
             {
@@ -426,7 +428,7 @@ namespace LiveViewer.Server.Live
             {
                 // Only installed levels can be suggested: the game can't show anything else.
                 var snapshot = await _levels!.GetAsync().ConfigureAwait(false);
-                if (snapshot.ByHash.ContainsKey(levelId) && _suggestions!.Add(levelId, connection.Label))
+                if (snapshot.ByHash.ContainsKey(levelId) && _suggestions!.Add(levelId, connection.Name))
                 {
                     _log.Info($"Client {connection.Id} ({connection.Address}) suggested level {levelId}.");
                     return;

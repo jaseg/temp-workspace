@@ -1,6 +1,6 @@
 // Binary protocol of the mod's live server. Layouts are documented in mod/PROTOCOL.md.
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const SUBPROTOCOL = 'bslive.v1';
 
 export const T = {
@@ -142,11 +142,15 @@ function message(type, size, fill) {
 	return buffer;
 }
 
-export function hello(credential) {
-	return message(T.Hello, 3 + (credential ? 32 : 0), (v, b) => {
+export function hello(credential, name) {
+	const nameBytes = new TextEncoder().encode(name).slice(0, 128);
+	const at = 4 + (credential ? 32 : 0);
+	return message(T.Hello, at - 1 + 4 + nameBytes.length, (v, b) => {
 		v.setUint16(1, PROTOCOL_VERSION, true);
 		v.setUint8(3, credential ? 1 : 0);
 		if (credential) b.set(credential, 4);
+		v.setInt32(at, nameBytes.length, true);
+		b.set(nameBytes, at + 4);
 	});
 }
 

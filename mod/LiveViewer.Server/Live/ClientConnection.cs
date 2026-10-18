@@ -72,7 +72,11 @@ namespace LiveViewer.Server.Live
 
         public IPAddress Address { get; }
 
+        /// <summary>The browser ("Firefox on Linux").</summary>
         public string Label { get; }
+
+        /// <summary>The viewer's name, from Hello (cleaned up). Shown with their suggestions.</summary>
+        public string Name { get; set; } = "";
 
         public string ContextId => _context.Id;
 

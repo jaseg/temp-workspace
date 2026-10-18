@@ -32,7 +32,7 @@ function saveCredential(bytes) {
 
 /**
  * Events (via `handlers`): state(state, detail), message(type, reader, receivedAt), suggestions(doc).
- * States: connecting, waiting (detail.code), approved, denied, revoked, disconnected.
+ * States: connecting, waiting (detail.name: the name the player sees), approved, denied, revoked, disconnected.
  */
 export class LiveConnection {
 	constructor(handlers) {
@@ -45,13 +45,15 @@ export class LiveConnection {
 		this.pingTimer = null;
 	}
 
-	connect() {
+	/** Connects as `name` (shown to the player for approval); reconnects keep the name. */
+	connect(name = this.name) {
+		this.name = name;
 		this.setState('connecting');
 		const ws = new WebSocket(`wss://${location.host}/ws`, SUBPROTOCOL);
 		ws.binaryType = 'arraybuffer';
 		this.ws = ws;
 		ws.onopen = () => {
-			ws.send(hello(loadCredential()));
+			ws.send(hello(loadCredential(), this.name));
 			this.startPings();
 		};
 		ws.onmessage = e => this.onMessage(e.data, performance.now());
@@ -89,7 +91,7 @@ export class LiveConnection {
 			case T.Waiting:
 				// A stored credential, if we sent one, wasn't accepted.
 				saveCredential(null);
-				this.setState('waiting', {code: r.str()});
+				this.setState('waiting', {name: r.str()});
 				return;
 			case T.Approved:
 				if (r.u8()) saveCredential(r.bytes(32).slice());

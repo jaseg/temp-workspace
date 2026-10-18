@@ -79,10 +79,15 @@
 		ws.binaryType = 'arraybuffer';
 		ws.onopen = () => {
 			const credential = loadCredential();
-			ws.send(message(T.Hello, 3 + (credential ? 32 : 0), (v, b) => {
-				v.setUint16(1, 1, true);
+			// Protocol 2: the test page always waits under the name "Test page".
+			const name = new TextEncoder().encode('Test page');
+			const at = 4 + (credential ? 32 : 0);
+			ws.send(message(T.Hello, at + 3 + name.length, (v, b) => {
+				v.setUint16(1, 2, true);
 				v.setUint8(3, credential ? 1 : 0);
 				if (credential) b.set(credential, 4);
+				v.setInt32(at, name.length, true);
+				b.set(name, at + 4);
 			}));
 			ping();
 			pingTimer = setInterval(ping, 1000);

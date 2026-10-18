@@ -1,5 +1,34 @@
-// DOM overlay for live mode: waiting room, connection state, song state and a latency readout.
+// DOM overlay for live mode: the name and "Request to watch" screen, waiting room, connection state, song state and a
+// latency readout.
+import {EVEN, ODD} from './words';
 require('./live.styl');
+
+const NAME_KEY = 'bslive.name';
+
+function loadName() {
+	try {
+		return localStorage.getItem(NAME_KEY) || '';
+	} catch (e) {
+		return '';
+	}
+}
+
+function saveName(name) {
+	try {
+		if (name) localStorage.setItem(NAME_KEY, name);
+		else localStorage.removeItem(NAME_KEY);
+	} catch (e) {
+		// Storage unavailable: the field just starts empty next time.
+	}
+}
+
+const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1);
+
+/** Two random words from the PGP word list (an even and an odd one), e.g. "Aztec Istanbul". */
+function randomName() {
+	const bytes = crypto.getRandomValues(new Uint8Array(2));
+	return `${capitalize(EVEN[bytes[0]])} ${capitalize(ODD[bytes[1]])}`;
+}
 
 const STATE_TEXT = {
 	connecting: 'Connecting to Beat Saber…',
@@ -29,7 +58,11 @@ export class LiveOverlay {
 				<div class="liveTitle"></div>
 				<div class="liveCode" hidden></div>
 				<div class="liveHint"></div>
-				<button class="liveRequest" type="button" hidden>Request to watch</button>
+				<form class="liveRequestForm" hidden>
+					<label class="liveNameLabel" for="liveNameInput">Your name</label>
+					<input id="liveNameInput" class="liveNameInput" type="text" maxlength="32" autocomplete="nickname" spellcheck="false">
+					<button class="liveRequest" type="submit">Request to watch</button>
+				</form>
 			</div>
 			<div class="liveStats" hidden></div>`;
 		document.body.appendChild(root);
@@ -39,6 +72,8 @@ export class LiveOverlay {
 		this.code = root.querySelector('.liveCode');
 		this.hint = root.querySelector('.liveHint');
 		this.statsEl = root.querySelector('.liveStats');
+		this.requestForm = root.querySelector('.liveRequestForm');
+		this.nameInput = root.querySelector('.liveNameInput');
 		this.requestButton = root.querySelector('.liveRequest');
 		this.connectionState = 'idle';
 
@@ -50,13 +85,13 @@ export class LiveOverlay {
 		});
 	}
 
-	render(title, hint = '', code = null) {
+	render(title, hint = '', name = null) {
 		this.title.textContent = title;
 		this.hint.textContent = hint;
-		this.code.hidden = !code;
-		// One box per word, so a long code wraps between words on narrow screens.
+		this.code.hidden = !name;
+		// One box per word, so a long name wraps between words on narrow screens.
 		this.code.replaceChildren();
-		(code || '').split(' ').forEach((word, i) => {
+		(name || '').split(' ').forEach((word, i) => {
 			if (i) this.code.append(' ');
 			const span = document.createElement('span');
 			span.textContent = word;
@@ -66,18 +101,24 @@ export class LiveOverlay {
 	}
 
 	/**
-	 * First screen: the viewer asks to watch with a click. The click is also the user gesture browsers require
-	 * before a page may play audio, so the song can be heard as soon as playback starts.
+	 * First screen: the viewer enters a name and asks to watch. The field suggests two random words as a greyed-out
+	 * placeholder, so typing replaces them; a name typed before is filled in. The click (or Enter) is also the user
+	 * gesture browsers require before a page may play audio, so the song can be heard as soon as playback starts.
 	 */
 	showRequest(onRequest) {
-		this.render('Watch live', 'The player approves new viewers in Beat Saber.');
-		this.requestButton.hidden = false;
-		this.requestButton.focus();
-		this.requestButton.addEventListener(
-			'click',
-			() => {
-				this.requestButton.hidden = true;
-				onRequest();
+		this.render('Watch live', 'The player lets new viewers in from Beat Saber, by name.');
+		this.nameInput.placeholder = randomName();
+		this.nameInput.value = loadName();
+		this.requestForm.hidden = false;
+		this.nameInput.focus();
+		this.requestForm.addEventListener(
+			'submit',
+			e => {
+				e.preventDefault();
+				const typed = this.nameInput.value.trim().replace(/\s+/g, ' ');
+				saveName(typed);
+				this.requestForm.hidden = true;
+				onRequest(typed || this.nameInput.placeholder);
 			},
 			{once: true}
 		);
@@ -86,7 +127,7 @@ export class LiveOverlay {
 	setConnectionState(state, detail) {
 		this.connectionState = state;
 		if (state === 'waiting') {
-			this.render(STATE_TEXT.waiting, 'Ask the player to allow this code in the Live Viewer menu in Beat Saber.', detail.code);
+			this.render(STATE_TEXT.waiting, 'The player sees this name in the Live Viewer menu in Beat Saber.', detail.name);
 		} else if (state === 'approved') {
 			this.render(this.session ? '' : END_TEXT.idle);
 		} else {

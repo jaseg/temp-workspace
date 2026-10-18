@@ -143,15 +143,15 @@ namespace LiveViewer.Server.Tests
             Assert.Fail("Connection stayed open.");
         }
 
-        private static byte[] Hello(byte[]? credential = null)
+        private static byte[] Hello(byte[]? credential = null, string name = "Test Viewer")
         {
-            var w = new MessageWriter().U8(MessageType.Hello).U16(1).Bool(credential != null);
+            var w = new MessageWriter().U8(MessageType.Hello).U16(MessageType.ProtocolVersion).Bool(credential != null);
             if (credential != null)
             {
                 w.Bytes(credential);
             }
 
-            return w.ToArray();
+            return w.String(name).ToArray();
         }
 
         private async Task<string> WaitForCodeAsync(ClientWebSocket ws)
@@ -163,7 +163,7 @@ namespace LiveViewer.Server.Tests
             return r.String(64);
         }
 
-        private long PendingId(string code) => _server.WaitingRoom.Pending.Single(p => p.MatchCode == code).ConnectionId;
+        private long PendingId(string name) => _server.WaitingRoom.Pending.Single(p => p.Name == name).ConnectionId;
 
         [Fact]
         public async Task RejectsWebSocketFromForeignOrMissingOrigin()
