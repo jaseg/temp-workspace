@@ -168,6 +168,20 @@ namespace LiveViewer.Server.Protocol
             return id;
         }
 
+        /// <summary>SuggestionMove: a level id and the position it should end up at.</summary>
+        public static (string id, int index) ParseSuggestionMove(MessageReader r)
+        {
+            var id = r.String(MaxLevelIdBytes);
+            var index = r.U16();
+            r.End();
+            if (!Levels.LevelLibrary.IsLevelId(id))
+            {
+                throw new ProtocolException("Malformed level id.");
+            }
+
+            return (id, index);
+        }
+
         public static LevelRequest ParseLevelStatsRequest(MessageReader r)
         {
             var request = new LevelRequest { RequestId = r.U16(), LevelId = r.String(MaxLevelIdBytes) };

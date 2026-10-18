@@ -87,6 +87,8 @@ export class LevelBrowser {
 		this.suggestions = []; // [{id, by, added}], oldest first, as the mod sends them
 		this.suggestionMax = 100;
 		this.pending = new Set(); // level ids with a suggestion change sent but not answered yet
+		this.drag = null; // the suggestion being dragged
+		this.deferredSuggestions = null; // a list that arrived during a drag, applied on drop
 		this.onChange = null; // called when the browser opens or closes, or the suggestions change
 		this.build();
 	}
@@ -219,6 +221,10 @@ export class LevelBrowser {
 
 	/** The mod's suggestion list (see "Suggestions" in PROTOCOL.md): on approval and after every change. */
 	setSuggestions(doc) {
+		if (this.drag) {
+			this.deferredSuggestions = doc;
+			return;
+		}
 		this.suggestions = Array.isArray(doc.levels) ? doc.levels.filter(s => typeof s.id === 'string') : [];
 		this.suggestionMax = doc.max || this.suggestionMax;
 		this.pending.clear();
@@ -243,6 +249,25 @@ export class LevelBrowser {
 		this.pending.add(levelId);
 		const row = this.rows.get(levelId);
 		if (row) this.renderSuggest(row);
+	}
+
+	/** Can the Suggested list be reordered right now? Not while a search filters it: positions would be ambiguous. */
+	get canReorder() {
+		return this.view === 'suggested' && !this.search.value.trim();
+	}
+
+	/** Moves a suggestion to position `index` of the shared list, here at once and then on the mod. */
+	moveSuggestion(levelId, index) {
+		const from = this.suggestions.findIndex(s => s.id === levelId);
+		const to = Math.max(0, Math.min(index, this.suggestions.length - 1));
+		if (from < 0 || from === to || !this.connection.moveSuggestion(levelId, to)) return;
+		// Optimistic: the mod's answer (to everyone) replaces this with the real order.
+		const entry = this.suggestions.splice(from, 1)[0];
+		this.suggestions.splice(to, 0, entry);
+		const focused = document.activeElement;
+		this.render();
+		// Keep keyboard focus on the button that was pressed, so it can be pressed again.
+		if (focused && this.list.contains(focused)) focused.focus();
 	}
 
 	toggle() {
@@ -328,11 +353,24 @@ export class LevelBrowser {
 			return row;
 		});
 		this.list.replaceChildren(...rows);
+		this.list.classList.toggle('reorder', this.view === 'suggested');
+		this.tabHint.textContent =
+			this.view === 'suggested' && !this.canReorder && pool.length > 1
+				? 'Clear the search to reorder.'
+				: this.view === 'suggested'
+				? 'Same order for everyone, and in the game. Drag ⠿ or use the arrows to reorder.'
+				: 'Suggested levels show up for the player in Beat Saber.';
 	}
 
 	buildRow(level) {
 		const row = el('li', 'lbLevel');
 		row.level = level;
+
+		const handle = el('div', 'lbHandle');
+		handle.title = 'Drag to reorder';
+		handle.setAttribute('aria-hidden', 'true');
+		handle.addEventListener('pointerdown', e => this.startDrag(e, row));
+		handle.addEventListener('click', e => e.stopPropagation());
 
 		const cover = el('div', 'lbCover');
 		const img = el('img');
@@ -372,6 +410,28 @@ export class LevelBrowser {
 			this.toggleSuggestion(level.id);
 		});
 		actions.append(play, suggest);
+		const order = el('div', 'lbOrder');
+		const orderButtons = {};
+		for (const [key, icon, text, title, index] of [
+			['top', '⤒', 'Top', 'Move to the top', () => 0],
+			['up', '▲', '', 'Move up', i => i - 1],
+			['down', '▼', '', 'Move down', i => i + 1],
+			['bottom', '⤓', 'Bottom', 'Move to the bottom', () => this.suggestions.length - 1],
+		]) {
+			const b = el('button', `lbMove lbMove-${key}`, icon);
+			if (text) b.append(el('span', 'lbMoveText', ` ${text}`));
+			b.type = 'button';
+			b.title = title;
+			b.setAttribute('aria-label', title);
+			b.addEventListener('click', e => {
+				e.stopPropagation();
+				const i = this.suggestions.findIndex(s => s.id === level.id);
+				if (i >= 0) this.moveSuggestion(level.id, index(i));
+			});
+			orderButtons[key] = b;
+			order.append(b);
+		}
+		actions.append(order);
 		if (level.missing) play.hidden = true;
 		main.append(suggested);
 		const progress = el('div', 'lbProgress');
@@ -379,14 +439,14 @@ export class LevelBrowser {
 		const details = el('div', 'lbDetails');
 		details.hidden = true;
 
-		row.append(cover, main, actions, progress, details);
+		row.append(handle, cover, main, actions, progress, details);
 		row.addEventListener('click', () => {
 			if (level.missing) return;
 			details.hidden = !details.hidden;
 			row.classList.toggle('expanded', !details.hidden);
 			if (!details.hidden) this.renderDetails(level, details);
 		});
-		row.refs = {img, chips, play, suggest, suggested, progress, details};
+		row.refs = {img, chips, play, suggest, suggested, progress, details, handle, order, orderButtons};
 		this.renderChips(level, row);
 		this.renderSuggest(row);
 		return row;
@@ -402,6 +462,93 @@ export class LevelBrowser {
 		suggest.title = entry ? 'Remove from the suggestions for the player' : 'Suggest this level to the player (shows up in Beat Saber)';
 		suggested.textContent = entry ? `Suggested by ${entry.by || 'a viewer'}, ${formatAgo(entry.added)}` : '';
 		suggested.hidden = !entry;
+
+		const {order, orderButtons} = row.refs;
+		const index = this.suggestions.indexOf(entry);
+		const reorder = this.view === 'suggested' && !!entry;
+		order.hidden = !reorder;
+		row.classList.toggle('reorderable', reorder && this.canReorder);
+		const last = this.suggestions.length - 1;
+		const off = !this.canReorder;
+		orderButtons.top.disabled = orderButtons.up.disabled = off || index <= 0;
+		orderButtons.bottom.disabled = orderButtons.down.disabled = off || index >= last;
+	}
+
+	// ---- dragging suggestions (pointer events: mouse, touch and pen) ----
+
+	startDrag(e, row) {
+		if (!this.canReorder || this.drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+		e.preventDefault();
+		const rows = [...this.list.children];
+		const indicator = el('div', 'lbDropLine');
+		this.list.append(indicator);
+		this.drag = {row, id: row.level.id, pointerId: e.pointerId, startY: e.clientY, y: e.clientY, startScroll: this.list.scrollTop, rows, indicator, target: rows.indexOf(row), raf: 0};
+		row.classList.add('dragging');
+		row.refs.handle.setPointerCapture(e.pointerId);
+		const move = ev => {
+			if (ev.pointerId !== this.drag.pointerId) return;
+			this.drag.y = ev.clientY;
+			this.updateDrag();
+		};
+		const end = ev => {
+			if (ev.pointerId !== this.drag.pointerId) return;
+			row.refs.handle.removeEventListener('pointermove', move);
+			row.refs.handle.removeEventListener('pointerup', end);
+			row.refs.handle.removeEventListener('pointercancel', end);
+			this.endDrag(ev.type === 'pointerup');
+		};
+		row.refs.handle.addEventListener('pointermove', move);
+		row.refs.handle.addEventListener('pointerup', end);
+		row.refs.handle.addEventListener('pointercancel', end);
+		// Scrolls the list while the pointer is near its top or bottom edge.
+		const scroll = () => {
+			const d = this.drag;
+			if (!d) return;
+			const box = this.list.getBoundingClientRect();
+			const edge = 48;
+			const speed = d.y < box.top + edge ? -(box.top + edge - d.y) : d.y > box.bottom - edge ? d.y - (box.bottom - edge) : 0;
+			if (speed) {
+				this.list.scrollTop += Math.max(-24, Math.min(24, speed / 2));
+				this.updateDrag();
+			}
+			d.raf = requestAnimationFrame(scroll);
+		};
+		this.drag.raf = requestAnimationFrame(scroll);
+		this.updateDrag();
+	}
+
+	updateDrag() {
+		const d = this.drag;
+		const listBox = this.list.getBoundingClientRect();
+		d.row.style.transform = `translateY(${d.y - d.startY + this.list.scrollTop - d.startScroll}px)`;
+		// The new position is the number of other rows whose middle is above the pointer.
+		const others = d.rows.filter(r => r !== d.row);
+		let target = 0;
+		for (const r of others) {
+			const box = r.getBoundingClientRect();
+			if (box.top + box.height / 2 < d.y) target++;
+		}
+		d.target = target;
+		const ref = others[target] || others[others.length - 1];
+		let y = 0;
+		if (ref) {
+			const box = ref.getBoundingClientRect();
+			y = (target < others.length ? box.top : box.bottom) - listBox.top + this.list.scrollTop;
+		}
+		d.indicator.style.top = `${y - 1}px`;
+	}
+
+	endDrag(drop) {
+		const d = this.drag;
+		cancelAnimationFrame(d.raf);
+		d.row.classList.remove('dragging');
+		d.row.style.transform = '';
+		d.indicator.remove();
+		this.drag = null;
+		const deferred = this.deferredSuggestions;
+		this.deferredSuggestions = null;
+		if (deferred) this.setSuggestions(deferred);
+		if (drop) this.moveSuggestion(d.id, d.target);
 	}
 
 	statsFor(level, d) {

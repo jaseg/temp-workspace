@@ -116,6 +116,7 @@ live data. Poses are never backlogged.
 | `0x86` | LevelStatsRequest | `u16 requestId, str levelId (≤ 64 bytes)`. Answered with the stats JSON as a file. |
 | `0x87` | SuggestionAdd | `str levelId`: 40 lowercase hex digits, else a protocol violation. |
 | `0x88` | SuggestionRemove | `str levelId`, as above. |
+| `0x89` | SuggestionMove | `str levelId, u16 index`: move the entry so it ends up at `index` (0 = first; larger values mean last). |
 
 The maximum inbound message size is 1 KB.
 
@@ -176,9 +177,10 @@ Stats JSON, a subset of BeatLeader's map data, re-encoded by the mod:
 Approved viewers share one list of levels they suggest to the player. The mod shows it in the game as a level
 pack ("Suggested by viewers") and keeps it across restarts.
 
-- Any approved viewer can add or remove any entry. Only installed levels can be added; at most 100 entries.
-- Changes are rate-limited per connection (10 in a row, then one every 2 s). A change that isn't applied (not
-  installed, already there, list full, rate limit) is answered with the unchanged list.
+- Any approved viewer can add, remove or move any entry. Only installed levels can be added; at most 100 entries.
+  New entries go to the end. The game's level pack uses the same order.
+- Changes are rate-limited per connection (20 in a row, then one per second). A change that isn't applied (not
+  installed, already there, list full, nothing to move, rate limit) is answered with the unchanged list.
 - `by` is the suggesting browser's description ("Firefox on Linux"), for display only.
 
 ```json

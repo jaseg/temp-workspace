@@ -176,6 +176,13 @@ export class DemoConnection extends LiveConnection {
 		return true;
 	}
 
+	moveSuggestion(levelId, index) {
+		const from = (this.suggestions || []).findIndex(s => s.id === levelId);
+		if (from >= 0) this.suggestions.splice(Math.min(index, this.suggestions.length - 1), 0, ...this.suggestions.splice(from, 1));
+		this.sendSuggestions();
+		return true;
+	}
+
 	playSong() {
 		const replay = this.replay;
 		const info = replay.info;

@@ -96,6 +96,7 @@ accent = #ff4fa3
   display none
 
 #levelBrowser .lbList
+  position relative // for the drop line while dragging
   flex 1 1 auto
   overflow-y auto
   width 100%
@@ -118,6 +119,52 @@ accent = #ff4fa3
 
   &:hover, &.expanded
     background #151920
+
+#levelBrowser .lbHandle
+  display none
+
+#levelBrowser .lbList.reorder .lbLevel
+  grid-template-columns 22px 64px 1fr auto
+
+#levelBrowser .lbList.reorder .lbHandle
+  display flex
+  align-self stretch
+  align-items center
+  justify-content center
+  margin -10px 0 -10px -10px
+  color #5b6370
+  font-size 18px
+  touch-action none // the handle drags; it must not scroll the page on touch screens
+  cursor not-allowed
+
+  &::before
+    content '⠿'
+
+#levelBrowser .lbLevel.reorderable .lbHandle
+  color #8b93a0
+  cursor grab
+
+  &:hover
+    color #e8ebef
+
+#levelBrowser .lbLevel.dragging
+  z-index 1
+  background #1d222b
+  box-shadow 0 8px 24px rgba(0, 0, 0, 0.5)
+  opacity 0.95
+  cursor grabbing
+
+  .lbHandle
+    cursor grabbing
+
+#levelBrowser .lbDropLine
+  position absolute
+  left 16px
+  right 16px
+  height 2px
+  border-radius 1px
+  background accent
+  pointer-events none
 
 #levelBrowser .lbCover
   width 64px
@@ -204,7 +251,38 @@ accent = #ff4fa3
 
 #levelBrowser .lbActions
   display flex
+  flex-wrap wrap
+  justify-content flex-end
   gap 6px
+  max-width 200px
+
+#levelBrowser .lbOrder
+  display flex
+  gap 4px
+  width 100%
+  justify-content flex-end
+
+  &[hidden]
+    display none
+
+#levelBrowser .lbMove
+  height 28px
+  padding 0 9px
+  border 0
+  border-radius 6px
+  background #232933
+  color #e8ebef
+  font inherit
+  font-size 13px
+  white-space nowrap
+  cursor pointer
+
+  &:hover:not(:disabled)
+    background #2d333d
+
+  &:disabled
+    opacity 0.35
+    cursor default
 
 #levelBrowser .lbPlay, #levelBrowser .lbSuggest
   min-width 84px
@@ -302,6 +380,14 @@ accent = #ff4fa3
 @media (max-width: 600px)
   #levelBrowser .lbActions
     flex-direction column
+    align-items stretch
+
+  #levelBrowser .lbMoveText
+    display none
+
+  #levelBrowser .lbMove
+    flex 1
+    padding 0 6px
 
   #levelBrowser .lbPlay, #levelBrowser .lbSuggest
     min-width 0
@@ -316,6 +402,12 @@ accent = #ff4fa3
   #levelBrowser .lbLevel
     grid-template-columns 48px 1fr auto
     padding 8px 4px
+
+  #levelBrowser .lbList.reorder .lbLevel
+    grid-template-columns 22px 48px 1fr auto
+
+  #levelBrowser .lbList.reorder .lbHandle
+    margin -8px 0 -8px -4px
 
   #levelBrowser .lbCover
     width 48px

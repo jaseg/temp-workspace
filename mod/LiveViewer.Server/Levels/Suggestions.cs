@@ -47,7 +47,7 @@ namespace LiveViewer.Server.Levels
         /// <summary>Raised after an entry is added or removed (on the calling thread).</summary>
         public event Action? Changed;
 
-        /// <summary>Oldest first.</summary>
+        /// <summary>In the viewers' order (new suggestions go to the end).</summary>
         public IReadOnlyList<Suggestion> List()
         {
             lock (_lock)
@@ -83,6 +83,31 @@ namespace LiveViewer.Server.Levels
                     return false;
                 }
 
+                Save();
+            }
+
+            Changed?.Invoke();
+            return true;
+        }
+
+        /// <summary>
+        /// Moves a suggestion so it ends up at <paramref name="index"/> (0 = first), clamped to the list. False if the
+        /// level isn't suggested or is already there.
+        /// </summary>
+        public bool Move(string id, int index)
+        {
+            lock (_lock)
+            {
+                var from = _entries.FindIndex(e => e.Id == id);
+                var to = Math.Max(0, Math.Min(index, _entries.Count - 1));
+                if (from < 0 || from == to)
+                {
+                    return false;
+                }
+
+                var entry = _entries[from];
+                _entries.RemoveAt(from);
+                _entries.Insert(to, entry);
                 Save();
             }
 

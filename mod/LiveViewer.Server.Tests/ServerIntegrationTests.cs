@@ -363,6 +363,18 @@ namespace LiveViewer.Server.Tests
             _server.WaitingRoom.Approve(PendingId(code), remember: false);
             Assert.Equal(new[] { id }, await ExpectSuggestionsAsync(c));
 
+            // Moving: a second suggestion, moved to the top, reaches everyone; a move to where it is already
+            // answers the sender with the current order.
+            var other = new string('1', 40);
+            _server.Suggestions.Add(other, "test"); // directly: the level needn't be installed for this
+            Assert.Equal(new[] { id, other }, await ExpectSuggestionsAsync(a));
+            Assert.Equal(new[] { id, other }, await ExpectSuggestionsAsync(c));
+            await SendAsync(c, new MessageWriter().U8(MessageType.SuggestionMove).String(other).U16(0).ToArray());
+            Assert.Equal(new[] { other, id }, await ExpectSuggestionsAsync(a));
+            Assert.Equal(new[] { other, id }, await ExpectSuggestionsAsync(c));
+            await SendAsync(c, new MessageWriter().U8(MessageType.SuggestionMove).String(other).U16(0).ToArray());
+            Assert.Equal(new[] { other, id }, await ExpectSuggestionsAsync(c));
+
             // Ids must look like level hashes.
             await SendAsync(b, Suggestion(true, "../../etc"));
             await ExpectClosedAsync(b);

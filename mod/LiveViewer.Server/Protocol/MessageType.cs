@@ -46,6 +46,7 @@ namespace LiveViewer.Server.Protocol
         public const byte LevelStatsRequest = 0x86;
         public const byte SuggestionAdd = 0x87;
         public const byte SuggestionRemove = 0x88;
+        public const byte SuggestionMove = 0x89;
     }
 
     public enum MapErrorCode : byte

@@ -31,6 +31,7 @@ export const T = {
 	LevelStatsRequest: 0x86,
 	SuggestionAdd: 0x87,
 	SuggestionRemove: 0x88,
+	SuggestionMove: 0x89,
 };
 
 export const LevelFile = {cover: 1, audio: 2};
@@ -191,5 +192,14 @@ export function suggestionChange(add, levelId) {
 	return message(add ? T.SuggestionAdd : T.SuggestionRemove, 4 + id.length, (v, b) => {
 		v.setInt32(1, id.length, true);
 		b.set(id, 5);
+	});
+}
+
+export function suggestionMove(levelId, index) {
+	const id = new TextEncoder().encode(levelId);
+	return message(T.SuggestionMove, 4 + id.length + 2, (v, b) => {
+		v.setInt32(1, id.length, true);
+		b.set(id, 5);
+		v.setUint16(5 + id.length, index, true);
 	});
 }

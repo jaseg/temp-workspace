@@ -53,6 +53,55 @@ const {chromium} = require('playwright');
 		return (el.hidden ? 0 : Number(el.textContent)) === n;
 	}, start, {timeout: 10000}).catch(() => errors.push("a: didn't see b's removal"));
 
+	// Reordering: A suggests three levels; B moves them with the buttons and by dragging; A sees each new order.
+	const ids = page => page.evaluate(() => window.liveSession.levels.suggestions.map(x => x.id));
+	const names = await a.$$eval('#levelBrowser .lbLevel:has(.lbSuggest:not(.on)) .lbName', els => els.slice(0, 3).map(e => e.textContent.trim()));
+	for (const n of names) {
+		const before = (await ids(a)).length;
+		await a.locator('#levelBrowser .lbLevel', {hasText: n}).first().locator('.lbSuggest').click();
+		await a.waitForFunction(k => window.liveSession.levels.suggestions.length === k, before + 1);
+	}
+	const three = (await ids(a)).slice(-3);
+	await b.waitForFunction(k => window.liveSession.levels.suggestions.length === k, (await ids(a)).length);
+	const same = async (expected, what) => {
+		await a.waitForFunction(e => JSON.stringify(window.liveSession.levels.suggestions.map(x => x.id).slice(-3)) === e, JSON.stringify(expected), {timeout: 5000})
+			.catch(() => errors.push(`a: wrong order after ${what}`));
+	};
+	const bRow = async id => {
+		const index = (await ids(b)).indexOf(id);
+		return b.locator('#levelBrowser .lbList > .lbLevel').nth(index);
+	};
+	await (await bRow(three[0])).locator('.lbMove-down').click();
+	await same([three[1], three[0], three[2]], 'move down');
+	await (await bRow(three[2])).locator('.lbMove-up').click();
+	await same([three[1], three[2], three[0]], 'move up');
+	await (await bRow(three[0])).locator('.lbMove-top').click();
+	await a.waitForFunction(id => window.liveSession.levels.suggestions[0].id === id, three[0], {timeout: 5000}).catch(() => errors.push('a: to top'));
+	await (await bRow(three[0])).locator('.lbMove-bottom').click();
+	await same([three[1], three[2], three[0]], 'to bottom');
+
+	// Drag the last of the three above the other two (B is phone-sized: drag with touch-like pointer moves).
+	const source = await (await bRow(three[2])).locator('.lbHandle').boundingBox();
+	const dest = await (await bRow(three[1])).boundingBox();
+	await b.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+	await b.mouse.down();
+	for (let i = 1; i <= 10; i++) await b.mouse.move(source.x + source.width / 2, source.y + source.height / 2 + ((dest.y + 4 - source.y - source.height / 2) * i) / 10);
+	await b.screenshot({path: `${shots}-b-dragging.png`});
+	await b.mouse.up();
+	await same([three[2], three[1], three[0]], 'drag');
+
+	// A search locks the order.
+	await b.fill('#levelBrowser .lbSearch', 'a');
+	check(await b.locator('#levelBrowser .lbMove-up:not([disabled])').count() === 0, 'b: move buttons enabled during a search');
+	await b.fill('#levelBrowser .lbSearch', '');
+	await b.screenshot({path: `${shots}-b-reorder.png`});
+	await a.click('#levelBrowser .lbTab:nth-child(2)');
+	await a.screenshot({path: `${shots}-a-reorder.png`});
+	for (const id of three) {
+		await a.evaluate(i => window.liveSession.connection.suggest(i, false), id);
+	}
+	await a.waitForFunction(t => !window.liveSession.levels.suggestions.some(x => t.includes(x.id)), three);
+
 	// The top bar's Live button goes back to the live view; B toggles too.
 	await a.click('#liveNav button:nth-child(1)');
 	check(await a.evaluate(() => document.getElementById('levelBrowser').hidden), 'a: Live button did not close the level browser');

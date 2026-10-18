@@ -1,5 +1,5 @@
 // WebSocket connection to the mod: waiting room, clock sync, message dispatch, map file and level library downloads.
-import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest, levelListRequest, levelFileRequest, levelStatsRequest, suggestionChange} from './protocol';
+import {T, Reader, SUBPROTOCOL, hello, ping, mapRequest, levelListRequest, levelFileRequest, levelStatsRequest, suggestionChange, suggestionMove} from './protocol';
 import {ServerClock} from './clock';
 
 const CREDENTIAL_KEY = 'bslive.credential';
@@ -169,6 +169,13 @@ export class LiveConnection {
 	suggest(levelId, add) {
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
 		this.ws.send(suggestionChange(add, levelId));
+		return true;
+	}
+
+	/** Moves a suggested level to position `index` (0 = first). The mod answers with the new order. */
+	moveSuggestion(levelId, index) {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+		this.ws.send(suggestionMove(levelId, index));
 		return true;
 	}
 

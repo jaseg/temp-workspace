@@ -216,6 +216,28 @@ namespace LiveViewer.Server.Tests
         }
 
         [Fact]
+        public void SuggestionsMove()
+        {
+            var store = new Suggestions(Path.Combine(_root, "order.tsv"));
+            var ids = Enumerable.Range(1, 4).Select(i => i.ToString("x40")).ToArray();
+            foreach (var id in ids)
+            {
+                store.Add(id, "x");
+            }
+
+            string Order() => string.Concat(store.List().Select(e => e.Id.Substring(39)));
+            Assert.True(store.Move(ids[3], 0));
+            Assert.Equal("4123", Order());
+            Assert.True(store.Move(ids[3], 99)); // clamped: to the bottom
+            Assert.Equal("1234", Order());
+            Assert.True(store.Move(ids[0], 2));
+            Assert.Equal("2314", Order());
+            Assert.False(store.Move(ids[0], 2)); // already there
+            Assert.False(store.Move(new string('f', 40), 0));
+            Assert.Equal("2314", string.Concat(new Suggestions(Path.Combine(_root, "order.tsv")).List().Select(e => e.Id.Substring(39))));
+        }
+
+        [Fact]
         public void ReadsWavDuration()
         {
             var path = Path.Combine(_root, "song.wav");

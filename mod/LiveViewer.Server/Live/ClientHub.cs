@@ -204,6 +204,10 @@ namespace LiveViewer.Server.Live
                     case MessageType.SuggestionRemove:
                         HandleSuggestion(connection, data[0] == MessageType.SuggestionAdd, ClientMessages.ParseSuggestionChange(reader));
                         break;
+                    case MessageType.SuggestionMove:
+                        var (moveId, moveIndex) = ClientMessages.ParseSuggestionMove(reader);
+                        HandleSuggestionMove(connection, moveId, moveIndex);
+                        break;
                     default:
                         throw new ProtocolException("Unknown message type.");
                 }
@@ -397,6 +401,23 @@ namespace LiveViewer.Server.Live
             }
 
             _ = AddSuggestionAsync(connection, levelId);
+        }
+
+        private void HandleSuggestionMove(ClientConnection connection, string levelId, int index)
+        {
+            lock (_lock)
+            {
+                if (connection.State != ClientState.Approved)
+                {
+                    throw new ProtocolException("Suggestion before approval.");
+                }
+            }
+
+            // Not applied (unknown level, already there, rate limit): the sender gets the real order back.
+            if (_suggestions == null || !connection.TryConsumeSuggestionToken() || !_suggestions.Move(levelId, index))
+            {
+                SendSuggestions(connection);
+            }
         }
 
         private async Task AddSuggestionAsync(ClientConnection connection, string levelId)

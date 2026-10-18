@@ -47,9 +47,9 @@ namespace LiveViewer.Server.Live
         private double _tokens = MaxTokens;
         private long _tokensUpdatedUs = LiveClock.NowUs();
 
-        // Suggestion changes: a few in a row, then one every two seconds.
-        private const double SuggestionsPerSecond = 0.5;
-        private const double MaxSuggestionTokens = 10;
+        // Suggestion changes (add, remove, move): 20 in a row, then one per second.
+        private const double SuggestionsPerSecond = 1;
+        private const double MaxSuggestionTokens = 20;
         private double _suggestionTokens = MaxSuggestionTokens;
         private long _suggestionTokensUpdatedUs = LiveClock.NowUs();
 
