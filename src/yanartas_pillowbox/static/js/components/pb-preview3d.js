@@ -17,6 +17,12 @@ template.innerHTML = `
   .info { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1; }
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
            border-radius: 5px; padding: 2px 9px; cursor: pointer; }
+  /* Spinner while the PCB layout runs. */
+  button[aria-busy="true"]::before { content: ""; display: inline-block; width: 0.8em; height: 0.8em;
+    margin-right: 6px; vertical-align: -0.1em; border: 2px solid currentColor;
+    border-right-color: transparent; border-radius: 50%; animation: pb-spin 0.8s linear infinite; }
+  @keyframes pb-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { button[aria-busy="true"]::before { animation-duration: 2.4s; } }
   button[aria-pressed="true"] { background: var(--surface-2); border-color: var(--text-muted); }
   .stage { position: relative; flex: 1; min-height: 0; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
@@ -208,6 +214,11 @@ export class PbPreview3d extends HTMLElement {
   /** Whether the Mesh button shows as on (the app owns the state). */
   set meshShown(on) {
     this.shadowRoot.querySelector("[data-mesh]").setAttribute("aria-pressed", String(Boolean(on)));
+  }
+
+  /** Spinner on the Mesh button while the layout runs. */
+  set meshBusy(busy) {
+    this.shadowRoot.querySelector("[data-mesh]").setAttribute("aria-busy", String(Boolean(busy)));
   }
 
   /** Show the PCB layout's copper (POST /api/pcb) on the paper, or none: each layer drawn

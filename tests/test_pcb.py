@@ -228,3 +228,31 @@ def test_api_routes(tmp_path):
     assert r.status_code == 200 and r.mimetype == "application/zip"
     names = zipfile.ZipFile(io.BytesIO(r.data)).namelist()
     assert "pillowbox.kicad_pcb" in names and "pillowbox-gerbers/pillowbox-F_Cu.gbr" in names
+
+
+@pytest.mark.parametrize("offset", ["cell", "cell_trace"])
+def test_back_mesh_grid_offset(offset):
+    """The back mesh's grid is offset from the front one's by half a cell (plus, optionally,
+    a trace width: then its traces lie over the front traces' gaps), in x and y."""
+    result = pcb.layout(D.with_values(mesh_back_offset=offset))
+    front, back = result.meshes[pcb.FRONT], result.meshes[pcb.BACK]
+    shift = front.cell / 2 + (D.mesh_trace_width if offset == "cell_trace" else 0.0)
+    for axis in (0, 1):
+        d = (back.origin[axis] - front.origin[axis]) % front.cell
+        assert d == pytest.approx(shift, abs=1e-9)
+    assert back.unreached == 0
+
+
+def test_trace_lengths(layout):
+    """Each mesh net's length: its loop and its two runs along the cable."""
+    lengths = layout.net_lengths()
+    net, longest = layout.longest_trace()
+    assert longest == max(v for n, v in lengths.items() if n.startswith("MESH_"))
+    for m_net, trace in zip(("MESH_F1",), layout.meshes[pcb.FRONT].traces, strict=False):
+        loop = sum(math.dist(a, b) for a, b in itertools.pairwise(trace))
+        assert lengths[m_net] > loop + 2 * D.fpc_cable_length  # (the cable runs, both ways)
+    data = pcb.preview_json(layout)
+    assert data["longest_trace"] == {"net": net, "length": pytest.approx(longest, abs=1e-3)}
+    assert max(data["meshes"][s]["longest"] for s in ("front", "back")) == pytest.approx(
+        longest, abs=1e-3
+    )

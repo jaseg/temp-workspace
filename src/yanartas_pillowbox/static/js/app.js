@@ -204,6 +204,11 @@ function setMesh(pcb) {
   preview3d.setMesh(pcb);
 }
 
+/** Spinner on the Mesh buttons (and the PCB download) while the layout runs. */
+function setMeshBusy(busy) {
+  preview2d.meshBusy = preview3d.meshBusy = busy;
+}
+
 function toggleMesh() {
   showMesh = !showMesh;
   preview2d.meshShown = preview3d.meshShown = showMesh;
@@ -211,6 +216,7 @@ function toggleMesh() {
   else {
     meshSeq++; // drop a layout in flight
     clearTimeout(meshTimer);
+    setMeshBusy(false);
     setMesh(null);
   }
 }
@@ -224,9 +230,11 @@ function scheduleMesh(delay = MESH_DELAY) {
   meshTimer = setTimeout(async () => {
     if (!lastValid) return;
     setStatus("Laying out the mesh…");
+    setMeshBusy(true);
     const { ok, data } = await api("POST", "/api/pcb", { config: lastValid.config }, { raw: true })
       .catch((err) => ({ ok: false, data: { error: err.message } }));
     if (seq !== meshSeq) return;
+    setMeshBusy(false);
     if (!ok) {
       setStatus(`Mesh: ${data.error || "layout failed"}`, true);
       return;
@@ -234,8 +242,10 @@ function scheduleMesh(delay = MESH_DELAY) {
     setMesh(data);
     const m = data.meshes;
     const missed = m.front.unreached + m.back.unreached;
+    const longest = data.longest_trace;
     setStatus(`Mesh: ${m.front.cells} + ${m.back.cells} cells of ${m.front.cell} mm`
-      + (missed ? `, ${missed} out of reach` : ""), missed > 0);
+      + (missed ? `, ${missed} out of reach` : "")
+      + ` · longest trace ${(longest.length / 1000).toFixed(2)} m (${longest.net})`, missed > 0);
   }, delay);
 }
 
@@ -348,6 +358,8 @@ async function downloadScad() {
 async function downloadPcb() {
   if (!lastValid) return;
   setStatus("Laying out the PCB…");
+  pcbBtn.classList.add("busy");
+  pcbBtn.disabled = true;
   try {
     const res = await fetch("/api/pcb/files", {
       method: "POST",
@@ -363,6 +375,9 @@ async function downloadPcb() {
   } catch (err) {
     setStatus(`PCB export failed: ${err.message}`, true);
     showBanner(`PCB export failed: ${err.message}`);
+  } finally {
+    pcbBtn.classList.remove("busy");
+    pcbBtn.disabled = !lastValid;
   }
 }
 

@@ -136,6 +136,8 @@ def cmd_pcb(args: argparse.Namespace) -> int:
     for side, m in layout.meshes.items():
         missed = f", {m.unreached} out of reach" if m.unreached else ""
         print(f"{side}: mesh over {m.cells} cells of {m.cell:g} mm{missed}", file=sys.stderr)
+    net, length = layout.longest_trace()
+    print(f"longest trace: {net}, {length / 1000:.2f} m", file=sys.stderr)
     for path in pcb.export(layout, args.output, args.name):
         print(f"wrote {path}", file=sys.stderr)
     return 0

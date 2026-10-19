@@ -96,6 +96,21 @@ class Layout:
     clearance: float = 0.15
     width: float = 0.15
 
+    def net_lengths(self) -> dict[str, float]:
+        """Each net's copper length (mm): all its tracks, from contact to contact for a mesh
+        net (the loop and its runs along the cable)."""
+        out: dict[str, float] = {}
+        for t in self.tracks:
+            length = sum(math.dist(a, b) for a, b in itertools.pairwise(t.points))
+            out[t.net] = out.get(t.net, 0.0) + length
+        return out
+
+    def longest_trace(self) -> tuple[str, float]:
+        """The longest mesh net and its length (mm)."""
+        lengths = {n: v for n, v in self.net_lengths().items() if n.startswith("MESH_")}
+        net = max(lengths, key=lengths.__getitem__)
+        return net, lengths[net]
+
 
 def pinout(pins: int, traces: int) -> list[str | None]:
     """Each pin's signal, from pin 1: "GND" or "M<i>" (mesh end i, from 1), None if free."""
@@ -267,8 +282,10 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
             # each layer's whole cells leave bare along the edges differ: its exit cell sits
             # half a cell into the flap (its traces run straight on across the gap) and on
             # the nearest column of its grid.
-            x0 = grid[0] + cell / 2 + round((x0 - grid[0] - cell / 2) / cell) * cell
-            corner = (x0, yj + cell / 2 if up else yj - 1.5 * cell)
+            # (and optionally by a trace width more, so its traces lie over the front's gaps)
+            shift = cell / 2 + (w if cfg.mesh_back_offset == "cell_trace" else 0.0)
+            x0 = grid[0] + shift + round((x0 - grid[0] - shift) / cell) * cell
+            corner = (x0, yj + shift if up else yj - cell - shift)
         if abs((x0 + cell / 2 - xc) * left0[0]) + cell / 2 > half - ec:
             raise PcbError("no room for the mesh's exit at the cable's junction")
         try:
@@ -602,6 +619,8 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
     def flat(points: Iterable[Point]) -> list[float]:
         return [round(c, 3) for p in points for c in p]
 
+    lengths = result.net_lengths()
+    longest = result.longest_trace()
     layers: dict[str, list[list[float]]] = {"front": [], "back": []}
     for track in result.tracks:
         layers["front" if track.layer == FRONT else "back"].append(flat(track.points))
@@ -618,9 +637,13 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
                 "cells": m.cells,
                 "unreached": m.unreached,
                 "cell": m.cell,
+                "longest": round(
+                    max(v for n, v in lengths.items() if n.startswith(f"MESH_{layer[0]}")), 3
+                ),
             }
             for layer, m in result.meshes.items()
         },
+        "longest_trace": {"net": longest[0], "length": round(longest[1], 3)},
     }
 
 

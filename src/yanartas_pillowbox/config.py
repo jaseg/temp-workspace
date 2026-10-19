@@ -388,6 +388,19 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         help="Seed of the mesh's random walk: the same seed gives the same mesh.",
     ),
     FieldSpec(
+        "mesh_back_offset",
+        "Back mesh offset",
+        "choice",
+        "PCB mesh",
+        choices=(
+            ("cell", "Half a cell"),
+            ("cell_trace", "Half a cell plus a trace width"),
+        ),
+        help="How far the back (B.Cu) mesh's grid is offset from the front one's, in x and y: "
+        "half a cell, so that the two layers leave different strips bare along the edges; "
+        "plus a trace width, so that its traces also lie over the front traces' gaps.",
+    ),
+    FieldSpec(
         "thickness",
         "Material thickness",
         "float",
@@ -448,6 +461,7 @@ class Config:
     mesh_traces: float = 4.0
     mesh_edge_clearance: float = 0.5
     mesh_seed: float = 0.0
+    mesh_back_offset: str = "cell"
     thickness: float = 0.2
     print_side: str = "outside"
 
