@@ -243,4 +243,3 @@ def _join(segments: list[list[Point]]) -> tuple[Point, ...]:
     if not all(used):
         raise MeshError("a net does not form one path (a closed loop is left over)")
     return straighten(out)
-

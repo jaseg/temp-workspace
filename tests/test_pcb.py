@@ -256,3 +256,79 @@ def test_trace_lengths(layout):
     assert max(data["meshes"][s]["longest"] for s in ("front", "back")) == pytest.approx(
         longest, abs=1e-3
     )
+
+
+def test_verify_passes_and_catches_opens_and_shorts(layout):
+    """The electrical check: every mesh net one piece from contact to contact, no copper of
+    two nets touching. It passes on a layout and finds an open and a short put in."""
+    import copy
+
+    assert pcb.verify(layout) == []
+    broken = copy.deepcopy(layout)
+    t = next(t for t in broken.tracks if t.net == "MESH_F2" and len(t.points) > 100)
+    i = len(t.points) // 2
+    t.points, rest = t.points[:i], t.points[i + 1 :]  # (a gap: the net is open)
+    broken.tracks.append(pcb.Track(rest, t.layer, t.net, t.width))
+    assert any("MESH_F2 is open" in p for p in pcb.verify(broken))
+    shorted = copy.deepcopy(layout)
+    a = next(t for t in shorted.tracks if t.net == "MESH_F1" and len(t.points) > 100)
+    b = next(t for t in shorted.tracks if t.net == "MESH_F2" and len(t.points) > 100)
+    shorted.tracks.append(pcb.Track((a.points[50], b.points[50]), a.layer, "MESH_F1", a.width))
+    assert any("short between" in p and "MESH_F2" in p for p in pcb.verify(shorted))
+
+
+def test_layout_fails_safe(monkeypatch, tmp_path):
+    """A layout that fails its check is not handed out: an error instead (the UI shows it)."""
+    from yanartas_pillowbox.server import create_app
+
+    monkeypatch.setattr(pcb, "verify", lambda result: ["MESH_F1 is open (made up)"])
+    with pytest.raises(pcb.PcbError, match="failed its check"):
+        pcb.layout(D)
+    client = create_app(tmp_path / "s.json").test_client()
+    r = client.post("/api/pcb", json={"config": D.with_values(mesh_traces=2).to_dict()})
+    assert r.status_code == 422 and "MESH_F1 is open" in r.json["error"]
+
+
+def test_mesh_metrics(layout):
+    """Spacing profile and pair skew of each mesh, in the preview."""
+    data = pcb.preview_json(layout)
+    for side in ("front", "back"):
+        m = data["meshes"][side]
+        assert m["algorithm"] == "kimesh"
+        sp = m["spacing"]
+        assert sp["below"] == 0 and sp["within"] > 0.8 * sp["measured"]  # (KiMesh: exact)
+        assert [p["nets"][0][-1] + p["nets"][1][-1] for p in m["skew"]] == ["12", "23", "34"]
+        assert all(0 <= p["total"] <= p["local"] + 1e-6 for p in m["skew"])
+
+
+def test_space_filling_curve_is_wired_in(monkeypatch):
+    """The curve layout gets the mask, the exit and the folding pattern's panels as zones
+    (its own tests run it on small areas; a full-size run is slow, below)."""
+    import dataclasses
+
+    from yanartas_pillowbox import kimesh, sfc
+    from yanartas_pillowbox.geometry import build_pattern
+
+    seen = []
+
+    def fake(mask, corner, side, n, pitch, seed=0, zones=()):
+        seen.append(len(zones))
+        m = kimesh.generate(mask, corner, side, n, pitch, seed=seed)
+        return dataclasses.replace(m, algorithm="sfc")
+
+    monkeypatch.setattr(sfc, "generate", fake)
+    result = pcb.layout(D.with_values(mesh_algorithm="sfc"))
+    assert seen == [len(build_pattern(D).faces)] * 2
+    assert pcb.preview_json(result)["meshes"]["front"]["algorithm"] == "sfc"
+
+
+@pytest.mark.slow
+def test_space_filling_curve_full_size():
+    """The default box with the curve layout: checked (open, shorts) by the layout itself,
+    every panel reached, the space mostly within the nominal one -5 / +20 %."""
+    result = pcb.layout(D.with_values(mesh_algorithm="sfc"))
+    assert pcb.verify(result) == []
+    for m in result.meshes.values():
+        assert m.algorithm == "sfc" and m.unreached == 0
+    for sp in result.spacing().values():
+        assert sp.under < 0.01 * sp.measured and sp.within > 0.6 * sp.measured

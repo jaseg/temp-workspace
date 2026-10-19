@@ -388,6 +388,22 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         help="Seed of the mesh's random walk: the same seed gives the same mesh.",
     ),
     FieldSpec(
+        "mesh_algorithm",
+        "Mesh layout",
+        "choice",
+        "PCB mesh",
+        choices=(
+            ("kimesh", "KiMesh grid"),
+            ("sfc", "Space-filling curve (slow)"),
+        ),
+        help="How the mesh is laid out. KiMesh: tiles on a square grid of cells, walked by "
+        "a random spanning tree; fast, but whole cells only, so strips along the edges stay "
+        "bare. Space-filling curve (after Bedel et al., 2022): one closed curve through "
+        "each panel, the panels joined across the folds as seldom as can be, the traces "
+        "offset from it and spread to share its spacing; follows the edges and folds, "
+        "but takes a minute or more per layer.",
+    ),
+    FieldSpec(
         "mesh_back_offset",
         "Back mesh offset",
         "choice",
@@ -396,8 +412,9 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
             ("cell", "Half a cell"),
             ("cell_trace", "Half a cell plus a trace width"),
         ),
-        help="How far the back (B.Cu) mesh's grid is offset from the front one's, in x and y: "
-        "half a cell, so that the two layers leave different strips bare along the edges; "
+        help="KiMesh: how far the back (B.Cu) mesh's grid is offset from the front one's, "
+        "in x and y: half a cell, so that the two layers leave different strips bare along "
+        "the edges; "
         "plus a trace width, so that its traces also lie over the front traces' gaps.",
     ),
     FieldSpec(
@@ -461,6 +478,7 @@ class Config:
     mesh_traces: float = 4.0
     mesh_edge_clearance: float = 0.5
     mesh_seed: float = 0.0
+    mesh_algorithm: str = "kimesh"
     mesh_back_offset: str = "cell"
     thickness: float = 0.2
     print_side: str = "outside"

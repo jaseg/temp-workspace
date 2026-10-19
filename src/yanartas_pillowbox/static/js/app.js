@@ -211,14 +211,31 @@ function renderMeshStats(pcb) {
   if (!pcb) return;
   const { front, back } = pcb.meshes;
   const m = (mm) => `${(mm / 1000).toFixed(2)} m`;
+  const both = (f) => `${f(front)} / ${f(back)}`;
+  const sfc = front.algorithm === "sfc";
+  // (spacing: the share of the traces' measured sides within the nominal space -5 / +20 %,
+  // and how much of them is below it; skew: the worst neighbouring pair of each mesh)
+  const share = (x) => `${((100 * x.spacing.within) / Math.max(x.spacing.measured, 1e-9)).toFixed(1)} %`;
+  const below = (x) => `${x.spacing.below.toFixed(1)} mm`;
+  const worst = (x, key) => Math.max(0, ...x.skew.map((p) => p[key]));
+  const skew = (x) => `${worst(x, "total").toFixed(1)} / ${worst(x, "local").toFixed(1)} mm`;
   const rows = [
-    ["Cell size", `${front.cell.toFixed(2)} mm`],
-    ["Cells (front / back)", `${front.cells} / ${back.cells}`],
+    ["Layout", sfc ? "Space-filling curve" : "KiMesh grid"],
+    ...(sfc
+      ? [["Curve graph cells (front / back)", both((x) => x.cells)]]
+      : [
+          ["Cell size", `${front.cell.toFixed(2)} mm`],
+          ["Cells (front / back)", both((x) => x.cells)],
+        ]),
     ...(front.unreached + back.unreached
-      ? [["Cells out of reach", `${front.unreached} / ${back.unreached}`, true]]
+      ? [[sfc ? "Panels out of reach" : "Cells out of reach", both((x) => x.unreached), true]]
       : []),
-    ["Longest trace (front / back)", `${m(front.longest)} / ${m(back.longest)}`],
+    ["Longest trace (front / back)", both((x) => m(x.longest))],
     ["Longest trace", `${m(pcb.longest_trace.length)} (${pcb.longest_trace.net})`],
+    ["Space within −5…+20 % (front / back)", both(share)],
+    ["Below nominal space (front / back)", both(below), front.spacing.under + back.spacing.under > 0],
+    ["Pair skew, total / local (front)", skew(front)],
+    ["Pair skew, total / local (back)", skew(back)],
   ];
   $("#mesh-derived").replaceChildren(...rows.flatMap(([k, v, bad]) => {
     const dt = Object.assign(document.createElement("dt"), { textContent: k });

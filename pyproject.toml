@@ -38,7 +38,8 @@ include = ["src/yanartas_pillowbox", "tests", "README.md", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-n auto --maxprocesses 12"  # pytest-xdist: CPU-bound, independent tests
+addopts = "-n auto --maxprocesses 12 -m 'not slow'"  # pytest-xdist: CPU-bound, independent tests
+markers = ["slow: full-size layouts that take minutes (run with -m slow)"]
 
 [tool.ruff]
 line-length = 100

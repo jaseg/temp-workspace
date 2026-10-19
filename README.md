@@ -178,7 +178,8 @@ All lengths are in millimetres.
 | `mesh_traces` | 4 | Mesh traces (loops, two ends each) per side of the foil. The mesh's cells are twice this many trace pitches wide (2.4 mm by default). Whole numbers 1–16; the plug needs a pin per end plus the GND pins. |
 | `mesh_edge_clearance` | 0.5 | How far the mesh keeps off the foil's cut edges and slits. 0–10. |
 | `mesh_seed` | 0 | Seed of the mesh's random walk: the same seed gives the same mesh. Whole number. |
-| `mesh_back_offset` | `cell` | How far the back (B.Cu) mesh's grid is offset from the front one's, in x and y: `cell` half a cell; `cell_trace` half a cell plus a trace width, so that the back traces also lie over the front traces' gaps. |
+| `mesh_algorithm` | `kimesh` | How the mesh is laid out: `kimesh` (tiles on a square grid, fast) or `sfc` (a closed space-filling curve after Bedel et al. 2022: follows edges and folds, crosses each fold as seldom as can be, takes a minute or more per layer). See *PCB layout*. |
+| `mesh_back_offset` | `cell` | KiMesh only: how far the back (B.Cu) mesh's grid is offset from the front one's, in x and y: `cell` half a cell; `cell_trace` half a cell plus a trace width, so that the back traces also lie over the front traces' gaps. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
 | `thickness` | 0.2 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
 
@@ -263,6 +264,27 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   trace width more, `mesh_back_offset`, so that its traces lie over the F.Cu traces' gaps).
   Each mesh trace runs some 44 m in the default box: *Derived geometry* (and the `pcb`
   command) reports the longest, loop and cable runs together.
+* **Space-filling curve** (`mesh_algorithm = sfc`, `sfc.py`), after A. Bedel, Y. Coudert-Osmont,
+  J. Martínez, R. I. Nishat, S. Whitesides, S. Lefebvre, *Closed space-filling curves with
+  controlled orientation for 3D printing*, Computer Graphics Forum 41(2), 2022
+  ([doi](https://doi.org/10.1111/cgf.14488), [code](https://github.com/mfx-inria/controllable-space-filling-curve)).
+  Each panel of the folding pattern is filled by a closed curve on the edges of a
+  centroidal Voronoi tessellation (a perfect matching's complement, cell centres threaded
+  in, cycles joined); the panels' curves are joined across the folds along a spanning
+  tree, two crossings per join, the least a closed curve can make. The curve is then
+  relaxed towards an even spacing of `mesh_traces` pitches (folds and edges hold it off by
+  half that), the mesh's traces are its offsets, spread to share its spacing, and the exit
+  is a "tongue" of two straight legs built into the curve's graph. It follows edges and
+  folds closely (no bare strips) at the cost of a less regular structure: the space
+  between traces varies, mostly within −5 %…+20 % of the nominal one, rarely below.
+* **Metrics** (*Derived geometry*, `pcb` command): the space between the traces, measured
+  along every trace on both sides (the share within −5 %…+20 % of `mesh_trace_space` and the
+  length below it), and, taking each pair of neighbouring traces (1+2, 2+3, 3+4) as a
+  differential pair, the difference in their lengths and the largest local difference (the
+  most one runs ahead of the other along the way), over the mesh.
+* **Check:** every layout is checked before it is handed out (preview, download, CLI):
+  each mesh net one piece of copper from its contact pad to its other one (no opens), no
+  copper of two nets touching on a layer (no shorts). A layout that fails is an error.
 * **Into the cable:** the F.Cu mesh's exit cell sits against the junction, where the cable
   leaves the inner flap, the B.Cu mesh's half a cell further in (on its offset grid, its
   traces running straight on across the gap); their traces run on into the cable and along

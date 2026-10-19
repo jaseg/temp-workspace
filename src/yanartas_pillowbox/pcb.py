@@ -25,15 +25,17 @@ from __future__ import annotations
 
 import itertools
 import math
+from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import shapely
 from shapely.geometry import LineString, Polygon
 
-from yanartas_pillowbox import kimesh
+from yanartas_pillowbox import kimesh, sfc
 from yanartas_pillowbox import mesh as meshgen
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.geometry import (
@@ -96,6 +98,7 @@ class Layout:
     meshes: dict[str, meshgen.Mesh] = field(default_factory=dict)
     clearance: float = 0.15
     width: float = 0.15
+    _cache: dict = field(default_factory=dict, repr=False)
 
     def net_lengths(self) -> dict[str, float]:
         """Each net's copper length (mm): all its tracks, from contact to contact for a mesh
@@ -111,6 +114,31 @@ class Layout:
         lengths = {n: v for n, v in self.net_lengths().items() if n.startswith("MESH_")}
         net = max(lengths, key=lengths.__getitem__)
         return net, lengths[net]
+
+    def spacing(self) -> dict[str, meshgen.Spacing]:
+        """Each mesh's spacing profile (its traces' space against the nominal one), by
+        layer. (Measured on first use.)"""
+        if "spacing" not in self._cache:
+            self._cache["spacing"] = {
+                layer: meshgen.spacing(m.traces, self.width, self.clearance)
+                for layer, m in self.meshes.items()
+            }
+        return self._cache["spacing"]
+
+    def skew(self) -> dict[str, list[tuple[str, str, float, float]]]:
+        """Each mesh's neighbouring traces (net 1 and 2, 2 and 3, ...) taken as differential
+        pairs, by layer: the nets, the difference in their lengths and the largest local
+        difference (mm), over the mesh (the cable's runs left out)."""
+        if "skew" not in self._cache:
+            out: dict[str, list[tuple[str, str, float, float]]] = {}
+            for layer, m in self.meshes.items():
+                side = "F" if layer == FRONT else "B"
+                out[layer] = [
+                    (f"MESH_{side}{i + 1}", f"MESH_{side}{i + 2}", *meshgen.skew(a, b))
+                    for i, (a, b) in enumerate(itertools.pairwise(m.traces))
+                ]
+            self._cache["skew"] = out
+        return self._cache["skew"]
 
 
 def pinout(pins: int, traces: int) -> list[str | None]:
@@ -290,14 +318,26 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         if abs((x0 + cell / 2 - xc) * left0[0]) + cell / 2 > half - ec:
             raise PcbError("no room for the mesh's exit at the cable's junction")
         try:
-            m = kimesh.generate(
-                mask,
-                corner,
-                meshgen.UP if up else meshgen.DOWN,
-                n,
-                pitch,
-                seed=int(cfg.mesh_seed) * 2 + i,
-            )
+            if cfg.mesh_algorithm == "sfc":
+                # (the panels as zones: the curve crosses the folds as seldom as can be)
+                m = sfc.generate(
+                    mask,
+                    corner,
+                    meshgen.UP if up else meshgen.DOWN,
+                    n,
+                    pitch,
+                    seed=int(cfg.mesh_seed) * 2 + i,
+                    zones=[Polygon(sample(f.boundary)) for f in pattern.faces],
+                )
+            else:
+                m = kimesh.generate(
+                    mask,
+                    corner,
+                    meshgen.UP if up else meshgen.DOWN,
+                    n,
+                    pitch,
+                    seed=int(cfg.mesh_seed) * 2 + i,
+                )
         except meshgen.MeshError as e:
             raise PcbError(str(e)) from e
         result.meshes[layer] = m
@@ -316,6 +356,9 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
 
     _route_cable(cfg, cable, result, sides, tracks, k_pin, pins)
     result.ground = cable_poly
+    problems = verify(result)  # (a fail-safe: no layout leaves here open or shorted)
+    if problems:
+        raise PcbError("the layout failed its check: " + "; ".join(problems[:5]))
     return result
 
 
@@ -442,6 +485,97 @@ def _clean(pts: Sequence[Point]) -> tuple[Point, ...]:
 
 
 # ----------------------------------------------------------------------------- export
+def verify(result: Layout) -> list[str]:
+    """The layout's electrical check, as a list of problems (none: it passes):
+
+    - every mesh net one connected piece of copper (tracks, vias, pads) from its contact
+      pad to its other contact pad, with no other pad on it (no opens);
+    - no copper of one net touching copper of another on the same layer (no shorts).
+
+    The ground zone is left out (it is poured around the traces, at their clearance)."""
+    problems: list[str] = []
+
+    def key(p: Point) -> tuple[int, int]:
+        return (round(p[0] * 1e4), round(p[1] * 1e4))
+
+    # Connectivity: the tracks' points (by layer), joined along each track and through vias.
+    parent: dict[tuple, tuple] = {}
+
+    def find(a: tuple) -> tuple:
+        parent.setdefault(a, a)
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    def join(a: tuple, b: tuple) -> None:
+        parent[find(a)] = find(b)
+
+    for t in result.tracks:
+        first = (t.net, t.layer, key(t.points[0]))
+        for p in t.points[1:]:
+            join(first, (t.net, t.layer, key(p)))
+    for v in result.vias:
+        join((v.net, FRONT, key(v.at)), (v.net, BACK, key(v.at)))
+    ends: dict[str, list[tuple]] = defaultdict(list)  # (track ends on a net's pads)
+    for t in result.tracks:
+        if not t.net.startswith("MESH_") or t.layer != FRONT:
+            continue
+        for p in (t.points[0], t.points[-1]):
+            for pad in result.pads:
+                (x, y), (sx, sy) = pad.at, pad.size
+                if abs(p[0] - x) <= sx / 2 + 1e-6 and abs(p[1] - y) <= sy / 2 + 1e-6:
+                    if pad.net != t.net:
+                        problems.append(f"{t.net} ends on pad {pad.number} ({pad.net})")
+                    ends[t.net].append((pad.number, find((t.net, FRONT, key(p)))))
+    nets = sorted({t.net for t in result.tracks if t.net.startswith("MESH_")})
+    for net in nets:
+        pads = {num for num, _ in ends[net]}
+        if len(pads) != 2:
+            problems.append(f"{net} reaches {len(pads)} contact pads, not 2")
+        roots = {find(n) for n in parent if n[0] == net}
+        if len(roots) != 1:
+            problems.append(f"{net} is open: {len(roots)} separate pieces of copper")
+
+    # Shorts: copper of different nets overlapping, layer by layer.
+    for layer in (FRONT, BACK):
+        geoms, nets_, radius = [], [], []
+        for t in result.tracks:
+            if t.layer == layer:
+                pts = np.asarray(t.points, float)
+                geoms += list(shapely.linestrings(np.stack([pts[:-1], pts[1:]], 1)))
+                nets_ += [t.net] * (len(pts) - 1)
+                radius += [t.width / 2] * (len(pts) - 1)
+        for v in result.vias:
+            geoms.append(shapely.Point(v.at))
+            nets_.append(v.net)
+            radius.append(VIA_SIZE / 2)
+        if layer == FRONT:
+            for pad in result.pads:
+                (x, y), (sx, sy) = pad.at, pad.size
+                geoms.append(shapely.box(x - sx / 2, y - sy / 2, x + sx / 2, y + sy / 2))
+                nets_.append(pad.net or f"(pad {pad.number})")
+                radius.append(0.0)
+        if not geoms:
+            continue
+        g = np.array(geoms, dtype=object)
+        net_arr = np.array(nets_, dtype=object)
+        rad = np.array(radius)
+        i, j = shapely.STRtree(g).query(g, predicate="dwithin", distance=2 * float(rad.max()))
+        keep = (i < j) & (net_arr[i] != net_arr[j])
+        i, j = i[keep], j[keep]
+        if len(i):
+            d = shapely.distance(g[i], g[j])
+            short = d < rad[i] + rad[j] - 1e-9
+            for a, b in list(zip(i[short], j[short], strict=True))[:5]:
+                c = shapely.centroid(g[a])
+                problems.append(
+                    f"short between {net_arr[a]} and {net_arr[b]} on {layer} "
+                    f"near ({c.x:.2f}, {c.y:.2f})"
+                )
+    return problems
+
+
 def to_kicad(result: Layout, name: str = "pillowbox") -> Any:
     """The layout as a gerbonara KiCad board: the foil's outline on Edge.Cuts, the folds on
     Dwgs.User, the tracks, vias and the plug's contacts (footprint J1), and the cable's GND
@@ -622,6 +756,7 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
 
     lengths = result.net_lengths()
     longest = result.longest_trace()
+    spacing, skew = result.spacing(), result.skew()
     layers: dict[str, list[list[float]]] = {"front": [], "back": []}
     for track in result.tracks:
         layers["front" if track.layer == FRONT else "back"].append(flat(track.points))
@@ -641,9 +776,16 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
                 "longest": round(
                     max(v for n, v in lengths.items() if n.startswith(f"MESH_{layer[0]}")), 3
                 ),
+                "algorithm": m.algorithm,
+                "spacing": spacing[layer].to_dict(),
+                "skew": [
+                    {"nets": [a, b], "total": round(total, 3), "local": round(local, 3)}
+                    for a, b, total, local in skew[layer]
+                ],
             }
             for layer, m in result.meshes.items()
         },
+        "space": result.clearance,
         "longest_trace": {"net": longest[0], "length": round(longest[1], 3)},
     }
 

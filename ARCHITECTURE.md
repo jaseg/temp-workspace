@@ -33,9 +33,9 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 |---|---|
 | `config.py` | `Config`, a frozen dataclass and the single validated input. It also holds `FieldSpec` metadata that drives the UI form, `from_dict` (the only entry point for untrusted data), cross-field validation, and the schema version (other versions are rejected). |
 | `crosssection.py` | Pure math for the closed body: one panel's cross-section (`CrossSection`), the panel width solver, and `Body`, the material model around the interior (section 4.3). |
-| `mesh.py` | What the mesh layout algorithms share: the `Mesh` result, `MeshError`, the side bits, `straighten`. |
+| `mesh.py` | What the mesh layouts share: the `Mesh` result, `MeshError`, the side bits, `straighten`, a nearest-point `Grid`, and the metrics: `spacing` (the space between traces along them) and `skew` (neighbouring traces as a differential pair). Needs numpy. |
 | `kimesh.py` | The security mesh generator, a port of KiMesh: tiles, the randomized depth-first walk over the cells inside a mask, and joining each net's segments into one path. Needs shapely. |
-| `sfc.py` | Work in progress, not wired up yet: a mesh layout from a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across folds as seldom as possible, the traces offset from the curve. Needs shapely and numpy. |
+| `sfc.py` | The second mesh layout: a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across the folds as seldom as possible, relaxed to an even spacing, the traces offset from it. Needs shapely and numpy. |
 | `pcb.py` | The flex-PCB layout (mask, both meshes, the cable's traces, fan-out, vias and plug contacts, GND zone) and its export through gerbonara (KiCad board and project, Gerber, SVG). Imported on demand: its dependencies are heavy (the in-browser build loads them on the first PCB request). |
 | `fpc.py` | The FPC cable's layout at the top end of the pattern: the level cut it leaves the inner flap by, the meander, its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
@@ -91,8 +91,10 @@ outputs.
 | `test_fpc.py` | The FPC cable: one simple outline, a folded straight strip of the set length, corner creases that lay each run back along the one before and end on the cut, the level cut it leaves the flap by, its clearances, the sharp plug and the rounded other corners, mirroring to the back end, the default fitting the pattern, and validation. |
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
 | `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
+| `test_mesh.py` | The shared metrics: spacing of parallel traces, skew of detours. |
+| `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing mostly within band, repeatable seeds, holes. |
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
-| `test_pcb.py` | The PCB layout: the pinout, both meshes, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes. |
+| `test_pcb.py` | The PCB layout: the pinout, both meshes, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring. A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded. |
 
@@ -228,7 +230,7 @@ inner flap's free edge.
   so that the mask's edge there is the junction line itself. The F.Cu exit cell sits against
   it; the B.Cu mesh's grid is offset by half a cell in x and y (its exit cell half a cell in,
   on the column of its grid nearest its pins), so the two layers' bare edge strips differ.
-- **Mesh.** `mesh.generate` aligns the grid on the exit cell. Cells inside the mask are
+- **Mesh.** `kimesh.generate` aligns the grid on the exit cell. Cells inside the mask are
   found in one vectorized `shapely.contains`; the walk is KiMesh's (iterative, with its
   "keep going straight" bias for `randomness < 1`); tiles are KiMesh's look-up table with
   its rotations done on tuples. Each net's segments are chained end to end into one path
@@ -237,9 +239,63 @@ inner flap's free edge.
   corners, as `fpc.outline`), so they stay parallel round every turn. `fan` jogs each
   layer's traces from the mesh's pitch to the pins' places at 45°, delaying jogs until
   neighbours keep their pitch. The back layer's vias alternate between two rows.
-- **Check.** The tests run a DRC of their own: different nets on a layer at least the trace
-  space apart (shapely `STRtree` `dwithin`), all copper on the foil, every mesh net one chain
-  from contact to contact, vias off the cable's folds.
+- **Space-filling curve** (`sfc.generate`). Steps, and where they differ from the
+  reference code (github.com/mfx-inria/controllable-space-filling-curve):
+  1. *Segments:* the area cut into the zones' (panels') pieces, each shrunk by half a
+     spacing (its *domain*).
+  2. *Graph:* seeds on a jittered triangular grid, Lloyd iterations to a centroidal Voronoi
+     tessellation (shapely), cells clipped to the domain, holes split off. The reference
+     builds a Voronoi diagram of short segments ("needles") along a direction field and
+     optimizes it with L-BFGS, so that cell edges, and so the curve, can follow the field;
+     with no field set, points suffice. (A boundary-alignment field is a possible extension.)
+  3. *2-factor:* Edmonds' blossom algorithm (degree-two chains contracted) for a perfect
+     matching; the edges left out cover every vertex with cycles.
+  4. *Refinement:* a vertex at each cell's centre, joined to the corners it sees, threaded
+     into one cycle edge of its cell (a bipartite matching here, "steal and freeze" there);
+     cycles joined by split-and-reconnect, then doubled edges (checked not to cross).
+  5. *Zoning:* the reference counts zone-border crossings in a stochastic optimizer (flip,
+     transpose, cross, zigzag moves). Here each zone's cycle is complete first and the
+     zones are joined along a spanning tree (longest borders first), one
+     split-and-reconnect across each border, the joins checked against the curve: two
+     crossings per join, the minimum. No orientation objective, so the optimizer is not
+     ported.
+  6. *Exit:* a seed pinned in the mouth keeps cell walls off it; the stretch of the domain's
+     edge between the tongue's two ends becomes a fixed edge of the graph, standing for the
+     tongue (two legs, a spacing apart, straight through the exit cell), so the cycle takes
+     it and leaves the mouth outward.
+  7. *Geometry:* the reference minimizes the segment-CVT energy plus a Laplacian and a
+     length term with L-BFGS. Here: per-zone discrete CVT steps (each vertex to the
+     centroid of the sample points nearest it in its zone), Taubin smoothing, bends tighter
+     than the traces can follow smoothed, a length controller (shrink or inflate) towards
+     area / spacing; then a repair pass, at a finer step, pushing apart runs nearer than the
+     least spacing and runs nearer than half that to the area's edge or a fold (but at the
+     joins), and smoothing tight bends. Every step is undone where it would make the curve
+     cross itself; resampling follows a spline through the vertices so as not to cut
+     corners.
+  8. *Traces:* offsets of the curve (made smooth and fine by a Catmull-Rom spline), at a
+     pitch per side of the measured distance to the next run (or twice that to the edge)
+     over the number of traces, smoothed along the curve (a running minimum, then a running
+     mean over ±40 vertices: a jittery pitch makes the outer traces wiggle, which shows as
+     pair skew), capped inside bends, never below the trace pitch (+2 %; exactly the pitch
+     on the tongue's legs). Loops and backward runs an offset makes inside a tight bend are
+     cut out; the traces are cut where the tongue leaves through the exit.
+  The default box takes about 1–1.5 min per layer.
+- **Check** (`verify`, run at the end of every `layout`): the tracks' points joined along
+  each track and through the vias (union-find on µm-rounded points): every mesh net one
+  piece, ending on exactly its two contact pads; per layer, every pair of copper pieces of
+  different nets (track segments, vias, pads; shapely `STRtree` `dwithin`) at least their
+  half widths apart. The tests add a DRC of their own (different nets at least the trace
+  space apart), all copper on the foil, vias off the cable's folds.
+- **Metrics.** `mesh.spacing`: each trace sampled every pitch; on either side the nearest
+  copper within 1.5 pitches in a cone about the normal (not the same trace within 2.5
+  pitches along it), refined to the exact distance to its segments; lengths below the
+  nominal space, below it by 5 %, within −5 %…+20 %, above. `mesh.skew`: one trace sampled
+  every 0.5 mm, each sample matched to the nearest point of its neighbour a little ahead of
+  the last match (monotone); the largest difference of the lengths run to the matched
+  points, and the difference of the totals.
+- **Later.** A port of the curve layout to Rust compiled to WebAssembly (run natively in
+  the browser, and from the Python CLI through wasmtime) for speed, once the algorithm is
+  settled; an alignment field (the reference's needles) to lay the curve along the edges.
 - **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board
   renderer fails on footprints, so `render_stack` draws the tracks, vias, graphics and
   footprint into the layer stack itself.

@@ -133,9 +133,22 @@ def cmd_pcb(args: argparse.Namespace) -> int:
     except pcb.PcbError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    spacing, skew = layout.spacing(), layout.skew()
     for side, m in layout.meshes.items():
-        missed = f", {m.unreached} out of reach" if m.unreached else ""
-        print(f"{side}: mesh over {m.cells} cells of {m.cell:g} mm{missed}", file=sys.stderr)
+        if m.algorithm == "sfc":
+            missed = f", {m.unreached} panels out of reach" if m.unreached else ""
+            print(f"{side}: space-filling curve over {m.cells} cells{missed}", file=sys.stderr)
+        else:
+            missed = f", {m.unreached} out of reach" if m.unreached else ""
+            print(f"{side}: mesh over {m.cells} cells of {m.cell:g} mm{missed}", file=sys.stderr)
+        sp = spacing[side]
+        print(
+            f"  space: {100 * sp.within / max(sp.measured, 1e-9):.1f} % within -5..+20 %, "
+            f"{sp.below:.1f} mm below nominal (least {sp.least:.3f} mm)",
+            file=sys.stderr,
+        )
+        for a, b, total, local in skew[side]:
+            print(f"  skew {a}/{b}: {total:.2f} mm total, {local:.2f} mm local", file=sys.stderr)
     net, length = layout.longest_trace()
     print(f"longest trace: {net}, {length / 1000:.2f} m", file=sys.stderr)
     for path in pcb.export(layout, args.output, args.name):

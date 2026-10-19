@@ -43,7 +43,7 @@ PYODIDE_FILES = ("pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "pyodide-l
 # The package modules the API needs (no Flask, no file persistence).
 PY_MODULES = (
     "__init__", "api", "config", "crosssection", "dimensions", "fpc", "geometry", "kimesh",
-    "mesh", "payload", "pcb", "presets", "scad", "svg",
+    "mesh", "payload", "pcb", "presets", "scad", "sfc", "svg",
 )  # fmt: skip
 
 # The PCB layout's dependencies, loaded by the worker on the first PCB request. Pyodide's own
