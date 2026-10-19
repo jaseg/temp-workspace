@@ -214,8 +214,11 @@ function renderMeshStats(pcb) {
   const both = (f) => `${f(front)} / ${f(back)}`;
   const sfc = front.algorithm === "sfc";
   // (spacing: the share of the traces' measured sides within the nominal space -5 / +20 %,
-  // and how much of them is below it; skew: the worst neighbouring pair of each mesh)
-  const share = (x) => `${((100 * x.spacing.within) / Math.max(x.spacing.measured, 1e-9)).toFixed(1)} %`;
+  // and over twice it, how much of them is below it and the widest gap; skew: the worst
+  // neighbouring pair of each mesh)
+  const pct = (x, key) => `${((100 * x.spacing[key]) / Math.max(x.spacing.measured, 1e-9)).toFixed(1)} %`;
+  const share = (x) => pct(x, "within");
+  const wide = (x) => `${pct(x, "wide")}, ≤ ${x.spacing.largest.toFixed(2)} mm`;
   const below = (x) => `${x.spacing.below.toFixed(1)} mm`;
   const worst = (x, key) => Math.max(0, ...x.skew.map((p) => p[key]));
   const skew = (x) => `${worst(x, "total").toFixed(1)} / ${worst(x, "local").toFixed(1)} mm`;
@@ -234,6 +237,7 @@ function renderMeshStats(pcb) {
     ["Longest trace", `${m(pcb.longest_trace.length)} (${pcb.longest_trace.net})`],
     ["Space within −5…+20 % (front / back)", both(share)],
     ["Below nominal space (front / back)", both(below), front.spacing.under + back.spacing.under > 0],
+    ["Gaps over twice the space, widest (front / back)", both(wide)],
     ["Pair skew, total / local (front)", skew(front)],
     ["Pair skew, total / local (back)", skew(back)],
   ];

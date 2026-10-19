@@ -91,8 +91,8 @@ outputs.
 | `test_fpc.py` | The FPC cable: one simple outline, a folded straight strip of the set length, corner creases that lay each run back along the one before and end on the cut, the level cut it leaves the flap by, its clearances, the sharp plug and the rounded other corners, mirroring to the back end, the default fitting the pattern, and validation. |
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
 | `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
-| `test_mesh.py` | The shared metrics: spacing of parallel traces, skew of detours. |
-| `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing mostly within band, repeatable seeds, holes. |
+| `test_mesh.py` | The shared metrics: spacing of parallel traces and across islands (not past the edge), skew of detours. |
+| `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing mostly within band and few islands, repeatable seeds, holes. |
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
 | `test_pcb.py` | The PCB layout: the pinout, both meshes, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring. A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
@@ -267,35 +267,57 @@ inner flap's free edge.
      length term with L-BFGS. Here: per-zone discrete CVT steps (each vertex to the
      centroid of the sample points nearest it in its zone), Taubin smoothing, bends tighter
      than the traces can follow smoothed, a length controller (shrink or inflate) towards
-     area / spacing; then a repair pass, at a finer step, pushing apart runs nearer than the
-     least spacing and runs nearer than half that to the area's edge or a fold (but at the
-     joins), and smoothing tight bends. Every step is undone where it would make the curve
-     cross itself; resampling follows a spline through the vertices so as not to cut
-     corners.
+     area / spacing. The reference's curve is a zero-width line (a printed bead fills small
+     voids); here each run carries a ribbon of all the traces, so a run spaced wider than
+     the ribbon leaves an island of up to a ribbon's width. So, unlike the reference, the
+     seeds are denser (the cycle comes out sparse), and two passes follow at a finer step:
+     growth (as by differential growth: runs nearer than a little over the ribbon's width
+     repel each other, bends bulge into the room left, pushes smoothed over a ribbon's
+     width; each step only where the step before pushed, until the length stalls), then a
+     repair pass pushing apart runs nearer than the least spacing (+4 %) and runs nearer
+     than half that to the area's edge or a fold (but at the joins). Tight bends are
+     rounded with Taubin's smoothing about them (a Laplacian step pulls a U-turn's tip
+     back, shortening the curve and opening an island in front of it), the Laplacian only
+     for those still too tight after ten steps (U-turns sit right at the limit: half the
+     ribbon). The vertices are kept and only split or merged locally (resampling every
+     step shrinks a curve). Every step is undone where it would make the curve cross
+     itself.
   8. *Traces:* offsets of the curve (made smooth and fine by a Catmull-Rom spline), at a
      pitch per side of the measured distance to the next run (or twice that to the edge)
      over the number of traces, smoothed along the curve (a running minimum, then a running
-     mean over ±40 vertices: a jittery pitch makes the outer traces wiggle, which shows as
-     pair skew), capped inside bends, never below the trace pitch (+2 %; exactly the pitch
-     on the tongue's legs). Loops and backward runs an offset makes inside a tight bend are
-     cut out; the traces are cut where the tongue leaves through the exit.
-  The default box takes about 1–1.5 min per layer.
+     mean over ±10 vertices), capped inside bends, never below the trace pitch (+2 %;
+     exactly the pitch on the tongue's legs). Spreading skews: two neighbouring traces on
+     one side differ in length by the pitch times the curve's turning, so a wider pitch in
+     a bend adds to or takes from their skew with the bend's sense, and over hundreds of
+     U-turns it adds up (to 16–19 mm on the default box). So, walking the curve from the
+     exit, the traces spread on the straight wherever there is room but in a bend only
+     where that pays back the skew run up so far (eased in and out over a few vertices).
+     Loops and backward runs an offset makes inside a tight bend are cut out; the traces are
+     cut where the tongue leaves through the exit.
+  The default box takes about 2.5 min per layer.
 - **Check** (`verify`, run at the end of every `layout`): the tracks' points joined along
   each track and through the vias (union-find on µm-rounded points): every mesh net one
   piece, ending on exactly its two contact pads; per layer, every pair of copper pieces of
   different nets (track segments, vias, pads; shapely `STRtree` `dwithin`) at least their
   half widths apart. The tests add a DRC of their own (different nets at least the trace
   space apart), all copper on the foil, vias off the cable's folds.
-- **Metrics.** `mesh.spacing`: each trace sampled every pitch; on either side the nearest
-  copper within 1.5 pitches in a cone about the normal (not the same trace within 2.5
-  pitches along it), refined to the exact distance to its segments; lengths below the
-  nominal space, below it by 5 %, within −5 %…+20 %, above. `mesh.skew`: one trace sampled
-  every 0.5 mm, each sample matched to the nearest point of its neighbour a little ahead of
-  the last match (monotone); the largest difference of the lengths run to the matched
-  points, and the difference of the totals.
+- **Metrics.** `mesh.spacing` (from `mesh.gaps`, the per-sample profile): each trace
+  sampled every pitch; on either side the nearest copper within 1.5 pitches in a cone
+  about the normal (not the same trace within 2.5 pitches along it), refined to the exact
+  distance to its segments, and near the nominal space or below to the trace's own
+  segments (the chords between samples cut a bend's corner by up to 0.025 mm); where
+  nothing is that near, the first copper straight across, out to three times as many
+  pitches as there are traces (further: the area's edge, not counted), so islands count.
+  Lengths below the nominal space, below it by 5 %, within −5 %…+20 %, above, above twice
+  it, and the least and largest space. `mesh.skew`: one trace sampled every 0.5 mm, each
+  sample matched to the nearest point of its neighbour a little ahead of the last match
+  (monotone); the largest difference of the lengths run to the matched points, and the
+  difference of the totals.
 - **Later.** A port of the curve layout to Rust compiled to WebAssembly (run natively in
   the browser, and from the Python CLI through wasmtime) for speed, once the algorithm is
-  settled; an alignment field (the reference's needles) to lay the curve along the edges.
+  settled; an alignment field (the reference's needles) to lay the curve along the edges;
+  a progress bar for the mesh layout; a switch to draw the traces as circular arcs (now
+  polylines, simplified within 2 µm).
 - **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board
   renderer fails on footprints, so `render_stack` draws the tracks, vias, graphics and
   footprint into the layer stack itself.

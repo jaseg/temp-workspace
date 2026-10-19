@@ -31,6 +31,12 @@ The steps follow the paper:
    3.3.3, then has nothing left to improve: no alignment or orientation objective is set.)
 6. *Geometry* (3.4). The curve is smoothed and relaxed towards an even spacing within its
    zone (the per-zone CVT objective: zone borders and the area's edge stand as mirrors).
+7. *Room between the runs* (not in the paper, whose curve is a line of no width). Each run
+   here carries a ribbon of all the traces, so where two runs part, the room between them
+   grows up to a ribbon's width before another run fits: islands. The curve is grown into
+   that room (as by differential growth: nearby runs repel, bends bulge where there is
+   room), its tight bends rounded without pulling them back, and the traces spread to
+   share what is left, in bends only as far as keeps neighbouring traces' skew down.
 
 Steps 2 and 6 differ in their means: the Voronoi diagram is of points (no orientation field,
 so no needles), and the geometry is relaxed by moving each vertex to the middle between its
@@ -50,14 +56,24 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString, MultiPoint, Polygon
 
-from yanartas_pillowbox.mesh import DOWN, LEFT, UP, Grid, Mesh, MeshError, Point, resample
+from yanartas_pillowbox.mesh import (
+    DOWN,
+    LEFT,
+    UP,
+    Grid,
+    Mesh,
+    MeshError,
+    Point,
+    Rays,
+    resample,
+)
 
 SPACING = 1.0  # the curve's target spacing, in multiples of its least (n pitches)
-SEED_SPACING = 2.2  # the CVT seeds' spacing, in target spacings (the cycle's ≈ 0.45 of it)
+SEED_SPACING = 1.4  # the CVT seeds' spacing, in target spacings (the cycle comes out sparser)
 LLOYD = 6  # Lloyd iterations of the seeds
-LLOYD_CURVE = 10  # CVT steps of the curve
+LLOYD_CURVE = 20  # CVT steps of the curve
 SPREAD = 1.3  # the traces spread over at most this many target spacings
-SMOOTH = 40  # the pitch of the traces smoothed over this many vertices either way
+SMOOTH = 10  # the pitch of the traces smoothed over this many vertices either way
 GAIN = 3.0  # the Laplacian weight per relative excess length
 REPAIR = 100  # steps pushing runs apart (at most)
 WINDOW = 1.5  # parts of the curve nearer than this many least spacings along it: one run
@@ -66,7 +82,14 @@ RAMP = 3  # ... ramped in over this many vertices off the tongue
 MARGIN = 0.02  # ... at a pitch this much above the least (but at the exit)
 SIMPLIFY = 0.002  # the traces simplified within this (mm; well within the margin)
 INSIDE = 0.9  # traces inside a bend keep within this share of its radius
-PUSH_MARGIN = 1.0  # runs closer than this many times their least spacing: pushed apart
+PUSH_MARGIN = 1.04  # runs closer than this many times their least spacing: pushed apart
+BEND_SLACK = 0.85  # bends this much tighter than the tightest: smoothed (U-turns sit at it)
+GROW = 150  # steps growing the curve into the room left between its runs (at most)
+REACH = 1.06  # ... runs nearer than this many least spacings repel each other
+GROW_RATE = 0.5  # ... the share of the room a bend bulges into per step
+HARD = 10  # repair steps before bends still too sharp are smoothed the hard way
+STALL = 10  # ... until it has grown less than 0.2 % over this many steps
+STRAIGHT = 0.1  # bends gentler than this many least spacings' curvature: straight (skew)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
 
@@ -800,49 +823,6 @@ def _curve(
 
 
 # ----------------------------------------------------------------------------- geometry
-class _Rays:
-    """Ray casting against segments, bucketed on a grid as wide as the rays are long."""
-
-    def __init__(self, a: np.ndarray, b: np.ndarray, reach: float) -> None:
-        self.a, self.b, self.reach = a, b, reach
-        cells, ids = self._cells(a, b)
-        order = np.argsort(cells, kind="stable")
-        self.keys, self.ids = cells[order], ids[order]
-
-    def _cells(self, a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """The grid cells each segment's box touches (it spans at most two each way)."""
-        lo = np.floor(np.minimum(a, b) / self.reach).astype(np.int64)
-        hi = np.floor(np.maximum(a, b) / self.reach).astype(np.int64)
-        keys, ids = [], []
-        n = np.arange(len(a))
-        for dx in (0, 1):
-            for dy in (0, 1):
-                ok = (lo[:, 0] + dx <= hi[:, 0]) & (lo[:, 1] + dy <= hi[:, 1])
-                keys.append((lo[ok, 0] + dx) * 1_000_003 + (lo[ok, 1] + dy))
-                ids.append(n[ok])
-        return np.concatenate(keys), np.concatenate(ids)
-
-    def cast(self, p: np.ndarray, d: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Every hit of the rays ``p + t d`` (``0 < t <= reach``, ``d`` unit): the ray, the
-        segment and ``t``."""
-        cells, rays = self._cells(p, p + d * self.reach)
-        lo = np.searchsorted(self.keys, cells, "left")
-        hi = np.searchsorted(self.keys, cells, "right")
-        count = hi - lo
-        ray = np.repeat(rays, count)
-        start = np.repeat(lo - np.concatenate([[0], np.cumsum(count)[:-1]]), count)
-        seg = self.ids[start + np.arange(len(ray))]
-        q, e = self.a[seg], self.b[seg] - self.a[seg]
-        dr, w = d[ray], q - p[ray]
-        den = dr[:, 0] * e[:, 1] - dr[:, 1] * e[:, 0]
-        ok = np.abs(den) > 1e-12
-        den = np.where(ok, den, 1.0)
-        t = (w[:, 0] * e[:, 1] - w[:, 1] * e[:, 0]) / den
-        s = (w[:, 0] * dr[:, 1] - w[:, 1] * dr[:, 0]) / den
-        ok &= (t > 1e-9) & (t <= self.reach) & (s >= 0) & (s <= 1)
-        return ray[ok], seg[ok], t[ok]
-
-
 def _even(p: np.ndarray, k: int, step: float, smooth: bool = False) -> np.ndarray:
     """The closed curve's first ``k`` vertices (an open polyline; the rest stay) resampled
     at an even step (``smooth``: along a spline through them, so as not to cut corners),
@@ -870,6 +850,18 @@ def _split(p: np.ndarray, longest: float) -> np.ndarray:
     return np.vstack([p[i] + (p[i + 1] - p[i]) * t[:, None], p[-1:]])
 
 
+def _respace(p: np.ndarray, step: float) -> np.ndarray:
+    """The open polyline at about ``step`` between vertices without moving any (so that,
+    resampled step after step, it does not shrink): vertices closer to the next but one
+    than ``step`` dropped (not two in a row; its ends kept), segments longer than one and a
+    half split."""
+    seg = np.hypot(*np.diff(p, axis=0).T)
+    drop = np.zeros(len(p), bool)
+    drop[1:-1] = seg[:-1] + seg[1:] < step
+    drop[1:] &= ~drop[:-1]
+    return _split(p[~drop], 1.5 * step)
+
+
 def _spacing(
     p: np.ndarray, mirrors: tuple[np.ndarray, np.ndarray], reach: float, window: float
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -884,7 +876,7 @@ def _spacing(
     arc = np.concatenate([[0.0], np.cumsum(np.hypot(*(q - p).T))])
     total, arc = arc[-1], arc[:-1]
     ma, mb = mirrors
-    rays = _Rays(np.vstack([p, ma]), np.vstack([q, mb]), reach)
+    rays = Rays(np.vstack([p, ma]), np.vstack([q, mb]), reach)
     out = []
     for sign in (1.0, -1.0):
         ray, seg, hit = rays.cast(p, sign * normal)
@@ -1037,7 +1029,7 @@ def _relax(
         p[1 : k - 1] = _lloyd(p, reg, samples, sreg, spacing)[1 : k - 1]
         p = _taubin(p, k)
         # (bends tighter than the traces can follow: smoothed while the length is held)
-        sharp = np.abs(_radius(p, 1)) < bend
+        sharp = np.abs(_radius(p, 1)) < BEND_SLACK * bend
         sharp[k - 1 :] = sharp[0] = False
         soft = sharp | np.roll(sharp, 1) | np.roll(sharp, -1)
         soft[k - 1 :] = soft[0] = False
@@ -1054,7 +1046,7 @@ def _relax(
 
     step = spacing / 4
     inner = resample(np.vstack([free[-1], tongue[1:-1], free[0]]), step)[1:-1]
-    free = _even(np.vstack([free, inner]), len(free), step)
+    free = _even(np.vstack([free, inner]), len(free), step, smooth=True)
     want = PUSH_MARGIN * least
     window = WINDOW * least
     # The edge the curve keeps off by half a spacing: the area's, and the zones' borders but
@@ -1073,11 +1065,13 @@ def _relax(
             borders = borders[far]
         edge = np.vstack([edge, borders])
     edges = Grid(edge, want)
-    p = np.vstack([free, inner])
-    k = len(free)
+    p, k = _grow(
+        np.vstack([free, inner]), len(free), step, least, target - tongue_len, edge, edges, bend
+    )
+    free = p[:k]
     hot = None
-    for _ in range(REPAIR):
-        free = _even(p, k, step, smooth=True)  # (evenly spaced again, along a spline)
+    for it in range(REPAIR):
+        free = _respace(p[:k], step)
         p = np.vstack([free, inner])
         k = len(free)
         which = np.arange(k)
@@ -1092,8 +1086,8 @@ def _relax(
             ((near >= 0) & (d < want) & movable, p[np.maximum(near, 0)], d),
             ((e >= 0) & (2 * de < want) & movable, edge[np.maximum(e, 0)], 2 * de),
         ]
-        sharp = np.abs(_radius(p, 1)) < bend
-        sharp[k:] = False
+        sharp = np.abs(_radius(p, 1)) < BEND_SLACK * bend
+        sharp[k - 1 :] = sharp[0] = False
         if not sharp.any() and not any(hit.any() for hit, _, _ in bad):
             break
         move = np.zeros_like(p)
@@ -1102,23 +1096,120 @@ def _relax(
             away /= np.maximum(np.hypot(away[:, 0], away[:, 1]), 1e-12)[:, None]
             np.add.at(move, which[hit], away * (0.6 * (want - dist[hit]) + step / 8)[:, None])
         move = (np.roll(move, 1, axis=0) + 2 * move + np.roll(move, -1, axis=0)) / 4
-        soft = sharp | np.roll(sharp, 1) | np.roll(sharp, -1)
-        move[soft] += 0.5 * _lap(p)[soft]
-        # off the tongue's mouths: the curve on along their arcs' end for a while
-        for end, prev, sign in ((0, len(p) - 1, 1), (k - 1, k, -1)):
-            t = p[end] - p[prev]
-            t /= max(math.hypot(*t), 1e-12)
-            for m in (1, 2, 3):
-                i = end + sign * m
-                on = p[end] + t * math.dist(p[i], p[end])
-                move[i] += (0.5 / m) * (on - p[i])
-        move[0] = move[k - 1] = 0
-        move[k:] = 0
+        move += _soften(p, k, sharp, hard=it >= HARD)
+        _mouths(p, k, move)
         size = np.hypot(move[:, 0], move[:, 1])
         move *= np.minimum(1.0, (step / 2) / np.maximum(size, 1e-12))[:, None]
         p = _untangle(p, p + move)
         moved = size[:k] > 0
         cell = np.unique(np.floor(p[:k][moved] / want).astype(np.int64), axis=0)
+        cell = np.unique((cell[:, None, :] + _AROUND[None]).reshape(-1, 2), axis=0)
+        hot = cell[:, 0] * 1_000_003 + cell[:, 1]
+    return p, k
+
+
+def _soften(p: np.ndarray, k: int, sharp: np.ndarray, hard: bool = False) -> np.ndarray:
+    """A move rounding the curve's ``sharp`` bends: Taubin's smoothing about them, so that
+    they open out rather than pull back (the curve keeps its length); ``hard``: a Laplacian
+    step at them, for those Taubin's leaves too sharp."""
+    soft = sharp.copy()
+    for i in range(1, 4):
+        soft |= np.roll(sharp, i) | np.roll(sharp, -i)
+    out = _taubin(p, k, 2) - p
+    out[~soft] = 0
+    if hard:
+        near = sharp | np.roll(sharp, 1) | np.roll(sharp, -1)
+        out[near] += 0.5 * _lap(p)[near]
+    return out
+
+
+def _mouths(p: np.ndarray, k: int, move: np.ndarray) -> None:
+    """Off the tongue's mouths: the curve on along their arcs' end for a while (``move``
+    amended: the vertex next to each mouth put on that line, the next two drawn towards it,
+    whatever else moves them; the tongue and its ends stay)."""
+    for end, prev, sign in ((0, len(p) - 1, 1), (k - 1, k, -1)):
+        t = p[end] - p[prev]
+        t /= max(math.hypot(*t), 1e-12)
+        for m in (1, 2, 3):
+            i = end + sign * m
+            on = p[end] + t * math.dist(p[i], p[end])
+            move[i] = (on - p[i]) if m == 1 else move[i] + (0.5 / m) * (on - p[i])
+    move[0] = move[k - 1] = 0
+    move[k:] = 0
+
+
+def _grow(
+    p: np.ndarray,
+    k: int,
+    step: float,
+    least: float,
+    target: float,
+    edge: np.ndarray,
+    edges: Grid,
+    bend: float,
+) -> tuple[np.ndarray, int]:
+    """The closed curve ``p`` (its first ``k`` vertices free, the rest the tongue's) grown
+    into the room between its runs, as by differential growth: runs nearer each other (or
+    twice the area's edge) than a little over the least spacing repel each other, and while
+    the free part is shorter than ``target``, its bends bulge out where there is room. Each
+    step looks again only where something was pushed the step before (an island at a time,
+    in effect, once the rest has settled)."""
+    reach = REACH * least
+    look = reach + step
+    window = WINDOW * least
+    width = max(1, round(least / step / 2))  # (pushes smoothed over about a least spacing)
+    hot = None
+    lengths: list[float] = []
+    for _ in range(GROW):
+        free = _respace(p[:k], step)
+        p = np.vstack([free, p[k:]])
+        k = len(free)
+        length = float(np.sum(np.hypot(*np.diff(free, axis=0).T)))
+        lengths.append(length)
+        stalled = len(lengths) > STALL and length < lengths[-STALL - 1] * 1.002
+        if length >= target or stalled:
+            break  # (grown as far as it goes)
+        which = np.arange(k)
+        if hot is not None:
+            cell = np.floor(free / look).astype(np.int64)
+            which = np.nonzero(np.isin(cell[:, 0] * 1_000_003 + cell[:, 1], hot))[0]
+        if not len(which):
+            break
+        t = np.roll(p, -1, axis=0) - np.roll(p, 1, axis=0)
+        t /= np.maximum(np.hypot(t[:, 0], t[:, 1]), 1e-12)[:, None]
+        normal = np.stack([-t[:, 1], t[:, 0]], 1)
+        _, left = _neighbours(p, window, look, 1, which)
+        _, right = _neighbours(p, window, look, -1, which)
+        e = edges.nearest(p[which], lambda qi, pi: np.ones(len(qi), bool))
+        to = edge[np.maximum(e, 0)] - p[which]
+        de = np.where(e >= 0, 2 * np.hypot(to[:, 0], to[:, 1]), look)
+        at = np.sum(to * normal[which], axis=1) > 0
+        left = np.where(at, np.minimum(left, de), left)
+        right = np.where(at, right, np.minimum(right, de))
+        force = (np.maximum(reach - right, 0) - np.maximum(reach - left, 0)) / 2
+        if length < target:
+            lap = _lap(p)
+            out = -sum(np.roll(lap, i, axis=0) for i in range(-2, 3))[which]
+            way = np.sign(np.sum(out * normal[which], axis=1))
+            room = np.where(way > 0, left, right) - reach
+            force += way * GROW_RATE * np.clip(room, 0, step)
+        push = np.zeros(len(p))
+        push[which] = force
+        push[k:] = 0
+        busy = np.abs(push) > 0.05 * step
+        if not busy.any():
+            break
+        for _ in range(2):
+            push = sum(np.roll(push, i) for i in range(-width, width + 1)) / (2 * width + 1)
+        move = normal * push[:, None] + _taubin(p, k, 1) - p
+        sharp = np.abs(_radius(p, 1)) < BEND_SLACK * bend
+        sharp[k - 1 :] = sharp[0] = False
+        move += _soften(p, k, sharp)
+        _mouths(p, k, move)
+        size = np.hypot(move[:, 0], move[:, 1])
+        move *= np.minimum(1.0, (step / 2) / np.maximum(size, 1e-12))[:, None]
+        p = _untangle(p, p + move)
+        cell = np.unique(np.floor(p[:k][busy[:k]] / look).astype(np.int64), axis=0)
         cell = np.unique((cell[:, None, :] + _AROUND[None]).reshape(-1, 2), axis=0)
         hot = cell[:, 0] * 1_000_003 + cell[:, 1]
     return p, k
@@ -1149,7 +1240,7 @@ def _crossing(p: np.ndarray, which: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     q = np.roll(p, -1, axis=0)
     e = q - p
     length = np.hypot(e[:, 0], e[:, 1])
-    rays = _Rays(p, q, max(float(length.max()), 1e-6))
+    rays = Rays(p, q, max(float(length.max()), 1e-6))
     d = e[which] / np.maximum(length[which], 1e-12)[:, None]
     ray, seg, t = rays.cast(p[which], d)
     i = which[ray]
@@ -1215,7 +1306,7 @@ def _lanes(
         c = resample(np.asarray(r.coords), spacing / 2)
         ea.append(c[:-1])
         eb.append(c[1:])
-    rays = _Rays(np.vstack(ea), np.vstack(eb), cap / 2)
+    rays = Rays(np.vstack(ea), np.vstack(eb), cap / 2)
     radius = _radius(p)
     # the least pitch: with the margin, but on the tongue's legs (exactly the pitch there),
     # ramped in along the curve off them
@@ -1236,7 +1327,7 @@ def _lanes(
             m = np.minimum(m, np.minimum(np.roll(d, i), np.roll(d, -i)))
         d = sum(np.roll(m, i) for i in range(-SMOOTH, SMOOTH + 1)) / (2 * SMOOTH + 1)
         d = np.maximum(d, floor)
-        sides.append(d / n)
+        sides.append(_balance(floor / n, d / n, p, k, least))
     fine = _spline(p, FINE)
     t = np.arange(len(fine)) / FINE  # (each fine vertex's place between the curve's)
     lo = np.floor(t).astype(int) % len(p)
@@ -1256,6 +1347,30 @@ def _lanes(
         ahead = np.sum((np.roll(lane, -1, axis=0) - lane) * tangent, axis=1) > 0
         ahead &= np.roll(ahead, 1)
         out.append(_unloop(lane[ahead]))
+    return out
+
+
+def _balance(lo: np.ndarray, hi: np.ndarray, p: np.ndarray, k: int, least: float) -> np.ndarray:
+    """The pitch of one side's traces along the closed curve ``p``: up to ``hi`` (to share the
+    room), down to ``lo`` (the least) where that would skew them. Neighbouring traces on one
+    side differ in length by the pitch times the curve's turning, so a pitch above the least
+    in a bend skews them, one way or the other with the bend's sense; along the curve from
+    the exit (vertex ``k``: the tongue's), the traces spread in a bend only where that pays
+    back the skew run up so far, on the straight wherever there is room (the choice eased in
+    and out over a few vertices)."""
+    curv = 1 / _radius(p)  # (signed: turning left)
+    ds = np.hypot(*(np.roll(p, -1, axis=0) - p).T)
+    order = np.roll(np.arange(len(p)), -k)
+    out = lo.copy()
+    skew, u = 0.0, 0.0
+    ease = 2 / (SMOOTH + 1)
+    straight = STRAIGHT / least
+    for i in order.tolist():
+        c = curv[i]
+        want = 1.0 if abs(c) < straight or skew * c <= 0 else 0.0
+        u += ease * (want - u)
+        out[i] = lo[i] + u * (hi[i] - lo[i])
+        skew += out[i] * c * ds[i]
     return out
 
 
@@ -1375,7 +1490,9 @@ def generate(
     for ring in _lanes(p, k, area, n, pitch, spacing, exact):
         line = shapely.line_merge(shapely.difference(LineString(np.vstack([ring, ring[:1]])), cut))
         if isinstance(line, LineString):
-            line = line.simplify(SIMPLIFY * pitch / 0.3, preserve_topology=False)
+            tol = SIMPLIFY * pitch / 0.3
+            fast = line.simplify(tol, preserve_topology=False)
+            line = fast if fast.is_simple else line.simplify(tol, preserve_topology=True)
         if not isinstance(line, LineString):
             raise MeshError("a trace does not leave through the exit")
         xy = frame.inv(np.asarray(line.coords))

@@ -134,19 +134,64 @@ class Grid:
         return out
 
 
+class Rays:
+    """Ray casting against segments, bucketed on a grid as wide as the rays are long."""
+
+    def __init__(self, a: np.ndarray, b: np.ndarray, reach: float) -> None:
+        self.a, self.b, self.reach = a, b, reach
+        cells, ids = self._cells(a, b)
+        order = np.argsort(cells, kind="stable")
+        self.keys, self.ids = cells[order], ids[order]
+
+    def _cells(self, a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """The grid cells each segment's box touches (it spans at most two each way)."""
+        lo = np.floor(np.minimum(a, b) / self.reach).astype(np.int64)
+        hi = np.floor(np.maximum(a, b) / self.reach).astype(np.int64)
+        keys, ids = [], []
+        n = np.arange(len(a))
+        for dx in (0, 1):
+            for dy in (0, 1):
+                ok = (lo[:, 0] + dx <= hi[:, 0]) & (lo[:, 1] + dy <= hi[:, 1])
+                keys.append((lo[ok, 0] + dx) * 1_000_003 + (lo[ok, 1] + dy))
+                ids.append(n[ok])
+        return np.concatenate(keys), np.concatenate(ids)
+
+    def cast(self, p: np.ndarray, d: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Every hit of the rays ``p + t d`` (``0 < t <= reach``, ``d`` unit): the ray, the
+        segment and ``t``."""
+        cells, rays = self._cells(p, p + d * self.reach)
+        lo = np.searchsorted(self.keys, cells, "left")
+        hi = np.searchsorted(self.keys, cells, "right")
+        count = hi - lo
+        ray = np.repeat(rays, count)
+        start = np.repeat(lo - np.concatenate([[0], np.cumsum(count)[:-1]]), count)
+        seg = self.ids[start + np.arange(len(ray))]
+        q, e = self.a[seg], self.b[seg] - self.a[seg]
+        dr, w = d[ray], q - p[ray]
+        den = dr[:, 0] * e[:, 1] - dr[:, 1] * e[:, 0]
+        ok = np.abs(den) > 1e-12
+        den = np.where(ok, den, 1.0)
+        t = (w[:, 0] * e[:, 1] - w[:, 1] * e[:, 0]) / den
+        s = (w[:, 0] * dr[:, 1] - w[:, 1] * dr[:, 0]) / den
+        ok &= (t > 1e-9) & (t <= self.reach) & (s >= 0) & (s <= 1)
+        return ray[ok], seg[ok], t[ok]
+
+
 # ----------------------------------------------------------------------------- metrics
 @dataclass(frozen=True)
 class Spacing:
     """The space between a mesh's traces (copper edge to copper edge), measured along every
     trace on either side where another trace (or another stretch of the same one) faces
-    it: lengths in mm of trace side, the space in mm."""
+    it: lengths in mm of trace side, the space in mm. (Facing nothing: at the area's edge.)"""
 
     measured: float  # trace length with copper facing it, both sides counted
     below: float  # ... with less than the nominal space
     under: float  # ... with less than the nominal space less the tolerance (5 %)
     within: float  # ... between that and the nominal space plus 20 %
     over: float  # ... with more
+    wide: float  # ... with more than twice the nominal space (the islands between runs)
     least: float  # the least space found
+    largest: float  # the largest
 
     def to_dict(self) -> dict[str, float]:
         return {k: round(v, 4) for k, v in self.__dict__.items()}
@@ -155,13 +200,39 @@ class Spacing:
 def spacing(
     traces: Sequence[Sequence[Point]], width: float, space: float, step: float | None = None
 ) -> Spacing:
-    """The spacing profile of ``traces`` (of ``width``, nominally ``space`` apart): samples
-    every ``step`` along each, the nearest copper on either side within one and a half
-    pitches (in a cone about the normal; not the same trace within two and a half pitches
-    along it)."""
+    """The spacing profile of ``traces`` (of ``width``, nominally ``space`` apart), summed
+    up from ``gaps``."""
+    _, weight, sides = gaps(traces, width, space, step)
+    found = {k: 0.0 for k in ("measured", "below", "under", "within", "over", "wide")}
+    least, largest = math.inf, 0.0
+    for gap in sides:
+        has = ~np.isnan(gap)
+        gap, wt = gap[has], weight[has]
+        found["measured"] += float(wt.sum())
+        found["below"] += float(wt[gap < space - 1e-9].sum())
+        found["under"] += float(wt[gap < 0.95 * space].sum())
+        found["within"] += float(wt[(gap >= 0.95 * space) & (gap <= 1.2 * space)].sum())
+        found["over"] += float(wt[gap > 1.2 * space].sum())
+        found["wide"] += float(wt[gap > 2 * space].sum())
+        if len(gap):
+            least = min(least, float(gap.min()))
+            largest = max(largest, float(gap.max()))
+    return Spacing(**found, least=least if math.isfinite(least) else 0.0, largest=largest)
+
+
+def gaps(
+    traces: Sequence[Sequence[Point]], width: float, space: float, step: float | None = None
+) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
+    """Samples every ``step`` (a pitch) along each of ``traces``, the trace length each
+    stands for, and the space to the nearest copper on either side of each (left, right;
+    NaN where none faces it): within one and a half pitches, in a cone about the normal (not
+    the same trace within two and a half pitches along it); where there is none, the first
+    copper straight across, as far as three times as many pitches as there are traces
+    (further: the area's edge)."""
     pitch = width + space
     step = step or pitch
     pts, net, arc, normal, weight = [], [], [], [], []
+    exact = _Polylines(traces)
     for i, t in enumerate(traces):
         p = resample(np.asarray(t, float), step)
         d = np.gradient(p, axis=0)
@@ -177,8 +248,9 @@ def spacing(
     reach = 1.5 * pitch  # (past the nominal space plus 20 %, by a margin)
     along = 2.5 * pitch  # (round a sharp corner, the same trace that far on is out of reach)
     grid = Grid(p, reach)
-    found = {"measured": 0.0, "below": 0.0, "under": 0.0, "within": 0.0, "over": 0.0}
-    least = math.inf
+    seg = np.nonzero(net[:-1] == net[1:])[0]  # (each sample to the next on its trace)
+    far = [Rays(p[seg], p[seg + 1], r) for r in (4 * pitch, 3 * max(len(traces), 2) * pitch)]
+    sides = []
     for side in (1.0, -1.0):
 
         def ok(qi: np.ndarray, pi: np.ndarray, side: float = side) -> np.ndarray:
@@ -192,20 +264,81 @@ def spacing(
         has = near >= 0
         q, j = p[has], near[has]
         dist = np.hypot(*(p[j] - q).T)
-        for o in (-1, 1):  # (to the segments either side of the nearest sample: exact)
+        for o in (-1, 1):  # (to the chords either side of the nearest sample)
             k = np.clip(j + o, 0, len(p) - 1)
             same = net[k] == net[j]
             dist = np.where(same, np.minimum(dist, _to_segment(q, p[j], p[k])), dist)
-        gap = dist - width
-        wt = weight[has]
-        found["measured"] += float(wt.sum())
-        found["below"] += float(wt[gap < space - 1e-9].sum())
-        found["under"] += float(wt[gap < 0.95 * space].sum())
-        found["within"] += float(wt[(gap >= 0.95 * space) & (gap <= 1.2 * space)].sum())
-        found["over"] += float(wt[gap > 1.2 * space].sum())
-        if len(gap):
-            least = min(least, float(gap.min()))
-    return Spacing(**found, least=least if math.isfinite(least) else 0.0)
+        # near the nominal space or below: to the trace itself (a chord cuts a bend's corner)
+        close = np.nonzero(dist - width < 1.25 * space)[0]
+        i = np.nonzero(has)[0][close]
+        dist[close] = exact.distance(
+            q[close], net[j[close]], arc[j[close]], 2 * step, net[i], arc[i], along
+        )
+        gap = np.full(len(p), np.nan)
+        gap[has] = dist - width
+        # nothing that near: straight across, further out
+        wide = np.nonzero(~has)[0]
+        across = np.full(len(wide), np.inf)
+        for rays in far:
+            for c in range(0, len(wide), CHUNK // 8):
+                i = wide[c : c + CHUNK // 8]
+                ray, s, t = rays.cast(p[i], side * normal[i])
+                a = seg[s]
+                mine = (net[a] == net[i[ray]]) & (np.abs(arc[a] - arc[i[ray]]) <= along)
+                keep = (t > width / 2) & ~mine
+                np.minimum.at(across, c + ray[keep], t[keep])
+            if np.isfinite(across).all():
+                break
+        hit = np.isfinite(across)
+        gap[wide[hit]] = across[hit] - width
+        sides.append(gap)
+    return p, weight, (sides[0], sides[1])
+
+
+class _Polylines:
+    """The traces' own segments, for exact distances near a point along one of them."""
+
+    def __init__(self, traces: Sequence[Sequence[Point]]) -> None:
+        self.a, self.b, self.start, self.arc = [], [], [], []
+        first = 0
+        for t in traces:
+            q = np.asarray(t, float)
+            seg = np.hypot(*np.diff(q, axis=0).T)
+            self.a.append(q[:-1])
+            self.b.append(q[1:])
+            self.arc.append(np.concatenate([[0.0], np.cumsum(seg)])[:-1])
+            self.start.append(first)
+            first += len(seg)
+        self.ends = np.array([*self.start, first])
+        self.a, self.b, self.arc = (np.concatenate(x) for x in (self.a, self.b, self.arc))
+
+    def distance(
+        self,
+        q: np.ndarray,
+        net: np.ndarray,
+        at: np.ndarray,
+        span: float,
+        own: np.ndarray,
+        here: np.ndarray,
+        along: float,
+    ) -> np.ndarray:
+        """Each point's distance to trace ``net`` where it runs within ``span`` of ``at`` along
+        it; not where that is the point's ``own`` trace within ``along`` of ``here``."""
+        out = np.full(len(q), np.inf)
+        for i in np.unique(net):
+            sel = np.nonzero(net == i)[0]
+            lo, hi = self.ends[i], self.ends[i + 1]
+            arc = self.arc[lo:hi]
+            first = lo + np.maximum(np.searchsorted(arc, at[sel] - span, "right") - 1, 0)
+            last = lo + np.searchsorted(arc, at[sel] + span, "right")
+            count = last - first
+            qi = np.repeat(sel, count)
+            si = np.repeat(first - np.concatenate([[0], np.cumsum(count)[:-1]]), count)
+            si += np.arange(len(qi))
+            d = _to_segment(q[qi], self.a[si], self.b[si])
+            d[(own[qi] == i) & (np.abs(self.arc[si] - here[qi]) <= along)] = np.inf
+            np.minimum.at(out, qi, d)
+        return out
 
 
 def _to_segment(q: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:

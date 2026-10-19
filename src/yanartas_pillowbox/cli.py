@@ -144,7 +144,9 @@ def cmd_pcb(args: argparse.Namespace) -> int:
         sp = spacing[side]
         print(
             f"  space: {100 * sp.within / max(sp.measured, 1e-9):.1f} % within -5..+20 %, "
-            f"{sp.below:.1f} mm below nominal (least {sp.least:.3f} mm)",
+            f"{sp.below:.1f} mm below nominal (least {sp.least:.3f} mm), "
+            f"{100 * sp.wide / max(sp.measured, 1e-9):.1f} % over twice it "
+            f"(widest {sp.largest:.2f} mm)",
             file=sys.stderr,
         )
         for a, b, total, local in skew[side]:

@@ -68,6 +68,7 @@ def test_layout(n, side, corner):
     sp = mesh.spacing(m.traces, PITCH / 2, PITCH / 2)
     assert sp.under < 0.05 * sp.measured and sp.below < 0.1 * sp.measured
     assert sp.within > 0.5 * sp.measured and sp.least > 0  # (rare tight spots allowed)
+    assert sp.wide < 0.15 * sp.measured  # (few islands between the curve's runs)
 
 
 def test_seed_repeats_the_layout():
