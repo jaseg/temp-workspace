@@ -95,6 +95,7 @@ SETTLE = 0  # steps settling each trace into the middle of the room either side 
 SETTLE_RATE = 0.5  # ... the share of the way there a step goes
 SETTLE_REACH = 3.0  # ... copper looked for this many pitches out (beyond: a hole, moved into)
 SETTLE_PIN = 1.5  # ... bends tighter than this many pitches' radius do not move inwards
+SETTLE_COOL = 2.0  # ... the moves dying down over the steps as (1 - step / steps) to this
 SETTLE_TUNE = 6.0  # ... a trace this many pitches behind (or ahead): steered at full strength
 SETTLE_STEER = 0.3  # ... the share of its bends' depth a step grows (or straightens) them by
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
@@ -1540,7 +1541,8 @@ def _settle(
     limit = SETTLE_SKEW * pitch
     sides = _neighbour_sides(tr)
     hot = None
-    for _ in range(SETTLE):
+    for it in range(SETTLE):
+        cool = (1 - it / SETTLE) ** SETTLE_COOL  # (annealed: the moves die down)
         p, net = tr.p, tr.net
         arc = tr.arc()
         where = np.minimum((tr.u * bins).astype(int), bins - 1)
@@ -1556,7 +1558,7 @@ def _settle(
         push = np.zeros(len(p))
         if len(look):
             push[look] = _centring(p, net, arc, normal, look, edge, edges, near, far, own, pitch)
-        push *= SETTLE_RATE
+        push *= SETTLE_RATE * cool
         # a tight bend: no move along its axis into it (its tip pinned, its legs may close)
         curv = tr.turning()
         axis = _bend_axes(tr, curv, SETTLE_PIN * pitch)
@@ -1584,8 +1586,8 @@ def _settle(
             pushes = np.sum(bend[mine] * toward, axis=1) < 0  # (a bump towards it)
             # (well ahead, its other bumps, out into holes, too: skew before coverage)
             give = np.clip(lead, 0.0, 1.0) * np.where(pushes, 1.0, np.clip(lead - 1, 0.0, 1.0))
-            move[mine] += (SETTLE_STEER * give)[:, None] * bend[mine]
-        move -= (SETTLE_STEER * grow)[:, None] * bend
+            move[mine] += (SETTLE_STEER * cool * give)[:, None] * bend[mine]
+        move -= (SETTLE_STEER * cool * grow)[:, None] * bend
         ahead = np.zeros((n, bins))
         for t in range(n - 1):
             ahead[t] = np.maximum(ahead[t], run[t] - run[t + 1])
@@ -1639,7 +1641,14 @@ def _settle(
         tr.p = new
         tr = tr.respaced(step)
         gained = _binned(tr, bins) - base
+        if _TRACE is not None:
+            run = np.cumsum(gained, axis=1)
+            apart = [round(float(np.max(np.abs(run[t] - run[t + 1]))), 1) for t in range(n - 1)]
+            _TRACE.append((int(moved.sum()), gained.sum(axis=1).round(1).tolist(), apart))
     return tr.lines()
+
+
+_TRACE: list | None = None  # (development: each settling step's figures, when a list)
 
 
 def _neighbour_sides(tr: _Traces) -> np.ndarray:
@@ -1760,13 +1769,13 @@ def _keep_clear(
     tr: _Traces, old: np.ndarray, new: np.ndarray, pitch: float, own: float
 ) -> np.ndarray:
     """``new`` with the vertices that would come nearer other copper than a pitch (with a
-    margin for the sampling), or whose segments would cross, back where they were
-    (``old``). A trace's own vertices ``a`` apart along it count as other copper once
-    they are nearer than a semicircle that long would hold them (2 a / pi): it may U-turn,
-    but not pinch."""
+    margin for what resampling and simplifying shave off), or whose segments would cross,
+    back where they were (``old``). A trace's own vertices count as other copper where it
+    faces itself (across it, as across a hairpin's legs; not round a kink): it may turn
+    sharply, but not pinch."""
     new = new.copy()
     net = tr.net
-    need = (1 - 1e-3) * pitch
+    need = 1.01 * pitch
     check = np.nonzero(np.any(new != old, axis=1))[0]
     reach = need + _gap_step(tr)
     for _ in range(6):
@@ -1775,18 +1784,22 @@ def _keep_clear(
             break
         tr.p = new
         arc = tr.arc()
+        normal = tr.normals()
+        tangent = np.stack([normal[:, 1], -normal[:, 0]], 1)
         qi, pi = Grid(new, reach).within(new[check], reach)
         q = check[qi]
         same = net[pi] == net[q]
         sep = np.abs(arc[pi] - arc[q])
         keep = ~same | (sep > own)
-        q, pi, same, sep = q[keep], pi[keep], same[keep], sep[keep]
-        d = np.hypot(*(new[pi] - new[q]).T)
+        q, pi, same = q[keep], pi[keep], same[keep]
+        v = new[pi] - new[q]
+        d = np.hypot(v[:, 0], v[:, 1])
         for nb in (tr.prev, tr.next):  # (other traces: to their segments, exactly)
             o = np.where(nb[pi] >= 0, nb[pi], pi)
             d = np.where(same, d, np.minimum(d, _to_segment(new[q], new[pi], new[o])))
-        limit = np.where(same, np.minimum(need, 0.95 * 2 * sep / np.pi), need)
-        bad = np.unique(q[d < limit])
+        # (its own copper: only straight across, not along it round a kink)
+        across = np.abs(np.sum(v * tangent[q], axis=1)) < 0.5 * np.maximum(d, 1e-12)
+        bad = np.unique(q[(d < need) & (~same | across)])
         # segments that cross
         seg = np.nonzero(tr.next >= 0)[0]
         touch = np.isin(seg, check) | np.isin(tr.next[seg], check)
