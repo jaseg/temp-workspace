@@ -10,7 +10,10 @@ skeleton); DIR/local-test.html is the same page as a full document for local tes
 (python -m http.server -d DIR).
 
 The Pyodide runtime comes from the npm tarball (downloaded to artifact/.cache/ unless
---pyodide-tgz is given) and is checked against the registry's integrity hash.
+--pyodide-tgz is given) and is checked against the registry's integrity hash. The PCB
+layout's packages come from Pyodide's CDN (shapely, with numpy and GEOS: checked against the
+tarball's pyodide-lock.json) and from PyPI (gerbonara: checked against a pinned hash); they
+are cached in artifact/.cache/ too.
 """
 
 from __future__ import annotations
@@ -39,9 +42,24 @@ PYODIDE_FILES = ("pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "pyodide-l
 
 # The package modules the API needs (no Flask, no file persistence).
 PY_MODULES = (
-    "__init__", "api", "config", "crosssection", "dimensions", "fpc", "geometry", "payload",
-    "presets", "scad", "svg",
+    "__init__", "api", "config", "crosssection", "dimensions", "fpc", "geometry", "mesh",
+    "payload", "pcb", "presets", "scad", "svg",
 )  # fmt: skip
+
+# The PCB layout's dependencies, loaded by the worker on the first PCB request. Pyodide's own
+# packages (with their dependencies, as its lock file lists them):
+PYODIDE_CDN = f"https://cdn.jsdelivr.net/pyodide/v{PYODIDE_VERSION}/full/"
+PYODIDE_PACKAGES = ("shapely",)
+# Pure-Python wheels, installed without their dependencies: gerbonara needs click (a Pyodide
+# package), quart (only for its own server, unused) and rtree (stubs/rtree stands in).
+WHEELS = {
+    "gerbonara-1.6.3-py3-none-any.whl": (
+        "https://files.pythonhosted.org/packages/91/25/df1ba4ab100da4fecc4c843946b72f98909885"
+        "810d5eb6c4c6cfedbdea31/gerbonara-1.6.3-py3-none-any.whl",
+        "fccf782acdc98e80e3a418b7ed57d35c4f6ac7a8bc5e5d3ddc48bdd870919be2",
+    ),
+}
+PYODIDE_EXTRA = ("click",)  # (gerbonara's, imported by modules the layout does not use)
 
 
 def patch(text: str, old: str, new: str) -> str:
@@ -62,6 +80,49 @@ def pyodide_tarball(path: Path | None) -> bytes:
     if digest != PYODIDE_SHA512:
         raise SystemExit(f"{path}: sha512 mismatch, not the pyodide {PYODIDE_VERSION} tarball")
     return data
+
+
+def fetch_checked(url: str, sha256: str) -> bytes:
+    """``url``'s content, cached in artifact/.cache/, checked against its sha256."""
+    path = HERE / ".cache" / url.rsplit("/", 1)[1]
+    if not path.exists():
+        path.parent.mkdir(exist_ok=True)
+        print("downloading", url)
+        with urllib.request.urlopen(url) as res:
+            path.write_bytes(res.read())
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != sha256:
+        raise SystemExit(f"{path}: sha256 mismatch")
+    return data
+
+
+PART = 4_000_000  # characters per part of an encoded package (artifact files: 16 MB at most)
+
+
+def write_parts(path: Path, data: bytes) -> int:
+    """``data`` base64-encoded into ``<path>.<i>.b64.txt`` parts; returns their count."""
+    text = base64.b64encode(data).decode()
+    parts = [text[i : i + PART] for i in range(0, len(text), PART)]
+    for i, part in enumerate(parts):
+        path.with_name(f"{path.name}.{i}.b64.txt").write_text(part)
+    return len(parts)
+
+
+def pyodide_packages(lock: dict, names: tuple[str, ...]) -> list[dict]:
+    """The lock's entries of ``names`` and everything they depend on, dependencies first."""
+    out: list[dict] = []
+
+    def add(name: str) -> None:
+        entry = lock["packages"][name]
+        if entry in out:
+            return
+        for dep in entry.get("depends", []):
+            add(dep)
+        out.append(entry)
+
+    for name in names:
+        add(name)
+    return out
 
 
 def build(out: Path, tgz: Path | None) -> None:
@@ -86,6 +147,35 @@ def build(out: Path, tgz: Path | None) -> None:
             (out / "pyodide" / name).write_bytes(tar.extractfile(f"package/{name}").read())
         stdlib = tar.extractfile("package/python_stdlib.zip").read()
     (out / "pyodide/python_stdlib.zip.b64.txt").write_text(base64.b64encode(stdlib).decode())
+
+    # The PCB layout's packages, base64-encoded like the standard library: the worker loads
+    # them on the first PCB request (py/pcb.json lists them).
+    lock = json.loads((out / "pyodide/pyodide-lock.json").read_text())
+    packages = pyodide_packages(lock, (*PYODIDE_PACKAGES, *PYODIDE_EXTRA))
+    parts = {}
+    for entry in packages:
+        data = fetch_checked(PYODIDE_CDN + entry["file_name"], entry["sha256"])
+        parts[entry["file_name"]] = write_parts(out / "pyodide" / entry["file_name"], data)
+    (out / "py/wheels").mkdir()
+    for name, (url, sha256) in WHEELS.items():
+        parts[name] = write_parts(out / "py/wheels" / name, fetch_checked(url, sha256))
+    stubs = sorted(p.relative_to(HERE / "stubs").as_posix() for p in (HERE / "stubs").rglob("*.py"))
+    for name in stubs:
+        (out / "py/stubs" / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(HERE / "stubs" / name, out / "py/stubs" / name)
+    (out / "py/pcb.json").write_text(
+        json.dumps(
+            {
+                "packages": [*PYODIDE_PACKAGES, *PYODIDE_EXTRA],
+                "files": [e["file_name"] for e in packages],
+                "parts": parts,
+                "wheels": list(WHEELS),
+                "stubs": stubs,
+            },
+            indent=1,
+        )
+        + "\n"
+    )
 
     for name in ("pyshim.js", "pyworker.js"):
         shutil.copy(HERE / name, out / name)

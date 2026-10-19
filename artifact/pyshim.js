@@ -97,7 +97,13 @@ window.fetch = async (input, init = {}) => {
   if (method === "PUT" && url.pathname === "/api/config" && reply.status === 200) {
     writeStore(JSON.parse(reply.body).config);
   }
-  return new Response(reply.body, { status: reply.status, headers: { "Content-Type": reply.type } });
+  let payload = reply.body;
+  if (reply.encoding === "base64") { // binary (the PCB files' zip)
+    const bin = atob(payload);
+    payload = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) payload[i] = bin.charCodeAt(i);
+  }
+  return new Response(payload, { status: reply.status, headers: { "Content-Type": reply.type } });
 };
 
 // Downloads go through the viewer's "downloads" capability (plain download links are blocked

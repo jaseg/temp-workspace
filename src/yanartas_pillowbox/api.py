@@ -67,7 +67,7 @@ def _pcb_layout(cfg: Config) -> tuple[Any, Any]:
     """The PCB layout (``pcb``: heavy dependencies, imported on demand)."""
     try:
         from yanartas_pillowbox import pcb
-    except ImportError as exc:  # (the in-browser build has no gerbonara)
+    except ImportError as exc:  # (shapely or gerbonara missing)
         raise ApiError(
             501, {"error": f"PCB layout unavailable here: {exc}", "errors": {}}
         ) from None

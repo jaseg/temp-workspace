@@ -2,11 +2,13 @@
 
 Routes requests like yanartas_pillowbox/server.py does, to the same ``api`` functions.
 Settings persistence is the caller's job (browser storage): GET /api/config gets the stored
-config passed in as ``stored`` and validates it; PUT /api/config only validates.
+config passed in as ``stored`` and validates it; PUT /api/config only validates. Binary
+replies (the PCB files' zip) travel base64-encoded (``encoding``).
 """
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import json
 from typing import Any
@@ -20,6 +22,11 @@ JSON = "application/json"
 
 
 def _reply(status: int, data: Any, content_type: str = JSON) -> str:
+    if isinstance(data, bytes):
+        body = base64.b64encode(data).decode()
+        return json.dumps(
+            {"status": status, "type": content_type, "body": body, "encoding": "base64"}
+        )
     body = data if isinstance(data, str) else json.dumps(data)
     return json.dumps({"status": status, "type": content_type, "body": body})
 
@@ -55,8 +62,10 @@ def _route(method: str, path: str, body: str | None, stored: str | None) -> str:
         return _reply(200, render_scad(api.parse_config(data)), "text/plain")
     if method == "POST" and path == "/api/payload":
         return _reply(200, api.payload_action(data))
-    if method == "POST" and path in ("/api/pcb", "/api/pcb/files"):
-        return _reply(501, {"error": "The PCB layout needs the desktop app (gerbonara)."})
+    if method == "POST" and path == "/api/pcb":
+        return _reply(200, api.pcb_preview(api.parse_config(data)))
+    if method == "POST" and path == "/api/pcb/files":
+        return _reply(200, api.pcb_files(api.parse_config(data)), "application/zip")
     return _reply(404, {"error": f"no route {method} {path}"})
 
 

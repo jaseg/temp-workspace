@@ -18,6 +18,7 @@ sha512 against the registry's integrity hash. Pass `--pyodide-tgz FILE` to use a
 | `pyworker.js` | Web worker that starts Pyodide, loads the modules listed in `py/files.json` and answers requests. |
 | `pyshim.js` | Loaded before `app.js`. It routes `fetch("/api/…")` to the worker and keeps settings in `localStorage`. Downloads go through the Artifact viewer's `downloads` capability. |
 | `build.py` | Assembles `dist/`. |
+| `stubs/rtree/` | Stand-in for `rtree`, which needs a C library Pyodide lacks. gerbonara imports it at the top of `gerbonara.cad.kicad.pcb` for a trace look-up index the PCB layout never uses; the stand-in fails loudly if anything does. |
 
 `dist/index.html` is the page body for an Artifact; the viewer adds the document skeleton.
 `dist/local-test.html` is the same page as a full document.
@@ -32,3 +33,13 @@ Other constraints of the viewer:
 - No inline scripts and no import maps.
 - Scripts load only from the page's own files, so three.js is shipped alongside the page.
 - `.zip` files are not served, so the Python standard library ships base64-encoded as text.
+
+**PCB layout.** The layout needs shapely and gerbonara. `build.py` bundles shapely (with
+numpy, from Pyodide's CDN, checked against the tarball's `pyodide-lock.json`), click, and the
+gerbonara wheel (from PyPI, checked against a pinned sha256; installed without its
+dependencies: quart only serves its own web UI, and `stubs/rtree` stands in for rtree). They
+ship base64-encoded in parts of at most 4 MB (`py/pcb.json` lists them; artifact files may be
+16 MB at most) and the worker loads them on the first PCB request, serving Pyodide's package
+loader through a `fetch` wrapper. Laying out the default box takes about 3 s (the first
+time about 6 s, with the loading), its zip of files about 20 s. The zip reply
+travels base64-encoded (`encoding: "base64"`), and `pyshim.js` decodes it.

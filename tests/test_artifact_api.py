@@ -50,6 +50,8 @@ def same(flask_response, status, body):
         ("POST", "/api/payload", {"config": {}, "action": "fit"}),
         ("POST", "/api/payload", {"config": {}, "action": "maximize", "field": "payload_width"}),
         ("POST", "/api/payload", {"config": {}, "action": "bogus"}),
+        ("POST", "/api/pcb", {"config": {"mesh_traces": 2}}),
+        ("POST", "/api/pcb", {"config": {"fpc_cable": "none"}}),
     ],
 )
 def test_routes_match_server(client, method, path, data):
@@ -75,3 +77,17 @@ def test_stored_config():
     for bad in ("{", "[]", json.dumps({**cfg, "version": 1})):
         got = json.loads(call("GET", "/api/config", stored=bad)[1])["config"]
         assert got == Config.defaults().to_dict()
+
+
+def test_pcb_files_travel_base64(client):
+    """The PCB files' zip: binary, so base64-encoded in the reply (pyshim.js decodes it)."""
+    import base64
+    import zipfile
+
+    body = json.dumps({"config": {"mesh_traces": 2}})
+    reply = json.loads(pb_api.handle("POST", "/api/pcb/files", body, None))
+    assert reply["status"] == 200 and reply["type"] == "application/zip"
+    assert reply["encoding"] == "base64"
+    names = zipfile.ZipFile(io.BytesIO(base64.b64decode(reply["body"]))).namelist()
+    expected = client.post("/api/pcb/files", data=body, content_type="application/json")
+    assert names == zipfile.ZipFile(io.BytesIO(expected.data)).namelist()
