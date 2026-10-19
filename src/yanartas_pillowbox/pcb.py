@@ -2,12 +2,15 @@
 traces leave through the FPC cable to the plug's contacts.
 
 Each copper layer carries its own mesh (``mesh``): ``mesh_traces`` loops over the box's faces,
-kept ``mesh_edge_clearance`` off the cut edges, the slits and the cable. A mesh's exit cell
-sits against the junction, where the cable leaves the inner flap, so its loops' ends run
-straight on into the cable: the front (F.Cu) mesh's on the plug's pin 1 side, the back
-(B.Cu) mesh's beside them. Along the cable they keep the mesh's pitch, each on its own
-layer. Just before the plug they fan out to their contacts' places, and the back mesh's
-traces change to the contact side (F.Cu) through two staggered rows of vias.
+kept ``mesh_edge_clearance`` off the cut edges, the slits and the cable. The front (F.Cu)
+mesh's exit cell sits against the junction, where the cable leaves the inner flap, so its
+loops' ends run straight on into the cable, on the plug's pin 1 side. The back (B.Cu) mesh's
+grid is offset by half a cell in x and y, so that the strips the two layers' whole cells
+leave bare along the edges differ: its exit cell sits half a cell into the flap, beside the
+front one's, and its loops' ends run straight on across the gap. Along the cable they keep
+the mesh's pitch, each on its own layer. Just before the plug they fan out to their
+contacts' places, and the back mesh's traces change to the contact side (F.Cu) through two
+staggered rows of vias.
 
 The plug's pins carry, from pin 1: GND, mesh ends 1-4, GND, 5-8, GND, 9-12, GND, 13-16, GND
 (the front mesh's ends 1-8, the back mesh's 9-16, each loop's two ends mirrored about the
@@ -251,13 +254,23 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     result.clearance, result.width = space, w
     cell = 2 * n * pitch
     half = cable.width / 2
-    tracks: dict[str, list[tuple[float, list[Point]]]] = {}  # layer -> (k, cable trace)
+    tracks: dict[str, list[tuple[float, str, Point]]] = {}  # layer -> ends (k, net, point)
+    grid = None  # the front mesh's exit corner
     for i, (layer, side_pins) in enumerate(sides.items()):
         centre = sum(k_pin(j) for j in side_pins) / len(side_pins)
-        if abs(centre) + cell / 2 > half - ec:
+        x0 = xc + centre * left0[0] - cell / 2  # (the exit cell centred on its pins)
+        if grid is None:
+            corner = (x0, yj if up else yj - cell)
+            grid = corner
+        else:
+            # The back mesh's grid is offset by half a cell both ways, so that the strips
+            # each layer's whole cells leave bare along the edges differ: its exit cell sits
+            # half a cell into the flap (its traces run straight on across the gap) and on
+            # the nearest column of its grid.
+            x0 = grid[0] + cell / 2 + round((x0 - grid[0] - cell / 2) / cell) * cell
+            corner = (x0, yj + cell / 2 if up else yj - 1.5 * cell)
+        if abs((x0 + cell / 2 - xc) * left0[0]) + cell / 2 > half - ec:
             raise PcbError("no room for the mesh's exit at the cable's junction")
-        x_mid = xc + centre * left0[0]
-        corner = (x_mid - cell / 2, yj if up else yj - cell)
         try:
             m = meshgen.generate(
                 mask,
@@ -274,12 +287,14 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         for net, trace in enumerate(m.traces):
             result.tracks.append(Track(trace, layer, f"MESH_{side}{net + 1}", w))
         # The loops' ends, across the cable from pin 1's side: they run on into the cable.
-        ends = sorted(
-            ((p[0] - xc) * left0[0], f"MESH_{side}{net + 1}")
-            for net, t in enumerate(m.traces)
-            for p in (t[0], t[-1])
-        )[::-1]
-        tracks[layer] = [(k, net) for k, net in ends]  # type: ignore[misc]
+        tracks[layer] = sorted(
+            (
+                ((p[0] - xc) * left0[0], f"MESH_{side}{net + 1}", p)
+                for net, t in enumerate(m.traces)
+                for p in (t[0], t[-1])
+            ),
+            reverse=True,
+        )
 
     _route_cable(cfg, cable, result, sides, tracks, k_pin, pins)
     result.ground = cable_poly
@@ -291,7 +306,7 @@ def _route_cable(
     cable: Cable,
     result: Layout,
     sides: dict[str, list[int]],
-    ends: dict[str, list[tuple[float, str]]],
+    ends: dict[str, list[tuple[float, str, Point]]],
     k_pin: Callable[[int], float],
     pins: list[str | None],
 ) -> None:
@@ -313,7 +328,7 @@ def _route_cable(
     row_gnd = plug + 0.2 + VIA_SIZE / 2
     rows = (row_gnd + VIA_SIZE + result.clearance, row_gnd + 2 * (VIA_SIZE + result.clearance))
     fans = {
-        layer: fan([k for k, _ in ends[layer]], [k_pin(j) for j in side_pins], pitch)
+        layer: fan([k for k, _, _ in ends[layer]], [k_pin(j) for j in side_pins], pitch)
         for layer, side_pins in sides.items()
     }
     fan_start = rows[1] + VIA_SIZE / 2 + result.clearance + max(f[0][-1][0] for f in fans.values())
@@ -330,11 +345,12 @@ def _route_cable(
         return shapely.Point(p).distance(folds) >= FOLD_CLEARANCE
 
     for layer, side_pins in sides.items():
-        for idx, ((k, net), j, local) in enumerate(
+        for idx, ((k, net, start), j, local) in enumerate(
             zip(ends[layer], side_pins, fans[layer], strict=True)
         ):
-            # Along the cable at k, up to the fan, then fanned out to the pin's place.
-            along = [*offset_path(path, k)[:-1], at(fan_start, k)]
+            # From the mesh's end (straight on to the junction if its exit cell lies further
+            # in), along the cable at k, up to the fan, then fanned out to the pin's place.
+            along = [start, *offset_path(path, k)[:-1], at(fan_start, k)]
             fanned = [at(fan_start - du, dv) for du, dv in local[1:]]
             if layer == FRONT:
                 pts = [*along, *fanned, at(plug, k_pin(j))]
@@ -360,7 +376,7 @@ def _route_cable(
     # Stitching vias along both edges of the cable and between the two meshes' traces.
     edge = cable.width / 2 - result.clearance - VIA_SIZE / 2 - cfg.mesh_edge_clearance / 2
     lanes = [edge, -edge]
-    bundles = sorted(k for layer in ends for k, _ in ends[layer])
+    bundles = sorted(k for layer in ends for k, _, _ in ends[layer])
     gaps = [
         (a + b) / 2
         for a, b in itertools.pairwise(bundles)

@@ -255,12 +255,14 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   sides on which it connects in the walk's tree. Each of the `mesh_traces` traces is one
   loop through every cell, with both ends at the exit cell. F.Cu and B.Cu each get their own
   mesh (different seeds). The cells only cover whole squares, so up to a cell's width along
-  the edges stays bare, as in KiMesh.
-* **Into the cable:** each mesh's exit cell sits against the junction, where the cable leaves
-  the inner flap; its traces run straight on into the cable and along it at the mesh's
-  pitch, each layer's on its own side (F.Cu's on pin 1's side). Before the plug they fan
-  out with 45° jogs to their contacts' places; the B.Cu traces change to the contact side
-  (F.Cu) through two staggered rows of vias (0.45 mm, 0.2 mm drill).
+  the edges stays bare, as in KiMesh; the B.Cu mesh's grid is offset from the F.Cu mesh's by
+  half a cell in x and y, so the two layers leave different strips bare.
+* **Into the cable:** the F.Cu mesh's exit cell sits against the junction, where the cable
+  leaves the inner flap, the B.Cu mesh's half a cell further in (on its offset grid, its
+  traces running straight on across the gap); their traces run on into the cable and along
+  it at the mesh's pitch, each layer's on its own side (F.Cu's on pin 1's side). Before the
+  plug they fan out with 45° jogs to their contacts' places; the B.Cu traces change to the
+  contact side (F.Cu) through two staggered rows of vias (0.45 mm, 0.2 mm drill).
 * **Plug pinout,** from pin 1 (on the cable's left, looking from the flap towards the tip):
   GND, mesh ends 1–4, GND, 5–8, GND, 9–12, GND, 13–16, GND; the rest are free. Ends 1–8 are
   the F.Cu mesh's, 9–16 the B.Cu mesh's; within each eight, a loop's two ends are mirrored

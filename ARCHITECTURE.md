@@ -223,7 +223,9 @@ inner flap's free edge.
 - **Mask.** The foil (`Polygon` of the outline, arcs within 5 µm, less the slits as 0.1 mm
   slots and the scraps) shrunk by the edge clearance, less the cable: the outline segments
   no face owns, closed and cut off level at the junction, plus a band beyond the junction
-  so that the mask's edge there is the junction line itself. The exit cells sit against it.
+  so that the mask's edge there is the junction line itself. The F.Cu exit cell sits against
+  it; the B.Cu mesh's grid is offset by half a cell in x and y (its exit cell half a cell in,
+  on the column of its grid nearest its pins), so the two layers' bare edge strips differ.
 - **Mesh.** `mesh.generate` aligns the grid on the exit cell. Cells inside the mask are
   found in one vectorized `shapely.contains`; the walk is KiMesh's (iterative, with its
   "keep going straight" bias for `randomness < 1`); tiles are KiMesh's look-up table with

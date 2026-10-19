@@ -149,6 +149,7 @@ class Mesh:
     cell: float  # the cells' size
     cells: int  # cells covered
     unreached: int  # cells inside the mask the walk could not reach
+    origin: Point = (0.0, 0.0)  # the exit cell's corner: the grid's alignment
 
     @property
     def ends(self) -> tuple[tuple[Point, Point], ...]:
@@ -221,7 +222,7 @@ def generate(
         for pts, net in tile(k, traces, chamfer):
             segments[net].append([(ox + (gx + u) * c, oy + (gy + v) * c) for u, v in pts])
     nets = tuple(_join(segments[i]) for i in range(traces))
-    return Mesh(nets, c, len(keys), len(todo))
+    return Mesh(nets, c, len(keys), len(todo), exit_corner)
 
 
 def _join(segments: list[list[Point]]) -> tuple[Point, ...]:
