@@ -65,6 +65,7 @@ from yanartas_pillowbox.mesh import (
     MeshError,
     Point,
     Rays,
+    _to_segment,
     resample,
 )
 
@@ -94,6 +95,8 @@ SETTLE = 0  # steps settling each trace into the middle of the room either side 
 SETTLE_RATE = 0.5  # ... the share of the way there a step goes
 SETTLE_REACH = 3.0  # ... copper looked for this many pitches out (beyond: a hole, moved into)
 SETTLE_PIN = 1.5  # ... bends tighter than this many pitches' radius do not move inwards
+SETTLE_TUNE = 6.0  # ... a trace this many pitches behind (or ahead): steered at full strength
+SETTLE_STEER = 0.3  # ... the share of its bends' depth a step grows (or straightens) them by
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -1535,6 +1538,7 @@ def _settle(
     base = _binned(tr, bins)  # (each trace's length by position, as laid)
     gained = np.zeros((n, bins))
     limit = SETTLE_SKEW * pitch
+    sides = _neighbour_sides(tr)
     hot = None
     for _ in range(SETTLE):
         p, net = tr.p, tr.net
@@ -1559,9 +1563,29 @@ def _settle(
         move = normal * push[:, None]
         into = np.sum(move * axis, axis=1)
         move -= np.maximum(into, 0.0)[:, None] * axis
-        # skew: where a trace is ahead of a neighbour (by position along the curve), no
-        # more gaining there; where behind, no losing
+        # length steered (by the length each trace has run from the exit, at its place
+        # along the curve): a trace behind a neighbour has its bends about a pitch across
+        # grown into what room there is (fingers, squiggles); one ahead of a neighbour has
+        # the bends it pushes towards that neighbour straightened, giving the room up to
+        # it (which, behind, grows into it); its fingers out into holes it keeps, but when
+        # well ahead.
         run = np.cumsum(gained, axis=1)
+        a, b = np.arange(len(p)), np.arange(len(p))
+        for _ in range(2):  # (two vertices either way: about a pitch)
+            a = np.where(tr.prev[a] >= 0, tr.prev[a], a)
+            b = np.where(tr.next[b] >= 0, tr.next[b], b)
+        bend = (p[a] + p[b]) / 2 - p  # (towards the bend's inside)
+        grow = np.zeros(len(p))
+        for t, u in [(i, j) for i in range(n) for j in (i - 1, i + 1) if 0 <= j < n]:
+            mine = net == t
+            lead = (run[t] - run[u])[where[mine]] / (SETTLE_TUNE * pitch)
+            grow[mine] = np.maximum(grow[mine], np.clip(-lead, 0.0, 1.0))
+            toward = sides[t, u] * normal[mine]  # (to the neighbour)
+            pushes = np.sum(bend[mine] * toward, axis=1) < 0  # (a bump towards it)
+            # (well ahead, its other bumps, out into holes, too: skew before coverage)
+            give = np.clip(lead, 0.0, 1.0) * np.where(pushes, 1.0, np.clip(lead - 1, 0.0, 1.0))
+            move[mine] += (SETTLE_STEER * give)[:, None] * bend[mine]
+        move -= (SETTLE_STEER * grow)[:, None] * bend
         ahead = np.zeros((n, bins))
         for t in range(n - 1):
             ahead[t] = np.maximum(ahead[t], run[t] - run[t + 1])
@@ -1593,7 +1617,7 @@ def _settle(
         tr.p = p
         back = np.zeros(len(p), bool)
         before, after = np.cumsum(gained, axis=1), np.cumsum(now, axis=1)
-        for t in range(n - 1):
+        for t in range(n - 1 if math.isfinite(limit) else 0):
             for a, b in ((t, t + 1), (t + 1, t)):
                 over = (after[a] - after[b] > limit) & (after[a] - after[b] > before[a] - before[b])
                 if not over.any():
@@ -1616,6 +1640,23 @@ def _settle(
         tr = tr.respaced(step)
         gained = _binned(tr, bins) - base
     return tr.lines()
+
+
+def _neighbour_sides(tr: _Traces) -> np.ndarray:
+    """For each two neighbouring traces: on which side of the first (along its normals:
+    1 left, -1 right) the second runs (they run alongside, so one side all along)."""
+    n = int(tr.net.max()) + 1
+    out = np.zeros((n, n))
+    normal = tr.normals()
+    for t in range(n - 1):
+        for a, b in ((t, t + 1), (t + 1, t)):
+            mine = np.nonzero(tr.net == a)[0]
+            some = mine[:: max(1, len(mine) // 60)]
+            other = LineString(tr.p[tr.net == b])
+            to = shapely.shortest_line(shapely.points(tr.p[some]), other)
+            to = np.diff(shapely.get_coordinates(to).reshape(-1, 2, 2), axis=1)[:, 0]
+            out[a, b] = 1.0 if np.mean(np.sum(to * normal[some], axis=1) > 0) > 0.5 else -1.0
+    return out
 
 
 def _binned(tr: _Traces, bins: int) -> np.ndarray:
@@ -1726,7 +1767,7 @@ def _keep_clear(
     but not pinch."""
     new = new.copy()
     net = tr.net
-    need = 1.02 * pitch
+    need = (1 - 1e-3) * pitch
     for _ in range(6):
         moved = np.nonzero(np.any(new != old, axis=1))[0]
         if not len(moved):
@@ -1745,10 +1786,13 @@ def _keep_clear(
             d = np.hypot(*(new[pi] - new[q]).T)
             sep = np.abs(arc[pi] - arc[q])
             same = net[pi] == net[q]
+            for nb in (tr.prev, tr.next):  # (other traces: to their segments, exactly)
+                o = np.where(nb[pi] >= 0, nb[pi], pi)
+                d = np.where(same, d, np.minimum(d, _to_segment(new[q], new[pi], new[o])))
             limit = np.where(same, np.minimum(need, 0.95 * 2 * sep / np.pi), need)
             return (d < limit) & (~same | (sep > own))
 
-        j = Grid(new, need).nearest(new[moved], close)
+        j = Grid(new, 1.2 * pitch).nearest(new[moved], close)
         bad = moved[j >= 0]
         # segments that cross
         seg = np.nonzero(tr.next >= 0)[0]
@@ -1760,7 +1804,7 @@ def _keep_clear(
         k = np.nonzero(touch)[0]
         ray, hit, t = rays.cast(a[k], e[k] / np.maximum(length[k], 1e-12)[:, None])
         i, h = seg[k[ray]], seg[hit]
-        cross = (t <= length[k[ray]]) & (h != i) & (h != tr.prev[i]) & (tr.next[h] != i)
+        cross = (t <= length[k[ray]]) & (h != i) & (h != tr.prev[i]) & (h != tr.next[i])
         crossed = np.concatenate([i[cross], tr.next[i[cross]], h[cross], tr.next[h[cross]]])
         back = np.unique(np.concatenate([bad, crossed[crossed >= 0]]))
         if not len(back):

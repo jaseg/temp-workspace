@@ -271,9 +271,10 @@ def gaps(
         # near the nominal space or below: to the trace itself (a chord cuts a bend's corner)
         close = np.nonzero(dist - width < 1.25 * space)[0]
         i = np.nonzero(has)[0][close]
-        dist[close] = exact.distance(
+        better = exact.distance(
             q[close], net[j[close]], arc[j[close]], 2 * step, net[i], arc[i], along
         )
+        dist[close] = np.where(np.isfinite(better), better, dist[close])
         gap = np.full(len(p), np.nan)
         gap[has] = dist - width
         # nothing that near: straight across, further out
