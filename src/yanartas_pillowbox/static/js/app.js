@@ -202,6 +202,30 @@ async function render() {
 function setMesh(pcb) {
   preview2d.setMesh(pcb);
   preview3d.setMesh(pcb);
+  renderMeshStats(pcb);
+}
+
+/** The mesh's figures, under their own heading in the Derived geometry box (none: hidden). */
+function renderMeshStats(pcb) {
+  $("#mesh-stats").hidden = !pcb;
+  if (!pcb) return;
+  const { front, back } = pcb.meshes;
+  const m = (mm) => `${(mm / 1000).toFixed(2)} m`;
+  const rows = [
+    ["Cell size", `${front.cell.toFixed(2)} mm`],
+    ["Cells (front / back)", `${front.cells} / ${back.cells}`],
+    ...(front.unreached + back.unreached
+      ? [["Cells out of reach", `${front.unreached} / ${back.unreached}`, true]]
+      : []),
+    ["Longest trace (front / back)", `${m(front.longest)} / ${m(back.longest)}`],
+    ["Longest trace", `${m(pcb.longest_trace.length)} (${pcb.longest_trace.net})`],
+  ];
+  $("#mesh-derived").replaceChildren(...rows.flatMap(([k, v, bad]) => {
+    const dt = Object.assign(document.createElement("dt"), { textContent: k });
+    const dd = Object.assign(document.createElement("dd"), { textContent: v });
+    if (bad) dd.classList.add("bad");
+    return [dt, dd];
+  }));
 }
 
 /** Spinner on the Mesh buttons (and the PCB download) while the layout runs. */
@@ -240,12 +264,8 @@ function scheduleMesh(delay = MESH_DELAY) {
       return;
     }
     setMesh(data);
-    const m = data.meshes;
-    const missed = m.front.unreached + m.back.unreached;
-    const longest = data.longest_trace;
-    setStatus(`Mesh: ${m.front.cells} + ${m.back.cells} cells of ${m.front.cell} mm`
-      + (missed ? `, ${missed} out of reach` : "")
-      + ` · longest trace ${(longest.length / 1000).toFixed(2)} m (${longest.net})`, missed > 0);
+    const missed = data.meshes.front.unreached + data.meshes.back.unreached;
+    setStatus(missed ? `Mesh laid out; ${missed} cells out of reach` : "Mesh laid out", missed > 0);
   }, delay);
 }
 

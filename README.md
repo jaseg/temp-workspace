@@ -82,7 +82,8 @@ the defaults. It never crashes because of the file.
 * **Mesh** (in the pattern's and the folded box's headers) shows the PCB layout's security
   mesh: F.Cu (the box's outside) in copper red, B.Cu (inside) in blue. The layout takes a
   second or two (a spinner shows on the button) and is redone after each change while the
-  mesh is shown; the status line then gives the cells and the longest trace's length. Its copper is
+  mesh is shown. Its figures (cell size, cells per side, the longest trace) appear under
+  *PCB mesh* in the *Derived geometry* box. Its copper is
   drawn into a bitmap once (in 3D, a texture on each side of the paper), never as SVG
   paths; zoomed in, the 2D view draws the visible part again at screen resolution.
   *Download PCB* saves the KiCad, Gerber and SVG files as a zip.
@@ -260,8 +261,8 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   the edges stays bare, as in KiMesh; the B.Cu mesh's grid is offset from the F.Cu mesh's by
   half a cell in x and y, so the two layers leave different strips bare (and optionally by a
   trace width more, `mesh_back_offset`, so that its traces lie over the F.Cu traces' gaps).
-  Each mesh trace runs some 44 m in the default box: the status line (and the `pcb` command)
-  reports the longest, loop and cable runs together.
+  Each mesh trace runs some 44 m in the default box: *Derived geometry* (and the `pcb`
+  command) reports the longest, loop and cable runs together.
 * **Into the cable:** the F.Cu mesh's exit cell sits against the junction, where the cable
   leaves the inner flap, the B.Cu mesh's half a cell further in (on its offset grid, its
   traces running straight on across the gap); their traces run on into the cable and along

@@ -138,6 +138,7 @@ legend { font-weight: 600; padding: 0 4px; }
   padding: 8px 12px;
 }
 .derived h2 { font-size: 13px; margin: 0 0 6px; }
+.derived h3 { font-size: 12px; margin: 10px 0 4px; padding-top: 8px; border-top: 1px solid var(--border); }
 .derived dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 0; font-size: 12px; }
 .derived dt { color: var(--text-muted); }
 .derived dd { margin: 0; font-family: var(--mono); text-align: right; }
