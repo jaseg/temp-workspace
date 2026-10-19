@@ -103,6 +103,32 @@ class Grid:
             )
         return out
 
+    def within(self, q: np.ndarray, r: float) -> tuple[np.ndarray, np.ndarray]:
+        """Every pair of a query and a point no further than ``r`` (at most the grid's
+        size) from it: the queries' indices and the points'."""
+        qs, ps = [], []
+        for k in range(0, len(q), CHUNK):
+            part = q[k : k + CHUNK]
+            c = np.floor(part / self.size).astype(np.int64)
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    keys = self._keys(c + np.array([dx, dy]))
+                    lo = np.searchsorted(self.keys, keys, "left")
+                    count = np.searchsorted(self.keys, keys, "right") - lo
+                    has = np.nonzero(count)[0]
+                    if not len(has):
+                        continue
+                    cnt = count[has]
+                    qi = np.repeat(has, cnt)
+                    first = np.concatenate([[0], np.cumsum(cnt)[:-1]])
+                    pi = self.order[np.repeat(lo[has] - first, cnt) + np.arange(len(qi))]
+                    near = np.sum((part[qi] - self.p[pi]) ** 2, axis=1) <= r * r
+                    qs.append(qi[near] + k)
+                    ps.append(pi[near])
+        if not qs:
+            return np.zeros(0, int), np.zeros(0, int)
+        return np.concatenate(qs), np.concatenate(ps)
+
     def _nearest(
         self, q: np.ndarray, ok: Callable[[np.ndarray, np.ndarray], np.ndarray] | None
     ) -> np.ndarray:

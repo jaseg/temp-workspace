@@ -1686,32 +1686,24 @@ def _centring(
     area's edge, which stands for copper at twice its distance). Looked for ``near`` first,
     then ``far``; nothing that far: a hole, as wide as that."""
     out = []
+    found = {}
+    todo = np.arange(len(look))
+    for reach in (near, far):  # (nearer first; further only where nothing that near)
+        if not len(todo):
+            break
+        q = look[todo]
+        qi, pi = Grid(p, reach).within(p[q], reach)
+        v = p[pi] - p[q[qi]]
+        dd = np.hypot(v[:, 0], v[:, 1])
+        across = np.sum(v * normal[q[qi]], axis=1)
+        other = (net[pi] != net[q[qi]]) | (np.abs(arc[pi] - arc[q[qi]]) > own)
+        for side in (1.0, -1.0):
+            d = found.setdefault(side, np.full(len(look), far))
+            hit = other & (side * across >= 0.7 * dd) & (dd > 0)
+            np.minimum.at(d, todo[qi[hit]], dd[hit])
+        todo = todo[(found[1.0][todo] >= far) | (found[-1.0][todo] >= far)]
     for side in (1.0, -1.0):
-        d = np.full(len(look), far)
-        todo = np.arange(len(look))
-        for reach in (near, far):
-            if not len(todo):
-                break
-            grid = Grid(p, reach)
-            q = look[todo]
-
-            def ok(
-                qi: np.ndarray,
-                pi: np.ndarray,
-                side: float = side,
-                q: np.ndarray = q,
-                reach: float = reach,
-            ) -> np.ndarray:
-                v = p[pi] - p[q[qi]]
-                dd = np.hypot(v[:, 0], v[:, 1])
-                facing = side * np.sum(v * normal[q[qi]], axis=1) >= 0.7 * dd
-                other = (net[pi] != net[q[qi]]) | (np.abs(arc[pi] - arc[q[qi]]) > own)
-                return facing & other & (dd <= reach) & (dd > 0)
-
-            j = grid.nearest(p[q], ok)
-            found = j >= 0
-            d[todo[found]] = np.hypot(*(p[j[found]] - p[q[found]]).T)
-            todo = todo[~found]
+        d = found[side]
         q = look
 
         def facing_edge(
@@ -1757,6 +1749,13 @@ def _bend_axes(tr: _Traces, curv: np.ndarray, radius: float) -> np.ndarray:
     return axis
 
 
+def _gap_step(tr: _Traces) -> float:
+    """Half the longest step between two vertices of the traces: a segment nearer a point
+    than d has an end nearer than d plus that."""
+    seg = np.hypot(*(tr.p[np.maximum(tr.next, 0)] - tr.p).T)[tr.next >= 0]
+    return float(seg.max()) / 2 if len(seg) else 0.0
+
+
 def _keep_clear(
     tr: _Traces, old: np.ndarray, new: np.ndarray, pitch: float, own: float
 ) -> np.ndarray:
@@ -1768,35 +1767,29 @@ def _keep_clear(
     new = new.copy()
     net = tr.net
     need = (1 - 1e-3) * pitch
+    check = np.nonzero(np.any(new != old, axis=1))[0]
+    reach = need + _gap_step(tr)
     for _ in range(6):
         moved = np.nonzero(np.any(new != old, axis=1))[0]
-        if not len(moved):
+        if not len(moved) or not len(check):
             break
         tr.p = new
         arc = tr.arc()
-
-        def close(
-            qi: np.ndarray,
-            pi: np.ndarray,
-            moved: np.ndarray = moved,
-            arc: np.ndarray = arc,
-            new: np.ndarray = new,
-        ) -> np.ndarray:
-            q = moved[qi]
-            d = np.hypot(*(new[pi] - new[q]).T)
-            sep = np.abs(arc[pi] - arc[q])
-            same = net[pi] == net[q]
-            for nb in (tr.prev, tr.next):  # (other traces: to their segments, exactly)
-                o = np.where(nb[pi] >= 0, nb[pi], pi)
-                d = np.where(same, d, np.minimum(d, _to_segment(new[q], new[pi], new[o])))
-            limit = np.where(same, np.minimum(need, 0.95 * 2 * sep / np.pi), need)
-            return (d < limit) & (~same | (sep > own))
-
-        j = Grid(new, 1.2 * pitch).nearest(new[moved], close)
-        bad = moved[j >= 0]
+        qi, pi = Grid(new, reach).within(new[check], reach)
+        q = check[qi]
+        same = net[pi] == net[q]
+        sep = np.abs(arc[pi] - arc[q])
+        keep = ~same | (sep > own)
+        q, pi, same, sep = q[keep], pi[keep], same[keep], sep[keep]
+        d = np.hypot(*(new[pi] - new[q]).T)
+        for nb in (tr.prev, tr.next):  # (other traces: to their segments, exactly)
+            o = np.where(nb[pi] >= 0, nb[pi], pi)
+            d = np.where(same, d, np.minimum(d, _to_segment(new[q], new[pi], new[o])))
+        limit = np.where(same, np.minimum(need, 0.95 * 2 * sep / np.pi), need)
+        bad = np.unique(q[d < limit])
         # segments that cross
         seg = np.nonzero(tr.next >= 0)[0]
-        touch = np.isin(seg, moved) | np.isin(tr.next[seg], moved)
+        touch = np.isin(seg, check) | np.isin(tr.next[seg], check)
         a, b = new[seg], new[tr.next[seg]]
         e = b - a
         length = np.hypot(e[:, 0], e[:, 1])
@@ -1810,6 +1803,11 @@ def _keep_clear(
         if not len(back):
             break
         new[back] = old[back]
+        # (next: what moved near what went back)
+        qi, pi = Grid(new, reach).within(new[back], reach)
+        near = np.unique(np.concatenate([pi, back, tr.prev[back], tr.next[back]]))
+        check = near[(near >= 0)]
+        check = check[np.any(new[check] != old[check], axis=1)]
     tr.p = old
     return new
 
