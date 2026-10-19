@@ -33,6 +33,7 @@ from typing import Any
 import shapely
 from shapely.geometry import LineString, Polygon
 
+from yanartas_pillowbox import kimesh
 from yanartas_pillowbox import mesh as meshgen
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.geometry import (
@@ -289,7 +290,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         if abs((x0 + cell / 2 - xc) * left0[0]) + cell / 2 > half - ec:
             raise PcbError("no room for the mesh's exit at the cable's junction")
         try:
-            m = meshgen.generate(
+            m = kimesh.generate(
                 mask,
                 corner,
                 meshgen.UP if up else meshgen.DOWN,
@@ -437,7 +438,7 @@ def _pad(
 
 
 def _clean(pts: Sequence[Point]) -> tuple[Point, ...]:
-    return tuple(meshgen._straighten(_dedupe(list(pts))))
+    return tuple(meshgen.straighten(_dedupe(list(pts))))
 
 
 # ----------------------------------------------------------------------------- export

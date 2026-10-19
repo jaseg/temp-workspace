@@ -1,0 +1,1372 @@
+"""Security mesh layout from a closed space-filling curve, after
+
+    A. Bedel, Y. Coudert-Osmont, J. Martínez, R. I. Nishat, S. Whitesides, S. Lefebvre:
+    "Closed space-filling curves with controlled orientation for 3D printing",
+    Computer Graphics Forum 41(2), 2022, pp. 473-492, doi:10.1111/cgf.14488
+    (reference code: https://github.com/mfx-inria/controllable-space-filling-curve, MIT).
+
+The paper fills a polygon with one closed curve at an even spacing. Here that curve is the
+mesh's centre line: its ``n`` traces are offsets of it, each a closed loop opened where the
+curve runs out through the exit cell. The curve's spacing is ``n`` pitches at the least, so
+the traces of neighbouring runs keep a pitch apart; where it is wider, the traces spread out
+to share it evenly (the paper's per-segment area), so no gap opens wider than the spacing's
+excess.
+
+The steps follow the paper:
+
+1. *Segments.* The area is split into the given zones (the folding pattern's panels: the
+   paper's material zones), each zone's part into its pieces.
+2. *Graph* (section 3.2). Seeds on a triangular grid, jittered, relaxed by Lloyd iterations
+   into a centroidal Voronoi tessellation of each segment (shrunk by half a spacing); the
+   cells' edges, clipped by the segment, form a planar graph whose vertices have degree three.
+3. *Initial cycles* (3.3.1). A perfect matching of the graph (Edmonds); the edges it leaves
+   out cover every vertex with disjoint cycles.
+4. *Refinement and one cycle* (3.3.2). A vertex at each cell's centre, joined to the cell's
+   corners; each centre is threaded into a cycle edge of its cell, the cycles are joined by
+   split-and-reconnect moves and, failing those, doubled edges.
+5. *Zoning.* The paper's zoning objective counts the curve's crossings of zone borders; here
+   each segment's cycle is complete before the segments are joined, along a spanning tree,
+   each join one split-and-reconnect across the shared border: two crossings per join, the
+   least a closed curve through all segments can have. (The paper's stochastic optimizer,
+   3.3.3, then has nothing left to improve: no alignment or orientation objective is set.)
+6. *Geometry* (3.4). The curve is smoothed and relaxed towards an even spacing within its
+   zone (the per-zone CVT objective: zone borders and the area's edge stand as mirrors).
+
+Steps 2 and 6 differ in their means: the Voronoi diagram is of points (no orientation field,
+so no needles), and the geometry is relaxed by moving each vertex to the middle between its
+neighbours across the curve (the CVT gradient across a run; a step per iteration, with a
+Laplacian smoothing) instead of an L-BFGS solve.
+"""
+
+from __future__ import annotations
+
+import itertools
+import math
+import random
+from collections import defaultdict, deque
+from collections.abc import Callable
+from dataclasses import dataclass
+
+import numpy as np
+import shapely
+from shapely.geometry import LineString, MultiPoint, Polygon
+
+from yanartas_pillowbox.mesh import DOWN, LEFT, UP, Mesh, MeshError, Point
+
+SPACING = 1.12  # the curve's target spacing, in multiples of its least (n pitches)
+SEED_SPACING = 2.2  # the CVT seeds' spacing, in target spacings (the cycle's ≈ 0.45 of it)
+LLOYD = 6  # Lloyd iterations of the seeds
+LLOYD_CURVE = 10  # CVT steps of the curve
+SPREAD = 1.3  # the traces spread over at most this many target spacings
+SMOOTH = 3  # the pitch of the traces smoothed over this many vertices either way
+GAIN = 3.0  # the Laplacian weight per relative excess length
+REPAIR = 100  # steps pushing runs apart (at most)
+WINDOW = 1.7  # parts of the curve nearer than this many least spacings along it: one run
+FINE = 4  # the traces offset from the curve split this many times finer
+RAMP = 3  # ... ramped in over this many vertices off the tongue
+MARGIN = 0.02  # ... at a pitch this much above the least (but at the exit)
+SIMPLIFY = 0.002  # the traces simplified within this (mm; well within the margin)
+INSIDE = 0.9  # traces inside a bend keep within this share of its radius
+PUSH_MARGIN = 1.04  # runs closer than this many times their least spacing: pushed apart
+ATTEMPTS = 4  # tries with fresh seeds when a graph comes out degenerate
+
+
+class _Retry(Exception):
+    """This graph cannot carry a cycle (a degenerate vertex): seed again."""
+
+
+# ----------------------------------------------------------------------------- frame
+class _Frame:
+    """A frame in which the exit cell's open side is its top (-y) side: the given side
+    turned or mirrored there."""
+
+    def __init__(self, side: int) -> None:
+        self.side = side
+
+    def fwd(self, xy: np.ndarray) -> np.ndarray:
+        x, y = xy[:, 0], xy[:, 1]
+        if self.side == UP:
+            return np.stack([x, y], 1)
+        if self.side == DOWN:
+            return np.stack([x, -y], 1)
+        if self.side == LEFT:
+            return np.stack([y, x], 1)
+        return np.stack([y, -x], 1)  # RIGHT
+
+    def inv(self, xy: np.ndarray) -> np.ndarray:
+        x, y = xy[:, 0], xy[:, 1]
+        if self.side == UP:
+            return np.stack([x, y], 1)
+        if self.side == DOWN:
+            return np.stack([x, -y], 1)
+        if self.side == LEFT:
+            return np.stack([y, x], 1)
+        return np.stack([-y, x], 1)
+
+    def geom(self, g: shapely.Geometry) -> shapely.Geometry:
+        return shapely.transform(g, self.fwd)
+
+
+# ----------------------------------------------------------------------------- segments
+@dataclass
+class _Segment:
+    region: int  # index of its region: one zone's piece of the area
+    domain: Polygon  # where its graph lies: the region, shrunk by half a spacing
+
+
+def _polygons(g: shapely.Geometry) -> list[Polygon]:
+    return [p for p in shapely.get_parts(g) if isinstance(p, Polygon) and not p.is_empty]
+
+
+def _regions(area: shapely.Geometry, zones: list[Polygon], least: float) -> list[Polygon]:
+    """The area cut into the zones' pieces (and what no zone covers), pieces too small to
+    take a curve left out."""
+    out: list[Polygon] = []
+    rest = area
+    for z in zones:
+        out += _polygons(shapely.intersection(area, z))
+        rest = shapely.difference(rest, z)
+    out += _polygons(rest)
+    return [r for r in out if r.area >= least]
+
+
+# ----------------------------------------------------------------------------- graph
+class _Graph:
+    """The curve's graph: vertices, edges (adjacency sets), the cells (faces) and the cycle
+    links (each covered vertex has two)."""
+
+    def __init__(self) -> None:
+        self.pts: list[Point] = []
+        self.adj: list[set[int]] = []
+        self.seg: list[int] = []
+        self.nbr: list[list[int]] = []
+        self.faces: list[tuple[list[int], Polygon, int]] = []
+        self._index: dict[tuple[int, int], int] = {}
+        self.fixed: set[tuple[int, int]] = set()  # cycle edges no move may take
+
+    def vertex(self, p: Point, seg: int, q: float = 1e-6) -> int:
+        """The vertex at ``p`` (within ``q``), added if new."""
+        kx, ky = round(p[0] / q), round(p[1] / q)
+        for dx in (0, -1, 1):
+            for dy in (0, -1, 1):
+                i = self._index.get((kx + dx, ky + dy))
+                if i is not None:
+                    return i
+        return self.add(p, seg, (kx, ky))
+
+    def add(self, p: Point, seg: int, key: tuple[int, int] | None = None) -> int:
+        i = len(self.pts)
+        self.pts.append((float(p[0]), float(p[1])))
+        self.adj.append(set())
+        self.seg.append(seg)
+        self.nbr.append([])
+        if key is not None:
+            self._index[key] = i
+        return i
+
+    def link(self, a: int, b: int) -> None:
+        self.nbr[a].append(b)
+        self.nbr[b].append(a)
+
+    def unlink(self, a: int, b: int) -> None:
+        self.nbr[a].remove(b)
+        self.nbr[b].remove(a)
+
+
+def _seeds(domain: Polygon, d: float, rng: random.Random) -> np.ndarray:
+    """Seeds on a triangular grid of side ``d``, jittered by up to ``d / 20`` (section 3.2)."""
+    x0, y0, x1, y1 = domain.bounds
+    h = d * math.sqrt(0.75)
+    pts = []
+    for j in range(int((y1 - y0) / h) + 2):
+        for i in range(int((x1 - x0) / d) + 2):
+            r, a = d / 20 * math.sqrt(rng.random()), 2 * math.pi * rng.random()
+            pts.append(
+                (x0 + (i + 0.5 * (j % 2)) * d + r * math.cos(a), y0 + j * h + r * math.sin(a))
+            )
+    pts = np.array(pts)
+    return pts[shapely.contains_xy(domain, pts[:, 0], pts[:, 1])]
+
+
+def _cells(domain: Polygon, d: float, rng: random.Random) -> list[Polygon]:
+    """A centroidal Voronoi tessellation of the domain (Lloyd iterations), cells clipped by
+    it, cells holding a hole of the domain split through it."""
+    seeds = _seeds(domain, d, rng)
+    if len(seeds) < 2:
+        return _split_holes(domain)
+    shapely.prepare(domain)
+    frame = shapely.box(*domain.bounds).buffer(2 * d)
+    for it in range(LLOYD + 1):
+        vor = shapely.voronoi_polygons(MultiPoint(seeds), extend_to=frame)
+        cells = shapely.intersection(shapely.get_parts(vor), domain)
+        cells = cells[~shapely.is_empty(cells)]
+        if it == LLOYD:
+            break
+        parts = [max(_polygons(c), key=lambda p: p.area) for c in cells]
+        cen = shapely.centroid(parts)
+        inside = shapely.contains(domain, cen)
+        cen = np.where(inside, cen, shapely.point_on_surface(parts))
+        seeds = shapely.get_coordinates(cen)
+    out: list[Polygon] = []
+    for c in cells:
+        for p in _polygons(c):
+            if p.area > 1e-9:
+                out += _split_holes(p)
+    return out
+
+
+def _split_holes(p: Polygon) -> list[Polygon]:
+    """The polygon cut so that no piece has a hole (a vertical cut through each)."""
+    if not p.interiors:
+        return [p]
+    cx = shapely.centroid(Polygon(p.interiors[0])).x
+    x0, y0, x1, y1 = p.bounds
+    out = []
+    for half in (shapely.box(x0 - 1, y0 - 1, cx, y1 + 1), shapely.box(cx, y0 - 1, x1 + 1, y1 + 1)):
+        for q in _polygons(shapely.intersection(p, half)):
+            out += _split_holes(q)
+    return out
+
+
+def _build(g: _Graph, cells: list[Polygon], seg: int) -> None:
+    """Add the cells' edges and corners to the graph."""
+    for cell in cells:
+        ids: list[int] = []
+        for p in cell.exterior.coords[:-1]:
+            i = g.vertex(p, seg)
+            if not ids or ids[-1] != i:
+                ids.append(i)
+        while len(ids) > 1 and ids[0] == ids[-1]:
+            ids.pop()
+        if len(ids) < 3:
+            continue
+        for a, b in zip(ids, ids[1:] + ids[:1], strict=True):
+            g.adj[a].add(b)
+            g.adj[b].add(a)
+        g.faces.append((ids, cell, seg))
+
+
+# ----------------------------------------------------------------------------- matching
+def _matching(n: int, nbrs: list[list[int]], rng: random.Random) -> list[int]:
+    """A maximum matching (Edmonds' blossom algorithm), greedy start: ``mate`` per vertex."""
+    mate = [-1] * n
+    order = list(range(n))
+    rng.shuffle(order)
+    for v in order:
+        if mate[v] < 0:
+            for u in nbrs[v]:
+                if mate[u] < 0 and u != v:
+                    mate[v], mate[u] = u, v
+                    break
+    base = list(range(n))
+    parent = [-1] * n
+    used = [False] * n
+    blossom = [False] * n
+
+    def lca(a: int, b: int) -> int:
+        seen = set()
+        while True:
+            a = base[a]
+            seen.add(a)
+            if mate[a] < 0:
+                break
+            a = parent[mate[a]]
+        while True:
+            b = base[b]
+            if b in seen:
+                return b
+            b = parent[mate[b]]
+
+    def mark(v: int, b: int, child: int) -> None:
+        while base[v] != b:
+            blossom[base[v]] = blossom[base[mate[v]]] = True
+            parent[v] = child
+            child = mate[v]
+            v = parent[mate[v]]
+
+    def search(root: int) -> tuple[int, list[int]]:
+        touched = [root]
+        used[root] = True
+        queue = deque([root])
+        while queue:
+            v = queue.popleft()
+            for u in nbrs[v]:
+                if base[v] == base[u] or mate[v] == u or u == v:
+                    continue
+                if u == root or (mate[u] >= 0 and parent[mate[u]] >= 0):
+                    b = lca(v, u)
+                    mark(v, b, u)
+                    mark(u, b, v)
+                    for i in touched:
+                        if blossom[base[i]]:
+                            base[i] = b
+                            if not used[i]:
+                                used[i] = True
+                                queue.append(i)
+                    for i in touched:
+                        blossom[i] = False
+                elif parent[u] < 0:
+                    parent[u] = v
+                    touched.append(u)
+                    if mate[u] < 0:
+                        return u, touched
+                    used[mate[u]] = True
+                    touched.append(mate[u])
+                    queue.append(mate[u])
+        return -1, touched
+
+    for root in order:
+        if mate[root] >= 0:
+            continue
+        end, touched = search(root)
+        v = end
+        while v >= 0:
+            pv = parent[v]
+            nxt = mate[pv]
+            mate[v], mate[pv] = pv, v
+            v = nxt
+        for i in touched:
+            used[i], parent[i], base[i] = False, -1, i
+    return mate
+
+
+def _two_factor(g: _Graph, rng: random.Random) -> None:
+    """Cycle links covering every vertex of degree three: the edges a perfect matching leaves
+    out (section 3.3.1). Chains of degree-two vertices act as one edge; a matched chain's
+    inner vertices stay off the cycle."""
+    deg = [len(a) for a in g.adj]
+    if any(k > 3 for k in deg):
+        raise _Retry
+    cubic = [i for i, k in enumerate(deg) if k == 3]
+    index = {v: j for j, v in enumerate(cubic)}
+    chains: list[list[int]] = []
+    seen: set[tuple[int, int]] = set()
+    for u in cubic:
+        for w in g.adj[u]:
+            if (u, w) in seen:
+                continue
+            chain, prev, here = [u, w], u, w
+            while deg[here] == 2:
+                prev, here = here, next(x for x in g.adj[here] if x != prev)
+                chain.append(here)
+            seen.add((u, w))
+            seen.add((here, prev))
+            chains.append(chain)
+    nbrs: list[list[int]] = [[] for _ in cubic]
+    for c in chains:
+        if c[0] != c[-1]:
+            nbrs[index[c[0]]].append(index[c[-1]])
+            nbrs[index[c[-1]]].append(index[c[0]])
+    mate = _matching(len(cubic), nbrs, rng)
+    if any(m < 0 for m in mate):
+        raise _Retry
+    matched: set[tuple[int, int]] = set()
+    for c in chains:
+        a, b = c[0], c[-1]
+        key = (min(a, b), max(a, b))
+        if a != b and cubic[mate[index[a]]] == b and key not in matched:
+            matched.add(key)
+            continue
+        for x, y in itertools.pairwise(c):
+            g.link(x, y)
+    # (rings of degree-two vertices only: a cycle by themselves)
+    for v, k in enumerate(deg):
+        if k == 2 and not g.nbr[v] and not any(deg[u] == 3 for u in _ring(g, v)):
+            ring = _ring(g, v)
+            for x, y in zip(ring, ring[1:] + ring[:1], strict=True):
+                g.link(x, y)
+    for u in cubic:
+        if len(g.nbr[u]) != 2:
+            raise _Retry
+
+
+def _ring(g: _Graph, v: int) -> list[int]:
+    out, prev, here = [v], -1, v
+    while True:
+        nxt = next((x for x in g.adj[here] if x != prev), None)
+        if nxt is None or nxt == v or len(g.adj[here]) != 2:
+            return out
+        out.append(nxt)
+        prev, here = here, nxt
+
+
+# ----------------------------------------------------------------------------- refinement
+def _centres(g: _Graph) -> None:
+    """A vertex at each cell's centre, joined to the corners it sees; each threaded into one
+    cycle edge along its cell (section 3.3.2: a bipartite matching of cells to edges)."""
+    polys = [f[1] for f in g.faces]
+    cen = shapely.centroid(polys)
+    ok = shapely.contains(polys, cen)
+    spokes: list[tuple[int, int]] = []
+    lines = []
+    for fi, (ids, _, _) in enumerate(g.faces):
+        if not ok[fi]:
+            continue
+        c = cen[fi]
+        for v in ids:
+            spokes.append((fi, v))
+            lines.append(LineString([(c.x, c.y), g.pts[v]]))
+    if not spokes:
+        return
+    grown = shapely.buffer(polys, 1e-7)
+    good = shapely.covers(np.array([grown[f] for f, _ in spokes]), lines)
+    sees: dict[int, set[int]] = defaultdict(set)
+    for (fi, v), k in zip(spokes, good, strict=True):
+        if k:
+            sees[fi].add(v)
+    cands: dict[int, list[tuple[int, int]]] = {}
+    for fi, vs in sees.items():
+        if sum(1 for v in vs if g.nbr[v]) < 3:
+            continue
+        ids = g.faces[fi][0]
+        es = [
+            (min(a, b), max(a, b))
+            for a, b in zip(ids, ids[1:] + ids[:1], strict=True)
+            if a in vs and b in vs and b in g.nbr[a]
+        ]
+        if es:
+            cands[fi] = es
+    owner: dict[tuple[int, int], int] = {}
+    chosen: dict[int, tuple[int, int]] = {}
+    for fi in cands:  # augmenting paths (BFS) over cells and their edges
+        prev: dict[int, tuple[int, tuple[int, int]] | None] = {fi: None}
+        queue, end = deque([fi]), None
+        while queue and end is None:
+            f = queue.popleft()
+            for e in cands[f]:
+                o = owner.get(e)
+                if o is None:
+                    end = (f, e)
+                    break
+                if o not in prev:
+                    prev[o] = (f, e)
+                    queue.append(o)
+        if end is None:
+            continue
+        f, e = end
+        while True:
+            owner[e] = f
+            chosen[f] = e
+            step = prev[f]
+            if step is None:
+                break
+            f, e = step
+    for fi, (a, b) in chosen.items():
+        c = g.add((cen[fi].x, cen[fi].y), g.faces[fi][2])
+        g.unlink(a, b)
+        g.link(a, c)
+        g.link(c, b)
+        for v in sees[fi]:
+            g.adj[c].add(v)
+            g.adj[v].add(c)
+
+
+class _Union:
+    def __init__(self, n: int) -> None:
+        self.p = list(range(n))
+
+    def find(self, a: int) -> int:
+        while self.p[a] != a:
+            self.p[a] = self.p[self.p[a]]
+            a = self.p[a]
+        return a
+
+    def join(self, a: int, b: int) -> bool:
+        a, b = self.find(a), self.find(b)
+        if a == b:
+            return False
+        self.p[b] = a
+        return True
+
+    def grow(self, n: int) -> None:
+        self.p += list(range(len(self.p), n))
+
+
+def _cycle_union(g: _Graph) -> _Union:
+    u = _Union(len(g.pts))
+    for a, ns in enumerate(g.nbr):
+        for b in ns:
+            u.join(a, b)
+    return u
+
+
+def _merge(g: _Graph, u: _Union) -> None:
+    """Join the cycles of each segment into one: split-and-reconnect where two cycle edges
+    face each other across a quad of graph edges, then doubled edges (section 3.3.2)."""
+    changed = True
+    while changed:
+        changed = False
+        for x1 in range(len(g.pts)):
+            for x2 in list(g.nbr[x1]):
+                if (min(x1, x2), max(x1, x2)) in g.fixed or x2 not in g.nbr[x1]:
+                    continue
+                for y1 in g.adj[x1]:
+                    if not g.nbr[y1] or u.find(y1) == u.find(x1):
+                        continue
+                    y2 = next((y for y in g.nbr[y1] if y in g.adj[x2]), None)
+                    if y2 is None or (min(y1, y2), max(y1, y2)) in g.fixed:
+                        continue
+                    g.unlink(x1, x2)
+                    g.unlink(y1, y2)
+                    g.link(x1, y1)
+                    g.link(x2, y2)
+                    u.join(x1, y1)
+                    changed = True
+                    break
+    for x in range(len(g.pts)):  # what is left: double a graph edge between two cycles
+        if not g.nbr[x]:
+            continue
+        for y in list(g.adj[x]):
+            if g.nbr[y] and g.seg[y] == g.seg[x] and u.find(x) != u.find(y) and _double(g, x, y):
+                u.grow(len(g.pts))
+                u.join(x, y)
+                u.join(x, len(g.pts) - 1)
+                u.join(x, len(g.pts) - 2)
+
+
+def _double(g: _Graph, u: int, v: int) -> bool:
+    """Join the cycles through ``u`` and ``v`` by doubling the edge between them (paper
+    figure 8): the copy runs from a point on one of ``u``'s cycle edges to one on ``v``'s,
+    both on the same side of the edge, crossing nothing. False where there is no such side."""
+    (ux, uy), (vx, vy) = g.pts[u], g.pts[v]
+
+    def side(w: int) -> float:
+        wx, wy = g.pts[w]
+        return (vx - ux) * (wy - uy) - (vy - uy) * (wx - ux)
+
+    for sign in (1.0, -1.0):
+        qs = [w for w in g.nbr[u] if sign * side(w) > 1e-9]
+        rs = [w for w in g.nbr[v] if sign * side(w) > 1e-9]
+        if not qs or not rs:
+            continue
+        q, r = qs[0], rs[0]
+        t = 0.25
+        a = (ux + t * (g.pts[q][0] - ux), uy + t * (g.pts[q][1] - uy))
+        b = (vx + t * (g.pts[r][0] - vx), vy + t * (g.pts[r][1] - vy))
+        copy = LineString([a, b])
+        around = {w for x in (u, v, q, r) for w in g.adj[x] | {x}}
+        if any(
+            copy.crosses(LineString([g.pts[x], g.pts[y]]))
+            for x in around
+            for y in g.nbr[x]
+            if x < y
+        ):
+            continue
+        u2, v2 = g.add(a, g.seg[u]), g.add(b, g.seg[v])
+        g.unlink(u, q)
+        g.unlink(v, r)
+        g.link(u, v)
+        g.link(u2, v2)
+        g.link(u2, q)
+        g.link(v2, r)
+        return True
+    return False
+
+
+# ----------------------------------------------------------------------------- zoning
+def _join_segments(
+    g: _Graph, u: _Union, segments: list[_Segment], regions: list[Polygon], spacing: float
+) -> None:
+    """Join the segments' cycles along a spanning tree of the segments that share a border
+    (longest borders first): each join one split-and-reconnect across the border."""
+    tree = shapely.STRtree(regions)
+    pairs = []
+    a_idx, b_idx = tree.query(regions, predicate="intersects")
+    for i, j in zip(a_idx, b_idx, strict=True):
+        if i < j:
+            border = shapely.line_merge(
+                shapely.intersection(regions[i].boundary, regions[j].buffer(1e-6))
+            )
+            if border.length >= 2 * spacing:
+                pairs.append((border.length, int(i), int(j), border))
+    pairs.sort(key=lambda p: -p[0])
+    by_region: dict[int, list[int]] = defaultdict(list)
+    for v, s in enumerate(g.seg):
+        if g.nbr[v]:
+            by_region[segments[s].region].append(v)
+    for _, ri, rj, border in pairs:
+        for line in sorted(_lines(border), key=lambda ln: -ln.length):
+            if line.length >= 2 * spacing and _connect(
+                g, u, segments, by_region[ri], by_region[rj], line, spacing
+            ):
+                break
+
+
+def _lines(g: shapely.Geometry) -> list[LineString]:
+    return [p for p in shapely.get_parts(g) if isinstance(p, LineString) and p.length > 0]
+
+
+def _connect(
+    g: _Graph,
+    u: _Union,
+    segments: list[_Segment],
+    va: list[int],
+    vb: list[int],
+    line: LineString,
+    spacing: float,
+) -> bool:
+    """One split-and-reconnect across the border ``line`` between two cycle edges (of cycles
+    not yet joined) facing each other across it, away from the border's ends (where other
+    borders meet it): the shortest joins, nearest the border's middle. Edges along their
+    segments' edges first (the gap between the segments holds nothing else, so the joins
+    cross nothing but the border); then any near the border whose joins cross no edge."""
+    end = min(2 * spacing, line.length / 6)
+    for along, near, reach in ((True, 1.0, 2.0), (False, 1.8, 2.6)):
+        edges = [
+            _border_edges(g, segments, vs, line, near * spacing, end, along) for vs in (va, vb)
+        ]
+        cands = []
+        mid = line.length / 2
+        for a1, a2, s1, s2 in edges[0]:
+            for b1, b2, t1, t2 in edges[1]:
+                if u.find(a1) == u.find(b1) or min(s2, t2) - max(s1, t1) < 0.1 * spacing:
+                    continue
+                l1, l2 = math.dist(g.pts[a1], g.pts[b1]), math.dist(g.pts[a2], g.pts[b2])
+                if max(l1, l2) <= reach * spacing:
+                    cands.append((l1 + l2 + 0.05 * abs((s1 + s2) / 2 - mid), a1, a2, b1, b2))
+        cands.sort()
+        if not along and cands:
+            cycle = [(a, b) for vs in (va, vb) for a in vs for b in g.nbr[a] if a < b]
+            tree = shapely.STRtree([LineString([g.pts[a], g.pts[b]]) for a, b in cycle])
+        for _, a1, a2, b1, b2 in cands[:100]:
+            if not along:
+                joins = [LineString([g.pts[a1], g.pts[b1]]), LineString([g.pts[a2], g.pts[b2]])]
+                if joins[0].intersects(joins[1]) or any(
+                    not {a1, a2, b1, b2} & set(cycle[i])
+                    for j in joins
+                    for i in tree.query(j, predicate="intersects")
+                ):
+                    continue
+            g.unlink(a1, a2)
+            g.unlink(b1, b2)
+            g.link(a1, b1)
+            g.link(a2, b2)
+            u.join(a1, b1)
+            return True
+    return False
+
+
+def _border_edges(
+    g: _Graph,
+    segments: list[_Segment],
+    vs: list[int],
+    line: LineString,
+    near: float,
+    end: float,
+    along: bool,
+) -> list[tuple[int, int, float, float]]:
+    """The cycle edges among ``vs`` within ``near`` of ``line`` and ``end`` from its ends
+    (``along``: only those along their segment's edge), each with its ends' places along
+    the line, in order."""
+    if not vs:
+        return []
+    p = np.array([g.pts[v] for v in vs])
+    close = shapely.distance(line, shapely.points(p)) <= near
+    keep = {v for v, k in zip(vs, close, strict=True) if k}
+    out = []
+    for a in keep:
+        for b in g.nbr[a]:
+            if a > b or b not in keep or (a, b) in g.fixed:
+                continue
+            (ax, ay), (bx, by) = g.pts[a], g.pts[b]
+            if along and (
+                g.seg[a] != g.seg[b]
+                or segments[g.seg[a]].domain.boundary.distance(
+                    shapely.Point((ax + bx) / 2, (ay + by) / 2)
+                )
+                > 1e-6
+            ):
+                continue
+            sa, sb = line.project(shapely.Point(ax, ay)), line.project(shapely.Point(bx, by))
+            if min(sa, sb) < end or max(sa, sb) > line.length - end:
+                continue
+            out.append((a, b, sa, sb) if sa <= sb else (b, a, sb, sa))
+    return out
+
+
+# ----------------------------------------------------------------------------- combinatorics
+def _curve(
+    area: shapely.Geometry,
+    zones: list[Polygon],
+    spacing: float,
+    mouth: tuple[Point, Point],
+    rng: random.Random,
+) -> tuple[np.ndarray, list[Polygon], np.ndarray, int, int]:
+    """The closed curve through the segments the exit's can reach, as its vertices (the
+    exit's tongue spliced in), the regions, each vertex's region, the cells and the regions
+    left out."""
+    regions = _regions(area, zones, 2 * spacing**2)
+    segments = [
+        _Segment(ri, d)
+        for ri, r in enumerate(regions)
+        for d in _polygons(r.buffer(-spacing / 2))
+        if d.area >= spacing**2
+    ]
+    if not segments:
+        raise MeshError("no room for the mesh")
+    for _ in range(ATTEMPTS):
+        g = _Graph()
+        for si, s in enumerate(segments):
+            _build(g, _cells(s.domain, SEED_SPACING * spacing, rng), si)
+        try:
+            _two_factor(g, rng)
+        except _Retry:
+            continue
+        break
+    else:
+        raise MeshError("could not build the curve's graph")
+    cells = len(g.faces)
+    _centres(g)
+    u = _cycle_union(g)
+    _merge(g, u)
+    _join_segments(g, u, segments, regions, spacing)
+
+    # The tongue: out through the exit and back, spliced into a cycle edge whose ends lie
+    # (nearest) straight on from its legs, so that the curve runs on along them; the new
+    # edges to them crossing nothing.
+    (ax, ay), (bx, by) = mouth
+    on = ((ax, ay + spacing / 2), (bx, by + spacing / 2))
+    mid = ((ax + bx) / 2, ay)
+    cands = []
+    for a in range(len(g.pts)):
+        if g.nbr[a] and math.dist(g.pts[a], mid) < 4 * spacing:
+            for b in g.nbr[a]:
+                if a < b:
+                    for x, y in ((a, b), (b, a)):
+                        cost = math.dist(g.pts[x], on[0]) + math.dist(g.pts[y], on[1])
+                        cands.append((cost, x, y))
+    near = {v for _, x, y in cands for v in (x, y)}
+    cycle = [(x, y) for x in near for y in g.nbr[x] if x < y or y not in near]
+    tree = shapely.STRtree([LineString([g.pts[x], g.pts[y]]) for x, y in cycle]) if cycle else None
+    best = None
+    for _, a, b in sorted(cands):
+        joins = [LineString([(ax, ay), g.pts[a]]), LineString([g.pts[b], (bx, by)])]
+        if joins[0].intersects(joins[1]):
+            continue
+        if tree is not None and any(
+            not {a, b} & set(cycle[i]) for j in joins for i in tree.query(j, predicate="intersects")
+        ):
+            continue
+        best = a, b
+        break
+    if best is None:
+        raise MeshError("no room for the mesh's exit")
+    a, b = best
+    root = u.find(a)
+    order = [b, a]  # walk from a away from b
+    while True:
+        nxt = next(x for x in g.nbr[order[-1]] if x != order[-2])
+        if nxt == b:
+            break
+        order.append(nxt)
+    order = [*order[1:], b]
+    pts = np.array([g.pts[v] for v in order])
+    seg = np.array([segments[g.seg[v]].region for v in order])
+    left = {segments[g.seg[v]].region for v in range(len(g.pts)) if g.nbr[v]}
+    left -= {segments[g.seg[v]].region for v in range(len(g.pts)) if g.nbr[v] and u.find(v) == root}
+    return pts, regions, seg, cells, len(left)
+
+
+# ----------------------------------------------------------------------------- geometry
+class _Rays:
+    """Ray casting against segments, bucketed on a grid as wide as the rays are long."""
+
+    def __init__(self, a: np.ndarray, b: np.ndarray, reach: float) -> None:
+        self.a, self.b, self.reach = a, b, reach
+        cells, ids = self._cells(a, b)
+        order = np.argsort(cells, kind="stable")
+        self.keys, self.ids = cells[order], ids[order]
+
+    def _cells(self, a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """The grid cells each segment's box touches (it spans at most two each way)."""
+        lo = np.floor(np.minimum(a, b) / self.reach).astype(np.int64)
+        hi = np.floor(np.maximum(a, b) / self.reach).astype(np.int64)
+        keys, ids = [], []
+        n = np.arange(len(a))
+        for dx in (0, 1):
+            for dy in (0, 1):
+                ok = (lo[:, 0] + dx <= hi[:, 0]) & (lo[:, 1] + dy <= hi[:, 1])
+                keys.append((lo[ok, 0] + dx) * 1_000_003 + (lo[ok, 1] + dy))
+                ids.append(n[ok])
+        return np.concatenate(keys), np.concatenate(ids)
+
+    def cast(self, p: np.ndarray, d: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Every hit of the rays ``p + t d`` (``0 < t <= reach``, ``d`` unit): the ray, the
+        segment and ``t``."""
+        cells, rays = self._cells(p, p + d * self.reach)
+        lo = np.searchsorted(self.keys, cells, "left")
+        hi = np.searchsorted(self.keys, cells, "right")
+        count = hi - lo
+        ray = np.repeat(rays, count)
+        start = np.repeat(lo - np.concatenate([[0], np.cumsum(count)[:-1]]), count)
+        seg = self.ids[start + np.arange(len(ray))]
+        q, e = self.a[seg], self.b[seg] - self.a[seg]
+        dr, w = d[ray], q - p[ray]
+        den = dr[:, 0] * e[:, 1] - dr[:, 1] * e[:, 0]
+        ok = np.abs(den) > 1e-12
+        den = np.where(ok, den, 1.0)
+        t = (w[:, 0] * e[:, 1] - w[:, 1] * e[:, 0]) / den
+        s = (w[:, 0] * dr[:, 1] - w[:, 1] * dr[:, 0]) / den
+        ok &= (t > 1e-9) & (t <= self.reach) & (s >= 0) & (s <= 1)
+        return ray[ok], seg[ok], t[ok]
+
+
+def _resample(p: np.ndarray, step: float) -> np.ndarray:
+    """The open polyline at an even step along it (its ends kept)."""
+    seg = np.hypot(*np.diff(p, axis=0).T)
+    s = np.concatenate([[0.0], np.cumsum(seg)])
+    n = max(1, round(s[-1] / step))
+    t = np.linspace(0.0, s[-1], n + 1)
+    return np.stack([np.interp(t, s, p[:, 0]), np.interp(t, s, p[:, 1])], 1)
+
+
+def _even(p: np.ndarray, k: int, step: float) -> np.ndarray:
+    """The closed curve's first ``k`` vertices (an open polyline; the rest stay) resampled
+    at an even step, unless that would make it cross itself (where it cuts a corner between
+    runs close together): then only its long segments split."""
+    free = _resample(p[:k], step)
+    q = np.vstack([free, p[k:]])
+    i, _ = _crossing(q, np.arange(len(q)))
+    return free if not len(i) else _split(p[:k], 1.5 * step)
+
+
+def _split(p: np.ndarray, longest: float) -> np.ndarray:
+    """The open polyline with its segments longer than ``longest`` split evenly (the
+    vertices kept where they are)."""
+    seg = np.hypot(*np.diff(p, axis=0).T)
+    parts = np.maximum(1, np.ceil(seg / longest)).astype(int)
+    if (parts == 1).all():
+        return p
+    t = np.concatenate([np.arange(m) / m for m in parts])
+    i = np.repeat(np.arange(len(seg)), parts)
+    return np.vstack([p[i] + (p[i + 1] - p[i]) * t[:, None], p[-1:]])
+
+
+def _spacing(
+    p: np.ndarray, mirrors: tuple[np.ndarray, np.ndarray], reach: float, window: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """For each vertex of the closed curve ``p``: the distance to its neighbour across the
+    curve on its left and right (a mirror's at twice the distance to it), at most ``reach``.
+    Parts of the curve within ``window`` along it do not count."""
+    n = len(p)
+    q = np.roll(p, -1, axis=0)
+    t = q - np.roll(p, 1, axis=0)
+    t /= np.maximum(np.hypot(t[:, 0], t[:, 1]), 1e-12)[:, None]
+    normal = np.stack([-t[:, 1], t[:, 0]], 1)
+    arc = np.concatenate([[0.0], np.cumsum(np.hypot(*(q - p).T))])
+    total, arc = arc[-1], arc[:-1]
+    ma, mb = mirrors
+    rays = _Rays(np.vstack([p, ma]), np.vstack([q, mb]), reach)
+    out = []
+    for sign in (1.0, -1.0):
+        ray, seg, hit = rays.cast(p, sign * normal)
+        curve = seg < n
+        gap = np.abs(arc[ray] - arc[np.where(curve, seg, 0)])
+        near = curve & (np.minimum(gap, total - gap) < window)
+        hit = np.where(curve, hit, 2 * hit)[~near]
+        d = np.full(n, reach)
+        np.minimum.at(d, ray[~near], hit)
+        out.append(d)
+    return out[0], out[1]
+
+
+def _mirrors(regions: list[Polygon], step: float) -> tuple[np.ndarray, np.ndarray]:
+    """The regions' borders (the area's edges and the zones' borders), in short pieces."""
+    a, b = [], []
+    for r in regions:
+        for ring in (r.exterior, *r.interiors):
+            c = _resample(np.asarray(ring.coords), step)
+            a.append(c[:-1])
+            b.append(c[1:])
+    return np.vstack(a), np.vstack(b)
+
+
+class _Grid:
+    """Points bucketed on a square grid, for nearest-point queries."""
+
+    def __init__(self, p: np.ndarray, size: float) -> None:
+        self.p, self.size = p, size
+        keys = self._keys(np.floor(p / size).astype(np.int64))
+        self.order = np.argsort(keys, kind="stable")
+        self.keys = keys[self.order]
+
+    @staticmethod
+    def _keys(c: np.ndarray) -> np.ndarray:
+        return c[:, 0] * 1_000_003 + c[:, 1]
+
+    def nearest(
+        self, q: np.ndarray, ok: Callable[[np.ndarray, np.ndarray], np.ndarray]
+    ) -> np.ndarray:
+        """For each query, the nearest point in its cell or the eight around it for which
+        ``ok(query indices, point indices)`` holds; -1 where there is none."""
+        c = np.floor(q / self.size).astype(np.int64)
+        best = np.full(len(q), np.inf)
+        out = np.full(len(q), -1)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                keys = self._keys(c + np.array([dx, dy]))
+                lo = np.searchsorted(self.keys, keys, "left")
+                count = np.searchsorted(self.keys, keys, "right") - lo
+                has = np.nonzero(count)[0]
+                if not len(has):
+                    continue
+                cnt = count[has]
+                qi = np.repeat(has, cnt)  # (grouped by query, in order)
+                first = np.concatenate([[0], np.cumsum(cnt)[:-1]])
+                pi = self.order[np.repeat(lo[has] - first, cnt) + np.arange(len(qi))]
+                d2 = np.sum((q[qi] - self.p[pi]) ** 2, axis=1)
+                d2[~ok(qi, pi)] = np.inf
+                low = np.minimum.reduceat(d2, first)
+                at = d2 == np.repeat(low, cnt)
+                take, pick = np.unique(qi[at], return_index=True)
+                better = low[np.searchsorted(has, take)] < best[take]
+                take = take[better]
+                best[take] = low[np.searchsorted(has, take)]
+                out[take] = pi[at][pick[better]]
+        return out
+
+
+def _samples(
+    regions: list[Polygon], step: float, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray]:
+    """Points on a square grid (randomly offset) over the regions, with their region."""
+    pts, reg = [], []
+    off = rng.random(2) * step
+    for ri, r in enumerate(regions):
+        x0, y0, x1, y1 = r.bounds
+        xs = np.arange(x0 - off[0], x1 + step, step)
+        ys = np.arange(y0 - off[1], y1 + step, step)
+        gx, gy = np.meshgrid(xs, ys)
+        gx, gy = gx.ravel(), gy.ravel()
+        ok = shapely.contains_xy(r, gx, gy)
+        pts.append(np.stack([gx[ok], gy[ok]], 1))
+        reg.append(np.full(int(ok.sum()), ri))
+    return np.vstack(pts), np.concatenate(reg)
+
+
+def _region_of(regions: list[Polygon], p: np.ndarray) -> np.ndarray:
+    out = np.full(len(p), -1)
+    for ri, r in enumerate(regions):
+        shapely.prepare(r)
+        out[(out < 0) & shapely.contains_xy(r, p[:, 0], p[:, 1])] = ri
+    return out
+
+
+def _lloyd(
+    p: np.ndarray, reg: np.ndarray, samples: np.ndarray, sreg: np.ndarray, spacing: float
+) -> np.ndarray:
+    """Each vertex's centroid of the area nearer to it than to any other vertex of the curve
+    in its region (the per-zone CVT): the vertex itself where that area is empty."""
+    grid = _Grid(p, 0.75 * spacing)
+    sums = np.zeros_like(p)
+    count = np.zeros(len(p))
+    chunk = 50_000
+    for k in range(0, len(samples), chunk):
+        q, qr = samples[k : k + chunk], sreg[k : k + chunk]
+        near = grid.nearest(q, lambda qi, pi, qr=qr: reg[pi] == qr[qi])
+        has = near >= 0
+        np.add.at(sums, near[has], q[has])
+        np.add.at(count, near[has], 1)
+    out = p.copy()
+    has = count > 0
+    out[has] = sums[has] / count[has, None]
+    return out
+
+
+def _neighbours(
+    p: np.ndarray, window: float, reach: float, side: int = 0, which: np.ndarray | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    """For each vertex of the closed curve ``p`` (or those ``which`` indexes): the nearest
+    vertex of the curve more than ``window`` away along it (and within ``reach``; on its left
+    for ``side`` 1, its right for -1, either for 0), and the distance to it (``reach`` and -1
+    where there is none)."""
+    q = np.roll(p, -1, axis=0)
+    t = q - np.roll(p, 1, axis=0)
+    normal = np.stack([-t[:, 1], t[:, 0]], 1)
+    arc = np.concatenate([[0.0], np.cumsum(np.hypot(*(q - p).T))])
+    total, arc = arc[-1], arc[:-1]
+    grid = _Grid(p, reach)
+
+    def ok(qi: np.ndarray, pi: np.ndarray) -> np.ndarray:
+        gap = np.abs(arc[qi] - arc[pi])
+        far = np.minimum(gap, total - gap) > window
+        if side:
+            far &= side * np.sum((p[pi] - p[qi]) * normal[qi], axis=1) > 0
+        return far
+
+    which = np.arange(len(p)) if which is None else which
+    near = np.full(len(which), -1)
+    for k in range(0, len(which), 50_000):
+        w = which[k : k + 50_000]
+        near[k : k + 50_000] = grid.nearest(p[w], lambda qi, pi, w=w: ok(w[qi], pi))
+    d = np.where(near >= 0, np.hypot(*(p[np.maximum(near, 0)] - p[which]).T), reach)
+    return near, np.minimum(d, reach)
+
+
+def _lap(p: np.ndarray) -> np.ndarray:
+    return (np.roll(p, 1, axis=0) + np.roll(p, -1, axis=0)) / 2 - p
+
+
+def _taubin(p: np.ndarray, k: int, passes: int = 2) -> np.ndarray:
+    """Taubin smoothing (a shrinking step, then an inflating one) of the closed curve's
+    first ``k`` vertices but the first and last: zigzags gone, the shape kept."""
+    p = p.copy()
+    for _ in range(passes):
+        for f in (0.5, -0.53):
+            d = f * _lap(p)
+            p[1 : k - 1] += d[1 : k - 1]
+    return p
+
+
+def _relax(
+    curve: np.ndarray,
+    tongue: np.ndarray,
+    area: shapely.Geometry,
+    regions: list[Polygon],
+    spacing: float,
+    least: float,
+    pitch: float,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, int]:
+    """The curve, relaxed: ``curve`` is an open polyline from the tongue's left end round to
+    its right end, the tongue closes it. Returned closed (the tongue last), with the number
+    of vertices before the tongue's (the first and that last one are the tongue's ends).
+
+    Each step moves the curve to its per-zone CVT centroids, smooths it (Taubin) and shrinks
+    or inflates it (a Laplacian step, at the scale of a few vertices) to keep its length near
+    the area over the spacing (the paper's length objective), resampling it after. Then,
+    at a finer step, where two runs come closer than ``least`` (with a margin), or a run
+    nearer the area's edge than half that, they are pushed apart, and where the curve bends
+    tighter than its traces can follow, it is smoothed. No step lets the curve cross
+    itself: what would, stays."""
+    step = spacing / 2
+    target = sum(r.area for r in regions) / spacing
+    tongue_len = float(np.sum(np.hypot(*np.diff(tongue, axis=0).T)))
+    free = _split(curve, step)
+    samples, sreg = _samples(regions, spacing / 3, rng)
+    inner = tongue[1:-1]
+    for _ in range(LLOYD_CURVE):
+        p = np.vstack([free, inner])
+        k = len(free)
+        old = p.copy()
+        reg = _region_of(regions, p)
+        p[1 : k - 1] = _lloyd(p, reg, samples, sreg, spacing)[1 : k - 1]
+        p = _taubin(p, k)
+        length = float(np.sum(np.hypot(*np.diff(p[:k], axis=0).T))) + tongue_len
+        lam = float(np.clip(GAIN * (length - target) / target, -0.2, 0.5))
+        lap = _lap(p)
+        lap = sum(np.roll(lap, i, axis=0) for i in range(-2, 3)) / 5
+        p[1 : k - 1] += lam * lap[1 : k - 1]
+        move = p - old  # (at most half a step: the curve does not jump)
+        size = np.hypot(move[:, 0], move[:, 1])
+        p = old + move * np.minimum(1.0, (step / 2) / np.maximum(size, 1e-12))[:, None]
+        free = _even(_untangle(old, p), k, step)
+
+    step = spacing / 4
+    inner = _resample(np.vstack([free[-1], tongue[1:-1], free[0]]), step)[1:-1]
+    free = _even(np.vstack([free, inner]), len(free), step)
+    want = PUSH_MARGIN * least
+    window = WINDOW * least
+    bend = _bend(round(least / pitch), pitch)
+    edge = np.vstack([_resample(np.asarray(r.coords), step / 2) for r in _rings(area)])
+    edges = _Grid(edge, want)
+    p = np.vstack([free, inner])
+    k = len(free)
+    hot = None
+    for _ in range(REPAIR):
+        free = _even(p, k, step)  # (evenly spaced again: nothing pushed off on its own)
+        p = np.vstack([free, inner])
+        k = len(free)
+        which = np.arange(k)
+        if hot is not None:  # only where something moved nearby
+            cell = np.floor(free / want).astype(np.int64)
+            which = np.nonzero(np.isin(cell[:, 0] * 1_000_003 + cell[:, 1], hot))[0]
+        near, d = _neighbours(p, window, want, which=which)
+        e = edges.nearest(p[which], lambda qi, pi: np.ones(len(qi), bool))
+        de = np.where(e >= 0, np.hypot(*(p[which] - edge[np.maximum(e, 0)]).T), want)
+        movable = (which > 0) & (which < k - 1)  # (the tongue's ends stay)
+        bad = [  # (the edge stands for a run's middle: twice the distance to it counts)
+            ((near >= 0) & (d < want) & movable, p[np.maximum(near, 0)], d),
+            ((e >= 0) & (2 * de < want) & movable, edge[np.maximum(e, 0)], 2 * de),
+        ]
+        sharp = np.abs(_radius(p, 1)) < bend * 1.1
+        sharp[k:] = False
+        if not sharp.any() and not any(hit.any() for hit, _, _ in bad):
+            break
+        move = np.zeros_like(p)
+        for hit, other, dist in bad:
+            away = p[which[hit]] - other[hit]
+            away /= np.maximum(np.hypot(away[:, 0], away[:, 1]), 1e-12)[:, None]
+            np.add.at(move, which[hit], away * (0.6 * (want - dist[hit]) + step / 8)[:, None])
+        move = (np.roll(move, 1, axis=0) + 2 * move + np.roll(move, -1, axis=0)) / 4
+        soft = sharp | np.roll(sharp, 1) | np.roll(sharp, -1)
+        move[soft] += 0.5 * _lap(p)[soft]
+        # off the tongue's mouths: the curve on along their arcs' end for a while
+        for end, prev, sign in ((0, len(p) - 1, 1), (k - 1, k, -1)):
+            t = p[end] - p[prev]
+            t /= max(math.hypot(*t), 1e-12)
+            for m in (1, 2, 3):
+                i = end + sign * m
+                on = p[end] + t * math.dist(p[i], p[end])
+                move[i] += (0.5 / m) * (on - p[i])
+        move[0] = move[k - 1] = 0
+        move[k:] = 0
+        size = np.hypot(move[:, 0], move[:, 1])
+        move *= np.minimum(1.0, (step / 2) / np.maximum(size, 1e-12))[:, None]
+        p = _untangle(p, p + move)
+        moved = size[:k] > 0
+        cell = np.unique(np.floor(p[:k][moved] / want).astype(np.int64), axis=0)
+        cell = np.unique((cell[:, None, :] + _AROUND[None]).reshape(-1, 2), axis=0)
+        hot = cell[:, 0] * 1_000_003 + cell[:, 1]
+    return p, k
+
+
+def _untangle(old: np.ndarray, new: np.ndarray) -> np.ndarray:
+    """The closed curve ``new`` (``old`` moved; ``old`` crossing nowhere) with the vertices
+    of every segment that would cross another back where they were."""
+    new = new.copy()
+    n = len(new)
+    moved = np.nonzero(np.any(new != old, axis=1))[0]
+    for _ in range(50):
+        if not len(moved):
+            return new
+        i, j = _crossing(new, np.unique(np.concatenate([moved, (moved - 1) % n])))
+        if not len(i):
+            return new
+        back = np.unique(np.concatenate([i, (i + 1) % n, j, (j + 1) % n]))
+        new[back] = old[back]
+        moved = back
+    return old
+
+
+def _crossing(p: np.ndarray, which: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The segments of the closed polyline ``p`` among ``which`` (segment ``i`` from vertex
+    ``i`` to the next) that cross or touch another one, other than their neighbours: the
+    pairs."""
+    q = np.roll(p, -1, axis=0)
+    e = q - p
+    length = np.hypot(e[:, 0], e[:, 1])
+    rays = _Rays(p, q, max(float(length.max()), 1e-6))
+    d = e[which] / np.maximum(length[which], 1e-12)[:, None]
+    ray, seg, t = rays.cast(p[which], d)
+    i = which[ray]
+    n = len(p)
+    gap = np.abs(i - seg)
+    hit = (np.minimum(gap, n - gap) > 1) & (t <= length[i])
+    return i[hit], seg[hit]
+
+
+def _radius(p: np.ndarray, reach: int = 2) -> np.ndarray:
+    """The closed curve's signed radius of curvature at each vertex (positive turning left,
+    towards the normal), from the turn between the chords ``reach`` vertices either way."""
+    a = p - np.roll(p, reach, axis=0)
+    b = np.roll(p, -reach, axis=0) - p
+    turn = np.arctan2(a[:, 0] * b[:, 1] - a[:, 1] * b[:, 0], np.sum(a * b, axis=1))
+    chord = (np.hypot(a[:, 0], a[:, 1]) + np.hypot(b[:, 0], b[:, 1])) / 2
+    return chord / np.where(np.abs(turn) < 1e-9, 1e-9, turn)
+
+
+_AROUND = np.array([(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)])
+
+
+def _bend(n: int, pitch: float) -> float:
+    """The tightest the curve may bend: its innermost trace (at the least pitch) within the
+    bend's radius."""
+    return (n - 1) / 2 * pitch / INSIDE
+
+
+def _rings(g: shapely.Geometry) -> list[shapely.LinearRing]:
+    return [r for poly in _polygons(g) for r in (poly.exterior, *poly.interiors)]
+
+
+def _lanes(
+    p: np.ndarray,
+    k: int,
+    area: shapely.Geometry,
+    n: int,
+    pitch: float,
+    spacing: float,
+    exact: np.ndarray,
+) -> list[np.ndarray]:
+    """The ``n`` traces round the closed curve ``p`` (vertices ``k`` on: the tongue's), as
+    closed polylines: offsets of the curve at a pitch that shares the spacing to the next run
+    on each side evenly (the area's edge counts as a run's middle), never below ``pitch``
+    (with a margin; exactly where ``exact``: the tongue's legs). Offset from the curve made smooth
+    (a Catmull-Rom spline through its vertices) and fine, so that no chord cuts a bend."""
+    least = n * pitch
+    cap = SPREAD * spacing
+    sides = []
+    q = np.roll(p, -2, axis=0) - np.roll(p, 2, axis=0)  # (a smooth normal)
+    q /= np.maximum(np.hypot(q[:, 0], q[:, 1]), 1e-12)[:, None]
+    normal = np.stack([-q[:, 1], q[:, 0]], 1)
+    ea, eb = [], []
+    for r in _rings(area):
+        c = _resample(np.asarray(r.coords), spacing / 2)
+        ea.append(c[:-1])
+        eb.append(c[1:])
+    rays = _Rays(np.vstack(ea), np.vstack(eb), cap / 2)
+    radius = _radius(p)
+    # the least pitch: with the margin, but on the tongue's legs (exactly the pitch there),
+    # ramped in along the curve off them
+    idx = np.nonzero(exact)[0]
+    gap = np.abs(np.arange(len(p))[:, None] - idx[[0, -1]][None, :])
+    off = np.where(exact, 0, np.min(np.minimum(gap, len(p) - gap), axis=1))
+    floor = least * (1 + MARGIN * np.clip(off / RAMP, 0.0, 1.0))
+    for side in (1, -1):
+        _, d = _neighbours(p, WINDOW * least, cap, side)
+        ray, _, t = rays.cast(p, side * normal)
+        np.minimum.at(d, ray, 2 * t)
+        # inside a bend: the innermost trace within its radius
+        inside = side * radius > 0
+        d[inside] = np.minimum(d[inside], INSIDE * np.abs(radius[inside]) * 2 * n / max(n - 1, 1))
+        d[exact] = least
+        m = d.copy()  # smoothed: a running minimum, then a running mean (never above d)
+        for i in range(1, SMOOTH + 1):
+            m = np.minimum(m, np.minimum(np.roll(d, i), np.roll(d, -i)))
+        d = sum(np.roll(m, i) for i in range(-SMOOTH, SMOOTH + 1)) / (2 * SMOOTH + 1)
+        d = np.maximum(d, floor)
+        sides.append(d / n)
+    fine = _spline(p, FINE)
+    t = np.arange(len(fine)) / FINE  # (each fine vertex's place between the curve's)
+    lo = np.floor(t).astype(int) % len(p)
+    hi = (lo + 1) % len(p)
+    f = t - np.floor(t)
+    q = np.roll(fine, -1, axis=0) - np.roll(fine, 1, axis=0)
+    q /= np.maximum(np.hypot(q[:, 0], q[:, 1]), 1e-12)[:, None]
+    normal = np.stack([-q[:, 1], q[:, 0]], 1)
+    out = []
+    tangent = np.stack([normal[:, 1], -normal[:, 0]], 1)
+    for j in range(n):
+        o = j - (n - 1) / 2
+        side = sides[0] if o > 0 else sides[1]
+        step = (side[lo] * (1 - f) + side[hi] * f) * o
+        lane = fine + normal * step[:, None]
+        # inside a bend tighter than the offset, the offset runs backwards: not those
+        ahead = np.sum((np.roll(lane, -1, axis=0) - lane) * tangent, axis=1) > 0
+        ahead &= np.roll(ahead, 1)
+        out.append(_unloop(lane[ahead]))
+    return out
+
+
+def _spline(p: np.ndarray, m: int) -> np.ndarray:
+    """The closed polyline through ``p`` as a Catmull-Rom spline (centripetal), ``m``
+    vertices per segment (the first of each at the segment's start)."""
+    p0, p1, p2, p3 = np.roll(p, 1, axis=0), p, np.roll(p, -1, axis=0), np.roll(p, -2, axis=0)
+
+    def knot(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return np.maximum(np.hypot(*(b - a).T), 1e-9) ** 0.5
+
+    t1 = knot(p0, p1)
+    t2 = t1 + knot(p1, p2)
+    t3 = t2 + knot(p2, p3)
+    out = []
+    for i in range(m):
+        t = (t1 + (t2 - t1) * i / m)[:, None]
+        a1 = ((t1[:, None] - t) * p0 + t * p1) / t1[:, None]
+        a2 = ((t2[:, None] - t) * p1 + (t - t1[:, None]) * p2) / (t2 - t1)[:, None]
+        a3 = ((t3[:, None] - t) * p2 + (t - t2[:, None]) * p3) / (t3 - t2)[:, None]
+        b1 = ((t2[:, None] - t) * a1 + t * a2) / t2[:, None]
+        b2 = ((t3[:, None] - t) * a2 + (t - t1[:, None]) * a3) / (t3 - t1)[:, None]
+        out.append(((t2[:, None] - t) * b1 + (t - t1[:, None]) * b2) / (t2 - t1)[:, None])
+    return np.stack(out, 1).reshape(-1, 2)
+
+
+def _unloop(q: np.ndarray, reach: int = 40) -> np.ndarray:
+    """The closed polyline without the small loops an offset leaves inside tight bends:
+    where a segment crosses one up to ``reach`` segments on, the vertices between give way
+    to the crossing."""
+    for _ in range(4):
+        a, b = q, np.roll(q, -1, axis=0)
+        r = b - a
+        hits = []
+        for j in range(2, reach + 1):
+            c, s = np.roll(a, -j, axis=0), np.roll(r, -j, axis=0)
+            den = r[:, 0] * s[:, 1] - r[:, 1] * s[:, 0]
+            w = c - a
+            ok = np.abs(den) > 1e-15
+            den = np.where(ok, den, 1.0)
+            t = (w[:, 0] * s[:, 1] - w[:, 1] * s[:, 0]) / den
+            u = (w[:, 0] * r[:, 1] - w[:, 1] * r[:, 0]) / den
+            ok &= (t > 0) & (t < 1) & (u > 0) & (u < 1)
+            for i in np.nonzero(ok)[0]:
+                hits.append((int(i), j, a[i] + t[i] * r[i]))
+        if not hits:
+            return q
+        n = len(q)
+        keep = np.ones(n, bool)
+        q = q.copy()
+        hits.sort(key=lambda h: (h[0], -h[1]))
+        done = -1
+        for i, j, x in hits:
+            span = [(i + m) % n for m in range(1, j + 1)]
+            if i <= done or not all(keep[v] for v in span) or not keep[i]:
+                continue
+            q[span[0]] = x
+            for v in span[1:]:
+                keep[v] = False
+            done = i + j
+        q = q[keep]
+    return q
+
+
+# ----------------------------------------------------------------------------- generator
+def generate(
+    mask: shapely.Geometry,
+    exit_corner: Point,
+    exit_side: int,
+    traces: int,
+    pitch: float,
+    seed: int | str | None = 0,
+    zones: tuple[Polygon, ...] | list[Polygon] = (),
+) -> Mesh:
+    """The mesh over ``mask``: ``traces`` nets at ``pitch`` (trace plus space) round a closed
+    space-filling curve, out through the exit cell (as ``kimesh.generate``: its corner with
+    the smallest x and y ``exit_corner``, its side ``exit_side`` open). ``zones`` (the
+    folding pattern's panels) are filled one by one and joined across their borders as
+    seldom as can be; ``seed`` makes the layout repeatable."""
+    if traces < 1:
+        raise MeshError("need at least one trace")
+    n = traces
+    c = 2 * n * pitch
+    least = n * pitch
+    spacing = SPACING * least
+    frame = _Frame(exit_side)
+    ox, oy = exit_corner
+    cell = frame.geom(shapely.box(ox, oy, ox + c, oy + c))
+    x0, y0, _, _ = cell.bounds
+    area = frame.geom(mask)
+    # (the exit's leads run on from the open side: nothing of the mesh beyond it)
+    area = shapely.difference(area, shapely.box(x0 - pitch, y0 - 4 * c, x0 + c + pitch, y0))
+    if not area.buffer(1e-6).contains(shapely.box(x0, y0, x0 + c, y0 + 1.5 * spacing)):
+        raise MeshError("no room for the mesh's exit cell")
+    ym, ytop = y0 + spacing, y0 - least
+    # The tongue's legs run straight through the exit cell to its mouth: the curve keeps
+    # out of the cell up to there (its traces' pitch there is the least).
+    area = shapely.difference(area, shapely.box(x0, y0 - 4 * c, x0 + c, ym))
+    rng = random.Random(seed)
+    nrng = np.random.default_rng(rng.getrandbits(64))
+    # The tongue: two legs, a run's spacing apart, straight up through the exit cell.
+    ax, bx = x0 + c / 4, x0 + 3 * c / 4
+    pts, regions, _, cells, left = _curve(
+        area, [frame.geom(z) for z in zones], spacing, ((ax, ym), (bx, ym)), rng
+    )
+    tongue = np.array([(bx, ym), (bx, ytop), (ax, ytop), (ax, ym)])
+    curve = np.vstack([[(ax, ym)], pts, [(bx, ym)]])
+    p, k = _relax(curve, tongue, area, regions, spacing, least, pitch, nrng)
+    cut = shapely.box(x0, ytop - c, x0 + c, y0)  # (within the leads' corridor)
+    out = []
+    exact = np.zeros(len(p), bool)  # (the tongue's legs: the traces at the pitch)
+    exact[k:] = p[k:, 1] < y0 + spacing / 4
+    for ring in _lanes(p, k, area, n, pitch, spacing, exact):
+        line = shapely.line_merge(shapely.difference(LineString(np.vstack([ring, ring[:1]])), cut))
+        if isinstance(line, LineString):
+            line = line.simplify(SIMPLIFY * pitch / 0.3, preserve_topology=False)
+        if not isinstance(line, LineString):
+            raise MeshError("a trace does not leave through the exit")
+        xy = frame.inv(np.asarray(line.coords))
+        out.append(xy)
+    # net 1 outermost: its ends farthest from the exit's middle
+    mid = frame.inv(np.array([[(ax + bx) / 2, y0]]))[0]
+    out.sort(key=lambda t: -math.dist(t[0], mid))
+    nets = tuple(tuple((float(x), float(y)) for x, y in t) for t in out)
+    return Mesh(nets, c, cells, left, exit_corner)

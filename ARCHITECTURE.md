@@ -33,7 +33,9 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 |---|---|
 | `config.py` | `Config`, a frozen dataclass and the single validated input. It also holds `FieldSpec` metadata that drives the UI form, `from_dict` (the only entry point for untrusted data), cross-field validation, and the schema version (other versions are rejected). |
 | `crosssection.py` | Pure math for the closed body: one panel's cross-section (`CrossSection`), the panel width solver, and `Body`, the material model around the interior (section 4.3). |
-| `mesh.py` | The security mesh generator, a port of KiMesh: tiles, the randomized depth-first walk over the cells inside a mask, and joining each net's segments into one path. Needs shapely. |
+| `mesh.py` | What the mesh layout algorithms share: the `Mesh` result, `MeshError`, the side bits, `straighten`. |
+| `kimesh.py` | The security mesh generator, a port of KiMesh: tiles, the randomized depth-first walk over the cells inside a mask, and joining each net's segments into one path. Needs shapely. |
+| `sfc.py` | Work in progress, not wired up yet: a mesh layout from a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across folds as seldom as possible, the traces offset from the curve. Needs shapely and numpy. |
 | `pcb.py` | The flex-PCB layout (mask, both meshes, the cable's traces, fan-out, vias and plug contacts, GND zone) and its export through gerbonara (KiCad board and project, Gerber, SVG). Imported on demand: its dependencies are heavy (the in-browser build loads them on the first PCB request). |
 | `fpc.py` | The FPC cable's layout at the top end of the pattern: the level cut it leaves the inner flap by, the meander, its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
@@ -89,7 +91,7 @@ outputs.
 | `test_fpc.py` | The FPC cable: one simple outline, a folded straight strip of the set length, corner creases that lay each run back along the one before and end on the cut, the level cut it leaves the flap by, its clearances, the sharp plug and the rounded other corners, mirroring to the back end, the default fitting the pattern, and validation. |
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
 | `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
-| `test_mesh.py` | The mesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
+| `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
 | `test_pcb.py` | The PCB layout: the pinout, both meshes, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes. |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded. |

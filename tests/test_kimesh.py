@@ -1,4 +1,4 @@
-"""The security mesh generator (a KiMesh port): every net one path through every reachable
+"""The KiMesh layout: every net one path through every reachable
 cell, both ends at the exit cell's open side, nets apart by their pitch."""
 
 import itertools
@@ -8,7 +8,7 @@ import pytest
 import shapely
 from shapely.geometry import LineString
 
-from yanartas_pillowbox import mesh
+from yanartas_pillowbox import kimesh as mesh
 
 PITCH = 0.3
 

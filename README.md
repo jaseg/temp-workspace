@@ -251,7 +251,7 @@ as in the 3D view; not to scale):
 `pcb.py` lays the box out as a two-layer flex PCB: the foil carries a security mesh on each
 side, and the mesh's traces leave through the FPC cable to the plug.
 
-* **Mesh:** a port of [KiMesh](https://git.yasec.de/jaseg/kimesh) (`mesh.py`). The foil,
+* **Mesh:** a port of [KiMesh](https://git.yasec.de/jaseg/kimesh) (`kimesh.py`). The foil,
   kept `mesh_edge_clearance` off its cut edges and slits and without the cable, is divided
   into square cells `2 × mesh_traces` trace pitches wide. A randomized depth-first walk from
   the *exit cell* visits every cell it can reach, and each cell gets KiMesh's tile for the
