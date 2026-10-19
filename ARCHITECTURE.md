@@ -316,7 +316,10 @@ inner flap's free edge.
 - **Later.** A port of the curve layout to Rust compiled to WebAssembly (run natively in
   the browser, and from the Python CLI through wasmtime) for speed, once the algorithm is
   settled; an alignment field (the reference's needles) to lay the curve along the edges;
-  a progress bar for the mesh layout; a switch to draw the traces as circular arcs (now
+  a progress bar for the mesh layout; per-trace settling (`sfc._settle`, off for now:
+  `SETTLE = 0`) still lets a trace pinch within 0.06 mm of itself near tight hairpins, and
+  takes minutes on a small area; its skew limit (`SETTLE_SKEW`) is off: reconsider it,
+  since filling holes with the outer traces alone skews pairs by ~100 mm over 3 m; a switch to draw the traces as circular arcs (now
   polylines, simplified within 2 µm).
 - **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board
   renderer fails on footprints, so `render_stack` draws the tracks, vias, graphics and

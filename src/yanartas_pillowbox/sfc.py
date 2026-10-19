@@ -90,6 +90,11 @@ GROW_RATE = 0.5  # ... the share of the room a bend bulges into per step
 HARD = 10  # repair steps before bends still too sharp are smoothed the hard way
 STALL = 10  # ... until it has grown less than 0.2 % over this many steps
 STRAIGHT = 0.1  # bends gentler than this many least spacings' curvature: straight (skew)
+SETTLE = 0  # steps settling each trace into the middle of the room either side of it
+SETTLE_RATE = 0.5  # ... the share of the way there a step goes
+SETTLE_REACH = 3.0  # ... copper looked for this many pitches out (beyond: a hole, moved into)
+SETTLE_PIN = 1.5  # ... bends tighter than this many pitches' radius do not move inwards
+SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
 
@@ -1435,6 +1440,336 @@ def _unloop(q: np.ndarray, reach: int = 40) -> np.ndarray:
     return q
 
 
+# ----------------------------------------------------------------------------- settling
+class _Traces:
+    """Open polylines held as one array: each vertex's trace, and the vertex before and
+    after it on its trace (-1 at its ends)."""
+
+    def __init__(self, lines: list[np.ndarray], u: list[np.ndarray] | None = None) -> None:
+        self.p = np.vstack(lines)
+        self.net = np.concatenate([np.full(len(t), i) for i, t in enumerate(lines)])
+        if u is None:  # (where along its trace, as laid: a share of it)
+            u = []
+            for t in lines:
+                arc = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(t, axis=0).T))])
+                u.append(arc / max(arc[-1], 1e-12))
+        self.u = np.concatenate(u)
+        first = np.cumsum([0] + [len(t) for t in lines])
+        idx = np.arange(len(self.p))
+        self.prev = np.where(np.isin(idx, first[:-1]), -1, idx - 1)
+        self.next = np.where(np.isin(idx, first[1:] - 1), -1, idx + 1)
+        self.first = first
+
+    def lines(self) -> list[np.ndarray]:
+        return [self.p[a:b] for a, b in itertools.pairwise(self.first)]
+
+    def respaced(self, step: float) -> _Traces:
+        """The traces at about ``step`` between vertices (``_respace``), each vertex's place
+        as laid carried along."""
+        lines, us = [], []
+        for a, b in itertools.pairwise(self.first):
+            t, u = self.p[a:b], self.u[a:b]
+            seg = np.hypot(*np.diff(t, axis=0).T)
+            drop = np.zeros(len(t), bool)
+            drop[1:-1] = seg[:-1] + seg[1:] < step
+            drop[1:] &= ~drop[:-1]
+            t, u = t[~drop], u[~drop]
+            seg = np.hypot(*np.diff(t, axis=0).T)
+            parts = np.maximum(1, np.ceil(seg / (1.5 * step))).astype(int)
+            f = np.concatenate([np.arange(m) / m for m in parts])
+            i = np.repeat(np.arange(len(seg)), parts)
+            lines.append(np.vstack([t[i] + (t[i + 1] - t[i]) * f[:, None], t[-1:]]))
+            us.append(np.concatenate([u[i] + (u[i + 1] - u[i]) * f, u[-1:]]))
+        return _Traces(lines, us)
+
+    def arc(self) -> np.ndarray:
+        seg = np.hypot(*(self.p[np.maximum(self.prev, 0)] - self.p).T)
+        seg[self.prev < 0] = 0.0
+        out = np.cumsum(seg)
+        return out - np.repeat(out[self.first[:-1]], np.diff(self.first))
+
+    def normals(self) -> np.ndarray:
+        a = self.p[np.where(self.prev < 0, np.arange(len(self.p)), self.prev)]
+        b = self.p[np.where(self.next < 0, np.arange(len(self.p)), self.next)]
+        t = b - a
+        t /= np.maximum(np.hypot(t[:, 0], t[:, 1]), 1e-12)[:, None]
+        return np.stack([-t[:, 1], t[:, 0]], 1)
+
+    def turning(self, reach: int = 2) -> np.ndarray:
+        """Each vertex's signed curvature (turning left: positive), from the chords
+        ``reach`` vertices either way along its trace (0 near its ends)."""
+        a, b = np.arange(len(self.p)), np.arange(len(self.p))
+        for _ in range(reach):
+            a = np.where(self.prev[a] >= 0, self.prev[a], a)
+            b = np.where(self.next[b] >= 0, self.next[b], b)
+        u, v = self.p - self.p[a], self.p[b] - self.p
+        turn = np.arctan2(u[:, 0] * v[:, 1] - u[:, 1] * v[:, 0], np.sum(u * v, axis=1))
+        chord = (np.hypot(u[:, 0], u[:, 1]) + np.hypot(v[:, 0], v[:, 1])) / 2
+        return np.where(chord > 1e-12, turn / np.maximum(chord, 1e-12), 0.0)
+
+
+def _settle(
+    lines: list[np.ndarray], pitch: float, area: shapely.Geometry, keep: shapely.Geometry
+) -> list[np.ndarray]:
+    """The traces, each settled on its own into the room around it: every vertex moved
+    towards the middle between the nearest copper on either side of it (the area's edge
+    standing for copper at twice its distance; nothing within reach: a hole, moved into),
+    never nearer other copper than a pitch, nor across it. Smoothness counts for little (a
+    trace may kink into a corner of a hole; only jitter is smoothed away), but in a tight
+    bend nothing moves along its axis into it: the innermost trace of a U-turn keeps its
+    tip where it is and closes up its legs. Neighbouring traces keep their lengths (run
+    from the exit) within ``SETTLE_SKEW`` pitches of each other at every point along the
+    curve: where one is ahead, it stops gaining (or the other losing) until the other
+    catches up. Only vertices near ones that moved are looked at again. The ends and the
+    exit (``keep``) stay as laid."""
+    step = pitch / 2
+    near, far = 2 * pitch, SETTLE_REACH * pitch
+    own = 0.5 * pitch  # (the trace's own vertices nearer along it: not copper across)
+    tr = _Traces([np.asarray(t, float) for t in lines]).respaced(step)
+    n = len(lines)
+    edge = np.vstack([resample(np.asarray(r.coords), step / 2) for r in _rings(area)])
+    edges = Grid(edge, far)
+    shapely.prepare(keep)
+    total = np.array([float(np.sum(np.hypot(*np.diff(t, axis=0).T))) for t in lines])
+    bins = max(int(np.max(total) / (2 * pitch)), 1)  # (positions along the curve)
+    base = _binned(tr, bins)  # (each trace's length by position, as laid)
+    gained = np.zeros((n, bins))
+    limit = SETTLE_SKEW * pitch
+    hot = None
+    for _ in range(SETTLE):
+        p, net = tr.p, tr.net
+        arc = tr.arc()
+        where = np.minimum((tr.u * bins).astype(int), bins - 1)
+        normal = tr.normals()
+        fixed = (tr.prev < 0) | (tr.next < 0) | shapely.contains_xy(keep, p[:, 0], p[:, 1])
+        for _ in range(4):  # (and a few vertices on from the ends)
+            fixed |= fixed[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
+            fixed |= fixed[np.maximum(tr.next, 0)] & (tr.next >= 0)
+        look = np.arange(len(p))
+        if hot is not None:
+            cell = np.floor(p / far).astype(np.int64)
+            look = np.nonzero(np.isin(cell[:, 0] * 1_000_003 + cell[:, 1], hot))[0]
+        push = np.zeros(len(p))
+        if len(look):
+            push[look] = _centring(p, net, arc, normal, look, edge, edges, near, far, own, pitch)
+        push *= SETTLE_RATE
+        # a tight bend: no move along its axis into it (its tip pinned, its legs may close)
+        curv = tr.turning()
+        axis = _bend_axes(tr, curv, SETTLE_PIN * pitch)
+        move = normal * push[:, None]
+        into = np.sum(move * axis, axis=1)
+        move -= np.maximum(into, 0.0)[:, None] * axis
+        # skew: where a trace is ahead of a neighbour (by position along the curve), no
+        # more gaining there; where behind, no losing
+        run = np.cumsum(gained, axis=1)
+        ahead = np.zeros((n, bins))
+        for t in range(n - 1):
+            ahead[t] = np.maximum(ahead[t], run[t] - run[t + 1])
+            ahead[t + 1] = np.maximum(ahead[t + 1], run[t + 1] - run[t])
+        behind = np.zeros((n, bins))
+        for t in range(n - 1):
+            behind[t] = np.maximum(behind[t], run[t + 1] - run[t])
+            behind[t + 1] = np.maximum(behind[t + 1], run[t] - run[t + 1])
+        grows = -np.sum(move * normal, axis=1) * curv  # (length change per unit length)
+        stop = ((grows > 0) & (ahead[net, where] > limit)) | (
+            (grows < 0) & (behind[net, where] > limit)
+        )
+        move[stop | fixed] = 0.0
+        size = np.hypot(move[:, 0], move[:, 1])
+        move *= np.minimum(1.0, (step / 3) / np.maximum(size, 1e-12))[:, None]
+        new = p + move
+        # jitter smoothed away (Taubin: no shrinking) round what moved, but where fixed
+        busy = np.hypot(move[:, 0], move[:, 1]) > 0
+        busy |= busy[np.maximum(tr.prev, 0)] | busy[np.maximum(tr.next, 0)]
+        busy &= (tr.prev >= 0) & (tr.next >= 0) & ~fixed
+        for f in (0.3, -0.32):
+            lap = (new[np.maximum(tr.prev, 0)] + new[np.maximum(tr.next, 0)]) / 2 - new
+            new[busy] += f * lap[busy]
+        new = _keep_clear(tr, p, new, pitch, own)
+        # skew, exactly: where a pair's running difference passes the limit and grew, the
+        # moves of the trace that gained more there taken back
+        tr.p = new
+        now = _binned(tr, bins) - base
+        tr.p = p
+        back = np.zeros(len(p), bool)
+        before, after = np.cumsum(gained, axis=1), np.cumsum(now, axis=1)
+        for t in range(n - 1):
+            for a, b in ((t, t + 1), (t + 1, t)):
+                over = (after[a] - after[b] > limit) & (after[a] - after[b] > before[a] - before[b])
+                if not over.any():
+                    continue
+                last = int(np.nonzero(over)[0][-1])
+                more = (now[a] - gained[a]) > (now[b] - gained[b])
+                more[last + 1 :] = False
+                back |= (net == a) & more[where]
+        if back.any():
+            new = new.copy()
+            new[back] = p[back]
+            new = _keep_clear(tr, p, new, pitch, own)
+        moved = np.hypot(*(new - p).T) > 0.02 * pitch
+        if not moved.any():
+            break
+        cell = np.unique(np.floor(new[moved] / far).astype(np.int64), axis=0)
+        cell = np.unique((cell[:, None, :] + _AROUND[None]).reshape(-1, 2), axis=0)
+        hot = cell[:, 0] * 1_000_003 + cell[:, 1]
+        tr.p = new
+        tr = tr.respaced(step)
+        gained = _binned(tr, bins) - base
+    return tr.lines()
+
+
+def _binned(tr: _Traces, bins: int) -> np.ndarray:
+    """Each trace's length by position along it as laid (``bins`` of it)."""
+    out = np.zeros((int(tr.net.max()) + 1, bins))
+    seg = np.nonzero(tr.next >= 0)[0]
+    where = np.minimum((tr.u[seg] * bins).astype(int), bins - 1)
+    np.add.at(out, (tr.net[seg], where), np.hypot(*(tr.p[tr.next[seg]] - tr.p[seg]).T))
+    return out
+
+
+def _centring(
+    p: np.ndarray,
+    net: np.ndarray,
+    arc: np.ndarray,
+    normal: np.ndarray,
+    look: np.ndarray,
+    edge: np.ndarray,
+    edges: Grid,
+    near: float,
+    far: float,
+    own: float,
+    pitch: float,
+) -> np.ndarray:
+    """For the vertices ``look``: how far (to the left: positive) the middle between the
+    nearest copper either side of each is, short of a pitch from it (half one from the
+    area's edge, which stands for copper at twice its distance). Looked for ``near`` first,
+    then ``far``; nothing that far: a hole, as wide as that."""
+    out = []
+    for side in (1.0, -1.0):
+        d = np.full(len(look), far)
+        todo = np.arange(len(look))
+        for reach in (near, far):
+            if not len(todo):
+                break
+            grid = Grid(p, reach)
+            q = look[todo]
+
+            def ok(
+                qi: np.ndarray,
+                pi: np.ndarray,
+                side: float = side,
+                q: np.ndarray = q,
+                reach: float = reach,
+            ) -> np.ndarray:
+                v = p[pi] - p[q[qi]]
+                dd = np.hypot(v[:, 0], v[:, 1])
+                facing = side * np.sum(v * normal[q[qi]], axis=1) >= 0.7 * dd
+                other = (net[pi] != net[q[qi]]) | (np.abs(arc[pi] - arc[q[qi]]) > own)
+                return facing & other & (dd <= reach) & (dd > 0)
+
+            j = grid.nearest(p[q], ok)
+            found = j >= 0
+            d[todo[found]] = np.hypot(*(p[j[found]] - p[q[found]]).T)
+            todo = todo[~found]
+        q = look
+
+        def facing_edge(
+            qi: np.ndarray, pi: np.ndarray, side: float = side, q: np.ndarray = q
+        ) -> np.ndarray:
+            return side * np.sum((edge[pi] - p[q[qi]]) * normal[q[qi]], axis=1) > 0
+
+        e = edges.nearest(p[q], facing_edge)
+        de = np.where(e >= 0, np.hypot(*(edge[np.maximum(e, 0)] - p[q]).T), far)
+        out.append((np.minimum(d, 2 * de), de))
+    (left, eleft), (right, eright) = out
+    push = (left - right) / 2
+    return np.where(
+        push > 0,
+        np.minimum(push, np.minimum(left - pitch, eleft - pitch / 2)),
+        np.maximum(push, -np.minimum(right - pitch, eright - pitch / 2)),
+    )
+
+
+def _bend_axes(tr: _Traces, curv: np.ndarray, radius: float) -> np.ndarray:
+    """For each vertex in a bend tighter than ``radius`` (zero elsewhere): the direction
+    into the bend at its tightest point (its axis, pointing in)."""
+    tight = np.abs(curv) * radius > 1
+    axis = np.zeros_like(tr.p)
+    if not tight.any():
+        return axis
+    normal = tr.normals()
+    # runs of tight vertices along each trace, turning the same way
+    start = tight & ~(
+        tight[np.maximum(tr.prev, 0)]
+        & (tr.prev >= 0)
+        & (np.sign(curv[np.maximum(tr.prev, 0)]) == np.sign(curv))
+    )
+    run = np.cumsum(start) - 1
+    run[~tight] = -1
+    ids = run[tight]
+    idx = np.nonzero(tight)[0]
+    best = np.full(ids.max() + 1, -1)
+    order = np.lexsort((np.abs(curv[idx]), ids))
+    best[ids[order]] = idx[order]  # (the last per run: its tightest vertex)
+    tip = best[ids]
+    axis[idx] = normal[tip] * np.sign(curv[tip])[:, None]
+    return axis
+
+
+def _keep_clear(
+    tr: _Traces, old: np.ndarray, new: np.ndarray, pitch: float, own: float
+) -> np.ndarray:
+    """``new`` with the vertices that would come nearer other copper than a pitch (with a
+    margin for the sampling), or whose segments would cross, back where they were
+    (``old``). A trace's own vertices ``a`` apart along it count as other copper once
+    they are nearer than a semicircle that long would hold them (2 a / pi): it may U-turn,
+    but not pinch."""
+    new = new.copy()
+    net = tr.net
+    need = 1.02 * pitch
+    for _ in range(6):
+        moved = np.nonzero(np.any(new != old, axis=1))[0]
+        if not len(moved):
+            break
+        tr.p = new
+        arc = tr.arc()
+
+        def close(
+            qi: np.ndarray,
+            pi: np.ndarray,
+            moved: np.ndarray = moved,
+            arc: np.ndarray = arc,
+            new: np.ndarray = new,
+        ) -> np.ndarray:
+            q = moved[qi]
+            d = np.hypot(*(new[pi] - new[q]).T)
+            sep = np.abs(arc[pi] - arc[q])
+            same = net[pi] == net[q]
+            limit = np.where(same, np.minimum(need, 0.95 * 2 * sep / np.pi), need)
+            return (d < limit) & (~same | (sep > own))
+
+        j = Grid(new, need).nearest(new[moved], close)
+        bad = moved[j >= 0]
+        # segments that cross
+        seg = np.nonzero(tr.next >= 0)[0]
+        touch = np.isin(seg, moved) | np.isin(tr.next[seg], moved)
+        a, b = new[seg], new[tr.next[seg]]
+        e = b - a
+        length = np.hypot(e[:, 0], e[:, 1])
+        rays = Rays(a, b, max(float(length.max()), 1e-6))
+        k = np.nonzero(touch)[0]
+        ray, hit, t = rays.cast(a[k], e[k] / np.maximum(length[k], 1e-12)[:, None])
+        i, h = seg[k[ray]], seg[hit]
+        cross = (t <= length[k[ray]]) & (h != i) & (h != tr.prev[i]) & (tr.next[h] != i)
+        crossed = np.concatenate([i[cross], tr.next[i[cross]], h[cross], tr.next[h[cross]]])
+        back = np.unique(np.concatenate([bad, crossed[crossed >= 0]]))
+        if not len(back):
+            break
+        new[back] = old[back]
+    tr.p = old
+    return new
+
+
 # ----------------------------------------------------------------------------- generator
 def generate(
     mask: shapely.Geometry,
@@ -1487,16 +1822,21 @@ def generate(
     out = []
     exact = np.zeros(len(p), bool)  # (the tongue's legs: the traces at the pitch)
     exact[k:] = p[k:, 1] < y0 + spacing / 4
+    lines = []
     for ring in _lanes(p, k, area, n, pitch, spacing, exact):
         line = shapely.line_merge(shapely.difference(LineString(np.vstack([ring, ring[:1]])), cut))
-        if isinstance(line, LineString):
-            tol = SIMPLIFY * pitch / 0.3
-            fast = line.simplify(tol, preserve_topology=False)
-            line = fast if fast.is_simple else line.simplify(tol, preserve_topology=True)
         if not isinstance(line, LineString):
             raise MeshError("a trace does not leave through the exit")
-        xy = frame.inv(np.asarray(line.coords))
-        out.append(xy)
+        lines.append(np.asarray(line.coords))
+    if SETTLE:
+        keep = shapely.box(x0 - c, ytop - c, x0 + 2 * c, ym + spacing)  # (the exit: as laid)
+        lines = _settle(lines, pitch, area, keep)
+    for xy in lines:
+        line = LineString(xy)
+        tol = SIMPLIFY * pitch / 0.3
+        fast = line.simplify(tol, preserve_topology=False)
+        line = fast if fast.is_simple else line.simplify(tol, preserve_topology=True)
+        out.append(frame.inv(np.asarray(line.coords)))
     # net 1 outermost: its ends farthest from the exit's middle
     mid = frame.inv(np.array([[(ax + bx) / 2, y0]]))[0]
     out.sort(key=lambda t: -math.dist(t[0], mid))
