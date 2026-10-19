@@ -100,6 +100,18 @@ def create_app(settings_path: Path) -> Flask:
         """``{config}`` -> OpenSCAD source of the box's interior."""
         return Response(render_scad(api.parse_config(body)), mimetype="application/x-openscad")
 
+    @app.post("/api/pcb")
+    @_json_route
+    def pcb_preview(body: Any) -> Any:
+        """``{config}`` -> the PCB layout's copper for the previews."""
+        return jsonify(api.pcb_preview(api.parse_config(body)))
+
+    @app.post("/api/pcb/files")
+    @_json_route
+    def pcb_files(body: Any) -> Any:
+        """``{config}`` -> zip of the PCB layout's KiCad, Gerber and SVG files."""
+        return Response(api.pcb_files(api.parse_config(body)), mimetype="application/zip")
+
     @app.post("/api/payload")
     @_json_route
     def payload_action(body: Any) -> Any:

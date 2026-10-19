@@ -9,7 +9,11 @@ description = "Generate laser-ready SVG folding patterns for pillow boxes, confi
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "jaseg" }]
-dependencies = ["flask>=3.0"]
+dependencies = [
+    "flask>=3.0",
+    "gerbonara>=1.5.0",
+    "shapely>=2.2.0",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Environment :: Web Environment",

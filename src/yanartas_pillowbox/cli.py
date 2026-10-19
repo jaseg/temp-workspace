@@ -1,4 +1,4 @@
-"""Command-line entry point: ``serve`` (default) and ``generate``."""
+"""Command-line entry point: ``serve`` (default), ``generate`` and ``pcb``."""
 
 from __future__ import annotations
 
@@ -30,7 +30,22 @@ def build_parser() -> argparse.ArgumentParser:
     _add_serve_args(serve)
 
     gen = sub.add_parser("generate", help="generate an SVG without the UI")
-    src = gen.add_mutually_exclusive_group()
+    _add_config_args(gen)
+    gen.add_argument(
+        "-o", "--output", required=True, metavar="OUT.svg", help="output file, or - for stdout"
+    )
+
+    pcb = sub.add_parser(
+        "pcb", help="lay the box out as a flex PCB with a security mesh (KiCad, Gerber, SVG)"
+    )
+    _add_config_args(pcb)
+    pcb.add_argument("-o", "--output", required=True, metavar="DIR", help="output directory")
+    pcb.add_argument("--name", default="pillowbox", help="base name of the files written")
+    return parser
+
+
+def _add_config_args(p: argparse.ArgumentParser) -> None:
+    src = p.add_mutually_exclusive_group()
     src.add_argument("--config", type=Path, metavar="FILE", help="JSON config file")
     src.add_argument(
         "--from-svg",
@@ -38,17 +53,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="take the config embedded in a previously generated SVG",
     )
-    gen.add_argument(
+    p.add_argument(
         "--set",
         action="append",
         default=[],
         metavar="KEY=VALUE",
         help="override one parameter (repeatable), e.g. --set width=80",
     )
-    gen.add_argument(
-        "-o", "--output", required=True, metavar="OUT.svg", help="output file, or - for stdout"
-    )
-    return parser
 
 
 def _add_serve_args(p: argparse.ArgumentParser) -> None:
@@ -67,10 +78,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "generate":
         return cmd_generate(args)
+    if args.command == "pcb":
+        return cmd_pcb(args)
     return cmd_serve(args)
 
 
-def cmd_generate(args: argparse.Namespace) -> int:
+def _load_config(args: argparse.Namespace) -> Config | None:
+    """The config the arguments give, or None (errors printed)."""
     try:
         cfg = Config.defaults()
         if args.config is not None:
@@ -88,17 +102,42 @@ def cmd_generate(args: argparse.Namespace) -> int:
     except ConfigError as exc:
         for key, msg in exc.errors.items():
             print(f"error: {key}: {msg}", file=sys.stderr)
-        return 2
+        return None
     except (SchemaVersionError, SvgImportError, json.JSONDecodeError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
-        return 2
+        return None
+    return cfg
 
+
+def cmd_generate(args: argparse.Namespace) -> int:
+    cfg = _load_config(args)
+    if cfg is None:
+        return 2
     svg = render_svg(cfg)
     if args.output == "-":
         sys.stdout.write(svg)
     else:
         Path(args.output).write_text(svg, encoding="utf-8")
         print(f"wrote {args.output}", file=sys.stderr)
+    return 0
+
+
+def cmd_pcb(args: argparse.Namespace) -> int:
+    from yanartas_pillowbox import pcb
+
+    cfg = _load_config(args)
+    if cfg is None:
+        return 2
+    try:
+        layout = pcb.layout(cfg)
+    except pcb.PcbError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    for side, m in layout.meshes.items():
+        missed = f", {m.unreached} out of reach" if m.unreached else ""
+        print(f"{side}: mesh over {m.cells} cells of {m.cell:g} mm{missed}", file=sys.stderr)
+    for path in pcb.export(layout, args.output, args.name):
+        print(f"wrote {path}", file=sys.stderr)
     return 0
 
 

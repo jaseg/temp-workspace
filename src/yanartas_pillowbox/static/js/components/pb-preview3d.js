@@ -3,6 +3,7 @@
 
 import * as THREE from "../../vendor/three/three.module.min.js";
 import { OrbitControls } from "../../vendor/three/OrbitControls.js";
+import { rasterize } from "../meshtex.js";
 
 const template = document.createElement("template");
 template.innerHTML = `
@@ -34,6 +35,7 @@ template.innerHTML = `
 <header>
   <h2>Folded box</h2>
   <div class="info" aria-live="polite"></div>
+  <button type="button" data-mesh aria-pressed="false" title="Show the PCB layout's security mesh: F.Cu outside, B.Cu inside">Mesh</button>
   <button type="button" data-dims aria-pressed="true" title="Show parameter dimensions">Dimensions</button>
   <button type="button" class="reset" title="Reset camera">Reset view</button>
 </header>
@@ -57,6 +59,8 @@ export class PbPreview3d extends HTMLElement {
   #showDims = true;
   #dark = matchMedia("(prefers-color-scheme: dark)");
   #lastDims = [];
+  #surfaces = []; // [{part, geom, outside, inside}]: the paper's two sides, per face
+  #textures = null; // {front, back, bbox}: the PCB layout's copper layers as textures
 
   constructor() {
     super();
@@ -65,6 +69,9 @@ export class PbPreview3d extends HTMLElement {
     this.#stage = root.querySelector(".stage");
     this.#info = root.querySelector(".info");
     root.querySelector(".reset").addEventListener("click", () => this.#resetCamera());
+    root.querySelector("[data-mesh]").addEventListener("click", () => {
+      this.dispatchEvent(new CustomEvent("pb-mesh-toggle", { bubbles: true, composed: true }));
+    });
     const toggle = root.querySelector("[data-dims]");
     toggle.addEventListener("click", () => {
       this.#showDims = !this.#showDims;
@@ -138,6 +145,7 @@ export class PbPreview3d extends HTMLElement {
     // front panel under it (none at zero thickness), as do the lids from the back panel.
     // Depth offsets keep the outer surface on top.
     const depthBias = (part) => (part.kind === "tab" || part.kind === "lid" ? 1 : 2);
+    this.#surfaces = [];
     for (const part of model.parts) {
       // The inner end flaps stand inside the box (behind the end wall gap): drawn through
       // the paper, like the payload.
@@ -149,16 +157,22 @@ export class PbPreview3d extends HTMLElement {
       geom.setAttribute("position", new THREE.Float32BufferAttribute(part.positions, 3));
       geom.setIndex(part.indices);
       geom.computeVertexNormals();
-      const mat = new THREE.MeshStandardMaterial({
+      // The two sides separately, so each can carry its own copper layer (setMesh): the
+      // triangles' winding faces into the box, so the pattern's visible side (F.Cu) is
+      // their back.
+      const side = (s) => new THREE.MeshStandardMaterial({
         color: paper[part.kind] ?? paper.panel,
         roughness: 0.85,
         metalness: 0,
-        side: THREE.DoubleSide,
+        side: s,
         polygonOffset: true, // also keeps fold lines drawn on the surface visible
         polygonOffsetFactor: depthBias(part),
         polygonOffsetUnits: 4 * depthBias(part),
       });
-      group.add(new THREE.Mesh(geom, mat));
+      const outside = new THREE.Mesh(geom, side(THREE.BackSide));
+      const inside = new THREE.Mesh(geom, side(THREE.FrontSide));
+      group.add(outside, inside);
+      this.#surfaces.push({ part, geom, outside, inside });
     }
     // Fold lines: black, dashed by fold direction like the export (pattern scaled with size).
     const b0 = model.bounds;
@@ -179,6 +193,7 @@ export class PbPreview3d extends HTMLElement {
     if (payload && !payload.empty) group.add(this.#payloadMesh(payload));
     this.#group = group;
     this.#scene.add(group);
+    this.#applyTextures();
     const b = model.bounds;
     const newSize = Math.hypot(b.width, b.length, b.height);
     this.#buildDims(dims, newSize);
@@ -187,6 +202,52 @@ export class PbPreview3d extends HTMLElement {
       this.#resetCamera();
     }
     this.#size = newSize;
+    this.#requestRender();
+  }
+
+  /** Whether the Mesh button shows as on (the app owns the state). */
+  set meshShown(on) {
+    this.shadowRoot.querySelector("[data-mesh]").setAttribute("aria-pressed", String(Boolean(on)));
+  }
+
+  /** Show the PCB layout's copper (POST /api/pcb) on the paper, or none: each layer drawn
+   *  into a texture once, mapped through the faces' flat coordinates. */
+  setMesh(pcb) {
+    if (this.#textures) {
+      this.#textures.front.dispose();
+      this.#textures.back.dispose();
+      this.#textures = null;
+    }
+    if (pcb && this.#renderer) {
+      const maxSize = Math.min(4096, this.#renderer.capabilities.maxTextureSize);
+      const texture = (layer) => {
+        const { canvas } = rasterize(pcb, [layer], { maxSize, background: "#ffffff" });
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = this.#renderer.capabilities.getMaxAnisotropy();
+        return tex;
+      };
+      this.#textures = { front: texture("front"), back: texture("back"), bbox: pcb.bbox };
+    }
+    this.#applyTextures();
+  }
+
+  #applyTextures() {
+    const t = this.#textures;
+    for (const { part, geom, outside, inside } of this.#surfaces) {
+      if (t) {
+        const [x0, y0, x1, y1] = t.bbox;
+        const uv = new Float32Array(part.flat.length);
+        for (let i = 0; i < part.flat.length; i += 2) {
+          uv[i] = (part.flat[i] - x0) / (x1 - x0);
+          uv[i + 1] = 1 - (part.flat[i + 1] - y0) / (y1 - y0);
+        }
+        geom.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      }
+      outside.material.map = t ? t.front : null;
+      inside.material.map = t ? t.back : null;
+      outside.material.needsUpdate = inside.material.needsUpdate = true;
+    }
     this.#requestRender();
   }
 

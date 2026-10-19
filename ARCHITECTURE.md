@@ -33,6 +33,8 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 |---|---|
 | `config.py` | `Config`, a frozen dataclass and the single validated input. It also holds `FieldSpec` metadata that drives the UI form, `from_dict` (the only entry point for untrusted data), cross-field validation, and the schema version (other versions are rejected). |
 | `crosssection.py` | Pure math for the closed body: one panel's cross-section (`CrossSection`), the panel width solver, and `Body`, the material model around the interior (section 4.3). |
+| `mesh.py` | The security mesh generator, a port of KiMesh: tiles, the randomized depth-first walk over the cells inside a mask, and joining each net's segments into one path. Needs shapely. |
+| `pcb.py` | The flex-PCB layout (mask, both meshes, the cable's traces, fan-out, vias and plug contacts, GND zone) and its export through gerbonara (KiCad board and project, Gerber, SVG). Imported on demand: the in-browser build has neither shapely nor gerbonara. |
 | `fpc.py` | The FPC cable's layout at the top end of the pattern: the level cut it leaves the inner flap by, the meander, its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
 | `svg.py` | Serializes a `Pattern` to SVG (layers, dash styles, labels, embedded config) and reads the config back (`extract_config`). |
@@ -42,7 +44,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | `presets.py` | Board sizes for the payload dropdown. |
 | `api.py` | The JSON API apart from its transport: request config parsing (`ApiError` carries the status and body of a refusal), `render` (SVG, model, section, info, dimensions and payload summary in one response), the payload actions and the defaults. The Flask server and the in-browser build (`artifact/pb_api.py`) both route to it. |
 | `server.py` | Flask app bound to 127.0.0.1, serving the UI and `/api/*`. |
-| `persistence.py`, `cli.py` | Settings file (`./yanartas-pillowbox.json`), and the `serve` / `generate` commands. |
+| `persistence.py`, `cli.py` | Settings file (`./yanartas-pillowbox.json`), and the `serve` / `generate` / `pcb` commands. |
 
 **Frontend** (`static/`): plain ES modules and custom elements, with no build step.
 
@@ -54,6 +56,10 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 - `pb-section` draws the cross-section.
 - `panzoom.js` is the 2D views' shared wheel, drag and pinch handling.
 - `dims2d.js` draws 2D dimensions at a constant on-screen text size.
+- `meshtex.js` draws the PCB layout's copper into a canvas: the 2D view shows it as one
+  image under the lines (and the visible part again at screen resolution when zoomed in),
+  the 3D view as textures, F.Cu on the outside and B.Cu on the inside (UVs from the faces'
+  flat coordinates). The ~100k trace segments are never DOM or scene objects.
 
 The browser never computes geometry: an edit posts the config, and the views redraw from
 the response.
@@ -83,6 +89,8 @@ outputs.
 | `test_fpc.py` | The FPC cable: one simple outline, a folded straight strip of the set length, corner creases that lay each run back along the one before and end on the cut, the level cut it leaves the flap by, its clearances, the sharp plug and the rounded other corners, mirroring to the back end, the default fitting the pattern, and validation. |
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
 | `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
+| `test_mesh.py` | The mesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
+| `test_pcb.py` | The PCB layout: the pinout, both meshes, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes. |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server. |
 
@@ -209,6 +217,28 @@ planes by `e` accordingly; everything stays an exact isometric folding.
 `width` from the top of a rising-then-falling edge. It sits around the edge's highest
 point, which is slightly off-centre because the edge is not symmetric. The cut flattens the
 inner flap's free edge.
+
+### 4.6 PCB layout
+
+- **Mask.** The foil (`Polygon` of the outline, arcs within 5 µm, less the slits as 0.1 mm
+  slots and the scraps) shrunk by the edge clearance, less the cable: the outline segments
+  no face owns, closed and cut off level at the junction, plus a band beyond the junction
+  so that the mask's edge there is the junction line itself. The exit cells sit against it.
+- **Mesh.** `mesh.generate` aligns the grid on the exit cell. Cells inside the mask are
+  found in one vectorized `shapely.contains`; the walk is KiMesh's (iterative, with its
+  "keep going straight" bias for `randomness < 1`); tiles are KiMesh's look-up table with
+  its rotations done on tuples. Each net's segments are chained end to end into one path
+  (two loose ends, at the exit side) and collinear points dropped.
+- **Cable traces** are the cable's centreline offset sideways (mitred at the square
+  corners, as `fpc.outline`), so they stay parallel round every turn. `fan` jogs each
+  layer's traces from the mesh's pitch to the pins' places at 45°, delaying jogs until
+  neighbours keep their pitch. The back layer's vias alternate between two rows.
+- **Check.** The tests run a DRC of their own: different nets on a layer at least the trace
+  space apart (shapely `STRtree` `dwithin`), all copper on the foil, every mesh net one chain
+  from contact to contact, vias off the cable's folds.
+- **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board
+  renderer fails on footprints, so `render_stack` draws the tracks, vias, graphics and
+  footprint into the layer stack itself.
 
 ## 5. Other algorithms
 

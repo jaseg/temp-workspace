@@ -47,6 +47,14 @@ yanartas-pillowbox generate --set width=80 --set length=150 --set height=30 \
     --set thickness=0.5 -o box.svg
 ```
 
+```text
+yanartas-pillowbox pcb [--config FILE | --from-svg FILE] [--set key=value ...] -o DIR [--name NAME]
+```
+Lays the box out as a flex PCB with a security mesh on both sides (see *PCB layout* below)
+and writes `NAME.kicad_pcb` and `NAME.kicad_pro`, the Gerber and drill files in
+`NAME-gerbers/`, and `NAME-top.svg` / `NAME-bottom.svg` into `DIR` (`NAME` defaults to
+`pillowbox`). Needs the FPC cable.
+
 ### Persistence
 
 The UI saves the last valid configuration to **`./yanartas-pillowbox.json`** in the current
@@ -71,6 +79,12 @@ the defaults. It never crashes because of the file.
   are drawn black, dashed by fold direction, and the visible cut edges solid. The inner end flaps, inside the box behind the
   end wall gaps, are drawn translucent purple through the paper. The camera has almost no inertia, and the
   dimension labels keep the same on-screen size at any zoom.
+* **Mesh** (in the pattern's and the folded box's headers) shows the PCB layout's security
+  mesh: F.Cu (the box's outside) in copper red, B.Cu (inside) in blue. The layout takes a
+  second or two and is redone after each change while the mesh is shown. Its copper is
+  drawn into a bitmap once (in 3D, a texture on each side of the paper), never as SVG
+  paths; zoomed in, the 2D view draws the visible part again at screen resolution.
+  *Download PCB* saves the KiCad, Gerber and SVG files as a zip.
 * **Body cross-section:** a 2D section through the closed body, perpendicular to its length.
   The body has this same section everywhere between the curved folds. It shows the closed
   width and height, and marks the two straight folds where they are seen end-on. Like the
@@ -157,6 +171,11 @@ All lengths are in millimetres.
 | `fpc_cable_inset` | 0 | How much narrower than the plug the rest of the cable is on each side; the plug's ears then stick out. 0–10. |
 | `fpc_corner_radius` | 1 | Rounds the cable's corners and where it meets the flap (not the plug's). 0–10; smaller where there is no room, e.g. at most half the clearance at the slots between rows. |
 | `fpc_cable_gap` | 1 | Cut-to-cut clearance between the cable's rows, and between the cable and the rest of the pattern. 0.1–20. |
+| `mesh_trace_width` | 0.15 | PCB layout: width of the security mesh's traces, on both copper layers and along the cable. 0.05–2. |
+| `mesh_trace_space` | 0.15 | Copper-to-copper space between them (and the clearance of the rest of the layout). 0.05–2. |
+| `mesh_traces` | 4 | Mesh traces (loops, two ends each) per side of the foil. The mesh's cells are twice this many trace pitches wide (2.4 mm by default). Whole numbers 1–16; the plug needs a pin per end plus the GND pins. |
+| `mesh_edge_clearance` | 0.5 | How far the mesh keeps off the foil's cut edges and slits. 0–10. |
+| `mesh_seed` | 0 | Seed of the mesh's random walk: the same seed gives the same mesh. Whole number. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
 | `thickness` | 0.2 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
 
@@ -223,6 +242,39 @@ corner on the front panel, seen from inside the box; C: a lengthwise section, ba
 as in the 3D view; not to scale):
 
 ![The FPC cable's first folds](docs/fpc-cable-folds.svg)
+
+### PCB layout
+
+`pcb.py` lays the box out as a two-layer flex PCB: the foil carries a security mesh on each
+side, and the mesh's traces leave through the FPC cable to the plug.
+
+* **Mesh:** a port of [KiMesh](https://git.yasec.de/jaseg/kimesh) (`mesh.py`). The foil,
+  kept `mesh_edge_clearance` off its cut edges and slits and without the cable, is divided
+  into square cells `2 × mesh_traces` trace pitches wide. A randomized depth-first walk from
+  the *exit cell* visits every cell it can reach, and each cell gets KiMesh's tile for the
+  sides on which it connects in the walk's tree. Each of the `mesh_traces` traces is one
+  loop through every cell, with both ends at the exit cell. F.Cu and B.Cu each get their own
+  mesh (different seeds). The cells only cover whole squares, so up to a cell's width along
+  the edges stays bare, as in KiMesh.
+* **Into the cable:** each mesh's exit cell sits against the junction, where the cable leaves
+  the inner flap; its traces run straight on into the cable and along it at the mesh's
+  pitch, each layer's on its own side (F.Cu's on pin 1's side). Before the plug they fan
+  out with 45° jogs to their contacts' places; the B.Cu traces change to the contact side
+  (F.Cu) through two staggered rows of vias (0.45 mm, 0.2 mm drill).
+* **Plug pinout,** from pin 1 (on the cable's left, looking from the flap towards the tip):
+  GND, mesh ends 1–4, GND, 5–8, GND, 9–12, GND, 13–16, GND; the rest are free. Ends 1–8 are
+  the F.Cu mesh's, 9–16 the B.Cu mesh's; within each eight, a loop's two ends are mirrored
+  about the middle (1 and 8 are the first loop). Contacts are 0.6 pitch wide and stop
+  0.2 mm short of the tip.
+* **Ground:** the cable is a GND zone on both layers. It is a KiCad zone, filled in KiCad;
+  the Gerber and SVG output leaves it out (fill and re-export in KiCad for fabrication).
+  Vias behind the GND contacts and stitching vias along the cable (kept 1 mm off its folds
+  and off the folded-flat corners) join the two layers.
+* **Output:** through [gerbonara](https://gitlab.com/gerbolyze/gerbonara): the KiCad board
+  (outline on Edge.Cuts, with the slits as 0.1 mm slots; fold lines on Dwgs.User; plug
+  contacts as footprint J1), a KiCad project carrying the design rules (net class Default:
+  the trace width and space, the vias), Gerber and drill files, and SVG renderings of both
+  sides.
 
 ### Geometry model
 
@@ -368,6 +420,8 @@ layers keep the line types apart.
 | `POST /api/render` | `{config}` | `{config, svg, model, section, info, dimensions, payload}`; `422 {errors: {field: message}}` if invalid |
 | `POST /api/payload` | `{config, action: "fit"}` or `{config, action: "maximize", field}` | `{config}` with the fitted box or maximized payload (not saved); `422 {errors}` if impossible |
 | `POST /api/scad` | `{config}` | OpenSCAD source of the interior (`application/x-openscad`); `422` if invalid |
+| `POST /api/pcb` | `{config}` | The PCB layout's copper for the previews: `{layers: {front, back}, vias, pads, width, via_size, bbox, offset, meshes}` (tracks as flat coordinate lists); `422 {error}` if it cannot be laid out |
+| `POST /api/pcb/files` | `{config}` | The PCB layout's KiCad, Gerber and SVG files as a zip (`application/zip`) |
 | `POST /api/import` | SVG as the raw body or a multipart `file` | `{config}`; `400 {error}` if unusable |
 
 ## Development

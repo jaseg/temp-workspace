@@ -1,10 +1,12 @@
 // <pb-preview2d>: shows the generated SVG with zoom/pan, parameter dimensions and a line-type
 // legend. Lines are black, as exported; the backdrop adapts per theme so they stay visible.
 // Fold dashes are drawn at a fixed screen size (the export's are in mm). Dimensions are a
-// preview-only overlay; they are never part of the downloaded SVG.
+// preview-only overlay; they are never part of the downloaded SVG. So is the PCB layout's
+// copper (the security mesh), drawn into one bitmap under the lines (see meshtex.js).
 
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
 import { LINE_STYLES, lineSwatch } from "../lines.js";
+import { COPPER, rasterize } from "../meshtex.js";
 import { attachPanZoom, unitsPerPixel } from "../panzoom.js";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -45,11 +47,14 @@ template.innerHTML = `
             border-top: 1px solid var(--border); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend .swatch { color: var(--text); }
+  .legend .copper { width: 14px; height: 8px; border-radius: 2px; display: inline-block; }
+  .stage svg image.mesh { image-rendering: auto; }
 </style>
 <header>
   <h2>Pattern</h2>
   <div class="size" aria-live="polite"></div>
   <div class="tools">
+    <button type="button" data-mesh aria-pressed="false" title="Show the PCB layout's security mesh (both copper layers)">Mesh</button>
     <button type="button" data-dims aria-pressed="true" title="Show parameter dimensions">Dimensions</button>
     <button type="button" data-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>
     <button type="button" data-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>
@@ -75,6 +80,11 @@ export class PbPreview2d extends HTMLElement {
   #sheet = null; // [0, 0, w, h] of the exported sheet
   #overlay = null; // <g> holding the sheet outline and the dimensions
   #dimFs = 0; // label size (user units) the dimensions were last drawn at
+  #mesh = null; // {url, x, y, w, h}: the copper bitmap, in SVG user units
+  #meshData = null; // the layout itself, for sharper bitmaps of a zoomed-in view
+  #detail = null; // {url, x, y, w, h}: the visible part at screen resolution
+  #detailTimer = 0;
+  #meshButton;
 
   constructor() {
     super();
@@ -83,9 +93,14 @@ export class PbPreview2d extends HTMLElement {
     this.#stage = root.querySelector(".stage");
     this.#dims = root.querySelector(".size");
     this.#legend = root.querySelector(".legend");
+    this.#meshButton = root.querySelector("[data-mesh]");
 
     root.querySelector(".tools").addEventListener("click", (e) => {
       const button = e.target.closest("button");
+      if (button?.hasAttribute("data-mesh")) {
+        this.dispatchEvent(new CustomEvent("pb-mesh-toggle", { bubbles: true, composed: true }));
+        return;
+      }
       if (button?.hasAttribute("data-dims")) {
         this.#showDims = !this.#showDims;
         button.setAttribute("aria-pressed", String(this.#showDims));
@@ -141,14 +156,122 @@ export class PbPreview2d extends HTMLElement {
       `pattern ${fmt(info.pattern_width)} × ${fmt(info.pattern_height)} mm · ` +
       `sheet ${fmt(w)} × ${fmt(h)} mm (10 mm margin)`;
 
-    // Legend: the line types present in this pattern.
-    const present = ["cut", ...["mountain", "valley"].filter((t) => svg.querySelector(`#fold-${t}`))];
-    this.#legend.replaceChildren(...present.map((t) => {
+    this.#placeMesh();
+    this.#drawLegend();
+    this.highlight(this.#highlight);
+  }
+
+  /** Whether the Mesh button shows as on (the app owns the state). */
+  set meshShown(on) {
+    this.#meshButton.setAttribute("aria-pressed", String(Boolean(on)));
+  }
+
+  /** Show the PCB layout's copper (POST /api/pcb), or none. */
+  setMesh(pcb) {
+    if (this.#mesh?.url) URL.revokeObjectURL(this.#mesh.url);
+    this.#mesh = null;
+    this.#meshData = pcb;
+    this.#dropDetail();
+    if (!pcb) {
+      this.#placeMesh();
+      this.#drawLegend();
+      return;
+    }
+    const { canvas, bbox } = rasterize(pcb, ["back", "front"], { alpha: { back: 0.55, front: 0.8 } });
+    const [x0, y0, x1, y1] = bbox;
+    const [dx, dy] = pcb.offset;
+    const mesh = { url: null, x: x0 + dx, y: y0 + dy, w: x1 - x0, h: y1 - y0 };
+    this.#mesh = mesh;
+    canvas.toBlob((blob) => {
+      if (this.#mesh !== mesh) return; // superseded meanwhile
+      mesh.url = URL.createObjectURL(blob);
+      this.#placeMesh();
+      this.#drawLegend();
+      this.#scheduleDetail();
+    });
+  }
+
+  #dropDetail() {
+    clearTimeout(this.#detailTimer);
+    if (this.#detail?.url) URL.revokeObjectURL(this.#detail.url);
+    this.#detail = null;
+    this.#svg?.querySelector("image.mesh-detail")?.remove();
+  }
+
+  /** Zoomed in past the whole bitmap's resolution: draw the visible part again at screen
+   *  resolution, once the view settles. */
+  #scheduleDetail() {
+    clearTimeout(this.#detailTimer);
+    this.#detailTimer = setTimeout(() => this.#drawDetail(), 150);
+  }
+
+  #drawDetail() {
+    const pcb = this.#meshData;
+    const mesh = this.#mesh;
+    if (!pcb || !mesh?.url || !this.#view || !this.#svg) return;
+    // The visible area: the viewBox, grown to the stage's aspect ratio (it is "meet"-fitted).
+    const [bx, by, bw, bh] = this.#view;
+    const cw = this.#stage.clientWidth || 1;
+    const ch = this.#stage.clientHeight || 1;
+    const upp = Math.max(bw / cw, bh / ch);
+    const [vw, vh] = [cw * upp, ch * upp];
+    const [vx, vy] = [bx - (vw - bw) / 2, by - (vh - bh) / 2];
+    const px = Math.max(cw, ch) * Math.min(devicePixelRatio, 2);
+    const base = 4096 / Math.max(mesh.w, mesh.h); // px per mm of the whole bitmap
+    if (px / Math.max(vw, vh) <= base * 1.2) {
+      this.#dropDetail();
+      return;
+    }
+    const [dx, dy] = pcb.offset;
+    const region = [vx - dx, vy - dy, vx + vw - dx, vy + vh - dy];
+    // Opaque, on the stage's colour: the blurrier whole bitmap must not show through.
+    const background = getComputedStyle(this.#stage).backgroundColor;
+    const { canvas } = rasterize(pcb, ["back", "front"], {
+      maxSize: Math.ceil(px), region, background, alpha: { back: 0.55, front: 0.8 } });
+    const detail = { url: null, x: vx, y: vy, w: vw, h: vh };
+    canvas.toBlob((blob) => {
+      if (this.#mesh !== mesh || this.#meshData !== pcb) return;
+      this.#dropDetail();
+      detail.url = URL.createObjectURL(blob);
+      this.#detail = detail;
+      const img = document.createElementNS(NS, "image");
+      Object.entries({ class: "mesh-detail", href: detail.url, x: vx, y: vy, width: vw, height: vh,
+        preserveAspectRatio: "none" }).forEach(([k, v]) => img.setAttribute(k, v));
+      this.#svg.querySelector("image.mesh")?.after(img);
+    });
+  }
+
+  /** (Re)insert the copper bitmap under the pattern's lines. */
+  #placeMesh() {
+    this.#svg?.querySelector("image.mesh")?.remove();
+    this.#dropDetail();
+    if (!this.#svg || !this.#mesh?.url) return;
+    const img = document.createElementNS(NS, "image");
+    const { url, x, y, w, h } = this.#mesh;
+    Object.entries({ class: "mesh", href: url, x, y, width: w, height: h, preserveAspectRatio: "none" })
+      .forEach(([k, v]) => img.setAttribute(k, v));
+    this.#svg.insertBefore(img, this.#svg.firstChild);
+  }
+
+  /** Legend: the line types present in this pattern (and the copper layers, if shown). */
+  #drawLegend() {
+    if (!this.#svg) return;
+    const present = ["cut", ...["mountain", "valley"].filter((t) => this.#svg.querySelector(`#fold-${t}`))];
+    const items = present.map((t) => {
       const item = document.createElement("span");
       item.append(lineSwatch(LINE_STYLES[t].dash), LINE_STYLES[t].label);
       return item;
-    }));
-    this.highlight(this.#highlight);
+    });
+    if (this.#mesh?.url) {
+      for (const [layer, label] of [["front", "F.Cu (outside)"], ["back", "B.Cu (inside)"]]) {
+        const item = document.createElement("span");
+        const swatch = Object.assign(document.createElement("i"), { className: "copper" });
+        swatch.style.background = COPPER[layer];
+        item.append(swatch, label);
+        items.push(item);
+      }
+    }
+    this.#legend.replaceChildren(...items);
   }
 
   /** Emphasise the dimensions of one parameter (or none). */
@@ -188,6 +311,7 @@ export class PbPreview2d extends HTMLElement {
     this.#view = v;
     this.#svg?.setAttribute("viewBox", v.map((n) => n.toFixed(4)).join(" "));
     this.#drawDims();
+    if (this.#mesh?.url) this.#scheduleDetail();
   }
 
   /** (Re)draw the dimensions so their labels are labelPx() screen pixels tall. */

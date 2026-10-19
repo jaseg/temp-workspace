@@ -55,6 +55,8 @@ def _route(method: str, path: str, body: str | None, stored: str | None) -> str:
         return _reply(200, render_scad(api.parse_config(data)), "text/plain")
     if method == "POST" and path == "/api/payload":
         return _reply(200, api.payload_action(data))
+    if method == "POST" and path in ("/api/pcb", "/api/pcb/files"):
+        return _reply(501, {"error": "The PCB layout needs the desktop app (gerbonara)."})
     return _reply(404, {"error": f"no route {method} {path}"})
 
 

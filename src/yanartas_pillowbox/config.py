@@ -332,6 +332,62 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "rest of the pattern.",
     ),
     FieldSpec(
+        "mesh_trace_width",
+        "Mesh trace width",
+        "float",
+        "PCB mesh",
+        "mm",
+        0.05,
+        2,
+        0.01,
+        help="Width of the security mesh's traces (both copper layers, and on the cable).",
+    ),
+    FieldSpec(
+        "mesh_trace_space",
+        "Mesh trace space",
+        "float",
+        "PCB mesh",
+        "mm",
+        0.05,
+        2,
+        0.01,
+        help="Copper-to-copper space between the mesh's traces.",
+    ),
+    FieldSpec(
+        "mesh_traces",
+        "Mesh traces per side",
+        "float",
+        "PCB mesh",
+        "",
+        1,
+        16,
+        1,
+        help="Mesh traces (loops, two ends each) on each side of the foil; their ends leave "
+        "through the FPC cable. The mesh's cells are twice this many trace pitches wide.",
+    ),
+    FieldSpec(
+        "mesh_edge_clearance",
+        "Mesh edge clearance",
+        "float",
+        "PCB mesh",
+        "mm",
+        0,
+        10,
+        0.05,
+        help="Distance the mesh keeps from the foil's cut edges and slits.",
+    ),
+    FieldSpec(
+        "mesh_seed",
+        "Mesh seed",
+        "float",
+        "PCB mesh",
+        "",
+        0,
+        1e9,
+        1,
+        help="Seed of the mesh's random walk: the same seed gives the same mesh.",
+    ),
+    FieldSpec(
         "thickness",
         "Material thickness",
         "float",
@@ -387,6 +443,11 @@ class Config:
     fpc_cable_inset: float = 0.0
     fpc_corner_radius: float = 1.0
     fpc_cable_gap: float = 1.0
+    mesh_trace_width: float = 0.15
+    mesh_trace_space: float = 0.15
+    mesh_traces: float = 4.0
+    mesh_edge_clearance: float = 0.5
+    mesh_seed: float = 0.0
     thickness: float = 0.2
     print_side: str = "outside"
 
@@ -589,6 +650,9 @@ def validate(cfg: Config) -> dict[str, str]:
     }
     if cfg.fpc_cable != "none" and "fpc_pins" not in errors and cfg.fpc_pins != int(cfg.fpc_pins):
         add("fpc_pins", "must be a whole number")
+    for name in ("mesh_traces", "mesh_seed"):
+        if name not in errors and getattr(cfg, name) != int(getattr(cfg, name)):
+            add(name, "must be a whole number")
     if body is not None and cfg.fpc_cable != "none" and not errors.keys() & fpc_fields:
         from yanartas_pillowbox import fpc  # (fpc imports this module)
 

@@ -63,6 +63,33 @@ def render(cfg: Config) -> dict[str, Any]:
     }
 
 
+def _pcb_layout(cfg: Config) -> tuple[Any, Any]:
+    """The PCB layout (``pcb``: heavy dependencies, imported on demand)."""
+    try:
+        from yanartas_pillowbox import pcb
+    except ImportError as exc:  # (the in-browser build has no gerbonara)
+        raise ApiError(
+            501, {"error": f"PCB layout unavailable here: {exc}", "errors": {}}
+        ) from None
+    try:
+        return pcb, pcb.layout(cfg)
+    except pcb.PcbError as exc:
+        raise ApiError(422, {"error": str(exc), "errors": {}}) from None
+
+
+def pcb_preview(cfg: Config) -> dict[str, Any]:
+    """The PCB layout's copper for the previews (``pcb.preview_json``), in the 2D view's
+    sheet coordinates too (``offset``)."""
+    pcb, layout = _pcb_layout(cfg)
+    return pcb.preview_json(layout, sheet_offset(build_pattern(cfg)))
+
+
+def pcb_files(cfg: Config) -> bytes:
+    """The PCB layout's KiCad, Gerber and SVG files, zipped."""
+    pcb, layout = _pcb_layout(cfg)
+    return pcb.export_zip(layout)
+
+
 def payload_action(request: Any) -> dict[str, Any]:
     """``{config, action: "fit" | "maximize", field?}`` -> ``{config}`` (not saved)."""
     cfg = parse_config(request)

@@ -18,6 +18,8 @@ const sectionView = $("#section");
 const statusEl = $("#status");
 const downloadBtn = $("#btn-download");
 const scadBtn = $("#btn-scad");
+const pcbBtn = $("#btn-pcb");
+const MESH_DELAY = 400; // ms after a render: the PCB layout takes a second or two
 
 const params = new Map(); // name -> <pb-param>
 let payloadPresets = []; // board sizes from /api/defaults
@@ -27,6 +29,9 @@ let savedJson = null;
 let renderSeq = 0;
 let renderTimer = 0;
 let saveTimer = 0;
+let showMesh = false; // the previews show the PCB layout's security mesh
+let meshSeq = 0;
+let meshTimer = 0;
 
 // ----------------------------------------------------------------------------- API helpers
 async function api(method, url, body, { raw = false } = {}) {
@@ -177,7 +182,7 @@ async function render() {
     if (!Object.keys(errors).length) showBanner(result.data.error || "Render failed");
     const n = Object.keys(errors).length;
     setStatus(`${n || "An"} invalid value${n === 1 ? "" : "s"} — previews show the last valid design`, true);
-    downloadBtn.disabled = scadBtn.disabled = true;
+    downloadBtn.disabled = scadBtn.disabled = pcbBtn.disabled = true;
     return;
   }
   showErrors({});
@@ -187,9 +192,51 @@ async function render() {
   preview3d.update(model, dimensions.model, payload);
   sectionView.update(section, dimensions.section, payload);
   renderDerived(info, payload);
-  downloadBtn.disabled = scadBtn.disabled = false;
+  downloadBtn.disabled = scadBtn.disabled = pcbBtn.disabled = false;
   setStatus("Up to date");
   scheduleSave(lastValid.config);
+  if (showMesh) scheduleMesh();
+}
+
+// ----------------------------------------------------------------------------- PCB mesh
+function setMesh(pcb) {
+  preview2d.setMesh(pcb);
+  preview3d.setMesh(pcb);
+}
+
+function toggleMesh() {
+  showMesh = !showMesh;
+  preview2d.meshShown = preview3d.meshShown = showMesh;
+  if (showMesh) scheduleMesh(0);
+  else {
+    meshSeq++; // drop a layout in flight
+    clearTimeout(meshTimer);
+    setMesh(null);
+  }
+}
+
+/** Lay out the PCB for the current design and show its copper (the old one goes at once:
+ *  it no longer matches the pattern). */
+function scheduleMesh(delay = MESH_DELAY) {
+  const seq = ++meshSeq;
+  clearTimeout(meshTimer);
+  setMesh(null);
+  meshTimer = setTimeout(async () => {
+    if (!lastValid) return;
+    setStatus("Laying out the mesh…");
+    const { ok, data } = await api("POST", "/api/pcb", { config: lastValid.config }, { raw: true })
+      .catch((err) => ({ ok: false, data: { error: err.message } }));
+    if (seq !== meshSeq) return;
+    if (!ok) {
+      setStatus(`Mesh: ${data.error || "layout failed"}`, true);
+      return;
+    }
+    setMesh(data);
+    const m = data.meshes;
+    const missed = m.front.unreached + m.back.unreached;
+    setStatus(`Mesh: ${m.front.cells} + ${m.back.cells} cells of ${m.front.cell} mm`
+      + (missed ? `, ${missed} out of reach` : ""), missed > 0);
+  }, delay);
 }
 
 function scheduleSave(config) {
@@ -298,6 +345,27 @@ async function downloadScad() {
   }
 }
 
+async function downloadPcb() {
+  if (!lastValid) return;
+  setStatus("Laying out the PCB…");
+  try {
+    const res = await fetch("/api/pcb/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config: lastValid.config }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `export failed (${res.status})`);
+    }
+    saveBlob(await res.blob(), fileName("-pcb.zip"));
+    setStatus("Up to date");
+  } catch (err) {
+    setStatus(`PCB export failed: ${err.message}`, true);
+    showBanner(`PCB export failed: ${err.message}`);
+  }
+}
+
 async function resetToDefaults() {
   const { config } = await api("GET", "/api/defaults");
   hideBanner();
@@ -371,6 +439,8 @@ async function main() {
   $("#btn-reset").addEventListener("click", resetToDefaults);
   downloadBtn.addEventListener("click", download);
   scadBtn.addEventListener("click", downloadScad);
+  pcbBtn.addEventListener("click", downloadPcb);
+  document.addEventListener("pb-mesh-toggle", toggleMesh);
   $("#banner-close").addEventListener("click", hideBanner);
   setupDragAndDrop();
   await render();
