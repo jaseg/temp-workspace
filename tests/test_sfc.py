@@ -75,6 +75,7 @@ def test_layout(n, side, corner):
 def test_seed_repeats_the_layout():
     a = sfc.generate(AREA, (7, 0), mesh.UP, 2, PITCH, seed=3, zones=ZONES)
     assert a == sfc.generate(AREA, (7, 0), mesh.UP, 2, PITCH, seed=3, zones=ZONES)
+    assert a.traces != sfc.generate(AREA, (7, 0), mesh.UP, 2, PITCH, seed=4, zones=ZONES).traces
 
 
 def test_arcs_draw_the_same_traces():
