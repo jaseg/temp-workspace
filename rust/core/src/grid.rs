@@ -82,6 +82,9 @@ impl Grid {
             self.cy(q[1] - r).max(0),
             self.cy(q[1] + r).min(self.h as i64 - 1),
         );
+        if i0 > i1 || j0 > j1 {
+            return; // (the query's reach misses the grid)
+        }
         let r2 = r * r;
         let (qx, qy, rr) = (f64x4::splat(q[0]), f64x4::splat(q[1]), f64x4::splat(r2));
         for j in j0..=j1 {

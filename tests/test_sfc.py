@@ -5,7 +5,6 @@ across their border as seldom as can be."""
 import itertools
 import math
 
-import numpy as np
 import pytest
 import shapely
 from shapely.geometry import LineString
@@ -89,13 +88,3 @@ def test_without_zones_and_with_a_hole():
 def test_no_room_for_the_exit():
     with pytest.raises(mesh.MeshError):
         sfc.generate(shapely.box(0, 0, 1, 1), (0, 0), mesh.UP, 4, PITCH)
-
-
-def test_untangle_keeps_the_curve_simple():
-    """A move that would make the curve cross itself is taken back."""
-    old = np.array([(0, 0), (4, 0), (4, 1), (0, 1)], float)
-    new = old.copy()
-    new[1] = (4, 2)  # (the edge 0-1 would cross 2-3)
-    assert not len(sfc._crossing(old, np.arange(4))[0])
-    out = sfc._untangle(old, new)
-    assert not len(sfc._crossing(out, np.arange(4))[0])

@@ -91,3 +91,26 @@ fn settling_keeps_clear_and_in_its_zone() {
         .fold(f64::MAX, f64::min);
     assert!(least > 0.95 * pitch, "traces {least} apart");
 }
+
+#[test]
+fn grid_lookups_off_the_grid_find_nothing() {
+    let p: Vec<P> = vec![[0.0, 0.0], [1.0, 1.0]];
+    let g = Grid::new(&p, 0.5, |_| true);
+    let mut n = 0;
+    g.within([50.0, 0.5], 1.0, |_, _| n += 1);
+    g.within([-50.0, -50.0], 1.0, |_, _| n += 1);
+    assert_eq!(n, 0);
+}
+
+#[test]
+fn untangle_keeps_the_curve_simple() {
+    use yanartas_mesh_core::{curve::untangle, segs::crossing};
+    let old: Vec<P> = vec![[0.0, 0.0], [4.0, 0.0], [4.0, 1.0], [0.0, 1.0], [-1.0, 0.5]];
+    let mut new = old.clone();
+    new[1] = [4.0, 2.0]; // (the edge 0-1 would cross 2-3)
+    let all: Vec<usize> = (0..old.len()).collect();
+    assert!(crossing(&old, &all).is_empty());
+    assert!(!crossing(&new, &all).is_empty());
+    let out = untangle(&old, &new);
+    assert!(crossing(&out, &all).is_empty());
+}

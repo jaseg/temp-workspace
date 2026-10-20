@@ -51,7 +51,6 @@ import math
 import random
 import sys
 from collections import defaultdict, deque
-from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -67,7 +66,6 @@ from yanartas_pillowbox.mesh import (
     Mesh,
     MeshError,
     Point,
-    Rays,
     resample,
 )
 
@@ -851,176 +849,6 @@ def _curve(
 
 
 # ----------------------------------------------------------------------------- geometry
-def _even(p: np.ndarray, k: int, step: float, smooth: bool = False) -> np.ndarray:
-    """The closed curve's first ``k`` vertices (an open polyline; the rest stay) resampled
-    at an even step (``smooth``: along a spline through them, so as not to cut corners),
-    unless that would make it cross itself (where it cuts a corner between runs close
-    together): then only its long segments split."""
-    if smooth:
-        fine = _spline(p, 4)[: 4 * (k - 1) + 1]  # (the spline from the first to the k-th)
-        free = resample(fine, step)
-    else:
-        free = resample(p[:k], step)
-    q = np.vstack([free, p[k:]])
-    i, _ = _crossing(q, np.arange(len(q)))
-    return free if not len(i) else _split(p[:k], 1.5 * step)
-
-
-def _split(p: np.ndarray, longest: float) -> np.ndarray:
-    """The open polyline with its segments longer than ``longest`` split evenly (the
-    vertices kept where they are)."""
-    seg = np.hypot(*np.diff(p, axis=0).T)
-    parts = np.maximum(1, np.ceil(seg / longest)).astype(int)
-    if (parts == 1).all():
-        return p
-    i = np.repeat(np.arange(len(seg)), parts)
-    t = (np.arange(len(i)) - np.repeat(np.cumsum(parts) - parts, parts)) / parts[i]
-    return np.vstack([p[i] + (p[i + 1] - p[i]) * t[:, None], p[-1:]])
-
-
-def _respace(p: np.ndarray, step: float) -> np.ndarray:
-    """The open polyline at about ``step`` between vertices without moving any (so that,
-    resampled step after step, it does not shrink): vertices closer to the next but one
-    than ``step`` dropped (not two in a row; its ends kept), segments longer than one and a
-    half split."""
-    seg = np.hypot(*np.diff(p, axis=0).T)
-    drop = np.zeros(len(p), bool)
-    drop[1:-1] = seg[:-1] + seg[1:] < step
-    drop[1:] &= ~drop[:-1]
-    return _split(p[~drop], 1.5 * step)
-
-
-def _spacing(
-    p: np.ndarray, mirrors: tuple[np.ndarray, np.ndarray], reach: float, window: float
-) -> tuple[np.ndarray, np.ndarray]:
-    """For each vertex of the closed curve ``p``: the distance to its neighbour across the
-    curve on its left and right (a mirror's at twice the distance to it), at most ``reach``.
-    Parts of the curve within ``window`` along it do not count."""
-    n = len(p)
-    q = np.roll(p, -1, axis=0)
-    t = q - np.roll(p, 1, axis=0)
-    t /= np.maximum(np.hypot(t[:, 0], t[:, 1]), 1e-12)[:, None]
-    normal = np.stack([-t[:, 1], t[:, 0]], 1)
-    arc = np.concatenate([[0.0], np.cumsum(np.hypot(*(q - p).T))])
-    total, arc = arc[-1], arc[:-1]
-    ma, mb = mirrors
-    rays = Rays(np.vstack([p, ma]), np.vstack([q, mb]), reach)
-    out = []
-    for sign in (1.0, -1.0):
-        ray, seg, hit = rays.cast(p, sign * normal)
-        curve = seg < n
-        gap = np.abs(arc[ray] - arc[np.where(curve, seg, 0)])
-        near = curve & (np.minimum(gap, total - gap) < window)
-        hit = np.where(curve, hit, 2 * hit)[~near]
-        d = np.full(n, reach)
-        np.minimum.at(d, ray[~near], hit)
-        out.append(d)
-    return out[0], out[1]
-
-
-def _mirrors(regions: list[Polygon], step: float) -> tuple[np.ndarray, np.ndarray]:
-    """The regions' borders (the area's edges and the zones' borders), in short pieces."""
-    a, b = [], []
-    for r in regions:
-        for ring in (r.exterior, *r.interiors):
-            c = resample(np.asarray(ring.coords), step)
-            a.append(c[:-1])
-            b.append(c[1:])
-    return np.vstack(a), np.vstack(b)
-
-
-def _samples(
-    regions: list[Polygon], step: float, rng: np.random.Generator
-) -> tuple[np.ndarray, np.ndarray]:
-    """Points on a square grid (randomly offset) over the regions, with their region."""
-    pts, reg = [], []
-    off = rng.random(2) * step
-    for ri, r in enumerate(regions):
-        x0, y0, x1, y1 = r.bounds
-        xs = np.arange(x0 - off[0], x1 + step, step)
-        ys = np.arange(y0 - off[1], y1 + step, step)
-        gx, gy = np.meshgrid(xs, ys)
-        gx, gy = gx.ravel(), gy.ravel()
-        ok = shapely.contains_xy(r, gx, gy)
-        pts.append(np.stack([gx[ok], gy[ok]], 1))
-        reg.append(np.full(int(ok.sum()), ri))
-    return np.vstack(pts), np.concatenate(reg)
-
-
-def _region_of(regions: list[Polygon], p: np.ndarray) -> np.ndarray:
-    out = np.full(len(p), -1)
-    for ri, r in enumerate(regions):
-        shapely.prepare(r)
-        out[(out < 0) & shapely.contains_xy(r, p[:, 0], p[:, 1])] = ri
-    return out
-
-
-def _lloyd(
-    p: np.ndarray, reg: np.ndarray, samples: np.ndarray, sreg: np.ndarray, spacing: float
-) -> np.ndarray:
-    """Each vertex's centroid of the area nearer to it than to any other vertex of the curve
-    in its region (the per-zone CVT): the vertex itself where that area is empty."""
-    grid = Grid(p, 0.75 * spacing)
-    sums = np.zeros_like(p)
-    count = np.zeros(len(p))
-    chunk = 50_000
-    for k in range(0, len(samples), chunk):
-        q, qr = samples[k : k + chunk], sreg[k : k + chunk]
-        near = grid.nearest(q, lambda qi, pi, qr=qr: reg[pi] == qr[qi])
-        has = near >= 0
-        np.add.at(sums, near[has], q[has])
-        np.add.at(count, near[has], 1)
-    out = p.copy()
-    has = count > 0
-    out[has] = sums[has] / count[has, None]
-    return out
-
-
-def _neighbours(
-    p: np.ndarray, window: float, reach: float, side: int = 0, which: np.ndarray | None = None
-) -> tuple[np.ndarray, np.ndarray]:
-    """For each vertex of the closed curve ``p`` (or those ``which`` indexes): the nearest
-    vertex of the curve more than ``window`` away along it (and within ``reach``; on its left
-    for ``side`` 1, its right for -1, either for 0), and the distance to it (``reach`` and -1
-    where there is none)."""
-    q = np.roll(p, -1, axis=0)
-    t = q - np.roll(p, 1, axis=0)
-    normal = np.stack([-t[:, 1], t[:, 0]], 1)
-    arc = np.concatenate([[0.0], np.cumsum(np.hypot(*(q - p).T))])
-    total, arc = arc[-1], arc[:-1]
-    grid = Grid(p, reach)
-
-    def ok(qi: np.ndarray, pi: np.ndarray) -> np.ndarray:
-        gap = np.abs(arc[qi] - arc[pi])
-        far = np.minimum(gap, total - gap) > window
-        if side:
-            far &= side * np.sum((p[pi] - p[qi]) * normal[qi], axis=1) > 0
-        return far
-
-    which = np.arange(len(p)) if which is None else which
-    near = np.full(len(which), -1)
-    for k in range(0, len(which), 50_000):
-        w = which[k : k + 50_000]
-        near[k : k + 50_000] = grid.nearest(p[w], lambda qi, pi, w=w: ok(w[qi], pi))
-    d = np.where(near >= 0, np.hypot(*(p[np.maximum(near, 0)] - p[which]).T), reach)
-    return near, np.minimum(d, reach)
-
-
-def _lap(p: np.ndarray) -> np.ndarray:
-    return (np.roll(p, 1, axis=0) + np.roll(p, -1, axis=0)) / 2 - p
-
-
-def _taubin(p: np.ndarray, k: int, passes: int = 2) -> np.ndarray:
-    """Taubin smoothing (a shrinking step, then an inflating one) of the closed curve's
-    first ``k`` vertices but the first and last: zigzags gone, the shape kept."""
-    p = p.copy()
-    for _ in range(passes):
-        for f in (0.5, -0.53):
-            d = f * _lap(p)
-            p[1 : k - 1] += d[1 : k - 1]
-    return p
-
-
 def _relax(
     curve: np.ndarray,
     tongue: np.ndarray,
@@ -1031,273 +859,41 @@ def _relax(
     pitch: float,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, int]:
-    """The curve, relaxed: ``curve`` is an open polyline from the tongue's left end round to
-    its right end, the tongue closes it. Returned closed (the tongue last), with the number
-    of vertices before the tongue's (the first and that last one are the tongue's ends).
-
-    Each step moves the curve to its per-zone CVT centroids, smooths it (Taubin) and shrinks
-    or inflates it (a Laplacian step, at the scale of a few vertices) to keep its length near
-    the area over the spacing (the paper's length objective), resampling it after. Then,
-    at a finer step, where two runs come closer than ``least`` (with a margin), or a run
-    nearer the area's edge than half that, they are pushed apart, and where the curve bends
-    tighter than its traces can follow, it is smoothed. No step lets the curve cross
-    itself: what would, stays."""
-    step = spacing / 2
-    target = sum(r.area for r in regions) / spacing
-    tongue_len = float(np.sum(np.hypot(*np.diff(tongue, axis=0).T)))
-    free = _split(curve, step)
-    samples, sreg = _samples(regions, spacing / 3, rng)
-    inner = tongue[1:-1]
-    bend = _bend(round(least / pitch), pitch)
-    for it in range(LLOYD_CURVE):
-        progress.report("relax", it, LLOYD_CURVE + REPAIR // 4)
-        p = np.vstack([free, inner])
-        k = len(free)
-        old = p.copy()
-        reg = _region_of(regions, p)
-        p[1 : k - 1] = _lloyd(p, reg, samples, sreg, spacing)[1 : k - 1]
-        p = _taubin(p, k)
-        # (bends tighter than the traces can follow: smoothed while the length is held)
-        sharp = np.abs(_radius(p, 1)) < BEND_SLACK * bend
-        sharp[k - 1 :] = sharp[0] = False
-        soft = sharp | np.roll(sharp, 1) | np.roll(sharp, -1)
-        soft[k - 1 :] = soft[0] = False
-        p[soft] += 0.5 * _lap(p)[soft]
-        length = float(np.sum(np.hypot(*np.diff(p[:k], axis=0).T))) + tongue_len
-        lam = float(np.clip(GAIN * (length - target) / target, -0.2, 0.5))
-        lap = _lap(p)
-        lap = sum(np.roll(lap, i, axis=0) for i in range(-2, 3)) / 5
-        p[1 : k - 1] += lam * lap[1 : k - 1]
-        move = p - old  # (at most half a step: the curve does not jump)
-        size = np.hypot(move[:, 0], move[:, 1])
-        p = old + move * np.minimum(1.0, (step / 2) / np.maximum(size, 1e-12))[:, None]
-        free = _even(_untangle(old, p), k, step)
-
-    step = spacing / 4
-    inner = resample(np.vstack([free[-1], tongue[1:-1], free[0]]), step)[1:-1]
-    free = _even(np.vstack([free, inner]), len(free), step, smooth=True)
-    want = PUSH_MARGIN * least
-    window = WINDOW * least
-    # The edge the curve keeps off by half a spacing: the area's, and the zones' borders but
-    # where the curve crosses them (where it joins the zones).
-    edge = np.vstack([resample(np.asarray(r.coords), step / 2) for r in _rings(area)])
-    borders = _borders(regions, area, step / 2)
-    if len(borders):
-        crossing = shapely.intersection(
-            LineString(np.vstack([free, inner, free[:1]])),
-            shapely.union_all([r.boundary for r in regions]),
-        )
-        xs = shapely.get_coordinates(crossing)
-        if len(xs):
-            near = Grid(xs, 1.5 * spacing).nearest(borders)
-            far = (near < 0) | (np.hypot(*(borders - xs[np.maximum(near, 0)]).T) > 1.5 * spacing)
-            borders = borders[far]
-        edge = np.vstack([edge, borders])
-    edges = Grid(edge, want)
-    p, k = _grow(
-        np.vstack([free, inner]), len(free), step, least, target - tongue_len, edge, edges, bend
+    """The curve, relaxed by the Rust core (``curve::relax``; see ARCHITECTURE.md, 6. and 7.):
+    ``curve`` an open polyline from the tongue's left end round to its right end, the tongue
+    closing it. Returned closed (the tongue last), with the number of vertices before the
+    tongue's. Here, what needs shapely: the regions' rings and area, the area's edge and the
+    borders between regions (points along them)."""
+    step = spacing / 8  # (the edge's points: half the finer relaxing step apart)
+    edge = np.vstack([resample(np.asarray(r.coords), step) for r in _rings(area)])
+    p, k = _core().relax_curve(
+        np.ascontiguousarray(curve, float),
+        np.ascontiguousarray(tongue, float),
+        [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
+        sum(r.area for r in regions) / spacing,
+        edge,
+        np.ascontiguousarray(_borders(regions, area, step), float),
+        spacing,
+        least,
+        pitch,
+        tuple(float(v) for v in rng.random(2) * spacing / 3),
+        {
+            "lloyd_curve": LLOYD_CURVE,
+            "gain": GAIN,
+            "push_margin": PUSH_MARGIN,
+            "window": WINDOW,
+            "bend_slack": BEND_SLACK,
+            "grow": GROW,
+            "reach": REACH,
+            "grow_rate": GROW_RATE,
+            "hard": HARD,
+            "stall": STALL,
+            "repair": REPAIR,
+            "inside": INSIDE,
+        },
+        lambda step, steps: progress.report("relax", step, steps),
     )
-    free = p[:k]
-    hot = None
-    for it in range(REPAIR):
-        # (the pushing apart mostly stops within a quarter of its steps)
-        progress.report("relax", LLOYD_CURVE + min(it, REPAIR // 4), LLOYD_CURVE + REPAIR // 4)
-        free = _respace(p[:k], step)
-        p = np.vstack([free, inner])
-        k = len(free)
-        which = np.arange(k)
-        if hot is not None:  # only where something moved nearby
-            cell = np.floor(free / want).astype(np.int64)
-            which = np.nonzero(np.isin(cell[:, 0] * 1_000_003 + cell[:, 1], hot))[0]
-        near, d = _neighbours(p, window, want, which=which)
-        e = edges.nearest(p[which], lambda qi, pi: np.ones(len(qi), bool))
-        de = np.where(e >= 0, np.hypot(*(p[which] - edge[np.maximum(e, 0)]).T), want)
-        movable = (which > 0) & (which < k - 1)  # (the tongue's ends stay)
-        bad = [  # (the edge stands for a run's middle: twice the distance to it counts)
-            ((near >= 0) & (d < want) & movable, p[np.maximum(near, 0)], d),
-            ((e >= 0) & (2 * de < want) & movable, edge[np.maximum(e, 0)], 2 * de),
-        ]
-        sharp = np.abs(_radius(p, 1)) < BEND_SLACK * bend
-        sharp[k - 1 :] = sharp[0] = False
-        if not sharp.any() and not any(hit.any() for hit, _, _ in bad):
-            break
-        move = np.zeros_like(p)
-        for hit, other, dist in bad:
-            away = p[which[hit]] - other[hit]
-            away /= np.maximum(np.hypot(away[:, 0], away[:, 1]), 1e-12)[:, None]
-            np.add.at(move, which[hit], away * (0.6 * (want - dist[hit]) + step / 8)[:, None])
-        move = (np.roll(move, 1, axis=0) + 2 * move + np.roll(move, -1, axis=0)) / 4
-        move += _soften(p, k, sharp, hard=it >= HARD)
-        _mouths(p, k, move)
-        size = np.hypot(move[:, 0], move[:, 1])
-        move *= np.minimum(1.0, (step / 2) / np.maximum(size, 1e-12))[:, None]
-        p = _untangle(p, p + move)
-        moved = size[:k] > 0
-        cell = np.unique(np.floor(p[:k][moved] / want).astype(np.int64), axis=0)
-        cell = np.unique((cell[:, None, :] + _AROUND[None]).reshape(-1, 2), axis=0)
-        hot = cell[:, 0] * 1_000_003 + cell[:, 1]
-    return p, k
-
-
-def _soften(p: np.ndarray, k: int, sharp: np.ndarray, hard: bool = False) -> np.ndarray:
-    """A move rounding the curve's ``sharp`` bends: Taubin's smoothing about them, so that
-    they open out rather than pull back (the curve keeps its length); ``hard``: a Laplacian
-    step at them, for those Taubin's leaves too sharp."""
-    soft = sharp.copy()
-    for i in range(1, 4):
-        soft |= np.roll(sharp, i) | np.roll(sharp, -i)
-    out = _taubin(p, k, 2) - p
-    out[~soft] = 0
-    if hard:
-        near = sharp | np.roll(sharp, 1) | np.roll(sharp, -1)
-        out[near] += 0.5 * _lap(p)[near]
-    return out
-
-
-def _mouths(p: np.ndarray, k: int, move: np.ndarray) -> None:
-    """Off the tongue's mouths: the curve on along their arcs' end for a while (``move``
-    amended: the vertex next to each mouth put on that line, the next two drawn towards it,
-    whatever else moves them; the tongue and its ends stay)."""
-    for end, prev, sign in ((0, len(p) - 1, 1), (k - 1, k, -1)):
-        t = p[end] - p[prev]
-        t /= max(math.hypot(*t), 1e-12)
-        for m in (1, 2, 3):
-            i = end + sign * m
-            on = p[end] + t * math.dist(p[i], p[end])
-            move[i] = (on - p[i]) if m == 1 else move[i] + (0.5 / m) * (on - p[i])
-    move[0] = move[k - 1] = 0
-    move[k:] = 0
-
-
-def _grow(
-    p: np.ndarray,
-    k: int,
-    step: float,
-    least: float,
-    target: float,
-    edge: np.ndarray,
-    edges: Grid,
-    bend: float,
-) -> tuple[np.ndarray, int]:
-    """The closed curve ``p`` (its first ``k`` vertices free, the rest the tongue's) grown
-    into the room between its runs, as by differential growth: runs nearer each other (or
-    twice the area's edge) than a little over the least spacing repel each other, and while
-    the free part is shorter than ``target``, its bends bulge out where there is room. Each
-    step looks again only where something was pushed the step before (an island at a time,
-    in effect, once the rest has settled)."""
-    reach = REACH * least
-    look = reach + step
-    window = WINDOW * least
-    width = max(1, round(least / step / 2))  # (pushes smoothed over about a least spacing)
-    hot = None
-    lengths: list[float] = []
-    for _ in range(GROW):
-        free = _respace(p[:k], step)
-        p = np.vstack([free, p[k:]])
-        k = len(free)
-        length = float(np.sum(np.hypot(*np.diff(free, axis=0).T)))
-        lengths.append(length)
-        stalled = len(lengths) > STALL and length < lengths[-STALL - 1] * 1.002
-        if length >= target or stalled:
-            break  # (grown as far as it goes)
-        which = np.arange(k)
-        if hot is not None:
-            cell = np.floor(free / look).astype(np.int64)
-            which = np.nonzero(np.isin(cell[:, 0] * 1_000_003 + cell[:, 1], hot))[0]
-        if not len(which):
-            break
-        t = np.roll(p, -1, axis=0) - np.roll(p, 1, axis=0)
-        t /= np.maximum(np.hypot(t[:, 0], t[:, 1]), 1e-12)[:, None]
-        normal = np.stack([-t[:, 1], t[:, 0]], 1)
-        _, left = _neighbours(p, window, look, 1, which)
-        _, right = _neighbours(p, window, look, -1, which)
-        e = edges.nearest(p[which], lambda qi, pi: np.ones(len(qi), bool))
-        to = edge[np.maximum(e, 0)] - p[which]
-        de = np.where(e >= 0, 2 * np.hypot(to[:, 0], to[:, 1]), look)
-        at = np.sum(to * normal[which], axis=1) > 0
-        left = np.where(at, np.minimum(left, de), left)
-        right = np.where(at, right, np.minimum(right, de))
-        force = (np.maximum(reach - right, 0) - np.maximum(reach - left, 0)) / 2
-        if length < target:
-            lap = _lap(p)
-            out = -sum(np.roll(lap, i, axis=0) for i in range(-2, 3))[which]
-            way = np.sign(np.sum(out * normal[which], axis=1))
-            room = np.where(way > 0, left, right) - reach
-            force += way * GROW_RATE * np.clip(room, 0, step)
-        push = np.zeros(len(p))
-        push[which] = force
-        push[k:] = 0
-        busy = np.abs(push) > 0.05 * step
-        if not busy.any():
-            break
-        for _ in range(2):
-            push = sum(np.roll(push, i) for i in range(-width, width + 1)) / (2 * width + 1)
-        move = normal * push[:, None] + _taubin(p, k, 1) - p
-        sharp = np.abs(_radius(p, 1)) < BEND_SLACK * bend
-        sharp[k - 1 :] = sharp[0] = False
-        move += _soften(p, k, sharp)
-        _mouths(p, k, move)
-        size = np.hypot(move[:, 0], move[:, 1])
-        move *= np.minimum(1.0, (step / 2) / np.maximum(size, 1e-12))[:, None]
-        p = _untangle(p, p + move)
-        cell = np.unique(np.floor(p[:k][busy[:k]] / look).astype(np.int64), axis=0)
-        cell = np.unique((cell[:, None, :] + _AROUND[None]).reshape(-1, 2), axis=0)
-        hot = cell[:, 0] * 1_000_003 + cell[:, 1]
-    return p, k
-
-
-def _untangle(old: np.ndarray, new: np.ndarray) -> np.ndarray:
-    """The closed curve ``new`` (``old`` moved; ``old`` crossing nowhere) with the vertices
-    of every segment that would cross another back where they were."""
-    new = new.copy()
-    n = len(new)
-    moved = np.nonzero(np.any(new != old, axis=1))[0]
-    for _ in range(50):
-        if not len(moved):
-            return new
-        i, j = _crossing(new, np.unique(np.concatenate([moved, (moved - 1) % n])))
-        if not len(i):
-            return new
-        back = np.unique(np.concatenate([i, (i + 1) % n, j, (j + 1) % n]))
-        new[back] = old[back]
-        moved = back
-    return old
-
-
-def _crossing(p: np.ndarray, which: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """The segments of the closed polyline ``p`` among ``which`` (segment ``i`` from vertex
-    ``i`` to the next) that cross or touch another one, other than their neighbours: the
-    pairs."""
-    q = np.roll(p, -1, axis=0)
-    e = q - p
-    length = np.hypot(e[:, 0], e[:, 1])
-    rays = Rays(p, q, max(float(length.max()), 1e-6))
-    d = e[which] / np.maximum(length[which], 1e-12)[:, None]
-    ray, seg, t = rays.cast(p[which], d)
-    i = which[ray]
-    n = len(p)
-    gap = np.abs(i - seg)
-    hit = (np.minimum(gap, n - gap) > 1) & (t <= length[i])
-    return i[hit], seg[hit]
-
-
-def _radius(p: np.ndarray, reach: int = 2) -> np.ndarray:
-    """The closed curve's signed radius of curvature at each vertex (positive turning left,
-    towards the normal), from the turn between the chords ``reach`` vertices either way."""
-    a = p - np.roll(p, reach, axis=0)
-    b = np.roll(p, -reach, axis=0) - p
-    turn = np.arctan2(a[:, 0] * b[:, 1] - a[:, 1] * b[:, 0], np.sum(a * b, axis=1))
-    chord = (np.hypot(a[:, 0], a[:, 1]) + np.hypot(b[:, 0], b[:, 1])) / 2
-    return chord / np.where(np.abs(turn) < 1e-9, 1e-9, turn)
-
-
-_AROUND = np.array([(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)])
-
-
-def _bend(n: int, pitch: float) -> float:
-    """The tightest the curve may bend: its innermost trace (at the least pitch) within the
-    bend's radius, and a U-turn no narrower than the least spacing."""
-    return max((n - 1) / 2 * pitch / INSIDE, n * pitch / 2)
+    return np.asarray(p), int(k)
 
 
 def _borders(regions: list[Polygon], area: shapely.Geometry, step: float) -> np.ndarray:
@@ -1322,148 +918,32 @@ def _lanes(
     exact: np.ndarray,
 ) -> list[np.ndarray]:
     """The ``n`` traces round the closed curve ``p`` (vertices ``k`` on: the tongue's), as
-    closed polylines: offsets of the curve at a pitch that shares the spacing to the next run
-    on each side evenly (the area's edge counts as a run's middle), never below ``pitch``
-    (with a margin; exactly where ``exact``: the tongue's legs). Offset from the curve made smooth
-    (a Catmull-Rom spline through its vertices) and fine, so that no chord cuts a bend."""
-    least = n * pitch
-    cap = SPREAD * spacing
-    sides = []
-    q = np.roll(p, -2, axis=0) - np.roll(p, 2, axis=0)  # (a smooth normal)
-    q /= np.maximum(np.hypot(q[:, 0], q[:, 1]), 1e-12)[:, None]
-    normal = np.stack([-q[:, 1], q[:, 0]], 1)
-    ea, eb = [], []
-    for r in _rings(area):
-        c = resample(np.asarray(r.coords), spacing / 2)
-        ea.append(c[:-1])
-        eb.append(c[1:])
-    rays = Rays(np.vstack(ea), np.vstack(eb), cap / 2)
-    radius = _radius(p)
-    # the least pitch: with the margin, but on the tongue's legs (exactly the pitch there),
-    # ramped in along the curve off them
-    idx = np.nonzero(exact)[0]
-    gap = np.abs(np.arange(len(p))[:, None] - idx[[0, -1]][None, :])
-    off = np.where(exact, 0, np.min(np.minimum(gap, len(p) - gap), axis=1))
-    floor = least * (1 + MARGIN * np.clip(off / RAMP, 0.0, 1.0))
-    for side in (1, -1):
-        _, d = _neighbours(p, WINDOW * least, cap, side)
-        ray, _, t = rays.cast(p, side * normal)
-        np.minimum.at(d, ray, 2 * t)
-        # inside a bend: the innermost trace within its radius
-        inside = side * radius > 0
-        d[inside] = np.minimum(d[inside], INSIDE * np.abs(radius[inside]) * 2 * n / max(n - 1, 1))
-        d[exact] = least
-        m = d.copy()  # smoothed: a running minimum, then a running mean (never above d)
-        for i in range(1, SMOOTH + 1):
-            m = np.minimum(m, np.minimum(np.roll(d, i), np.roll(d, -i)))
-        d = sum(np.roll(m, i) for i in range(-SMOOTH, SMOOTH + 1)) / (2 * SMOOTH + 1)
-        d = np.maximum(d, floor)
-        sides.append(_balance(floor / n, d / n, p, k, least))
-    fine = _spline(p, FINE)
-    t = np.arange(len(fine)) / FINE  # (each fine vertex's place between the curve's)
-    lo = np.floor(t).astype(int) % len(p)
-    hi = (lo + 1) % len(p)
-    f = t - np.floor(t)
-    q = np.roll(fine, -1, axis=0) - np.roll(fine, 1, axis=0)
-    q /= np.maximum(np.hypot(q[:, 0], q[:, 1]), 1e-12)[:, None]
-    normal = np.stack([-q[:, 1], q[:, 0]], 1)
-    out = []
-    tangent = np.stack([normal[:, 1], -normal[:, 0]], 1)
-    for j in range(n):
-        o = j - (n - 1) / 2
-        side = sides[0] if o > 0 else sides[1]
-        step = (side[lo] * (1 - f) + side[hi] * f) * o
-        lane = fine + normal * step[:, None]
-        # inside a bend tighter than the offset, the offset runs backwards: not those
-        ahead = np.sum((np.roll(lane, -1, axis=0) - lane) * tangent, axis=1) > 0
-        ahead &= np.roll(ahead, 1)
-        out.append(_unloop(lane[ahead]))
-    return out
-
-
-def _balance(lo: np.ndarray, hi: np.ndarray, p: np.ndarray, k: int, least: float) -> np.ndarray:
-    """The pitch of one side's traces along the closed curve ``p``: up to ``hi`` (to share the
-    room), down to ``lo`` (the least) where that would skew them. Neighbouring traces on one
-    side differ in length by the pitch times the curve's turning, so a pitch above the least
-    in a bend skews them, one way or the other with the bend's sense; along the curve from
-    the exit (vertex ``k``: the tongue's), the traces spread in a bend only where that pays
-    back the skew run up so far, on the straight wherever there is room (the choice eased in
-    and out over a few vertices)."""
-    curv = 1 / _radius(p)  # (signed: turning left)
-    ds = np.hypot(*(np.roll(p, -1, axis=0) - p).T)
-    order = np.roll(np.arange(len(p)), -k)
-    out = lo.copy()
-    skew, u = 0.0, 0.0
-    ease = 2 / (SMOOTH + 1)
-    straight = STRAIGHT / least
-    for i in order.tolist():
-        c = curv[i]
-        want = 1.0 if abs(c) < straight or skew * c <= 0 else 0.0
-        u += ease * (want - u)
-        out[i] = lo[i] + u * (hi[i] - lo[i])
-        skew += out[i] * c * ds[i]
-    return out
-
-
-def _spline(p: np.ndarray, m: int) -> np.ndarray:
-    """The closed polyline through ``p`` as a Catmull-Rom spline (centripetal), ``m``
-    vertices per segment (the first of each at the segment's start)."""
-    p0, p1, p2, p3 = np.roll(p, 1, axis=0), p, np.roll(p, -1, axis=0), np.roll(p, -2, axis=0)
-
-    def knot(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-        return np.maximum(np.hypot(*(b - a).T), 1e-9) ** 0.5
-
-    t1 = knot(p0, p1)
-    t2 = t1 + knot(p1, p2)
-    t3 = t2 + knot(p2, p3)
-    out = []
-    for i in range(m):
-        t = (t1 + (t2 - t1) * i / m)[:, None]
-        a1 = ((t1[:, None] - t) * p0 + t * p1) / t1[:, None]
-        a2 = ((t2[:, None] - t) * p1 + (t - t1[:, None]) * p2) / (t2 - t1)[:, None]
-        a3 = ((t3[:, None] - t) * p2 + (t - t2[:, None]) * p3) / (t3 - t2)[:, None]
-        b1 = ((t2[:, None] - t) * a1 + t * a2) / t2[:, None]
-        b2 = ((t3[:, None] - t) * a2 + (t - t1[:, None]) * a3) / (t3 - t1)[:, None]
-        out.append(((t2[:, None] - t) * b1 + (t - t1[:, None]) * b2) / (t2 - t1)[:, None])
-    return np.stack(out, 1).reshape(-1, 2)
-
-
-def _unloop(q: np.ndarray, reach: int = 40) -> np.ndarray:
-    """The closed polyline without the small loops an offset leaves inside tight bends:
-    where a segment crosses one up to ``reach`` segments on, the vertices between give way
-    to the crossing."""
-    for _ in range(4):
-        a, b = q, np.roll(q, -1, axis=0)
-        r = b - a
-        hits = []
-        for j in range(2, reach + 1):
-            c, s = np.roll(a, -j, axis=0), np.roll(r, -j, axis=0)
-            den = r[:, 0] * s[:, 1] - r[:, 1] * s[:, 0]
-            w = c - a
-            ok = np.abs(den) > 1e-15
-            den = np.where(ok, den, 1.0)
-            t = (w[:, 0] * s[:, 1] - w[:, 1] * s[:, 0]) / den
-            u = (w[:, 0] * r[:, 1] - w[:, 1] * r[:, 0]) / den
-            ok &= (t > 0) & (t < 1) & (u > 0) & (u < 1)
-            for i in np.nonzero(ok)[0]:
-                hits.append((int(i), j, a[i] + t[i] * r[i]))
-        if not hits:
-            return q
-        n = len(q)
-        keep = np.ones(n, bool)
-        q = q.copy()
-        hits.sort(key=lambda h: (h[0], -h[1]))
-        done = -1
-        for i, j, x in hits:
-            span = [(i + m) % n for m in range(1, j + 1)]
-            if i <= done or not all(keep[v] for v in span) or not keep[i]:
-                continue
-            q[span[0]] = x
-            for v in span[1:]:
-                keep[v] = False
-            done = i + j
-        q = q[keep]
-    return q
+    closed polylines, by the Rust core (``lanes::lanes``): offsets of the curve at a pitch
+    that shares the spacing to the next run on each side evenly (the area's edge counts as a
+    run's middle), never below ``pitch`` (with a margin; exactly where ``exact``: the
+    tongue's legs), in bends only as far as keeps skew down."""
+    rings = [resample(np.asarray(r.coords), spacing / 2) for r in _rings(area)]
+    out = _core().offset_lanes(
+        np.ascontiguousarray(p, float),
+        k,
+        np.vstack([c[:-1] for c in rings]),
+        np.vstack([c[1:] for c in rings]),
+        n,
+        pitch,
+        spacing,
+        [bool(x) for x in exact],
+        {
+            "spread": SPREAD,
+            "smooth": SMOOTH,
+            "fine": FINE,
+            "ramp": float(RAMP),
+            "margin": MARGIN,
+            "inside": INSIDE,
+            "window": WINDOW,
+            "straight": STRAIGHT,
+        },
+    )
+    return [np.asarray(t) for t in out]
 
 
 # ----------------------------------------------------------------------------- settling
@@ -1495,12 +975,7 @@ def _settle(
         edge = np.vstack([edge, borders[clear]])
     elif len(borders):
         edge = np.vstack([edge, borders])
-    settle = _native.settle_traces if _native is not None else _browser_settle()
-    if settle is None:
-        raise MeshError(
-            "the mesh settling needs its Rust core: install yanartas-mesh (rust/python), "
-            "or in the browser build its WebAssembly (artifact/build.py)"
-        )
+    settle = _core().settle_traces
 
     def report(d: dict) -> None:
         progress.report(d.pop("phase"), d.pop("step"), d.pop("steps"), **d)
@@ -1517,11 +992,25 @@ def _settle(
     return [np.asarray(t) for t in out]
 
 
-def _browser_settle() -> Callable[..., list[np.ndarray]] | None:
-    """In the browser (Pyodide), the settling's WebAssembly build that the web worker loaded
-    (``self.yanartasMesh``), called like the Rust extension's ``settle_traces``; else none."""
+def _core() -> object:
+    """The Rust core (rust/core): natively its extension ``yanartas_mesh``, in the browser
+    its WebAssembly build behind the same calls."""
+    core = _native if _native is not None else _browser_core()
+    if core is None:
+        raise MeshError(
+            "the mesh layout needs its Rust core: install yanartas-mesh (rust/python), "
+            "or in the browser build its WebAssembly (artifact/build.py)"
+        )
+    return core
+
+
+def _browser_core() -> object | None:
+    """In the browser (Pyodide), the WebAssembly build the web worker loaded
+    (``self.yanartasMesh``), behind the extension's calls; else none."""
     if sys.platform != "emscripten":
         return None
+    import types
+
     import js  # type: ignore[import-not-found]
     from pyodide.ffi import create_proxy, to_js  # type: ignore[import-not-found]
 
@@ -1529,35 +1018,61 @@ def _browser_settle() -> Callable[..., list[np.ndarray]] | None:
     if mesh is None:
         return None
 
+    def f64(a: np.ndarray) -> object:
+        return to_js(np.ascontiguousarray(a, float).ravel())
+
+    def u32(a: list[int]) -> object:
+        return to_js(np.asarray(a, np.uint32))
+
     def flat(points: list[np.ndarray]) -> tuple[object, object]:
-        both = np.ascontiguousarray(np.vstack(points), float).ravel() if points else np.zeros(0)
-        return to_js(both), to_js(np.array([len(q) for q in points], np.uint32))
+        both = np.vstack(points) if points else np.zeros((0, 2))
+        return f64(both), u32([len(q) for q in points])
 
-    def settle(lines, pitch, edge, zones, keep, params, report):  # noqa: ANN001, ANN202
-        rings = [r for z in zones for r in z]
-        line_pts, line_lens = flat(lines)
-        ring_pts, ring_lens = flat(rings)
-        hook = create_proxy(lambda o: report(o.to_py()))
+    def obj(d: dict) -> object:
+        return to_js(d, dict_converter=js.Object.fromEntries)
+
+    def unflat(points: object, lens: object) -> list[np.ndarray]:
+        pts = np.asarray(points.to_py(), float).reshape(-1, 2)
+        return np.split(pts, np.cumsum(np.asarray(lens.to_py(), int))[:-1])
+
+    def call(fn, *args, report=None):  # noqa: ANN001, ANN002, ANN202
+        hook = create_proxy(report) if report is not None else None
         try:
-            out = mesh.settle(
-                line_pts,
-                line_lens,
-                pitch,
-                to_js(np.ascontiguousarray(edge, float).ravel()),
-                ring_pts,
-                ring_lens,
-                to_js(np.array([len(z) for z in zones], np.uint32)),
-                to_js(np.array(keep, float)),
-                to_js(params, dict_converter=js.Object.fromEntries),
-                hook,
-            )
+            return fn(*args, hook)
         finally:
-            hook.destroy()
-        pts = np.asarray(out.points.to_py(), float).reshape(-1, 2)
-        lens = np.asarray(out.lens.to_py(), int)
-        return np.split(pts, np.cumsum(lens)[:-1])
+            if hook is not None:
+                hook.destroy()
 
-    return settle
+    def settle_traces(lines, pitch, edge, zones, keep, params, report):  # noqa: ANN001, ANN202
+        rings = [r for z in zones for r in z]
+        out = call(
+            mesh.settle, *flat(lines), pitch, f64(edge), *flat(rings),
+            u32([len(z) for z in zones]), f64(np.array(keep)), obj(params),
+            report=lambda o: report(o.to_py()),
+        )  # fmt: skip
+        return unflat(out.points, out.lens)
+
+    def relax_curve(*a: object) -> tuple[np.ndarray, int]:
+        curve, tongue, regions, target, edge, borders, spacing, least, pitch = a[:9]
+        offset, params, report = a[9:]
+        rings = [r for z in regions for r in z]
+        out = call(
+            mesh.relax_curve, f64(curve), f64(tongue), *flat(rings),
+            u32([len(z) for z in regions]), target, f64(edge), f64(borders), spacing, least,
+            pitch, f64(np.array(offset)), obj(params), report=report,
+        )  # fmt: skip
+        return np.asarray(out.points.to_py(), float).reshape(-1, 2), int(out.k)
+
+    def offset_lanes(p, k, edge_a, edge_b, n, pitch, spacing, exact, params):  # noqa: ANN001, ANN202
+        out = mesh.offset_lanes(
+            f64(p), k, f64(edge_a), f64(edge_b), n, pitch, spacing,
+            to_js(np.asarray(exact, np.uint8)), obj(params),
+        )  # fmt: skip
+        return unflat(out.points, out.lens)
+
+    return types.SimpleNamespace(
+        settle_traces=settle_traces, relax_curve=relax_curve, offset_lanes=offset_lanes
+    )
 
 
 def _params() -> dict[str, float]:
