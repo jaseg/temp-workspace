@@ -72,8 +72,8 @@ fn status<'py>(py: Python<'py>, s: &Status) -> PyResult<Bound<'py, PyDict>> {
 }
 
 /// The traces settled and matched in length (`sfc._settle`): `lines` the traces (each an
-/// (n, 2) array), `edge` points along the edge, `zones` each zone's rings, `keep` the
-/// exit's box (x0, y0, x1, y1), `params` the constants by name, `progress` called with a
+/// (n, 2) array), `edge` points along the edge, `zones` each zone's rings, `keep` what is
+/// left as laid (the exit: polygons, each its rings), `params` the constants by name, `progress` called with a
 /// dict after each step (phase, step, steps, vertices, looked, moved, checked, apart).
 #[pyfunction]
 #[pyo3(signature = (lines, pitch, edge, zones, keep, params, progress=None))]
@@ -84,7 +84,7 @@ fn settle_traces<'py>(
     pitch: f64,
     edge: PyReadonlyArray2<'py, f64>,
     zones: Vec<Vec<PyReadonlyArray2<'py, f64>>>,
-    keep: (f64, f64, f64, f64),
+    keep: Vec<Vec<PyReadonlyArray2<'py, f64>>>,
     params: &Bound<'py, PyDict>,
     progress: Option<PyObject>,
 ) -> PyResult<Bound<'py, PyList>> {
@@ -96,7 +96,10 @@ fn settle_traces<'py>(
             .iter()
             .map(|z| z.iter().map(points).collect::<PyResult<Vec<_>>>())
             .collect::<PyResult<_>>()?,
-        keep: [keep.0, keep.1, keep.2, keep.3],
+        keep: keep
+            .iter()
+            .map(|z| z.iter().map(points).collect::<PyResult<Vec<_>>>())
+            .collect::<PyResult<_>>()?,
     };
     let prm = read_params(params)?;
     let mut failed: Option<PyErr> = None;

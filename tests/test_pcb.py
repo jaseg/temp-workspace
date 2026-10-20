@@ -353,31 +353,57 @@ def test_mesh_metrics(layout):
         assert all(0 <= p["total"] <= p["local"] + 1e-6 for p in m["skew"])
 
 
-def test_space_filling_curve_is_wired_in(monkeypatch):
-    """The curve layout gets the mask, the exit and the folding pattern's panels as zones
-    (its own tests run it on small areas; a full-size run is slow, below)."""
-    import dataclasses
+def _ports_only(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, neck=None):
+    """A stand-in for the curve's layout: ``n`` nested U-turns in the exit cell (its open
+    side to -x), net 1 outermost."""
+    from yanartas_pillowbox import mesh
 
-    from yanartas_pillowbox import kimesh, sfc
+    cx, cy = corner
+    c = 2 * n * pitch
+    traces = tuple(
+        (
+            (cx, cy + (j + 0.5) * pitch),
+            (cx + (n - j) * pitch, cy + (j + 0.5) * pitch),
+            (cx + (n - j) * pitch, cy + c - (j + 0.5) * pitch),
+            (cx, cy + c - (j + 0.5) * pitch),
+        )
+        for j in range(n)
+    )
+    return mesh.Mesh(traces, c, 1, 0, corner, "sfc")
+
+
+def test_space_filling_curve_is_wired_in(monkeypatch):
+    """The curve layout: each layer's area in partitions of equal area, each laid out on its
+    own (its traces, its port in turn along the junction, its neck, the panels as zones),
+    the partitions' traces together the layer's mesh (its own tests run it on small areas;
+    a full-size run is slow, below)."""
+    from yanartas_pillowbox import sfc
     from yanartas_pillowbox.geometry import build_pattern
 
     seen = []
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False):
-        seen.append((len(zones), n))
-        m = kimesh.generate(mask, corner, side, n, pitch, seed=seed)
-        return dataclasses.replace(m, algorithm="sfc")
+    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, neck=None):
+        seen.append((len(zones), n, mask.area))
+        return _ports_only(mask, corner, side, n, pitch)
 
     monkeypatch.setattr(sfc, "generate", fake)
     cfg = D.with_values(mesh_algorithm="sfc")
     result = pcb.layout(cfg)
-    # (each layer's traces: the partitions' together, through one exit cell for now)
-    n = int(cfg.mesh_partitions * cfg.mesh_traces)
-    assert seen == [(len(pcb.mesh_zones(build_pattern(D))), n)] * 2
+    count, each = int(cfg.mesh_partitions), int(cfg.mesh_traces)
+    n = count * each
+    zones = len(pcb.mesh_zones(build_pattern(D)))
+    assert [(z, k) for z, k, _ in seen] == [(zones, each)] * (2 * count)
+    for side in range(2):  # (the partitions of a layer: of equal area)
+        areas = [a for _, _, a in seen[side * count : (side + 1) * count]]
+        assert max(areas) - min(areas) < 0.03 * max(areas)
     data = pcb.preview_json(result)
     assert data["meshes"]["front"]["algorithm"] == "sfc"
     assert data["meshes"]["front"]["traces"] == n
-    assert result.meshes[pcb.FRONT].cell == pytest.approx(2 * n * (D.mesh_trace_width + 0.15))
+    m = result.meshes[pcb.FRONT]
+    assert m.groups == (each,) * count and len(m.parts) == count
+    assert m.cell == pytest.approx(2 * each * (D.mesh_trace_width + 0.15))
+    # (pairs only within a partition)
+    assert len(result.skew()[pcb.FRONT]) == count * (each - 1)
     pads = [p for p in result.pads if p.net and p.net.startswith("MESH_")]
     assert len(pads) == 4 * n <= D.fpc_pins
     assert pcb.verify(result) == []
@@ -407,23 +433,21 @@ def test_mesh_zones_join_faces_but_across_folds_and_slits():
 
 def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     """What the mesh layout reports while it runs is polled at /api/progress: its stage
-    (the layer), phase, step and the whole layout's share done (both sides' mean)."""
-    import dataclasses
-
-    from yanartas_pillowbox import kimesh, progress, sfc
+    (the layer and partition), phase, step and the whole layout's share done (the mean of
+    all the parts laid out at once)."""
+    from yanartas_pillowbox import progress, sfc
     from yanartas_pillowbox.server import create_app
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False):
+    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, neck=None):
         progress.report("settle", 20, 40, vertices=1000)
-        m = kimesh.generate(mask, corner, side, n, pitch, seed=seed)
-        return dataclasses.replace(m, algorithm="sfc")
+        return _ports_only(mask, corner, side, n, pitch)
 
     monkeypatch.setattr(sfc, "generate", fake)
     client = create_app(tmp_path / "s.json").test_client()
     config = D.with_values(mesh_traces=2, mesh_algorithm="sfc").to_dict()
     assert client.post("/api/pcb", json={"config": config}).status_code == 200
     e = client.get("/api/progress").json["progress"]  # (the sides run at once: either)
-    assert e["stage"] in ("F.Cu", "B.Cu") and (e["phase"], e["step"], e["steps"]) == (
+    assert e["stage"].split()[0] in ("F.Cu", "B.Cu") and (e["phase"], e["step"], e["steps"]) == (
         "settle",
         20,
         40,

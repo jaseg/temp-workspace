@@ -86,6 +86,7 @@ FINE = 4  # the traces offset from the curve split this many times finer
 RAMP = 3  # ... ramped in over this many vertices off the tongue
 MARGIN = 0.02  # ... at a pitch this much above the least (but at the exit)
 SIMPLIFY = 0.002  # the traces simplified within this (mm; well within the margin)
+LOOP = 3.0  # loops the traces' offsets leave in tight bends: cut out up to this many spacings long
 ARCS = 0.002  # drawn in lines and arcs (``arcs``): within this of the traces (mm)
 INSIDE = 0.9  # traces inside a bend keep within this share of its radius
 PUSH_MARGIN = 1.04  # runs closer than this many times their least spacing: pushed apart
@@ -291,6 +292,63 @@ def _borders(regions: list[Polygon], area: shapely.Geometry, step: float) -> np.
     return np.vstack(pts) if pts else np.zeros((0, 2))
 
 
+def _unlooped(ring: np.ndarray, most: float) -> np.ndarray:
+    """The closed trace without the small loops an offset can leave in a tight bend (where
+    it crosses itself, the shorter way round, if no longer than ``most``, cut out)."""
+    for _ in range(50):
+        m = len(ring)
+        segs = shapely.linestrings(np.stack([ring, np.roll(ring, -1, axis=0)], 1))
+        a, b = shapely.STRtree(segs).query(segs, predicate="crosses")
+        gap = np.abs(a - b)
+        keep = (a < b) & (np.minimum(gap, m - gap) > 1)
+        if not keep.any():
+            return ring
+        seg = np.hypot(*np.diff(np.vstack([ring, ring[:1]]), axis=0).T)
+        run = np.concatenate([[0.0], np.cumsum(seg)])
+        best = None
+        for i, j in zip(a[keep], b[keep], strict=True):
+            inner = run[j] - run[i + 1]  # (from i + 1 to j)
+            outer = run[m] - inner
+            size = min(inner, outer)
+            if size <= most and (best is None or size < best[0]):
+                best = (size, int(i), int(j), inner <= outer)
+        if best is None:
+            return ring
+        _, i, j, inside = best
+        x = shapely.get_coordinates(shapely.intersection(segs[i], segs[j]))[0]
+        if inside:  # (vertices i + 1 .. j out)
+            ring = np.vstack([ring[: i + 1], [x], ring[j + 1 :]])
+        else:  # (vertices j + 1 .. i out, round the end)
+            ring = np.vstack([[x], ring[i + 1 : j + 1]])
+    return ring
+
+
+def _opened(ring: np.ndarray, cut: Polygon) -> np.ndarray:
+    """The closed trace ``ring`` opened at the exit: the one run of its vertices within
+    ``cut`` taken out, its ends where it crosses into ``cut`` (the rest of it as it is)."""
+    inside = shapely.contains_xy(cut, ring[:, 0], ring[:, 1])
+    m = len(ring)
+    starts = [i for i in range(m) if inside[i - 1] and not inside[i]]
+    stops = [i for i in range(m) if not inside[i] and inside[(i + 1) % m]]
+    if len(starts) != 1 or len(stops) != 1:
+        raise MeshError("a trace does not leave through the exit")
+    s, e = starts[0], stops[0]
+    path = np.roll(ring, -s, axis=0)[: (e - s) % m + 1]
+    edge = cut.boundary
+
+    def cross(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        q = shapely.get_coordinates(LineString([a, b]).intersection(edge))
+        return q[np.argmin(np.hypot(*(q - b).T))] if len(q) else a
+
+    return np.vstack([[cross(ring[s - 1], ring[s])], path, [cross(ring[(e + 1) % m], ring[e])]])
+
+
+def _longest(g: shapely.Geometry) -> LineString:
+    """The line, or the longest of its pieces once joined."""
+    g = shapely.line_merge(g) if not isinstance(g, LineString) else g
+    return g if isinstance(g, LineString) else max(shapely.get_parts(g), key=lambda p: p.length)
+
+
 def _rings(g: shapely.Geometry) -> list[shapely.LinearRing]:
     return [r for poly in _polygons(g) for r in (poly.exterior, *poly.interiors)]
 
@@ -346,7 +404,7 @@ def _settle(
     (yanartas_mesh, on all cores), in the browser its WebAssembly build. Here, what needs
     shapely: the edge's points (the area's edge, and the zones' borders but where the
     traces cross them at the curve's joins, where they stay as laid), the zones' rings, and
-    the exit (``keep``, left as laid)."""
+    what is left as laid (``keep``: the exit, the neck)."""
     step = SETTLE_STEP * pitch
     far = SETTLE_REACH * pitch
     edge = np.vstack([resample(np.asarray(r.coords), step / 2) for r in _rings(area)])
@@ -372,7 +430,7 @@ def _settle(
         pitch,
         np.ascontiguousarray(edge, float),
         [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
-        tuple(float(v) for v in keep.bounds),
+        [[np.asarray(r.coords, float) for r in _rings(g)] for g in _polygons(keep)],
         _params(len(lines)),
         report,
     )
@@ -432,10 +490,11 @@ def _browser_core() -> object | None:
 
     def settle_traces(lines, pitch, edge, zones, keep, params, report):  # noqa: ANN001, ANN202
         rings = [r for z in zones for r in z]
+        held = [r for z in keep for r in z]
         out = call(
             mesh.settle, *flat(lines), pitch, f64(edge), *flat(rings),
-            u32([len(z) for z in zones]), f64(np.array(keep)), obj(params),
-            report=lambda o: report(o.to_py()),
+            u32([len(z) for z in zones]), *flat(held), u32([len(z) for z in keep]),
+            obj(params), report=lambda o: report(o.to_py()),
         )  # fmt: skip
         return unflat(out.points, out.lens)
 
@@ -530,6 +589,7 @@ def generate(
     seed: int | str | None = 0,
     zones: tuple[Polygon, ...] | list[Polygon] = (),
     arcs: bool = False,
+    neck: LineString | None = None,
 ) -> Mesh:
     """The mesh over ``mask``: ``traces`` nets at ``pitch`` (trace plus space) round a closed
     space-filling curve, out through the exit cell (as ``kimesh.generate``: its corner with
@@ -557,17 +617,39 @@ def generate(
     area = shapely.difference(area, shapely.box(x0, y0 - 4 * c, x0 + c, ym))
     rng = random.Random(seed)
     nrng = np.random.default_rng(rng.getrandbits(64))
-    # The tongue: two legs, a run's spacing apart, straight up through the exit cell.
+    # The tongue: two legs, a run's spacing apart, straight up through the exit cell (and
+    # on along the neck, its corridor kept out of the area as the cell).
     ax, bx = x0 + c / 4, x0 + 3 * c / 4
+    centre = None
+    if neck is not None:
+        q = np.asarray(frame.geom(neck).coords, float)
+        q[0] = (x0 + c / 2, ym)
+        if LineString(q).length > 1e-6:
+            centre = LineString(q).simplify(1e-9)  # (no points in line: one offset each way)
+    if centre is None:
+        legs = (np.array([(ax, ym)]), np.array([(bx, ym)]))
+        inward = np.array([0.0, 1.0])
+    else:
+        area = shapely.difference(area, centre.buffer(spacing, cap_style="flat"))
+        legs = tuple(
+            np.asarray(_longest(shapely.offset_curve(centre, d, join_style="round")).coords)
+            for d in (spacing / 2, -spacing / 2)
+        )
+        if abs(legs[0][0][0] - ax) > abs(legs[1][0][0] - ax):
+            legs = legs[::-1]
+        tail = np.asarray(centre.coords)[-2:]
+        inward = (tail[1] - tail[0]) / np.linalg.norm(tail[1] - tail[0])
+    area = shapely.union_all(_polygons(area))  # (no slivers of lines or points left)
+    la, lb = legs  # (each from the exit cell's mouth on to the curve's)
     pts, regions, _, cells, left = _curve(
         area,
         [frame.geom(z) for z in zones],
         spacing,
-        ((ax, ym + spacing / 2), (bx, ym + spacing / 2)),
+        (tuple(la[-1] + inward * spacing / 2), tuple(lb[-1] + inward * spacing / 2)),
         rng.getrandbits(64),
     )
-    tongue = np.array([(bx, ym), (bx, ytop), (ax, ytop), (ax, ym)])
-    curve = np.vstack([[(ax, ym)], pts, [(bx, ym)]])
+    tongue = np.vstack([lb[::-1], [(bx, ytop), (ax, ytop)], la])
+    curve = np.vstack([la[-1:], pts, lb[-1:]])
     progress.report("graph", cells=cells)
     p, k = _relax(curve, tongue, area, regions, spacing, least, pitch, nrng)
     progress.report("relax", vertices=len(p))
@@ -575,16 +657,19 @@ def generate(
     out = []
     exact = np.zeros(len(p), bool)  # (the tongue's legs: the traces at the pitch)
     exact[k:] = p[k:, 1] < y0 + spacing / 4
+    if centre is not None:  # (and along the neck, but where it opens out)
+        along = shapely.line_locate_point(centre, shapely.points(p[k:]))
+        exact[k:] |= along < centre.length - 0.75 * spacing
     lines = []
     for ring in _lanes(p, k, area, n, pitch, spacing, exact):
-        line = shapely.line_merge(shapely.difference(LineString(np.vstack([ring, ring[:1]])), cut))
-        if not isinstance(line, LineString):
-            raise MeshError("a trace does not leave through the exit")
-        lines.append(np.asarray(line.coords))
+        lines.append(_opened(_unlooped(ring, LOOP * spacing), cut))
     if SETTLE:
-        # (the leads, beyond the area's edge: as laid; all else settles, the curve's turns
-        # round the tongue too, or holes are left either side of it)
-        keep = shapely.box(x0, ytop - c, x0 + c, y0)
+        # (the tongue: its leads beyond the area's edge, its legs through the exit cell and
+        # along the neck, as laid at the pitch; all else settles, the curve's turns round
+        # it too, or holes are left either side of it)
+        keep = shapely.box(x0, ytop - c, x0 + c, ym)
+        if centre is not None:
+            keep = shapely.union_all([keep, centre.buffer(spacing, cap_style="flat")])
         progress.report("lanes", traces=len(lines))
         lines = _settle(lines, pitch, area, regions, keep)
     progress.report("match", 1, 1)

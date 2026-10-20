@@ -72,13 +72,13 @@ impl Default for Params {
 
 /// What to settle: the traces (offsets of one curve, from the exit), the pitch, the edge
 /// (points along the area's edge and the zones' borders but at the curve's joins), the
-/// zones (each its rings), and the exit (a box left as laid).
+/// zones (each its rings), and what is left as laid (the exit: polygons, each its rings).
 pub struct Input {
     pub lines: Vec<Vec<P>>,
     pub pitch: f64,
     pub edge: Vec<P>,
     pub zones: Vec<Vec<Vec<P>>>,
-    pub keep: [f64; 4],
+    pub keep: Vec<Vec<Vec<P>>>,
 }
 
 /// How far settling has got, after each step.
@@ -102,7 +102,7 @@ struct Ctx<'a> {
     own: f64,
     pin: usize,
     zones: &'a Zones,
-    keep: [f64; 4],
+    keep: &'a Zones,
     edge: &'a [P],
     edges: &'a Grid,
 }
@@ -111,6 +111,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
     let pitch = input.pitch;
     let step = prm.step * pitch;
     let zones = Zones::new(&input.zones, 2.0 * pitch);
+    let keep = Zones::new(&input.keep, 2.0 * pitch);
     let edges = Grid::new(&input.edge, prm.reach * pitch, |_| true);
     let cx = Ctx {
         pitch,
@@ -120,7 +121,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         own: 0.5 * pitch,
         pin: (prm.reach / prm.step).ceil() as usize,
         zones: &zones,
-        keep: input.keep,
+        keep: &keep,
         edge: &input.edge,
         edges: &edges,
     };
@@ -212,6 +213,17 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         let mut mv: Vec<P> = pmap(tr.len(), |i| {
             if fixed[i] {
                 return [0.0, 0.0];
+            }
+            // (out of the area, as the lanes left it: only back in, towards its edge)
+            if zone[i].is_none() {
+                return match nearest_edge(&cx, p[i], 4.0 * cx.far) {
+                    Some(e) => {
+                        let v = sub(e, p[i]);
+                        let size = norm(v).max(1e-12);
+                        scale(v, (prm.leap * step / size).min(1.0))
+                    }
+                    None => [0.0, 0.0],
+                };
             }
             let mut m = add(scale(normal[i], push[i]), crowd[i]);
             // down the density's slope, the whole ribbon at once: into the holes
@@ -454,15 +466,9 @@ fn excess(gained: &[Vec<f64>], band: f64) -> Vec<Vec<f64>> {
 /// exit, and a few pitches either way of where a trace crosses from one zone into another),
 /// and each vertex's zone (none moves from one into another).
 fn held(tr: &Traces, cx: &Ctx) -> (Vec<bool>, Vec<Option<usize>>) {
-    let [x0, y0, x1, y1] = cx.keep;
-    let mut fixed: Vec<bool> = (0..tr.len())
-        .map(|i| {
-            let q = tr.p[i];
-            tr.prev[i] == NONE
-                || tr.next[i] == NONE
-                || (q[0] > x0 && q[0] < x1 && q[1] > y0 && q[1] < y1)
-        })
-        .collect();
+    let mut fixed: Vec<bool> = pmap(tr.len(), |i| {
+        tr.prev[i] == NONE || tr.next[i] == NONE || cx.keep.of(tr.p[i]).is_some()
+    });
     fixed = spread(tr, fixed, 4);
     let zone: Vec<Option<usize>> = pmap(tr.len(), |i| cx.zones.of(tr.p[i]));
     // (from one zone into another: not out of them all, as the leads leave through the exit)
@@ -609,6 +615,17 @@ fn bend_axes(tr: &Traces, curv: &[f64], normal: &[P], radius: f64) -> Vec<P> {
     axis
 }
 
+/// The edge's point nearest `q` within `reach`, if any.
+fn nearest_edge(cx: &Ctx, q: P, reach: f64) -> Option<P> {
+    let mut best: Option<(f64, usize)> = None;
+    cx.edges.within(q, reach, |e, d2| {
+        if best.is_none_or(|b| d2 < b.0) {
+            best = Some((d2, e));
+        }
+    });
+    best.map(|(_, e)| cx.edge[e])
+}
+
 /// Rounds of taking back clashing moves at most.
 const ROUNDS: usize = 100;
 
@@ -683,6 +700,14 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
             // that copper on the far side of a fold need never be looked at (as a panel's
             // worker cannot); a vertex already nearer may only move away
             let half = cx.pitch / 2.0;
+            // (one out of the area: never further out)
+            if bad.is_empty() && moved(q) && cx.zones.of(old[q]).is_none() {
+                let far = 4.0 * cx.far;
+                let gap = |at: P| nearest_edge(cx, at, far).map_or(far, |e| dist(e, at));
+                if gap(new[q]) > gap(old[q]) + 1e-9 {
+                    bad.push(q);
+                }
+            }
             if bad.is_empty() && moved(q) && cx.edges.any_around(new[q], half) {
                 let near = |at: P| {
                     let mut d = f64::MAX;

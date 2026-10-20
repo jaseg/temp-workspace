@@ -73,7 +73,7 @@ fn settling_keeps_clear_and_in_its_zone() {
         pitch,
         edge,
         zones: vec![vec![box_]],
-        keep: [0.0; 4],
+        keep: Vec::new(),
     };
     let mut steps = 0;
     let out = settle(&input, &Params::default(), &mut |_| steps += 1);

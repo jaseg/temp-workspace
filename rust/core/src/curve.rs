@@ -115,7 +115,8 @@ pub fn relax(
             p[i] = add(p[i], scale(s, lam / 5.0));
         }
         cap_moves(&old, &mut p, step / 2.0);
-        free = even(&untangle(&old, &p), k, step, false);
+        keep_in(&zones, &old, &mut p);
+        free = within(&zones, even(&untangle(&old, &p), k, step, false));
     }
 
     step = spacing / 4.0;
@@ -127,11 +128,14 @@ pub fn relax(
     .concat();
     let r = resample(&ends, step);
     inner = r[1..r.len() - 1].to_vec();
-    free = even(
-        &[free.clone(), inner.clone()].concat(),
-        free.len(),
-        step,
-        true,
+    free = within(
+        &zones,
+        even(
+            &[free.clone(), inner.clone()].concat(),
+            free.len(),
+            step,
+            true,
+        ),
     );
     let want = prm.push_margin * least;
     let window = prm.window * least;
@@ -160,12 +164,13 @@ pub fn relax(
         &edge,
         &edges,
         bend,
+        &zones,
         prm,
     );
     let mut hot: Option<HashSet<(i64, i64)>> = None;
     for it in 0..prm.repair {
         progress(prm.lloyd_curve + it.min(prm.repair / 4), total);
-        let free = respace(&p[..k], step);
+        let free = within(&zones, respace(&p[..k], step));
         p = [free.clone(), inner.clone()].concat();
         k = free.len();
         let which: Vec<usize> = match &hot {
@@ -222,6 +227,7 @@ pub fn relax(
         let moved: Vec<bool> = mv.iter().map(|v| norm(*v) > 0.0).collect();
         let mut new: Vec<P> = (0..m).map(|i| add(p[i], mv[i])).collect();
         cap_moves(&p, &mut new, step / 2.0);
+        keep_in(&zones, &p, &mut new);
         p = untangle(&p, &new);
         hot = Some(hot_cells((0..k).filter(|&i| moved[i]).map(|i| p[i]), want));
     }
@@ -240,6 +246,7 @@ fn grow(
     edge: &[P],
     edges: &Grid,
     bend: f64,
+    zones: &Zones,
     prm: &CurveParams,
 ) -> (Vec<P>, usize) {
     let reach = prm.reach * least;
@@ -250,7 +257,7 @@ fn grow(
     let mut hot: Option<HashSet<(i64, i64)>> = None;
     let mut lengths: Vec<f64> = Vec::new();
     for _ in 0..prm.grow {
-        let free = respace(&p[..k], step);
+        let free = within(zones, respace(&p[..k], step));
         p = [free.clone(), p[k..].to_vec()].concat();
         k = free.len();
         let length: f64 = free.windows(2).map(|w| dist(w[0], w[1])).sum();
@@ -321,6 +328,7 @@ fn grow(
         mouths(&p, k, &mut mv);
         let mut new: Vec<P> = (0..m).map(|i| add(p[i], mv[i])).collect();
         cap_moves(&p, &mut new, step / 2.0);
+        keep_in(zones, &p, &mut new);
         p = untangle(&p, &new);
         hot = Some(hot_cells((0..k).filter(|&i| busy[i]).map(|i| p[i]), look));
     }
@@ -501,6 +509,30 @@ fn cap_moves(old: &[P], new: &mut [P], most: f64) {
             new[i] = add(old[i], scale(m, most / s));
         }
     }
+}
+
+/// Each vertex of `new` that `old` had in a zone and the move takes out of them all back
+/// where it was (the curve never leaves its area).
+fn keep_in(zones: &Zones, old: &[P], new: &mut [P]) {
+    let out: Vec<bool> = pmap(old.len(), |i| {
+        new[i] != old[i] && zones.of(new[i]).is_none() && zones.of(old[i]).is_some()
+    });
+    for (i, &o) in out.iter().enumerate() {
+        if o {
+            new[i] = old[i];
+        }
+    }
+}
+
+/// The open curve without the vertices out of the zones (but its ends): resampled, a chord
+/// across a corner of the edge puts them there, and pushed off the edge they would leave.
+fn within(zones: &Zones, free: Vec<P>) -> Vec<P> {
+    let k = free.len();
+    let keep: Vec<bool> = pmap(k, |i| i == 0 || i + 1 == k || zones.of(free[i]).is_some());
+    free.into_iter()
+        .zip(keep)
+        .filter_map(|(q, k)| k.then_some(q))
+        .collect()
 }
 
 /// The closed curve `new` (`old` moved, `old` crossing nowhere) with the vertices of every

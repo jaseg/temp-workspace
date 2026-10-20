@@ -66,7 +66,8 @@ fn status(s: &Status) -> Result<Object, JsValue> {
 
 /// The traces settled and matched in length: `lines`/`line_lens` the traces' points and
 /// counts, `edge` the edge's points, `zones`/`ring_lens`/`zone_rings` the zones' rings
-/// (points, each ring's count, each zone's number of rings), `keep` the exit's box,
+/// (points, each ring's count, each zone's number of rings), `keep`/`keep_lens`/`keep_rings`
+/// what is left as laid (the exit) alike,
 /// `params` the constants by name, `progress` called with each step's figures. Returns
 /// `{points, lens}`.
 #[wasm_bindgen]
@@ -80,28 +81,31 @@ pub fn settle(
     ring_lens: &[u32],
     zone_rings: &[u32],
     keep: &[f64],
+    keep_lens: &[u32],
+    keep_rings: &[u32],
     params_obj: JsValue,
     progress: Option<Function>,
 ) -> Result<Object, JsValue> {
-    let rings = runs(zones, ring_lens);
-    let mut at = 0;
-    let zones: Vec<Vec<Vec<P>>> = zone_rings
-        .iter()
-        .map(|&n| {
-            let z = rings[at..at + n as usize].to_vec();
-            at += n as usize;
-            z
-        })
-        .collect();
-    if keep.len() != 4 {
-        return Err("keep: a box (x0, y0, x1, y1)".into());
-    }
+    let polygons = |pts: &[f64], lens: &[u32], counts: &[u32]| -> Vec<Vec<Vec<P>>> {
+        let rings = runs(pts, lens);
+        let mut at = 0;
+        counts
+            .iter()
+            .map(|&n| {
+                let z = rings[at..at + n as usize].to_vec();
+                at += n as usize;
+                z
+            })
+            .collect()
+    };
+    let zones = polygons(zones, ring_lens, zone_rings);
+    let keep = polygons(keep, keep_lens, keep_rings);
     let input = Input {
         lines: runs(lines, line_lens),
         pitch,
         edge: points(edge),
         zones,
-        keep: [keep[0], keep[1], keep[2], keep[3]],
+        keep,
     };
     let prm = params(&params_obj)?;
     let mut failed: Option<JsValue> = None;

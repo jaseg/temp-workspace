@@ -50,6 +50,19 @@ class Mesh:
     algorithm: str = "kimesh"  # what laid it out: "kimesh" or "sfc"
     # each net as lines and arcs (``traces`` then: these drawn as a polyline), if fitted
     arcs: tuple[tuple[Piece, ...], ...] | None = None
+    # the partitions' traces in turn (how many each; one partition: all), and their areas
+    groups: tuple[int, ...] = ()
+    parts: tuple = ()  # (shapely polygons)
+
+    @property
+    def pairs(self) -> list[tuple[int, int]]:
+        """The neighbouring traces of each partition (as differential pairs)."""
+        sizes = self.groups or (len(self.traces),)
+        out, first = [], 0
+        for size in sizes:
+            out += [(i, i + 1) for i in range(first, first + size - 1)]
+            first += size
+        return out
 
     @property
     def ends(self) -> tuple[tuple[Point, Point], ...]:

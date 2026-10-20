@@ -38,7 +38,7 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString, Polygon
 
-from yanartas_pillowbox import kimesh, progress, sfc
+from yanartas_pillowbox import kimesh, partition, progress, sfc
 from yanartas_pillowbox import mesh as meshgen
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.geometry import (
@@ -143,16 +143,21 @@ class Layout:
         return self._cache["density"]
 
     def skew(self) -> dict[str, list[tuple[str, str, float, float]]]:
-        """Each mesh's neighbouring traces (net 1 and 2, 2 and 3, ...) taken as differential
-        pairs, by layer: the nets, the difference in their lengths and the largest local
-        difference (mm), over the mesh (the cable's runs left out)."""
+        """Each mesh's neighbouring traces (net 1 and 2, 2 and 3, ..., within each
+        partition) taken as differential pairs, by layer: the nets, the difference in their
+        lengths and the largest local difference (mm), over the mesh (the cable's runs left
+        out)."""
         if "skew" not in self._cache:
             out: dict[str, list[tuple[str, str, float, float]]] = {}
             for layer, m in self.meshes.items():
                 side = "F" if layer == FRONT else "B"
                 out[layer] = [
-                    (f"MESH_{side}{i + 1}", f"MESH_{side}{i + 2}", *meshgen.skew(a, b))
-                    for i, (a, b) in enumerate(itertools.pairwise(m.traces))
+                    (
+                        f"MESH_{side}{i + 1}",
+                        f"MESH_{side}{j + 1}",
+                        *meshgen.skew(m.traces[i], m.traces[j]),
+                    )
+                    for i, j in m.pairs
                 ]
             self._cache["skew"] = out
         return self._cache["skew"]
@@ -362,27 +367,62 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
             raise PcbError("no room for the mesh's exit at the cable's junction")
         corners[layer] = corner
 
-    def mesh(i: int, corner: Point) -> meshgen.Mesh:
-        # (its own copy of the mask: preparing a shared geometry from two threads crashes)
-        area = shapely.from_wkb(shapely.to_wkb(mask))
-        side = meshgen.LEFT  # (the cable leaves the edge towards -x)
-        seed = int(cfg.mesh_seed) * 2 + i
-        if cfg.mesh_algorithm == "sfc":
-            # (the panels as zones: the curve crosses the folds as seldom as can be)
-            zones = mesh_zones(pattern)
-            return sfc.generate(
-                area, corner, side, n, pitch, seed=seed, zones=zones,
-                arcs=cfg.mesh_shape == "arcs",
-            )  # fmt: skip
-        return kimesh.generate(area, corner, side, n, pitch, seed=seed)
+    def copy(g: shapely.Geometry) -> shapely.Geometry:
+        # (each job its own: preparing a shared geometry from two threads crashes)
+        return shapely.from_wkb(shapely.to_wkb(g))
 
-    # The two sides are independent: laid out at once.
+    side = meshgen.LEFT  # (the cable leaves the edge towards -x)
+    jobs: list[tuple[str, Callable[[], meshgen.Mesh]]] = []
+    plan: dict[str, list[partition.Partition]] = {}
+    for i, (layer, corner) in enumerate(corners.items()):
+        seed = int(cfg.mesh_seed) * 2 + i
+        if cfg.mesh_algorithm != "sfc":
+            jobs.append((layer, functools.partial(
+                kimesh.generate, copy(mask), corner, side, n, pitch, seed=seed
+            )))  # fmt: skip
+            continue
+        # The curve's mesh: the layer's area in partitions of equal area, each its own
+        # traces (and its own port: a square a pair of lanes wide, in turn along the
+        # junction), each laid out on its own.
+        count, each = int(cfg.mesh_partitions), int(cfg.mesh_traces)
+        port = 2 * each * pitch
+        cx, cy = corner
+        ports = [
+            shapely.box(cx, cy + k * port, cx + port, cy + (k + 1) * port) for k in range(count)
+        ]
+        area = mask.difference(shapely.box(xj - 1, cy, cx, cy + count * port))  # (the leads)
+        zones = mesh_zones(pattern)
+        try:
+            parts = partition.partition(area, zones, ports, (1.0, 0.0), port, seed, pitch / 4)
+        except meshgen.MeshError as e:
+            raise PcbError(str(e)) from e
+        plan[layer] = parts
+        for k, part in enumerate(parts):
+            name = f"{layer} {k + 1}/{count}" if count > 1 else layer
+            jobs.append((name, functools.partial(
+                sfc.generate, copy(part.area), (cx, cy + k * port), side, each, pitch,
+                seed=seed * 1000 + k, zones=[copy(z) for z in zones],
+                arcs=cfg.mesh_shape == "arcs", neck=part.neck,
+            )))  # fmt: skip
+
+    # The two sides (and each one's partitions) are independent: laid out at once.
     try:
-        meshes = progress.side_by_side(
-            [(layer, functools.partial(mesh, i, c)) for i, (layer, c) in enumerate(corners.items())]
-        )
+        done = progress.side_by_side(jobs)
     except meshgen.MeshError as e:
         raise PcbError(str(e)) from e
+    meshes = []
+    for layer in corners:
+        if layer not in plan:
+            meshes.append(done.pop(0))
+            continue
+        got = [done.pop(0) for _ in plan[layer]]
+        arcs = tuple(a for m in got for a in m.arcs) if all(m.arcs for m in got) else None
+        meshes.append(meshgen.Mesh(
+            tuple(t for m in got for t in m.traces), got[0].cell,
+            sum(m.cells for m in got), sum(m.unreached for m in got), corners[layer],
+            "sfc", arcs, tuple(len(m.traces) for m in got),
+            tuple(p.area for p in plan[layer]),
+        ))  # fmt: skip
     for layer, m in zip(corners, meshes, strict=True):
         result.meshes[layer] = m
         side = "F" if layer == FRONT else "B"

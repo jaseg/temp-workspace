@@ -95,7 +95,8 @@ outputs.
 | `test_mesh.py` | The shared metrics: spacing of parallel traces and across islands (not past the edge), skew of detours. |
 | `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing rarely below the nominal and few islands (settled), repeatable seeds, holes. |
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
-| `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (its partitions' traces through one exit cell for now). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
+| `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its neck's corridor (a port wide); cells never across a fold; the seed repeats the split, another differs; a neck carrying a partition's traces at the pitch. |
+| `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (its partitions laid out each on its own, their traces the layer's, of equal area). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded. |
 
@@ -245,7 +246,40 @@ an exact isometry: the panels curve along it, not across it.
   cell in x and y (its exit cell half a cell in, on the row of its grid nearest its pins),
   so the two layers' bare edge strips differ. Each exit cell is `2 N` trace pitches wide,
   `N` the side's nets (`Config.mesh_nets`: the curve's `mesh_partitions × mesh_traces`,
-  KiMesh's `mesh_traces`).
+  KiMesh's `mesh_traces`); for the curve it is a row of *ports*, one per partition, each
+  a square a pair of trace lanes wide (`2 mesh_traces` pitches).
+- **Partitions** (`partition.py`, the curve only). Each side's area (less the leads' strip
+  to the ports) is split into `mesh_partitions` parts of equal area, each laid out on its
+  own (`sfc.generate`, all of both sides' at once) with its own traces through its own
+  port; the layer's mesh is theirs together (`Mesh.groups`: how many traces each; pair
+  skew only within one).
+  1. *Necks:* a fan of corridors, each exactly a port wide (a pair of trace lanes), one
+     from each port: straight in through the port and the square in front of it (its
+     *throat*), then (an arc of 1.5 necks' radius) off at its angle, the angles spread
+     evenly round the ports, 20° off the junction at most; on each side the outer ones turn
+     first, each further in one a little later (so none crosses another); each runs on
+     until the room between it and its neighbours is 3 necks wide (shortened to keep half a
+     neck inside the area). `sfc.generate(neck=...)` runs the tongue's legs along it
+     (offsets of its centreline, the traces at the pitch), keeps the curve out of it, and
+     opens the curve's mouth at its end.
+  2. *Cells:* Voronoi cells a neck across, Lloyd-relaxed, each zone (panel) on its own, so
+     none straddles a fold; each throat a cell of its own.
+  3. *Grown from the necks' ends:* each cell to the neck end its cheapest path starts
+     from, each end's start weighted (an additively weighted Voronoi diagram over the cell
+     graph; a step across a fold 4 times dearer, every step's cost varied by a smooth
+     random field from the seed, so the two layers' borders differ), the weights set for
+     equal areas: each partition the tree of its end's paths, so of a piece and round it.
+     (Grown from the throats instead, a port apart, a small change of weight swings whole
+     regions and no weights balance it; sectors by angle round the ports left the middle
+     ones strips along the others.) The cells near the fan go to the nearest neck, each
+     neck's end to its own; all of them kept so.
+  4. *Refined* beyond the fan: borders smoothed (a cell to the partition holding most of
+     its border, a neighbour across a fold counting a quarter: borders keep to folds),
+     areas evened out between neighbours, the most uneven pair first (to within 1 %), no
+     partition ever torn (a cell is given up only if its neighbours in the partition stay
+     joined). Each partition is then its cells, its port and its corridor, less the
+     others' corridors and ports; a split that comes out uneven is tried afresh (6 times
+     at most).
 - **Mesh.** `kimesh.generate` aligns the grid on the exit cell. Cells inside the mask are
   found in one vectorized `shapely.contains`; the walk is KiMesh's (iterative, with its
   "keep going straight" bias for `randomness < 1`); tiles are KiMesh's look-up table with
@@ -389,8 +423,9 @@ an exact isometry: the panels curve along it, not across it.
   domains, the borders between regions, the edge's points, the exit's cut) and the
   constants, passed in by name. The default box lays out in about 2 min a side natively,
   nearly all of it settling.
-- **Both sides at once.** The front and back meshes are independent: `pcb.layout` works
-  out both exit corners first, then lays both out together (`progress.side_by_side`:
+- **Both sides at once.** The front and back meshes (and each one's partitions) are
+  independent: `pcb.layout` works out both exit corners and the partitions first, then
+  lays all out together (`progress.side_by_side`, a stage per partition, `F.Cu 2/3`:
   threads, as the heavy parts release the GIL; each with its own copy of the mask, since
   shapely crashes when two threads prepare one geometry; one after the other in the
   browser), their progress merged (the share done: their mean).

@@ -276,10 +276,13 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   Each panel of the folding pattern is filled by a closed curve on the edges of a
   centroidal Voronoi tessellation (a perfect matching's complement, cell centres threaded
   in, cycles joined); the panels' curves are joined across the folds along a spanning
-  tree, two crossings per join, the least a closed curve can make. Each side's area is to
-  be split into `mesh_partitions` partitions of equal area, each with `mesh_traces` traces
-  of its own (for now one curve carries all `mesh_partitions × mesh_traces` traces, out
-  through one exit cell as wide as the partitions' together). The curve is then
+  tree, two crossings per join, the least a closed curve can make. Each side's area is
+  split into `mesh_partitions` partitions of equal area, each with `mesh_traces` traces of
+  its own through its own port at the cable's junction: from each port a corridor exactly
+  a pair of trace lanes wide (its traces at the pitch) fans out to where its partition
+  opens (a star there); the partitions grow from the corridors' ends, their borders
+  keeping to the folds where they can and differing between the two sides. Each
+  partition's curve is
   relaxed towards an even spacing of as many pitches as it carries traces (folds and edges hold it off by
   half that), the mesh's traces are its offsets, spread to share its spacing, and the exit
   is a "tongue" of two straight legs built into the curve's graph. It follows edges and

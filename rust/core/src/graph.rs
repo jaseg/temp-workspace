@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
-use crate::geom::{add, closest, cross, dist, scale, sub, P};
+use crate::geom::{add, closest, cross, dist, norm, scale, sub, P};
 use crate::grid::Grid;
 use crate::par::pmap;
 use crate::poly::{
@@ -184,10 +184,10 @@ pub fn curve(
                 .total_cmp(&distance(&segments[j].domain, mouth[0]))
         })
         .unwrap();
-    let pin = [
-        (mouth[0][0] + mouth[1][0]) / 2.0,
-        (mouth[0][1] + mouth[1][1]) / 2.0 + d / 2.0,
-    ];
+    // (inwards: square to the mouth, to the left going from its first end to its second)
+    let across = sub(mouth[1], mouth[0]);
+    let inward = scale([-across[1], across[0]], 1.0 / norm(across).max(1e-12));
+    let pin = add(scale(add(mouth[0], mouth[1]), 0.5), scale(inward, d / 2.0));
     let pin = contains(&segments[exit_seg].domain, pin).then_some(pin);
     let mut rng = Rng::new(input.seed);
     let mut built = None;
