@@ -317,8 +317,8 @@ inner flap's free edge.
      where it faces itself across (or is much further along it than away: a finger's
      pinched legs); none crosses. Only vertices near ones that moved are
      looked at again (a grid query of all pairs within a radius).
-  The default box takes about 2.5 min per layer, and settling as long again or more (see
-  Later).
+  The default box takes about 2 min per layer to lay, and about 20 min more to settle
+  (see Later).
 - **Check** (`verify`, run at the end of every `layout`): the tracks' points joined along
   each track and through the vias (union-find on µm-rounded points): every mesh net one
   piece, ending on exactly its two contact pads; per layer, every pair of copper pieces of
