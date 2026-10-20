@@ -62,10 +62,12 @@ def test_meshes_cover_both_sides(layout):
 
 
 def test_plug_contacts_carry_the_pinout(layout):
-    pins = pcb.pinout(int(D.fpc_pins), int(D.mesh_traces))
+    n = D.mesh_nets
+    pins = pcb.pinout(int(D.fpc_pins), n)
     pads = {p.number: p for p in sorted(layout.pads, key=lambda p: p.number)}
     assert sorted(pads) == list(range(1, int(D.fpc_pins) + 1))
-    # Each mesh loop's two ends: mirrored within its side's eight ends.
+    # Each mesh loop's two ends: mirrored within its side's ends.
+    ends = 2 * n
     for j, signal in enumerate(pins, start=1):
         if signal is None:
             assert pads[j].net is None
@@ -73,8 +75,8 @@ def test_plug_contacts_carry_the_pinout(layout):
             assert pads[j].net == "GND"
         else:
             i = int(signal[1:]) - 1
-            side, k = ("F", i) if i < 8 else ("B", i - 8)
-            assert pads[j].net == f"MESH_{side}{min(k, 7 - k) + 1}"
+            side, k = ("F", i) if i < ends else ("B", i - ends)
+            assert pads[j].net == f"MESH_{side}{min(k, ends - 1 - k) + 1}"
     # Pin pitch across the plug, along its end.
     xs = [pads[j].at for j in range(1, int(D.fpc_pins) + 1)]
     for a, b in itertools.pairwise(xs):
@@ -141,6 +143,36 @@ def test_mesh_keeps_off_the_edges(layout):
     for t in layout.tracks:
         if t.net.startswith("MESH_") and len(t.points) > 100:  # the mesh loops themselves
             assert LineString(t.points).distance(edge) >= D.mesh_edge_clearance - t.width / 2 - 1e-6
+
+
+def test_meshes_exit_at_the_junction(layout):
+    """Each layer's exit cell sits at the cable's junction on the front panel's free edge
+    (x = 0), open towards the cable: the front one against it, the back one half a cell
+    further in (and offset along the edge); every loop's two ends leave towards -x, within
+    the junction."""
+    from yanartas_pillowbox.geometry import build_pattern
+
+    cable = build_pattern(D).cable
+    (x, ya), (_, yb) = cable.junction
+    lo, hi = sorted((ya, yb))
+    front, back = layout.meshes[pcb.FRONT], layout.meshes[pcb.BACK]
+    assert front.origin[0] == pytest.approx(x)
+    assert back.origin[0] == pytest.approx(x + front.cell / 2)
+    for m in (front, back):
+        assert lo < m.origin[1] and m.origin[1] + m.cell < hi
+        for a, b in m.ends:
+            assert a[0] == pytest.approx(m.origin[0]) and b[0] == pytest.approx(m.origin[0])
+            assert m.origin[1] < a[1] < m.origin[1] + m.cell
+    # The traces run on into the cable from there, at the mesh's pitch, out of the edge.
+    starts = [t.points for t in layout.tracks if t.net.startswith("MESH_") and len(t.points) < 50]
+    assert starts and all(min(p[0] for p in pts) < x - 1 for pts in starts)
+
+
+def test_cable_down():
+    """Turning down along the edge, the cable carries the mesh just the same."""
+    result = pcb.layout(D.with_values(fpc_cable="down"))
+    assert pcb.verify(result) == []
+    assert all(m.unreached == 0 for m in result.meshes.values())
 
 
 def test_vias_keep_off_the_cable_folds(layout):
@@ -332,14 +364,29 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
     seen = []
 
     def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False):
-        seen.append(len(zones))
+        seen.append((len(zones), n))
         m = kimesh.generate(mask, corner, side, n, pitch, seed=seed)
         return dataclasses.replace(m, algorithm="sfc")
 
     monkeypatch.setattr(sfc, "generate", fake)
-    result = pcb.layout(D.with_values(mesh_algorithm="sfc"))
-    assert seen == [len(build_pattern(D).faces)] * 2
-    assert pcb.preview_json(result)["meshes"]["front"]["algorithm"] == "sfc"
+    cfg = D.with_values(mesh_algorithm="sfc")
+    result = pcb.layout(cfg)
+    # (each layer's traces: the partitions' together, through one exit cell for now)
+    n = int(cfg.mesh_partitions * cfg.mesh_traces)
+    assert seen == [(len(build_pattern(D).faces), n)] * 2
+    data = pcb.preview_json(result)
+    assert data["meshes"]["front"]["algorithm"] == "sfc"
+    assert data["meshes"]["front"]["traces"] == n
+    assert result.meshes[pcb.FRONT].cell == pytest.approx(2 * n * (D.mesh_trace_width + 0.15))
+    pads = [p for p in result.pads if p.net and p.net.startswith("MESH_")]
+    assert len(pads) == 4 * n <= D.fpc_pins
+    assert pcb.verify(result) == []
+
+
+def test_partitions_need_pins(monkeypatch):
+    """The plug must hold every partition's ends: too few pins are an error, not cut."""
+    with pytest.raises(pcb.PcbError, match="pins"):
+        pcb.layout(D.with_values(mesh_algorithm="sfc", mesh_partitions=4))
 
 
 def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):

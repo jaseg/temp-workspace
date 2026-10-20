@@ -122,7 +122,8 @@ the defaults. It never crashes because of the file.
     height;
   * **Cross-section:** width, height, and the front panel's arc (part of the
     circumference). This view shades the material at its thickness, the box interior and the
-    payload space, and draws the glue tab and, dashed, the payload clearance.
+    payload space, and draws the glue tab, the FPC cable (through its middle) and, dashed,
+    the payload clearance.
 
   Width, length and height are interior dimensions, so where they are measured inside the
   material their end points sit off the drawn lines by the material allowance.
@@ -164,18 +165,19 @@ All lengths are in millimetres.
 | `glue_tab_width` | 12 | Width of the glue tab, and of the lids' glue tabs. 3–100, and narrower than the front panel it is glued onto. The tab's ends are cut back only as far as needed to stay off the front panel's curved folds, from square up to 45° (*Glue-tab taper* in the UI); the default end wall gap needs none. |
 | `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
 | `fpc_cutout_width` | 15 | Width of that flat section. 0 to the inner flaps' width − 1. The cut is level and exactly this wide. The flap's edge is not quite symmetric, so the section sits around its highest point, within about a millimetre of the flap's centre. |
-| `fpc_cable` | `front` | `none`, `front` or `back`: a flat cable of the flex PCB leaving that end's inner flap (see *FPC cable* below). Not with an FPC cutout at the same end. |
-| `fpc_cable_length` | 55 | From the inner flap's edge to the plug's tip, with every corner folded flat. 10–2000. Rows that do not fit beside the rest of the pattern make it taller (the default fits). |
-| `fpc_pins` | 30 | Contacts of the FPC connector, 2–200. |
+| `fpc_cable` | `up` | `none`, `up` or `down`: a flat cable of the flex PCB leaving the middle of the front panel's free straight edge (the glued edge), turning up (towards the top of the pattern, the box's front end) or down along it (see *FPC cable* below). |
+| `fpc_cable_length` | 55 | From the front panel's edge to the plug's tip, with every corner folded flat. 10–2000. The cable sticks out beside the edge; every further row makes the pattern wider (the default takes one). |
+| `fpc_pins` | 61 | Contacts of the FPC connector, 2–200. The default holds the default space-filling-curve mesh: 3 partitions × 4 traces × 2 ends × 2 sides, and a GND pin after every four ends (plus pin 1). The PCB layout refuses a plug with too few pins. |
 | `fpc_pitch` | 0.5 | Contact pitch, 0.1–2.54. |
-| `fpc_edge_margin` | 0.5 | From the outermost contacts' centres to the plug's edges: the plug is `(pins − 1)·pitch + 2·margin` wide (15.5 mm by default, the usual `(pins + 1)·pitch`). |
+| `fpc_edge_margin` | 0.5 | From the outermost contacts' centres to the plug's edges: the plug is `(pins − 1)·pitch + 2·margin` wide (31 mm by default, the usual `(pins + 1)·pitch`). At most the front panel's straight edge beside the back panel, less 1 mm. |
 | `fpc_plug_length` | 4 | Length of the plug at the cable's end, 1–50. |
 | `fpc_cable_inset` | 0 | How much narrower than the plug the rest of the cable is on each side; the plug's ears then stick out. 0–10. |
-| `fpc_corner_radius` | 1 | Rounds the cable's corners and where it meets the flap (not the plug's). 0–10; smaller where there is no room, e.g. at most half the clearance at the slots between rows. |
+| `fpc_corner_radius` | 1 | Rounds the cable's corners and where it meets the front panel's edge (not the plug's). 0–10; smaller where there is no room, e.g. at most half the clearance at the slots between rows. |
 | `fpc_cable_gap` | 1 | Cut-to-cut clearance between the cable's rows, and between the cable and the rest of the pattern. 0.1–20. |
 | `mesh_trace_width` | 0.15 | PCB layout: width of the security mesh's traces, on both copper layers and along the cable. 0.05–2. |
 | `mesh_trace_space` | 0.15 | Copper-to-copper space between them (and the clearance of the rest of the layout). 0.05–2. |
-| `mesh_traces` | 4 | Mesh traces (loops, two ends each) per side of the foil. The mesh's cells are twice this many trace pitches wide (2.4 mm by default). Whole numbers 1–16; the plug needs a pin per end plus the GND pins. |
+| `mesh_traces` | 4 | Mesh traces (loops, two ends each) per side of the foil: for the space-filling curve, per partition (so `mesh_partitions × mesh_traces` per side); for KiMesh, in all. The exit cell is twice as many trace pitches wide as a side has traces (KiMesh: every cell, 2.4 mm by default). Whole numbers 1–16; the plug needs a pin per end plus the GND pins. |
+| `mesh_partitions` | 3 | Space-filling curve only: each side's mesh area is split into this many partitions of equal area, each with `mesh_traces` traces of its own from the connector. Whole numbers 1–16. KiMesh ignores it. |
 | `mesh_edge_clearance` | 0.5 | How far the mesh keeps off the foil's cut edges and slits. 0–10. |
 | `mesh_seed` | 0 | Seed of the mesh's random walk: the same seed gives the same mesh. Whole number. |
 | `mesh_algorithm` | `kimesh` | How the mesh is laid out: `kimesh` (tiles on a square grid, fast) or `sfc` (a closed space-filling curve after Bedel et al. 2022: follows edges and folds, crosses each fold as seldom as can be, takes a minute or more per layer). See *PCB layout*. |
@@ -218,33 +220,35 @@ vertex of a fine 3D mesh.
 
 ### FPC cable
 
-The pattern can carry a flat cable for a flex PCB (`fpc.py`). It leaves the top of one inner
-flap, whose edge is cut off level over exactly the cable's width, like the FPC cutout, so the
-cable leaves along a straight line and the flap keeps its height. The cable runs up from the
-flap for the clearance plus the inset (the stub), turns 90° towards the glue tab and then
-meanders in rows stacked upward, from the lid's glue tab to the glue tab's free edge. The last
+The pattern can carry a flat cable for a flex PCB (`fpc.py`). It leaves the middle of the
+front panel's free straight edge (the glued edge, at the pattern's left), outward. The cable
+runs out from the edge for the clearance plus the inset plus a thickness (the stub), turns 90°
+up or down (`fpc_cable`) and then meanders in rows along the edge, stacked outward, between the
+end sections beside the edge (the wings and the lids' glue tabs, or the outer flaps). The last
 `fpc_plug_length` is the plug, the board shape of the connector end (contacts, soldermask,
-keepouts and stiffener are not drawn). The default length fits beside the rest of the
-pattern; longer cables add rows above it. The cable takes as few rows as fit, with its turns
-spread evenly: each one sits the same distance in from its side, so the tip ends at its side.
+keepouts and stiffener are not drawn). The cable always sticks out beside the edge; the
+default length takes one row, longer cables add rows further out. The cable takes as few rows
+as fit, with its turns spread evenly: each one sits the same distance in from its side, so
+the tip ends at its side. The FPC cutouts (`fpc_cutout`) are independent of it.
 
 Every corner is a square, the cable's width on a side, folded flat along its diagonal from
 the outer to the inner corner (the fold lines on the cable). That lays the next run back
 along the one before: the first corner turns the cable back over the stub, and each U-turn
 (two corners) sends the next row on in the same direction as the one before. Folded, the
-cable is one straight strip, `fpc_cable_length` long from the flap's edge.
+cable is one straight strip, `fpc_cable_length` long from the edge.
 
-In the box, the cable folds 90° into the box along the junction, so the stub lies on the
-inside of the front panel. The first corner folds it back towards the inner wall, leaving a
-two-layer triangle (half the corner square) beside the stub. A fold straight across the first
-row, where it gets back to the wall, turns it 90° up the inside of the inner wall; it bends
-round towards the back panel, with a radius of half the box's height, and runs on along the
-inside of the back panel. The 3D view draws it that way, through the paper, and the fold indicators follow from
-it. A cable longer than that route inside the box runs on through the far end.
+In the box, the front panel's free edge rests against the inside of the back panel, by the
+glue fold; the glue tab wraps round it on the outside (see *Material thickness*). The cable
+folds into the box along the junction, so the stub lies on the inside of the back panel. The
+first corner folds it back towards the glued edge, leaving a two-layer triangle (half the
+corner square) beside the stub. A fold straight across the first row, where it gets back to
+the glued edge, turns it onto the inside of the front panel, along which it runs on (round the
+straight fold onto the back panel, if it is that long). The panels curve along the cable, not
+across it, so it lies on them exactly. The 3D view draws it that way, through the paper, the
+cross-section draws it through its middle, and the fold indicators follow from it.
 
-How the cable's first folds take it into the box (A: the flat pattern; B: the folded first
-corner on the front panel, seen from inside the box; C: a lengthwise section, back panel up
-as in the 3D view; not to scale):
+How the cable's first folds take it into the box (A: the flat pattern; B: the cross-section
+at the glued edge, back panel up as in the 3D view, thickness exaggerated; not to scale):
 
 ![The FPC cable's first folds](docs/fpc-cable-folds.svg)
 
@@ -272,8 +276,11 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   Each panel of the folding pattern is filled by a closed curve on the edges of a
   centroidal Voronoi tessellation (a perfect matching's complement, cell centres threaded
   in, cycles joined); the panels' curves are joined across the folds along a spanning
-  tree, two crossings per join, the least a closed curve can make. The curve is then
-  relaxed towards an even spacing of `mesh_traces` pitches (folds and edges hold it off by
+  tree, two crossings per join, the least a closed curve can make. Each side's area is to
+  be split into `mesh_partitions` partitions of equal area, each with `mesh_traces` traces
+  of its own (for now one curve carries all `mesh_partitions × mesh_traces` traces, out
+  through one exit cell as wide as the partitions' together). The curve is then
+  relaxed towards an even spacing of as many pitches as it carries traces (folds and edges hold it off by
   half that), the mesh's traces are its offsets, spread to share its spacing, and the exit
   is a "tongue" of two straight legs built into the curve's graph. It follows edges and
   folds closely (no bare strips) at the cost of a less regular structure: the space
@@ -288,17 +295,20 @@ side, and the mesh's traces leave through the FPC cable to the plug.
 * **Check:** every layout is checked before it is handed out (preview, download, CLI):
   each mesh net one piece of copper from its contact pad to its other one (no opens), no
   copper of two nets touching on a layer (no shorts). A layout that fails is an error.
-* **Into the cable:** the F.Cu mesh's exit cell sits against the junction, where the cable
-  leaves the inner flap, the B.Cu mesh's half a cell further in (on its offset grid, its
-  traces running straight on across the gap); their traces run on into the cable and along
+* **Into the cable:** each side has one exit cell, `2 ×` its traces' pitches wide. The F.Cu
+  mesh's sits against the junction, where the cable leaves the front panel's free edge (open
+  towards the cable), the B.Cu mesh's half a cell further in and on its offset grid along the
+  edge (its traces running straight on across the gap); their traces run on into the cable and along
   it at the mesh's pitch, each layer's on its own side (F.Cu's on pin 1's side). Before the
   plug they fan out with 45° jogs to their contacts' places; the B.Cu traces change to the
   contact side (F.Cu) through two staggered rows of vias (0.45 mm, 0.2 mm drill).
-* **Plug pinout,** from pin 1 (on the cable's left, looking from the flap towards the tip):
-  GND, mesh ends 1–4, GND, 5–8, GND, 9–12, GND, 13–16, GND; the rest are free. Ends 1–8 are
-  the F.Cu mesh's, 9–16 the B.Cu mesh's; within each eight, a loop's two ends are mirrored
-  about the middle (1 and 8 are the first loop). Contacts are 0.6 pitch wide and stop
-  0.2 mm short of the tip.
+* **Plug pinout,** from pin 1 (on the cable's left, looking from the edge towards the tip):
+  GND, mesh ends 1–4, GND, 5–8, GND, …, a GND pin after every four ends; the rest are free.
+  With `N` traces per side (KiMesh: `mesh_traces`; the curve: `mesh_partitions ×
+  mesh_traces`), ends 1–2N are the F.Cu mesh's, the next 2N the B.Cu mesh's; within each
+  side's ends, a loop's two ends are mirrored about the middle (1 and 2N are the first
+  loop). The default KiMesh layout (N = 4) uses pins 1–21; the default curve layout
+  (N = 12) all 61. Contacts are 0.6 pitch wide and stop 0.2 mm short of the tip.
 * **Ground:** the cable is a GND zone on both layers. It is a KiCad zone, filled in KiCad;
   the Gerber and SVG output leaves it out (fill and re-export in KiCad for fabrication).
   Vias behind the GND contacts and stitching vias along the cable (kept 1 mm off its folds
@@ -435,7 +445,7 @@ layers keep the line types apart.
 * **Styling:** `fill="none"`, `stroke` and `stroke-width` are plain attributes on every
   element, with a fixed 0.1 mm stroke width. There are no CSS classes and no `<style>`.
 * **Metadata:** the complete config is stored as JSON in
-  `<metadata><pillowbox:config version="5">…</pillowbox:config></metadata>`, with the
+  `<metadata><pillowbox:config version="9">…</pillowbox:config></metadata>`, with the
   namespace `https://github.com/jaseg/yanartas-pillowbox/ns/config`. That is what *Import*
   and `--from-svg` read back. The `version` field is the config schema version. Files from
   another version are rejected with a clear message.

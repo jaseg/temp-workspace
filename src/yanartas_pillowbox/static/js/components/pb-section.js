@@ -52,6 +52,11 @@ template.innerHTML = `
   .legend i.clearance.bad { border-top-color: var(--error); }
   .legend i.material { background: var(--material-fill); }
   .legend i.glue-tab { height: 0; border-radius: 0; border-top: 1.4px solid var(--glue-color); }
+  .cable { fill: none; stroke: var(--cable-color); stroke-width: 1.4px; stroke-linecap: round;
+           stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .legend i.cable { height: 0; border-radius: 0; border-top: 1.4px solid var(--cable-color); }
+  :host { --cable-color: #c27c0e; }
+  @media (prefers-color-scheme: dark) { :host { --cable-color: #f0b429; } }
   text { fill: var(--text-muted); font-family: var(--ui-font, system-ui, sans-serif); }
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
            border-radius: 5px; padding: 2px 9px; cursor: pointer; }
@@ -131,7 +136,8 @@ export class PbSection extends HTMLElement {
   }
 
   /** section: {front, back: [[x, z]...] (mid-surfaces), interior: [[x, z]...] (closed),
-   *  glue_tab: [[x, z]...], material: [outline...], width, height (interior), bbox};
+   *  glue_tab: [[x, z]...], material: [outline...], cable: [[[x, z]...]...] | null (the FPC
+   *  cable's mid-surface, through its middle), width, height (interior), bbox};
    *  dims: parameter dimensions in the same (X, Z) frame. */
   update(section, dims = [], payload = null) {
     const { width, height } = section;
@@ -142,6 +148,7 @@ export class PbSection extends HTMLElement {
     this.#data = { section: turnSection(section), dims: dims.map(turnDim), payload };
     this.#render();
     this.#legend.replaceChildren(legendItem("interior", "Box interior"), legendItem("material", "Material"), legendItem("glue-tab", "Glue tab"));
+    if (section.cable) this.#legend.append(legendItem("cable", "FPC cable"));
     if (payload && !payload.empty) {
       const bad = payload.fits ? "" : " bad";
       this.#legend.append(
@@ -203,6 +210,11 @@ export class PbSection extends HTMLElement {
     // The glue tab, wrapped around the front panel's free edge onto its outside.
     const tab = section.glue_tab.map(p);
     svg.append(el("path", { class: "glue-tab", d: `M ${tab.map((q) => q.join(",")).join(" L ")}` }));
+    // The FPC cable, folded in at the glued edge: the stub on the back panel, the rest folded
+    // back over it and on along the front panel.
+    for (const line of section.cable ?? []) {
+      svg.append(el("path", { class: "cable", d: `M ${line.map(p).map((q) => q.join(",")).join(" L ")}` }));
+    }
 
     // Payload: preview only, centred in the section.
     if (payload && !payload.empty) {
@@ -241,6 +253,7 @@ function turnSection(section) {
     back: section.back.map(turn),
     interior: section.interior.map(turn),
     glue_tab: section.glue_tab.map(turn),
+    cable: section.cable && section.cable.map((line) => line.map(turn)),
     material: section.material.map((band) => band.map(turn)),
     inner: Object.fromEntries(Object.entries(section.inner).map(([k, v]) => [k, turn(v)])),
     bbox: [-x1, -z1, -x0, -z0],

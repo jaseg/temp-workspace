@@ -41,6 +41,7 @@ This needs ``|f'| <= 1``, i.e. the fold arc may turn at most 45 degrees at the c
 
 from __future__ import annotations
 
+import bisect
 import itertools
 import math
 from collections.abc import Sequence
@@ -228,7 +229,7 @@ class FoldCategory(StrEnum):
     CURVED = "curved"
     GLUE = "glue"
     LID = "lid"  # outer flap -> lid over the end wall gap
-    CABLE = "cable"  # the FPC cable: its junction with the inner flap, and its corners
+    CABLE = "cable"  # the FPC cable: its junction with the front panel, and its corners
 
 
 class FoldDirection(StrEnum):
@@ -315,14 +316,14 @@ class Cable:
     """The FPC cable (see ``fpc``) in pattern coordinates. Not a face of the folded box:
     ``FoldedCable`` maps it."""
 
-    end: str  # "top" | "bottom": the end of the pattern whose inner flap it leaves
+    turn: str  # "up" | "down": the way its first corner turns it, along the free edge
     width: float
     plug_width: float
     plug_length: float
-    junction: tuple[Point, Point]  # its seam with the inner flap, left to right
+    junction: tuple[Point, Point]  # its seam with the front panel's free edge (x = 0)
     path: tuple[Point, ...]  # centreline, from the junction's middle to the tip
-    # In order along the cable: the junction (90 degrees, into the box), the first corner
-    # (flat), the wall fold (90 degrees, up the inner wall) and the other corners (flat);
+    # In order along the cable: the junction (into the box, onto the back panel), the first
+    # corner (flat), the wall fold (onto the front panel) and the other corners (flat);
     # directions set by build_pattern.
     folds: tuple[Fold, ...]
 
@@ -413,14 +414,10 @@ def flatten_cut(cuts: Sequence[Point], width: float) -> tuple[Point, ...]:
     return cut_level(cuts, *level_cut(cuts, width))
 
 
-def cut_level(
-    cuts: Sequence[Point], a: float, b: float, cap: float, clear: float = 0.0
-) -> tuple[Point, ...]:
-    """The (u, c) cut samples with the edge cut off level at ``cap`` from u = a to b; samples
-    within ``clear`` of the level section's ends are dropped, leaving straight runs there
-    (for the FPC cable's fillets)."""
-    left = [q for q in cuts if q[0] < a - clear - 1e-9]
-    right = [q for q in cuts if q[0] > b + clear + 1e-9]
+def cut_level(cuts: Sequence[Point], a: float, b: float, cap: float) -> tuple[Point, ...]:
+    """The (u, c) cut samples with the edge cut off level at ``cap`` from u = a to b."""
+    left = [q for q in cuts if q[0] < a - 1e-9]
+    right = [q for q in cuts if q[0] > b + 1e-9]
     return (*left, (a, cap), (b, cap), *right)
 
 
@@ -721,39 +718,17 @@ def build_pattern(cfg: Config) -> Pattern:
         return tuple(_mirror(seg, length) for seg in chain)
 
     def back_end(level: float) -> tuple[Segment, ...]:
-        """The inner flap's cut edge at the top end, left to right; an FPC cutout or cable
-        cuts its top off ``level`` wide."""
+        """The inner flap's cut edge at the top end, left to right; an FPC cutout cuts its
+        top off ``level`` wide."""
         return _cut_chain(wf, e, flatten_cut(back_cuts, level), up=True)
 
     f_ft = arc_from_chord(p["tl"], p["tf"], sf, down)
     cable_layout = fpc.layout(cfg)
-    cable_end = {"front": "top", "back": "bottom"}.get(cfg.fpc_cable)
 
     def end(name: str) -> _End:
         """One end of the pattern, in top-end coordinates (the bottom end is mirrored)."""
         cutout = cfg.fpc_cutout in ("both", "front" if name == "top" else "back")
-        cable = cable_layout if cable_end == name else None
-        level = cfg.fpc_cutout_width if cutout else 0.0
-        if cable is None:
-            return _end(back_end(level))
-        # The flap's top cut off level where the cable leaves it (the junction).
-        cuts = cut_level(back_cuts, *cable.level, 2 * cfg.fpc_corner_radius)
-        e_ = _end(_cut_chain(wf, e, cuts, up=True))
-        # The cable's cut replaces the junction, every corner rounded but the plug's: the
-        # cable's, and where it meets the flap's edge.
-        k = next(
-            i
-            for i, seg in enumerate(e_.chain)
-            if isinstance(seg, Line)
-            and seg.start == cable.junction[0]
-            and seg.end == cable.junction[1]
-        )
-        before, after = e_.chain[k - 1], e_.chain[k + 1]
-        assert isinstance(before, Line) and isinstance(after, Line)
-        loop = fillet(
-            (before.start, *cable.outline, after.end), cfg.fpc_corner_radius, cable.plug_corners
-        )
-        return replace(e_, chain=(*e_.chain[: k - 1], *loop, *e_.chain[k + 2 :]))
+        return _end(back_end(cfg.fpc_cutout_width if cutout else 0.0))
 
     def _end(back_cut: tuple[Segment, ...]) -> _End:
         """One end with the inner flap's cut edge ``back_cut``."""
@@ -867,8 +842,28 @@ def build_pattern(cfg: Config) -> Pattern:
 
     top, bottom = end("top"), end("bottom")
     tab = (Line(p["tr"], p["gt"]), Line(p["gt"], p["gb"]), Line(p["gb"], p["br"]))
-    free_edge = Line((0.0, length - e), (0.0, e))
-    outline = Outline((*top.chain, *tab, *rev(mirror(bottom.chain)), free_edge))
+    # The front panel's free edge, up from the bottom end section to the top one; the FPC
+    # cable leaves its middle.
+    free_edge: tuple[Segment, ...] = (Line((0.0, length - e), (0.0, e)),)
+    edge_cut = free_edge
+    if cable_layout is not None:
+        # The cable's cut replaces the junction, every corner rounded but the plug's: the
+        # cable's, and where it meets the edge. The panel's edge keeps the junction (a fold)
+        # and, where the fillets leave it, the edge's straight cut.
+        edge_cut = fillet(
+            ((0.0, length - e), *cable_layout.outline, (0.0, e)),
+            cfg.fpc_corner_radius,
+            cable_layout.plug_corners,
+        )
+        j0, j1 = cable_layout.junction
+        first, last = edge_cut[0], edge_cut[-1]
+        assert isinstance(first, Line) and isinstance(last, Line)
+        free_edge = (
+            first,
+            *_lines((first.end, j0), (j0, j1), (j1, last.start)),
+            last,
+        )
+    outline = Outline((*top.chain, *tab, *rev(mirror(bottom.chain)), *edge_cut))
     slits = tuple(
         c
         for c in (top.slit, mirror(bottom.slit), *top.shared, *(mirror(c) for c in bottom.shared))
@@ -914,7 +909,7 @@ def build_pattern(cfg: Config) -> Pattern:
                 *side_b,
                 f_fb.reversed(),
                 *rev(left_b),
-                free_edge,
+                *free_edge,
                 *rev(left_t),
             ),
             0.0,
@@ -975,8 +970,8 @@ def build_pattern(cfg: Config) -> Pattern:
         info["end_height_increase"] = -lid.level - body.thickness
     folds = tuple(replace(f, direction=fold_direction(cfg, f.segment, faces)) for f in folds)
     cable = None
-    if cable_layout is not None and cable_end is not None:
-        cable = _place_cable(cfg, cable_layout, cable_end, length, outline.segments)
+    if cable_layout is not None:
+        cable = _place_cable(cfg, cable_layout, outline.segments)
         info["fpc_cable_width"] = cable.width
         info["fpc_plug_width"] = cable.plug_width
     scraps = (*top.scraps, *(mirror(c) for c in bottom.scraps))
@@ -1051,21 +1046,12 @@ def _lid_tab_right(fold: Line, side: Line, inner: tuple[Segment, ...], width: fl
     return _Tab(cut, face, slits, (scrap,), (*clear, *shared, *after), after)
 
 
-def _place_cable(
-    cfg: Config, layout: fpc.CableLayout, end: str, length: float, cut: Sequence[Segment]
-) -> Cable:
-    """The cable laid out at the top end, moved to its end of the pattern, with its folds
-    (run from cut to cut: past the corners' fillets)."""
-
-    def at(q: Point) -> Point:
-        return q if end == "top" else (q[0], length - q[1])
-
-    junction = (at(layout.junction[0]), at(layout.junction[1]))
-    path = tuple(at(q) for q in layout.path)
+def _place_cable(cfg: Config, layout: fpc.CableLayout, cut: Sequence[Segment]) -> Cable:
+    """The cable with its folds (run from cut to cut: past the corners' fillets)."""
     reach = 2 * cfg.fpc_corner_radius + 1e-6
 
     def fold(name: str, a: Point, b: Point) -> Fold:
-        return Fold(name, FoldCategory.CABLE, _clip(at(a), at(b), cut, reach))
+        return Fold(name, FoldCategory.CABLE, _clip(a, b, cut, reach))
 
     corners = [fold(f"cable-corner-{i + 1}", a, b) for i, (a, b) in enumerate(layout.creases)]
     folds = (
@@ -1074,7 +1060,15 @@ def _place_cable(
         fold("cable-wall", *layout.wall),
         *corners[1:],
     )
-    cable = Cable(end, layout.width, layout.plug_width, layout.plug_length, junction, path, folds)
+    cable = Cable(
+        layout.turn,
+        layout.width,
+        layout.plug_width,
+        layout.plug_length,
+        layout.junction,
+        layout.path,
+        folds,
+    )
     return replace(cable, folds=FoldedCable(cfg, cable).fold_directions())
 
 
@@ -1260,76 +1254,165 @@ class FoldedBox:
         return pos if end == "top" else (pos[0], -pos[1], pos[2])
 
 
+class _Run:
+    """A polyline in the cross-section's (X, Z) plane, by arc length ``s`` from its first
+    point; straight on past both ends."""
+
+    def __init__(self, pts: Sequence[Point]) -> None:
+        self.pts = [q for i, q in enumerate(pts) if i == 0 or _dist(q, pts[i - 1]) > 1e-9]
+        self.s = [0.0]
+        for a, b in itertools.pairwise(self.pts):
+            self.s.append(self.s[-1] + _dist(a, b))
+
+    def at(self, s: float) -> Point:
+        i = min(max(bisect.bisect_right(self.s, s) - 1, 0), len(self.pts) - 2)
+        a, b = self.pts[i], self.pts[i + 1]
+        k = (s - self.s[i]) / (self.s[i + 1] - self.s[i])
+        return (a[0] + k * (b[0] - a[0]), a[1] + k * (b[1] - a[1]))
+
+    def locate(self, p: Point) -> float:
+        """The arc length of the point nearest p (on the ends' extensions too)."""
+        last = len(self.pts) - 2
+        best = (math.inf, 0.0)
+        for i, (a, b) in enumerate(itertools.pairwise(self.pts)):
+            d = _sub(b, a)
+            k = ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / (d[0] ** 2 + d[1] ** 2)
+            if i > 0:
+                k = max(k, 0.0)
+            if i < last:
+                k = min(k, 1.0)
+            q = _add(a, _mul(d, k))
+            best = min(best, (_dist(p, q), self.s[i] + k * (self.s[i + 1] - self.s[i])))
+        return best[1]
+
+    def tangent(self, end: int) -> tuple[Point, Point]:
+        """The first (0) or last (-1) point, and the direction of travel there."""
+        a, b = (self.pts[0], self.pts[1]) if end == 0 else (self.pts[-2], self.pts[-1])
+        d = _sub(b, a)
+        return (a if end == 0 else b), _mul(d, 1 / math.hypot(*d))
+
+
+def _meet(p: Point, d: Point, q: Point, e: Point) -> Point:
+    """Where the line through p along d meets the line through q along e."""
+    den = d[0] * e[1] - d[1] * e[0]
+    k = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / den
+    return _add(p, _mul(d, k))
+
+
+def _crossing(a: _Run, b: _Run, near: float = 20.0) -> tuple[float, float]:
+    """The arc lengths along a and b of where they cross, within ``near`` of their starts
+    (or on the starts' extensions, as far back)."""
+
+    def pieces(run: _Run) -> list[tuple[float, Point, Point]]:
+        (p, d) = run.tangent(0)
+        out = [(-near, _sub(p, _mul(d, near)), p)]
+        for i, (q0, q1) in enumerate(itertools.pairwise(run.pts)):
+            if run.s[i] > near:
+                break
+            out.append((run.s[i], q0, q1))
+        return out
+
+    for sa, a0, a1 in pieces(a):
+        da = _sub(a1, a0)
+        for sb, b0, b1 in pieces(b):
+            db = _sub(b1, b0)
+            den = da[0] * db[1] - da[1] * db[0]
+            if abs(den) < 1e-12:
+                continue
+            w = _sub(b0, a0)
+            ka = (w[0] * db[1] - w[1] * db[0]) / den
+            kb = (w[0] * da[1] - w[1] * da[0]) / den
+            if 0 <= ka <= 1 and 0 <= kb <= 1:
+                return sa + ka * math.hypot(*da), sb + kb * math.hypot(*db)
+    # (the runs always cross at the glued edge's corner)
+    raise ValueError("the runs do not cross")  # pragma: no cover
+
+
+def _join(a: _Run, b: _Run) -> _Run:
+    """Run a, then b, cut where a's end and b's start tangents meet (a corner of the box)."""
+    (p, d), (q, e) = a.tangent(-1), b.tangent(0)
+    x = _meet(p, d, q, e)
+    keep_a = [r for r in a.pts if (r[0] - x[0]) * d[0] + (r[1] - x[1]) * d[1] < -1e-9]
+    keep_b = [r for r in b.pts if (r[0] - x[0]) * e[0] + (r[1] - x[1]) * e[1] > 1e-9]
+    return _Run([*keep_a, x, *keep_b])
+
+
 class FoldedCable:
     """The FPC cable in the closed box (see ``fpc``).
 
     With every corner folded flat (``fpc.unfold``) the cable is one straight strip; ``r``
     runs along it from the junction (negative on the stub and the first row folded back
-    over it), ``v`` across it. In the box, in a lengthwise section through the cable's
-    middle: the stub lies on the inside of the front panel, from the inner wall (its
-    mid-surface, ``d = 0``) into the box; the strip, folded back over it, runs back to a
-    thickness off the wall (``r = -t``), up the wall's inside, round a bend of half the box's
-    height and on
-    along the inside of the back panel. The panels and the wall are curved across the cable;
-    it lies flat against them where they are closest (a chord)."""
+    over it), ``v`` across it, along the box. The front panel's free edge rests against the
+    inside of the back panel, by the glue fold (the glue tab lies outside). In the box's
+    cross-section through the cable: the stub lies on the inside of the back panel, from
+    the junction (``d = 0``) into the box; the strip, folded back over it, runs back to a
+    thickness short of the junction (``r = -t``), where it folds onto the inside of the
+    front panel and runs on along it (round the straight fold onto the back panel, and
+    straight on past the glue fold, if it is that long). The panels curve along the cable,
+    not across it, so it lies on them exactly: its mid-surface a thickness off theirs (two
+    for the layer over the stub)."""
 
     def __init__(self, cfg: Config, cable: Cable) -> None:
         self.cfg, self.cable = cfg, cable
         self.box = box = FoldedBox(cfg)
         body, t = box.body, cfg.thickness
-        self.flap = f"back-{cable.end}-flap"
+        wf, wb = body.front.width, body.back.width
         self.creases = tuple((f.segment.start, f.segment.end) for f in cable.corners)
-        (xa, y0), (xb, _) = cable.junction
-        self.xc, self.y0 = (xa + xb) / 2, y0
-        self.sign = 1.0 if cable.end == "top" else -1.0  # flat y towards r > 0
-        j = box.map(self.flap, (self.xc, y0))
-        self.origin = j
-        self.sx = math.copysign(1.0, box.map(self.flap, (self.xc + 1.0, y0))[0] - j[0])
-        self.sy = -math.copysign(1.0, j[1])  # into the box, along it
-        h = cable.width / 2
-        xs = [j[0] + k * h for k in (-1.0, -0.5, 0.0, 0.5, 1.0)]
+        (self.x0, ya), (_, yb) = cable.junction
+        self.yc = (ya + yb) / 2
+        self.y0 = cfg.front_length / 2 - self.yc  # (the box's Y at the junction's middle)
         self.t = t
-        # (the front panel is at +Z, the back panel at -Z)
-        self.z_front = min(body.surface_z("front", -t / 2, x) for x in xs) - t / 2
-        self.z_back = max(body.surface_z("back", -t / 2, x) for x in xs) + t / 2
-        drop = self.z_front - t - self.z_back  # up the wall, from the second layer
-        self.radius = max(0.0, min(cfg.height / 2, drop))  # the slow bend: half the height
-        self.rise = drop - self.radius
+
+        def inside(panel: str, k: float, forward: bool = True) -> _Run:
+            """The panel's mid-surface offset k into the box: the front panel from its free
+            edge, the back panel from the straight fold (or the other way round)."""
+            point, normal, w = (
+                (body.front_point, body.front_normal, wf)
+                if panel == "front"
+                else (body.back_point, body.back_normal, wb)
+            )
+            us = [w * i / 512 for i in range(513)]
+            pts = []
+            for u in us if forward else reversed(us):
+                (x, z), (nx, nz) = point(u), normal(u)
+                pts.append((x - k * nx, z - k * nz))
+            return _Run(pts)
+
+        # The stub, from the glued edge (where the front panel's edge rests) into the box.
+        self.stub_run = inside("back", t, forward=False)
+        self.stub_from = self.stub_run.locate(body.front_point(0.0))
+        # Folded back over it, the second layer meets the front panel's inside: the wall
+        # fold, at r = -t.
+        self.layer = inside("back", 2 * t, forward=False)
+        self.front_run = _join(inside("front", t), inside("back", t))
+        self.layer_wall, self.front_wall = _crossing(self.layer, self.front_run)
         # the stub and the first corner square, from the junction into the box
-        self.stub = abs(cable.path[1][1] - y0) + h
+        self.stub = abs(cable.path[1][0] - self.x0) + cable.width / 2
 
-    def section(self, r: float) -> tuple[float, float]:
-        """(d, z) of the straightened strip at r (past the first corner): d into the box
-        from the wall's mid-surface, z height."""
-        t, rad = self.t, self.radius
-        z2 = self.z_front - t  # the second layer, over the stub
-        if r <= -t:
-            return (-r, z2)
-        r -= -t
-        if r <= self.rise:
-            return (t, z2 - r)
-        r -= self.rise
-        arc = rad * math.pi / 2
-        if r <= arc:
-            phi = r / rad
-            return (t + rad - rad * math.cos(phi), self.z_back + rad - rad * math.sin(phi))
-        return (t + rad + r - arc, self.z_back)
+    def stub_at(self, d: float) -> Point:
+        """(X, Z) of the stub at d into the box from the junction."""
+        return self.stub_run.at(self.stub_from + d)
 
-    def point(self, v: float, d: float, z: float) -> Point3:
-        o = self.origin
-        return (o[0] + self.sx * v, o[1] + self.sy * d, z)
+    def section(self, r: float) -> Point:
+        """(X, Z) of the straightened strip at r (past the first corner)."""
+        if r <= -self.t:
+            return self.layer.at(self.layer_wall - self.t - r)
+        return self.front_run.at(self.front_wall + self.t + r)
+
+    def point(self, v: float, x: float, z: float) -> Point3:
+        return (x, self.y0 - v, z)
 
     def straight(self, p: Point, run: int) -> tuple[float, float]:
         """(v, r) of flat point p on run ``run``, straightened."""
         q = fpc.unfold(p, run, self.creases)
-        return (q[0] - self.xc, self.sign * (q[1] - self.y0))
+        return (q[1] - self.yc, q[0] - self.x0)
 
     def map(self, run: int, p: Point) -> Point3:
         """Flat point p of run ``run`` (0: the stub, up to the first corner's crease) in
         the box."""
         v, r = self.straight(p, run)
         if run == 0:
-            return self.point(v, -r, self.z_front)
+            return self.point(v, *self.stub_at(-r))
         return self.point(v, *self.section(r))
 
     def _print_normal(self, run: int, p: Point) -> Point3:
@@ -1346,46 +1429,60 @@ class FoldedCable:
         sign = -1.0 if self.cfg.print_side == "inside" else 1.0
         return (sign * n[0] / k, sign * n[1] / k, sign * n[2] / k)
 
+    @staticmethod
+    def _along(curve: Any, s: float) -> Point3:
+        """The unit direction of travel along ``curve`` (s to (X, Z)) at s."""
+        (x0, z0), (x1, z1) = curve(s), curve(s + 1e-3)
+        k = math.hypot(x1 - x0, z1 - z0)
+        return ((x1 - x0) / k, 0.0, (z1 - z0) / k)
+
+    @staticmethod
+    def _inward(curve: Any, s: float) -> Point3:
+        """The unit normal of ``curve`` at s towards the box's axis: away from the panel
+        the strip lies on there."""
+        (x0, z0), (x1, z1) = curve(s - 1e-3), curve(s + 1e-3)
+        k = math.hypot(x1 - x0, z1 - z0)
+        nx, nz = -(z1 - z0) / k, (x1 - x0) / k
+        x, z = curve(s)
+        return (nx, 0.0, nz) if nx * x + nz * z < 0 else (-nx, 0.0, -nz)
+
     def fold_directions(self) -> tuple[Fold, ...]:
         """The cable's folds with their directions, seen from the print side (as
-        ``fold_direction``): the junction folds the cable into the box, the first corner
-        lays it back over the stub (away from the front panel), the wall fold turns it up
-        the wall, and every other corner lays the rest of the cable on the run before it,
-        on the side away from the box surface it lies on."""
+        ``fold_direction``): the junction folds the cable into the box, onto the back
+        panel, the first corner lays it back over the stub (away from the back panel), the
+        wall fold turns it onto the front panel, and every other corner lays the rest of
+        the cable on the run before it, on the side away from the box surface it lies on."""
         path, out = self.cable.path, []
         corner = 0
         for fold in self.cable.folds:
             mid = fold.segment.point_at(0.5)
             if fold.name == "cable-junction":
-                q = (mid[0], mid[1] + self.sign * 1e-3)  # just inside the flap
-                n = print_side_normal(self.box, self.flap, q, 2.5e-4)
+                q = (mid[0] + 1e-3, mid[1])  # just inside the front panel
+                n = print_side_normal(self.box, "front-panel", q, 2.5e-4)
                 if self.cfg.print_side == "inside":
                     n = (-n[0], -n[1], -n[2])
-                into = (0.0, self.sy, 0.0)
+                into = self._along(self.stub_at, 0.0)
             elif fold.name == "cable-wall":
                 q = _add(mid, _mul(_sub(path[1], path[2]), 1e-3 / _dist(path[1], path[2])))
-                n, into = self._print_normal(1, q), (0.0, 0.0, -1.0)
+                n, into = self._print_normal(1, q), self._along(self.section, -self.t)
             else:
                 # On the run before the corner, just short of its centre.
                 a, p = path[corner], path[corner + 1]
                 q = _add(p, _mul(_sub(a, p), 1e-3 / _dist(a, p)))
                 n = self._print_normal(corner, q)
-                if corner == 0:
-                    into = (0.0, 0.0, -1.0)  # over the stub, away from the front panel
+                _, r = self.straight(q, corner)
+                if corner == 0:  # over the stub, away from the back panel
+                    into = self._inward(self.stub_at, -r)
                 else:  # away from the surface: the strip's inward normal there
-                    _, r = self.straight(p, corner)
-                    (d0, z0), (d1, z1) = self.section(r - 1e-3), self.section(r + 1e-3)
-                    k = math.hypot(d1 - d0, z1 - z0)
-                    nd, nz = -(z1 - z0) / k, (d1 - d0) / k
-                    into = (0.0, self.sy * nd, nz)
+                    into = self._inward(self.section, r)
                 corner += 1
             bend = sum(i * j for i, j in zip(into, n, strict=True))
             out.append(replace(fold, direction=_direction(bend)))
         return tuple(out)
 
     def model(self) -> dict[str, Any]:
-        """The folded cable: the stub with the first corner's triangle on the front panel,
-        and the straightened rest (folded back over it, up the wall, along the back panel):
+        """The folded cable: the stub with the first corner's triangle on the back panel,
+        and the straightened rest (folded back over it, onto the front panel and along it):
         meshes, cut edges and fold lines."""
         cable = self.cable
         h, hp = cable.width / 2, cable.plug_width / 2
@@ -1406,21 +1503,19 @@ class FoldedCable:
             return (-h, vc) if side > 0 else (vc, h)
 
         ds = [
-            0.0,
+            *((stub - cable.width) * i / 4 for i in range(4)),
             stub - cable.width,
             *(stub - cable.width + cable.width * i / 8 for i in range(1, 9)),
         ]
         stub_rows = [
-            (self.point(span(d)[0], d, self.z_front), self.point(span(d)[1], d, self.z_front))
+            (self.point(span(d)[0], *self.stub_at(d)), self.point(span(d)[1], *self.stub_at(d)))
             for d in ds
         ]
 
         length = self.cfg.fpc_cable_length
         plug = length - cable.plug_length
         rs = {-stub, -stub + cable.width, -self.t, plug, length}
-        arc_from = -self.t + self.rise
-        rs |= {arc_from + self.radius * math.pi / 2 * i / 12 for i in range(13)}
-        n = max(4, math.ceil((length + stub) / 2))
+        n = max(4, math.ceil(length + stub))  # (every millimetre: the panels curve along it)
         rs |= {-stub + (length + stub) * i / n for i in range(n + 1)}
         rows: list[tuple[float, float, float]] = []  # (r, v from, v to)
         for r in sorted(x for x in rs if -stub <= x <= length):
@@ -1481,7 +1576,7 @@ class FoldedCable:
         for fold in cable.folds:
             ends = (fold.segment.start, fold.segment.end)
             if fold.name == "cable-junction":
-                pts = [self.point(v, 0.0, self.z_front) for v in (-h, h)]
+                pts = [self.point(v, *self.stub_at(0.0)) for v in (-h, h)]
             elif fold.name == "cable-corner-1":
                 pts = [self.map(0, q) for q in ends]
             elif fold.name == "cable-wall":
@@ -1503,6 +1598,16 @@ class FoldedCable:
             "cuts": cuts,
             "lines": lines,
         }
+
+    def section_lines(self) -> list[list[list[float]]]:
+        """The cable in the box's cross-section through its middle (X, Z): the stub (with
+        the first corner square), and the rest, from the first corner on."""
+        stub, length = self.stub, self.cfg.fpc_cable_length
+        n = max(4, math.ceil(length + stub))
+        first = [self.stub_at(stub * i / 16) for i in range(17)]
+        rs = {-stub + (length + stub) * i / n for i in range(n + 1)} | {-self.t}
+        rest = [self.section(r) for r in sorted(rs) if r <= length]
+        return [[[round(c, 6) for c in q] for q in line] for line in (first, rest)]
 
 
 def _r3(p: Point3) -> list[float]:
@@ -1706,6 +1811,28 @@ def _interior(body: Body, samples: int) -> list[list[float]]:
     return [[round(c, 6) for c in q] for q in out]
 
 
+def _section_cable(cfg: Config) -> list[list[list[float]]] | None:
+    """The FPC cable in the cross-section (``FoldedCable.section_lines``), or None."""
+    layout = fpc.layout(cfg)
+    if layout is None:
+        return None
+    # (its corners' creases are all the folded cable needs of its folds)
+    corners = tuple(
+        Fold(f"cable-corner-{i + 1}", FoldCategory.CABLE, Line(*c))
+        for i, c in enumerate(layout.creases)
+    )
+    cable = Cable(
+        layout.turn,
+        layout.width,
+        layout.plug_width,
+        layout.plug_length,
+        layout.junction,
+        layout.path,
+        corners,
+    )
+    return FoldedCable(cfg, cable).section_lines()
+
+
 def body_bbox(body: Body, with_material: bool = True) -> BBox:
     """(x0, z0, x1, z1) of the closed body's cross-section, glue tab included."""
     h = body.thickness / 2 if with_material else 0.0
@@ -1737,7 +1864,9 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
     always agree), ``glue_tab`` the glue tab's mid-surface from the glue fold, on the
     outside of the front panel, ``material`` the outlines of the material around the two
     panels and the tab, ``interior`` the closed outline of the interior, ``inner``
-    the interior's corners and apexes (where the interior width and height are measured).
+    the interior's corners and apexes (where the interior width and height are measured),
+    ``cable`` the FPC cable's mid-surface in the section through its middle (the stub, and
+    the rest from the first corner; ``FoldedCable.section_lines``), or None.
     """
     box = FoldedBox(cfg)
     body = box.body
@@ -1773,4 +1902,5 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
         "height": cfg.height,
         "thickness": body.thickness,
         "bbox": [round(c, 6) for c in body_bbox(body)],
+        "cable": _section_cable(cfg),
     }

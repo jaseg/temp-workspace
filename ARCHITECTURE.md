@@ -38,7 +38,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | `sfc.py` | The second mesh layout: a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across the folds as seldom as possible, relaxed to an even spacing, the traces offset from it, then settled by the Rust core (`yanartas_mesh`). Needs shapely and numpy. |
 | `progress.py` | How far a long layout has got: the layouts report phases and steps, the CLI and the web UI show them. |
 | `pcb.py` | The flex-PCB layout (mask, both meshes, the cable's traces, fan-out, vias and plug contacts, GND zone) and its export through gerbonara (KiCad board and project, Gerber, SVG). Imported on demand: its dependencies are heavy (the in-browser build loads them on the first PCB request). |
-| `fpc.py` | The FPC cable's layout at the top end of the pattern: the level cut it leaves the inner flap by, the meander, its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
+| `fpc.py` | The FPC cable's layout: it leaves the middle of the front panel's free edge (x = 0) and turns up or down along it; the meander (laid out in a frame of its own, turned into the pattern's), its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
 | `svg.py` | Serializes a `Pattern` to SVG (layers, dash styles, labels, embedded config) and reads the config back (`extract_config`). |
 | `dimensions.py` | Preview-only dimension annotations for all three views, measured on the same geometry. |
@@ -86,16 +86,16 @@ outputs.
 |---|---|
 | `test_config.py` | Validation messages, limits, the width solve (interior corner to corner), interior height and flap offsets. |
 | `test_geometry.py` | Outline continuity and absence of self-intersections, fold placement, fold directions from both sides, thickness offsets, FPC cutouts, the end wall gap. |
-| `test_model3d.py` | That the 3D model *is* the pattern folded: faces tile the pattern, each mesh triangle is isometric to its flat triangle, faces stay attached along every fold, no hidden creases inside a face, flap edges meet the intended surfaces, the glue tab lies at distance `t`, and the section matches the mesh. |
+| `test_model3d.py` | That the 3D model *is* the pattern folded: faces tile the pattern, each mesh triangle is isometric to its flat triangle, faces stay attached along every fold, no hidden creases inside a face, flap edges meet the intended surfaces, the glue tab lies at distance `t` on the outside of the front panel, and the section matches the mesh. |
 | `test_svg.py` | SVG conventions (layers, dashes, a single closed cut path, attributes only), round-trip of the embedded config, parsed paths reproducing the geometry, labels. |
 | `test_dimensions.py` | Every dimension measures its parameter and its points lie on, or a stated allowance off, the exported geometry. |
-| `test_fpc.py` | The FPC cable: one simple outline, a folded straight strip of the set length, corner creases that lay each run back along the one before and end on the cut, the level cut it leaves the flap by, its clearances, the sharp plug and the rounded other corners, mirroring to the back end, the default fitting the pattern, and validation. |
+| `test_fpc.py` | The FPC cable: one simple outline, a folded straight strip of the set length, corner creases that lay each run back along the one before and end on the cut, where it leaves the front panel's free edge, its clearances, the sharp plug and the rounded other corners, turning down mirroring turning up, the pattern growing only beside the edge, the folded route (on the back panel, the layer over it, onto the front panel; isometric, inside the box), the cross-section, the default pins, and validation. |
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
 | `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
 | `test_mesh.py` | The shared metrics: spacing of parallel traces and across islands (not past the edge), skew of detours. |
 | `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing rarely below the nominal and few islands (settled), repeatable seeds, holes. |
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
-| `test_pcb.py` | The PCB layout: the pinout, both meshes, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring. A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
+| `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (its partitions' traces through one exit cell for now). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded. |
 
@@ -216,21 +216,36 @@ planes by `e` accordingly; everything stays an exact isometric folding.
 - **Interior.** The interior, payload clearance and fit are unchanged: they are bounded by
   the inner walls, centred on the box.
 
-### 4.5 FPC cutout
+### 4.5 FPC cutout and cable
 
 `level_cut` finds, by bisection on the level, the horizontal cut that removes exactly
 `width` from the top of a rising-then-falling edge. It sits around the edge's highest
 point, which is slightly off-centre because the edge is not symmetric. The cut flattens the
 inner flap's free edge.
 
+The FPC cable is independent of it: it leaves the middle of the front panel's free straight
+edge. `fpc.meander` lays it out in a frame of its own (the junction level, the stub up, the
+first turn to the right); `fpc.layout` turns that into the pattern (out of the edge is -x,
+the first turn up or down along it; down mirrors, so the outline is reversed). In the box
+(`FoldedCable`), the front panel's free edge rests against the inside of the back panel by
+the glue fold (the glue tab lies outside, 4.3), a thickness off its mid-surface: the stub
+follows the back panel's inside (its mid-surface offset `t`), the layer folded back over it
+`2t`, and from the wall fold (where that layer crosses the front panel's offset `t`, at
+`r = -t`) the strip follows the front panel's inside, round the straight fold onto the back
+panel's. These are polylines by arc length (`_Run`), so the strip, ruled along the box, is
+an exact isometry: the panels curve along it, not across it.
+
 ### 4.6 PCB layout
 
 - **Mask.** The foil (`Polygon` of the outline, arcs within 5 µm, less the slits as 0.1 mm
   slots and the scraps) shrunk by the edge clearance, less the cable: the outline segments
-  no face owns, closed and cut off level at the junction, plus a band beyond the junction
-  so that the mask's edge there is the junction line itself. The F.Cu exit cell sits against
-  it; the B.Cu mesh's grid is offset by half a cell in x and y (its exit cell half a cell in,
-  on the column of its grid nearest its pins), so the two layers' bare edge strips differ.
+  no face owns, closed along the front panel's free edge (x = 0), plus a band beyond the
+  junction so that the mask's edge there is the junction line itself. The F.Cu exit cell
+  sits against it, open towards the cable (-x); the B.Cu mesh's grid is offset by half a
+  cell in x and y (its exit cell half a cell in, on the row of its grid nearest its pins),
+  so the two layers' bare edge strips differ. Each exit cell is `2 N` trace pitches wide,
+  `N` the side's nets (`Config.mesh_nets`: the curve's `mesh_partitions × mesh_traces`,
+  KiMesh's `mesh_traces`).
 - **Mesh.** `kimesh.generate` aligns the grid on the exit cell. Cells inside the mask are
   found in one vectorized `shapely.contains`; the walk is KiMesh's (iterative, with its
   "keep going straight" bias for `randomness < 1`); tiles are KiMesh's look-up table with

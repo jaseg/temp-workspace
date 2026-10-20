@@ -200,14 +200,15 @@ def test_bbox_covers_everything(cfg):
     spread = 0.0 if lid_layout(cfg) is None else lid_layout(cfg).spread  # the bands, at x < 0
     # (and with lids, their glue tabs beside the bands)
     tabs = 0.0 if lid_layout(cfg) is None else cfg.glue_tab_width
-    assert x1 - x0 == pytest.approx(cfg.body.circumference + cfg.glue_tab_width + spread + tabs)
+    assert x1 == pytest.approx(cfg.body.circumference + cfg.glue_tab_width)
+    if pat.cable is None:
+        assert x0 == pytest.approx(-spread - tabs)
+    else:  # (the cable sticks out beside the front panel's free edge, its rows outward)
+        assert x0 < -spread - tabs
     # The outer flaps, or with an end wall gap their lids, stick out furthest.
     lid = lid_layout(cfg)
     reach = cfg.body.front_cut_sagitta if lid is None else max(d for _, d in lid.depth) - lid.level
-    if pat.cable is None:
-        assert y1 - y0 == pytest.approx(cfg.front_length + 2 * reach)
-    else:  # (the cable's rows may stick out further)
-        assert y1 - y0 >= cfg.front_length + 2 * reach - 1e-9
+    assert y1 - y0 == pytest.approx(cfg.front_length + 2 * reach)
 
 
 def test_lid_fold_mirrors_the_front_fold(cfg):

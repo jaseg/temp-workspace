@@ -16,7 +16,7 @@ from yanartas_pillowbox import crosssection
 
 # Bumped whenever the meaning of saved settings changes; documents of any other version are
 # rejected (no migrations).
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
@@ -231,11 +231,16 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "FPC cable",
         "choice",
         "FPC cable",
-        choices=(("none", "None"), ("front", "Front end"), ("back", "Back end")),
-        help="A flat cable of the flex PCB, leaving the top of that end's inner flap (cut off "
-        "level over the cable's width) and meandering in rows over the free space above it. "
-        "Every corner folds flat along its diagonal, so the cable becomes one straight strip. "
-        "Front end: the flap at the top of the pattern; back end: the one at the bottom.",
+        choices=(
+            ("none", "None"),
+            ("up", "Up (towards the front end)"),
+            ("down", "Down (towards the back end)"),
+        ),
+        help="A flat cable of the flex PCB, leaving the middle of the front panel's free "
+        "straight edge (the glued edge) outward, turning up or down along it and meandering "
+        "in rows beside it. Every corner folds flat along its diagonal, so the cable becomes "
+        "one straight strip. Up: towards the top of the pattern (the box's front end); down: "
+        "towards the bottom.",
     ),
     FieldSpec(
         "fpc_cable_length",
@@ -246,8 +251,8 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         10,
         2000,
         1,
-        help="From the inner flap's edge to the plug's tip, once every corner is folded flat. "
-        "Rows that do not fit above the rest of the pattern make it taller.",
+        help="From the front panel's edge to the plug's tip, once every corner is folded "
+        "flat. Rows that do not fit beside the edge make the pattern wider.",
     ),
     FieldSpec(
         "fpc_pins",
@@ -315,7 +320,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         0,
         10,
         0.1,
-        help="Rounds every corner of the cable's outline, and where it meets the inner flap. "
+        help="Rounds every corner of the cable's outline, and where it meets the front panel. "
         "Smaller where the outline leaves no room (e.g. at the ends of the slots between "
         "rows: at most half the clearance).",
     ),
@@ -355,15 +360,30 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
     ),
     FieldSpec(
         "mesh_traces",
-        "Mesh traces per side",
+        "Traces per partition",
         "float",
         "PCB mesh",
         "",
         1,
         16,
         1,
-        help="Mesh traces (loops, two ends each) on each side of the foil; their ends leave "
-        "through the FPC cable. The mesh's cells are twice this many trace pitches wide.",
+        help="Mesh traces (loops, two ends each) on each side of the foil: for the "
+        "space-filling curve, in each partition (see Mesh partitions); for KiMesh, in all. "
+        "Their ends leave through the FPC cable. The exit cell is twice as many trace pitches "
+        "wide as a side has traces.",
+    ),
+    FieldSpec(
+        "mesh_partitions",
+        "Mesh partitions",
+        "float",
+        "PCB mesh",
+        "",
+        1,
+        16,
+        1,
+        help="Space-filling curve: the mesh's area on each side is split into this many "
+        "partitions of equal area, each with Mesh traces traces of its own from the "
+        "connector. KiMesh ignores it.",
     ),
     FieldSpec(
         "mesh_edge_clearance",
@@ -478,9 +498,9 @@ class Config:
     glue_tab_width: float = 12.0
     fpc_cutout: str = "none"
     fpc_cutout_width: float = 15.0
-    fpc_cable: str = "front"
-    fpc_cable_length: float = 55.0  # (as long as fits beside the default pattern)
-    fpc_pins: float = 30.0
+    fpc_cable: str = "up"
+    fpc_cable_length: float = 55.0  # (one row, beside the default pattern's free edge)
+    fpc_pins: float = 61.0  # (the default curve mesh's ends and the GND pins between them)
     fpc_pitch: float = 0.5
     fpc_edge_margin: float = 0.5
     fpc_plug_length: float = 4.0
@@ -490,6 +510,7 @@ class Config:
     mesh_trace_width: float = 0.15
     mesh_trace_space: float = 0.15
     mesh_traces: float = 4.0
+    mesh_partitions: float = 3.0
     mesh_edge_clearance: float = 0.5
     mesh_seed: float = 0.0
     mesh_algorithm: str = "kimesh"
@@ -514,6 +535,13 @@ class Config:
         """Length of the front panel's straight edges, corner to corner: the box overall. The
         front panel runs on by the end wall gap at each end."""
         return self.edge_length + 2 * self.end_wall_gap
+
+    @property
+    def mesh_nets(self) -> int:
+        """The mesh's nets (loops) on each copper layer: the space-filling curve's traces in
+        all its partitions; KiMesh's traces."""
+        traces = int(self.mesh_traces)
+        return traces * int(self.mesh_partitions) if self.mesh_algorithm == "sfc" else traces
 
     # -------------------------------------------------------------- (de)serialization
     def to_dict(self) -> dict[str, Any]:
@@ -697,23 +725,21 @@ def validate(cfg: Config) -> dict[str, str]:
     }
     if cfg.fpc_cable != "none" and "fpc_pins" not in errors and cfg.fpc_pins != int(cfg.fpc_pins):
         add("fpc_pins", "must be a whole number")
-    for name in ("mesh_traces", "mesh_seed"):
+    for name in ("mesh_traces", "mesh_partitions", "mesh_seed"):
         if name not in errors and getattr(cfg, name) != int(getattr(cfg, name)):
             add(name, "must be a whole number")
     if body is not None and cfg.fpc_cable != "none" and not errors.keys() & fpc_fields:
         from yanartas_pillowbox import fpc  # (fpc imports this module)
 
-        cable_end = "front" if cfg.fpc_cable == "front" else "back"
         width = fpc.cable_width(cfg)
-        if cfg.fpc_cutout in (cable_end, "both"):
-            add("fpc_cutout", f"the FPC cable already cuts the {cable_end} end's inner flap")
-        elif width <= 0:
+        edge = cfg.edge_length - 1  # (between the end sections, beside the back panel)
+        if width <= 0:
             add("fpc_cable_inset", "leaves no cable: must be less than half the plug's width")
-        elif width > body.back.width - 1:
+        elif width > edge:
             add(
                 "fpc_pins",
-                f"the cable ({_fmt(width)} mm) must be at most {_fmt(body.back.width - 1)} mm "
-                "wide (the inner flaps' width minus 1 mm)",
+                f"the cable ({_fmt(width)} mm) must be at most {_fmt(edge)} mm wide (the front "
+                "panel's free edge beside the back panel, minus 1 mm)",
             )
         elif "end_wall_gap" not in errors and "lid_offset" not in errors:
             try:
