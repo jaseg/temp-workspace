@@ -301,12 +301,12 @@ def test_junction_and_wall_folds(cfg):
     assert mid[0] - x == pytest.approx(-cfg.thickness, abs=1e-9)
 
 
-def _panel(body, panel, k, n=2000):
+def _panel(shell, panel, k, n=2000):
     """The panel's mid-surface (k = 0) or the surface offset k into the box, sampled."""
     point, normal, w = (
-        (body.front_point, body.front_normal, body.front.width)
+        (shell.front_point, shell.front_normal, shell.front.width)
         if panel == "front"
-        else (body.back_point, body.back_normal, body.back.width)
+        else (shell.back_point, shell.back_normal, shell.back.width)
     )
     out = []
     for i in range(n + 1):
@@ -325,13 +325,13 @@ def test_folded_cable_route(cfg):
     panel; the rest on along the inside of the front panel, as long as set."""
     pattern = build_pattern(cfg)
     folded = FoldedCable(cfg, pattern.cable)
-    t, body = cfg.thickness, cfg.body
+    t, shell = cfg.thickness, cfg.shell
     stub = folded.stub
     assert stub == pytest.approx(cfg.fpc_cable_gap + cfg.fpc_cable_inset + t + pattern.cable.width)
     # It leaves where the front panel's free edge rests against the back panel.
-    assert math.dist(folded.stub_at(0), body.front_point(0)) < 0.05 * t + 1e-9
-    back, front = _panel(body, "back", t), _panel(body, "front", t)
-    layer = _panel(body, "back", 2 * t)
+    assert math.dist(folded.stub_at(0), shell.front_point(0)) < 0.05 * t + 1e-9
+    back, front = _panel(shell, "back", t), _panel(shell, "front", t)
+    layer = _panel(shell, "back", 2 * t)
     for d in (0.0, stub / 2, stub):
         assert _dist(folded.stub_at(d), back) < 0.01
     for r in (-stub, -stub / 2, -2 * t):
@@ -354,20 +354,20 @@ def test_folded_cable_route(cfg):
 
 
 def test_folded_cable_stays_inside_the_box(cfg):
-    """Every point of the folded cable lies inside the closed body's section (its
+    """Every point of the folded cable lies inside the closed shell's section (its
     mid-surfaces), within its length (between the curved folds)."""
     model = build_model3d(cfg)
     section = build_cross_section(cfg)
-    b = cfg.body
-    body = Polygon([*_panel(b, "front", 0), *_panel(b, "back", 0)]).buffer(1e-4)
+    b = cfg.shell
+    shell = Polygon([*_panel(b, "front", 0), *_panel(b, "back", 0)]).buffer(1e-4)
     pos = model["cable"]["positions"]
-    half = cfg.edge_length / 2 - cfg.body.back.sagitta
+    half = cfg.edge_length / 2 - cfg.shell.back.sagitta
     for i in range(0, len(pos), 3):
         x, y, z = pos[i : i + 3]
-        assert body.contains(Point(x, z)), (x, z)
+        assert shell.contains(Point(x, z)), (x, z)
         assert abs(y) < half
     for line in section["cable"]:
-        assert all(body.contains(Point(*p)) for p in line)
+        assert all(shell.contains(Point(*p)) for p in line)
 
 
 def test_cable_in_the_3d_model(cfg):

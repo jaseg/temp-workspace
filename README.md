@@ -4,9 +4,9 @@ Generate **laser-ready SVG folding patterns for pillow boxes**, configured throu
 UI with live 2D and 3D previews. The tool runs entirely offline: the UI is served from
 `127.0.0.1`, and all frontend assets, including three.js, ship inside the package.
 
-A pillow box is cut from one flat sheet. It has two body panels and a glue tab. Each short
+A pillow box is cut from one flat sheet. It has two shell panels and a glue tab. Each short
 end of each panel has a curved (circular-arc) fold. The lens-shaped flap outside that fold
-closes the end, and pressing the flaps in makes the body bulge into a "pillow".
+closes the end, and pressing the flaps in makes the shell bulge into a "pillow".
 
 ## Installation & running
 
@@ -31,7 +31,7 @@ browser unless you pass `--no-browser`. The server only listens on `127.0.0.1`.
 ```text
 yanartas-pillowbox generate [--config FILE | --from-svg FILE] [--set key=value ...] -o out.svg
 ```
-Generates an SVG headlessly, using the same engine as the UI.
+Generates an SVG from the command line, using the same engine as the UI.
 
 * `--config FILE` takes a JSON config, either the persisted `yanartas-pillowbox.json` or any
   subset of the parameters below.
@@ -69,8 +69,8 @@ the defaults. It never crashes because of the file.
   *Download* is disabled. Below the form, *Derived geometry* lists the computed fold and cut
   radii, arc length, the straight-edge length, the circumference and the flat panel width.
 * **Pattern (2D):** the exact SVG you will download. Zoom with the wheel, the +/− buttons or a
-  two-point pinch, drag to pan, and double-click or press *Fit* to reset (the
-  cross-section view works the same way). The header shows the pattern and
+  pinch, drag to pan, and double-click or press *Fit* to reset (the
+  cross-section view works the same way). The title bar shows the pattern and
   sheet sizes. All lines are black, as in the export, and differ only in dashing (see
   *Output SVG*). A legend shows the line types; dashes keep their on-screen size at any
   zoom. The backdrop stays light in the dark theme so the black lines remain visible.
@@ -79,7 +79,7 @@ the defaults. It never crashes because of the file.
   are drawn black, dashed by fold direction, and the visible cut edges solid. The inner end flaps, inside the box behind the
   end wall gaps, are drawn translucent purple through the paper. The camera has almost no inertia, and the
   dimension labels keep the same on-screen size at any zoom.
-* **Mesh** (in the pattern's and the folded box's headers) shows the PCB layout's security
+* **Mesh** (in the pattern's and the folded box's title bars) shows the PCB layout's security
   mesh: F.Cu (the box's outside) in copper red, B.Cu (inside) in blue. The layout takes a
   second or two (a spinner shows on the button) and is redone after each change while the
   mesh is shown. Its figures (cell size, cells per side, the longest trace) appear under
@@ -87,11 +87,11 @@ the defaults. It never crashes because of the file.
   drawn into a bitmap once (in 3D, a texture on each side of the paper), never as SVG
   paths; zoomed in, the 2D view draws the visible part again at screen resolution.
   *Download PCB* saves the KiCad, Gerber and SVG files as a zip.
-* **Body cross-section:** a 2D section through the closed body, perpendicular to its length.
-  The body has this same section everywhere between the curved folds. It shows the closed
+* **Shell cross-section:** a 2D section through the closed shell, perpendicular to its length.
+  The shell has this same section everywhere between the curved folds. It shows the closed
   width and height, and marks the two straight folds where they are seen end-on. Like the
   3D view, it shows the back panel up.
-* **Payload:** below the body controls, set the width, depth and height of a rectangular
+* **Payload:** below the shell controls, set the width, depth and height of a rectangular
   payload, and a **clearance**: the minimum true distance from any point of the payload to
   the nearest point of the box surface. The payload is drawn centred inside the box in the
   cross-section and 3D views, with the clearance envelope dashed in the cross-section. It
@@ -107,7 +107,7 @@ the defaults. It never crashes because of the file.
     just shows which preset, if any, matches the current payload size.
   * **Max** next to each payload field sets it to the largest value that keeps the clearance
     in the current box.
-  * **Fit box to payload** (in the body controls) sets width, length and height to the
+  * **Fit box to payload** (in the shell controls) sets width, length and height to the
     smallest box that holds the payload with its clearance, minimizing the area of the
     pattern's bounding box.
     Glue tab, end wall gap, lid overlap, lid offset and thickness are left alone; the box is
@@ -188,7 +188,7 @@ All lengths are in millimetres.
 
 The stroke width is fixed at 0.1 mm.
 
-**Computed, not set:** the **circumference** is the perimeter of the closed body's
+**Computed, not set:** the **circumference** is the perimeter of the closed shell's
 cross-section (along the middle of the material), i.e. the flat width of both panels
 together. It follows from `width`, the height and the thickness: the more the panels bulge,
 the more material it takes to span the same width. The two panels differ slightly in width
@@ -224,7 +224,7 @@ The pattern can carry a flat cable for a flex PCB (`fpc.py`). It leaves the midd
 front panel's free straight edge (the glued edge, at the pattern's left), outward. The cable
 runs out from the edge for the clearance plus the inset plus a thickness (the stub), turns 90°
 up or down (`fpc_cable`) and then meanders in rows along the edge, stacked outward, between the
-end sections beside the edge (the wings and the lids' glue tabs, or the outer flaps). The last
+end sections beside the edge (the overhangs and the lids' glue tabs, or the outer flaps). The last
 `fpc_plug_length` is the plug, the board shape of the connector end (contacts, soldermask,
 keepouts and stiffener are not drawn). The cable always sticks out beside the edge; the
 default length takes one row, longer cables add rows further out. The cable takes as few rows
@@ -294,8 +294,8 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   over 1 mm, against the nominal share: how much it varies, and the share of the area
   under 70 % of nominal, i.e. holes between runs), and, taking each pair of neighbouring traces (1+2, 2+3, 3+4) as a
   differential pair, the difference in their lengths and the largest local difference (the
-  most one runs ahead of the other along the way), over the mesh.
-* **Check:** every layout is checked before it is handed out (preview, download, CLI):
+  most one is longer than the other along the way), over the mesh.
+* **Check:** every layout is checked before it is given out (preview, download, CLI):
   each mesh net one piece of copper from its contact pad to its other one (no opens), no
   copper of two nets touching on a layer (no shorts). A layout that fails is an error.
 * **Into the cable:** each side has one exit cell, `2 ×` its traces' pitches wide. The F.Cu
@@ -362,10 +362,10 @@ rather than the stacked `))___((`.
   the gap. The flap's top edge becomes a fold, and the lid folds over onto the outside of
   the back panel and runs on `lid_overlap` past the inner wall.
 * **Lid glue tabs:** outer lids tend to spring back up, so each lid's two straight sides
-  carry a square glue tab, as wide as the body's. It folds round the box's side and is
-  glued onto the outside of the wing and the front panel. Where the inner flap's curved
+  carry a square glue tab, as wide as the shell's. It folds round the box's side and is
+  glued onto the outside of the overhang and the front panel. Where the inner flap's curved
   edge rises into the tab beside it, the tab butts up against that edge (one shared cut),
-  and the small piece left between them beside the wing is cut out (a closed slit path).
+  and the small piece left between them beside the overhang is cut out (a closed slit path).
   In the 3D view the tabs are drawn as flat panels.
 * The lid's fold lies in a plane at 45°, like the curved folds, so the lid folds exactly:
   in the pattern the fold is the front panel's curved fold turned over (an arc of the
@@ -373,11 +373,11 @@ rather than the stacked `))___((`.
   turned over, about one thickness flatter than the back panel.
 * **Widened ends:** the lids float `lid_offset` above the back panel where they come
   closest (a little more towards the middle), so the end sections are taller than the
-  body. They are wider to match: over the gap only, the front panel's cross-section runs
+  shell. They are wider to match: over the gap only, the front panel's cross-section runs
   on past both side folds, along its own fold arc continued, until it meets the lid's
   fold. The outer flap closes to a point there again, and nothing needs an extra crease.
-  In the pattern the front panel grows two small **wings** over each gap, and its curved
-  fold continues across them. At the straight fold the wing ends on the inner flap's cut
+  In the pattern the front panel grows two small **overhangs** over each gap, and its curved
+  fold continues across them. At the straight fold the overhang ends on the inner flap's cut
   edge: a single cut separates the two. In the SVG that shared stretch is a short open
   **slit** path in the cut layer, next to the closed outline, so it is cut once. Because the outer walls follow the continued arc, they reach
   slightly past the front panel's ends at the sides, so the box is a few millimetres
@@ -409,7 +409,7 @@ top of each other:
   panel's angle at that edge), so the tab wraps around that edge.
 * **Width solve:** the interior width runs between the inner corners at the two side folds,
   where the panels' inner surfaces meet. The tool solves for the two panels' flat widths so
-  that this is exactly `width` (`crosssection.solve_body`).
+  that this is exactly `width` (`crosssection.solve_shell`).
 * **Lengths:** the back panel's straight edges are `length + height + 3·t` long, the front
   panel's `2·end_wall_gap` longer.
 
@@ -428,7 +428,7 @@ own mirror image. Only the fold indicators flip.
 | `fold-valley` | Fold - valley | dashed | `3 2` |
 
 The dashes follow the origami convention. Each fold's direction is computed from the folded
-3D model, not set by hand. Seen from the outside, every fold of a pillow box is a mountain
+3D model, not set manually. Seen from the outside, every fold of a pillow box is a mountain
 fold: the panels fold around the interior, and the flaps and glue tab fold inwards. Seen
 from the inside, every fold is a valley fold. A fold layer is only written when it has
 folds.
@@ -441,7 +441,7 @@ layers keep the line types apart.
   side. There are no page-size settings.
 * **Cut outline:** exactly one closed `<path>` (one `M`, ending in `Z`) that traces the whole
   contour in one direction. Arcs are exact SVG `A` commands; with material thickness,
-  flap edges that follow the body are fine polylines. The path has no duplicate segments
+  flap edges that follow the shell are fine polylines. The path has no duplicate segments
   and no stray subpaths.
 * **Fold lines:** separate open paths, dashed by fold direction. They end exactly on the
   outline and never run along it.
@@ -458,7 +458,7 @@ layers keep the line types apart.
 
 ## HTTP API
 
-| Method & path | Body | Response |
+| Method & path | Request | Response |
 |---|---|---|
 | `GET /api/defaults` | — | `{config, fields, payload_presets}` with the default config, field specs (labels, units, ranges) and board presets |
 | `GET /api/config` | — | `{config}` with the current (persisted) config |
@@ -468,7 +468,7 @@ layers keep the line types apart.
 | `POST /api/scad` | `{config}` | OpenSCAD source of the interior (`application/x-openscad`); `422` if invalid |
 | `POST /api/pcb` | `{config}` | The PCB layout's copper for the previews: `{layers: {front, back}, vias, pads, width, via_size, bbox, offset, meshes}` (tracks as flat coordinate lists); `422 {error}` if it cannot be laid out |
 | `POST /api/pcb/files` | `{config}` | The PCB layout's KiCad, Gerber and SVG files as a zip (`application/zip`) |
-| `POST /api/import` | SVG as the raw body or a multipart `file` | `{config}`; `400 {error}` if unusable |
+| `POST /api/import` | SVG as raw text or a multipart `file` | `{config}`; `400 {error}` if unusable |
 
 ## Development
 

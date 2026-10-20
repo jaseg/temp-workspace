@@ -30,8 +30,8 @@ def cfg(request):
 def polygons(src: str) -> dict[str, list[tuple[float, float]]]:
     """The polygon of each ``module name() { polygon([...]); }`` in the source."""
     out = {}
-    for name, body in re.findall(r"module (\w+)\(\) \{\s*polygon\(\[(.*?)\]\);", src, re.S):
-        out[name] = [(float(x), float(y)) for x, y in re.findall(r"\[(\S+), (\S+)\]", body)]
+    for name, points in re.findall(r"module (\w+)\(\) \{\s*polygon\(\[(.*?)\]\);", src, re.S):
+        out[name] = [(float(x), float(y)) for x, y in re.findall(r"\[(\S+), (\S+)\]", points)]
     return out
 
 
@@ -76,7 +76,7 @@ def test_main_space_is_the_interior(cfg):
     """Section: the panels' inner surfaces. Plan, in the middle: the interior length."""
     polys = polygons(render_scad(cfg))
     section = polys["main_section"]
-    exact = _interior(cfg.body, 1)
+    exact = _interior(cfg.shell, 1)
     assert min(x for x, _ in section) == pytest.approx(min(x for x, _ in exact), abs=1e-4)
     assert max(x for x, _ in section) == pytest.approx(max(x for x, _ in exact), abs=1e-4)
     assert y_bounds(section, 0) == pytest.approx([-cfg.height / 2, cfg.height / 2], abs=CHORD)
@@ -95,26 +95,26 @@ def test_end_space_lies_between_the_end_walls(cfg):
     t, half, e = cfg.thickness, cfg.length / 2, cfg.end_wall_gap
     end, main = polys["end_plan"], polys["main_plan"]
     assert y_bounds(end, 0) == pytest.approx([half + t, half + t + e], abs=CHORD)
-    body, lid = cfg.body, lid_layout(cfg)
+    shell, lid = cfg.shell, lid_layout(cfg)
     # The lid's inner surface, in the middle: half a thickness inside its mid-surface, which
     # lies the front panel's sagitta below the lid level.
-    lid_inner = body.z_shift + lid.level - body.front.sagitta + t / 2
+    lid_inner = shell.z_shift + lid.level - shell.front.sagitta + t / 2
     assert y_bounds(polys["end_section"], 0) == pytest.approx(
         [lid_inner, cfg.height / 2], abs=CHORD
     )
     assert lid_inner <= -cfg.height / 2 - t + 1e-9  # outside the back panel
-    # Across the widened end section, past the body's sides, to where the lid's and the
+    # Across the widened end section, past the shell's sides, to where the lid's and the
     # front panel's inner surfaces meet (the section's ends are single points).
     section = polys["end_section"]
     xs = sorted(x for x, _ in section)
-    edges = sorted(body.front_point(u)[0] for u in (0.0, body.front.width))
+    edges = sorted(shell.front_point(u)[0] for u in (0.0, shell.front.width))
     assert xs[0] < edges[0] and xs[-1] > edges[1]
     for x in (xs[0], xs[-1]):
         assert len([q for q in section if q[0] == x]) == 1
     # Across the box, the inner wall's thickness separates the end space from the main space
     # (measured along Y: t / cos of the wall's angle; away from the tight corners, where this
     # first-order estimate no longer holds for thick material).
-    lo, hi = body.inner_glue[0], body.inner_fold[0]
+    lo, hi = shell.inner_glue[0], shell.inner_fold[0]
     for i in range(2, 19):
         x, d = lo + (hi - lo) * i / 20, 1e-3
         k = (y_bounds(end, x + d)[0] - y_bounds(end, x - d)[0]) / (2 * d)

@@ -6,7 +6,7 @@ which is centred on the box interior.
 
 The box surface facing the payload is the material's inner surface, ``t/2`` inside the
 mid-surface the model folds: the panels (cylinders with rulings along Y, see
-``crosssection.Body``) and the inner flaps' end walls (cylinders with rulings along Z through
+``crosssection.Shell``) and the inner flaps' end walls (cylinders with rulings along Z through
 the back panel's creases, ``|Y| = edge/2 - Zb(u)``).
 
 **Clearance** is the true 3D distance from the payload to the nearest point of that surface.
@@ -36,10 +36,10 @@ from dataclasses import replace
 from yanartas_pillowbox.config import SPECS_BY_NAME, Config, ConfigError
 from yanartas_pillowbox.crosssection import (
     MAX_SAGITTA_RATIO,
-    Body,
     CrossSection,
+    Shell,
     drop_at_slope,
-    solve_body,
+    solve_shell,
     width_ratio,
 )
 from yanartas_pillowbox.geometry import MAX_SPREAD_SLOPE, max_lid_offset, min_lid_width
@@ -106,28 +106,28 @@ def curve_clearance(curve: Curve, length: float, a: float, b: float) -> float:
     return _grid_min(f, [length * i / SAMPLES for i in range(SAMPLES + 1)])[1]
 
 
-def section_clearance(body: Body, width: float, height: float) -> float:
+def section_clearance(shell: Shell, width: float, height: float) -> float:
     """Distance in the cross-section from the payload rectangle (width x height, centred) to
     the panels' inner surfaces; negative if the rectangle pokes through them."""
-    a, b, h = width / 2, height / 2, body.thickness / 2
+    a, b, h = width / 2, height / 2, shell.thickness / 2
     return (
         min(
-            curve_clearance(body.front_point, body.front.width, a, b),
-            curve_clearance(body.back_point, body.back.width, a, b),
+            curve_clearance(shell.front_point, shell.front.width, a, b),
+            curve_clearance(shell.back_point, shell.back.width, a, b),
         )
         - h
     )
 
 
-def wall_clearance(body: Body, width: float, depth: float) -> float:
+def wall_clearance(shell: Shell, width: float, depth: float) -> float:
     """Distance in plan from the payload (width x depth, centred) to the inner end walls'
     inner surfaces (the same at both ends)."""
-    half = body.edge_length / 2
+    half = shell.edge_length / 2
 
     def wall(u: float) -> tuple[float, float]:
-        return (body.back_point(u)[0], half - body.back.z(u))
+        return (shell.back_point(u)[0], half - shell.back.z(u))
 
-    return curve_clearance(wall, body.back.width, width / 2, depth / 2) - body.thickness / 2
+    return curve_clearance(wall, shell.back.width, width / 2, depth / 2) - shell.thickness / 2
 
 
 def clearance(cfg: Config) -> float | None:
@@ -135,10 +135,10 @@ def clearance(cfg: Config) -> float | None:
     None: no payload)."""
     if is_empty(cfg):
         return None
-    body = cfg.body
+    shell = cfg.shell
     return min(
-        section_clearance(body, cfg.payload_width, cfg.payload_height),
-        wall_clearance(body, cfg.payload_width, cfg.payload_depth),
+        section_clearance(shell, cfg.payload_width, cfg.payload_height),
+        wall_clearance(shell, cfg.payload_width, cfg.payload_depth),
     )
 
 
@@ -163,15 +163,15 @@ def _r2(v: float) -> float:
 def maximize(cfg: Config, field: str) -> Config:
     """Largest value of one payload dimension that keeps the clearance in the current box."""
     m = cfg.payload_clearance
-    body = cfg.body
+    shell = cfg.shell
     if field == "payload_depth":
-        if section_clearance(body, cfg.payload_width, cfg.payload_height) < m:
+        if section_clearance(shell, cfg.payload_width, cfg.payload_height) < m:
             raise PayloadError(
                 "payload_width", "the payload's width and height already break the clearance"
             )
 
         def ok(v: float) -> bool:
-            return wall_clearance(body, cfg.payload_width, v) >= m
+            return wall_clearance(shell, cfg.payload_width, v) >= m
 
         if not ok(0.0):
             raise PayloadError("payload_clearance", "the clearance leaves no room along the length")
@@ -182,8 +182,8 @@ def maximize(cfg: Config, field: str) -> Config:
 
         def ok(v: float) -> bool:
             w, h = (v, cfg.payload_height) if field == "payload_width" else (cfg.payload_width, v)
-            return section_clearance(body, w, h) >= m and (
-                field == "payload_height" or wall_clearance(body, v, cfg.payload_depth) >= m
+            return section_clearance(shell, w, h) >= m and (
+                field == "payload_height" or wall_clearance(shell, v, cfg.payload_depth) >= m
             )
 
         if not ok(0.0):
@@ -247,7 +247,7 @@ def _candidate(base: Config, r: float) -> tuple[float, float, float] | None:
         return None  # too steep at the sides to widen the ends for the lids
     # The front panel's edge, plus at both ends the outer flaps (sagitta + 1.5 t) or, with a
     # gap, the lids (about the gap, the overlap, the sagitta, 2.5 t and the lid offset beyond
-    # the edge). (The wings' width is left out: it is small and changes slowly with r.)
+    # the edge). (The overhangs' width is left out: it is small and changes slowly with r.)
     gap = base.end_wall_gap
     edge = length + 2 * sagitta + 3 * t + 2 * gap
     reach = sagitta + 1.5 * t
@@ -265,10 +265,10 @@ def _min_width(cfg: Config, height: float, guess: float) -> float | None:
 
     def ok(w: float) -> bool:
         try:
-            body = solve_body(w, height, cfg.length, t)
+            shell = solve_shell(w, height, cfg.length, t)
         except ValueError:  # too narrow to close at this height
             return False
-        return section_clearance(body, cfg.payload_width, cfg.payload_height) >= m
+        return section_clearance(shell, cfg.payload_width, cfg.payload_height) >= m
 
     step = 0.02 * guess + 0.5
     lo, hi = max(cfg.payload_width, guess - step), min(w_max, guess + step)
@@ -327,8 +327,8 @@ def fit_box(cfg: Config) -> Config:
         raise PayloadError("payload_width", "the fitted box would be wider than the limit")
     out = replace(base, width=_r2(_ceil(exact)))
     for _ in range(1000):
-        body, m = out.body, cfg.payload_clearance
-        lids_ok = out.end_wall_gap <= 0 or max_lid_offset(body) >= out.lid_offset
+        shell, m = out.shell, cfg.payload_clearance
+        lids_ok = out.end_wall_gap <= 0 or max_lid_offset(shell) >= out.lid_offset
         if lids_ok and fits(out):
             break
         if not lids_ok:
@@ -339,12 +339,12 @@ def fit_box(cfg: Config) -> Config:
                     "lid_offset", "no box within the width limit allows this lid offset"
                 )
             out = replace(out, width=max(wide, _r2(out.width + ROUND)))
-        elif section_clearance(body, cfg.payload_width, cfg.payload_height) < m:
+        elif section_clearance(shell, cfg.payload_width, cfg.payload_height) < m:
             out = replace(out, width=_r2(out.width + ROUND))
         else:
             # The end walls' clearance grows by exactly half of what the length grows (the
             # walls keep their shape): one step, rounded up.
-            walls = wall_clearance(body, cfg.payload_width, cfg.payload_depth)
+            walls = wall_clearance(shell, cfg.payload_width, cfg.payload_depth)
             length = _r2(_ceil(out.length + 2 * max(m - walls, 0.0)))
             out = replace(out, length=max(length, _r2(out.length + ROUND)))
     try:

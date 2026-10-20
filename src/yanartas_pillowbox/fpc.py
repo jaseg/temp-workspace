@@ -4,7 +4,7 @@ The cable leaves the middle of the front panel's free straight edge (the glued e
 the pattern), outward: the *junction*. In the pattern it runs straight out, away from the
 edge, for the clearance, the inset and a thickness (the stub), turns 90 degrees up (towards
 the top of the pattern, the box's front end) or down along the edge and meanders in rows
-along it, stacked outward (an S), between the end sections beside the edge (the wings, the
+along it, stacked outward (an S), between the end sections beside the edge (the overhangs, the
 lids' glue tabs, or the outer flaps' corners), as few as fit, its turns spread evenly so that
 its tip ends at the side; the last ``plug_length`` of it is the plug that goes into a ZIF
 connector. Every row makes the pattern wider.
@@ -86,7 +86,7 @@ def _unit(a: Point, b: Point) -> Point:
 
 
 def _side(d: Point) -> Point:
-    """The left-hand normal of a run going ``d`` (towards the junction's left end at the
+    """The left normal of a run going ``d`` (towards the junction's left end at the
     start, going up), in ``meander``'s frame."""
     return (d[1], -d[0])
 
@@ -151,22 +151,22 @@ def meander(
         )
     y = y0 - stub - h
     pts: list[Point] = [(xc, y0), (xc, y)]
-    head = ends[1] - xc  # the first row, to its turn
-    if rem <= head + h:  # one row, no turn
+    first_row = ends[1] - xc  # the first row, to its turn
+    if rem <= first_row + h:  # one row, no turn
         pts.append((xc + rem, y))
         return tuple(pts)
-    min_head = max(w, first_run)  # the turn clear of the first corner (and the wall fold)
-    if head < min_head:
+    min_first_row = max(w, first_run)  # the turn clear of the first corner (and the wall fold)
+    if first_row < min_first_row:
         raise CableError(
             "fpc_cable_length", "no room beside the edge's middle for the cable's first turn"
         )
     # The fewest rows n whose folded reach, the tip at its side, holds the cable; then the
     # slack, spread over the 2 (n - 1) turns: each first row's turn, the two turns of every
     # middle row and the last row's turn are each that much farther in.
-    reach = head + h - inset  # less a pitch and a full row per further row
+    reach = first_row + h - inset  # less a pitch and a full row per further row
     n = 1 + math.ceil((rem - reach) / (full - pitch))
     shift = (reach + (n - 1) * (full - pitch) - rem) / (2 * (n - 1))
-    shift = min(shift, head - min_head, (full - w) / 2)  # every row still holds its turns
+    shift = min(shift, first_row - min_first_row, (full - w) / 2)  # every row still holds its turns
     right = True
     for row in range(n - 1):
         end = ends[1] - shift if right else ends[0] + shift
@@ -236,7 +236,7 @@ def layout(cfg: Config) -> CableLayout | None:
     # going up (out of the edge), the first turn to the right (along the edge, up or down).
     junction = ((-w / 2, 0.0), (w / 2, 0.0))
     # The rows clear the end sections beside the edge (beyond the back panel's ends: the
-    # wings, the lids' glue tabs, the outer flaps' corners) by the clearance.
+    # overhangs, the lids' glue tabs, the outer flaps' corners) by the clearance.
     reach = lf / 2 - e - gap
     # The stub clears the edge by the clearance (and the plug's ears), and is a thickness
     # longer: the first row, folded back over it, folds onto the front panel a thickness

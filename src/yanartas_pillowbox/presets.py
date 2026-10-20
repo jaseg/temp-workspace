@@ -3,7 +3,7 @@
 Each preset sets the payload's width (across the box: the board's short side), depth (along
 the box: its long side) and height (the full stack, from the solder joints underneath to the
 tallest connector or add-on board on top). Heights are rounded up and partly estimated from
-typical connector and header heights, so they are a starting point: measure your own board
+typical connector heights, so they are a starting point: measure your own board
 (with cables) before cutting.
 """
 
@@ -33,7 +33,7 @@ PAYLOAD_PRESETS: tuple[PayloadPreset, ...] = (
     PayloadPreset("rpi-b-hat", "Raspberry Pi Model B + HAT", "Raspberry Pi", 56, 85, 22),
     PayloadPreset("rpi-zero", "Raspberry Pi Zero / Zero 2 W", "Raspberry Pi", 30, 65, 6),
     PayloadPreset("rpi-zero-phat", "Raspberry Pi Zero + pHAT", "Raspberry Pi", 30, 65, 16),
-    # Arduino UNO Q: Uno footprint, 68.58 x 53.34 mm; female headers on top, a shield stacks on
+    # Arduino UNO Q: Uno outline, 68.58 x 53.34 mm; female headers on top, a shield stacks on
     # them.
     PayloadPreset("uno-q", "Arduino UNO Q", "Arduino", 53.5, 69, 14),
     PayloadPreset("uno-q-shield", "Arduino UNO Q + shield", "Arduino", 53.5, 69, 24),

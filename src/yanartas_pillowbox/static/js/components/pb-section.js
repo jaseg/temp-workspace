@@ -1,5 +1,5 @@
-// <pb-section>: 2D cross-section of the closed box body (perpendicular to its length), as
-// computed by geometry.build_cross_section. The body is a cylinder between the curved folds,
+// <pb-section>: 2D cross-section of the closed box shell (perpendicular to its length), as
+// computed by geometry.build_cross_section. The shell is a cylinder between the curved folds,
 // so this section holds along the whole straight part of the box.
 
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
@@ -66,7 +66,7 @@ template.innerHTML = `
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
 </style>
 <header>
-  <h2>Body cross-section</h2>
+  <h2>Shell cross-section</h2>
   <div class="info" aria-live="polite"></div>
   <div class="tools">
     <button type="button" data-dims aria-pressed="true" title="Show parameter dimensions">Dimensions</button>
@@ -75,7 +75,7 @@ template.innerHTML = `
     <button type="button" data-zoom="fit" title="Fit to view (double-click)">Fit</button>
   </div>
 </header>
-<div class="stage" role="img" aria-label="Cross-section of the closed box body"></div>
+<div class="stage" role="img" aria-label="Cross-section of the closed box shell"></div>
 <div class="legend"></div>
 `;
 
@@ -142,7 +142,7 @@ export class PbSection extends HTMLElement {
   update(section, dims = [], payload = null) {
     const { width, height } = section;
     this.#info.textContent = `${fmt(width)} × ${fmt(height)} mm`;
-    this.#info.title = "Interior width × height. The body has this cross-section everywhere "
+    this.#info.title = "Interior width × height. The shell has this cross-section everywhere "
       + "between the curved folds.";
     // Drawn back panel up, like the 3D view: the model frame turned 180 degrees.
     this.#data = { section: turnSection(section), dims: dims.map(turnDim), payload };

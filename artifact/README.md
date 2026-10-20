@@ -20,7 +20,7 @@ sha512 against the registry's integrity hash. Pass `--pyodide-tgz FILE` to use a
 | `build.py` | Assembles `dist/`. |
 | `stubs/rtree/` | Stand-in for `rtree`, which needs a C library Pyodide lacks. gerbonara imports it at the top of `gerbonara.cad.kicad.pcb` for a trace look-up index the PCB layout never uses; the stand-in fails loudly if anything does. |
 
-`dist/index.html` is the page body for an Artifact; the viewer adds the document skeleton.
+`dist/index.html` is the page content for an Artifact; the viewer adds the document wrapper.
 `dist/local-test.html` is the same page as a full document.
 
 The build changes the frontend in only a few ways, all to fit the Artifact viewer:

@@ -1,4 +1,4 @@
-"""Cross-section of the closed box body, and the flat panel width that produces it.
+"""Cross-section of the closed box shell, and the flat panel width that produces it.
 
 Pure math (no config, no geometry imports). Notation: ``W`` is the flat width of one panel
 (half the circumference), ``s`` the curved-fold sagitta and ``d`` the closed width of the box
@@ -204,9 +204,9 @@ def curve_samples(width: float) -> int:
 
 
 @dataclass(frozen=True)
-class Body:
-    """Mid-surface geometry of the closed body, made of material of thickness ``t``, whose
-    *interior* is ``width`` x ``height`` x ``length`` (see ``solve_body``).
+class Shell:
+    """Mid-surface geometry of the closed shell, made of material of thickness ``t``, whose
+    *interior* is ``width`` x ``height`` x ``length`` (see ``solve_shell``).
 
     Frame: the 3D model's (X across, Z height), centred on the interior. The **front** panel
     (+Z) carries the outer flaps and has the glue tab on top of it; the **back** panel (-Z)
@@ -222,7 +222,7 @@ class Body:
     in by ``height/2``, the back fold by ``height/2 + t``. On the centreline that puts the
     inner surfaces of the panels at ``Z = +-height/2`` and of the inner wall at
     ``|Y| = length/2``. The inner flaps reach the front panel's inner surface, the outer flaps
-    the back panel's outer surface (flush with the outside of the body).
+    the back panel's outer surface (flush with the outside of the shell).
 
     The glue tab lies on the outside of the front panel: its mid-surface is the front's,
     offset by ``t`` along the outward normal. It leaves G along the tangent at E for
@@ -246,7 +246,7 @@ class Body:
 
     @property
     def edge_length(self) -> float:
-        """Straight body edges, corner to corner."""
+        """Straight shell edges, corner to corner."""
         return edge_length(self.length, self.height, self.thickness)
 
     @property
@@ -391,14 +391,14 @@ class Body:
 
 
 def edge_length(length: float, height: float, thickness: float) -> float:
-    """Straight body edges for an interior ``length`` x ``height``: the inner wall's
+    """Straight shell edges for an interior ``length`` x ``height``: the inner wall's
     mid-surface stands ``t/2`` beyond the interior, at the back fold's apex (``height/2 + t``
     in from the corner line)."""
     return length + height + 3 * thickness
 
 
 def _assemble(xf: float, s_f: float, s_b: float, t: float) -> tuple[float, ...]:
-    """Body pieces for a front panel of closed mid-surface width ``xf``."""
+    """Shell pieces for a front panel of closed mid-surface width ``xf``."""
     wf = panel_width(xf, s_f)
     sf = edge_slope(wf, s_f)
     xb = xf + t / sf  # the glue fold sits t / sin(alpha) beyond the front's free edge
@@ -413,8 +413,8 @@ def _assemble(xf: float, s_f: float, s_b: float, t: float) -> tuple[float, ...]:
 
 
 @lru_cache(maxsize=512)
-def solve_body(width: float, height: float, length: float, thickness: float) -> Body:
-    """Mid-surface body whose interior is ``width`` (inner corner to inner corner) by
+def solve_shell(width: float, height: float, length: float, thickness: float) -> Shell:
+    """Mid-surface shell whose interior is ``width`` (inner corner to inner corner) by
     ``height`` by ``length``. Raises ValueError if an arc is too steep to close."""
     t = thickness
     s_f, s_b = height / 2, height / 2 + t
@@ -427,7 +427,7 @@ def solve_body(width: float, height: float, length: float, thickness: float) -> 
         xf += err  # d(interior)/d(xf) is 1 up to O(t / width)
     p = (xb - vpx - vgx) / 2  # centres the interior on X = 0
     front, back = CrossSection(wf, s_f), CrossSection(wb, s_b)
-    return Body(
+    return Shell(
         width,
         height,
         length,
@@ -442,11 +442,11 @@ def solve_body(width: float, height: float, length: float, thickness: float) -> 
 
 
 def max_height(width: float, thickness: float) -> float:
-    """Largest interior height a body of this interior width can have (to 1 um)."""
+    """Largest interior height a shell of this interior width can have (to 1 um)."""
 
     def ok(h: float) -> bool:
         try:
-            solve_body(width, h, 1.0, thickness)
+            solve_shell(width, h, 1.0, thickness)
         except ValueError:
             return False
         return True

@@ -1,5 +1,5 @@
 // Application controller: builds the parameter form from the server's field specs, renders
-// through /api/render (debounced), persists through PUT /api/config, and handles
+// through /api/render (debounced), persists through PUT /api/config, and runs
 // import/export/reset. Geometry lives entirely in Python; nothing here computes shapes.
 
 import "./components/pb-param.js";
@@ -36,11 +36,11 @@ let meshSeq = 0;
 let meshTimer = 0;
 
 // ----------------------------------------------------------------------------- API helpers
-async function api(method, url, body, { raw = false } = {}) {
+async function api(method, url, content, { raw = false } = {}) {
   const init = { method, headers: {} };
-  if (body instanceof FormData) init.body = body;
-  else if (body !== undefined) {
-    init.body = JSON.stringify(body);
+  if (content instanceof FormData) init.body = content;
+  else if (content !== undefined) {
+    init.body = JSON.stringify(content);
     init.headers["Content-Type"] = "application/json";
   }
   const res = await fetch(url, init);
@@ -68,7 +68,7 @@ function buildForm(specs, presets = []) {
     params.set(spec.name, param);
     groups.get(spec.group).append(param);
   }
-  // Body: compute the smallest box (width, length, height) that holds the payload.
+  // Shell: compute the smallest box (width, length, height) that holds the payload.
   const fit = Object.assign(document.createElement("button"), {
     type: "button",
     className: "group-action",
@@ -77,7 +77,7 @@ function buildForm(specs, presets = []) {
       + "pattern's bounding box. Glue tab and thickness are kept.",
   });
   fit.addEventListener("click", () => payloadAction({ action: "fit" }));
-  groups.get("Body")?.append(fit);
+  groups.get("Shell")?.append(fit);
 
   // Payload: board presets fill in width, depth and height (UI only, not a setting).
   payloadPresets = presets;
@@ -207,7 +207,7 @@ function setMesh(pcb) {
   renderMeshStats(pcb);
 }
 
-/** The mesh's figures, under their own heading in the Derived geometry box (none: hidden). */
+/** The mesh's figures, under their own title in the Derived geometry box (none: hidden). */
 function renderMeshStats(pcb) {
   $("#mesh-stats").hidden = !pcb;
   if (!pcb) return;
@@ -394,9 +394,9 @@ function renderDerived(info, payload) {
 // ----------------------------------------------------------------------------- import/export
 async function importFile(file) {
   if (!file) return;
-  const body = new FormData();
-  body.append("file", file, file.name);
-  const { ok, data } = await api("POST", "/api/import", body, { raw: true });
+  const upload = new FormData();
+  upload.append("file", file, file.name);
+  const { ok, data } = await api("POST", "/api/import", upload, { raw: true });
   if (!ok) {
     showBanner(`Could not import “${file.name}”: ${data.error || "unknown error"}`);
     return;

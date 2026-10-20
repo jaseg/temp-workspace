@@ -5,8 +5,8 @@ Usage: python artifact/build.py [--out DIR] [--pyodide-tgz FILE]
 Writes DIR (default artifact/dist/): the package's geometry modules and pb_api.py, run by
 Pyodide in a web worker (pyworker.js); pyshim.js, which answers the frontend's /api/*
 requests from that worker; and the frontend, unchanged except for the patches below.
-DIR/index.html is the page body for a claude.ai Artifact (the viewer adds the document
-skeleton); DIR/local-test.html is the same page as a full document for local testing
+DIR/index.html is the page content for a claude.ai Artifact (the viewer adds the document
+wrapper); DIR/local-test.html is the same page as a full document for local testing
 (python -m http.server -d DIR).
 
 The Pyodide runtime comes from the npm tarball (downloaded to artifact/.cache/ unless
@@ -165,7 +165,7 @@ def build(out: Path, tgz: Path | None, mesh: bool = True) -> None:
     (out / "py/files.json").write_text(json.dumps(files, indent=1) + "\n")
 
     # Pyodide runtime. Artifacts do not serve .zip files: the standard library ships
-    # base64-encoded as text and pyworker.js hands it to Pyodide as a blob URL.
+    # base64-encoded as text and pyworker.js passes it to Pyodide as a blob URL.
     (out / "pyodide").mkdir()
     with tarfile.open(fileobj=io.BytesIO(pyodide_tarball(tgz)), mode="r:gz") as tar:
         for name in PYODIDE_FILES:
@@ -255,16 +255,16 @@ def build(out: Path, tgz: Path | None, mesh: bool = True) -> None:
     )
     (out / "static/css/app.css").write_text(css)
 
-    # The page: the repo's index.html body, with the shim loaded before the app. No inline
-    # scripts (the viewer's CSP refuses them).
+    # The page: the inside of the repo's index.html <body>, with the shim loaded before the
+    # app. No inline scripts (the viewer's CSP refuses them).
     html = (STATIC / "index.html").read_text()
-    body = html[html.index("<body>") + len("<body>") : html.index("</body>")].strip("\n")
+    inner = html[html.index("<body>") + len("<body>") : html.index("</body>")].strip("\n")
     page = (
         "<title>Pillow Box Designer</title>\n"
         '<link rel="stylesheet" href="static/css/app.css">\n'
         '<script type="module" src="pyshim.js"></script>\n'
         '<script type="module" src="static/js/app.js"></script>\n'
-        f"{body}\n"
+        f"{inner}\n"
     )
     (out / "index.html").write_text(page)
 

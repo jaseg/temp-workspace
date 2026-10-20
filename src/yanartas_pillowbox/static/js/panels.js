@@ -1,6 +1,6 @@
 // Panel layout: draggable dividers between the panels (role="separator", also moved with the
 // arrow keys; double-click resets) and maximizing one preview to fill the layout area (its
-// header button, or Escape, restores). Divider positions are remembered per viewer in
+// title bar button, or Escape, restores). Divider positions are remembered per viewer in
 // localStorage when it is available. The previews refit through their own ResizeObservers.
 
 const KEY = "pb-layout";
@@ -170,7 +170,7 @@ const ICONS = {
   restore: '<path d="M14 6.5H9.5V2M2 9.5h4.5V14M9.5 6.5 14 2.5M6.5 9.5 2 13.5"/>',
 };
 
-/** Maximize/restore button for a preview's header: asks the layout (pb-maximize event) and
+/** Maximize/restore button for a preview's title bar: asks the layout (pb-maximize event) and
  *  follows the host's `maximized` attribute, which the layout sets. */
 export function maximizeButton(host) {
   const button = document.createElement("button");

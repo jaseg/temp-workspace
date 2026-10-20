@@ -74,7 +74,7 @@ def test_progress_lines_name_stage_phase_step_and_figures():
     with progress.listening(events.append), progress.stage("B.Cu", 1, 2):
         progress.report("match", 20, 20)
     assert events[0]["done"] == 1.0
-    progress.report("graph")  # (nobody listening: nothing happens)
+    progress.report("graph")  # (no one listening: nothing happens)
 
 
 def test_side_by_side_runs_both_and_merges_progress():

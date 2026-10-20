@@ -15,16 +15,16 @@ from yanartas_pillowbox.svg import render_svg, sheet_offset
 
 
 class ApiError(Exception):
-    """A request the API refuses: the HTTP ``status`` and the JSON ``body`` to answer with."""
+    """A request the API refuses: the HTTP ``status`` and the JSON ``reply`` to answer with."""
 
-    def __init__(self, status: int, body: dict[str, Any]) -> None:
-        super().__init__(body.get("error"))
+    def __init__(self, status: int, reply: dict[str, Any]) -> None:
+        super().__init__(reply.get("error"))
         self.status = status
-        self.body = body
+        self.reply = reply
 
 
 def parse_config(data: Any) -> Config:
-    """The config of a request body (``{"config": {...}}``, or the config itself)."""
+    """The config of a request's JSON (``{"config": {...}}``, or the config itself)."""
     if not isinstance(data, dict):
         raise ApiError(400, {"error": "expected a JSON object", "errors": {}})
     data = data.get("config", data)
@@ -65,7 +65,7 @@ def render(cfg: Config) -> dict[str, Any]:
 
 
 _progress: dict[str, Any] | None = None  # the PCB layout's latest progress event
-forward: Callable[[dict[str, Any]], None] | None = None  # (also handed each, when set)
+forward: Callable[[dict[str, Any]], None] | None = None  # (also given each, when set)
 
 
 def _track(event: dict[str, Any]) -> None:
@@ -76,7 +76,7 @@ def _track(event: dict[str, Any]) -> None:
 
 
 def layout_progress() -> dict[str, Any]:
-    """``{progress}``: how far the PCB layout in hand (or the last) has got (``progress``'s
+    """``{progress}``: how far the PCB layout in progress (or the last) has got (``progress``'s
     event; null before any)."""
     return {"progress": _progress}
 

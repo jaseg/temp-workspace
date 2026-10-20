@@ -156,7 +156,7 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
             **stroke_attrs(dash),
         },
     )
-    # Slits: cuts inside the outline (the wings' ends on the inner flaps' edges), one open
+    # Slits: cuts inside the outline (the overhangs' ends on the inner flaps' edges), one open
     # path each, so every cut is made once.
     for i, slit in enumerate(pattern.slits):
         ET.SubElement(
@@ -189,8 +189,8 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
     _labels(root, cfg, pattern, offset)
 
     ET.indent(root, space="  ")
-    body = ET.tostring(root, encoding="unicode")
-    return '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + body + "\n"
+    text = ET.tostring(root, encoding="unicode")
+    return '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + text + "\n"
 
 
 def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]:

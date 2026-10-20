@@ -23,17 +23,17 @@ def client(tmp_path):
     return create_app(tmp_path / "s.json").test_client()
 
 
-def call(method, path, body=None, stored=None):
-    reply = json.loads(pb_api.handle(method, path, body, stored))
-    return reply["status"], reply["body"]
+def call(method, path, content=None, stored=None):
+    reply = json.loads(pb_api.serve(method, path, content, stored))
+    return reply["status"], reply["content"]
 
 
-def same(flask_response, status, body):
+def same(flask_response, status, content):
     assert flask_response.status_code == status
     if flask_response.mimetype == "application/json":
-        assert flask_response.get_json() == json.loads(body)
+        assert flask_response.get_json() == json.loads(content)
     else:
-        assert flask_response.get_data(as_text=True) == body
+        assert flask_response.get_data(as_text=True) == content
 
 
 @pytest.mark.parametrize(
@@ -56,9 +56,9 @@ def same(flask_response, status, body):
     ],
 )
 def test_routes_match_server(client, method, path, data):
-    body = None if data is None else json.dumps(data)
-    expected = client.open(path, method=method, data=body, content_type="application/json")
-    same(expected, *call(method, path, body))
+    content = None if data is None else json.dumps(data)
+    expected = client.open(path, method=method, data=content, content_type="application/json")
+    same(expected, *call(method, path, content))
 
 
 def test_import_matches_server(client):
@@ -85,10 +85,10 @@ def test_pcb_files_travel_base64(client):
     import base64
     import zipfile
 
-    body = json.dumps({"config": {"mesh_traces": 2}})
-    reply = json.loads(pb_api.handle("POST", "/api/pcb/files", body, None))
+    content = json.dumps({"config": {"mesh_traces": 2}})
+    reply = json.loads(pb_api.serve("POST", "/api/pcb/files", content, None))
     assert reply["status"] == 200 and reply["type"] == "application/zip"
     assert reply["encoding"] == "base64"
-    names = zipfile.ZipFile(io.BytesIO(base64.b64decode(reply["body"]))).namelist()
-    expected = client.post("/api/pcb/files", data=body, content_type="application/json")
+    names = zipfile.ZipFile(io.BytesIO(base64.b64decode(reply["content"]))).namelist()
+    expected = client.post("/api/pcb/files", data=content, content_type="application/json")
     assert names == zipfile.ZipFile(io.BytesIO(expected.data)).namelist()
