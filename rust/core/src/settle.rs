@@ -154,17 +154,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         let pushes = pmap(look.len(), |k| {
             let i = look[k];
             let lean = -prm.reach_out * dot(tip[i], normal[i]);
-            centring(
-                &tr,
-                &arc,
-                &normal,
-                &verts,
-                &input.edge,
-                &edges,
-                i,
-                lean,
-                &cx,
-            )
+            centring(&tr, &arc, &normal, &verts, cx.edge, cx.edges, i, lean, &cx)
         });
         let mut push = vec![0.0; tr.len()];
         for (k, &i) in look.iter().enumerate() {
@@ -443,12 +433,11 @@ fn centring(
     let (q, n, t) = (tr.p[i], normal[i], tr.net[i]);
     let mut side = [cx.far, cx.far]; // (left, right)
     let look = |r: f64, side: &mut [f64; 2]| {
-        verts.around(q, r, |j| {
-            let v = sub(tr.p[j], q);
-            let dd = norm(v);
-            if dd <= 0.0 || dd > r {
+        verts.within(q, r, |j, d2| {
+            if d2 <= 0.0 {
                 return;
             }
+            let (v, dd) = (sub(tr.p[j], q), d2.sqrt());
             if tr.net[j] == t && (arc[j] - arc[i]).abs() <= cx.own {
                 return;
             }
@@ -467,9 +456,8 @@ fn centring(
     // the edge: the nearest point on either side (most vertices: none near, at once)
     let mut de = [cx.far, cx.far];
     if edges.any_around(q, 2.0 * cx.far) {
-        edges.around(q, 2.0 * cx.far, |e| {
-            let v = sub(edge[e], q);
-            let d = norm(v);
+        edges.within(q, 2.0 * cx.far, |e, d2| {
+            let (v, d) = (sub(edge[e], q), d2.sqrt());
             let k = if dot(v, n) > 0.0 { 0 } else { 1 };
             if dot(v, n) != 0.0 && d < de[k] {
                 de[k] = d;
@@ -544,7 +532,7 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
             let q = check[k];
             let tangent = [normal[q][1], -normal[q][0]];
             let (mut bad, mut count) = (false, 0);
-            segs.around(new[q], reach, |s| {
+            segs.within(new[q], reach, |s, _| {
                 if bad {
                     return;
                 }
@@ -572,8 +560,7 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
             if !bad && cx.edges.any_around(new[q], half) {
                 let near = |at: P| {
                     let mut d = f64::MAX;
-                    cx.edges
-                        .around(at, half, |e| d = d.min(dist(cx.edge[e], at)));
+                    cx.edges.within(at, half, |_, d2| d = d.min(d2.sqrt()));
                     d
                 };
                 let now = near(new[q]);
@@ -598,7 +585,7 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
             let s = touched[k];
             let s1 = tr.next[s];
             let mut out = Vec::new();
-            segs.around(new[s], dist(new[s], new[s1]) + longest, |h| {
+            segs.within(new[s], dist(new[s], new[s1]) + longest, |h, _| {
                 if h == s || h == tr.prev[s] || h == s1 {
                     return;
                 }
@@ -627,7 +614,7 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
             if tr.next[b] != NONE {
                 next.push(tr.next[b]);
             }
-            segs.around(old[b], reach + grow, |s| {
+            segs.within(old[b], reach + grow, |s, _| {
                 next.push(s);
                 next.push(tr.next[s]);
             });

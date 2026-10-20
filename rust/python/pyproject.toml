@@ -13,3 +13,15 @@ dynamic = ["version"]
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "yanartas_mesh"
+
+[tool.uv]
+# (rebuilt by uv sync whenever the Rust sources change)
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "src/**/*.rs" },
+    { file = "../Cargo.toml" },
+    { file = "../Cargo.lock" },
+    { file = "../core/Cargo.toml" },
+    { file = "../core/src/**/*.rs" },
+]

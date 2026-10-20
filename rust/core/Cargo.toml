@@ -11,3 +11,4 @@ parallel = ["dep:rayon"]
 
 [dependencies]
 rayon = { version = "1.10", optional = true }
+wide = "1.0"

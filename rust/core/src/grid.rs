@@ -1,6 +1,10 @@
 //! A flat bucket grid of points (a counting sort by cell), for every point within a radius
 //! of a query. Cells are half the usual radius, so a look-up scans about 5 x 5 cells: fewer
-//! points to reject than 3 x 3 cells as wide as the radius.
+//! points to reject than 3 x 3 cells as wide as the radius. The points' coordinates are kept
+//! in cell order (x and y apart), so that `within` tests four at a time (SIMD: WebAssembly's
+//! simd128 in the browser, SSE/AVX natively).
+
+use wide::f64x4;
 
 use crate::geom::P;
 
@@ -12,6 +16,8 @@ pub struct Grid {
     h: usize,
     start: Vec<u32>, // (per cell, into `items`; one more than cells)
     items: Vec<u32>,
+    xs: Vec<f64>, // (each item's point, in the same order)
+    ys: Vec<f64>,
 }
 
 impl Grid {
@@ -37,6 +43,8 @@ impl Grid {
             h,
             start: vec![0; w * h + 1],
             items: Vec::new(),
+            xs: Vec::new(),
+            ys: Vec::new(),
         };
         let mut key = vec![u32::MAX; p.len()];
         for (i, q) in p.iter().enumerate() {
@@ -57,7 +65,54 @@ impl Grid {
                 fill[k as usize] += 1;
             }
         }
+        g.xs = g.items.iter().map(|&i| p[i as usize][0]).collect();
+        g.ys = g.items.iter().map(|&i| p[i as usize][1]).collect();
         g
+    }
+
+    /// Each point no further than `r` from `q`, with its squared distance (four tested at a
+    /// time).
+    #[inline]
+    pub fn within(&self, q: P, r: f64, mut f: impl FnMut(usize, f64)) {
+        let (i0, i1) = (
+            self.cx(q[0] - r).max(0),
+            self.cx(q[0] + r).min(self.w as i64 - 1),
+        );
+        let (j0, j1) = (
+            self.cy(q[1] - r).max(0),
+            self.cy(q[1] + r).min(self.h as i64 - 1),
+        );
+        let r2 = r * r;
+        let (qx, qy, rr) = (f64x4::splat(q[0]), f64x4::splat(q[1]), f64x4::splat(r2));
+        for j in j0..=j1 {
+            let row = j as usize * self.w;
+            // (a row's cells are consecutive in the arrays: one run)
+            let a = self.start[row + i0 as usize] as usize;
+            let b = self.start[row + i1 as usize + 1] as usize;
+            let mut k = a;
+            while k + 4 <= b {
+                let dx = f64x4::from(<[f64; 4]>::try_from(&self.xs[k..k + 4]).unwrap()) - qx;
+                let dy = f64x4::from(<[f64; 4]>::try_from(&self.ys[k..k + 4]).unwrap()) - qy;
+                let d2 = dx * dx + dy * dy;
+                let hit = d2.simd_le(rr).to_bitmask();
+                if hit != 0 {
+                    let d2 = d2.to_array();
+                    for (l, &d) in d2.iter().enumerate() {
+                        if hit & (1 << l) != 0 {
+                            f(self.items[k + l] as usize, d);
+                        }
+                    }
+                }
+                k += 4;
+            }
+            for k in k..b {
+                let (dx, dy) = (self.xs[k] - q[0], self.ys[k] - q[1]);
+                let d = dx * dx + dy * dy;
+                if d <= r2 {
+                    f(self.items[k] as usize, d);
+                }
+            }
+        }
     }
 
     #[inline]
