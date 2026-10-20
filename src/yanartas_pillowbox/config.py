@@ -79,7 +79,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "width",
         "Box width",
         "float",
-        "Body",
+        "Shell",
         "mm",
         10,
         1000,
@@ -92,7 +92,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "length",
         "Box length",
         "float",
-        "Body",
+        "Shell",
         "mm",
         10,
         2000,
@@ -106,7 +106,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "end_wall_gap",
         "End wall gap",
         "float",
-        "Body",
+        "Shell",
         "mm",
         0,
         500,
@@ -120,7 +120,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "lid_overlap",
         "Lid overlap",
         "float",
-        "Body",
+        "Shell",
         "mm",
         0,
         200,
@@ -133,7 +133,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "lid_offset",
         "Lid offset",
         "float",
-        "Body",
+        "Shell",
         "mm",
         0,
         100,
@@ -147,7 +147,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "height",
         "Box height",
         "float",
-        "Body",
+        "Shell",
         "mm",
         0.5,
         640,
@@ -461,7 +461,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         5,
         0.05,
         help="Width, height and length are interior dimensions; the pattern adds the material "
-        "around them. The front panel's flaps close on the outside, flush with the body; "
+        "around them. The front panel's flaps close on the outside, flush with the shell; "
         "the back panel's flaps are shortened to fit inside.",
     ),
     FieldSpec(
@@ -521,9 +521,9 @@ class Config:
 
     # ----------------------------------------------------------------- derived values
     @property
-    def body(self) -> crosssection.Body:
-        """Mid-surface geometry of the closed body around the interior (cached)."""
-        return crosssection.solve_body(self.width, self.height, self.length, self.thickness)
+    def shell(self) -> crosssection.Shell:
+        """Mid-surface geometry of the closed shell around the interior (cached)."""
+        return crosssection.solve_shell(self.width, self.height, self.length, self.thickness)
 
     @property
     def edge_length(self) -> float:
@@ -652,7 +652,7 @@ def validate(cfg: Config) -> dict[str, str]:
         # meet at a real fold: sagitta <= MAX_SAGITTA_RATIO * W for both panels, which bounds
         # the height for a given width (see crosssection.max_height).
         try:
-            _ = cfg.body
+            _ = cfg.shell
         except ValueError:
             max_height = crosssection.max_height(cfg.width, cfg.thickness)
             add(
@@ -667,11 +667,11 @@ def validate(cfg: Config) -> dict[str, str]:
             "to be at least 0.25 mm",
         )
 
-    # Checks below need the flat panel widths, which only exist for a valid body.
-    body = None if errors.keys() & {"width", "height", "thickness"} else cfg.body
+    # Checks below need the flat panel widths, which only exist for a valid shell.
+    shell = None if errors.keys() & {"width", "height", "thickness"} else cfg.shell
 
-    if body is not None and "glue_tab_width" not in errors:
-        panel = body.front.width
+    if shell is not None and "glue_tab_width" not in errors:
+        panel = shell.front.width
         if cfg.glue_tab_width >= panel:
             add(
                 "glue_tab_width",
@@ -680,14 +680,14 @@ def validate(cfg: Config) -> dict[str, str]:
             )
 
     if (
-        body is not None
+        shell is not None
         and cfg.end_wall_gap > 0
         and not errors.keys() & {"end_wall_gap", "lid_offset"}
     ):
         # (geometry imports this module)
         from yanartas_pillowbox.geometry import max_lid_offset, min_lid_width
 
-        limit = max_lid_offset(body)
+        limit = max_lid_offset(shell)
         if limit < 0:
             add(
                 "end_wall_gap",
@@ -703,13 +703,13 @@ def validate(cfg: Config) -> dict[str, str]:
                 f"widened ends would have to turn past 45 degrees at the sides){hint}",
             )
 
-    if body is not None and cfg.fpc_cutout != "none" and "fpc_cutout_width" not in errors:
-        limit = body.back.width - 1
+    if shell is not None and cfg.fpc_cutout != "none" and "fpc_cutout_width" not in errors:
+        limit = shell.back.width - 1
         if cfg.fpc_cutout_width > limit:
             add(
                 "fpc_cutout_width",
                 f"must be at most {_fmt(limit)} mm (the inner flaps' width, "
-                f"{_fmt(body.back.width)} mm, minus 1 mm)",
+                f"{_fmt(shell.back.width)} mm, minus 1 mm)",
             )
 
     fpc_fields = {
@@ -728,7 +728,7 @@ def validate(cfg: Config) -> dict[str, str]:
     for name in ("mesh_traces", "mesh_partitions", "mesh_seed"):
         if name not in errors and getattr(cfg, name) != int(getattr(cfg, name)):
             add(name, "must be a whole number")
-    if body is not None and cfg.fpc_cable != "none" and not errors.keys() & fpc_fields:
+    if shell is not None and cfg.fpc_cable != "none" and not errors.keys() & fpc_fields:
         from yanartas_pillowbox import fpc  # (fpc imports this module)
 
         width = fpc.cable_width(cfg)

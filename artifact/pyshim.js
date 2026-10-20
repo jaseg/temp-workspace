@@ -99,17 +99,17 @@ window.fetch = async (input, init = {}) => {
     });
   }
   if (method === "POST" && url.pathname === "/api/pcb") progress = null;
-  let body = init.body ?? null;
-  if (body instanceof FormData) {
-    const file = body.get("file");
-    body = file ? await file.text() : "";
+  let content = init.body ?? null;
+  if (content instanceof FormData) {
+    const file = content.get("file");
+    content = file ? await file.text() : "";
   }
   const stored = method === "GET" && url.pathname === "/api/config" ? readStore() : null;
-  const reply = await call({ method, path: url.pathname, body, stored });
+  const reply = await call({ method, path: url.pathname, content, stored });
   if (method === "PUT" && url.pathname === "/api/config" && reply.status === 200) {
-    writeStore(JSON.parse(reply.body).config);
+    writeStore(JSON.parse(reply.content).config);
   }
-  let payload = reply.body;
+  let payload = reply.content;
   if (reply.encoding === "base64") { // binary (the PCB files' zip)
     const bin = atob(payload);
     payload = new Uint8Array(bin.length);

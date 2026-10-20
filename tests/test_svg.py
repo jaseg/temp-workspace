@@ -46,7 +46,7 @@ def test_outline_is_one_closed_path(cfg):
     root = svg_elements(render_svg(cfg))
     cut_layer = root.find(f"{q('g')}[@id='cut']")
     paths = cut_layer.findall(q("path"))
-    # The outline, plus with widened ends one open slit at each (a wing's end on the inner
+    # The outline, plus with widened ends one open slit at each (a overhang's end on the inner
     # flap's cut edge), each cut once.
     pattern = build_pattern(cfg)
     assert len(paths) == 1 + len(pattern.slits)
@@ -155,7 +155,7 @@ def test_fold_paths_are_open_and_single(cfg):
     root = svg_elements(render_svg(cfg))
     els = list(fold_elements(root))
     pattern = build_pattern(cfg)
-    # + the lids' folds and the front folds continued over the wings, at each end, and the
+    # + the lids' folds and the front folds continued over the overhangs, at each end, and the
     # FPC cable's corners
     cable = len(pattern.cable.folds) if pattern.cable else 0
     assert len(els) == len(pattern.folds) + cable
@@ -177,7 +177,7 @@ def test_fold_paths_do_not_overlap_cut_in_svg(cfg):
     folds = {el.get("id"): parse_path(el.get("d"))[1] for el in fold_elements(root)}
     for name, segs in folds.items():
         for p in (segs[0].start, segs[-1].end):
-            # (where a front fold runs on into a wing's, it ends on the other fold)
+            # (where a front fold runs on into a overhang's, it ends on the other fold)
             on_fold = any(
                 min(s.distance_to(p) for s in other) < 1e-5
                 for key, other in folds.items()

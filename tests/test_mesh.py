@@ -30,7 +30,7 @@ def test_spacing_sees_islands_but_not_the_edge():
 
 
 def test_skew():
-    """Total: the difference in length; local: the most one runs ahead of the other."""
+    """Total: the difference in length; local: the most one is longer than the other so far."""
     a = [(0, 0), (10, 0), (20, 0)]
     b = [(0, 0.3), (10, 0.3), (20, 0.3)]
     assert mesh.skew(a, b) == pytest.approx((0, 0), abs=0.3)

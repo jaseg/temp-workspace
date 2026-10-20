@@ -353,7 +353,7 @@ export class PbPreview3d extends HTMLElement {
       : { normal: "#4f545b", hl: "#c2410c" };
   }
 
-  /** Dimension lines, extension lines, arrowheads and text labels; drawn on top of the box. */
+  /** Dimension lines, extension lines, arrow tips and text labels; drawn on top of the box. */
   #buildDims(dims, size = this.#size) {
     this.#lastDims = dims;
     if (this.#dims) {

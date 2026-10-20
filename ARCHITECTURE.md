@@ -7,10 +7,10 @@
 ## 1. What the app does
 
 `yanartas-pillowbox` generates laser-cuttable SVG patterns for pillow boxes: a two-panel
-body with lens-shaped end flaps folded along curved creases. The input is the box's
+shell with lens-shaped end flaps folded along curved creases. The input is the box's
 interior size and the material thickness. A local web UI shows the flat pattern, a folded
-3D model and the body's cross-section, with dimensions, a payload volume and board
-presets. The same SVG can be generated headless from the CLI.
+3D model and the shell's cross-section, with dimensions, a payload volume and board
+presets. The same SVG can be generated from the command line.
 
 ## 2. Application architecture
 
@@ -32,7 +32,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | Module | Role |
 |---|---|
 | `config.py` | `Config`, a frozen dataclass and the single validated input. It also holds `FieldSpec` metadata that drives the UI form, `from_dict` (the only entry point for untrusted data), cross-field validation, and the schema version (other versions are rejected). |
-| `crosssection.py` | Pure math for the closed body: one panel's cross-section (`CrossSection`), the panel width solver, and `Body`, the material model around the interior (section 4.3). |
+| `crosssection.py` | Pure math for the closed shell: one panel's cross-section (`CrossSection`), the panel width solver, and `Shell`, the material model around the interior (section 4.3). |
 | `mesh.py` | What the mesh layouts share: the `Mesh` result, `MeshError`, the side bits, `straighten`, a nearest-point `Grid`, and the metrics: `spacing` (the space between traces along them) and `skew` (neighbouring traces as a differential pair). Needs numpy. |
 | `kimesh.py` | The security mesh generator, a port of KiMesh: tiles, the randomized depth-first walk over the cells inside a mask, and joining each net's segments into one path. Needs shapely. |
 | `sfc.py` | The second mesh layout: a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across the folds as seldom as possible, relaxed to an even spacing, the traces offset from it, then settled by the Rust core (`yanartas_mesh`). Needs shapely and numpy. |
@@ -45,7 +45,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | `payload.py` | Payload clearance, per-field maximize, and *Fit box to payload*. |
 | `scad.py` | OpenSCAD model of the interior: the payload space and the end spaces. |
 | `presets.py` | Board sizes for the payload dropdown. |
-| `api.py` | The JSON API apart from its transport: request config parsing (`ApiError` carries the status and body of a refusal), `render` (SVG, model, section, info, dimensions and payload summary in one response), the payload actions and the defaults. The Flask server and the in-browser build (`artifact/pb_api.py`) both route to it. |
+| `api.py` | The JSON API apart from its transport: request config parsing (`ApiError` carries the status and reply of a refusal), `render` (SVG, model, section, info, dimensions and payload summary in one response), the payload actions and the defaults. The Flask server and the in-browser build (`artifact/pb_api.py`) both route to it. |
 | `server.py` | Flask app bound to 127.0.0.1, serving the UI and `/api/*`. |
 | `persistence.py`, `cli.py` | Settings file (`./yanartas-pillowbox.json`), and the `serve` / `generate` / `pcb` commands. |
 
@@ -57,7 +57,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 - `pb-preview2d` shows the SVG with pan and zoom.
 - `pb-preview3d` uses vendored three.js r160.
 - `pb-section` draws the cross-section.
-- `panzoom.js` is the 2D views' shared wheel, drag and pinch handling.
+- `panzoom.js` is the 2D views' shared wheel, drag and pinch input.
 - `dims2d.js` draws 2D dimensions at a constant on-screen text size.
 - `meshtex.js` draws the PCB layout's copper into a canvas: the 2D view shows it as one
   image under the lines (and the visible part again at screen resolution when zoomed in),
@@ -67,8 +67,8 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 The browser never computes geometry: an edit posts the config, and the views redraw from
 the response.
 
-**Caching:** `solve_body` is `lru_cache`d on their (hashable) inputs.
-One render touches the same body many times, so this keeps a render under about 100 ms.
+**Caching:** `solve_shell` is `lru_cache`d on their (hashable) inputs.
+One render touches the same shell many times, so this keeps a render under about 100 ms.
 
 ## 3. Test suite architecture
 
@@ -147,7 +147,7 @@ only on `r = s/W`, so the panel width for a given closed width and sagitta is a 
 bisection on `c(r)/r` (`crosssection.panel_width`). `CrossSection.x(u)` uses a Simpson
 table for fast repeated evaluation.
 
-### 4.3 Material thickness (`crosssection.Body`)
+### 4.3 Material thickness (`crosssection.Shell`)
 
 Inputs are **interior** dimensions, and the mid-surface lies `t/2` outside the interior.
 
@@ -157,8 +157,8 @@ Inputs are **interior** dimensions, and the mid-surface lies `t/2` outside the i
   follows from the stacking, it is not a modelling choice. With the model centred on the
   interior (`z_shift = t/2`), the panels' inner surfaces sit at `±height/2`.
 - **Flap reach.** Outer flaps reach the back panel's **outer** surface (flush with the
-  body); inner flaps stop at the front panel's **inner** surface.
-- **Cut edges.** Cut edges are not arcs. `Body.front_cuts` and `Body.back_cuts` sample the
+  shell); inner flaps stop at the front panel's **inner** surface.
+- **Cut edges.** Cut edges are not arcs. `Shell.front_cuts` and `Shell.back_cuts` sample the
   target surface. `surface_z(panel, offset, X)` finds the panel point at that `X` on the
   surface offset along the normal, by bisection on `u` with tangent extension beyond the
   panel ends. Inner cuts are clipped at the chord, with the exact chord-leaving point
@@ -171,7 +171,7 @@ Inputs are **interior** dimensions, and the mid-surface lies `t/2` outside the i
   `s = u + t·(α − asin f'(u))`, solved by Newton iteration, which keeps it isometric.
 - **Width solve.** The interior width runs between the **mitred inner corners**: the
   intersections of the panels' inner-surface tangent lines at each side fold.
-  `solve_body` finds the front panel's closed width by fixed-point iteration (the
+  `solve_shell` finds the front panel's closed width by fixed-point iteration (the
   derivative is about 1), then centres the interior on `X = 0`.
 
 ### 4.4 End wall gap
@@ -198,8 +198,8 @@ planes by `e` accordingly; everything stays an exact isometric folding.
 - **Widened ends.** The two folds meet where `f(x) = level / 2`: over the gap, the front
   panel's fold arc and cross-section run on past both edges (`CrossSection.x_ext/z_ext`,
   the arc continued, valid below 45°) by `spread` on each side. In the pattern these are
-  the front panel's wings, with their own curved folds continuing the panel's. At the
-  straight fold the wing's end is the inner flap's cut edge itself: that stretch is a slit
+  the front panel's overhangs, with their own curved folds continuing the panel's. At the
+  straight fold the overhang's end is the inner flap's cut edge itself: that stretch is a slit
   (`Pattern.slits`, a cut with material on both sides), written as its own open path. The outer
   flap is a lens between the continued front fold and the lid's fold. `max_lid_offset`
   limits the offset so the continued arc turns at most `MAX_SPREAD_SLOPE`.
@@ -207,9 +207,9 @@ planes by `e` accordingly; everything stays an exact isometric folding.
   the crease's ends to the free edge) are glue folds carrying square tabs `g` wide
   (`lid-tab-{end}-{side}` faces, kind `tab`). Over the inner flap, `_lid_tab_right` butts
   the tab up against the flap's cut edge where that rises above the crease's end; the
-  piece that leaves beside the wing is cut out (`Pattern.scraps`, a closed loop of slits).
-  In 3D a tab is a flat panel on the wing's tangent plane at the lid's side.
-- **Glue tab taper.** `glue_tab_taper` cuts the body's glue tab back only as far as keeps
+  piece that leaves beside the overhang is cut out (`Pattern.scraps`, a closed loop of slits).
+  In 3D a tab is a flat panel on the overhang's tangent plane at the lid's side.
+- **Glue tab taper.** `glue_tab_taper` cuts the shell's glue tab back only as far as keeps
   it, glued from the back panel's end on, off the front panel's fold arc: square where the
   gap leaves room, at most 45°.
 - **Views.** The 3D and section views show the model turned half a turn about its length,
@@ -436,7 +436,7 @@ an exact isometry: the panels curve along it, not across it.
   it), otherwise a status line per step. The web UI polls `GET /api/progress` while a PCB
   layout runs (the latest event: the server keeps it; in the browser build the worker posts
   each to the page, and `pyshim.js` answers the poll) and shows a bar and the phase in the
-  header. The lengths' differences are shown only once matching: settling's swing wide.
+  top bar. The lengths' differences are shown only once matching: settling's swing wide.
 - **Later.** The rest of the curve layout in Rust; an alignment field (the reference's
   needles) to lay the curve along the edges; a hard skew limit in settling
   (dropped: it cost coverage; steering and matching keep the skew within 10 mm instead):

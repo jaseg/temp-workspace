@@ -215,8 +215,8 @@ class _Progress:
 
 def _status(e: dict) -> str:
     """One line of a progress event: its stage and phase, step, and figures."""
-    head = f"{e['stage']}: " if e["stage"] else ""
-    text = f"{head}{e['phase']}"
+    prefix = f"{e['stage']}: " if e["stage"] else ""
+    text = f"{prefix}{e['phase']}"
     if e["steps"] > 1:
         text += f" {e['step']}/{e['steps']}"
     parts = []

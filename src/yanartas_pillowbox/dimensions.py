@@ -82,11 +82,11 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
 
     Width, length and height are interior dimensions: where they are measured inside the
     material, the measured points sit off the drawn lines by the material allowance."""
-    body = cfg.body
-    wf, wb = body.front.width, body.back.width
+    shell = cfg.shell
+    wf, wb = shell.front.width, shell.back.width
     edge, g, t = cfg.edge_length, cfg.glue_tab_width, cfg.thickness
     taper = pattern.info["glue_tab_taper"]
-    e, front_edge, s_f = cfg.end_wall_gap, cfg.front_length, body.front.sagitta
+    e, front_edge, s_f = cfg.end_wall_gap, cfg.front_length, shell.front.sagitta
     dx, dy = offset
     x0, y0, x1, y1 = pattern.bbox
     # Outer dimension lines sit outside the sheet (pattern + margin), so they never cover it.
@@ -97,7 +97,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
 
     # Interior length along the back panel's midline, between the inner end walls (its
     # flaps): their inner surfaces stand t/2 inside the back panel's curved folds.
-    s_b = body.back.sagitta
+    s_b = shell.back.sagitta
     ya, yb = e + s_b + t / 2, e + edge - s_b - t / 2
     # Interior height across a back panel (inner) flap: from t/2 inside the fold (the back
     # panel's inner surface) to the cut edge (the front panel's inner surface). Taken on the
@@ -105,13 +105,13 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
     # to where the edge would be without the cut.
     xh = wf + wb / 2
     cut = {end for end in ("front", "back") if cfg.fpc_cutout in (end, "both")}
-    reach = body.back_cuts[len(body.back_cuts) // 2][1] if len(cut) == 2 else None
+    reach = shell.back_cuts[len(shell.back_cuts) // 2][1] if len(cut) == 2 else None
     if cut == {"front"}:
         y_cut = pattern.face("back-bottom-flap").y_range(xh)[1]
-        y_fold = e + edge - body.back.sagitta + t / 2
+        y_fold = e + edge - shell.back.sagitta + t / 2
     else:
         y_cut = e - reach if reach is not None else pattern.face("back-top-flap").y_range(xh)[0]
-        y_fold = e + body.back.sagitta - t / 2
+        y_fold = e + shell.back.sagitta - t / 2
     # End wall gap, on the front panel's midline at the bottom end: from the outer wall's
     # inner surface (t/2 inside the front's curved fold) to the inner wall's outer surface.
     yg = (front_edge - s_f - t / 2, front_edge - e - s_f - t / 2)
@@ -194,7 +194,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
 
 # ------------------------------------------------------------------------- cross-section
 def section_dimensions(cfg: Config, section: dict[str, Any]) -> list[Dimension]:
-    """Dimensions for the body cross-section, in its (X, Z) frame (Z up). Width and height
+    """Dimensions for the shell cross-section, in its (X, Z) frame (Z up). Width and height
     are measured on the interior (the material's inner surfaces)."""
     front, inner = section["front"], section["inner"]
     x0, z0, x1, z1 = section["bbox"]
@@ -219,7 +219,7 @@ def section_dimensions(cfg: Config, section: dict[str, Any]) -> list[Dimension]:
         # Part of the (computed) circumference: the front panel's arc.
         Dimension(
             "circumference",
-            f"front panel {fmt(cfg.body.front.width)}",
+            f"front panel {fmt(cfg.shell.front.width)}",
             "path",
             tuple(tuple(q) for q in front),
             polyline_length(front),
@@ -233,10 +233,10 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
     """Dimensions for the 3D preview, in the model frame (X across, Y length, Z height),
     measured on the interior."""
     box = FoldedBox(cfg)
-    body = box.body
-    wf, length, s_f, t = body.front.width, cfg.front_length, body.front.sagitta, cfg.thickness
+    shell = box.shell
+    wf, length, s_f, t = shell.front.width, cfg.front_length, shell.front.sagitta, cfg.thickness
     e = cfg.end_wall_gap
-    x0, x1 = body.inner_glue[0], body.inner_fold[0]
+    x0, x1 = shell.inner_glue[0], shell.inner_fold[0]
     gap = 0.12 * max(length, x1 - x0)
 
     def add(a: Point3, v: Coords, k: float = 1.0) -> Coords:
@@ -264,7 +264,7 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
     # Length: along the back panel's midline (the ridge on the side the view shows up), between
     # the inner end walls' inner surfaces, t/2 inside the back panel's curved folds; drawn
     # beyond the back panel (-Z).
-    wb, s_b = body.back.width, body.back.sagitta
+    wb, s_b = shell.back.width, shell.back.sagitta
     a = box.map("back-panel", (wf + wb / 2, e + s_b + t / 2))
     b = box.map("back-panel", (wf + wb / 2, length - e - s_b - t / 2))
     off = (0.0, 0.0, -gap * 0.6)
@@ -273,7 +273,7 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
     if e > 0 and lid is not None:
         # End wall gap, in line with the length at the far end (-Y), on the centreline under
         # the lid: from the inner wall's outer surface to the outer wall's inner surface.
-        z = body.z_shift + lid.level - s_f + t / 2  # the lid's inner surface there
+        z = shell.z_shift + lid.level - s_f + t / 2  # the lid's inner surface there
         a = (0.0, -(cfg.length / 2 + t), z)
         b = (0.0, -(cfg.length / 2 + t + e), z)
         dims.append(offset_dim("end_wall_gap", f"gap {fmt(e)}", a, b, off, 1.15, 0.5))
@@ -292,19 +292,19 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
         # Lid offset, where the lid comes closest to the back panel, over the overlap at the
         # near end: from where the lid's mid-surface would rest (a thickness outside the back
         # panel's) up to where it floats; drawn beside, outward across the box.
-        zs, front = body.z_shift, body.front
+        zs, front = shell.z_shift, shell.front
         n = curve_samples(wf)
         us = [wf * i / n for i in range(n + 1)]
 
         def float_at(u: float) -> float:
-            x3 = body.front_point(u)[0]
-            return body.surface_z("back", t, x3) - (zs + lid.level - front.z(u))
+            x3 = shell.front_point(u)[0]
+            return shell.surface_z("back", t, x3) - (zs + lid.level - front.z(u))
 
         u = min(us, key=float_at)
-        x3 = body.front_point(u)[0]
-        y_int = e + (zs - body.surface_z("back", 0.0, x3)) + cfg.lid_overlap / 2
+        x3 = shell.front_point(u)[0]
+        y_int = e + (zs - shell.surface_z("back", 0.0, x3)) + cfg.lid_overlap / 2
         y3 = length / 2 - y_int
-        a = (x3, y3, body.surface_z("back", t, x3))
+        a = (x3, y3, shell.surface_z("back", t, x3))
         b = (x3, y3, zs + lid.level - front.z(u))
         side = (math.copysign(gap * 0.35, x3 or 1.0), 0.0, 0.0)
         label = f"lid offset {fmt(cfg.lid_offset)}"
@@ -331,7 +331,7 @@ def model_dimensions(cfg: Config) -> list[Dimension]:
 
     # Width: across the interior from inner corner to inner corner, at the near end of the
     # back panel (where the corners end).
-    z = (body.inner_glue[1] + body.inner_fold[1]) / 2
+    z = (shell.inner_glue[1] + shell.inner_fold[1]) / 2
     a, b = (x0, -cfg.edge_length / 2, z), (x1, -cfg.edge_length / 2, z)
     y_line = -length / 2 - gap * 0.6
     la, lb = (a[0], y_line, 0.0), (b[0], y_line, 0.0)

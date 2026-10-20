@@ -62,7 +62,7 @@ def test_curved_fold_length_matches_closing_edge():
     folds = {f.name: f.segment for f in pat.folds}
     radius = pat.info["front_fold_radius"]
     assert pat.info["back_fold_radius"] == pytest.approx(radius)
-    theta = 2 * math.asin(cfg.body.front.width / 2 / radius)
+    theta = 2 * math.asin(cfg.shell.front.width / 2 / radius)
     analytic = radius * theta
     for end in ("top", "bottom"):
         front, back = folds[f"front-{end}"], folds[f"back-{end}"]
@@ -118,11 +118,11 @@ def test_length_is_the_midline_between_fold_apexes(cfg):
 
 def test_end_sections_widen_the_front_panel(cfg):
     """With an end wall gap, over the gap the front panel runs on past both edges (the
-    wings) by the lid's spread, along its own fold arc continued; the wings' other edges
-    are cut, and at the straight fold the wing stops short of the inner flap's cut edge."""
+    overhangs) by the lid's spread, along its own fold arc continued; the overhangs' other edges
+    are cut, and at the straight fold the overhang stops short of the inner flap's cut edge."""
     pat = build_pattern(cfg)
     lid = lid_layout(cfg)
-    e, wf, length = cfg.end_wall_gap, cfg.body.front.width, cfg.front_length
+    e, wf, length = cfg.end_wall_gap, cfg.shell.front.width, cfg.front_length
     on_fold = [pat.fold("panels").segment.distance_to((wf, y)) < 1e-9 for y in (e, length / 2)]
     assert on_fold == [True, True]
     if lid is None:
@@ -139,22 +139,22 @@ def test_end_sections_widen_the_front_panel(cfg):
     assert left.start == pytest.approx((-sp, -lid.drop)) and left.end == (0.0, 0.0)
     assert right.start == (wf, 0.0) and right.end == pytest.approx((wf + sp, -lid.drop))
     for name, x in (("front-top-left", -sp / 2), ("front-top-right", wf + sp / 2)):
-        wing = pat.face(name)
-        lo, hi = wing.y_range(x)
+        overhang = pat.face(name)
+        lo, hi = overhang.y_range(x)
         assert pat.outline.distance_to((x, lo)) > 1e-3  # the fold
-        # Cut at the gap's end: on the outline, or (right wing) the slit by the inner flap.
+        # Cut at the gap's end: on the outline, or (right overhang) the slit by the inner flap.
         cuts = [*pat.outline.segments, *(seg for slit in pat.slits for seg in slit)]
         assert min(seg.distance_to((x, hi)) for seg in cuts) < 1e-9
         assert hi == pytest.approx(e) or name.endswith("right")
-    # At the straight fold the wing ends on the inner flap's cut edge: one cut (a slit,
-    # inside the outline) separates them, from the back panel's corner to the wing's side.
-    flap, wing = pat.face("back-top-flap"), pat.face("front-top-right")
+    # At the straight fold the overhang ends on the inner flap's cut edge: one cut (a slit,
+    # inside the outline) separates them, from the back panel's corner to the overhang's side.
+    flap, overhang = pat.face("back-top-flap"), pat.face("front-top-right")
     for i in range(1, 50):
         x = wf + sp * i / 50
-        assert flap.y_range(x)[0] == pytest.approx(wing.y_range(x)[1], abs=1e-9)
+        assert flap.y_range(x)[0] == pytest.approx(overhang.y_range(x)[1], abs=1e-9)
     slit = pat.slits[0]
     assert slit[0].start == (wf, e) and slit[-1].end[0] == pytest.approx(wf + sp)
-    # joins the outline at the wing's side (or, past a lid's glue tab, its scrap's cut)
+    # joins the outline at the overhang's side (or, past a lid's glue tab, its scrap's cut)
     beside = [*pat.outline.segments, *(seg for loop in pat.scraps for seg in loop)]
     assert min(seg.distance_to(slit[-1].end) for seg in beside) < 1e-9
     assert pat.outline.distance_to(slit[0].start) > 1e-3  # and ends inside, at the corner
@@ -200,14 +200,14 @@ def test_bbox_covers_everything(cfg):
     spread = 0.0 if lid_layout(cfg) is None else lid_layout(cfg).spread  # the bands, at x < 0
     # (and with lids, their glue tabs beside the bands)
     tabs = 0.0 if lid_layout(cfg) is None else cfg.glue_tab_width
-    assert x1 == pytest.approx(cfg.body.circumference + cfg.glue_tab_width)
+    assert x1 == pytest.approx(cfg.shell.circumference + cfg.glue_tab_width)
     if pat.cable is None:
         assert x0 == pytest.approx(-spread - tabs)
     else:  # (the cable sticks out beside the front panel's free edge, its rows outward)
         assert x0 < -spread - tabs
     # The outer flaps, or with an end wall gap their lids, stick out furthest.
     lid = lid_layout(cfg)
-    reach = cfg.body.front_cut_sagitta if lid is None else max(d for _, d in lid.depth) - lid.level
+    reach = cfg.shell.front_cut_sagitta if lid is None else max(d for _, d in lid.depth) - lid.level
     assert y1 - y0 == pytest.approx(cfg.front_length + 2 * reach)
 
 
@@ -223,10 +223,10 @@ def test_lid_fold_mirrors_the_front_fold(cfg):
         assert lid is None
         assert not [f for f in pat.folds if f.category is FoldCategory.LID]
         return
-    body, t = cfg.body, cfg.thickness
+    shell, t = cfg.shell, cfg.thickness
     front, crease = pat.fold("front-top").segment, pat.fold("lid-top").segment
     assert crease.radius == pytest.approx(front.radius)
-    # The lid's fold and the front fold continued over the wings run between the same two
+    # The lid's fold and the front fold continued over the overhangs run between the same two
     # points, where they meet: the flap is a lens.
     if lid.spread > 0:
         front_l, front_r = pat.fold("front-top-left").segment, pat.fold("front-top-right").segment
@@ -235,23 +235,23 @@ def test_lid_fold_mirrors_the_front_fold(cfg):
     assert crease.start == pytest.approx(front_l.start)
     assert crease.end == pytest.approx(front_r.end)
     assert crease.start[1] == pytest.approx(lid.level / 2)
-    assert crease.point_at(0.5)[1] == pytest.approx(lid.level - body.front.sagitta)
+    assert crease.point_at(0.5)[1] == pytest.approx(lid.level - shell.front.sagitta)
     assert lid.level <= -cfg.lid_offset  # the offset lifts it off its resting level
     bottom = pat.fold("lid-bottom").segment
     assert bottom.point_at(0.5) == pytest.approx(
         (crease.point_at(0.5)[0], cfg.front_length - crease.point_at(0.5)[1])
     )
     lid_face = pat.face("front-top-lid")
-    wf = body.front.width
+    wf = shell.front.width
     reach = cfg.end_wall_gap - t / 2 + cfg.lid_overlap
 
     def back_depth(x):  # the back panel's z(u) at the same X
-        return body.z_shift - body.surface_z("back", 0.0, body.front_point(x)[0])
+        return shell.z_shift - shell.surface_z("back", 0.0, shell.front_point(x)[0])
 
     for x, depth in lid.depth[1:-1]:
         if not 0 <= x <= wf:
-            # Over the wings the edge runs on along the continued fold arc: one smooth curve.
-            edge = back_depth(0.0 if x < 0 else wf) + body.front.z_ext(x)
+            # Over the overhangs the edge runs on along the continued fold arc: one smooth curve.
+            edge = back_depth(0.0 if x < 0 else wf) + shell.front.z_ext(x)
             assert depth == pytest.approx(reach + edge, abs=1e-9)
             continue
         crease_depth = back_depth(x)
@@ -261,13 +261,13 @@ def test_lid_fold_mirrors_the_front_fold(cfg):
 
 
 def test_lid_edge_is_one_smooth_curve(cfg):
-    """The lid's free edge has no step where the wings begin: its slope carries on across
+    """The lid's free edge has no step where the overhangs begin: its slope carries on across
     the front panel's edges (exactly at zero thickness, to within about ten percent with
     material)."""
     lid = lid_layout(cfg)
     if lid is None or lid.spread == 0:
-        pytest.skip("no wings")
-    wf, d = cfg.body.front.width, lid.depth
+        pytest.skip("no overhangs")
+    wf, d = cfg.shell.front.width, lid.depth
     for corner in (0.0, wf):
         i = min(range(len(d)), key=lambda k: abs(d[k][0] - corner))
         (xa, a), (xb, b), (xc, c) = d[i - 1], d[i], d[i + 1]
@@ -333,7 +333,7 @@ def test_fpc_cutout_flattens_only_the_chosen_inner_flaps(which):
     assert is_closed_loop(pat.outline.segments)
     assert self_intersections(polyline(pat.outline.segments, 16)) == []
     flattened = {"none": set(), "front": {"top"}, "back": {"bottom"}, "both": {"top", "bottom"}}
-    x0, x1 = cfg.body.front.width, cfg.body.front.width + cfg.body.back.width
+    x0, x1 = cfg.shell.front.width, cfg.shell.front.width + cfg.shell.back.width
     for end, k in (("top", 0), ("bottom", 1)):
         face, before = pat.face(f"back-{end}-flap"), plain.face(f"back-{end}-flap")
         xs = [x0 + (x1 - x0) * i / 2000 for i in range(1, 2000)]
@@ -349,14 +349,14 @@ def test_fpc_cutout_flattens_only_the_chosen_inner_flaps(which):
         else:
             assert changed == []
     for name in ("front-top-flap", "front-bottom-flap"):
-        x = cfg.body.front.width / 2
+        x = cfg.shell.front.width / 2
         assert pat.face(name).y_range(x) == pytest.approx(plain.face(name).y_range(x))
 
 
 def test_fpc_cutout_width_validated():
     from yanartas_pillowbox.config import ConfigError
 
-    too_wide = Config.defaults().body.back.width - 0.9  # the inner flaps' width, less 1 mm
+    too_wide = Config.defaults().shell.back.width - 0.9  # the inner flaps' width, less 1 mm
     with pytest.raises(ConfigError) as info:
         Config.defaults().with_values(
             fpc_cutout="both", fpc_cutout_width=too_wide, fpc_cable="none"
@@ -374,7 +374,7 @@ def test_glue_tab_tapers_only_as_needed():
     from yanartas_pillowbox.geometry import glue_tab_taper
 
     d = Config.defaults()
-    sec, g = d.body.front, d.glue_tab_width
+    sec, g = d.shell.front, d.glue_tab_width
     r = circle_radius(sec.width, sec.sagitta)
     tapers = []
     for e in (20, 10, 5, 2, 0):
@@ -396,12 +396,12 @@ def test_glue_tab_tapers_only_as_needed():
 
 @pytest.mark.parametrize("tab", [12, 25])
 def test_lid_glue_tabs(tab):
-    """Each lid's straight sides carry a square glue tab as wide as the body's, folded
-    (mountain, like the body's) along the side; over the inner flap it butts up against the
-    flap's edge where that rises into it, and the scrap beside the wing is cut out."""
+    """Each lid's straight sides carry a square glue tab as wide as the shell's, folded
+    (mountain, like the shell's) along the side; over the inner flap it butts up against the
+    flap's edge where that rises into it, and the scrap beside the overhang is cut out."""
     cfg = Config.defaults().with_values(glue_tab_width=tab)
     pat, lid = build_pattern(cfg), lid_layout(cfg)
-    sp, dd, wf = lid.spread, lid.drop, cfg.body.front.width
+    sp, dd, wf = lid.spread, lid.drop, cfg.shell.front.width
     for end in ("top", "bottom"):
         for side, x in (("left", -sp), ("right", wf + sp)):
             name = f"lid-tab-{end}-{side}"

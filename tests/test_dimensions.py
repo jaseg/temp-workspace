@@ -40,7 +40,7 @@ def measured(d):
 
 def expected_value(cfg, param):
     if param == "circumference":  # computed, not an input
-        return cfg.body.circumference
+        return cfg.shell.circumference
     return getattr(cfg, param)
 
 
@@ -95,7 +95,7 @@ def test_pattern_dimensions_sit_on_the_exported_geometry(cfg):
         ("lid_overlap", 1): None,
     }
     if cfg.fpc_cutout == "both":  # measured to where the edge would be without the cutout
-        x = cfg.body.front.width + cfg.body.back.width / 2
+        x = cfg.shell.front.width + cfg.shell.back.width / 2
         plain = build_pattern(cfg.with_values(fpc_cutout="none"))
         cut = pattern.face("back-top-flap").y_range(x)[0]
         allowance["height", 1] = cut - plain.face("back-top-flap").y_range(x)[0]
@@ -125,8 +125,8 @@ def test_length_dimension_runs_along_the_inner_flaps(cfg):
         apex = pattern.fold(fold).segment.point_at(0.5)
         assert p == pytest.approx((apex[0] + dx, apex[1] + dy + k * inset))
     # (drawn beside the midline, clear of the exported labels)
-    body = cfg.body
-    assert length.at == pytest.approx(body.front.width + body.back.width * 0.3 + dx)
+    shell = cfg.shell
+    assert length.at == pytest.approx(shell.front.width + shell.back.width * 0.3 + dx)
 
 
 def test_gap_dimension_on_the_front_panel(cfg):
@@ -211,15 +211,15 @@ def test_section_dimensions(cfg):
         assert sorted(width.points) == pytest.approx(folds, abs=1e-5)
     # Part of the circumference: the arc length of the front panel's mid-surface.
     arc = dims["circumference"]
-    assert measured(arc) == pytest.approx(cfg.body.front.width, rel=1e-4)
+    assert measured(arc) == pytest.approx(cfg.shell.front.width, rel=1e-4)
     assert [list(p) for p in arc.points] == section["front"]
 
 
 # ------------------------------------------------------------------ 3D model
 def test_model_dimensions(cfg):
     box = FoldedBox(cfg)
-    body = box.body
-    w, edge, t = body.front.width, cfg.edge_length, cfg.thickness
+    shell = box.shell
+    w, edge, t = shell.front.width, cfg.edge_length, cfg.thickness
     e, front = cfg.end_wall_gap, cfg.front_length
     dims = {d.param: d for d in dm.model_dimensions(cfg)}
     extra = {"end_wall_gap", "lid_overlap", "lid_offset"} if e > 0 else set()
@@ -227,7 +227,7 @@ def test_model_dimensions(cfg):
 
     length = dims["length"]  # along the back panel's midline, between the inner walls
     assert math.dist(*length.points) == pytest.approx(cfg.length)
-    inset, wb = e + body.back.sagitta + t / 2, body.back.width
+    inset, wb = e + shell.back.sagitta + t / 2, shell.back.width
     ends = [box.map("back-panel", (w + wb / 2, y)) for y in (inset, front - inset)]
     for p, a in zip(length.points, ends, strict=True):
         assert math.dist(p, a) < 1e-9
@@ -245,7 +245,7 @@ def test_model_dimensions(cfg):
         offset = dims["lid_offset"]
         rest, lid_point = offset.points
         assert math.dist(rest, lid_point) == pytest.approx(cfg.lid_offset, abs=1e-9)
-        assert rest[2] == pytest.approx(body.surface_z("back", t, rest[0]))
+        assert rest[2] == pytest.approx(shell.surface_z("back", t, rest[0]))
         assert lid_point[2] < rest[2]
         # (drawn on the back panel's side, which the 3D view shows up)
         for name in ("length", "end_wall_gap", "lid_overlap"):
@@ -260,7 +260,7 @@ def test_model_dimensions(cfg):
     width = dims["width"]  # interior corner to interior corner, at the -Y end of the box
     assert math.dist(*width.points) == pytest.approx(cfg.width, rel=1e-9)
     xs = sorted(p[0] for p in width.points)
-    assert xs == pytest.approx([body.inner_glue[0], body.inner_fold[0]])
+    assert xs == pytest.approx([shell.inner_glue[0], shell.inner_fold[0]])
     assert all(p[1] == pytest.approx(-edge / 2) for p in width.points)
 
     for d in dims.values():  # drawing geometry is present

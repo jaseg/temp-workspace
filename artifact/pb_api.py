@@ -33,15 +33,15 @@ except ImportError:  # (natively, under the tests)
 
 def _reply(status: int, data: Any, content_type: str = JSON) -> str:
     if isinstance(data, bytes):
-        body = base64.b64encode(data).decode()
+        content = base64.b64encode(data).decode()
         return json.dumps(
-            {"status": status, "type": content_type, "body": body, "encoding": "base64"}
+            {"status": status, "type": content_type, "content": content, "encoding": "base64"}
         )
-    body = data if isinstance(data, str) else json.dumps(data)
-    return json.dumps({"status": status, "type": content_type, "body": body})
+    content = data if isinstance(data, str) else json.dumps(data)
+    return json.dumps({"status": status, "type": content_type, "content": content})
 
 
-def _route(method: str, path: str, body: str | None, stored: str | None) -> str:
+def _route(method: str, path: str, content: str | None, stored: str | None) -> str:
     if method == "GET" and path == "/api/defaults":
         return _reply(200, api.defaults())
     if method == "GET" and path == "/api/config":
@@ -52,16 +52,16 @@ def _route(method: str, path: str, body: str | None, stored: str | None) -> str:
                 cfg = Config.from_dict(json.loads(stored), require_version=True)
         return _reply(200, {"config": cfg.to_dict()})
     if method == "POST" and path == "/api/import":
-        if not body:
+        if not content:
             return _reply(400, {"error": "No file was uploaded."})
         try:
-            cfg = extract_config(body)
+            cfg = extract_config(content)
         except SvgImportError as exc:
             return _reply(400, {"error": str(exc)})
         return _reply(200, {"config": cfg.to_dict()})
 
     try:
-        data = json.loads(body or "null")
+        data = json.loads(content or "null")
     except json.JSONDecodeError:
         data = None
     if method == "PUT" and path == "/api/config":
@@ -81,8 +81,8 @@ def _route(method: str, path: str, body: str | None, stored: str | None) -> str:
     return _reply(404, {"error": f"no route {method} {path}"})
 
 
-def handle(method: str, path: str, body: str | None, stored: str | None) -> str:
+def serve(method: str, path: str, content: str | None, stored: str | None) -> str:
     try:
-        return _route(method, path, body, stored)
+        return _route(method, path, content, stored)
     except api.ApiError as exc:
-        return _reply(exc.status, exc.body)
+        return _reply(exc.status, exc.reply)

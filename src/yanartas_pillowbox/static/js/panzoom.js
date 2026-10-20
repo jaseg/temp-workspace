@@ -1,4 +1,4 @@
-// Pointer handling shared by the 2D previews: wheel zooms about the cursor, one pointer
+// Pointer input shared by the 2D previews: wheel zooms about the cursor, one pointer
 // pans, two pinch-zoom about their midpoint (and pan with it), double-click fits, and a
 // click on a dimension (one that did not pan) asks the app to focus its parameter.
 //

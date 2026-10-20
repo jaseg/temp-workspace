@@ -30,7 +30,7 @@ export function drawDims2d(dims, { fs, flipY = false }) {
   const xs = [];
   const ys = [];
   const track = (...pts) => pts.forEach(([x, y]) => { xs.push(x); ys.push(y); });
-  const a = fs * 0.55; // arrowhead length
+  const a = fs * 0.55; // arrow tip length
 
   for (const d of dims) {
     const g = el("g", { class: "dim" });
@@ -69,8 +69,8 @@ export function drawDims2d(dims, { fs, flipY = false }) {
       const ends = [T(src[0]), T(src[src.length - 1])];
       g.append(line(ends[0], off[0], "ext"), line(ends[1], off[off.length - 1], "ext"));
       g.append(el("path", { class: "ln", d: `M ${off.map((q) => q.join(",")).join(" L ")}` }));
-      g.append(arrowhead(off[0], unit(off[1], off[0]), a),
-               arrowhead(off[off.length - 1], unit(off[off.length - 2], off[off.length - 1]), a));
+      g.append(arrowTip(off[0], unit(off[1], off[0]), a),
+               arrowTip(off[off.length - 1], unit(off[off.length - 2], off[off.length - 1]), a));
       const m = Math.floor(off.length / 2);
       const t = unit(off[m - 1], off[m + 1]);
       // Put the label on the far side of the dimension line from the measured curve.
@@ -99,11 +99,11 @@ export function highlightDims(root, param) {
 }
 
 function arrows(q1, q2, a) {
-  return [arrowhead(q1, unit(q2, q1), a), arrowhead(q2, unit(q1, q2), a)];
+  return [arrowTip(q1, unit(q2, q1), a), arrowTip(q2, unit(q1, q2), a)];
 }
 
-/** Filled arrowhead with its tip at `tip`, pointing along unit vector `d`. */
-function arrowhead(tip, d, a) {
+/** Filled arrow tip with its point at `tip`, pointing along unit vector `d`. */
+function arrowTip(tip, d, a) {
   const n = [-d[1], d[0]];
   const b = [tip[0] - d[0] * a, tip[1] - d[1] * a];
   const w = a * 0.32;

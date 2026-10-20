@@ -52,7 +52,7 @@ def pts3(part):
 
 def assert_inside_mesh(cfg):
     """Independent containment check against the folded 3D mesh: no panel vertex above the
-    payload's footprint is lower than its top, and no end-wall vertex across its width is
+    payload's outline is lower than its top, and no end-wall vertex across its width is
     closer to the centre than its end."""
     pw, pd, ph = cfg.payload_width, cfg.payload_depth, cfg.payload_height
     for part in build_model3d(cfg)["parts"]:
@@ -91,7 +91,7 @@ def test_fits_matches_section(box):
         rect_segment_distance(a, b, w, h)
         for a, b in itertools.pairwise(section["interior"] + section["interior"][:1])
     )
-    assert P.section_clearance(box.body, w, h) == pytest.approx(brute, abs=2e-3)
+    assert P.section_clearance(box.shell, w, h) == pytest.approx(brute, abs=2e-3)
 
 
 def box_point_distance(cfg, p):
@@ -182,7 +182,7 @@ def test_maximize_height_touches_the_inner_surface(box):
     """With no margin the largest payload touches the material's inner surface."""
     box = replace(box, payload_clearance=0)
     out = P.maximize(box, "payload_height")
-    assert P.section_clearance(out.body, out.payload_width, out.payload_height) == pytest.approx(
+    assert P.section_clearance(out.shell, out.payload_width, out.payload_height) == pytest.approx(
         0, abs=0.011
     )
 
@@ -217,7 +217,7 @@ def pattern_area(cfg):
 
 
 @pytest.mark.parametrize("dims", PAYLOADS, ids=[f"{w}x{d}x{h}" for w, d, h in PAYLOADS])
-def test_fit_box_holds_payload_and_only_touches_body(dims):
+def test_fit_box_holds_payload_and_only_touches_shell(dims):
     pw, pd, ph = dims
     cfg = D.with_values(payload_width=pw, payload_depth=pd, payload_height=ph)
     out = P.fit_box(cfg)
@@ -290,8 +290,8 @@ def test_payload_is_persisted_but_not_drawn_in_svg():
     cfg = D.with_values(payload_width=33.3, payload_depth=77.7, payload_height=11.1)
     svg = render_svg(cfg)
     assert extract_config(svg) == cfg  # stored in the embedded config ...
-    body = svg[svg.index("</metadata>") :]
-    assert "payload" not in body.lower() and "<rect" not in body  # ... but never drawn
+    drawing = svg[svg.index("</metadata>") :]
+    assert "payload" not in drawing.lower() and "<rect" not in drawing  # ... but never drawn
 
 
 def test_api(tmp_path):

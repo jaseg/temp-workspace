@@ -15,7 +15,7 @@ from yanartas_pillowbox.crosssection import CrossSection, max_height, panel_widt
 D = Config.defaults()
 MAX_H = max_height(D.width, D.thickness)  # the steepest box of the default width
 NARROW = {"width": 55, "height": 20, "fpc_cable": "none"}  # a front panel under the tab limit
-WF = Config.from_dict(NARROW).body.front.width
+WF = Config.from_dict(NARROW).shell.front.width
 
 
 def errors_for(**changes):
@@ -134,7 +134,7 @@ def test_lid_offset_is_limited_by_the_45_degree_turn():
     from yanartas_pillowbox.geometry import max_lid_offset
 
     cfg = Config.defaults()
-    limit = max_lid_offset(cfg.body)
+    limit = max_lid_offset(cfg.shell)
     assert cfg.with_values(lid_offset=math.floor(limit * 100) / 100)
     errs = errors_for(lid_offset=limit + 0.1)
     assert "lid_offset" in errs and "45 degrees" in errs["lid_offset"]
@@ -159,7 +159,7 @@ def test_print_side_validated():
     assert "print_side" in errors_for(print_side="top")
 
 
-def test_version_handling():
+def test_version_check():
     with pytest.raises(SchemaVersionError):
         Config.from_dict({"version": 0})
     with pytest.raises(SchemaVersionError):
@@ -215,31 +215,31 @@ def test_width_drives_the_cross_section(width, arc, t):
             **arc,
         }
     )
-    body = cfg.body
-    assert body.inner_fold[0] - body.inner_glue[0] == pytest.approx(width, rel=1e-10)
-    assert body.inner_fold[0] == pytest.approx(width / 2, rel=1e-10)  # centred
+    shell = cfg.shell
+    assert shell.inner_fold[0] - shell.inner_glue[0] == pytest.approx(width, rel=1e-10)
+    assert shell.inner_fold[0] == pytest.approx(width / 2, rel=1e-10)  # centred
     if t == 0:  # zero thickness: both panels are the plain cross-section of that width
-        for sec in (body.front, body.back):
+        for sec in (shell.front, shell.back):
             assert sec.width == pytest.approx(panel_width(width, arc["height"] / 2), rel=1e-12)
             assert CrossSection(sec.width, sec.sagitta).closed_width == pytest.approx(width)
     else:  # the material sits outside the interior
-        assert body.front.closed_width > width and body.back.closed_width > width
+        assert shell.front.closed_width > width and shell.back.closed_width > width
 
 
 def test_interior_height_and_flap_offsets():
     """The panels' inner surfaces are height/2 above and below the centre; the outer (front)
     flaps' wall stands t outside the inner (back) flaps' wall."""
     cfg = Config.from_dict({"height": 18, "thickness": 0.8, "fpc_cable": "none"})
-    body = cfg.body
-    front_inner = body.front_point(body.front.width / 2)[1] - 0.4
-    back_inner = body.back_point(body.back.width / 2)[1] + 0.4
+    shell = cfg.shell
+    front_inner = shell.front_point(shell.front.width / 2)[1] - 0.4
+    back_inner = shell.back_point(shell.back.width / 2)[1] + 0.4
     assert (front_inner, back_inner) == pytest.approx((9, -9))
-    assert body.back.sagitta - body.front.sagitta == pytest.approx(0.8)
+    assert shell.back.sagitta - shell.front.sagitta == pytest.approx(0.8)
     # Outer flaps reach the back panel's outer surface, inner flaps the front's inner surface.
     # (exactly at the panels' apexes, which are a fraction of t apart across the box)
-    assert body.front.sagitta + body.front_cut_sagitta == pytest.approx(18 + 1.2, abs=0.01)
-    back_cut = body.back_cuts[len(body.back_cuts) // 2][1]
-    assert body.back.sagitta + back_cut == pytest.approx(18 + 0.4, abs=0.01)
+    assert shell.front.sagitta + shell.front_cut_sagitta == pytest.approx(18 + 1.2, abs=0.01)
+    back_cut = shell.back_cuts[len(shell.back_cuts) // 2][1]
+    assert shell.back.sagitta + back_cut == pytest.approx(18 + 0.4, abs=0.01)
 
 
 def test_mesh_nets_per_side():

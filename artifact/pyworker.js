@@ -1,5 +1,5 @@
 // Runs the yanartas-pillowbox Python package in Pyodide, off the main thread.
-// Messages in: {id, method, path, body, stored}; out: {id, reply} or {id, error};
+// Messages in: {id, method, path, content, stored}; out: {id, reply} or {id, error};
 // plus one {ready: true} or {failed: message} once start-up is over.
 
 const here = (path) => new URL(path, import.meta.url);
@@ -108,11 +108,11 @@ api.then(
 );
 
 self.onmessage = async ({ data }) => {
-  const { id, method, path, body, stored } = data;
+  const { id, method, path, content, stored } = data;
   try {
-    const handler = await api;
+    const pbApi = await api;
     if (path.startsWith("/api/pcb")) await loadPcb();
-    self.postMessage({ id, reply: handler.handle(method, path, body ?? null, stored ?? null) });
+    self.postMessage({ id, reply: pbApi.serve(method, path, content ?? null, stored ?? null) });
   } catch (err) {
     self.postMessage({ id, error: String(err?.message ?? err) });
   }

@@ -30,7 +30,7 @@ class State:
 
 
 def _json_route(view: Callable[[Any], Any]) -> Callable[[], Any]:
-    """A JSON route: the view gets the parsed request body; ``ApiError`` becomes its reply."""
+    """A JSON route: the view gets the parsed request JSON; ``ApiError`` becomes its reply."""
 
     @wraps(view)
     def wrapper() -> Any:
@@ -39,7 +39,7 @@ def _json_route(view: Callable[[Any], Any]) -> Callable[[], Any]:
         try:
             return view(request.get_json(silent=True))
         except api.ApiError as exc:
-            return jsonify(exc.body), exc.status
+            return jsonify(exc.reply), exc.status
 
     return wrapper
 
@@ -78,8 +78,8 @@ def create_app(settings_path: Path) -> Flask:
 
     @app.put("/api/config")
     @_json_route
-    def put_config(body: Any) -> Any:
-        cfg = api.parse_config(body)
+    def put_config(data: Any) -> Any:
+        cfg = api.parse_config(data)
         with state.lock:
             state.config = cfg
             try:
@@ -91,36 +91,36 @@ def create_app(settings_path: Path) -> Flask:
 
     @app.post("/api/render")
     @_json_route
-    def render(body: Any) -> Any:
-        return jsonify(api.render(api.parse_config(body)))
+    def render(data: Any) -> Any:
+        return jsonify(api.render(api.parse_config(data)))
 
     @app.post("/api/scad")
     @_json_route
-    def scad(body: Any) -> Any:
+    def scad(data: Any) -> Any:
         """``{config}`` -> OpenSCAD source of the box's interior."""
-        return Response(render_scad(api.parse_config(body)), mimetype="application/x-openscad")
+        return Response(render_scad(api.parse_config(data)), mimetype="application/x-openscad")
 
     @app.post("/api/pcb")
     @_json_route
-    def pcb_preview(body: Any) -> Any:
+    def pcb_preview(data: Any) -> Any:
         """``{config}`` -> the PCB layout's copper for the previews."""
-        return jsonify(api.pcb_preview(api.parse_config(body)))
+        return jsonify(api.pcb_preview(api.parse_config(data)))
 
     @app.get("/api/progress")
     def layout_progress() -> Response:
-        """How far the PCB layout in hand has got (polled while it runs)."""
+        """How far the PCB layout in progress has got (polled while it runs)."""
         return jsonify(api.layout_progress())
 
     @app.post("/api/pcb/files")
     @_json_route
-    def pcb_files(body: Any) -> Any:
+    def pcb_files(data: Any) -> Any:
         """``{config}`` -> zip of the PCB layout's KiCad, Gerber and SVG files."""
-        return Response(api.pcb_files(api.parse_config(body)), mimetype="application/zip")
+        return Response(api.pcb_files(api.parse_config(data)), mimetype="application/zip")
 
     @app.post("/api/payload")
     @_json_route
-    def payload_action(body: Any) -> Any:
-        return jsonify(api.payload_action(body))
+    def payload_action(data: Any) -> Any:
+        return jsonify(api.payload_action(data))
 
     @app.post("/api/import")
     def import_svg() -> Any:
