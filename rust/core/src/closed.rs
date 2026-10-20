@@ -1,4 +1,4 @@
-//! Polylines, closed and open, as `sfc.py` handles them (closed: index arithmetic wraps).
+//! Polylines, closed and open, as `sfc.py` uses them (closed: index arithmetic wraps).
 
 use crate::geom::{add, dist, norm, scale, sub, P};
 

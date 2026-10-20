@@ -147,18 +147,18 @@ macro_rules! read {
     )*};
 }
 
-/// The curve relaxed (`sfc._relax`): `curve` open from the tongue's left end round to its
-/// right end, `tongue` closing it, `regions` each region's rings, `target` the length to
+/// The curve relaxed (`sfc._relax`): `curve` open from the stem's left end round to its
+/// right end, `stem` closing it, `regions` each region's rings, `target` the length to
 /// aim at, `edge`/`borders` points along the area's edge and the regions' borders,
 /// `offset` the samples' offset, `params` the constants by name, `progress(step, steps)`.
-/// Returns the closed curve (the tongue last) and the number of vertices before the tongue.
+/// Returns the closed curve (the stem last) and the number of vertices before the stem.
 #[pyfunction]
-#[pyo3(signature = (curve, tongue, regions, target, edge, borders, spacing, least, pitch, offset, params, progress=None))]
+#[pyo3(signature = (curve, stem, regions, target, edge, borders, spacing, least, pitch, offset, params, progress=None))]
 #[allow(clippy::too_many_arguments)]
 fn relax_curve<'py>(
     py: Python<'py>,
     curve: PyReadonlyArray2<'py, f64>,
-    tongue: PyReadonlyArray2<'py, f64>,
+    stem: PyReadonlyArray2<'py, f64>,
     regions: Vec<Vec<PyReadonlyArray2<'py, f64>>>,
     target: f64,
     edge: PyReadonlyArray2<'py, f64>,
@@ -172,7 +172,7 @@ fn relax_curve<'py>(
 ) -> PyResult<(Bound<'py, PyArray2<f64>>, usize)> {
     let input = CurveInput {
         curve: points(&curve)?,
-        tongue: points(&tongue)?,
+        stem: points(&stem)?,
         regions: regions
             .iter()
             .map(|z| z.iter().map(points).collect::<PyResult<Vec<_>>>())
@@ -220,8 +220,8 @@ fn relax_curve<'py>(
     Ok((array(py, &p), k))
 }
 
-/// The `n` traces round the closed curve `p` (`sfc._lanes`): `k` the tongue's first vertex,
-/// `edge_a`/`edge_b` the area's edge in short segments, `exact` the tongue's legs.
+/// The `n` traces round the closed curve `p` (`sfc._lanes`): `k` the stem's first vertex,
+/// `edge_a`/`edge_b` the area's edge in short segments, `exact` the stem's rails.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn offset_lanes<'py>(
@@ -250,16 +250,16 @@ fn offset_lanes<'py>(
 
 /// The curve's graph walked into a curve (`sfc._curve`): `segments` each (region, its
 /// domain's rings), `borders` each (region, region, the lines of their shared border; the
-/// longest first), `mouth` the tongue's ends, `seed` the random seed. Returns the curve's
+/// longest first), `opening` the stem's ends, `seed` the random seed. Returns the curve's
 /// points, each one's region, the number of cells and of regions left out.
 #[pyfunction]
-#[pyo3(signature = (segments, borders, mouth, spacing, seed, params, progress=None))]
+#[pyo3(signature = (segments, borders, opening, spacing, seed, params, progress=None))]
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn curve_graph<'py>(
     py: Python<'py>,
     segments: Vec<(usize, Vec<PyReadonlyArray2<'py, f64>>)>,
     borders: Vec<(usize, usize, Vec<PyReadonlyArray2<'py, f64>>)>,
-    mouth: ((f64, f64), (f64, f64)),
+    opening: ((f64, f64), (f64, f64)),
     spacing: f64,
     seed: u64,
     params: &Bound<'py, PyDict>,
@@ -279,7 +279,7 @@ fn curve_graph<'py>(
             .iter()
             .map(|(i, j, lines)| Ok((*i, *j, lines.iter().map(points).collect::<PyResult<_>>()?)))
             .collect::<PyResult<_>>()?,
-        mouth: [[mouth.0 .0, mouth.0 .1], [mouth.1 .0, mouth.1 .1]],
+        opening: [[opening.0 .0, opening.0 .1], [opening.1 .0, opening.1 .1]],
         spacing,
         seed,
     };

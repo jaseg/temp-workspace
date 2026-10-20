@@ -1,6 +1,6 @@
 //! The traces round the curve (`sfc._lanes`): offsets of it at a pitch that shares the
 //! spacing to the next run on each side evenly (the area's edge counts as a run's middle),
-//! never below the least (with a margin, but exactly on the tongue's legs), in bends only as
+//! never below the least (with a margin, but exactly on the stem's rails), in bends only as
 //! far as keeps neighbouring traces' skew down (`_balance`); offset from a fine spline
 //! through the curve, small loops in tight bends cut out (`_unloop`).
 
@@ -38,9 +38,9 @@ impl Default for LaneParams {
     }
 }
 
-/// The `n` traces round the closed curve `p` (vertices `k` on: the tongue's) as closed
+/// The `n` traces round the closed curve `p` (vertices `k` on: the stem's) as closed
 /// polylines; `edge` the area's edge in short segments (each `[a, b]`), `exact` the
-/// vertices on the tongue's legs.
+/// vertices on the stem's rails.
 #[allow(clippy::too_many_arguments)]
 pub fn lanes(
     p: &[P],
@@ -62,7 +62,7 @@ pub fn lanes(
         cap / 2.0,
     );
     let rad = radius(p, 2);
-    // the least pitch: with the margin, but on the tongue's legs, ramped in off them
+    // the least pitch: with the margin, but on the stem's rails, ramped in off them
     let idx: Vec<usize> = (0..m).filter(|&i| exact[i]).collect();
     let floor: Vec<f64> = (0..m)
         .map(|i| {

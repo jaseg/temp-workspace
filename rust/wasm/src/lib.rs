@@ -147,12 +147,12 @@ fn number(obj: &JsValue, name: &str) -> Result<Option<f64>, JsValue> {
 }
 
 /// The curve relaxed (`sfc._relax`; the Python extension's `relax_curve`): returns
-/// `{points, k}`, the closed curve and the number of vertices before the tongue's.
+/// `{points, k}`, the closed curve and the number of vertices before the stem's.
 #[wasm_bindgen]
 #[allow(clippy::too_many_arguments)]
 pub fn relax_curve(
     curve: &[f64],
-    tongue: &[f64],
+    stem: &[f64],
     regions: &[f64],
     ring_lens: &[u32],
     zone_rings: &[u32],
@@ -168,7 +168,7 @@ pub fn relax_curve(
 ) -> Result<Object, JsValue> {
     let input = CurveInput {
         curve: points(curve),
-        tongue: points(tongue),
+        stem: points(stem),
         regions: zones_of(regions, ring_lens, zone_rings),
         target,
         edge: points(edge),
@@ -267,7 +267,7 @@ pub fn curve_graph(
     pair_lines: &[u32],
     lines: &[f64],
     line_lens: &[u32],
-    mouth: &[f64],
+    opening: &[f64],
     spacing: f64,
     seed_hi: u32,
     seed_lo: u32,
@@ -297,7 +297,7 @@ pub fn curve_graph(
     let input = GraphInput {
         segments,
         borders,
-        mouth: [[mouth[0], mouth[1]], [mouth[2], mouth[3]]],
+        opening: [[opening[0], opening[1]], [opening[2], opening[3]]],
         spacing,
         seed: ((seed_hi as u64) << 32) | seed_lo as u64,
     };

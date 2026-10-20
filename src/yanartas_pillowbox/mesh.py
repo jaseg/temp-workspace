@@ -526,7 +526,7 @@ def skew(a: Sequence[Point], b: Sequence[Point], step: float = 0.5) -> tuple[flo
     """Two neighbouring traces taken as a differential pair, both from the same end: the
     difference in their lengths, and the largest difference in the length run along each
     from that end to where they face each other (``a`` sampled every ``step``, each sample
-    matched to the nearest point of ``b`` a little ahead of the last match)."""
+    matched to the nearest point of ``b`` a little further along than the last match)."""
     pa, pb = np.asarray(a, float), np.asarray(b, float)
     la = float(np.sum(np.hypot(*np.diff(pa, axis=0).T)))
     lb = float(np.sum(np.hypot(*np.diff(pb, axis=0).T)))
@@ -536,11 +536,11 @@ def skew(a: Sequence[Point], b: Sequence[Point], step: float = 0.5) -> tuple[flo
     sa = np.linspace(0.0, la, len(qa))
     sb = np.linspace(0.0, lb, len(qb))
     block = 64
-    ahead = int(block * step / fine * max(lb / max(la, 1e-9), 1.0) * 2) + 64
+    window = int(block * step / fine * max(lb / max(la, 1e-9), 1.0) * 2) + 64
     j, worst = 0, 0.0
     for k in range(0, len(qa), block):
         q = qa[k : k + block]
-        cand = qb[j : j + ahead]
+        cand = qb[j : j + window]
         d2 = np.sum((q[:, None, :] - cand[None, :, :]) ** 2, axis=2)
         m = j + np.maximum.accumulate(np.argmin(d2, axis=1))
         worst = max(worst, float(np.max(np.abs(sa[k : k + block] - sb[m]))))

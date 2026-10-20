@@ -1,9 +1,9 @@
 //! The space-filling curve's combinatorial part (`sfc._curve`): per segment a centroidal
 //! Voronoi tessellation (Lloyd iterations of jittered seeds), its cells' edges a planar
-//! graph; the exit's tongue; the cycles a perfect matching leaves out (Edmonds); a vertex
+//! graph; the exit's stem; the cycles a perfect matching leaves out (Edmonds); a vertex
 //! at each cell's centre threaded into a cycle edge (bipartite matching); the cycles merged
 //! by split-and-reconnect and doubled edges; the segments joined across their borders along
-//! a spanning tree; the curve walked from the tongue's end round to its other end.
+//! a spanning tree; the curve walked from the stem's end round to its other end.
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
@@ -42,16 +42,16 @@ pub struct Segment {
 
 /// What the graph is built from: the segments, the borders between regions (each pair of
 /// regions with the lines of their shared border, longest first; the pairs longest first),
-/// the exit's mouth (the tongue's two ends), the spacing and the random seed.
+/// the exit's opening (the stem's two ends), the spacing and the random seed.
 pub struct GraphInput {
     pub segments: Vec<Segment>,
     pub borders: Vec<(usize, usize, Vec<Vec<P>>)>,
-    pub mouth: [P; 2],
+    pub opening: [P; 2],
     pub spacing: f64,
     pub seed: u64,
 }
 
-/// The curve: its vertices from the tongue's end at `mouth[0]` round to its other end, each
+/// The curve: its vertices from the stem's end at `opening[0]` round to its other end, each
 /// vertex's region, the number of cells, and the number of regions it could not reach.
 pub struct Curve {
     pub pts: Vec<P>,
@@ -176,18 +176,21 @@ pub fn curve(
     }
     let spacing = input.spacing;
     let d = prm.seed_spacing * spacing;
-    let mouth = input.mouth;
-    // (a seed pinned inside the mouth: no cell wall reaches the edge between its ends)
+    let opening = input.opening;
+    // (a seed pinned inside the opening: no cell wall reaches the edge between its ends)
     let exit_seg = (0..segments.len())
         .min_by(|&i, &j| {
-            distance(&segments[i].domain, mouth[0])
-                .total_cmp(&distance(&segments[j].domain, mouth[0]))
+            distance(&segments[i].domain, opening[0])
+                .total_cmp(&distance(&segments[j].domain, opening[0]))
         })
         .unwrap();
-    // (inwards: square to the mouth, to the left going from its first end to its second)
-    let across = sub(mouth[1], mouth[0]);
+    // (inwards: square to the opening, to the left going from its first end to its second)
+    let across = sub(opening[1], opening[0]);
     let inward = scale([-across[1], across[0]], 1.0 / norm(across).max(1e-12));
-    let pin = add(scale(add(mouth[0], mouth[1]), 0.5), scale(inward, d / 2.0));
+    let pin = add(
+        scale(add(opening[0], opening[1]), 0.5),
+        scale(inward, d / 2.0),
+    );
     let pin = contains(&segments[exit_seg].domain, pin).then_some(pin);
     let mut rng = Rng::new(input.seed);
     let mut built = None;
@@ -204,7 +207,7 @@ pub fn curve(
             build(&mut g, cells, si);
             progress(si + 1, segments.len() + 1);
         }
-        let ends = match tongue(&mut g, segments, mouth) {
+        let ends = match stem(&mut g, segments, opening) {
             Ok(e) => e,
             Err(Retry) => continue,
         };
@@ -226,7 +229,7 @@ pub fn curve(
     merge(&mut g, &mut u);
     join_segments(&mut g, &mut u, segments, &input.borders, spacing);
     let root = u.find(a);
-    let mut order = vec![b, a]; // (walk from a away from b: the tongue between them)
+    let mut order = vec![b, a]; // (walk from a away from b: the stem between them)
     for _ in 0..g.pts.len() + 2 {
         let last = order[order.len() - 1];
         let before = order[order.len() - 2];
@@ -440,15 +443,15 @@ fn build(g: &mut Graph, cells: Vec<Rings>, seg: usize) {
     }
 }
 
-// ---------------------------------------------------------------------------- tongue
+// ---------------------------------------------------------------------------- stem
 
-/// The exit's tongue in the graph: its two ends, on one edge along the rim of the segment
+/// The exit's stem in the graph: its two ends, on one edge along the rim of the segment
 /// nearest them (which they split), the edge between them one the cycle must take.
-fn tongue(g: &mut Graph, segments: &[Segment], mouth: [P; 2]) -> Result<(usize, usize), Retry> {
+fn stem(g: &mut Graph, segments: &[Segment], opening: [P; 2]) -> Result<(usize, usize), Retry> {
     let seg = (0..segments.len())
         .min_by(|&i, &j| {
-            distance(&segments[i].domain, mouth[0])
-                .total_cmp(&distance(&segments[j].domain, mouth[0]))
+            distance(&segments[i].domain, opening[0])
+                .total_cmp(&distance(&segments[j].domain, opening[0]))
         })
         .unwrap();
     let mut count: HashMap<Edge, usize> = HashMap::new();
@@ -470,7 +473,7 @@ fn tongue(g: &mut Graph, segments: &[Segment], mouth: [P; 2]) -> Result<(usize, 
         return Err(Retry);
     }
     let gap = |e: &Edge, q: P| dist(closest(q, g.pts[e.0], g.pts[e.1]).0, q);
-    let near: Vec<usize> = mouth
+    let near: Vec<usize> = opening
         .iter()
         .map(|&q| {
             (0..rim.len())
@@ -478,13 +481,16 @@ fn tongue(g: &mut Graph, segments: &[Segment], mouth: [P; 2]) -> Result<(usize, 
                 .unwrap()
         })
         .collect();
-    if near[0] != near[1] || gap(&rim[near[0]], mouth[0]) > 1e-6 {
-        return Err(Retry); // (a cell wall between the ends, or the mouth off the rim)
+    if near[0] != near[1] || gap(&rim[near[0]], opening[0]) > 1e-6 {
+        return Err(Retry); // (a cell wall between the ends, or the opening off the rim)
     }
     let (mut x, mut y) = rim[near[0]];
     let (px, py) = (g.pts[x], g.pts[y]);
     let len = dist(px, py);
-    let t: Vec<f64> = mouth.iter().map(|&q| closest(q, px, py).1 * len).collect();
+    let t: Vec<f64> = opening
+        .iter()
+        .map(|&q| closest(q, px, py).1 * len)
+        .collect();
     let lo = t[0].min(t[1]);
     let hi = t[0].max(t[1]);
     if lo <= 1e-6 && hi < len - 1e-6 {

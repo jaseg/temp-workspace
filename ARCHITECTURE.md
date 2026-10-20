@@ -95,7 +95,7 @@ outputs.
 | `test_mesh.py` | The shared metrics: spacing of parallel traces and across islands (not past the edge), skew of detours. |
 | `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing rarely below the nominal and few islands (settled), repeatable seeds, holes. |
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
-| `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its neck's corridor (a port wide); cells never across a fold; the seed repeats the split, another differs; a neck carrying a partition's traces at the pitch. |
+| `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its feeder's corridor (a port wide); cells never across a fold; the seed repeats the split, another differs; a feeder carrying a partition's traces at the pitch. |
 | `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (its partitions laid out each on its own, their traces the layer's, of equal area). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded. |
@@ -253,26 +253,26 @@ an exact isometry: the panels curve along it, not across it.
   own (`sfc.generate`, all of both sides' at once) with its own traces through its own
   port; the layer's mesh is theirs together (`Mesh.groups`: how many traces each; pair
   skew only within one).
-  1. *Necks:* a fan of corridors, each exactly a port wide (a pair of trace lanes), one
+  1. *Feeders:* a fan of corridors, each exactly a port wide (a pair of trace lanes), one
      from each port: straight in through the port and the square in front of it (its
-     *throat*), then (an arc of 1.5 necks' radius) off at its angle, the angles spread
+     *gate*), then (an arc of 1.5 feeders' radius) off at its angle, the angles spread
      evenly round the ports, 20° off the junction at most; on each side the outer ones turn
      first, each further in one a little later (so none crosses another); each runs on
-     until the room between it and its neighbours is 3 necks wide (shortened to keep half a
-     neck inside the area). `sfc.generate(neck=...)` runs the tongue's legs along it
+     until the room between it and its neighbours is 3 feeders wide (shortened to keep half a
+     feeder inside the area). `sfc.generate(feeder=...)` runs the stem's rails along it
      (offsets of its centreline, the traces at the pitch), keeps the curve out of it, and
-     opens the curve's mouth at its end.
-  2. *Cells:* Voronoi cells a neck across, Lloyd-relaxed, each zone (panel) on its own, so
-     none straddles a fold; each throat a cell of its own.
-  3. *Grown from the necks' ends:* each cell to the neck end its cheapest path starts
+     opens the curve at its end.
+  2. *Cells:* Voronoi cells a feeder across, Lloyd-relaxed, each zone (panel) on its own, so
+     none straddles a fold; each gate a cell of its own.
+  3. *Grown from the feeders' ends:* each cell to the feeder end its cheapest path starts
      from, each end's start weighted (an additively weighted Voronoi diagram over the cell
      graph; a step across a fold 4 times dearer, every step's cost varied by a smooth
      random field from the seed, so the two layers' borders differ), the weights set for
      equal areas: each partition the tree of its end's paths, so of a piece and round it.
-     (Grown from the throats instead, a port apart, a small change of weight swings whole
+     (Grown from the gates instead, a port apart, a small change of weight swings whole
      regions and no weights balance it; sectors by angle round the ports left the middle
-     ones strips along the others.) The cells near the fan go to the nearest neck, each
-     neck's end to its own; all of them kept so.
+     ones strips along the others.) The cells near the fan go to the nearest feeder, each
+     feeder's end to its own; all of them kept so.
   4. *Refined* beyond the fan: borders smoothed (a cell to the partition holding most of
      its border, a neighbour across a fold counting a quarter: borders keep to folds),
      areas evened out between neighbours, the most uneven pair first (to within 1 %), no
@@ -309,10 +309,10 @@ an exact isometry: the panels curve along it, not across it.
      split-and-reconnect across each border, the joins checked against the curve: two
      crossings per join, the minimum. No orientation objective, so the optimizer is not
      ported.
-  6. *Exit:* a seed pinned in the mouth keeps cell walls off it; the stretch of the domain's
-     edge between the tongue's two ends becomes a fixed edge of the graph, standing for the
-     tongue (two legs, a spacing apart, straight through the exit cell), so the cycle takes
-     it and leaves the mouth outward.
+  6. *Exit:* a seed pinned in the opening keeps cell walls off it; the stretch of the domain's
+     edge between the stem's two ends becomes a fixed edge of the graph, standing for the
+     stem (two rails, a spacing apart, straight through the exit cell), so the cycle takes
+     it and leaves the opening outward.
   7. *Geometry:* the reference minimizes the segment-CVT energy plus a Laplacian and a
      length term with L-BFGS. Here: per-zone discrete CVT steps (each vertex to the
      centroid of the sample points nearest it in its zone), Taubin smoothing, bends tighter
@@ -336,14 +336,14 @@ an exact isometry: the panels curve along it, not across it.
      pitch per side of the measured distance to the next run (or twice that to the edge)
      over the number of traces, smoothed along the curve (a running minimum, then a running
      mean over ±10 vertices), capped inside bends, never below the trace pitch (+2 %;
-     exactly the pitch on the tongue's legs). Spreading skews: two neighbouring traces on
+     exactly the pitch on the stem's rails). Spreading skews: two neighbouring traces on
      one side differ in length by the pitch times the curve's turning, so a wider pitch in
      a bend adds to or takes from their skew with the bend's sense, and over hundreds of
      U-turns it adds up (to 16–19 mm on the default box). So, walking the curve from the
      exit, the traces spread on the straight wherever there is room but in a bend only
      where that pays back the skew run up so far (eased in and out over a few vertices).
      Loops and backward runs an offset makes inside a tight bend are cut out; the traces are
-     cut where the tongue leaves through the exit.
+     cut where the stem leaves through the exit.
   9. *Settling* (`_settle`, not in the reference): the traces, offsets of one curve, leave
      every gap between two runs as wide as the runs are apart, and the holes where runs
      meet. So each trace is then moved on its own, by steps (`SETTLE`), towards the middle
@@ -352,7 +352,7 @@ an exact isometry: the panels curve along it, not across it.
      distance; where the traces cross a border, at the curve's joins, they stay as laid). Smoothness
      counts for little: a trace may kink into a hole's corner (only jitter is smoothed, by
      a Taubin step); but in a bend tighter than 1.5 pitches nothing moves along its axis
-     into it, so a U-turn's innermost trace keeps its tip and closes up its legs. A U-turn's
+     into it, so a U-turn's innermost trace keeps its tip and closes up its sides. A U-turn's
      tip (bends about as tight as a ribbon's) goes on out along its axis instead of to
      the middle of the room before it, up to a pitch from the copper ahead: the outermost
      trace first, the ones inside after it, so the U grows longer into a gap rather than
@@ -360,16 +360,16 @@ an exact isometry: the panels curve along it, not across it.
      holes lengthens the outermost traces (only they face holes), so length is steered:
      by each trace's length run from the exit at its place along the curve (a place kept
      per vertex as laid, against the traces' lengths as laid), a trace behind a neighbour
-     has its bends about a pitch across grown into what room there is (fingers,
+     has its bends about a pitch across grown into what room there is (spurs,
      squiggles), one ahead has the bumps it pushes towards that neighbour straightened,
-     giving the room up to it (well ahead, its fingers into holes too: skew before
+     giving the room up to it (well ahead, its spurs into holes too: skew before
      coverage). It is steered only where the lead is still being built up (over about 15
      mm of curve it gains on the neighbour the way it leads): steered all along after a
      lead, a long trace took it back many times over and swung. Over a whole board that
      still leaves 10-25 mm, so the settled traces are then matched: walking along the
      curve, wherever a trace runs more than 15 pitches ahead of the shortest, that much is
      marked to come out of it there, and a few steps straighten its bends there (its
-     squiggles and fingers) by that much (`_match`; the band above how far leads swing to
+     squiggles and spurs) by that much (`_match`; the band above how far leads swing to
      and fro through the bends, or every swing is cut). Only ever shortening, it costs
      little coverage (on the default box: skew 21 → 10 mm at most, length and islands as
      before). With more traces the holes where a ribbon's bends meet grow (the ribbon
@@ -383,10 +383,10 @@ an exact isometry: the panels curve along it, not across it.
      (`SCALE`). On a 75 × 90 mm crop, 8 traces: the density's spread 4.4 → 1.3 % (as
      4 traces), the area under 70 % of nominal 0.55 → 0.01 %, skew ≤ 13.6 → 4.4 mm; 12
      traces: thin area 5.4 → 0.3 %. All moves die down over the steps
-     (annealing), or the layout churns and the steering chases its tail. Every move keeps
+     (annealing), or the layout churns and the steering goes round in circles. Every move keeps
      a pitch (+1 %) from other copper, measured to segments, and from the trace itself
-     where it faces itself across (or is much further along it than away: a finger's
-     pinched legs); none crosses. Only vertices near ones that moved are
+     where it faces itself across (or is much further along it than away: a spur's
+     pinched sides); none crosses. Only vertices near ones that moved are
      looked at again. Neighbours come from GEOS STRtrees (shapely; in the browser too, from
      Pyodide's build): one of the vertices per step for the centring, one of the segments
      per step for the clearance (distances to segments exactly; a vertex taken back is

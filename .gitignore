@@ -10,3 +10,4 @@ build/
 /artifact/dist/
 /artifact/.cache/
 /rust/target/
+.claude/worktrees/

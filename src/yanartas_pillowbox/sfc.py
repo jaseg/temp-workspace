@@ -83,7 +83,7 @@ GAIN = 3.0  # the Laplacian weight per relative excess length
 REPAIR = 100  # steps pushing runs apart (at most)
 WINDOW = 1.5  # parts of the curve nearer than this many least spacings along it: one run
 FINE = 4  # the traces offset from the curve split this many times finer
-RAMP = 3  # ... ramped in over this many vertices off the tongue
+RAMP = 3  # ... ramped in over this many vertices off the stem
 MARGIN = 0.02  # ... at a pitch this much above the least (but at the exit)
 SIMPLIFY = 0.002  # the traces simplified within this (mm; well within the margin)
 LOOP = 3.0  # loops the traces' offsets leave in tight bends: cut out up to this many spacings long
@@ -106,7 +106,7 @@ SETTLE_STEP = 0.35  # ... the traces held at this many pitches between vertices
 SETTLE_STILL = 0.005  # ... moves shorter than this many pitches: none
 SETTLE_BAND = 1.0  # ... traces within this many pitches of length of each other: not steered
 SETTLE_LEAP = 0.34  # ... a vertex moved at most this many of the steps between vertices
-SETTLE_TUNE = 3.0  # ... a trace this many pitches behind (or ahead): steered at full strength
+SETTLE_TUNE = 3.0  # ... a trace this many pitches short (or long): steered at full strength
 SETTLE_STEER = 0.6  # ... the share of its bends' depth a step grows (or straightens) them by
 SETTLE_SPAN = 25  # ... (where along the curve it gains more, over this many places)
 SETTLE_STEER_COOL = 2.0  # ... (the steering dying down as the moves, to this)
@@ -120,7 +120,7 @@ SETTLE_FINISH = 10  # ... then all smoothed this many times (kept clear)
 SCALE = 4  # ... (the steps and the tips' lean for this many traces; more: in proportion)
 MATCH = 20  # steps matching the settled traces' lengths (taking it out of the longer)
 # (the band above how far the leads swing to and fro through the bends: else every swing is cut)
-MATCH_BAND = 15.0  # ... no trace more than this many pitches ahead of the shortest
+MATCH_BAND = 15.0  # ... no trace more than this many pitches longer than the shortest
 MATCH_RATE = 0.5  # ... the share of their bends' depth a step straightens them by, at most
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -179,12 +179,12 @@ def _curve(
     area: shapely.Geometry,
     zones: list[Polygon],
     spacing: float,
-    mouth: tuple[Point, Point],
+    opening: tuple[Point, Point],
     seed: int,
 ) -> tuple[np.ndarray, list[Polygon], np.ndarray, int, int]:
     """The closed curve through the segments the exit's can reach, by the Rust core
-    (``graph::curve``; see ARCHITECTURE.md, 2. to 5.): its vertices from the tongue's end at
-    ``mouth[0]`` round to its other end (the tongue, out through the exit and back, closes
+    (``graph::curve``; see ARCHITECTURE.md, 2. to 5.): its vertices from the stem's end at
+    ``opening[0]`` round to its other end (the stem, out through the exit and back, closes
     it), the regions, each vertex's region, the cells and the regions left out. Here, what
     needs shapely: the regions, the segments' domains (each region's pieces shrunk by half a
     spacing) and the borders between regions."""
@@ -201,7 +201,7 @@ def _curve(
         pts, region, cells, left = _core().curve_graph(
             [(ri, [np.asarray(r.coords, float)[:-1] for r in _rings(d)]) for ri, d in segments],
             _shared_borders(regions, spacing),
-            (tuple(map(float, mouth[0])), tuple(map(float, mouth[1]))),
+            (tuple(map(float, opening[0])), tuple(map(float, opening[1]))),
             spacing,
             seed,
             {"seed_spacing": SEED_SPACING, "lloyd": LLOYD, "attempts": ATTEMPTS},
@@ -239,7 +239,7 @@ def _lines(g: shapely.Geometry) -> list[LineString]:
 # ----------------------------------------------------------------------------- geometry
 def _relax(
     curve: np.ndarray,
-    tongue: np.ndarray,
+    stem: np.ndarray,
     area: shapely.Geometry,
     regions: list[Polygon],
     spacing: float,
@@ -248,15 +248,15 @@ def _relax(
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, int]:
     """The curve, relaxed by the Rust core (``curve::relax``; see ARCHITECTURE.md, 6. and 7.):
-    ``curve`` an open polyline from the tongue's left end round to its right end, the tongue
-    closing it. Returned closed (the tongue last), with the number of vertices before the
-    tongue's. Here, what needs shapely: the regions' rings and area, the area's edge and the
+    ``curve`` an open polyline from the stem's left end round to its right end, the stem
+    closing it. Returned closed (the stem last), with the number of vertices before the
+    stem's. Here, what needs shapely: the regions' rings and area, the area's edge and the
     borders between regions (points along them)."""
     step = spacing / 8  # (the edge's points: half the finer relaxing step apart)
     edge = np.vstack([resample(np.asarray(r.coords), step) for r in _rings(area)])
     p, k = _core().relax_curve(
         np.ascontiguousarray(curve, float),
-        np.ascontiguousarray(tongue, float),
+        np.ascontiguousarray(stem, float),
         [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
         sum(r.area for r in regions) / spacing,
         edge,
@@ -362,11 +362,11 @@ def _lanes(
     spacing: float,
     exact: np.ndarray,
 ) -> list[np.ndarray]:
-    """The ``n`` traces round the closed curve ``p`` (vertices ``k`` on: the tongue's), as
+    """The ``n`` traces round the closed curve ``p`` (vertices ``k`` on: the stem's), as
     closed polylines, by the Rust core (``lanes::lanes``): offsets of the curve at a pitch
     that shares the spacing to the next run on each side evenly (the area's edge counts as a
     run's middle), never below ``pitch`` (with a margin; exactly where ``exact``: the
-    tongue's legs), in bends only as far as keeps skew down."""
+    stem's rails), in bends only as far as keeps skew down."""
     rings = [resample(np.asarray(r.coords), spacing / 2) for r in _rings(area)]
     out = _core().offset_lanes(
         np.ascontiguousarray(p, float),
@@ -404,7 +404,7 @@ def _settle(
     (yanartas_mesh, on all cores), in the browser its WebAssembly build. Here, what needs
     shapely: the edge's points (the area's edge, and the zones' borders but where the
     traces cross them at the curve's joins, where they stay as laid), the zones' rings, and
-    what is left as laid (``keep``: the exit, the neck)."""
+    what is left as laid (``keep``: the exit, the feeder)."""
     step = SETTLE_STEP * pitch
     far = SETTLE_REACH * pitch
     edge = np.vstack([resample(np.asarray(r.coords), step / 2) for r in _rings(area)])
@@ -499,11 +499,11 @@ def _browser_core() -> object | None:
         return unflat(out.points, out.lens)
 
     def relax_curve(*a: object) -> tuple[np.ndarray, int]:
-        curve, tongue, regions, target, edge, borders, spacing, least, pitch = a[:9]
+        curve, stem, regions, target, edge, borders, spacing, least, pitch = a[:9]
         offset, params, report = a[9:]
         rings = [r for z in regions for r in z]
         out = call(
-            mesh.relax_curve, f64(curve), f64(tongue), *flat(rings),
+            mesh.relax_curve, f64(curve), f64(stem), *flat(rings),
             u32([len(z) for z in regions]), target, f64(edge), f64(borders), spacing, least,
             pitch, f64(np.array(offset)), obj(params), report=report,
         )  # fmt: skip
@@ -516,7 +516,7 @@ def _browser_core() -> object | None:
         )  # fmt: skip
         return unflat(out.points, out.lens)
 
-    def curve_graph(segments, borders, mouth, spacing, seed, params, report):  # noqa: ANN001, ANN202
+    def curve_graph(segments, borders, opening, spacing, seed, params, report):  # noqa: ANN001, ANN202
         rings = [r for _, rs in segments for r in rs]
         lines = [ln for _, _, ls in borders for ln in ls]
         try:
@@ -525,7 +525,7 @@ def _browser_core() -> object | None:
                 u32([len(rs) for _, rs in segments]),
                 u32([v for i, j, _ in borders for v in (i, j)]),
                 u32([len(ls) for _, _, ls in borders]), *flat(lines),
-                f64(np.array(mouth)), spacing, seed >> 32, seed & 0xFFFFFFFF, obj(params),
+                f64(np.array(opening)), spacing, seed >> 32, seed & 0xFFFFFFFF, obj(params),
                 report=report,
             )  # fmt: skip
         except Exception as e:  # (pyodide's JsException: what the core refused)
@@ -589,7 +589,7 @@ def generate(
     seed: int | str | None = 0,
     zones: tuple[Polygon, ...] | list[Polygon] = (),
     arcs: bool = False,
-    neck: LineString | None = None,
+    feeder: LineString | None = None,
 ) -> Mesh:
     """The mesh over ``mask``: ``traces`` nets at ``pitch`` (trace plus space) round a closed
     space-filling curve, out through the exit cell (as ``kimesh.generate``: its corner with
@@ -612,35 +612,35 @@ def generate(
     if not area.buffer(1e-6).contains(shapely.box(x0, y0, x0 + c, y0 + 1.5 * spacing)):
         raise MeshError("no room for the mesh's exit cell")
     ym, ytop = y0 + spacing, y0 - least
-    # The tongue's legs run straight through the exit cell to its mouth: the curve keeps
+    # The stem's rails run straight through the exit cell to its opening: the curve keeps
     # out of the cell up to there (its traces' pitch there is the least).
     area = shapely.difference(area, shapely.box(x0, y0 - 4 * c, x0 + c, ym))
     rng = random.Random(seed)
     nrng = np.random.default_rng(rng.getrandbits(64))
-    # The tongue: two legs, a run's spacing apart, straight up through the exit cell (and
-    # on along the neck, its corridor kept out of the area as the cell).
+    # The stem: two rails, a run's spacing apart, straight up through the exit cell (and
+    # on along the feeder, its corridor kept out of the area as the cell).
     ax, bx = x0 + c / 4, x0 + 3 * c / 4
     centre = None
-    if neck is not None:
-        q = np.asarray(frame.geom(neck).coords, float)
+    if feeder is not None:
+        q = np.asarray(frame.geom(feeder).coords, float)
         q[0] = (x0 + c / 2, ym)
         if LineString(q).length > 1e-6:
             centre = LineString(q).simplify(1e-9)  # (no points in line: one offset each way)
     if centre is None:
-        legs = (np.array([(ax, ym)]), np.array([(bx, ym)]))
+        rails = (np.array([(ax, ym)]), np.array([(bx, ym)]))
         inward = np.array([0.0, 1.0])
     else:
         area = shapely.difference(area, centre.buffer(spacing, cap_style="flat"))
-        legs = tuple(
+        rails = tuple(
             np.asarray(_longest(shapely.offset_curve(centre, d, join_style="round")).coords)
             for d in (spacing / 2, -spacing / 2)
         )
-        if abs(legs[0][0][0] - ax) > abs(legs[1][0][0] - ax):
-            legs = legs[::-1]
-        tail = np.asarray(centre.coords)[-2:]
-        inward = (tail[1] - tail[0]) / np.linalg.norm(tail[1] - tail[0])
+        if abs(rails[0][0][0] - ax) > abs(rails[1][0][0] - ax):
+            rails = rails[::-1]
+        last = np.asarray(centre.coords)[-2:]
+        inward = (last[1] - last[0]) / np.linalg.norm(last[1] - last[0])
     area = shapely.union_all(_polygons(area))  # (no slivers of lines or points left)
-    la, lb = legs  # (each from the exit cell's mouth on to the curve's)
+    la, lb = rails  # (each from the exit cell's opening on to the curve's)
     pts, regions, _, cells, left = _curve(
         area,
         [frame.geom(z) for z in zones],
@@ -648,24 +648,24 @@ def generate(
         (tuple(la[-1] + inward * spacing / 2), tuple(lb[-1] + inward * spacing / 2)),
         rng.getrandbits(64),
     )
-    tongue = np.vstack([lb[::-1], [(bx, ytop), (ax, ytop)], la])
+    stem = np.vstack([lb[::-1], [(bx, ytop), (ax, ytop)], la])
     curve = np.vstack([la[-1:], pts, lb[-1:]])
     progress.report("graph", cells=cells)
-    p, k = _relax(curve, tongue, area, regions, spacing, least, pitch, nrng)
+    p, k = _relax(curve, stem, area, regions, spacing, least, pitch, nrng)
     progress.report("relax", vertices=len(p))
     cut = shapely.box(x0, ytop - c, x0 + c, y0)  # (within the leads' corridor)
     out = []
-    exact = np.zeros(len(p), bool)  # (the tongue's legs: the traces at the pitch)
+    exact = np.zeros(len(p), bool)  # (the stem's rails: the traces at the pitch)
     exact[k:] = p[k:, 1] < y0 + spacing / 4
-    if centre is not None:  # (and along the neck, but where it opens out)
+    if centre is not None:  # (and along the feeder, but where it opens out)
         along = shapely.line_locate_point(centre, shapely.points(p[k:]))
         exact[k:] |= along < centre.length - 0.75 * spacing
     lines = []
     for ring in _lanes(p, k, area, n, pitch, spacing, exact):
         lines.append(_opened(_unlooped(ring, LOOP * spacing), cut))
     if SETTLE:
-        # (the tongue: its leads beyond the area's edge, its legs through the exit cell and
-        # along the neck, as laid at the pitch; all else settles, the curve's turns round
+        # (the stem: its leads beyond the area's edge, its rails through the exit cell and
+        # along the feeder, as laid at the pitch; all else settles, the curve's turns round
         # it too, or holes are left either side of it)
         keep = shapely.box(x0, ytop - c, x0 + c, ym)
         if centre is not None:

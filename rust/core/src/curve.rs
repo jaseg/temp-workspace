@@ -47,14 +47,14 @@ impl Default for CurveParams {
     }
 }
 
-/// What to relax: the curve (open, from the tongue's left end round to its right end), the
-/// tongue (which closes it), the regions (each its rings), the length to aim at (the
+/// What to relax: the curve (open, from the stem's left end round to its right end), the
+/// stem (which closes it), the regions (each its rings), the length to aim at (the
 /// regions' area over the spacing), the area's edge and the borders between regions (points
 /// along them), the spacing, the least spacing (`n` pitches), the pitch, and the samples'
 /// offset (from the layout's random state).
 pub struct CurveInput {
     pub curve: Vec<P>,
-    pub tongue: Vec<P>,
+    pub stem: Vec<P>,
     pub regions: Vec<Vec<Vec<P>>>,
     pub target: f64,
     pub edge: Vec<P>,
@@ -65,8 +65,8 @@ pub struct CurveInput {
     pub offset: [f64; 2],
 }
 
-/// The curve relaxed, closed (the tongue last), with the number of vertices before the
-/// tongue's. `progress(step, steps)` after each step.
+/// The curve relaxed, closed (the stem last), with the number of vertices before the
+/// stem's. `progress(step, steps)` after each step.
 pub fn relax(
     input: &CurveInput,
     prm: &CurveParams,
@@ -75,11 +75,11 @@ pub fn relax(
     let (spacing, least, pitch) = (input.spacing, input.least, input.pitch);
     let zones = Zones::new(&input.regions, spacing);
     let total = prm.lloyd_curve + prm.repair / 4;
-    let tongue_len: f64 = input.tongue.windows(2).map(|w| dist(w[0], w[1])).sum();
+    let stem_len: f64 = input.stem.windows(2).map(|w| dist(w[0], w[1])).sum();
     let mut step = spacing / 2.0;
     let mut free = split(&input.curve, step);
     let (samples, sreg) = samples(&input.regions, &zones, spacing / 3.0, input.offset);
-    let mut inner: Vec<P> = input.tongue[1..input.tongue.len() - 1].to_vec();
+    let mut inner: Vec<P> = input.stem[1..input.stem.len() - 1].to_vec();
     let n = (least / pitch).round();
     let bend = ((n - 1.0) / 2.0 * pitch / prm.inside).max(n * pitch / 2.0);
     for it in 0..prm.lloyd_curve {
@@ -103,7 +103,7 @@ pub fn relax(
                 p[i] = add(p[i], scale(l[i], 0.5));
             }
         }
-        let length: f64 = p[..k].windows(2).map(|w| dist(w[0], w[1])).sum::<f64>() + tongue_len;
+        let length: f64 = p[..k].windows(2).map(|w| dist(w[0], w[1])).sum::<f64>() + stem_len;
         let lam = (prm.gain * (length - input.target) / input.target).clamp(-0.2, 0.5);
         let l = lap(&p);
         let m = p.len();
@@ -122,7 +122,7 @@ pub fn relax(
     step = spacing / 4.0;
     let ends = [
         &[*free.last().unwrap()][..],
-        &input.tongue[1..input.tongue.len() - 1],
+        &input.stem[1..input.stem.len() - 1],
         &[free[0]],
     ]
     .concat();
@@ -160,7 +160,7 @@ pub fn relax(
         free.len(),
         step,
         least,
-        input.target - tongue_len,
+        input.target - stem_len,
         &edge,
         &edges,
         bend,
@@ -186,7 +186,7 @@ pub fn relax(
         let mut mv = vec![[0.0, 0.0]; p.len()];
         for (j, &w) in which.iter().enumerate() {
             if w == 0 || w + 1 >= k {
-                continue; // (the tongue's ends stay)
+                continue; // (the stem's ends stay)
             }
             // (the edge stands for a run's middle: twice the distance to it counts)
             let mut push = |other: P, d: f64| {
@@ -223,7 +223,7 @@ pub fn relax(
         for i in 0..m {
             mv[i] = add(mv[i], soft[i]);
         }
-        mouths(&p, k, &mut mv);
+        openings(&p, k, &mut mv);
         let moved: Vec<bool> = mv.iter().map(|v| norm(*v) > 0.0).collect();
         let mut new: Vec<P> = (0..m).map(|i| add(p[i], mv[i])).collect();
         cap_moves(&p, &mut new, step / 2.0);
@@ -325,7 +325,7 @@ fn grow(
                 )
             })
             .collect();
-        mouths(&p, k, &mut mv);
+        openings(&p, k, &mut mv);
         let mut new: Vec<P> = (0..m).map(|i| add(p[i], mv[i])).collect();
         cap_moves(&p, &mut new, step / 2.0);
         keep_in(zones, &p, &mut new);
@@ -477,9 +477,9 @@ fn soften(p: &[P], k: usize, sharp: &[bool], hard: bool) -> Vec<P> {
     out
 }
 
-/// Off the tongue's mouths: the curve on along their arcs' end for a while (`mv` amended;
-/// the tongue and its ends stay).
-fn mouths(p: &[P], k: usize, mv: &mut [P]) {
+/// Off the stem's openings: the curve on along their arcs' end for a while (`mv` amended;
+/// the stem and its ends stay).
+fn openings(p: &[P], k: usize, mv: &mut [P]) {
     let n = p.len();
     for (end, prev, sign) in [(0, n - 1, 1isize), (k - 1, k, -1isize)] {
         let t = sub(p[end], p[prev]);

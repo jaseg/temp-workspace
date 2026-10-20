@@ -1,5 +1,5 @@
 """Partitions of a mesh's area: of equal area, together the whole of it, each of a piece and
-at its own port (in turn along the junction), necks a pair of lanes wide where needed."""
+at its own port (in turn along the junction), feeders a pair of lanes wide where needed."""
 
 import itertools
 
@@ -33,9 +33,9 @@ def test_partitions(count, seed):
     for p, port in zip(parts, ps, strict=True):
         assert p.area.geom_type == "Polygon"  # (of a piece)
         assert p.port == port and port.difference(p.area).area < 1e-6
-        # (a neck from the port's middle on, its corridor a port wide, inside)
-        assert p.neck.coords[0] == pytest.approx(tuple(port.centroid.coords[0]))
-        corridor = p.neck.buffer(PITCH * n, cap_style="flat").intersection(AREA)
+        # (a feeder from the port's middle on, its corridor a port wide, inside)
+        assert p.feeder.coords[0] == pytest.approx(tuple(port.centroid.coords[0]))
+        corridor = p.feeder.buffer(PITCH * n, cap_style="flat").intersection(AREA)
         assert corridor.difference(p.area).area < 1e-3 * (2 * n * PITCH) ** 2
 
 
@@ -58,16 +58,16 @@ def test_cells_keep_to_the_zones():
 
 
 def test_a_neck_carries_the_tongue_on():
-    """A partition laid out along a neck: its traces leave through its port at the pitch,
-    run along the neck and fill the part beyond, nearer nothing than the pitch."""
+    """A partition laid out along a feeder: its traces leave through its port at the pitch,
+    run along the feeder and fill the part beyond, nearer nothing than the pitch."""
     n = 2
     c = 2 * n * PITCH
     area = shapely.box(0, 0, 30, 20)
-    neck = shapely.LineString([(c / 2, 10), (4, 10), (8, 14)])
-    m = sfc.generate(area, (0, 10 - c / 2), mesh.LEFT, n, PITCH, seed=1, neck=neck)
+    feeder = shapely.LineString([(c / 2, 10), (4, 10), (8, 14)])
+    m = sfc.generate(area, (0, 10 - c / 2), mesh.LEFT, n, PITCH, seed=1, feeder=feeder)
     lines = [shapely.LineString(t) for t in m.traces]
     assert all(line.is_simple for line in lines)
     assert min(a.distance(b) for a, b in itertools.combinations(lines, 2)) > 0.99 * PITCH
-    corridor = neck.buffer(c / 2, cap_style="flat")
+    corridor = feeder.buffer(c / 2, cap_style="flat")
     inside = shapely.union_all(lines).intersection(corridor.buffer(-PITCH / 4))
-    assert inside.length > 2 * n * 0.8 * neck.length  # (its traces run along it)
+    assert inside.length > 2 * n * 0.8 * feeder.length  # (its traces run along it)

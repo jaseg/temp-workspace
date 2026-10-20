@@ -202,7 +202,7 @@ def _unit(a: Point, b: Point) -> Point:
 
 
 def _left(d: Point) -> Point:
-    """Left-hand normal of a run going ``d`` (as ``fpc._side``)."""
+    """Left normal of a run going ``d`` (as ``fpc._side``)."""
     return (d[1], -d[0])
 
 
@@ -402,7 +402,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
             jobs.append((name, functools.partial(
                 sfc.generate, copy(part.area), (cx, cy + k * port), side, each, pitch,
                 seed=seed * 1000 + k, zones=[copy(z) for z in zones],
-                arcs=cfg.mesh_shape == "arcs", neck=part.neck,
+                arcs=cfg.mesh_shape == "arcs", feeder=part.feeder,
             )))  # fmt: skip
 
     # The two sides (and each one's partitions) are independent: laid out at once.

@@ -330,7 +330,7 @@ def test_verify_passes_and_catches_opens_and_shorts(layout):
 
 
 def test_layout_fails_safe(monkeypatch, tmp_path):
-    """A layout that fails its check is not handed out: an error instead (the UI shows it)."""
+    """A layout that fails its check is not given out: an error instead (the UI shows it)."""
     from yanartas_pillowbox.server import create_app
 
     monkeypatch.setattr(pcb, "verify", lambda result: ["MESH_F1 is open (made up)"])
@@ -353,7 +353,7 @@ def test_mesh_metrics(layout):
         assert all(0 <= p["total"] <= p["local"] + 1e-6 for p in m["skew"])
 
 
-def _ports_only(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, neck=None):
+def _ports_only(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, feeder=None):
     """A stand-in for the curve's layout: ``n`` nested U-turns in the exit cell (its open
     side to -x), net 1 outermost."""
     from yanartas_pillowbox import mesh
@@ -374,7 +374,7 @@ def _ports_only(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, neck
 
 def test_space_filling_curve_is_wired_in(monkeypatch):
     """The curve layout: each layer's area in partitions of equal area, each laid out on its
-    own (its traces, its port in turn along the junction, its neck, the panels as zones),
+    own (its traces, its port in turn along the junction, its feeder, the panels as zones),
     the partitions' traces together the layer's mesh (its own tests run it on small areas;
     a full-size run is slow, below)."""
     from yanartas_pillowbox import sfc
@@ -382,7 +382,7 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
 
     seen = []
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, neck=None):
+    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, feeder=None):
         seen.append((len(zones), n, mask.area))
         return _ports_only(mask, corner, side, n, pitch)
 
@@ -438,7 +438,7 @@ def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     from yanartas_pillowbox import progress, sfc
     from yanartas_pillowbox.server import create_app
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, neck=None):
+    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, feeder=None):
         progress.report("settle", 20, 40, vertices=1000)
         return _ports_only(mask, corner, side, n, pitch)
 

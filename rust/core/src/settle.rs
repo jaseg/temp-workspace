@@ -192,7 +192,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         // copper nearer than the pitch (as laid: at a sharp corner, off to the side where
         // centring does not look): straight away from it
         let crowd: Vec<P> = pmap(tr.len(), |i| crowded(&tr, &arc, &verts, i, &cx));
-        // a tight bend: no move along its axis into it (its tip pinned, its legs may close)
+        // a tight bend: no move along its axis into it (its tip pinned, its sides may close)
         let axis = bend_axes(&tr, &curv, &normal, prm.pin * pitch);
         let bend = tr.bends(prm.bend);
         let run: Vec<Vec<f64>> = gained.iter().map(|g| cumsum(g)).collect();
@@ -368,7 +368,7 @@ fn smoothed(mut tr: Traces, prm: &Params, cx: &Ctx) -> Traces {
 }
 
 /// The settled traces matched in length (`sfc._match`): where one runs (from the exit) more
-/// than `match_band` pitches ahead of the shortest, its bends there straightened by as much
+/// than `match_band` pitches longer than the shortest, its bends there straightened by as much
 /// as takes it back, over a few steps; never lengthened.
 fn matched(
     mut tr: Traces,
@@ -441,7 +441,7 @@ fn matched(
 }
 
 /// For each trace and place along the curve: how much length to take out there so that no
-/// trace runs more than `band` ahead of the shortest, taken out where it gets ahead.
+/// trace runs more than `band` longer than the shortest, taken out where it gains.
 fn excess(gained: &[Vec<f64>], band: f64) -> Vec<Vec<f64>> {
     let n = gained.len();
     let bins = gained[0].len();

@@ -69,7 +69,7 @@ the defaults. It never crashes because of the file.
   *Download* is disabled. Below the form, *Derived geometry* lists the computed fold and cut
   radii, arc length, the straight-edge length, the circumference and the flat panel width.
 * **Pattern (2D):** the exact SVG you will download. Zoom with the wheel, the +/− buttons or a
-  two-finger pinch, drag to pan, and double-click or press *Fit* to reset (the
+  two-point pinch, drag to pan, and double-click or press *Fit* to reset (the
   cross-section view works the same way). The header shows the pattern and
   sheet sizes. All lines are black, as in the export, and differ only in dashing (see
   *Output SVG*). A legend shows the line types; dashes keep their on-screen size at any
@@ -285,7 +285,7 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   partition's curve is
   relaxed towards an even spacing of as many pitches as it carries traces (folds and edges hold it off by
   half that), the mesh's traces are its offsets, spread to share its spacing, and the exit
-  is a "tongue" of two straight legs built into the curve's graph. It follows edges and
+  is a "stem" of two straight rails built into the curve's graph. It follows edges and
   folds closely (no bare strips) at the cost of a less regular structure: the space
   between traces varies, mostly within −5 %…+20 % of the nominal one, rarely below.
 * **Metrics** (*Derived geometry*, `pcb` command): the space between the traces, measured
