@@ -475,3 +475,8 @@ Layout:
 * `persistence.py`, `server.py`, `cli.py`.
 * `static/`: the no-build ES-module frontend, with web components for the parameter input
   and both previews. three.js r160 is vendored under `static/vendor/three` (MIT).
+
+## License
+
+GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later): see LICENSE. The Rust
+core in `rust/` is under the same license.
