@@ -298,7 +298,8 @@ inner flap's free edge.
      every gap between two runs as wide as the runs are apart, and the holes where runs
      meet. So each trace is then moved on its own, by steps (`SETTLE`), towards the middle
      between the nearest copper on either side of it (nothing within three pitches: a hole,
-     moved into; the area's edge standing for copper at twice its distance). Smoothness
+     moved into; the area's edge and the zones' borders standing for copper at twice their
+     distance; where the traces cross a border, at the curve's joins, they stay as laid). Smoothness
      counts for little: a trace may kink into a hole's corner (only jitter is smoothed, by
      a Taubin step); but in a bend tighter than 1.5 pitches nothing moves along its axis
      into it, so a U-turn's innermost trace keeps its tip and closes up its legs. Filling
@@ -313,7 +314,8 @@ inner flap's free edge.
      lead, a long trace took it back many times over and swung. All moves die down over the steps
      (annealing), or the layout churns and the steering chases its tail. Every move keeps
      a pitch (+1 %) from other copper, measured to segments, and from the trace itself
-     where it faces itself across; none crosses. Only vertices near ones that moved are
+     where it faces itself across (or is much further along it than away: a finger's
+     pinched legs); none crosses. Only vertices near ones that moved are
      looked at again (a grid query of all pairs within a radius).
   The default box takes about 2.5 min per layer, and settling as long again or more (see
   Later).
