@@ -65,7 +65,6 @@ from yanartas_pillowbox.mesh import (
     MeshError,
     Point,
     Rays,
-    _to_segment,
     resample,
 )
 
@@ -1708,6 +1707,50 @@ def _settle(
 _TRACE: list | None = None  # (development: each settling step's figures, when a list)
 
 
+class _Segments:
+    """Segments (``a`` to ``b``) in a GEOS STRtree, for the ones near points or crossing."""
+
+    def __init__(self, a: np.ndarray, b: np.ndarray) -> None:
+        self.a, self.b = a, b
+        self.lines = shapely.linestrings(np.stack([a, b], 1))
+        self.tree = shapely.STRtree(self.lines)
+
+    def near(self, q: np.ndarray, r: float) -> tuple[np.ndarray, np.ndarray]:
+        """Every pair of a point and a segment no further than ``r`` from it (as the
+        segments were put in the tree)."""
+        qi, si = self.tree.query(shapely.points(q), predicate="dwithin", distance=r)
+        return qi.astype(np.int64), si.astype(np.int64)
+
+    def crossing(
+        self, which: np.ndarray, a: np.ndarray, b: np.ndarray, slack: float
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Every pair of one of the segments ``which`` and a segment it crosses, the
+        segments now running from ``a`` to ``b``: each moved no further than ``slack``
+        since it was put in the tree."""
+        now = shapely.linestrings(np.stack([a[which], b[which]], 1))
+        wi, si = self.tree.query(now, predicate="dwithin", distance=2 * slack)
+        i = which[wi]
+        hit = _crosses(a[i], b[i], a[si], b[si])
+        return i[hit], si[hit].astype(np.int64)
+
+
+def _crosses(a: np.ndarray, b: np.ndarray, c: np.ndarray, d: np.ndarray) -> np.ndarray:
+    """Whether each segment ``a``-``b`` crosses its ``c``-``d`` (strictly: not just touching)."""
+
+    def side(p: np.ndarray, q: np.ndarray, r: np.ndarray) -> np.ndarray:
+        return (q[:, 0] - p[:, 0]) * (r[:, 1] - p[:, 1]) - (q[:, 1] - p[:, 1]) * (r[:, 0] - p[:, 0])
+
+    return (side(a, b, c) * side(a, b, d) < 0) & (side(c, d, a) * side(c, d, b) < 0)
+
+
+def _closest(q: np.ndarray, a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Each point's nearest point on its segment, and where on it (0 at ``a``, 1 at ``b``)."""
+    e = b - a
+    t = (q[:, 0] - a[:, 0]) * e[:, 0] + (q[:, 1] - a[:, 1]) * e[:, 1]
+    t = np.clip(t / np.maximum(e[:, 0] ** 2 + e[:, 1] ** 2, 1e-18), 0, 1)
+    return a + e * t[:, None], t
+
+
 def _neighbour_sides(tr: _Traces) -> np.ndarray:
     """For each two neighbouring traces: on which side of the first (along its normals:
     1 left, -1 right) the second runs (they run alongside, so one side all along)."""
@@ -1754,11 +1797,12 @@ def _centring(
     out = []
     found = {}
     todo = np.arange(len(look))
+    tree = shapely.STRtree(shapely.points(p))
     for reach in (near, far):  # (nearer first; further only where nothing that near)
         if not len(todo):
             break
         q = look[todo]
-        qi, pi = Grid(p, reach).within(p[q], reach)
+        qi, pi = tree.query(shapely.points(p[q]), predicate="dwithin", distance=reach)
         v = p[pi] - p[q[qi]]
         dd = np.hypot(v[:, 0], v[:, 1])
         across = v[:, 0] * normal[q[qi], 0] + v[:, 1] * normal[q[qi], 1]
@@ -1815,77 +1859,59 @@ def _bend_axes(tr: _Traces, curv: np.ndarray, radius: float) -> np.ndarray:
     return axis
 
 
-def _gap_step(tr: _Traces) -> float:
-    """Half the longest step between two vertices of the traces: a segment nearer a point
-    than d has an end nearer than d plus that."""
-    seg = np.hypot(*(tr.p[np.maximum(tr.next, 0)] - tr.p).T)[tr.next >= 0]
-    return float(seg.max()) / 2 if len(seg) else 0.0
-
-
 def _keep_clear(
     tr: _Traces, old: np.ndarray, new: np.ndarray, pitch: float, own: float
 ) -> np.ndarray:
     """``new`` with the vertices that would come nearer other copper than a pitch (with a
     margin for what resampling and simplifying shave off), or whose segments would cross,
-    back where they were (``old``). A trace's own vertices count as other copper where it
+    back where they were (``old``). A trace's own copper counts as other copper where it
     faces itself (across it, as across a hairpin's legs; not round a kink): it may turn
-    sharply, but not pinch."""
+    sharply, but not pinch. (Distances to segments, exactly: from an STRtree of them.)"""
     new = new.copy()
     net = tr.net
     need = 1.01 * pitch
     check = np.nonzero(np.any(new != old, axis=1))[0]
-    reach = need + _gap_step(tr)
+    start = np.nonzero(tr.next >= 0)[0]  # (each segment by its first vertex)
+    # (one tree, of the segments as moved: a vertex taken back is off by its move at most,
+    # so the look-ups reach that much further, and what they find is measured as it is)
+    segs = _Segments(new[start], new[tr.next[start]])
+    slack = float(np.max(np.hypot(*(new - old).T), initial=0.0))
     for _ in range(6):
-        moved = np.nonzero(np.any(new != old, axis=1))[0]
-        if not len(moved) or not len(check):
+        if not len(check):
             break
         tr.p = new
         arc = tr.arc()
         normal = tr.normals()
         tangent = np.stack([normal[:, 1], -normal[:, 0]], 1)
-        grid = Grid(new, reach)
-        qi, pi = grid.within(new[check], reach)
-        around = pi  # (for the crossings below)
-        q = check[qi]
-        same = net[pi] == net[q]
-        sep = np.abs(arc[pi] - arc[q])
-        keep = ~same | (sep > own)
-        q, pi, same, sep = q[keep], pi[keep], same[keep], sep[keep]
-        v = new[pi] - new[q]
+        qi, k = segs.near(new[check], need + slack)
+        q, s0 = check[qi], start[k]
+        s1 = tr.next[s0]
+        c, t = _closest(new[q], new[s0], new[s1])
+        v = c - new[q]
         d = np.hypot(v[:, 0], v[:, 1])
-        for nb in (tr.prev, tr.next):  # (other traces: to their segments, exactly)
-            o = np.where(nb[pi] >= 0, nb[pi], pi)
-            d = np.where(same, d, np.minimum(d, _to_segment(new[q], new[pi], new[o])))
+        same = net[s0] == net[q]
+        sep = np.abs(arc[s0] + t * (arc[s1] - arc[s0]) - arc[q])
         # (its own copper: straight across, or much further along it than away, as across
         # a finger's pinched legs; not along it round a kink)
         across = np.abs(v[:, 0] * tangent[q, 0] + v[:, 1] * tangent[q, 1]) < 0.5 * np.maximum(
             d, 1e-12
         )
         across |= sep > 2 * d
-        bad = np.unique(q[(d < need) & (~same | across)])
-        # segments that cross
-        seg = np.nonzero(tr.next >= 0)[0]
-        if len(check) < len(new) // 4:  # (few: only the segments near them can be crossed)
-            near = np.unique(np.concatenate([around, tr.prev[around], check]))
-            seg = np.intersect1d(seg, near[near >= 0])
-        touch = np.isin(seg, check) | np.isin(tr.next[seg], check)
-        a, b = new[seg], new[tr.next[seg]]
-        e = b - a
-        length = np.hypot(e[:, 0], e[:, 1])
-        rays = Rays(a, b, max(float(length.max()), 1e-6))
-        k = np.nonzero(touch)[0]
-        ray, hit, t = rays.cast(a[k], e[k] / np.maximum(length[k], 1e-12)[:, None])
-        i, h = seg[k[ray]], seg[hit]
-        cross = (t <= length[k[ray]]) & (h != i) & (h != tr.prev[i]) & (h != tr.next[i])
+        bad = q[(d < need) & (~same | ((sep > own) & across))]
+        # segments that cross (not merely sharing an end with their neighbours)
+        touch = np.nonzero(np.isin(start, check) | np.isin(tr.next[start], check))[0]
+        i, h = segs.crossing(touch, new[start], new[tr.next[start]], slack)
+        i, h = start[i], start[h]
+        cross = (h != i) & (h != tr.prev[i]) & (h != tr.next[i])
         crossed = np.concatenate([i[cross], tr.next[i[cross]], h[cross], tr.next[h[cross]]])
         back = np.unique(np.concatenate([bad, crossed[crossed >= 0]]))
         if not len(back):
             break
         new[back] = old[back]
         # (next: what moved near what went back)
-        qi, pi = grid.within(new[back], reach)
-        near = np.unique(np.concatenate([pi, back, tr.prev[back], tr.next[back]]))
-        check = near[(near >= 0)]
+        _, k = segs.near(new[back], need + 2 * slack)
+        near = np.concatenate([start[k], tr.next[start[k]], back, tr.prev[back], tr.next[back]])
+        check = np.unique(near[near >= 0])
         check = check[np.any(new[check] != old[check], axis=1)]
     tr.p = old
     return new

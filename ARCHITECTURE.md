@@ -316,7 +316,10 @@ inner flap's free edge.
      a pitch (+1 %) from other copper, measured to segments, and from the trace itself
      where it faces itself across (or is much further along it than away: a finger's
      pinched legs); none crosses. Only vertices near ones that moved are
-     looked at again (a grid query of all pairs within a radius).
+     looked at again. Neighbours come from GEOS STRtrees (shapely; in the browser too, from
+     Pyodide's build): one of the vertices per step for the centring, one of the segments
+     per step for the clearance (distances to segments exactly; a vertex taken back is
+     looked for as far again as it moved).
   The default box takes about 2 min per layer to lay, and about 20 min more to settle
   (see Later).
 - **Check** (`verify`, run at the end of every `layout`): the tracks' points joined along
