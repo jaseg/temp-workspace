@@ -613,9 +613,10 @@ def _sealed(g: shapely.Geometry, area: shapely.Geometry, size: float) -> shapely
     """``g`` with its holes smaller than ``size`` square filled, but where ``area`` has them."""
     polys = []
     for q in _parts(g):
+        holes = [Polygon(r) for r in q.interiors]
         keep = [
-            r for r in q.interiors
-            if Polygon(r).area >= size * size or not area.contains(Polygon(r).representative_point())
+            r for r, h in zip(q.interiors, holes, strict=True)
+            if h.area >= size * size or not area.contains(h.representative_point())
         ]  # fmt: skip
         polys.append(Polygon(q.exterior, keep))
     return shapely.union_all(polys)
