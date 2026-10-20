@@ -315,7 +315,14 @@ inner flap's free edge.
      giving the room up to it (well ahead, its fingers into holes too: skew before
      coverage). It is steered only where the lead is still being built up (over about 15
      mm of curve it gains on the neighbour the way it leads): steered all along after a
-     lead, a long trace took it back many times over and swung. All moves die down over the steps
+     lead, a long trace took it back many times over and swung. Over a whole board that
+     still leaves 10-25 mm, so the settled traces are then matched: walking along the
+     curve, wherever a trace runs more than 15 pitches ahead of the shortest, that much is
+     marked to come out of it there, and a few steps straighten its bends there (its
+     squiggles and fingers) by that much (`_match`; the band above how far leads swing to
+     and fro through the bends, or every swing is cut). Only ever shortening, it costs
+     little coverage (on the default box: skew 21 → 10 mm at most, length and islands as
+     before). All moves die down over the steps
      (annealing), or the layout churns and the steering chases its tail. Every move keeps
      a pitch (+1 %) from other copper, measured to segments, and from the trace itself
      where it faces itself across (or is much further along it than away: a finger's

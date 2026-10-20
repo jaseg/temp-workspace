@@ -106,7 +106,7 @@ SETTLE_SPAN = 25  # ... (where along the curve it gains more, over this many pla
 SETTLE_STEER_COOL = 2.0  # ... (the steering dying down as the moves, to this)
 SETTLE_TIP = 1.0  # ... U-turns tighter than this many pitches per trace's radius: tips
 SETTLE_REACH_OUT = 1.0  # ... leaning out along their axis by this share of the room
-MATCH = 12  # steps matching the settled traces' lengths (taking it out of the longer)
+MATCH = 20  # steps matching the settled traces' lengths (taking it out of the longer)
 # (the band above how far the leads swing to and fro through the bends: else every swing is cut)
 MATCH_BAND = 15.0  # ... no trace more than this many pitches ahead of the shortest
 MATCH_RATE = 0.5  # ... the share of their bends' depth a step straightens them by, at most
