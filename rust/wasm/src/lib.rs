@@ -3,8 +3,8 @@
 //! (points as x, y, x, y, ...), the constants by name, progress to a JS function.
 
 use js_sys::{Array, Float64Array, Function, Object, Reflect, Uint32Array};
-use pillowbox_mesh_core::{geom::P, settle as settle_core, Input, Params, Status};
 use wasm_bindgen::prelude::*;
+use yanartas_mesh_core::{geom::P, settle as settle_core, Input, Params, Status};
 
 fn points(flat: &[f64]) -> Vec<P> {
     flat.chunks_exact(2).map(|c| [c[0], c[1]]).collect()

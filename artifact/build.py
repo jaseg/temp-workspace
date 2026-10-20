@@ -138,11 +138,11 @@ def build_mesh(out: Path) -> None:
                 "or pass --no-wasm (the browser then settles in numpy: far slower)"
             )
     subprocess.run(
-        ["cargo", "build", "--release", "-p", "pillowbox-mesh-wasm",
+        ["cargo", "build", "--release", "-p", "yanartas-mesh-wasm",
          "--target", "wasm32-unknown-unknown"],
         cwd=rust, check=True,
     )  # fmt: skip
-    wasm = rust / "target/wasm32-unknown-unknown/release/pillowbox_mesh_wasm.wasm"
+    wasm = rust / "target/wasm32-unknown-unknown/release/yanartas_mesh_wasm.wasm"
     subprocess.run(
         ["wasm-bindgen", "--target", "web", "--no-typescript", "--out-dir", str(out / "mesh"),
          str(wasm)],

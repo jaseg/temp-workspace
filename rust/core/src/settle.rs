@@ -572,7 +572,8 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
             if !bad && cx.edges.any_around(new[q], half) {
                 let near = |at: P| {
                     let mut d = f64::MAX;
-                    cx.edges.around(at, half, |e| d = d.min(dist(cx.edge[e], at)));
+                    cx.edges
+                        .around(at, half, |e| d = d.min(dist(cx.edge[e], at)));
                     d
                 };
                 let now = near(new[q]);

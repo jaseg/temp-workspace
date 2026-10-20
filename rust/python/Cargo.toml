@@ -1,13 +1,14 @@
 [package]
-name = "pillowbox-mesh-python"
+name = "yanartas-mesh-python"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [lib]
-name = "pillowbox_mesh"
+name = "yanartas_mesh"
 crate-type = ["cdylib"]
 
 [dependencies]
-pillowbox-mesh-core = { path = "../core" }
+yanartas-mesh-core = { path = "../core" }
 pyo3 = { version = "0.25", features = ["extension-module", "abi3-py311"] }
 numpy = "0.25"

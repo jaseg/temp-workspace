@@ -35,7 +35,8 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | `crosssection.py` | Pure math for the closed body: one panel's cross-section (`CrossSection`), the panel width solver, and `Body`, the material model around the interior (section 4.3). |
 | `mesh.py` | What the mesh layouts share: the `Mesh` result, `MeshError`, the side bits, `straighten`, a nearest-point `Grid`, and the metrics: `spacing` (the space between traces along them) and `skew` (neighbouring traces as a differential pair). Needs numpy. |
 | `kimesh.py` | The security mesh generator, a port of KiMesh: tiles, the randomized depth-first walk over the cells inside a mask, and joining each net's segments into one path. Needs shapely. |
-| `sfc.py` | The second mesh layout: a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across the folds as seldom as possible, relaxed to an even spacing, the traces offset from it. Needs shapely and numpy. |
+| `sfc.py` | The second mesh layout: a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across the folds as seldom as possible, relaxed to an even spacing, the traces offset from it, then settled by the Rust core (`yanartas_mesh`). Needs shapely and numpy. |
+| `progress.py` | How far a long layout has got: the layouts report phases and steps, the CLI and the web UI show them. |
 | `pcb.py` | The flex-PCB layout (mask, both meshes, the cable's traces, fan-out, vias and plug contacts, GND zone) and its export through gerbonara (KiCad board and project, Gerber, SVG). Imported on demand: its dependencies are heavy (the in-browser build loads them on the first PCB request). |
 | `fpc.py` | The FPC cable's layout at the top end of the pattern: the level cut it leaves the inner flap by, the meander, its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
@@ -351,10 +352,13 @@ inner flap's free edge.
   sample matched to the nearest point of its neighbour a little ahead of the last match
   (monotone); the largest difference of the lengths run to the matched points, and the
   difference of the totals.
-- **Rust.** Settling and length matching also exist in Rust (`rust/`, see its README):
-  a PyO3 extension (`pillowbox_mesh`, all cores) that `sfc` uses when installed (about
-  15x faster: the default box's settling 2 min instead of 30), and a WebAssembly build
-  for the browser (to come). The constants stay in `sfc.py` and are passed in.
+- **Rust.** Settling and length matching run in Rust only (`rust/`, see its README;
+  AGPL-3.0-or-later): natively the PyO3 extension `yanartas_mesh` (a dependency, built from
+  `rust/python`; on all cores: the default box's settling about 2 min), in the browser its
+  WebAssembly build, which the web worker loads (`artifact/build.py` builds it). `sfc.py`
+  prepares what needs shapely (the edge's points, the zones' rings, the exit) and keeps
+  the constants, passed in by name. Settling also keeps half a pitch from the edge and the
+  folds, so that a panel never needs the copper beyond its folds.
 - **Progress** (`progress.py`): the layouts report their phases and steps (graph, relax,
   lanes, settle, match; the stage: the mesh's layer) with figures (vertices, moved,
   clearances measured, the traces' length differences) and the whole layout's share done.
@@ -364,8 +368,9 @@ inner flap's free edge.
   each to the page, and `pyshim.js` answers the poll) and shows a bar and the phase in the
   header. The lengths' differences are shown only once matching: settling's swing wide.
 - **Later.** The rest of the curve layout in Rust; an alignment field (the reference's
-  needles) to lay the curve along the edges; settling's hard skew limit (`SETTLE_SKEW`, off:
-  the steering keeps neighbouring traces within a few mm instead): reconsider it; a
+  needles) to lay the curve along the edges; a hard skew limit in settling
+  (dropped: it cost coverage; steering and matching keep the skew within 10 mm instead):
+  reconsider it; a
   switch to draw the traces as circular arcs (now
   polylines, simplified within 2 µm).
 - **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board

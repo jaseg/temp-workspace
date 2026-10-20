@@ -1,8 +1,9 @@
 [package]
-name = "pillowbox-mesh-core"
-description = "The mesh layout's settling for yanartas-pillowbox (the traces moved into the room round them)."
+name = "yanartas-mesh-core"
+description = "The security mesh layout's settling for yanartas-pillowbox (each trace moved into the room round it)."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [features]
 default = ["parallel"]

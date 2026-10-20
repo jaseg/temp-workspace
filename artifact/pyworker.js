@@ -87,12 +87,13 @@ function loadPcb() {
       py.FS.writeFile(path, await r.text());
     }
     py.runPython("import importlib; importlib.invalidate_caches()");
-    // The mesh settling in WebAssembly (sfc.py calls self.pillowboxMesh.settle); without
+    // The mesh settling in WebAssembly (sfc.py calls self.yanartasMesh.settle); without
     // it (a build with --no-wasm) sfc settles in numpy, far slower.
     try {
-      const mesh = await import("./mesh/pillowbox_mesh_wasm.js");
-      await mesh.default({ module_or_path: here("./mesh/pillowbox_mesh_wasm_bg.wasm") });
-      self.pillowboxMesh = mesh;
+      const mesh = await import("./mesh/yanartas_mesh_wasm.js");
+      await mesh.default({ module_or_path: here("./mesh/yanartas_mesh_wasm_bg.wasm") });
+      self.yanartasMesh = mesh;
+      console.info("mesh settling: WebAssembly ready");
     } catch (err) {
       console.warn("mesh settling in WebAssembly unavailable:", err);
     }

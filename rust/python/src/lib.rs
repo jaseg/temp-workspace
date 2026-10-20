@@ -1,11 +1,11 @@
-//! `pillowbox_mesh`: the Rust settling as a Python extension (PyO3). `sfc._settle` calls
+//! `yanartas_mesh`: the Rust settling as a Python extension (PyO3). `sfc._settle` calls
 //! `settle` when this is installed, and its own numpy code otherwise.
 
 use numpy::ndarray::Array2;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
-use pillowbox_mesh_core::{geom::P, settle, Input, Params, Status};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use yanartas_mesh_core::{geom::P, settle, Input, Params, Status};
 
 fn points(a: &PyReadonlyArray2<f64>) -> PyResult<Vec<P>> {
     let a = a.as_array();
@@ -121,7 +121,7 @@ fn settle_traces<'py>(
 }
 
 #[pymodule]
-fn pillowbox_mesh(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn yanartas_mesh(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(settle_traces, m)?)?;
     Ok(())
 }

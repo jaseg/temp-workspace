@@ -1,20 +1,23 @@
 # Rust core
 
-The mesh layout's settling (`sfc._settle`, `sfc._match`) in Rust: about 15x the numpy
-code's speed on four cores (the default box: settling 125 s instead of about 30 min).
-`sfc.py` uses it when the extension is installed and its own numpy code otherwise
-(`SETTLE_NATIVE`); its constants stay in `sfc.py` and are passed in.
+The security mesh's settling and length matching (see ARCHITECTURE.md, Space-filling
+curve, 9. Settling), the only implementation of them: `sfc.py` prepares what needs shapely
+and calls it, natively through the PyO3 extension (a dependency of the package, built from
+`rust/python` by `uv sync`), in the browser through the WebAssembly build. Its constants
+stay in `sfc.py` and are passed in by name. On the default box, settling takes about 2 min
+on four cores. License: AGPL-3.0-or-later.
 
 | Crate | Role |
 | --- | --- |
-| `core` (`pillowbox-mesh-core`) | The algorithm. `parallel` (default): per-vertex work on all cores (rayon). |
-| `python` (`pillowbox_mesh`) | The PyO3 extension: `settle_traces(lines, pitch, edge, zones, keep, params, progress)`. |
-| `wasm` | The browser build (wasm-bindgen; to come). |
+| `core` (`yanartas-mesh-core`) | The algorithm. `parallel` (default): per-vertex work on all cores (rayon). |
+| `python` (`yanartas-mesh`, module `yanartas_mesh`) | The PyO3 extension: `settle_traces(lines, pitch, edge, zones, keep, params, progress)`. |
+| `wasm` (`yanartas-mesh-wasm`) | The browser build (wasm-bindgen, `--target web`): `settle(...)` on flat typed arrays; `artifact/build.py` builds it. |
 
 ```sh
-uv tool run maturin build --release -m rust/python/Cargo.toml -o dist/
-uv pip install dist/pillowbox_mesh-*.whl          # (into the project's environment)
+uv sync                                                   # (builds and installs the extension)
 cargo test --release --manifest-path rust/Cargo.toml
+rustup target add wasm32-unknown-unknown                  # (for artifact/build.py)
+cargo install wasm-bindgen-cli --version <rust/Cargo.lock's wasm-bindgen>
 ```
 
 ## Design
@@ -34,12 +37,13 @@ cargo test --release --manifest-path rust/Cargo.toml
 
 ## Plan
 
-1. Core: settling and length matching (done), unit tests against small cases.
-2. Python: the extension (done); status lines and a progress bar in the CLI.
+1. Core: settling and length matching (done), unit tests against small cases (done).
+2. Python: the extension (done); status lines and a progress bar in the CLI (done).
 3. Threads: per vertex within a step (done, rayon). Panels as units: settling keeps every
    vertex in its zone, so a panel needs only its own copper; the steering's bookkeeping
    (each trace's length gained by place along the curve) is shared once a step. In the
    browser that maps onto one Web Worker per panel (no shared memory needed).
-4. WebAssembly: the core built for the browser, run in the Pyodide worker's place for the
-   settling, a progress bar in the web UI from the workers' messages.
+4. WebAssembly: the core built for the browser and called from the Pyodide worker (done;
+   same results as native to 1e-13), the web UI's progress bar (done). Per-panel workers:
+   to come.
 5. Later: the rest of the curve layout (CVT graph, matching, relaxation, lanes).

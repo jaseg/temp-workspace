@@ -13,6 +13,7 @@ dependencies = [
     "flask>=3.0",
     "gerbonara>=1.5.0",
     "shapely>=2.2.0",
+    "yanartas-mesh",  # (the mesh settling's Rust core: rust/python, built with maturin)
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -29,6 +30,9 @@ dev = [
     "pytest-xdist>=3.8.0",
     "ruff>=0.6",
 ]
+
+[tool.uv.sources]
+yanartas-mesh = { path = "rust/python" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/yanartas_pillowbox"]

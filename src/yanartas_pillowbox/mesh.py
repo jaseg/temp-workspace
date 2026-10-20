@@ -24,6 +24,7 @@ import numpy as np
 
 Point = tuple[float, float]
 CHUNK = 50_000  # queries at a time (bounds the memory a query takes)
+PAIRS = 2_000_000  # ray-segment pairs at a time (bounds the memory a ray cast takes)
 
 RIGHT, DOWN, LEFT, UP = 0b0001, 0b0010, 0b0100, 0b1000
 STEP = {RIGHT: (1, 0), DOWN: (0, 1), LEFT: (-1, 0), UP: (0, -1)}
@@ -188,8 +189,25 @@ class Rays:
         segment and ``t``."""
         cells, rays = self._cells(p, p + d * self.reach)
         lo = np.searchsorted(self.keys, cells, "left")
-        hi = np.searchsorted(self.keys, cells, "right")
-        count = hi - lo
+        count = np.searchsorted(self.keys, cells, "right") - lo
+        # (in parts of at most PAIRS ray-segment pairs: a few long segments make wide cells,
+        # and every ray in them meets every segment; memory bounded, as in the browser)
+        out: tuple[list, list, list] = ([], [], [])
+        upto = np.cumsum(count)
+        k = 0
+        while k < len(cells):
+            m = max(int(np.searchsorted(upto, (upto[k - 1] if k else 0) + PAIRS, "right")), k + 1)
+            r, sg, t = self._hits(p, d, rays[k:m], lo[k:m], count[k:m])
+            for acc, x in zip(out, (r, sg, t), strict=True):
+                acc.append(x)
+            k = m
+        if not out[0]:
+            return np.zeros(0, int), np.zeros(0, int), np.zeros(0)
+        return np.concatenate(out[0]), np.concatenate(out[1]), np.concatenate(out[2])
+
+    def _hits(
+        self, p: np.ndarray, d: np.ndarray, rays: np.ndarray, lo: np.ndarray, count: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         ray = np.repeat(rays, count)
         start = np.repeat(lo - np.concatenate([[0], np.cumsum(count)[:-1]]), count)
         seg = self.ids[start + np.arange(len(ray))]

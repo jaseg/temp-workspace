@@ -1,7 +1,7 @@
-use pillowbox_mesh_core::geom::{crosses, dist, resample, P};
-use pillowbox_mesh_core::grid::Grid;
-use pillowbox_mesh_core::zones::Zones;
-use pillowbox_mesh_core::{settle, Input, Params};
+use yanartas_mesh_core::geom::{crosses, dist, resample, P};
+use yanartas_mesh_core::grid::Grid;
+use yanartas_mesh_core::zones::Zones;
+use yanartas_mesh_core::{settle, Input, Params};
 
 #[test]
 fn grid_finds_every_point_within_reach() {
