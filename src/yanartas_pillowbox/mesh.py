@@ -122,7 +122,8 @@ class Grid:
                     qi = np.repeat(has, cnt)
                     first = np.concatenate([[0], np.cumsum(cnt)[:-1]])
                     pi = self.order[np.repeat(lo[has] - first, cnt) + np.arange(len(qi))]
-                    near = np.sum((part[qi] - self.p[pi]) ** 2, axis=1) <= r * r
+                    v = part[qi] - self.p[pi]
+                    near = v[:, 0] ** 2 + v[:, 1] ** 2 <= r * r
                     qs.append(qi[near] + k)
                     ps.append(pi[near])
         if not qs:

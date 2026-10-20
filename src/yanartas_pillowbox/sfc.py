@@ -96,7 +96,7 @@ SETTLE_RATE = 0.5  # ... the share of the way there a step goes
 SETTLE_REACH = 3.0  # ... copper looked for this many pitches out (beyond: a hole, moved into)
 SETTLE_PIN = 1.5  # ... bends tighter than this many pitches' radius do not move inwards
 SETTLE_COOL = 2.0  # ... the moves dying down over the steps as (1 - step / steps) to this
-SETTLE_STEP = 0.5  # ... the traces held at this many pitches between vertices
+SETTLE_STEP = 0.35  # ... the traces held at this many pitches between vertices
 SETTLE_STILL = 0.005  # ... moves shorter than this many pitches: none
 SETTLE_TRIM = 0  # ... then steps of length steering alone, trimming the skew left
 SETTLE_BAND = 1.0  # ... traces within this many pitches of length of each other: not steered
@@ -859,8 +859,8 @@ def _split(p: np.ndarray, longest: float) -> np.ndarray:
     parts = np.maximum(1, np.ceil(seg / longest)).astype(int)
     if (parts == 1).all():
         return p
-    t = np.concatenate([np.arange(m) / m for m in parts])
     i = np.repeat(np.arange(len(seg)), parts)
+    t = (np.arange(len(i)) - np.repeat(np.cumsum(parts) - parts, parts)) / parts[i]
     return np.vstack([p[i] + (p[i + 1] - p[i]) * t[:, None], p[-1:]])
 
 
@@ -1485,8 +1485,8 @@ class _Traces:
             t, u = t[~drop], u[~drop]
             seg = np.hypot(*np.diff(t, axis=0).T)
             parts = np.maximum(1, np.ceil(seg / (1.5 * step))).astype(int)
-            f = np.concatenate([np.arange(m) / m for m in parts])
             i = np.repeat(np.arange(len(seg)), parts)
+            f = (np.arange(len(i)) - np.repeat(np.cumsum(parts) - parts, parts)) / parts[i]
             lines.append(np.vstack([t[i] + (t[i + 1] - t[i]) * f[:, None], t[-1:]]))
             us.append(np.concatenate([u[i] + (u[i + 1] - u[i]) * f, u[-1:]]))
         return _Traces(lines, us)
@@ -1532,9 +1532,9 @@ def _settle(
     catches up. Only vertices near ones that moved are looked at again. The ends and the
     exit (``keep``) stay as laid."""
     step = SETTLE_STEP * pitch
-    near, far = 2 * pitch, SETTLE_REACH * pitch
+    near, far = 1.5 * pitch, SETTLE_REACH * pitch
     own = 0.5 * pitch  # (the trace's own vertices nearer along it: not copper across)
-    tr = _Traces([np.asarray(t, float) for t in lines]).respaced(step)
+    tr = _Traces([resample(np.asarray(t, float), step) for t in lines])
     n = len(lines)
     edge = np.vstack([resample(np.asarray(r.coords), step / 2) for r in _rings(area)])
     edges = Grid(edge, far)
@@ -1723,7 +1723,7 @@ def _centring(
         qi, pi = Grid(p, reach).within(p[q], reach)
         v = p[pi] - p[q[qi]]
         dd = np.hypot(v[:, 0], v[:, 1])
-        across = np.sum(v * normal[q[qi]], axis=1)
+        across = v[:, 0] * normal[q[qi], 0] + v[:, 1] * normal[q[qi], 1]
         other = (net[pi] != net[q[qi]]) | (np.abs(arc[pi] - arc[q[qi]]) > own)
         for side in (1.0, -1.0):
             d = found.setdefault(side, np.full(len(look), far))
@@ -1805,7 +1805,9 @@ def _keep_clear(
         arc = tr.arc()
         normal = tr.normals()
         tangent = np.stack([normal[:, 1], -normal[:, 0]], 1)
-        qi, pi = Grid(new, reach).within(new[check], reach)
+        grid = Grid(new, reach)
+        qi, pi = grid.within(new[check], reach)
+        around = pi  # (for the crossings below)
         q = check[qi]
         same = net[pi] == net[q]
         sep = np.abs(arc[pi] - arc[q])
@@ -1817,13 +1819,14 @@ def _keep_clear(
             o = np.where(nb[pi] >= 0, nb[pi], pi)
             d = np.where(same, d, np.minimum(d, _to_segment(new[q], new[pi], new[o])))
         # (its own copper: only straight across, not along it round a kink)
-        across = np.abs(np.sum(v * tangent[q], axis=1)) < 0.5 * np.maximum(d, 1e-12)
+        across = np.abs(v[:, 0] * tangent[q, 0] + v[:, 1] * tangent[q, 1]) < 0.5 * np.maximum(
+            d, 1e-12
+        )
         bad = np.unique(q[(d < need) & (~same | across)])
         # segments that cross
         seg = np.nonzero(tr.next >= 0)[0]
         if len(check) < len(new) // 4:  # (few: only the segments near them can be crossed)
-            _, near = Grid(new, reach).within(new[check], reach)
-            near = np.unique(np.concatenate([near, tr.prev[near], check]))
+            near = np.unique(np.concatenate([around, tr.prev[around], check]))
             seg = np.intersect1d(seg, near[near >= 0])
         touch = np.isin(seg, check) | np.isin(tr.next[seg], check)
         a, b = new[seg], new[tr.next[seg]]
@@ -1840,7 +1843,7 @@ def _keep_clear(
             break
         new[back] = old[back]
         # (next: what moved near what went back)
-        qi, pi = Grid(new, reach).within(new[back], reach)
+        qi, pi = grid.within(new[back], reach)
         near = np.unique(np.concatenate([pi, back, tr.prev[back], tr.next[back]]))
         check = near[(near >= 0)]
         check = check[np.any(new[check] != old[check], axis=1)]
