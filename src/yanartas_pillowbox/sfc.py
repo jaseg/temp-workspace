@@ -104,6 +104,7 @@ SETTLE_LEAP = 0.34  # ... a vertex moved at most this many of the steps between 
 SETTLE_TUNE = 3.0  # ... a trace this many pitches behind (or ahead): steered at full strength
 SETTLE_STEER = 0.6  # ... the share of its bends' depth a step grows (or straightens) them by
 SETTLE_SPAN = 25  # ... (where along the curve it gains more, over this many places)
+SETTLE_STEER_COOL = 2.0  # ... (the steering dying down as the moves, to this)
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -1573,7 +1574,11 @@ def _settle(
         # annealed: the moves die down over the steps; then a few steps of length steering
         # alone (from half strength, dying down too) trim what skew is left
         cool = (1 - it / SETTLE) ** SETTLE_COOL if it < SETTLE else 0.0
-        steer = cool if it < SETTLE else 0.5 * (1 - (it - SETTLE) / SETTLE_TRIM) ** SETTLE_COOL
+        steer = (
+            (1 - it / SETTLE) ** SETTLE_STEER_COOL
+            if it < SETTLE
+            else 0.5 * (1 - (it - SETTLE) / SETTLE_TRIM) ** SETTLE_COOL
+        )
         p, net = tr.p, tr.net
         arc = tr.arc()
         where = np.minimum((tr.u * bins).astype(int), bins - 1)
