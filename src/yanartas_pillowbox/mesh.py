@@ -327,7 +327,7 @@ class _Polylines:
     """The traces' own segments, for exact distances near a point along one of them."""
 
     def __init__(self, traces: Sequence[Sequence[Point]]) -> None:
-        self.a, self.b, self.start, self.arc = [], [], [], []
+        self.a, self.b, self.start, self.arc, self.len = [], [], [], [], []
         first = 0
         for t in traces:
             q = np.asarray(t, float)
@@ -335,10 +335,13 @@ class _Polylines:
             self.a.append(q[:-1])
             self.b.append(q[1:])
             self.arc.append(np.concatenate([[0.0], np.cumsum(seg)])[:-1])
+            self.len.append(seg)
             self.start.append(first)
             first += len(seg)
         self.ends = np.array([*self.start, first])
-        self.a, self.b, self.arc = (np.concatenate(x) for x in (self.a, self.b, self.arc))
+        self.a, self.b, self.arc, self.len = (
+            np.concatenate(x) for x in (self.a, self.b, self.arc, self.len)
+        )
 
     def distance(
         self,
@@ -364,7 +367,11 @@ class _Polylines:
             si = np.repeat(first - np.concatenate([[0], np.cumsum(count)[:-1]]), count)
             si += np.arange(len(qi))
             d = _to_segment(q[qi], self.a[si], self.b[si])
-            d[(own[qi] == i) & (np.abs(self.arc[si] - here[qi]) <= along)] = np.inf
+            # (a segment of its own trace reaching within that, however long)
+            near = (self.arc[si] <= here[qi] + along) & (
+                self.arc[si] + self.len[si] >= here[qi] - along
+            )
+            d[(own[qi] == i) & near] = np.inf
             np.minimum.at(out, qi, d)
         return out
 
