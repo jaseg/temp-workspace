@@ -230,6 +230,7 @@ function renderMeshStats(pcb) {
   const skew = (x) => `${worst(x, "total").toFixed(1)} / ${worst(x, "local").toFixed(1)} mm`;
   const rows = [
     ["Layout", sfc ? "Space-filling curve" : "KiMesh grid"],
+    ["Traces per side", `${front.traces}`],
     ...(sfc
       ? [["Curve graph cells (front / back)", both((x) => x.cells)]]
       : [

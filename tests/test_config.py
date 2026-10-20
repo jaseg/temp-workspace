@@ -60,6 +60,10 @@ def test_missing_fields_use_defaults():
         ({"end_wall_gap": -1}, "end_wall_gap"),
         ({"end_wall_gap": 501}, "end_wall_gap"),
         ({"lid_overlap": -1}, "lid_overlap"),
+        ({"mesh_partitions": 0}, "mesh_partitions"),
+        ({"mesh_partitions": 2.5}, "mesh_partitions"),
+        ({"mesh_partitions": 17}, "mesh_partitions"),
+        ({"fpc_cable": "back"}, "fpc_cable"),  # (schema 8's ends: now up or down)
     ],
 )
 def test_validation_errors(changes, field):
@@ -236,3 +240,13 @@ def test_interior_height_and_flap_offsets():
     assert body.front.sagitta + body.front_cut_sagitta == pytest.approx(18 + 1.2, abs=0.01)
     back_cut = body.back_cuts[len(body.back_cuts) // 2][1]
     assert body.back.sagitta + back_cut == pytest.approx(18 + 0.4, abs=0.01)
+
+
+def test_mesh_nets_per_side():
+    """The space-filling curve's partitions each carry the set traces; KiMesh has no
+    partitions."""
+    d = Config.defaults()
+    assert (d.mesh_partitions, d.mesh_traces, d.mesh_algorithm) == (3, 4, "kimesh")
+    assert d.mesh_nets == 4
+    assert d.with_values(mesh_algorithm="sfc").mesh_nets == 12
+    assert d.with_values(mesh_algorithm="sfc", mesh_partitions=1, mesh_traces=5).mesh_nets == 5

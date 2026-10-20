@@ -1,22 +1,24 @@
 """PCB layout of the box as a flex PCB: a security mesh on both sides of the foil, whose
 traces leave through the FPC cable to the plug's contacts.
 
-Each copper layer carries its own mesh (``mesh``): ``mesh_traces`` loops over the box's faces,
-kept ``mesh_edge_clearance`` off the cut edges, the slits and the cable. The front (F.Cu)
-mesh's exit cell sits against the junction, where the cable leaves the inner flap, so its
-loops' ends run straight on into the cable, on the plug's pin 1 side. The back (B.Cu) mesh's
-grid is offset by half a cell in x and y, so that the strips the two layers' whole cells
-leave bare along the edges differ: its exit cell sits half a cell into the flap, beside the
-front one's, and its loops' ends run straight on across the gap. Along the cable they keep
-the mesh's pitch, each on its own layer. Just before the plug they fan out to their
-contacts' places, and the back mesh's traces change to the contact side (F.Cu) through two
-staggered rows of vias.
+Each copper layer carries its own mesh (``mesh``): its nets (``Config.mesh_nets``: the
+space-filling curve's ``mesh_traces`` per partition, KiMesh's ``mesh_traces``) loop over the
+box's faces, kept ``mesh_edge_clearance`` off the cut edges, the slits and the cable. The
+front (F.Cu) mesh's exit cell sits against the junction, where the cable leaves the front
+panel's free edge, so its loops' ends run straight on into the cable, on the plug's pin 1
+side. The back (B.Cu) mesh's grid is offset by half a cell in x and y, so that the strips the
+two layers' whole cells leave bare along the edges differ: its exit cell sits half a cell
+into the panel, beside the front one's, and its loops' ends run straight on across the gap.
+Along the cable they keep the mesh's pitch, each on its own layer. Just before the plug they
+fan out to their contacts' places, and the back mesh's traces change to the contact side
+(F.Cu) through two staggered rows of vias.
 
-The plug's pins carry, from pin 1: GND, mesh ends 1-4, GND, 5-8, GND, 9-12, GND, 13-16, GND
-(the front mesh's ends 1-8, the back mesh's 9-16, each loop's two ends mirrored about the
-middle of its eight); the rest stay unconnected. GND is a ground plane on both layers of the
-cable: a KiCad zone, filled in KiCad (not in the Gerber and SVG output here); vias stitch the
-two layers together, and connect the GND contacts to the back layer.
+The plug's pins carry, from pin 1: GND, mesh ends 1-4, GND, 5-8, GND, ... (a GND pin after
+every four ends; the front mesh's ends first, then the back mesh's, each loop's two ends
+mirrored about the middle of its side's ends); the rest stay unconnected. GND is a ground
+plane on both layers of the cable: a KiCad zone, filled in KiCad (not in the Gerber and SVG
+output here); vias stitch the two layers together, and connect the GND contacts to the back
+layer.
 
 Coordinates are the pattern's (mm, y down), as in KiCad.
 """
@@ -157,7 +159,8 @@ class Layout:
 
 
 def pinout(pins: int, traces: int) -> list[str | None]:
-    """Each pin's signal, from pin 1: "GND" or "M<i>" (mesh end i, from 1), None if free."""
+    """Each pin's signal, from pin 1: "GND" or "M<i>" (mesh end i, from 1), None if free;
+    ``traces``: the mesh's nets on each side."""
     ends = 4 * traces  # two ends per loop, two sides
     out: list[str | None] = ["GND"]
     for i in range(ends):
@@ -289,7 +292,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     cable = pattern.cable
     if cable is None:
         raise PcbError("the PCB layout needs the FPC cable (its traces leave through it)")
-    n = int(cfg.mesh_traces)
+    n = cfg.mesh_nets
     w, space = cfg.mesh_trace_width, cfg.mesh_trace_space
     pitch = w + space
     pins = pinout(int(cfg.fpc_pins), n)
@@ -303,32 +306,28 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     if not isinstance(board, Polygon):  # pragma: no cover - the foil is one piece
         raise PcbError("the foil falls apart")
 
-    # The cable: its cut (the outline that bounds no face), closed across the junction.
+    # The cable: its cut (the outline that bounds no face), closed along the free edge.
     faces = {_segment_key(s) for f in pattern.faces for s in f.boundary}
     cable_cut = [s for s in pattern.outline.segments if _segment_key(s) not in faces]
     cable_poly = Polygon(sample(cable_cut)).buffer(0)
-    (jl, yj), (jr, _) = cable.junction
-    xc = (jl + jr) / 2
-    out_dir = _unit(cable.path[0], cable.path[1])  # from the flap into the cable
-    up = out_dir[1] < 0  # (the cable leaves the top end upward)
+    (xj, ya), (_, yb) = cable.junction
+    yc, lo, hi = (ya + yb) / 2, min(ya, yb), max(ya, yb)
+    out_dir = _unit(cable.path[0], cable.path[1])  # from the edge into the cable (-x)
     r = 2 * cfg.fpc_corner_radius + 1
-    beyond = shapely.box(jl - r, yj - r if up else yj, jr + r, yj if up else yj + r)
-    # (its cut closes across the fillets' ends, a little into the flap: cut off level)
-    x0, y0, x1, y1 = cable_poly.bounds
-    side = (
-        shapely.box(x0 - 1, y0 - 1, x1 + 1, yj) if up else shapely.box(x0 - 1, yj, x1 + 1, y1 + 1)
-    )
-    cable_poly = cable_poly.intersection(side)
+    beyond = shapely.box(xj - r, lo - r, xj, hi + r)
+    # (its cut closes across the fillets' ends, along the edge: cut off there)
+    x0, y0, _, y1 = cable_poly.bounds
+    cable_poly = cable_poly.intersection(shapely.box(x0 - 1, y0 - 1, xj, y1 + 1))
     mask = board.buffer(-ec).difference(cable_poly).difference(beyond)
 
-    # Pins: across the plug, pin 1 on the cable's left (walking from the flap to the tip).
+    # Pins: across the plug, pin 1 on the cable's left (walking from the edge to the tip).
     pin_pitch = cfg.fpc_pitch
     npins = int(cfg.fpc_pins)
 
     def k_pin(j: int) -> float:
         return ((npins + 1) / 2 - j) * pin_pitch
 
-    left0 = _left(out_dir)
+    left0 = _left(out_dir)  # (along the junction, towards pin 1's side)
     mesh_pins = {s: j + 1 for j, s in enumerate(pins) if s and s.startswith("M")}
     per_side = 2 * n
     sides = {
@@ -346,27 +345,27 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     corners = {}
     for layer, side_pins in sides.items():
         centre = sum(k_pin(j) for j in side_pins) / len(side_pins)
-        x0 = xc + centre * left0[0] - cell / 2  # (the exit cell centred on its pins)
+        y0 = yc + centre * left0[1] - cell / 2  # (the exit cell centred on its pins)
         if grid is None:
-            corner = (x0, yj if up else yj - cell)
+            corner = (xj, y0)
             grid = corner
         else:
             # The back mesh's grid is offset by half a cell both ways, so that the strips
             # each layer's whole cells leave bare along the edges differ: its exit cell sits
-            # half a cell into the flap (its traces run straight on across the gap) and on
-            # the nearest column of its grid.
+            # half a cell into the panel (its traces run straight on across the gap) and on
+            # the nearest row of its grid.
             # (and optionally by a trace width more, so its traces lie over the front's gaps)
             shift = cell / 2 + (w if cfg.mesh_back_offset == "cell_trace" else 0.0)
-            x0 = grid[0] + shift + round((x0 - grid[0] - shift) / cell) * cell
-            corner = (x0, yj + shift if up else yj - cell - shift)
-        if abs((x0 + cell / 2 - xc) * left0[0]) + cell / 2 > half - ec:
+            y0 = grid[1] + shift + round((y0 - grid[1] - shift) / cell) * cell
+            corner = (xj + shift, y0)
+        if abs(y0 + cell / 2 - yc) + cell / 2 > half - ec:
             raise PcbError("no room for the mesh's exit at the cable's junction")
         corners[layer] = corner
 
     def mesh(i: int, corner: Point) -> meshgen.Mesh:
         # (its own copy of the mask: preparing a shared geometry from two threads crashes)
         area = shapely.from_wkb(shapely.to_wkb(mask))
-        side = meshgen.UP if up else meshgen.DOWN
+        side = meshgen.LEFT  # (the cable leaves the edge towards -x)
         seed = int(cfg.mesh_seed) * 2 + i
         if cfg.mesh_algorithm == "sfc":
             # (the panels as zones: the curve crosses the folds as seldom as can be)
@@ -393,7 +392,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         # The loops' ends, across the cable from pin 1's side: they run on into the cable.
         tracks[layer] = sorted(
             (
-                ((p[0] - xc) * left0[0], f"MESH_{side}{net + 1}", p)
+                ((p[1] - yc) * left0[1], f"MESH_{side}{net + 1}", p)
                 for net, t in enumerate(m.traces)
                 for p in (t[0], t[-1])
             ),
@@ -840,6 +839,7 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
                     max(v for n, v in lengths.items() if n.startswith(f"MESH_{layer[0]}")), 3
                 ),
                 "algorithm": m.algorithm,
+                "traces": len(m.traces),
                 "spacing": spacing[layer].to_dict(),
                 "density": density[layer].to_dict() if layer in density else None,
                 "skew": [

@@ -8,6 +8,7 @@ from dataclasses import replace
 
 import pytest
 from helpers import loop_area, polyline
+from shapely.geometry import Point, Polygon
 
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.crosssection import max_height
@@ -275,6 +276,29 @@ def test_box_closes_along_glued_seam(case):
             continue  # the lead from the glue fold to the panel's edge
         d = min(seg_dist((p[0], p[2]), a, b) for a, b in itertools.pairwise(front))
         assert d == pytest.approx(t, abs=1e-5), (x, p)
+
+
+def test_glue_tab_lies_on_the_outside(case):
+    """The glue tab lies on the outside of the front panel (not between the panels): each of
+    its points off the lead is a thickness out along the front panel's outward normal, and
+    the cross-section draws it there too."""
+    cfg, _, _, parts = case
+    body, t = cfg.body, cfg.thickness
+    wf, wb = body.front.width, body.back.width
+    us = [wf * i / 4000 for i in range(4001)]
+    front = [body.front_point(u) for u in us]
+    tab = parts["glue-tab"]
+    for (x, _), p in zip(pts2(tab), pts3(tab), strict=True):
+        if x - wf - wb <= body.tab_lead + 1e-9:
+            continue
+        i = min(range(len(us)), key=lambda k: math.dist(front[k], (p[0], p[2])))
+        (fx, fz), (nx, nz) = front[i], body.front_normal(us[i])
+        assert (p[0] - fx) * nx + (p[2] - fz) * nz == pytest.approx(t, abs=1e-3), (x, p)
+    if t > 0:
+        section = build_cross_section(cfg)
+        ring = section["front"] + section["back"]
+        inside = Polygon(ring)
+        assert all(not inside.contains(Point(*q)) for q in section["glue_tab"][1:])
 
 
 def test_flaps_stand_on_the_end_walls(case):

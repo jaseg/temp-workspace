@@ -141,10 +141,18 @@ def cmd_pcb(args: argparse.Namespace) -> int:
     for side, m in layout.meshes.items():
         if m.algorithm == "sfc":
             missed = f", {m.unreached} panels out of reach" if m.unreached else ""
-            print(f"{side}: space-filling curve over {m.cells} cells{missed}", file=sys.stderr)
+            print(
+                f"{side}: space-filling curve, {len(m.traces)} traces, over {m.cells} "
+                f"cells{missed}",
+                file=sys.stderr,
+            )
         else:
             missed = f", {m.unreached} out of reach" if m.unreached else ""
-            print(f"{side}: mesh over {m.cells} cells of {m.cell:g} mm{missed}", file=sys.stderr)
+            print(
+                f"{side}: mesh, {len(m.traces)} traces, over {m.cells} cells of {m.cell:g} "
+                f"mm{missed}",
+                file=sys.stderr,
+            )
         sp = spacing[side]
         print(
             f"  space: {100 * sp.within / max(sp.measured, 1e-9):.1f} % within -5..+20 %, "

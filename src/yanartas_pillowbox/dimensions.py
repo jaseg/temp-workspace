@@ -101,12 +101,10 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
     ya, yb = e + s_b + t / 2, e + edge - s_b - t / 2
     # Interior height across a back panel (inner) flap: from t/2 inside the fold (the back
     # panel's inner surface) to the cut edge (the front panel's inner surface). Taken on the
-    # bottom flap if an FPC cutout or cable cuts only the top one down; with both cut down,
-    # measured to where the edge would be without the cut.
+    # bottom flap if an FPC cutout cuts only the top one down; with both cut down, measured
+    # to where the edge would be without the cut.
     xh = wf + wb / 2
-    cut = {
-        end for end in ("front", "back") if cfg.fpc_cutout in (end, "both") or cfg.fpc_cable == end
-    }
+    cut = {end for end in ("front", "back") if cfg.fpc_cutout in (end, "both")}
     reach = body.back_cuts[len(body.back_cuts) // 2][1] if len(cut) == 2 else None
     if cut == {"front"}:
         y_cut = pattern.face("back-bottom-flap").y_range(xh)[1]
