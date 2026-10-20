@@ -99,6 +99,7 @@ class Layout:
     pads: list[Pad] = field(default_factory=list)
     ground: Polygon | None = None  # the cable: GND zone on both layers
     meshes: dict[str, meshgen.Mesh] = field(default_factory=dict)
+    area: Polygon | None = None  # what the meshes cover
     clearance: float = 0.15
     width: float = 0.15
     _cache: dict = field(default_factory=dict, repr=False)
@@ -127,6 +128,17 @@ class Layout:
                 for layer, m in self.meshes.items()
             }
         return self._cache["spacing"]
+
+    def density(self) -> dict[str, meshgen.Density]:
+        """Each mesh's coverage of its area (how evenly), by layer. (Measured on first
+        use.)"""
+        if "density" not in self._cache:
+            self._cache["density"] = {
+                layer: meshgen.density(m.traces, self.area, self.width, self.clearance)
+                for layer, m in self.meshes.items()
+                if self.area is not None
+            }
+        return self._cache["density"]
 
     def skew(self) -> dict[str, list[tuple[str, str, float, float]]]:
         """Each mesh's neighbouring traces (net 1 and 2, 2 and 3, ...) taken as differential
@@ -298,6 +310,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     }
 
     result = Layout(board, (*(f.segment for f in pattern.folds), *(f.segment for f in cable.folds)))
+    result.area = mask
     result.clearance, result.width = space, w
     cell = 2 * n * pitch
     half = cable.width / 2
@@ -779,7 +792,7 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
 
     lengths = result.net_lengths()
     longest = result.longest_trace()
-    spacing, skew = result.spacing(), result.skew()
+    spacing, skew, density = result.spacing(), result.skew(), result.density()
     layers: dict[str, list[list[float]]] = {"front": [], "back": []}
     for track in result.tracks:
         layers["front" if track.layer == FRONT else "back"].append(flat(track.points))
@@ -801,6 +814,7 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
                 ),
                 "algorithm": m.algorithm,
                 "spacing": spacing[layer].to_dict(),
+                "density": density[layer].to_dict() if layer in density else None,
                 "skew": [
                     {"nets": [a, b], "total": round(total, 3), "local": round(local, 3)}
                     for a, b, total, local in skew[layer]

@@ -144,3 +144,35 @@ fn arcs_follow_the_polyline_within_the_tolerance() {
     assert_eq!(q[0], p[0]);
     assert_eq!(*q.last().unwrap(), *p.last().unwrap());
 }
+
+#[test]
+fn density_slopes_out_of_a_hole() {
+    use yanartas_mesh_core::density::Density;
+    use yanartas_mesh_core::traces::Traces;
+    // traces across a 20 x 12 mm area at 0.3 mm, but a 2.4 mm wide band left out
+    let lines: Vec<Vec<P>> = (0..40)
+        .filter(|i| !(16..24).contains(i))
+        .map(|i| {
+            let y = 0.15 + 0.3 * i as f64;
+            (0..=80).map(|k| [k as f64 * 0.25, y]).collect()
+        })
+        .collect();
+    let tr = Traces::new(&lines, None);
+    let inside = |q: P| (0.0..=20.0).contains(&q[0]) && (0.0..=12.0).contains(&q[1]);
+    let mut d = Density::new([0.0, 0.0, 20.0, 12.0], 1.0, inside);
+    d.update(&tr, 0.3);
+    assert!(
+        (d.at([10.0, 2.0]) - 1.0).abs() < 0.05,
+        "{}",
+        d.at([10.0, 2.0])
+    );
+    assert!(d.at([10.0, 6.0]) < 0.4, "{}", d.at([10.0, 6.0]));
+    // (the edge counts no hole: as dense by it as away from it)
+    assert!(
+        (d.at([10.0, 0.3]) - 1.0).abs() < 0.1,
+        "{}",
+        d.at([10.0, 0.3])
+    );
+    // (the density falls towards the hole from either side)
+    assert!(d.slope([10.0, 4.5])[1] < -0.1 && d.slope([10.0, 7.5])[1] > 0.1);
+}

@@ -297,6 +297,82 @@ def spacing(
     return Spacing(**found, least=least if math.isfinite(least) else 0.0, largest=largest)
 
 
+@dataclass(frozen=True)
+class Density:
+    """How evenly a mesh's copper covers its area: the copper's share of the area about
+    each point (blurred over ``DENSITY_BLUR``), against the nominal share (trace width over
+    pitch), away from the area's edge. A hole between runs shows as a dip."""
+
+    mean: float  # the mean share, of the nominal
+    spread: float  # its standard deviation, of the nominal
+    thin: float  # the share of the area under 70 % of the nominal
+    least: float  # the least found, of the nominal
+
+    def to_dict(self) -> dict[str, float]:
+        return {k: round(v, 4) for k, v in self.__dict__.items()}
+
+
+DENSITY_BLUR = 1.0  # the copper's share of the area taken over about this far (mm)
+DENSITY_CELL = 0.2  # ... on a grid this fine (mm)
+THIN = 0.7  # under this share of the nominal: thin
+
+
+def density(
+    traces: Sequence[Sequence[Point]],
+    area: object,  # (shapely geometry: what the mesh covers)
+    width: float,
+    space: float,
+    blur: float = DENSITY_BLUR,
+    cell: float = DENSITY_CELL,
+) -> Density:
+    """The coverage of ``area`` by ``traces`` (``width`` wide, nominally ``space`` apart):
+    each trace's copper (its length times its width) put in the grid cells along it, then
+    blurred (three box blurs: about a Gaussian), over the area blurred alike (so the edge
+    counts no hole); the points at least about ``blur`` inside the edge measured."""
+    import shapely
+
+    x0, y0, x1, y1 = area.bounds
+    pad = 4 * blur
+    nx = math.ceil((x1 - x0 + 2 * pad) / cell)
+    ny = math.ceil((y1 - y0 + 2 * pad) / cell)
+    ox, oy = x0 - pad, y0 - pad
+    copper = np.zeros(nx * ny)
+    step = cell / 2
+    for t in traces:
+        p = np.asarray(t, float)
+        if len(p) < 2:
+            continue
+        q = resample(p, step)
+        mid = (q[1:] + q[:-1]) / 2
+        seg = np.hypot(*np.diff(q, axis=0).T)
+        i = np.clip(((mid[:, 0] - ox) / cell).astype(np.int64), 0, nx - 1)
+        j = np.clip(((mid[:, 1] - oy) / cell).astype(np.int64), 0, ny - 1)
+        copper += np.bincount(j * nx + i, seg * width, nx * ny)
+    copper = copper.reshape(ny, nx) / (cell * cell)
+    xs = ox + (np.arange(nx) + 0.5) * cell
+    ys = oy + (np.arange(ny) + 0.5) * cell
+    inside = shapely.contains_xy(area, *np.meshgrid(xs, ys)).astype(float)
+    # (three box blurs of half-width r: variance r (r + 1) cells²)
+    r = max(1, round((math.sqrt(1 + 4 * (blur / cell) ** 2) - 1) / 2))
+
+    def smooth(a: np.ndarray) -> np.ndarray:
+        for _ in range(3):
+            for axis in (0, 1):
+                c = np.cumsum(np.insert(a, 0, 0.0, axis=axis), axis=axis)
+                n = a.shape[axis]
+                hi = np.take(c, np.minimum(np.arange(n) + r + 1, n), axis=axis)
+                lo = np.take(c, np.maximum(np.arange(n) - r, 0), axis=axis)
+                a = (hi - lo) / (2 * r + 1)
+        return a
+
+    share = smooth(inside)
+    deep = (inside > 0) & (share > 0.9)
+    if not deep.any():
+        return Density(0.0, 0.0, 0.0, 0.0)
+    v = (smooth(copper * inside)[deep] / share[deep]) / (width / (width + space))
+    return Density(float(v.mean()), float(v.std()), float((v < THIN).mean()), float(v.min()))
+
+
 def gaps(
     traces: Sequence[Sequence[Point]], width: float, space: float, step: float | None = None
 ) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:

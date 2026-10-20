@@ -280,7 +280,9 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   between traces varies, mostly within −5 %…+20 % of the nominal one, rarely below.
 * **Metrics** (*Derived geometry*, `pcb` command): the space between the traces, measured
   along every trace on both sides (the share within −5 %…+20 % of `mesh_trace_space` and the
-  length below it), and, taking each pair of neighbouring traces (1+2, 2+3, 3+4) as a
+  length below it), the coverage (the copper's share of the area about each point, blurred
+  over 1 mm, against the nominal share: how much it varies, and the share of the area
+  under 70 % of nominal, i.e. holes between runs), and, taking each pair of neighbouring traces (1+2, 2+3, 3+4) as a
   differential pair, the difference in their lengths and the largest local difference (the
   most one runs ahead of the other along the way), over the mesh.
 * **Check:** every layout is checked before it is handed out (preview, download, CLI):

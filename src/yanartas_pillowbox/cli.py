@@ -137,7 +137,7 @@ def cmd_pcb(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     bar.close()
-    spacing, skew = layout.spacing(), layout.skew()
+    spacing, skew, density = layout.spacing(), layout.skew(), layout.density()
     for side, m in layout.meshes.items():
         if m.algorithm == "sfc":
             missed = f", {m.unreached} panels out of reach" if m.unreached else ""
@@ -153,6 +153,16 @@ def cmd_pcb(args: argparse.Namespace) -> int:
             f"(widest {sp.largest:.2f} mm)",
             file=sys.stderr,
         )
+        if side in density:
+            from yanartas_pillowbox.mesh import THIN
+
+            d = density[side]
+            print(
+                f"  coverage: {100 * d.mean:.0f} % of nominal density, spread "
+                f"{100 * d.spread:.1f} %, {100 * d.thin:.2f} % of the area under "
+                f"{100 * THIN:.0f} % (least {100 * d.least:.0f} %)",
+                file=sys.stderr,
+            )
         for a, b, total, local in skew[side]:
             print(f"  skew {a}/{b}: {total:.2f} mm total, {local:.2f} mm local", file=sys.stderr)
     net, length = layout.longest_trace()

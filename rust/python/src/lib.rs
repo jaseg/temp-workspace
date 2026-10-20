@@ -46,6 +46,8 @@ fn read_params(d: &Bound<'_, PyDict>) -> PyResult<Params> {
         steer_cool,
         tip,
         reach_out,
+        fill,
+        fill_blur,
         match_steps,
         match_band,
         match_rate

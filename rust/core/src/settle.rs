@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 
+use crate::density::Density;
 use crate::geom::{add, closest, crosses, dist, dot, norm, resample, scale, sub, P};
 use crate::grid::Grid;
 use crate::par::pmap;
@@ -29,6 +30,8 @@ pub struct Params {
     pub steer_cool: f64,    // SETTLE_STEER_COOL
     pub tip: f64,           // SETTLE_TIP
     pub reach_out: f64,     // SETTLE_REACH_OUT
+    pub fill: f64,          // SETTLE_FILL
+    pub fill_blur: f64,     // SETTLE_FILL_BLUR
     pub match_steps: usize, // MATCH
     pub match_band: f64,    // MATCH_BAND
     pub match_rate: f64,    // MATCH_RATE
@@ -52,6 +55,8 @@ impl Default for Params {
             steer_cool: 2.0,
             tip: 1.0,
             reach_out: 1.0,
+            fill: 2.0,
+            fill_blur: 0.5,
             match_steps: 20,
             match_band: 15.0,
             match_rate: 0.5,
@@ -128,6 +133,20 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
     let mut gained = minus(&tr.binned(bins), &base);
     let sides = neighbour_sides(&tr);
     let mut hot: Option<HashSet<(i64, i64)>> = None;
+    // (the density's blur: about the size of the holes where a ribbon's bends meet)
+    let blur = prm.fill_blur * n as f64 * pitch;
+    let mut density = (prm.fill > 0.0).then(|| {
+        let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+        for q in input.zones.iter().flatten().flatten() {
+            b = [
+                b[0].min(q[0]),
+                b[1].min(q[1]),
+                b[2].max(q[0]),
+                b[3].max(q[1]),
+            ];
+        }
+        Density::new(b, blur, |q| zones.of(q).is_some())
+    });
     let mut status = Status {
         phase: "settle",
         steps: prm.steps,
@@ -151,6 +170,9 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         // a U-turn's tip, as tight as a ribbon's: on out along its axis
         let tip = bend_axes(&tr, &curv, &normal, prm.tip * n as f64 * pitch);
         let verts = Grid::new(&tr.p, cx.near / 2.0, |_| true);
+        if let Some(d) = density.as_mut() {
+            d.update(&tr, pitch);
+        }
         let pushes = pmap(look.len(), |k| {
             let i = look[k];
             let lean = -prm.reach_out * dot(tip[i], normal[i]);
@@ -183,6 +205,11 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
                 return [0.0, 0.0];
             }
             let mut m = scale(normal[i], push[i]);
+            // down the density's slope, the whole ribbon at once: into the holes
+            if let Some(d) = &density {
+                let down = -dot(d.slope(p[i]), normal[i]) * blur * blur;
+                m = add(m, scale(normal[i], prm.fill * cool * down));
+            }
             let into = dot(m, axis[i]);
             if into > 0.0 {
                 m = sub(m, scale(axis[i], into));

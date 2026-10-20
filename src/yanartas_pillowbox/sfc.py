@@ -111,6 +111,9 @@ SETTLE_SPAN = 25  # ... (where along the curve it gains more, over this many pla
 SETTLE_STEER_COOL = 2.0  # ... (the steering dying down as the moves, to this)
 SETTLE_TIP = 1.0  # ... U-turns tighter than this many pitches per trace's radius: tips
 SETTLE_REACH_OUT = 1.0  # ... leaning out along their axis by this share of the room
+SETTLE_FILL = 2.0  # ... down the slope of the traces' density (into holes) by this much
+SETTLE_FILL_BLUR = 0.5  # ... (the density blurred over this many pitches per trace)
+SCALE = 4  # ... (the steps and the tips' lean for this many traces; more: in proportion)
 MATCH = 20  # steps matching the settled traces' lengths (taking it out of the longer)
 # (the band above how far the leads swing to and fro through the bends: else every swing is cut)
 MATCH_BAND = 15.0  # ... no trace more than this many pitches ahead of the shortest
@@ -367,7 +370,7 @@ def _settle(
         np.ascontiguousarray(edge, float),
         [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
         tuple(float(v) for v in keep.bounds),
-        _params(),
+        _params(len(lines)),
         report,
     )
     return [np.asarray(t) for t in out]
@@ -482,10 +485,13 @@ def _browser_core() -> object | None:
     )
 
 
-def _params() -> dict[str, float]:
-    """The settling's constants, by the Rust core's names for them."""
+def _params(traces: int = SCALE) -> dict[str, float]:
+    """The settling's constants, by the Rust core's names for them, for ``traces`` traces
+    (the holes left where a ribbon's bends meet grow with its width: more steps for them,
+    and U-turn tips leaning out further into them)."""
+    more = max(1.0, traces / SCALE)
     return {
-        "steps": SETTLE,
+        "steps": round(SETTLE * more),
         "rate": SETTLE_RATE,
         "reach": SETTLE_REACH,
         "pin": SETTLE_PIN,
@@ -498,8 +504,10 @@ def _params() -> dict[str, float]:
         "steer": SETTLE_STEER,
         "span": SETTLE_SPAN,
         "steer_cool": SETTLE_STEER_COOL,
-        "tip": SETTLE_TIP,
-        "reach_out": SETTLE_REACH_OUT,
+        "tip": SETTLE_TIP * more,
+        "reach_out": SETTLE_REACH_OUT * more,
+        "fill": SETTLE_FILL,
+        "fill_blur": SETTLE_FILL_BLUR,
         "match_steps": MATCH,
         "match_band": MATCH_BAND,
         "match_rate": MATCH_RATE,

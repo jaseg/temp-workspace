@@ -45,3 +45,17 @@ def test_skew():
     total, local = mesh.skew(early, late)
     assert total == pytest.approx(0, abs=0.7)
     assert local > 3.5
+
+
+def test_density_sees_holes_but_not_the_edge():
+    """Traces side by side at the pitch fill their area at the nominal density, its edge
+    counting no hole; leave a few out and the hole shows."""
+    import shapely
+
+    area = shapely.box(0, 0, 20, 12)
+    full = [[(0, 0.15 + 0.3 * i), (20, 0.15 + 0.3 * i)] for i in range(40)]
+    d = mesh.density(full, area, 0.15, 0.15)
+    assert d.mean == pytest.approx(1, abs=0.02) and d.spread < 0.02 and d.thin == 0
+    holed = [t for i, t in enumerate(full) if not 16 <= i < 24]  # (a 2.4 mm wide gap)
+    h = mesh.density(holed, area, 0.15, 0.15)
+    assert h.thin > 0.05 and h.least < 0.3 and h.spread > 0.1

@@ -323,7 +323,17 @@ inner flap's free edge.
      squiggles and fingers) by that much (`_match`; the band above how far leads swing to
      and fro through the bends, or every swing is cut). Only ever shortening, it costs
      little coverage (on the default box: skew 21 → 10 mm at most, length and islands as
-     before). All moves die down over the steps
+     before). With more traces the holes where a ribbon's bends meet grow (the ribbon
+     is as wide as its traces), past what centring fills: there a hole fills only as a
+     wave, the trace facing it first and each one behind it a step later. So every vertex
+     is also moved down the slope of the traces' density (`density.rs`: their length per
+     area times the pitch, on a grid, blurred over half a pitch per trace, over the area
+     blurred alike so its edge is no hole; `SETTLE_FILL`): every trace near a hole sees
+     its slope at once and the ribbon moves into it as a whole, each trace gaining about
+     as much. The steps and the U-turn tips' lean also grow with the traces past four
+     (`SCALE`). On a 75 × 90 mm crop, 8 traces: the density's spread 4.4 → 1.3 % (as
+     4 traces), the area under 70 % of nominal 0.55 → 0.01 %, skew ≤ 13.6 → 4.4 mm; 12
+     traces: thin area 5.4 → 0.3 %. All moves die down over the steps
      (annealing), or the layout churns and the steering chases its tail. Every move keeps
      a pitch (+1 %) from other copper, measured to segments, and from the trace itself
      where it faces itself across (or is much further along it than away: a finger's

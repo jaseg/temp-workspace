@@ -5,6 +5,7 @@
 pub mod arcs;
 pub mod closed;
 pub mod curve;
+pub mod density;
 pub mod geom;
 pub mod graph;
 pub mod grid;
