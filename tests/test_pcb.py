@@ -324,7 +324,7 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
 
 def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     """What the mesh layout reports while it runs is polled at /api/progress: its stage
-    (the layer), phase, step and the whole layout's share done."""
+    (the layer), phase, step and the whole layout's share done (both sides' mean)."""
     import dataclasses
 
     from yanartas_pillowbox import kimesh, progress, sfc
@@ -339,9 +339,13 @@ def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     client = create_app(tmp_path / "s.json").test_client()
     config = D.with_values(mesh_traces=2, mesh_algorithm="sfc").to_dict()
     assert client.post("/api/pcb", json={"config": config}).status_code == 200
-    e = client.get("/api/progress").json["progress"]
-    assert (e["stage"], e["phase"], e["step"], e["steps"]) == ("B.Cu", "settle", 20, 40)
-    assert e["vertices"] == 1000 and 0.5 < e["done"] < 1
+    e = client.get("/api/progress").json["progress"]  # (the sides run at once: either)
+    assert e["stage"] in ("F.Cu", "B.Cu") and (e["phase"], e["step"], e["steps"]) == (
+        "settle",
+        20,
+        40,
+    )
+    assert e["vertices"] == 1000 and 0.2 < e["done"] < 1
 
 
 @pytest.mark.slow

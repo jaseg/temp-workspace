@@ -23,6 +23,7 @@ Coordinates are the pattern's (mm, y down), as in KiCad.
 
 from __future__ import annotations
 
+import functools
 import itertools
 import math
 from collections import defaultdict
@@ -300,7 +301,8 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     half = cable.width / 2
     tracks: dict[str, list[tuple[float, str, Point]]] = {}  # layer -> ends (k, net, point)
     grid = None  # the front mesh's exit corner
-    for i, (layer, side_pins) in enumerate(sides.items()):
+    corners = {}
+    for layer, side_pins in sides.items():
         centre = sum(k_pin(j) for j in side_pins) / len(side_pins)
         x0 = xc + centre * left0[0] - cell / 2  # (the exit cell centred on its pins)
         if grid is None:
@@ -317,30 +319,27 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
             corner = (x0, yj + shift if up else yj - cell - shift)
         if abs((x0 + cell / 2 - xc) * left0[0]) + cell / 2 > half - ec:
             raise PcbError("no room for the mesh's exit at the cable's junction")
-        try:
-            if cfg.mesh_algorithm == "sfc":
-                # (the panels as zones: the curve crosses the folds as seldom as can be)
-                with progress.stage(layer, i, len(sides)):
-                    m = sfc.generate(
-                        mask,
-                        corner,
-                        meshgen.UP if up else meshgen.DOWN,
-                        n,
-                        pitch,
-                        seed=int(cfg.mesh_seed) * 2 + i,
-                        zones=[Polygon(sample(f.boundary)) for f in pattern.faces],
-                    )
-            else:
-                m = kimesh.generate(
-                    mask,
-                    corner,
-                    meshgen.UP if up else meshgen.DOWN,
-                    n,
-                    pitch,
-                    seed=int(cfg.mesh_seed) * 2 + i,
-                )
-        except meshgen.MeshError as e:
-            raise PcbError(str(e)) from e
+        corners[layer] = corner
+
+    def mesh(i: int, corner: Point) -> meshgen.Mesh:
+        # (its own copy of the mask: preparing a shared geometry from two threads crashes)
+        area = shapely.from_wkb(shapely.to_wkb(mask))
+        side = meshgen.UP if up else meshgen.DOWN
+        seed = int(cfg.mesh_seed) * 2 + i
+        if cfg.mesh_algorithm == "sfc":
+            # (the panels as zones: the curve crosses the folds as seldom as can be)
+            zones = [Polygon(sample(f.boundary)) for f in pattern.faces]
+            return sfc.generate(area, corner, side, n, pitch, seed=seed, zones=zones)
+        return kimesh.generate(area, corner, side, n, pitch, seed=seed)
+
+    # The two sides are independent: laid out at once.
+    try:
+        meshes = progress.side_by_side(
+            [(layer, functools.partial(mesh, i, c)) for i, (layer, c) in enumerate(corners.items())]
+        )
+    except meshgen.MeshError as e:
+        raise PcbError(str(e)) from e
+    for layer, m in zip(corners, meshes, strict=True):
         result.meshes[layer] = m
         side = "F" if layer == FRONT else "B"
         for net, trace in enumerate(m.traces):

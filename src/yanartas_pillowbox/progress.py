@@ -9,8 +9,13 @@ An event is a dict: ``stage`` (the mesh's layer, as ``pcb.layout`` names it), ``
 from __future__ import annotations
 
 import contextlib
+import sys
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
+from typing import TypeVar
+
+T = TypeVar("T")
 
 # each phase's rough share of a mesh's time (settling natively: about as long as laying)
 WEIGHT = {"graph": 0.25, "relax": 0.2, "lanes": 0.05, "settle": 0.4, "match": 0.1}
@@ -70,3 +75,33 @@ def report(phase: str, step: int = 1, steps: int = 1, **figures: object) -> None
             **figures,
         }
     )
+
+
+def side_by_side(jobs: Sequence[tuple[str, Callable[[], T]]]) -> list[T]:
+    """Each job's result, the jobs run at once (threads: the layouts' heavy parts release
+    the GIL), each a stage named as given; their events to this thread's listener, the
+    share done the mean of theirs. In the browser (no threads) one after another."""
+    s = _state()
+    listener = s["listener"]
+    if len(jobs) < 2 or sys.platform == "emscripten":
+        out = []
+        for k, (name, job) in enumerate(jobs):
+            with stage(name, k, len(jobs)):
+                out.append(job())
+        return out
+    lock = threading.Lock()
+    share = [0.0] * len(jobs)
+
+    def run(k: int, name: str, job: Callable[[], T]) -> T:
+        def forward(event: dict) -> None:
+            with lock:
+                share[k] = event["done"]
+                if listener is not None:
+                    listener({**event, "done": round(sum(share) / len(share), 4)})
+
+        with listening(forward), stage(name, 0, 1):
+            return job()
+
+    with ThreadPoolExecutor(len(jobs)) as pool:
+        futures = [pool.submit(run, k, name, job) for k, (name, job) in enumerate(jobs)]
+        return [f.result() for f in futures]

@@ -75,3 +75,22 @@ def test_progress_lines_name_stage_phase_step_and_figures():
         progress.report("match", 20, 20)
     assert events[0]["done"] == 1.0
     progress.report("graph")  # (nobody listening: nothing happens)
+
+
+def test_side_by_side_runs_both_and_merges_progress():
+    from yanartas_pillowbox import progress
+
+    events = []
+
+    def job(name):
+        def run():
+            progress.report("settle", 1, 2)
+            return name
+
+        return run
+
+    with progress.listening(events.append):
+        out = progress.side_by_side([("F.Cu", job("front")), ("B.Cu", job("back"))])
+    assert out == ["front", "back"]
+    assert {e["stage"] for e in events} == {"F.Cu", "B.Cu"}
+    assert max(e["done"] for e in events) < 1  # (each side half way: the mean too)

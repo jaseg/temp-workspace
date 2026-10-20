@@ -359,6 +359,11 @@ inner flap's free edge.
   prepares what needs shapely (the edge's points, the zones' rings, the exit) and keeps
   the constants, passed in by name. Settling also keeps half a pitch from the edge and the
   folds, so that a panel never needs the copper beyond its folds.
+- **Both sides at once.** The front and back meshes are independent: `pcb.layout` works
+  out both exit corners first, then lays both out together (`progress.side_by_side`:
+  threads, as the heavy parts release the GIL; each with its own copy of the mask, since
+  shapely crashes when two threads prepare one geometry; one after the other in the
+  browser), their progress merged (the share done: their mean).
 - **Progress** (`progress.py`): the layouts report their phases and steps (graph, relax,
   lanes, settle, match; the stage: the mesh's layer) with figures (vertices, moved,
   clearances measured, the traces' length differences) and the whole layout's share done.
