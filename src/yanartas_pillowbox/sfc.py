@@ -106,6 +106,10 @@ SETTLE_SPAN = 25  # ... (where along the curve it gains more, over this many pla
 SETTLE_STEER_COOL = 2.0  # ... (the steering dying down as the moves, to this)
 SETTLE_TIP = 1.0  # ... U-turns tighter than this many pitches per trace's radius: tips
 SETTLE_REACH_OUT = 1.0  # ... leaning out along their axis by this share of the room
+MATCH = 12  # steps matching the settled traces' lengths (taking it out of the longer)
+# (the band above how far the leads swing to and fro through the bends: else every swing is cut)
+MATCH_BAND = 15.0  # ... no trace more than this many pitches ahead of the shortest
+MATCH_RATE = 0.5  # ... the share of their bends' depth a step straightens them by, at most
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -1584,16 +1588,7 @@ def _settle(
         arc = tr.arc()
         where = np.minimum((tr.u * bins).astype(int), bins - 1)
         normal = tr.normals()
-        fixed = (tr.prev < 0) | (tr.next < 0) | shapely.contains_xy(keep, p[:, 0], p[:, 1])
-        for _ in range(4):  # (and a few vertices on from the ends)
-            fixed |= fixed[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
-            fixed |= fixed[np.maximum(tr.next, 0)] & (tr.next >= 0)
-        zone = _region_of(regions, p)  # (no vertex moves from one zone into another)
-        join = (tr.next >= 0) & (zone != zone[np.maximum(tr.next, 0)])
-        for _ in range(pin):
-            join |= join[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
-            join |= join[np.maximum(tr.next, 0)] & (tr.next >= 0)
-        fixed |= join
+        fixed, zone = _held(tr, regions, keep, pin)
         look = np.arange(len(p))
         if hot is not None:
             cell = np.floor(p / near).astype(np.int64)
@@ -1712,7 +1707,99 @@ def _settle(
             run = np.cumsum(gained, axis=1)
             apart = [round(float(np.max(np.abs(run[t] - run[t + 1]))), 1) for t in range(n - 1)]
             _TRACE.append((int(moved.sum()), gained.sum(axis=1).round(1).tolist(), apart))
+    tr = _match(tr, base, bins, pitch, regions, keep, pin, own)
     return tr.lines()
+
+
+def _held(
+    tr: _Traces, regions: list[Polygon], keep: shapely.Geometry, pin: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """The vertices settling leaves where they are (the traces' ends and a few vertices on,
+    the exit, and ``pin`` vertices either way of where a trace crosses from one zone into
+    another), and each vertex's zone (none moves from one into another)."""
+    p = tr.p
+    fixed = (tr.prev < 0) | (tr.next < 0) | shapely.contains_xy(keep, p[:, 0], p[:, 1])
+    for _ in range(4):
+        fixed |= fixed[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
+        fixed |= fixed[np.maximum(tr.next, 0)] & (tr.next >= 0)
+    zone = _region_of(regions, p)
+    join = (tr.next >= 0) & (zone != zone[np.maximum(tr.next, 0)])
+    for _ in range(pin):
+        join |= join[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
+        join |= join[np.maximum(tr.next, 0)] & (tr.next >= 0)
+    return fixed | join, zone
+
+
+def _excess(gained: np.ndarray, band: float) -> np.ndarray:
+    """For each trace and place along the curve: how much length to take out there so that
+    no trace runs (from the exit) more than ``band`` ahead of the shortest, taken out where
+    it gets ahead (walking along: the least that does)."""
+    run = np.cumsum(gained, axis=1)
+    out = np.zeros_like(gained)
+    taken = np.zeros(len(gained))
+    for b in range(gained.shape[1]):  # (sequential: what is taken shortens all after)
+        now = run[:, b] - taken
+        over = np.maximum(now - (now.min() + band), 0.0)
+        out[:, b] = over
+        taken += over
+    return out
+
+
+def _match(
+    tr: _Traces,
+    base: np.ndarray,
+    bins: int,
+    pitch: float,
+    regions: list[Polygon],
+    keep: shapely.Geometry,
+    pin: int,
+    own: float,
+) -> _Traces:
+    """The settled traces matched in length: where one runs (from the exit) more than
+    ``MATCH_BAND`` pitches ahead of the shortest, its bends there straightened (its
+    squiggles and fingers drawn in) by as much as takes it back, over a few steps; never
+    lengthened (a little coverage given up for skew)."""
+    step = SETTLE_STEP * pitch
+    span = np.ones(SETTLE_SPAN) / SETTLE_SPAN
+    for _ in range(MATCH):
+        gained = _binned(tr, bins) - base
+        excess = _excess(gained, MATCH_BAND * pitch)
+        if _TRACE is not None:
+            run = np.cumsum(gained, axis=1)
+            _TRACE.append(
+                (
+                    "match",
+                    gained.sum(axis=1).round(1).tolist(),
+                    excess.sum(axis=1).round(1).tolist(),
+                    [
+                        round(float(np.max(np.abs(run[t] - run[t + 1]))), 1)
+                        for t in range(len(run) - 1)
+                    ],
+                )
+            )
+        if excess.max() < 0.01 * pitch:
+            break
+        # (spread over the places round it, so that there are bends enough to straighten;
+        # each place's share of what it holds beyond its length as laid, at most all)
+        want = np.stack([np.convolve(e, span, "same") for e in excess])
+        held = np.stack([np.convolve(np.maximum(g, 0.0), span, "same") for g in gained])
+        share = np.clip(want / np.maximum(held, 1e-9), 0.0, 1.0)
+        p = tr.p
+        where = np.minimum((tr.u * bins).astype(int), bins - 1)
+        fixed, zone = _held(tr, regions, keep, pin)
+        a, b = np.arange(len(p)), np.arange(len(p))
+        for _ in range(2):
+            a = np.where(tr.prev[a] >= 0, tr.prev[a], a)
+            b = np.where(tr.next[b] >= 0, tr.next[b], b)
+        bend = (p[a] + p[b]) / 2 - p
+        move = (MATCH_RATE * share[tr.net, where])[:, None] * bend
+        move[fixed] = 0.0
+        new = p + move
+        strayed = _region_of(regions, new) != zone
+        new[strayed] = p[strayed]
+        tr.p = _keep_clear(tr, p, new, pitch, own)
+        tr = tr.respaced(step)
+    return tr
 
 
 _TRACE: list | None = None  # (development: each settling step's figures, when a list)
