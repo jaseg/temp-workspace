@@ -35,7 +35,7 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString, Polygon
 
-from yanartas_pillowbox import kimesh, sfc
+from yanartas_pillowbox import kimesh, progress, sfc
 from yanartas_pillowbox import mesh as meshgen
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.geometry import (
@@ -320,15 +320,16 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         try:
             if cfg.mesh_algorithm == "sfc":
                 # (the panels as zones: the curve crosses the folds as seldom as can be)
-                m = sfc.generate(
-                    mask,
-                    corner,
-                    meshgen.UP if up else meshgen.DOWN,
-                    n,
-                    pitch,
-                    seed=int(cfg.mesh_seed) * 2 + i,
-                    zones=[Polygon(sample(f.boundary)) for f in pattern.faces],
-                )
+                with progress.stage(layer, i, len(sides)):
+                    m = sfc.generate(
+                        mask,
+                        corner,
+                        meshgen.UP if up else meshgen.DOWN,
+                        n,
+                        pitch,
+                        seed=int(cfg.mesh_seed) * 2 + i,
+                        zones=[Polygon(sample(f.boundary)) for f in pattern.faces],
+                    )
             else:
                 m = kimesh.generate(
                     mask,

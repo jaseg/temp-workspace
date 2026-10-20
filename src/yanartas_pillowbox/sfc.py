@@ -56,6 +56,7 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString, MultiPoint, Polygon
 
+from yanartas_pillowbox import progress
 from yanartas_pillowbox.mesh import (
     DOWN,
     LEFT,
@@ -116,7 +117,6 @@ MATCH = 20  # steps matching the settled traces' lengths (taking it out of the l
 MATCH_BAND = 15.0  # ... no trace more than this many pitches ahead of the shortest
 MATCH_RATE = 0.5  # ... the share of their bends' depth a step straightens them by, at most
 SETTLE_NATIVE = True  # ... in Rust when its extension is installed (pillowbox_mesh)
-PROGRESS = None  # called with each settling step's figures (a dict), when set
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -1577,7 +1577,9 @@ def _settle(
             [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
             tuple(float(v) for v in keep.bounds),
             _params(),
-            PROGRESS,
+            lambda d: progress.report(
+                d.pop("phase"), d.pop("step"), d.pop("steps"), **{k: v for k, v in d.items()}
+            ),
         )
         return [np.asarray(t) for t in out]
     pin = math.ceil(SETTLE_REACH / SETTLE_STEP)  # (vertices either way)
@@ -1721,9 +1723,18 @@ def _settle(
         tr.p = new
         tr = tr.respaced(step)
         gained = _binned(tr, bins) - base
+        run = np.cumsum(gained, axis=1)
+        apart = [round(float(np.max(np.abs(run[t] - run[t + 1]))), 1) for t in range(n - 1)]
+        progress.report(
+            "settle",
+            it,
+            SETTLE,
+            vertices=len(tr.p),
+            looked=len(look),
+            moved=int(moved.sum()),
+            apart=apart,
+        )
         if _TRACE is not None:
-            run = np.cumsum(gained, axis=1)
-            apart = [round(float(np.max(np.abs(run[t] - run[t + 1]))), 1) for t in range(n - 1)]
             _TRACE.append((int(moved.sum()), gained.sum(axis=1).round(1).tolist(), apart))
     tr = _match(tr, base, bins, pitch, regions, keep, pin, own)
     return tr.lines()
@@ -1803,9 +1814,10 @@ def _match(
     lengthened (a little coverage given up for skew)."""
     step = SETTLE_STEP * pitch
     span = np.ones(SETTLE_SPAN) / SETTLE_SPAN
-    for _ in range(MATCH):
+    for it in range(MATCH):
         gained = _binned(tr, bins) - base
         excess = _excess(gained, MATCH_BAND * pitch)
+        progress.report("match", it, MATCH, vertices=len(tr.p))
         if _TRACE is not None:
             run = np.cumsum(gained, axis=1)
             _TRACE.append(
@@ -2105,7 +2117,9 @@ def generate(
     )
     tongue = np.array([(bx, ym), (bx, ytop), (ax, ytop), (ax, ym)])
     curve = np.vstack([[(ax, ym)], pts, [(bx, ym)]])
+    progress.report("graph", cells=cells)
     p, k = _relax(curve, tongue, area, regions, spacing, least, pitch, nrng)
+    progress.report("relax", vertices=len(p))
     cut = shapely.box(x0, ytop - c, x0 + c, y0)  # (within the leads' corridor)
     out = []
     exact = np.zeros(len(p), bool)  # (the tongue's legs: the traces at the pitch)
@@ -2118,7 +2132,9 @@ def generate(
         lines.append(np.asarray(line.coords))
     if SETTLE:
         keep = shapely.box(x0 - c, ytop - c, x0 + 2 * c, ym + spacing)  # (the exit: as laid)
+        progress.report("lanes", traces=len(lines))
         lines = _settle(lines, pitch, area, regions, keep)
+    progress.report("match", 1, 1)
     for xy in lines:
         line = LineString(xy)
         tol = SIMPLIFY * pitch / 0.3

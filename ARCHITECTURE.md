@@ -351,10 +351,17 @@ inner flap's free edge.
   sample matched to the nearest point of its neighbour a little ahead of the last match
   (monotone); the largest difference of the lengths run to the matched points, and the
   difference of the totals.
-- **Later.** A port of the curve layout to Rust compiled to WebAssembly (run natively in
-  the browser, and from the Python CLI through wasmtime) for speed, once the algorithm is
-  settled; an alignment field (the reference's needles) to lay the curve along the edges;
-  a progress bar for the mesh layout; settling's hard skew limit (`SETTLE_SKEW`, off:
+- **Rust.** Settling and length matching also exist in Rust (`rust/`, see its README):
+  a PyO3 extension (`pillowbox_mesh`, all cores) that `sfc` uses when installed (about
+  15x faster: the default box's settling 2 min instead of 30), and a WebAssembly build
+  for the browser (to come). The constants stay in `sfc.py` and are passed in.
+- **Progress** (`progress.py`): the layouts report their phases and steps (graph, relax,
+  lanes, settle, match; the stage: the mesh's layer) with figures (vertices, moved,
+  clearances measured, the traces' length differences) and the whole layout's share done.
+  The CLI shows a bar redrawn in place on a terminal (each phase's last figures kept above
+  it), otherwise a status line per step.
+- **Later.** The rest of the curve layout in Rust; an alignment field (the reference's
+  needles) to lay the curve along the edges; settling's hard skew limit (`SETTLE_SKEW`, off:
   the steering keeps neighbouring traces within a few mm instead): reconsider it; a
   switch to draw the traces as circular arcs (now
   polylines, simplified within 2 µm).

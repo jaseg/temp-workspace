@@ -1,0 +1,93 @@
+use pillowbox_mesh_core::geom::{crosses, dist, resample, P};
+use pillowbox_mesh_core::grid::Grid;
+use pillowbox_mesh_core::zones::Zones;
+use pillowbox_mesh_core::{settle, Input, Params};
+
+#[test]
+fn grid_finds_every_point_within_reach() {
+    let p: Vec<P> = (0..400)
+        .map(|k| [(k % 20) as f64 * 0.37, (k / 20) as f64 * 0.41])
+        .collect();
+    let g = Grid::new(&p, 0.5, |_| true);
+    let q = [3.3, 4.1];
+    let mut found = Vec::new();
+    g.around(q, 1.0, |i| found.push(i));
+    for (i, x) in p.iter().enumerate() {
+        if dist(*x, q) <= 1.0 {
+            assert!(found.contains(&i), "point {i} missed");
+        }
+    }
+    assert!(!g.any_around([100.0, 100.0], 1.0));
+}
+
+#[test]
+fn zones_tell_inside_from_out_and_holes() {
+    let outer = vec![[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]];
+    let hole = vec![[4.0, 4.0], [6.0, 4.0], [6.0, 6.0], [4.0, 6.0]];
+    let right = vec![[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]];
+    let z = Zones::new(&[vec![outer, hole], vec![right]], 0.6);
+    assert_eq!(z.of([1.0, 1.0]), Some(0));
+    assert_eq!(z.of([5.0, 5.0]), None);
+    assert_eq!(z.of([15.0, 5.0]), Some(1));
+    assert_eq!(z.of([25.0, 5.0]), None);
+}
+
+#[test]
+fn resample_keeps_the_ends_and_evens_the_steps() {
+    let p = vec![[0.0, 0.0], [1.0, 0.0], [1.0, 2.0]];
+    let q = resample(&p, 0.1);
+    assert_eq!(q[0], [0.0, 0.0]);
+    assert_eq!(*q.last().unwrap(), [1.0, 2.0]);
+    assert_eq!(q.len(), 31);
+    assert!(q.windows(2).all(|w| (dist(w[0], w[1]) - 0.1).abs() < 0.05));
+}
+
+#[test]
+fn crossing_is_strict() {
+    assert!(crosses([0.0, 0.0], [2.0, 2.0], [0.0, 2.0], [2.0, 0.0]));
+    assert!(!crosses([0.0, 0.0], [1.0, 1.0], [1.0, 1.0], [2.0, 0.0])); // (sharing an end)
+    assert!(!crosses([0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]));
+}
+
+/// Two wavy traces in a box with a wide gap between them: settled, they keep a pitch apart,
+/// stay in the box and their ends stay put.
+#[test]
+fn settling_keeps_clear_and_in_its_zone() {
+    let pitch = 0.3;
+    let wave = |y: f64| -> Vec<P> {
+        (0..=200)
+            .map(|k| {
+                let x = k as f64 * 0.1;
+                [x, y + 0.2 * (x * 1.3).sin()]
+            })
+            .collect()
+    };
+    let lines = vec![wave(2.0), wave(3.5)];
+    let box_ = vec![[-0.5, 0.0], [20.5, 0.0], [20.5, 6.0], [-0.5, 6.0]];
+    let mut edge = Vec::new();
+    for k in 0..4 {
+        edge.extend(resample(&[box_[k], box_[(k + 1) % 4]], 0.05));
+    }
+    let input = Input {
+        lines: lines.clone(),
+        pitch,
+        edge,
+        zones: vec![vec![box_]],
+        keep: [0.0; 4],
+    };
+    let mut steps = 0;
+    let out = settle(&input, &Params::default(), &mut |_| steps += 1);
+    assert!(steps > 0);
+    for (t, line) in out.iter().enumerate() {
+        assert_eq!(line[0], lines[t][0]);
+        assert_eq!(*line.last().unwrap(), *lines[t].last().unwrap());
+        assert!(line
+            .iter()
+            .all(|q| q[0] > -0.5 && q[0] < 20.5 && q[1] > 0.0 && q[1] < 6.0));
+    }
+    let least = out[0]
+        .iter()
+        .flat_map(|a| out[1].iter().map(move |b| dist(*a, *b)))
+        .fold(f64::MAX, f64::min);
+    assert!(least > 0.95 * pitch, "traces {least} apart");
+}

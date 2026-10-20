@@ -51,3 +51,23 @@ def test_generate_errors(tmp_path, capsys):
     assert main(["generate", "--from-svg", str(tmp_path / "missing.svg"), "-o", str(out)]) == 2
     assert not out.exists()
     assert "height" in capsys.readouterr().err
+
+
+def test_progress_lines_name_stage_phase_step_and_figures():
+    import io
+
+    from yanartas_pillowbox import progress
+    from yanartas_pillowbox.cli import _Progress
+
+    out = io.StringIO()
+    bar = _Progress(out)
+    with progress.listening(bar), progress.stage("F.Cu", 1, 2):
+        progress.report("settle", 3, 40, vertices=1_500_000, moved=420, apart=[1.25, 0.5])
+    bar.close()
+    line = out.getvalue().strip()
+    assert line == "F.Cu: settle 3/40 (1.50 M vertices, 420 moved, skew 1.2/0.5 mm)"
+    events = []
+    with progress.listening(events.append), progress.stage("B.Cu", 1, 2):
+        progress.report("match", 20, 20)
+    assert events[0]["done"] == 1.0
+    progress.report("graph")  # (nobody listening: nothing happens)

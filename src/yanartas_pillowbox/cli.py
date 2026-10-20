@@ -10,7 +10,7 @@ import threading
 import webbrowser
 from pathlib import Path
 
-from yanartas_pillowbox import __version__
+from yanartas_pillowbox import __version__, progress
 from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, parse_cli_value
 from yanartas_pillowbox.persistence import default_settings_path
 from yanartas_pillowbox.svg import SvgImportError, extract_config, render_svg
@@ -128,11 +128,15 @@ def cmd_pcb(args: argparse.Namespace) -> int:
     cfg = _load_config(args)
     if cfg is None:
         return 2
+    bar = _Progress(sys.stderr)
     try:
-        layout = pcb.layout(cfg)
+        with progress.listening(bar):
+            layout = pcb.layout(cfg)
     except pcb.PcbError as exc:
+        bar.close()
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    bar.close()
     spacing, skew = layout.spacing(), layout.skew()
     for side, m in layout.meshes.items():
         if m.algorithm == "sfc":
@@ -156,6 +160,60 @@ def cmd_pcb(args: argparse.Namespace) -> int:
     for path in pcb.export(layout, args.output, args.name):
         print(f"wrote {path}", file=sys.stderr)
     return 0
+
+
+class _Progress:
+    """The layout's progress on ``out``: on a terminal a bar redrawn in place (each phase's
+    last figures kept above it); otherwise a status line per step."""
+
+    WIDTH = 24
+
+    def __init__(self, out) -> None:  # noqa: ANN001  (a text stream)
+        self.out = out
+        self.tty = out.isatty()
+        self.key: tuple[str, str] | None = None
+        self.line = ""
+
+    def __call__(self, e: dict) -> None:
+        key = (e["stage"], e["phase"])
+        text = _status(e)
+        if self.tty:
+            if self.key is not None and key != self.key:
+                self.out.write("\r\033[K" + self.line + "\n")  # (the phase done: kept)
+            full = round(e["done"] * self.WIDTH)
+            bar = "#" * full + "." * (self.WIDTH - full)
+            self.out.write(f"\r\033[K[{bar}] {100 * e['done']:3.0f}%  {text}")
+        else:
+            self.out.write(text + "\n")
+        self.out.flush()
+        self.key, self.line = key, text
+
+    def close(self) -> None:
+        if self.tty and self.key is not None:
+            self.out.write("\r\033[K" + self.line + "\n")
+            self.out.flush()
+        self.key = None
+
+
+def _status(e: dict) -> str:
+    """One line of a progress event: its stage and phase, step, and figures."""
+    head = f"{e['stage']}: " if e["stage"] else ""
+    text = f"{head}{e['phase']}"
+    if e["steps"] > 1:
+        text += f" {e['step']}/{e['steps']}"
+    parts = []
+    for key, name in (("cells", "cells"), ("vertices", "vertices"), ("moved", "moved")):
+        if key in e:
+            parts.append(f"{_count(e[key])} {name}")
+    if "checked" in e:
+        parts.append(f"{_count(e['checked'])} clearances")
+    if e.get("apart"):
+        parts.append("skew " + "/".join(f"{a:.1f}" for a in e["apart"]) + " mm")
+    return text + (f" ({', '.join(parts)})" if parts else "")
+
+
+def _count(n: float) -> str:
+    return f"{n / 1e6:.2f} M" if n >= 1e6 else f"{n / 1e3:.0f} k" if n >= 1e4 else f"{n:g}"
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
