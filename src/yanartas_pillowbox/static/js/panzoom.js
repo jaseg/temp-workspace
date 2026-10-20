@@ -51,6 +51,8 @@ export function attachPanZoom(stage, host) {
   const startDrag = (p) => { drag = { x: p.x, y: p.y, view: [...host.view()] }; };
 
   stage.addEventListener("dblclick", () => host.fit());
+  // (The mesh is drawn as <image>s: no native image drag instead of a pan.)
+  stage.addEventListener("dragstart", (e) => e.preventDefault());
   // (Pointer capture retargets the click to the stage, so remember the dimension that was
   // under the pointer when it went down.)
   stage.addEventListener("click", () => {
