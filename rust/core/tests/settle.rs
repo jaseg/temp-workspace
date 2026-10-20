@@ -74,6 +74,7 @@ fn settling_keeps_clear_and_in_its_zone() {
         edge,
         zones: vec![vec![box_]],
         keep: Vec::new(),
+        groups: Vec::new(),
     };
     let mut steps = 0;
     let out = settle(&input, &Params::default(), &mut |_| steps += 1);

@@ -373,7 +373,6 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
 
     side = meshgen.LEFT  # (the cable leaves the edge towards -x)
     jobs: list[tuple[str, Callable[[], meshgen.Mesh]]] = []
-    plan: dict[str, list[partition.Partition]] = {}
     for i, (layer, corner) in enumerate(corners.items()):
         seed = int(cfg.mesh_seed) * 2 + i
         if cfg.mesh_algorithm != "sfc":
@@ -383,7 +382,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
             continue
         # The curve's mesh: the layer's area in partitions of equal area, each its own
         # traces (and its own port: a square a pair of lanes wide, in turn along the
-        # junction), each laid out on its own.
+        # junction), all laid out at once.
         count, each = int(cfg.mesh_partitions), int(cfg.mesh_traces)
         port = 2 * each * pitch
         cx, cy = corner
@@ -393,36 +392,22 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         area = mask.difference(shapely.box(xj - 1, cy, cx, cy + count * port))  # (the leads)
         zones = mesh_zones(pattern)
         try:
-            parts = partition.partition(area, zones, ports, (1.0, 0.0), port, seed, pitch / 4)
+            parts = partition.partition(area, zones, ports, (1.0, 0.0), port, seed)
         except meshgen.MeshError as e:
             raise PcbError(str(e)) from e
-        plan[layer] = parts
-        for k, part in enumerate(parts):
-            name = f"{layer} {k + 1}/{count}" if count > 1 else layer
-            jobs.append((name, functools.partial(
-                sfc.generate, copy(part.area), (cx, cy + k * port), side, each, pitch,
-                seed=seed * 1000 + k, zones=[copy(z) for z in zones],
-                arcs=cfg.mesh_shape == "arcs", feeder=part.feeder,
-            )))  # fmt: skip
+        jobs.append((layer, functools.partial(
+            sfc.generate, copy(area), [(cx, cy + k * port) for k in range(count)], side,
+            each, pitch, seed=seed, zones=[copy(z) for z in zones],
+            arcs=cfg.mesh_shape == "arcs", partitions=[copy(p.area) for p in parts],
+            stems=[p.reach for p in parts],
+        )))  # fmt: skip
 
-    # The two sides (and each one's partitions) are independent: laid out at once.
+    # The two sides are independent: laid out at once.
     try:
         done = progress.side_by_side(jobs)
     except meshgen.MeshError as e:
         raise PcbError(str(e)) from e
-    meshes = []
-    for layer in corners:
-        if layer not in plan:
-            meshes.append(done.pop(0))
-            continue
-        got = [done.pop(0) for _ in plan[layer]]
-        arcs = tuple(a for m in got for a in m.arcs) if all(m.arcs for m in got) else None
-        meshes.append(meshgen.Mesh(
-            tuple(t for m in got for t in m.traces), got[0].cell,
-            sum(m.cells for m in got), sum(m.unreached for m in got), corners[layer],
-            "sfc", arcs, tuple(len(m.traces) for m in got),
-            tuple(p.area for p in plan[layer]),
-        ))  # fmt: skip
+    meshes = done
     for layer, m in zip(corners, meshes, strict=True):
         result.meshes[layer] = m
         side = "F" if layer == FRONT else "B"

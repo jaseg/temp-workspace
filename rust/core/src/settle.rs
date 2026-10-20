@@ -79,6 +79,9 @@ pub struct Input {
     pub edge: Vec<P>,
     pub zones: Vec<Vec<Vec<P>>>,
     pub keep: Vec<Vec<Vec<P>>>,
+    /// Each trace's group (its mesh's partition): lengths matched only within a group, of
+    /// neighbours in turn (none given: one group).
+    pub groups: Vec<usize>,
 }
 
 /// How far settling has got, after each step.
@@ -103,6 +106,7 @@ struct Ctx<'a> {
     pin: usize,
     zones: &'a Zones,
     keep: &'a Zones,
+    group: &'a [usize],
     edge: &'a [P],
     edges: &'a Grid,
 }
@@ -113,6 +117,11 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
     let zones = Zones::new(&input.zones, 2.0 * pitch);
     let keep = Zones::new(&input.keep, 2.0 * pitch);
     let edges = Grid::new(&input.edge, prm.reach * pitch, |_| true);
+    let group: Vec<usize> = if input.groups.len() == input.lines.len() {
+        input.groups.clone()
+    } else {
+        vec![0; input.lines.len()]
+    };
     let cx = Ctx {
         pitch,
         step,
@@ -122,6 +131,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         pin: (prm.reach / prm.step).ceil() as usize,
         zones: &zones,
         keep: &keep,
+        group: &group,
         edge: &input.edge,
         edges: &edges,
     };
@@ -138,10 +148,15 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
     // some, the inner in tight turns)
     let base = Traces::new(&input.lines, None).binned(bins);
     let mut gained = minus(&tr.binned(bins), &base);
-    let sides = neighbour_sides(&tr);
+    let sides = neighbour_sides(&tr, &group);
     let mut hot: Option<HashSet<(i64, i64)>> = None;
     // (the density's blur: about the size of the holes where a ribbon's bends meet)
-    let blur = prm.fill_blur * n as f64 * pitch;
+    // (a ribbon: one group's traces)
+    let ribbon = (0..n)
+        .map(|t| group.iter().filter(|&&g| g == group[t]).count())
+        .max()
+        .unwrap_or(0) as f64;
+    let blur = prm.fill_blur * ribbon * pitch;
     let mut density = (prm.fill > 0.0).then(|| {
         let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
         for q in input.zones.iter().flatten().flatten() {
@@ -175,7 +190,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         };
         let curv = tr.turning(2);
         // a U-turn's tip, as tight as a ribbon's: on out along its axis
-        let tip = bend_axes(&tr, &curv, &normal, prm.tip * n as f64 * pitch);
+        let tip = bend_axes(&tr, &curv, &normal, prm.tip * ribbon * pitch);
         let verts = Grid::new(&tr.p, cx.near / 2.0, |_| true);
         if let Some(d) = density.as_mut() {
             d.update(&tr, pitch);
@@ -201,7 +216,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
             .map(|t| {
                 (0..n)
                     .map(|u| {
-                        if t.abs_diff(u) == 1 {
+                        if t.abs_diff(u) == 1 && group[t] == group[u] {
                             window(&minus1(&gained[t], &gained[u]), prm.span)
                         } else {
                             Vec::new()
@@ -240,7 +255,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
             let (t, w) = (tr.net[i], at[i]);
             let mut grow: f64 = 0.0;
             for u in [t.wrapping_sub(1), t + 1] {
-                if u >= n {
+                if u >= n || cx.group[u] != cx.group[t] {
                     continue;
                 }
                 let lead = run[t][w] - run[u][w];
@@ -308,7 +323,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         status.moved = moved.len();
         status.checked = checked;
         if moved.is_empty() {
-            status.apart = apart(&gained);
+            status.apart = apart(&gained, cx.group);
             progress(&status);
             break;
         }
@@ -326,7 +341,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         tr = tr.respaced(step);
 
         gained = minus(&tr.binned(bins), &base);
-        status.apart = apart(&gained);
+        status.apart = apart(&gained, cx.group);
         progress(&status);
     }
     let tr = smoothed(tr, prm, &cx);
@@ -385,11 +400,11 @@ fn matched(
     };
     for it in 0..prm.match_steps {
         let gained = minus(&tr.binned(bins), base);
-        let excess = excess(&gained, prm.match_band * cx.pitch);
+        let excess = excess(&gained, prm.match_band * cx.pitch, cx.group);
         let most = excess.iter().flatten().fold(0.0, |a: f64, &b| a.max(b));
         status.step = it;
         status.vertices = tr.len();
-        status.apart = apart(&gained);
+        status.apart = apart(&gained, cx.group);
         if most < 0.01 * cx.pitch {
             break;
         }
@@ -442,19 +457,23 @@ fn matched(
 
 /// For each trace and place along the curve: how much length to take out there so that no
 /// trace runs more than `band` longer than the shortest, taken out where it gains.
-fn excess(gained: &[Vec<f64>], band: f64) -> Vec<Vec<f64>> {
+fn excess(gained: &[Vec<f64>], band: f64, group: &[usize]) -> Vec<Vec<f64>> {
     let n = gained.len();
     let bins = gained[0].len();
     let mut out = vec![vec![0.0; bins]; n];
     let mut run = vec![0.0; n];
     let mut taken = vec![0.0; n];
+    let groups = group.iter().copied().max().map_or(0, |g| g + 1);
     for b in 0..bins {
         for t in 0..n {
             run[t] += gained[t][b];
         }
-        let least = (0..n).map(|t| run[t] - taken[t]).fold(f64::MAX, f64::min);
+        let mut least = vec![f64::MAX; groups];
         for t in 0..n {
-            let over = (run[t] - taken[t] - (least + band)).max(0.0);
+            least[group[t]] = least[group[t]].min(run[t] - taken[t]);
+        }
+        for t in 0..n {
+            let over = (run[t] - taken[t] - (least[group[t]] + band)).max(0.0);
             out[t][b] = over;
             taken[t] += over;
         }
@@ -785,11 +804,14 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
 
 /// For each two neighbouring traces: on which side of the first (along its normals: 1 left,
 /// -1 right) the second runs.
-fn neighbour_sides(tr: &Traces) -> Vec<Vec<f64>> {
+fn neighbour_sides(tr: &Traces, group: &[usize]) -> Vec<Vec<f64>> {
     let n = tr.traces();
     let normal = tr.normals();
     let mut out = vec![vec![0.0; n]; n];
     for t in 0..n.saturating_sub(1) {
+        if group[t] != group[t + 1] {
+            continue;
+        }
         for (a, b) in [(t, t + 1), (t + 1, t)] {
             let mine: Vec<usize> = (tr.first[a]..tr.first[a + 1]).collect();
             let every = (mine.len() / 60).max(1);
@@ -851,10 +873,13 @@ fn window(a: &[f64], m: usize) -> Vec<f64> {
         .collect()
 }
 
-fn apart(gained: &[Vec<f64>]) -> Vec<f64> {
+fn apart(gained: &[Vec<f64>], group: &[usize]) -> Vec<f64> {
     let run: Vec<Vec<f64>> = gained.iter().map(|g| cumsum(g)).collect();
     (0..run.len().saturating_sub(1))
         .map(|t| {
+            if group[t] != group[t + 1] {
+                return 0.0;
+            }
             run[t]
                 .iter()
                 .zip(&run[t + 1])

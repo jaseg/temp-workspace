@@ -73,10 +73,11 @@ fn status<'py>(py: Python<'py>, s: &Status) -> PyResult<Bound<'py, PyDict>> {
 
 /// The traces settled and matched in length (`sfc._settle`): `lines` the traces (each an
 /// (n, 2) array), `edge` points along the edge, `zones` each zone's rings, `keep` what is
-/// left as laid (the exit: polygons, each its rings), `params` the constants by name, `progress` called with a
-/// dict after each step (phase, step, steps, vertices, looked, moved, checked, apart).
+/// left as laid (the exits: polygons, each its rings), `params` the constants by name,
+/// `progress` called with a dict after each step (phase, step, steps, vertices, looked,
+/// moved, checked, apart), `groups` each trace's group (lengths matched within it).
 #[pyfunction]
-#[pyo3(signature = (lines, pitch, edge, zones, keep, params, progress=None))]
+#[pyo3(signature = (lines, pitch, edge, zones, keep, params, progress=None, groups=None))]
 #[allow(clippy::too_many_arguments)]
 fn settle_traces<'py>(
     py: Python<'py>,
@@ -87,6 +88,7 @@ fn settle_traces<'py>(
     keep: Vec<Vec<PyReadonlyArray2<'py, f64>>>,
     params: &Bound<'py, PyDict>,
     progress: Option<PyObject>,
+    groups: Option<Vec<usize>>,
 ) -> PyResult<Bound<'py, PyList>> {
     let input = Input {
         lines: lines.iter().map(points).collect::<PyResult<_>>()?,
@@ -100,6 +102,7 @@ fn settle_traces<'py>(
             .iter()
             .map(|z| z.iter().map(points).collect::<PyResult<Vec<_>>>())
             .collect::<PyResult<_>>()?,
+        groups: groups.unwrap_or_default(),
     };
     let prm = read_params(params)?;
     let mut failed: Option<PyErr> = None;
@@ -248,23 +251,24 @@ fn offset_lanes<'py>(
     PyList::new(py, out.iter().map(|t| array(py, t)))
 }
 
-/// The curve's graph walked into a curve (`sfc._curve`): `segments` each (region, its
+/// The curves' graph walked into curves (`sfc._curve`): `segments` each (region, its
 /// domain's rings), `borders` each (region, region, the lines of their shared border; the
-/// longest first), `opening` the stem's ends, `seed` the random seed. Returns the curve's
-/// points, each one's region, the number of cells and of regions left out.
+/// longest first), `openings` each a stem's ends, `seed` the random seed. Returns per
+/// opening its curve's points and each one's region, the number of cells and of regions
+/// left out.
 #[pyfunction]
-#[pyo3(signature = (segments, borders, opening, spacing, seed, params, progress=None))]
+#[pyo3(signature = (segments, borders, openings, spacing, seed, params, progress=None))]
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn curve_graph<'py>(
     py: Python<'py>,
     segments: Vec<(usize, Vec<PyReadonlyArray2<'py, f64>>)>,
     borders: Vec<(usize, usize, Vec<PyReadonlyArray2<'py, f64>>)>,
-    opening: ((f64, f64), (f64, f64)),
+    openings: Vec<((f64, f64), (f64, f64))>,
     spacing: f64,
     seed: u64,
     params: &Bound<'py, PyDict>,
     progress: Option<PyObject>,
-) -> PyResult<(Bound<'py, PyArray2<f64>>, Vec<usize>, usize, usize)> {
+) -> PyResult<(Vec<(Bound<'py, PyArray2<f64>>, Vec<usize>)>, usize, usize)> {
     let input = GraphInput {
         segments: segments
             .iter()
@@ -279,7 +283,10 @@ fn curve_graph<'py>(
             .iter()
             .map(|(i, j, lines)| Ok((*i, *j, lines.iter().map(points).collect::<PyResult<_>>()?)))
             .collect::<PyResult<_>>()?,
-        opening: [[opening.0 .0, opening.0 .1], [opening.1 .0, opening.1 .1]],
+        openings: openings
+            .iter()
+            .map(|(a, b)| [[a.0, a.1], [b.0, b.1]])
+            .collect(),
         spacing,
         seed,
     };
@@ -301,7 +308,12 @@ fn curve_graph<'py>(
         return Err(e);
     }
     let c = out.map_err(pyo3::exceptions::PyValueError::new_err)?;
-    Ok((array(py, &c.pts), c.region, c.cells, c.left))
+    let curves = c
+        .curves
+        .iter()
+        .map(|(pts, region)| (array(py, pts), region.clone()))
+        .collect();
+    Ok((curves, c.cells, c.left))
 }
 
 /// (testing) The tessellation of one domain: its cells' outlines.
@@ -316,8 +328,8 @@ fn _cells<'py>(
 ) -> PyResult<Bound<'py, PyList>> {
     let domain: Vec<Vec<P>> = domain.iter().map(points).collect::<PyResult<_>>()?;
     let mut rng = yanartas_mesh_core::graph::Rng::new(seed);
-    let out =
-        yanartas_mesh_core::graph::cells(&domain, d, &mut rng, pin.map(|p| [p.0, p.1]), lloyd);
+    let pins: Vec<P> = pin.map(|p| [p.0, p.1]).into_iter().collect();
+    let out = yanartas_mesh_core::graph::cells(&domain, d, &mut rng, &pins, lloyd);
     PyList::new(py, out.iter().map(|c| array(py, &c[0])))
 }
 

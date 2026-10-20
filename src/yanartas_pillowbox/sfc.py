@@ -49,6 +49,7 @@ from __future__ import annotations
 import math
 import random
 import sys
+from collections.abc import Sequence
 
 import numpy as np
 import shapely
@@ -123,6 +124,7 @@ MATCH = 20  # steps matching the settled traces' lengths (taking it out of the l
 MATCH_BAND = 15.0  # ... no trace more than this many pitches longer than the shortest
 MATCH_RATE = 0.5  # ... the share of their bends' depth a step straightens them by, at most
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
+STEM_MARGIN = 0.25  # the area kept this many pitches further off a longer stem beside it
 
 
 # ----------------------------------------------------------------------------- frame
@@ -176,19 +178,19 @@ def _regions(area: shapely.Geometry, zones: list[Polygon], least: float) -> list
 
 # ----------------------------------------------------------------------------- curve
 def _curve(
-    area: shapely.Geometry,
-    zones: list[Polygon],
+    regions: list[Polygon],
+    owner: list[int],
     spacing: float,
-    opening: tuple[Point, Point],
+    openings: list[tuple[Point, Point]],
     seed: int,
-) -> tuple[np.ndarray, list[Polygon], np.ndarray, int, int]:
-    """The closed curve through the segments the exit's can reach, by the Rust core
-    (``graph::curve``; see ARCHITECTURE.md, 2. to 5.): its vertices from the stem's end at
-    ``opening[0]`` round to its other end (the stem, out through the exit and back, closes
-    it), the regions, each vertex's region, the cells and the regions left out. Here, what
-    needs shapely: the regions, the segments' domains (each region's pieces shrunk by half a
-    spacing) and the borders between regions."""
-    regions = _regions(area, zones, 2 * spacing**2)
+) -> tuple[list[tuple[np.ndarray, np.ndarray]], int, int]:
+    """The closed curves through the regions, one per opening, by the Rust core
+    (``graph::curve``; see ARCHITECTURE.md, 2. to 5.): each its vertices from its stem's end
+    at ``opening[0]`` round to its other end (the stem, out through the exit and back,
+    closes it) and each vertex's region; the cells and the regions left out. A curve
+    crosses only between regions of the same ``owner`` (partition). Here, what needs
+    shapely: the segments' domains (each region's pieces shrunk by half a spacing) and the
+    borders between regions."""
     segments = [
         (ri, d)
         for ri, r in enumerate(regions)
@@ -197,11 +199,12 @@ def _curve(
     ]
     if not segments:
         raise MeshError("no room for the mesh")
+    borders = [b for b in _shared_borders(regions, spacing) if owner[b[0]] == owner[b[1]]]
     try:
-        pts, region, cells, left = _core().curve_graph(
+        found, cells, left = _core().curve_graph(
             [(ri, [np.asarray(r.coords, float)[:-1] for r in _rings(d)]) for ri, d in segments],
-            _shared_borders(regions, spacing),
-            (tuple(map(float, opening[0])), tuple(map(float, opening[1]))),
+            borders,
+            [(tuple(map(float, a)), tuple(map(float, b))) for a, b in openings],
             spacing,
             seed,
             {"seed_spacing": SEED_SPACING, "lloyd": LLOYD, "attempts": ATTEMPTS},
@@ -209,7 +212,7 @@ def _curve(
         )
     except ValueError as e:
         raise MeshError(str(e)) from e
-    return np.asarray(pts), regions, np.asarray(region), int(cells), int(left)
+    return [(np.asarray(p), np.asarray(r)) for p, r in found], int(cells), int(left)
 
 
 def _shared_borders(
@@ -343,12 +346,6 @@ def _opened(ring: np.ndarray, cut: Polygon) -> np.ndarray:
     return np.vstack([[cross(ring[s - 1], ring[s])], path, [cross(ring[(e + 1) % m], ring[e])]])
 
 
-def _longest(g: shapely.Geometry) -> LineString:
-    """The line, or the longest of its pieces once joined."""
-    g = shapely.line_merge(g) if not isinstance(g, LineString) else g
-    return g if isinstance(g, LineString) else max(shapely.get_parts(g), key=lambda p: p.length)
-
-
 def _rings(g: shapely.Geometry) -> list[shapely.LinearRing]:
     return [r for poly in _polygons(g) for r in (poly.exterior, *poly.interiors)]
 
@@ -398,13 +395,15 @@ def _settle(
     area: shapely.Geometry,
     regions: list[Polygon],
     keep: shapely.Geometry,
+    groups: list[int] | None = None,
 ) -> list[np.ndarray]:
-    """The traces, each settled on its own into the room around it, then matched in length,
+    """The traces, each settled on its own into the room around it, then matched in length
+    (within each of their ``groups``: partitions),
     by the Rust core (rust/core; see ARCHITECTURE.md, Settling): natively its extension
     (yanartas_mesh, on all cores), in the browser its WebAssembly build. Here, what needs
     shapely: the edge's points (the area's edge, and the zones' borders but where the
     traces cross them at the curve's joins, where they stay as laid), the zones' rings, and
-    what is left as laid (``keep``: the exit, the feeder)."""
+    what is left as laid (``keep``: the exits)."""
     step = SETTLE_STEP * pitch
     far = SETTLE_REACH * pitch
     edge = np.vstack([resample(np.asarray(r.coords), step / 2) for r in _rings(area)])
@@ -431,8 +430,9 @@ def _settle(
         np.ascontiguousarray(edge, float),
         [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
         [[np.asarray(r.coords, float) for r in _rings(g)] for g in _polygons(keep)],
-        _params(len(lines)),
+        _params(len(lines) if groups is None else max(groups.count(g) for g in set(groups))),
         report,
+        groups,
     )
     return [np.asarray(t) for t in out]
 
@@ -488,13 +488,13 @@ def _browser_core() -> object | None:
             if hook is not None:
                 hook.destroy()
 
-    def settle_traces(lines, pitch, edge, zones, keep, params, report):  # noqa: ANN001, ANN202
+    def settle_traces(lines, pitch, edge, zones, keep, params, report, groups=None):  # noqa: ANN001, ANN202
         rings = [r for z in zones for r in z]
         held = [r for z in keep for r in z]
         out = call(
             mesh.settle, *flat(lines), pitch, f64(edge), *flat(rings),
             u32([len(z) for z in zones]), *flat(held), u32([len(z) for z in keep]),
-            obj(params), report=lambda o: report(o.to_py()),
+            u32(groups or []), obj(params), report=lambda o: report(o.to_py()),
         )  # fmt: skip
         return unflat(out.points, out.lens)
 
@@ -516,7 +516,7 @@ def _browser_core() -> object | None:
         )  # fmt: skip
         return unflat(out.points, out.lens)
 
-    def curve_graph(segments, borders, opening, spacing, seed, params, report):  # noqa: ANN001, ANN202
+    def curve_graph(segments, borders, openings, spacing, seed, params, report):  # noqa: ANN001, ANN202
         rings = [r for _, rs in segments for r in rs]
         lines = [ln for _, _, ls in borders for ln in ls]
         try:
@@ -525,13 +525,15 @@ def _browser_core() -> object | None:
                 u32([len(rs) for _, rs in segments]),
                 u32([v for i, j, _ in borders for v in (i, j)]),
                 u32([len(ls) for _, _, ls in borders]), *flat(lines),
-                f64(np.array(opening)), spacing, seed >> 32, seed & 0xFFFFFFFF, obj(params),
+                f64(np.array(openings)), spacing, seed >> 32, seed & 0xFFFFFFFF, obj(params),
                 report=report,
             )  # fmt: skip
         except Exception as e:  # (pyodide's JsException: what the core refused)
             raise ValueError(str(e)) from e
-        pts = np.asarray(out.points.to_py(), float).reshape(-1, 2)
-        return pts, list(out.region.to_py()), int(out.cells), int(out.left)
+        pts = unflat(out.points, out.lens)
+        ends = np.cumsum([len(q) for q in pts])[:-1]
+        region = np.split(np.asarray(out.region.to_py(), int), ends)
+        return list(zip(pts, region, strict=True)), int(out.cells), int(out.left)
 
     def fit_arcs(lines, tol):  # noqa: ANN001, ANN202
         out = mesh.fit_arcs(*flat(lines), tol)
@@ -582,20 +584,27 @@ def _params(traces: int = SCALE) -> dict[str, float]:
 # ----------------------------------------------------------------------------- generator
 def generate(
     mask: shapely.Geometry,
-    exit_corner: Point,
+    exit_corner: Point | Sequence[Point],
     exit_side: int,
     traces: int,
     pitch: float,
     seed: int | str | None = 0,
     zones: tuple[Polygon, ...] | list[Polygon] = (),
     arcs: bool = False,
-    feeder: LineString | None = None,
+    partitions: Sequence[shapely.Geometry] = (),
+    stems: Sequence[float] = (),
 ) -> Mesh:
     """The mesh over ``mask``: ``traces`` nets at ``pitch`` (trace plus space) round a closed
     space-filling curve, out through the exit cell (as ``kimesh.generate``: its corner with
     the smallest x and y ``exit_corner``, its side ``exit_side`` open). ``zones`` (the
     folding pattern's panels) are filled one by one and joined across their borders as
-    seldom as can be; ``seed`` makes the layout repeatable."""
+    seldom as can be; ``seed`` makes the layout repeatable. With ``partitions`` (the mask
+    split, ``partition.partition``; ``exit_corner`` then each one's exit cell's corner, in
+    turn), a curve and its ``traces`` nets per partition, all laid out at once: the
+    partitions' borders kept as the zones' (no curve crosses one), the traces settled
+    together, matched in length within their partition (``Mesh.groups``). ``stems``: how
+    far in from each exit's open side its curve opens (its stem's rails straight on in
+    through the exit cell and on, at the pitch; at least a spacing)."""
     if traces < 1:
         raise MeshError("need at least one trace")
     n = traces
@@ -603,80 +612,89 @@ def generate(
     least = n * pitch
     spacing = SPACING * least
     frame = _Frame(exit_side)
-    ox, oy = exit_corner
-    cell = frame.geom(shapely.box(ox, oy, ox + c, oy + c))
-    x0, y0, _, _ = cell.bounds
+    corners = [tuple(q) for q in exit_corner] if partitions else [tuple(exit_corner)]
+    if len(corners) != max(len(partitions), 1):
+        raise MeshError("need an exit per partition")
+    exits = [frame.geom(shapely.box(ox, oy, ox + c, oy + c)).bounds[:2] for ox, oy in corners]
+    if stems and len(stems) != len(exits):
+        raise MeshError("need a stem per exit")
+    tops = [y0 + max(spacing, stems[k] if stems else 0.0) for k, (_, y0) in enumerate(exits)]
     area = frame.geom(mask)
-    # (the exit's leads run on from the open side: nothing of the mesh beyond it)
-    area = shapely.difference(area, shapely.box(x0 - pitch, y0 - 4 * c, x0 + c + pitch, y0))
-    if not area.buffer(1e-6).contains(shapely.box(x0, y0, x0 + c, y0 + 1.5 * spacing)):
-        raise MeshError("no room for the mesh's exit cell")
-    ym, ytop = y0 + spacing, y0 - least
-    # The stem's rails run straight through the exit cell to its opening: the curve keeps
-    # out of the cell up to there (its traces' pitch there is the least).
-    area = shapely.difference(area, shapely.box(x0, y0 - 4 * c, x0 + c, ym))
+    for x0, y0 in exits:  # (the exits' leads run on from the open side: no mesh beyond)
+        area = shapely.difference(area, shapely.box(x0 - pitch, y0 - 4 * c, x0 + c + pitch, y0))
+    for (x0, y0), ym in zip(exits, tops, strict=True):
+        if not area.buffer(1e-6).contains(shapely.box(x0, y0, x0 + c, ym + 0.5 * spacing)):
+            raise MeshError("no room for the mesh's exit cell")
+    # The stems' rails run straight through the exit cells (and on) to their openings: the
+    # curves keep out of there (their traces' pitch there is the least).
+    for (x0, y0), ym in zip(exits, tops, strict=True):
+        area = shapely.difference(area, shapely.box(x0, y0 - 4 * c, x0 + c, ym))
+    # (and a little further beside a longer stem, from a spacing past where the curve beside
+    # it opens: else it runs on along it with no room to spare, and a wobble of its brings
+    # its outer trace nearer the stem's than the pitch)
+    for (xa, _), ya in zip(exits, tops, strict=True):
+        for (xb, _), yb in zip(exits, tops, strict=True):
+            if abs(abs(xa - xb) - c) < 1e-6 and yb > ya + spacing:
+                m = STEM_MARGIN * pitch
+                x = xb - m if xb > xa else xb + c
+                area = shapely.difference(area, shapely.box(x, ya + spacing, x + m, yb))
+    area = shapely.union_all(_polygons(area))  # (no slivers of lines or points left)
     rng = random.Random(seed)
     nrng = np.random.default_rng(rng.getrandbits(64))
-    # The stem: two rails, a run's spacing apart, straight up through the exit cell (and
-    # on along the feeder, its corridor kept out of the area as the cell).
-    ax, bx = x0 + c / 4, x0 + 3 * c / 4
-    centre = None
-    if feeder is not None:
-        q = np.asarray(frame.geom(feeder).coords, float)
-        q[0] = (x0 + c / 2, ym)
-        if LineString(q).length > 1e-6:
-            centre = LineString(q).simplify(1e-9)  # (no points in line: one offset each way)
-    if centre is None:
-        rails = (np.array([(ax, ym)]), np.array([(bx, ym)]))
-        inward = np.array([0.0, 1.0])
-    else:
-        area = shapely.difference(area, centre.buffer(spacing, cap_style="flat"))
-        rails = tuple(
-            np.asarray(_longest(shapely.offset_curve(centre, d, join_style="round")).coords)
-            for d in (spacing / 2, -spacing / 2)
-        )
-        if abs(rails[0][0][0] - ax) > abs(rails[1][0][0] - ax):
-            rails = rails[::-1]
-        last = np.asarray(centre.coords)[-2:]
-        inward = (last[1] - last[0]) / np.linalg.norm(last[1] - last[0])
-    area = shapely.union_all(_polygons(area))  # (no slivers of lines or points left)
-    la, lb = rails  # (each from the exit cell's opening on to the curve's)
-    pts, regions, _, cells, left = _curve(
-        area,
-        [frame.geom(z) for z in zones],
-        spacing,
-        (tuple(la[-1] + inward * spacing / 2), tuple(lb[-1] + inward * spacing / 2)),
-        rng.getrandbits(64),
-    )
-    stem = np.vstack([lb[::-1], [(bx, ytop), (ax, ytop)], la])
-    curve = np.vstack([la[-1:], pts, lb[-1:]])
+    zs = [frame.geom(z) for z in zones]
+    parts = [
+        shapely.union_all(_polygons(area.intersection(frame.geom(g)))) for g in partitions
+    ] or [area]
+    regions: list[Polygon] = []
+    owner: list[int] = []
+    for k, part in enumerate(parts):
+        got = _regions(part, zs, 2 * spacing**2)
+        regions += got
+        owner += [k] * len(got)
+    # The stems: two rails, a run's spacing apart, straight up through each exit cell.
+    openings = [
+        ((x0 + c / 4, ym + spacing / 2), (x0 + 3 * c / 4, ym + spacing / 2))
+        for (x0, _), ym in zip(exits, tops, strict=True)
+    ]
+    found, cells, left = _curve(regions, owner, spacing, openings, rng.getrandbits(64))
     progress.report("graph", cells=cells)
-    p, k = _relax(curve, stem, area, regions, spacing, least, pitch, nrng)
-    progress.report("relax", vertices=len(p))
-    cut = shapely.box(x0, ytop - c, x0 + c, y0)  # (within the leads' corridor)
-    out = []
-    exact = np.zeros(len(p), bool)  # (the stem's rails: the traces at the pitch)
-    exact[k:] = p[k:, 1] < y0 + spacing / 4
-    if centre is not None:  # (and along the feeder, but where it opens out)
-        along = shapely.line_locate_point(centre, shapely.points(p[k:]))
-        exact[k:] |= along < centre.length - 0.75 * spacing
     lines = []
-    for ring in _lanes(p, k, area, n, pitch, spacing, exact):
-        lines.append(_opened(_unlooped(ring, LOOP * spacing), cut))
+    for k, ((x0, y0), ym, (pts, _)) in enumerate(zip(exits, tops, found, strict=True)):
+        ax, bx, ytop = x0 + c / 4, x0 + 3 * c / 4, y0 - least
+        stem = np.array([(bx, ym), (bx, ytop), (ax, ytop), (ax, ym)])
+        curve = np.vstack([[(ax, ym)], pts, [(bx, ym)]])
+        mine = [r for r, o in zip(regions, owner, strict=True) if o == k]
+        p, kk = _relax(curve, stem, parts[k], mine, spacing, least, pitch, nrng)
+        progress.report("relax", vertices=len(p))
+        exact = np.zeros(len(p), bool)  # (the stem's rails: the traces at the pitch)
+        exact[kk:] = True
+        # (and the curve where it runs on straight from them, held so by the relaxation:
+        # beside a longer stem, room for no more than the pitch)
+        exact[:kk] = (p[:kk, 1] < ym + spacing) & (np.abs(p[:kk, 0] - x0 - c / 2) < c / 2)
+        cut = shapely.box(x0, ytop - c, x0 + c, y0)  # (within the leads' corridor)
+        lines.append([
+            _opened(_unlooped(ring, LOOP * spacing), cut)
+            for ring in _lanes(p, kk, parts[k], n, pitch, spacing, exact)
+        ])  # fmt: skip
+    groups = [k for k, ls in enumerate(lines) for _ in ls]
+    flat = [line for ls in lines for line in ls]
     if SETTLE:
-        # (the stem: its leads beyond the area's edge, its rails through the exit cell and
-        # along the feeder, as laid at the pitch; all else settles, the curve's turns round
-        # it too, or holes are left either side of it)
-        keep = shapely.box(x0, ytop - c, x0 + c, ym)
-        if centre is not None:
-            keep = shapely.union_all([keep, centre.buffer(spacing, cap_style="flat")])
-        progress.report("lanes", traces=len(lines))
-        lines = _settle(lines, pitch, area, regions, keep)
+        # (the stems: their leads beyond the area's edge, their rails through the exit
+        # cells, as laid at the pitch; all else settles, the curves' turns round them too,
+        # or holes are left either side of them)
+        keep = shapely.union_all([
+            shapely.box(x0, y0 - least - c, x0 + c, ym)
+            for (x0, y0), ym in zip(exits, tops, strict=True)
+        ])  # fmt: skip
+        progress.report("lanes", traces=len(flat))
+        # (the partitions' borders kept as the zones': each trace in its own)
+        flat = _settle(flat, pitch, area, regions, keep, groups)
     progress.report("match", 1, 1)
+    out: list[np.ndarray] = []
     shapes: list[tuple[Piece, ...] | None] = []
     if arcs:
         tol = ARCS * pitch / 0.3
-        for rows in _core().fit_arcs([np.ascontiguousarray(xy, float) for xy in lines], tol):
+        for rows in _core().fit_arcs([np.ascontiguousarray(xy, float) for xy in flat], tol):
             ends = frame.inv(np.asarray(rows, float)[:, 1:].reshape(-1, 2)).reshape(-1, 3, 2)
             pieces = tuple(
                 (
@@ -689,16 +707,22 @@ def generate(
             shapes.append(pieces)
             out.append(np.asarray(sample_arcs(pieces, tol)))
     else:
-        for xy in lines:
+        for xy in flat:
             line = LineString(xy)
             tol = SIMPLIFY * pitch / 0.3
             fast = line.simplify(tol, preserve_topology=False)
             line = fast if fast.is_simple else line.simplify(tol, preserve_topology=True)
             out.append(frame.inv(np.asarray(line.coords)))
             shapes.append(None)
-    # net 1 outermost: its ends farthest from the exit's middle
-    mid = frame.inv(np.array([[(ax + bx) / 2, y0]]))[0]
-    order = sorted(range(len(out)), key=lambda i: -math.dist(out[i][0], mid))
+    # each partition's net 1 outermost: its ends farthest from its exit's middle
+    order = []
+    for k, (x0, y0) in enumerate(exits):
+        mid = frame.inv(np.array([[x0 + c / 2, y0]]))[0]
+        mine = [i for i in range(len(out)) if groups[i] == k]
+        order += sorted(mine, key=lambda i, m=mid: -math.dist(out[i][0], m))
     nets = tuple(tuple((float(x), float(y)) for x, y in out[i]) for i in order)
     shaped = tuple(shapes[i] for i in order) if arcs else None
-    return Mesh(nets, c, cells, left, exit_corner, "sfc", shaped)
+    if not partitions:
+        return Mesh(nets, c, cells, left, corners[0], "sfc", shaped)
+    sizes = tuple(groups.count(k) for k in range(len(exits)))
+    return Mesh(nets, c, cells, left, corners[0], "sfc", shaped, sizes, tuple(partitions))

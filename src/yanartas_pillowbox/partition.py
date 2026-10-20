@@ -1,22 +1,22 @@
-"""Partitions: a layer's mesh area split into parts of equal area, each laid out on its own
-(``sfc.generate``) with its own traces from the connector.
+"""Partitions: a layer's mesh area split into parts of equal area, each a curve of its own
+with its own traces from the connector, all laid out at once (``sfc.generate`` with
+``partitions``).
 
 Each partition has a *port*: its exit cell, a square a pair of trace lanes wide (``2 n``
 pitches: its ``n`` traces out and back) in the row of them along the cable's junction, and
-a *feeder*: a corridor exactly that wide from its port on into the area, along which its
-stem runs (``sfc.generate(feeder=...)``, its traces at the pitch) to where its curve opens.
-The feeders fan out from the ports (a star there): each straight in through its port and the
-square in front of it (its *gate*), then off at its angle, the angles spread evenly round
-the ports, the outer ones turning first (so none crosses another), each long enough that
-the room between it and its neighbours is a few feeders wide where it ends. The area is cut
-into Voronoi cells about a feeder wide (Lloyd's relaxation, each zone, i.e. panel, on its
-own, so that no cell straddles a fold), the cells into sectors: each cell by the way its
-cheapest path from the ports leaves them (crossing a fold costs more; every step's cost
-varied by a smooth random field from the seed, so two layers' borders differ), cut by rays
-from between the ports, each set for its sector's share of the area but kept between the
-feeders either side. Beyond the fan the borders are smoothed (a cell to the partition holding
-most of its border, a neighbour across a fold counting little: borders keep to folds) and
-the areas evened out, each partition kept of a piece.
+in front of it a *strip* as wide, straight on into the area: its curve runs in along it and
+back. The strips lie side by side (nothing between them), the middle ones longest, so that
+each one's end and a stretch of its side face the open area. The rest of the area is cut
+into Voronoi cells a few ports across (Lloyd's relaxation, each zone, i.e. panel, on its
+own, so that no cell straddles a fold); two cells are neighbours only through a wall at
+least a port long, so that no partition narrows below a curve's run in and back out. Each
+cell goes to the strip its cheapest path starts from (an additively weighted Voronoi
+diagram: crossing a fold costs more, every step's cost is varied by a smooth random field
+and noise from the seed, so two layers' borders differ), the weights set for equal areas;
+then the borders are smoothed (a cell to the partition holding most of its border, a
+neighbour across a fold counting little: borders keep to folds) and the areas evened out,
+each partition kept of a piece. Its curve keeps half a spacing off its borders, as off a
+fold, so two partitions' curves run a spacing apart, as two runs of one curve do.
 """
 
 from __future__ import annotations
@@ -28,38 +28,36 @@ from dataclasses import dataclass
 import numpy as np
 import shapely
 import shapely.affinity
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import Polygon
 
 from yanartas_pillowbox.mesh import MeshError
 
 LLOYD = 3  # Lloyd iterations of the cells
+CELL = 2.5  # the cells this many ports across
+STRIP = 1.0  # the outer strips this many ports long (in front of the port)
+STAGGER = 1.5  # ... each further in this many ports longer than the one outside it
 FOLD = 4.0  # crossing a fold costs this many times as far
 NOISE = 0.1  # each step's cost randomized by up to this share
 FIELD = 0.5  # ... and varied by up to this share over the area (smoothly)
 WAVES = 4  # ... (a sum of this many plane waves)
-SLANT = 0.35  # the feeders and borders leave the ports this far (radians) off the junction
-OPENING = 3.0  # cells this many feeders round a feeder's end: its partition's (its curve opens)
-ROOM = 3.0  # a feeder runs on until the room between it and the next is this many feeders wide
-BEND = 1.5  # ... its turn an arc this many feeders in radius
-TURN = 0.25  # ... each turning this many feeders further in than the one outside it (and more)
 ITERATIONS = 60  # rounds setting the weights for partitions of equal area
 SMOOTH = 4  # passes giving cells to the partition that holds most of their border
 ACROSS = 0.25  # ... a neighbour across a fold counting this much
 BALANCE = 0.01  # partitions' areas within this share of each other
 HOPS = 6  # a partition kept of a piece: looked for this many cells round a cell it gives up
-THIN = 0.25  # parts of a partition thinner than twice this many feeders: left out
 ATTEMPTS = 6  # tries at an even split
 UNEVEN = 0.03  # ... even: the partitions' areas within this share of each other
 
 
 @dataclass(frozen=True)
 class Partition:
-    """One partition: what its mesh covers (its port, feeder and part) and its feeder (from the
-    port's middle on to where its curve opens)."""
+    """One partition: what its mesh covers (its cells, and in front of them its port and
+    strip, where its stem runs), its port and how far in from the port's outer side its
+    curve opens (the strip's end)."""
 
     area: Polygon
     port: Polygon
-    feeder: LineString
+    reach: float
 
 
 def _parts(g: shapely.Geometry) -> list[Polygon]:
@@ -67,24 +65,34 @@ def _parts(g: shapely.Geometry) -> list[Polygon]:
 
 
 def cells(
-    area: shapely.Geometry, zones: list[Polygon], size: float, rng: np.random.Generator
-) -> tuple[list[Polygon], list[int]]:
+    area: shapely.Geometry,
+    zones: list[Polygon],
+    size: float,
+    rng: np.random.Generator,
+    pins: list[tuple[float, float]] = (),
+) -> tuple[list[Polygon], list[int], list[int]]:
     """The area as Voronoi cells about ``size`` across, each zone's on its own (Lloyd's
-    relaxation): the cells and each one's zone."""
+    relaxation; a seed at each of ``pins`` stays there): the cells, each one's zone, and
+    each pin's cell (-1: none)."""
     out: list[Polygon] = []
     zone: list[int] = []
     pieces = [(zi, p) for zi, z in enumerate(zones) for p in _parts(z.intersection(area))]
     covered = shapely.union_all([z for z in zones]) if zones else Polygon()
     pieces += [(len(zones), p) for p in _parts(shapely.difference(area, covered))]
+    held = np.asarray(pins, float).reshape(-1, 2)
     for zi, piece in pieces:
         k = max(1, round(piece.area / (size * size * math.sqrt(3) / 2)))
         x0, y0, x1, y1 = piece.bounds
         shapely.prepare(piece)
+        mine = held[shapely.contains_xy(piece, held[:, 0], held[:, 1])]
         pts = np.zeros((0, 2))
         while len(pts) < k:
             q = rng.uniform((x0, y0), (x1, y1), (4 * k, 2))
             pts = np.vstack([pts, q[shapely.contains_xy(piece, q[:, 0], q[:, 1])]])
         pts = pts[:k]
+        if len(mine):
+            far = np.hypot(*(pts[:, None] - mine[None]).transpose(2, 0, 1)).min(1) > size / 2
+            pts = np.vstack([mine, pts[far]])
         box = shapely.box(x0, y0, x1, y1).buffer(size)
         for it in range(LLOYD + 1):
             vor = shapely.voronoi_polygons(shapely.multipoints(pts), extend_to=box, ordered=True)
@@ -92,15 +100,21 @@ def cells(
             if it == LLOYD:
                 break
             pts = shapely.get_coordinates(shapely.centroid(got))
+            pts[: len(mine)] = mine
         for c in got:
             for p in _parts(c):
                 out.append(p)
                 zone.append(zi)
-    return out, zone
+    at = []
+    for q in held:
+        hit = [i for i, c in enumerate(out) if c.covers(shapely.Point(q))]
+        at.append(hit[0] if hit else -1)
+    return out, zone, at
 
 
-def _graph(polys: list[Polygon], zone: list[int]) -> list[list[tuple[int, float]]]:
-    """Each cell's neighbours (sharing a border), with the cost of the step to it."""
+def _graph(polys: list[Polygon], zone: list[int], wall: float) -> list[list[tuple[int, float]]]:
+    """Each cell's neighbours (sharing a border at least ``wall`` long), with the cost of
+    the step to it."""
     tree = shapely.STRtree(polys)
     a, b = tree.query(polys, predicate="intersects")
     keep = a < b
@@ -112,7 +126,7 @@ def _graph(polys: list[Polygon], zone: list[int]) -> list[list[tuple[int, float]
     cen = shapely.get_coordinates(shapely.centroid(arr))
     nbrs: list[list[tuple[int, float]]] = [[] for _ in polys]
     for i, j, s in zip(a, b, shared, strict=True):
-        if s > 1e-3:
+        if s >= wall:
             step = float(np.hypot(*(cen[i] - cen[j]))) * (FOLD if zone[i] != zone[j] else 1.0)
             nbrs[i].append((int(j), step))
             nbrs[j].append((int(i), step))
@@ -160,20 +174,16 @@ def _refine(
     zone: list[int],
     area: np.ndarray,
     target: np.ndarray,
-    gate_cells: list[list[int]],
-    frozen: np.ndarray,
-    pinned: np.ndarray,
+    fronts: list[int],
 ) -> np.ndarray:
-    """Each partition of a piece with its port (cut off pieces to the neighbour they
-    border most), its borders smoothed (a cell to the partition holding most of its
+    """Each partition of a piece with the cell in front of its strip (cut off pieces to the
+    neighbour they border most), its borders smoothed (a cell to the partition holding most of its
     border, a neighbour across a fold counting little) and the areas evened out (cells
-    passed on between neighbours, the most uneven pair first), each kept of a piece and at
-    its port."""
+    passed on between neighbours, the most uneven pair first), each kept of a piece."""
     owner = owner.copy()
     count = len(target)
-    fixed = pinned.copy()  # (the gates and feeders' ends: never moved; the fan: smoothed only)
-    for cs in gate_cells:
-        fixed[cs] = True
+    fixed = np.zeros(len(owner), bool)
+    fixed[fronts] = True
     src = np.repeat(np.arange(len(owner)), [len(v) for v in nbrs])
     dst = np.array([j for v in nbrs for j, _ in v], int)
     zn = np.asarray(zone)
@@ -190,10 +200,8 @@ def _refine(
         owner[i] = q
         return True
 
-    # (pieces cut off from the port: to the neighbour most beside; the feeder's end joined
-    # to the port by its corridor, though its cells beside it may not be the partition's)
-    for k in range(count):
-        seen = set(gate_cells[k]) | set(np.nonzero(pinned & (owner == k))[0].tolist())
+    for k in range(count):  # (pieces cut off from the strip: to the neighbour most beside)
+        seen = {fronts[k]}
         stack = list(seen)
         while stack:
             i = stack.pop()
@@ -221,14 +229,13 @@ def _refine(
         cand = np.nonzero((best != owner) & (v.max(1) > 2 * mine) & ~fixed)[0]
         if not sum(move(int(i), int(best[i])) for i in cand):
             break
-    fixed |= frozen  # (evening out: not in the fan)
     blocked: set[tuple[int, int]] = set()
     mean = float(area.mean())
     for _ in range(len(owner)):
         over = np.bincount(owner, area, count) - target
         edge = owner[src] != owner[dst]
         pairs = {(int(a), int(b)) for a, b in zip(owner[src[edge]], owner[dst[edge]], strict=True)}
-        pairs = [pq for pq in pairs if pq not in blocked and over[pq[0]] - over[pq[1]] > 2 * mean]
+        pairs = [pq for pq in pairs if pq not in blocked and over[pq[0]] - over[pq[1]] > mean]
         if not pairs or max(over) < BALANCE * float(target.mean()) / 2:
             break
         p, q = max(pairs, key=lambda pq: over[pq[0]] - over[pq[1]])
@@ -254,26 +261,19 @@ def partition(
     inward: tuple[float, float],
     width: float,
     seed: int,
-    margin: float = 0.0,
 ) -> list[Partition]:
-    """``area`` (less the ports) split into one partition per port (in their order along
-    the junction; ``inward`` the way from the junction into the area), of equal area, each
-    reaching its port by its feeder, ``width`` wide (a pair of trace lanes: the ports'
-    width); each kept ``margin`` off the others (but its port and feeder: their traces are
-    laid at the pitch). A split that comes out uneven is tried again afresh."""
+    """``area`` split into one partition per port (in their order along the junction;
+    ``inward`` the way from the junction into the area), of equal area, each holding its
+    port, ``width`` wide (a pair of trace lanes: the ports' width), and its strip. A split
+    that comes out uneven is tried again afresh."""
     rng = np.random.default_rng(seed)
     best, worst = None, math.inf
     for _ in range(ATTEMPTS):
-        parts = _partition(area, zones, ports, inward, width, rng, margin)
+        parts = _partition(area, zones, ports, inward, width, rng)
         a = [p.area.area for p in parts]
         bad = (max(a) - min(a)) / max(a)
-        for p in parts:
-            corridor = _corridor(p.feeder, width).intersection(area)
-            if (
-                p.port.difference(p.area).area > 1e-6
-                or corridor.difference(p.area).area > 1e-3 * width * width
-            ):
-                bad = math.inf
+        if any(p.port.difference(p.area).area > 1e-6 for p in parts):
+            bad = math.inf
         if bad < worst:
             best, worst = parts, bad
         if bad < UNEVEN:
@@ -283,6 +283,23 @@ def partition(
     return best
 
 
+def strips(ports: list[Polygon], inward: tuple[float, float], width: float) -> list[Polygon]:
+    """Each port's strip: from the port's inner side straight on in, as wide; the middle
+    ones longest, no two side by side as long."""
+    inv = np.asarray(inward, float) / math.hypot(*inward)
+    count = len(ports)
+    rank = sorted(range(count), key=lambda k: (min(k, count - 1 - k), k))
+    out = []
+    for k, port in enumerate(ports):
+        depth = width * (STRIP + STAGGER * rank.index(k))
+        d = shapely.get_coordinates(port) @ inv
+        step = float(d.max() - d.min())
+        ahead = shapely.affinity.translate(port, *(inv * step))
+        far = shapely.affinity.translate(port, *(inv * (step + depth - width)))
+        out.append(shapely.union_all([ahead, far]).convex_hull)
+    return out
+
+
 def _partition(
     area: shapely.Geometry,
     zones: list[Polygon],
@@ -290,28 +307,42 @@ def _partition(
     inward: tuple[float, float],
     width: float,
     rng: np.random.Generator,
-    margin: float,
 ) -> list[Partition]:
     count = len(ports)
     inv = np.asarray(inward, float) / math.hypot(*inward)
-    feeders = _fan(ports, inv, width, area)
-    corridors = [_corridor(n, width) for n in feeders]
-    # (each port's gate: the cell in front of it, as wide, its partition's for sure)
-    gates = [
-        shapely.affinity.translate(port, *(inv * _depth(port, inv))).intersection(area)
-        for port in ports
-    ]
-    rest = shapely.difference(area, shapely.union_all([*ports, *gates]))
-    polys, zone = cells(rest, zones, width, rng)
-    if len(polys) < 4 * count:
-        raise MeshError("no room for the mesh's partitions")
-    for t in gates:
-        polys.append(t)
-        zone.append(
-            next((zi for zi, z in enumerate(zones) if z.intersects(t.centroid)), len(zones))
+    lanes = strips(ports, inward, width)
+    # (a cell pinned in front of each strip's end, its own: where its curve opens)
+    ends = []
+    for s in lanes:
+        d = shapely.get_coordinates(s) @ inv
+        mid = np.asarray(s.centroid.coords[0]) + inv * (
+            float(d.max()) - float(s.centroid.coords[0] @ inv)
         )
-    gate_cells = [[len(polys) - count + k] for k in range(count)]
-    nbrs = _graph(polys, zone)
+        ends.append(tuple(mid + inv * CELL * width / 2))
+    rest = shapely.difference(area, shapely.union_all([*ports, *lanes]))
+    polys, zone, front = cells(rest, zones, CELL * width, rng, ends)
+    if len(polys) < 2 * count or min(front) < 0 or len(set(front)) < count:
+        raise MeshError("no room for the mesh's partitions")
+    # (and the strip's end all its own: a box over it, out of the cells beside)
+    side = np.array([-inv[1], inv[0]]) * width  # (a port either side too: never a corridor)
+    for k, end in enumerate(ends):
+        e = np.asarray(end) - inv * CELL * width / 2  # (the strip's end's middle)
+        f = e + inv * 0.75 * width
+        cut = shapely.intersection(Polygon([e - side, e + side, f + side, f - side]), rest)
+        for i in range(len(polys)):
+            if i != front[k] and polys[i].intersects(cut):
+                polys[i] = max(
+                    _parts(polys[i].difference(cut)) or [Polygon()], key=lambda q: q.area
+                )
+        polys[front[k]] = _one(shapely.union_all([polys[front[k]], cut]), polys[front[k]])
+    gone = {i for i, q in enumerate(polys) if q.is_empty or q.area < 1e-9}
+    if gone:
+        keep = [i for i in range(len(polys)) if i not in gone]
+        remap = {old: new for new, old in enumerate(keep)}
+        polys = [polys[i] for i in keep]
+        zone = [zone[i] for i in keep]
+        front = [remap[i] for i in front]
+    nbrs = _graph(polys, zone, 0.99 * width)
     arr = np.asarray(polys, dtype=object)
     cen = shapely.get_coordinates(shapely.centroid(arr))
     cell_area = shapely.area(arr)
@@ -321,109 +352,68 @@ def _partition(
         [(j, step * noise[j] * (field[i] + field[j]) / 2) for j, step in v]
         for i, v in enumerate(nbrs)
     ]
-    tips = [int(np.argmin(np.hypot(*(cen - np.asarray(n.coords)[-1]).T))) for n in feeders]
-    want = float(cell_area.sum() + sum(p.area for p in ports)) / count
-    owner = _weighted(
-        cost, cell_area, [[t] for t in tips], want - np.array([p.area for p in ports]), width
-    )
-    # The fan: each cell near the ports and feeders its nearest feeder's, each feeder's end in
-    # its own partition (where its curve opens); all kept so.
-    pts = shapely.points(cen)
-    near = np.array(
-        [
-            shapely.distance(shapely.union_all([p, c]), pts)
-            for p, c in zip(ports, corridors, strict=True)
-        ]
-    )
-    frozen = near.min(0) < width
-    owner[frozen] = np.argmin(near[:, frozen], axis=0)
-    # (where the discs overlap, as of two feeders ending side by side: the nearer end's)
-    ends = np.array([shapely.distance(shapely.Point(n.coords[-1]), pts) for n in feeders])
-    pinned = ends.min(0) < OPENING * width
-    owner[pinned] = np.argmin(ends[:, pinned], axis=0)
-    frozen |= pinned
-    for k, cs in enumerate(gate_cells):
-        owner[cs] = k
-    # Evened out, and again for what the feeders add and take.
-    target = np.full(count, float(cell_area.sum() + sum(p.area for p in ports)) / count)
-    extra = np.zeros(count)
-    # (and the cells passed past a narrow channel kept where they went)
-    for _ in range(3):
-        owner = _refine(owner, nbrs, zone, cell_area, target - extra, gate_cells, frozen, pinned)
-        out, given = _areas(owner, arr, area, ports, corridors, margin, width)
-        for g, k in given:
-            went = ~frozen & (owner != k) & shapely.contains(g, pts)
-            owner[went] = k
-            frozen |= went
-        for k in range(count):
-            extra[k] = out[k].area - cell_area[owner == k].sum()
-    return [Partition(_one(out[k], ports[k]), ports[k], feeders[k]) for k in range(count)]
-
-
-def _fan(
-    ports: list[Polygon], inward: np.ndarray, width: float, area: shapely.Geometry
-) -> list[LineString]:
-    """Each port's feeder: from its middle straight in through its gate (and further, the
-    more ports lie outside it on its side), then off at its angle (spread evenly round
-    the ports, ``SLANT`` off the junction at most), on until the room between it and its
-    neighbours is ``ROOM`` feeders wide (shortened to stay in the area)."""
-    count = len(ports)
-    along = np.array([inward[1], -inward[0]])
-    pc = shapely.get_coordinates(shapely.centroid(np.asarray(ports, dtype=object)))
-    order = list(np.argsort(pc @ along))
-    top = math.pi / 2 - SLANT
-    share = 2 * top / count
-    angle = {k: -top + (r + 0.5) * share for r, k in enumerate(order)}
-    # (straight in: through the gate, and the turn's arc only beyond it; then a turn
-    # further in each port in from the outside)
-    radius = BEND * width
-    depth = {}
-    for side in (order, order[::-1]):
-        h = 2 * width
-        for k in side[: (count + 1) // 2]:
-            depth[k] = max(depth.get(k, 0.0), h + radius * math.tan(abs(angle[k]) / 2))
-            h = depth[k] + width * (TURN + math.tan(abs(angle[k]) / 2))
-    reach = max(ROOM * width / max(share, 1e-6), 2 * width) + width
-    shapely.prepare(area)
-    inner = area.buffer(-width / 2)
+    held = [p.area + s.area for p, s in zip(ports, lanes, strict=True)]
+    total = float(cell_area.sum() + sum(held))
+    want = total / count - np.array(held)
+    owner = _weighted(cost, cell_area, [[i] for i in front], want)
+    # (cells no path through a wide enough wall reaches: to the partition beside)
+    loose = _graph(polys, zone, 1e-3)
+    for _ in range(len(polys)):
+        lost = np.nonzero(owner < 0)[0]
+        if not len(lost):
+            break
+        for i in lost:
+            near = [owner[j] for j, _ in loose[i] if owner[j] >= 0]
+            if near:
+                owner[i] = max(set(near), key=near.count)
+    owner[owner < 0] = 0
+    owner = _refine(owner, nbrs, zone, cell_area, want, front)
+    owner = _pinched(owner, arr, zone, loose, front, width)
     out = []
     for k in range(count):
-        base = pc[k]  # (the port's middle)
-        bend = base + inward * (depth[k] - width / 2)
-        way = inward * math.cos(angle[k]) + along * math.sin(angle[k])
-        line = _rounded(base, bend, bend + way * reach, radius)
-        # (it ends where it would come within half a feeder of the area's edge)
-        inside = shapely.intersection(line, inner)
-        piece = next(
-            (g for g in shapely.get_parts(inside) if g.distance(shapely.Point(base)) < 1e-6),
-            None,
-        )
-        if piece is not None and piece.length < line.length - 1e-9:
-            line = piece
-        out.append(line)
+        g = shapely.union_all([*arr[owner == k], ports[k], lanes[k]], grid_size=1e-6)
+        d = shapely.get_coordinates(lanes[k]) @ inv
+        e = shapely.get_coordinates(ports[k]) @ inv
+        out.append(Partition(_one(g, ports[k]), ports[k], float(d.max() - e.min())))
     return out
 
 
-def _rounded(a: np.ndarray, b: np.ndarray, c: np.ndarray, radius: float) -> LineString:
-    """The path a - b - c with its corner at b an arc of ``radius``."""
-    u, v = (b - a) / np.hypot(*(b - a)), (c - b) / np.hypot(*(c - b))
-    turn = math.atan2(u[0] * v[1] - u[1] * v[0], u @ v)
-    if abs(turn) < 1e-6:
-        return LineString([a, c])
-    t = radius * math.tan(abs(turn) / 2)
-    start = b - u * t
-    normal = np.array([-u[1], u[0]]) * math.copysign(1.0, turn)
-    centre = start + normal * radius
-    steps = max(2, math.ceil(abs(turn) / 0.15))
-    arc = [
-        centre - normal * radius * math.cos(f * turn) + u * radius * math.sin(abs(f * turn))
-        for f in np.linspace(0, 1, steps + 1)
-    ]
-    return LineString([a, *arc, c])
-
-
-def _corridor(feeder: LineString, width: float) -> shapely.Geometry:
-    return feeder.buffer(width / 2, cap_style="flat", join_style="round")
+def _pinched(
+    owner: np.ndarray,
+    arr: np.ndarray,
+    zone: list[int],
+    loose: list[list[tuple[int, float]]],
+    front: list[int],
+    width: float,
+) -> np.ndarray:
+    """The cells of a partition's piece in a zone past a passage narrower than its curve's
+    run in and back out (where its curve's domain, the piece shrunk by half a spacing, comes
+    apart: what lies past it no curve reaches) to the neighbour beside them most."""
+    owner = owner.copy()
+    zn = np.asarray(zone)
+    cen = shapely.points(shapely.get_coordinates(shapely.centroid(arr)))
+    fixed = set(front)
+    for _ in range(4):
+        moved = False
+        for k in range(owner.max() + 1):
+            for z in set(zn[owner == k].tolist()):
+                mine = np.nonzero((owner == k) & (zn == z))[0]
+                piece = shapely.union_all(arr[mine], grid_size=1e-6)
+                for g in _parts(piece):
+                    parts = _parts(g.buffer(-width / 4))
+                    if len(parts) < 2:
+                        continue
+                    main = max(parts, key=lambda q: q.area).buffer(width / 4 + 1e-6)
+                    for i in mine:
+                        if i in fixed or not g.covers(cen[i]) or main.covers(cen[i]):
+                            continue
+                        near = [owner[j] for j, _ in loose[i] if owner[j] != k]
+                        if near:
+                            owner[i] = max(set(near), key=near.count)
+                            moved = True
+        if not moved:
+            break
+    return owner
 
 
 def _field(cen: np.ndarray, rng: np.random.Generator) -> np.ndarray:
@@ -445,13 +435,11 @@ def _weighted(
     area: np.ndarray,
     sources: list[list[int]],
     want: np.ndarray,
-    width: float,
 ) -> np.ndarray:
     """Each cell to the source its cheapest path starts from, each source's start weighted
-    (an additively weighted Voronoi diagram over the cells, from the feeders' ends: far
-    enough apart for the weights to tell): each partition the tree of its source's paths,
-    so of a piece and round its feeder's end; the weights set so that each gets about
-    ``want`` of the area."""
+    (an additively weighted Voronoi diagram over the cells, from the strips' ends): each
+    partition the tree of its source's paths, so of a piece; the weights set so that each
+    gets about ``want`` of the area (cells no path reaches: -1)."""
     count = len(sources)
     w = np.zeros(count)
     best, best_err = None, math.inf
@@ -488,138 +476,7 @@ def _weighted(
         w -= w.mean()
         step *= 0.93
     assert best is not None
-    best[best < 0] = 0
     return best
-
-
-def _areas(
-    owner: np.ndarray,
-    arr: np.ndarray,
-    area: shapely.Geometry,
-    ports: list[Polygon],
-    corridors: list[shapely.Geometry],
-    margin: float,
-    width: float,
-) -> tuple[list[Polygon], list[tuple[Polygon, int]]]:
-    """Each port's partition: the port, its cells, its feeder's corridor, the others'
-    corridors and ports kept out; pieces so cut off from their port given to a
-    neighbour, and those past a narrow channel (these also returned, with whom to);
-    each but its port and corridor ``margin`` off the others."""
-    count = len(ports)
-    out = []
-    for k in range(count):
-        mine = owner == k
-        cells_ = shapely.union_all(arr[mine]) if mine.any() else Polygon()
-        whole = shapely.union_all([cells_, ports[k], corridors[k]]).intersection(area)
-        others = [g for m in range(count) if m != k for g in (corridors[m], ports[m])]
-        out.append(shapely.difference(whole, shapely.union_all(others)))
-    out = _reattach(out, ports, corridors)
-    own = [shapely.union_all([ports[k], corridors[k]]) for k in range(count)]
-    out, given = _narrows(out, ports, corridors, own, width)
-    # (of a piece, and without the hairline gaps the cells leave where panels meet: else the
-    # margin cuts round the slivers, and a curve cannot take holes so thin)
-    out = [_one(_sealed(g, area, width / 10), ports[k]) for k, g in enumerate(out)]
-    if margin > 0:  # (each but its port and corridor kept off the others)
-        out = [
-            shapely.difference(
-                g, shapely.difference(
-                    shapely.union_all([h for m, h in enumerate(out) if m != k]).buffer(margin),
-                    own[k],
-                ),
-            )
-            for k, g in enumerate(out)
-        ]  # fmt: skip
-    # (parts too thin for a curve, as the wedges between two feeders fanning apart, or a
-    # channel the margin narrowed: left out)
-    thin = THIN * width
-    out = [
-        _one(shapely.union_all([
-            shapely.difference(g, own[k]).buffer(-thin).buffer(thin).intersection(g), own[k]
-        ]).intersection(g), ports[k])
-        for k, g in enumerate(out)
-    ]  # fmt: skip
-    return [_sealed(g, area, width / 10) for g in out], given
-
-
-def _narrows(
-    out: list, ports: list[Polygon], corridors: list, own: list, width: float
-) -> tuple[list, list[tuple[Polygon, int]]]:
-    """What lies past a channel narrower than a curve's run in and out (a feeder wide) to the
-    neighbour whose part (not its corridor) it borders the most: its curve would squeeze
-    through (as between a feeder's end and the next feeder), or the part, of a piece and
-    fitting, given to the partition it bulges out of. Crumbs (at corners) stay."""
-    out, given = list(out), []
-    for k in range(len(out)):
-        bulk = shapely.difference(out[k], own[k])
-        opened = bulk.buffer(-width / 2).buffer(width / 2).intersection(bulk)
-        opening = own[k].buffer(width / 8)
-        main = (
-            shapely.union_all([own[k], *(g for g in _parts(opened) if g.intersects(opening))])
-            .buffer(width / 8)
-            .intersection(out[k])
-        )
-        for g in _parts(shapely.difference(out[k], main)):
-            if not width * width <= g.area < bulk.area / 2:
-                continue
-            best, share = None, 0.0
-            for m in range(len(out)):
-                if m != k:
-                    s = g.boundary.intersection(
-                        shapely.difference(out[m], corridors[m]).buffer(1e-6)
-                    ).length
-                    if s > share:
-                        best, share = m, s
-            if best is not None and share > width:
-                out[best] = shapely.union_all([out[best], g])
-                out[k] = shapely.difference(out[k], g)
-                given.append((g, best))
-    return out, given
-
-
-def _depth(port: Polygon, inward: np.ndarray) -> float:
-    """How deep the port runs in."""
-    d = shapely.get_coordinates(port) @ inward
-    return float(d.max() - d.min())
-
-
-def _reattach(out: list, ports: list[Polygon], corridors: list) -> list:
-    """Pieces of a partition cut off from its port (by another's corridor) to a neighbour
-    whose part (not its corridor) they touch the most."""
-    out = list(out)
-    count = len(out)
-    for k in range(count):
-        pieces = _parts(out[k])
-        if len(pieces) < 2:
-            continue
-        keep = max(pieces, key=lambda g: (g.intersects(ports[k].buffer(1e-6)), g.area))
-        for g in pieces:
-            if g is keep:
-                continue
-            best, share = None, 0.0
-            for m in range(count):
-                if m == k:
-                    continue
-                bulk = shapely.difference(out[m], corridors[m])
-                s = g.boundary.intersection(bulk.buffer(1e-6)).length
-                if s > share:
-                    best, share = m, s
-            if best is not None:
-                out[best] = shapely.union_all([out[best], g])
-                out[k] = shapely.difference(out[k], g)
-    return out
-
-
-def _sealed(g: shapely.Geometry, area: shapely.Geometry, size: float) -> shapely.Geometry:
-    """``g`` with its holes smaller than ``size`` square filled, but where ``area`` has them."""
-    polys = []
-    for q in _parts(g):
-        holes = [Polygon(r) for r in q.interiors]
-        keep = [
-            r for r, h in zip(q.interiors, holes, strict=True)
-            if h.area >= size * size or not area.contains(h.representative_point())
-        ]  # fmt: skip
-        polys.append(Polygon(q.exterior, keep))
-    return shapely.union_all(polys)
 
 
 def _one(g: shapely.Geometry, port: Polygon) -> Polygon:

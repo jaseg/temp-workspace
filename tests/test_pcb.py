@@ -353,12 +353,12 @@ def test_mesh_metrics(layout):
         assert all(0 <= p["total"] <= p["local"] + 1e-6 for p in m["skew"])
 
 
-def _ports_only(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, feeder=None):
-    """A stand-in for the curve's layout: ``n`` nested U-turns in the exit cell (its open
+def _ports_only(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, partitions=()):
+    """A stand-in for the curve's layout: ``n`` nested U-turns in each exit cell (its open
     side to -x), net 1 outermost."""
     from yanartas_pillowbox import mesh
 
-    cx, cy = corner
+    corners = list(corner) if partitions else [corner]
     c = 2 * n * pitch
     traces = tuple(
         (
@@ -367,14 +367,19 @@ def _ports_only(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, feed
             (cx + (n - j) * pitch, cy + c - (j + 0.5) * pitch),
             (cx, cy + c - (j + 0.5) * pitch),
         )
+        for cx, cy in corners
         for j in range(n)
     )
-    return mesh.Mesh(traces, c, 1, 0, corner, "sfc")
+    if not partitions:
+        return mesh.Mesh(traces, c, 1, 0, corner, "sfc")
+    return mesh.Mesh(
+        traces, c, 1, 0, corners[0], "sfc", None, (n,) * len(corners), tuple(partitions)
+    )
 
 
 def test_space_filling_curve_is_wired_in(monkeypatch):
-    """The curve layout: each layer's area in partitions of equal area, each laid out on its
-    own (its traces, its port in turn along the junction, its feeder, the panels as zones),
+    """The curve layout: each layer's area in partitions of equal area, laid out at once
+    (each its traces, its port in turn along the junction, its stem; the panels as zones),
     the partitions' traces together the layer's mesh (its own tests run it on small areas;
     a full-size run is slow, below)."""
     from yanartas_pillowbox import sfc
@@ -382,9 +387,9 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
 
     seen = []
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, feeder=None):
-        seen.append((len(zones), n, mask.area))
-        return _ports_only(mask, corner, side, n, pitch)
+    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, partitions=(), stems=()):
+        seen.append((len(zones), n, [p.area for p in partitions], len(corner), len(stems)))
+        return _ports_only(mask, corner, side, n, pitch, partitions=partitions)
 
     monkeypatch.setattr(sfc, "generate", fake)
     cfg = D.with_values(mesh_algorithm="sfc")
@@ -392,10 +397,9 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
     count, each = int(cfg.mesh_partitions), int(cfg.mesh_traces)
     n = count * each
     zones = len(pcb.mesh_zones(build_pattern(D)))
-    assert [(z, k) for z, k, _ in seen] == [(zones, each)] * (2 * count)
-    for side in range(2):  # (the partitions of a layer: of equal area)
-        areas = [a for _, _, a in seen[side * count : (side + 1) * count]]
-        assert max(areas) - min(areas) < 0.03 * max(areas)
+    assert [(z, k, e, s) for z, k, _, e, s in seen] == [(zones, each, count, count)] * 2
+    for *_, areas, _, _ in seen:  # (the partitions of a layer: of equal area)
+        assert len(areas) == count and max(areas) - min(areas) < 0.03 * max(areas)
     data = pcb.preview_json(result)
     assert data["meshes"]["front"]["algorithm"] == "sfc"
     assert data["meshes"]["front"]["traces"] == n
@@ -433,14 +437,14 @@ def test_mesh_zones_join_faces_but_across_folds_and_slits():
 
 def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     """What the mesh layout reports while it runs is polled at /api/progress: its stage
-    (the layer and partition), phase, step and the whole layout's share done (the mean of
+    (the layer), phase, step and the whole layout's share done (the mean of
     all the parts laid out at once)."""
     from yanartas_pillowbox import progress, sfc
     from yanartas_pillowbox.server import create_app
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, feeder=None):
+    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, partitions=(), stems=()):
         progress.report("settle", 20, 40, vertices=1000)
-        return _ports_only(mask, corner, side, n, pitch)
+        return _ports_only(mask, corner, side, n, pitch, partitions=partitions)
 
     monkeypatch.setattr(sfc, "generate", fake)
     client = create_app(tmp_path / "s.json").test_client()

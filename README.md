@@ -278,11 +278,14 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   in, cycles joined); the panels' curves are joined across the folds along a spanning
   tree, two crossings per join, the least a closed curve can make. Each side's area is
   split into `mesh_partitions` partitions of equal area, each with `mesh_traces` traces of
-  its own through its own port at the cable's junction: from each port a corridor exactly
-  a pair of trace lanes wide (its traces at the pitch) fans out to where its partition
-  opens (a star there); the partitions grow from the corridors' ends, their borders
-  keeping to the folds where they can and differing between the two sides. Each
-  partition's curve is
+  its own through its own port at the cable's junction: from each port a strip exactly a
+  pair of trace lanes wide runs straight in (its traces at the pitch, side by side with the
+  next port's, the middle ones longest) to where its partition's curve opens; the
+  partitions grow over Voronoi cells from the strips' ends, their borders keeping to the
+  folds where they can and differing between the two sides. All are laid out in one pass:
+  a partition's border is kept like a fold (each curve half a spacing off it, so
+  neighbouring partitions' traces run a pitch apart, nothing between them) and all traces
+  settle together, lengths matched within each partition. Each partition's curve is
   relaxed towards an even spacing of as many pitches as it carries traces (folds and edges hold it off by
   half that), the mesh's traces are its offsets, spread to share its spacing, and the exit
   is a "stem" of two straight rails built into the curve's graph. It follows edges and

@@ -67,9 +67,9 @@ fn status(s: &Status) -> Result<Object, JsValue> {
 /// The traces settled and matched in length: `lines`/`line_lens` the traces' points and
 /// counts, `edge` the edge's points, `zones`/`ring_lens`/`zone_rings` the zones' rings
 /// (points, each ring's count, each zone's number of rings), `keep`/`keep_lens`/`keep_rings`
-/// what is left as laid (the exit) alike,
-/// `params` the constants by name, `progress` called with each step's figures. Returns
-/// `{points, lens}`.
+/// what is left as laid (the exits) alike, `groups` each trace's group (lengths matched
+/// within it; empty: one), `params` the constants by name, `progress` called with each
+/// step's figures. Returns `{points, lens}`.
 #[wasm_bindgen]
 #[allow(clippy::too_many_arguments)]
 pub fn settle(
@@ -83,6 +83,7 @@ pub fn settle(
     keep: &[f64],
     keep_lens: &[u32],
     keep_rings: &[u32],
+    groups: &[u32],
     params_obj: JsValue,
     progress: Option<Function>,
 ) -> Result<Object, JsValue> {
@@ -106,6 +107,7 @@ pub fn settle(
         edge: points(edge),
         zones,
         keep,
+        groups: groups.iter().map(|&g| g as usize).collect(),
     };
     let prm = params(&params_obj)?;
     let mut failed: Option<JsValue> = None;
@@ -255,7 +257,8 @@ pub fn offset_lanes(
 /// `seg_region` each segment's region, its domain's rings flat (`rings`, `ring_lens`,
 /// `seg_rings`); the borders: `pairs` (region, region) flat, `pair_lines` each pair's
 /// number of lines, the lines flat (`lines`, `line_lens`); the seed in two halves. Returns
-/// `{points, region, cells, left}`.
+/// `{points, lens, region, cells, left}`: the curves' points and regions flat, each
+/// curve's number of points (one curve per opening, `openings` four numbers each).
 #[wasm_bindgen]
 #[allow(clippy::too_many_arguments)]
 pub fn curve_graph(
@@ -267,7 +270,7 @@ pub fn curve_graph(
     pair_lines: &[u32],
     lines: &[f64],
     line_lens: &[u32],
-    opening: &[f64],
+    openings: &[f64],
     spacing: f64,
     seed_hi: u32,
     seed_lo: u32,
@@ -297,7 +300,10 @@ pub fn curve_graph(
     let input = GraphInput {
         segments,
         borders,
-        opening: [[opening[0], opening[1]], [opening[2], opening[3]]],
+        openings: openings
+            .chunks(4)
+            .map(|o| [[o[0], o[1]], [o[2], o[3]]])
+            .collect(),
         spacing,
         seed: ((seed_hi as u64) << 32) | seed_lo as u64,
     };
@@ -327,10 +333,20 @@ pub fn curve_graph(
         return Err(e);
     }
     let c = out.map_err(|e| JsValue::from_str(&e))?;
-    let flat: Vec<f64> = c.pts.iter().flat_map(|q| [q[0], q[1]]).collect();
-    let region: Vec<u32> = c.region.iter().map(|&r| r as u32).collect();
+    let flat: Vec<f64> = c
+        .curves
+        .iter()
+        .flat_map(|(pts, _)| pts.iter().flat_map(|q| [q[0], q[1]]))
+        .collect();
+    let lens: Vec<u32> = c.curves.iter().map(|(pts, _)| pts.len() as u32).collect();
+    let region: Vec<u32> = c
+        .curves
+        .iter()
+        .flat_map(|(_, r)| r.iter().map(|&x| x as u32))
+        .collect();
     let o = Object::new();
     Reflect::set(&o, &"points".into(), &Float64Array::from(flat.as_slice()))?;
+    Reflect::set(&o, &"lens".into(), &Uint32Array::from(lens.as_slice()))?;
     Reflect::set(&o, &"region".into(), &Uint32Array::from(region.as_slice()))?;
     Reflect::set(&o, &"cells".into(), &(c.cells as f64).into())?;
     Reflect::set(&o, &"left".into(), &(c.left as f64).into())?;

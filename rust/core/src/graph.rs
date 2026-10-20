@@ -41,21 +41,22 @@ pub struct Segment {
 }
 
 /// What the graph is built from: the segments, the borders between regions (each pair of
-/// regions with the lines of their shared border, longest first; the pairs longest first),
-/// the exit's opening (the stem's two ends), the spacing and the random seed.
+/// regions with the lines of their shared border, longest first; the pairs longest first:
+/// only those a curve may cross), the exits' openings (each a stem's two ends), the
+/// spacing and the random seed.
 pub struct GraphInput {
     pub segments: Vec<Segment>,
     pub borders: Vec<(usize, usize, Vec<Vec<P>>)>,
-    pub opening: [P; 2],
+    pub openings: Vec<[P; 2]>,
     pub spacing: f64,
     pub seed: u64,
 }
 
-/// The curve: its vertices from the stem's end at `opening[0]` round to its other end, each
-/// vertex's region, the number of cells, and the number of regions it could not reach.
-pub struct Curve {
-    pub pts: Vec<P>,
-    pub region: Vec<usize>,
+/// The curves, one per exit: each its vertices from its stem's end at `opening[0]` round
+/// to its other end, and each vertex's region; the number of cells, and the number of
+/// regions no curve could reach.
+pub struct Curves {
+    pub curves: Vec<(Vec<P>, Vec<usize>)>,
     pub cells: usize,
     pub left: usize,
 }
@@ -164,97 +165,124 @@ impl Graph {
 
 struct Retry;
 
-/// The curve through the segments the exit's can reach.
+/// A build: the graph, its cycles' union, the stems' ends, the cells, the vertices lost.
+type Built = (Graph, Union, Vec<(usize, usize)>, usize, usize);
+
+/// The curves through the segments, one closed through each exit's stem (the segments a
+/// border joins: one curve; those of different exits never joined).
 pub fn curve(
     input: &GraphInput,
     prm: &GraphParams,
     progress: &mut dyn FnMut(usize, usize),
-) -> Result<Curve, String> {
+) -> Result<Curves, String> {
     let segments = &input.segments;
-    if segments.is_empty() {
+    if segments.is_empty() || input.openings.is_empty() {
         return Err("no room for the mesh".into());
     }
     let spacing = input.spacing;
     let d = prm.seed_spacing * spacing;
-    let opening = input.opening;
-    // (a seed pinned inside the opening: no cell wall reaches the edge between its ends)
-    let exit_seg = (0..segments.len())
-        .min_by(|&i, &j| {
-            distance(&segments[i].domain, opening[0])
-                .total_cmp(&distance(&segments[j].domain, opening[0]))
-        })
-        .unwrap();
-    // (inwards: square to the opening, to the left going from its first end to its second)
-    let across = sub(opening[1], opening[0]);
-    let inward = scale([-across[1], across[0]], 1.0 / norm(across).max(1e-12));
-    let pin = add(
-        scale(add(opening[0], opening[1]), 0.5),
-        scale(inward, d / 2.0),
-    );
-    let pin = contains(&segments[exit_seg].domain, pin).then_some(pin);
+    let nearest = |q: P| {
+        (0..segments.len())
+            .min_by(|&i, &j| {
+                distance(&segments[i].domain, q).total_cmp(&distance(&segments[j].domain, q))
+            })
+            .unwrap()
+    };
+    // (a seed pinned inside each opening: no cell wall reaches the edge between its ends;
+    // inwards: square to the opening, to the left going from its first end to its second)
+    let mut pins: Vec<Vec<P>> = vec![Vec::new(); segments.len()];
+    for opening in &input.openings {
+        let across = sub(opening[1], opening[0]);
+        let inward = scale([-across[1], across[0]], 1.0 / norm(across).max(1e-12));
+        let pin = add(
+            scale(add(opening[0], opening[1]), 0.5),
+            scale(inward, d / 2.0),
+        );
+        let seg = nearest(opening[0]);
+        if contains(&segments[seg].domain, pin) {
+            pins[seg].push(pin);
+        }
+    }
     let mut rng = Rng::new(input.seed);
-    let mut built = None;
+    // (a build with a cycle no exit's curve took in, as one cut off in a narrow spot: tried
+    // afresh, the best kept)
+    let mut best: Option<Built> = None;
     for _ in 0..prm.attempts {
         let mut g = Graph::new();
         for (si, s) in segments.iter().enumerate() {
-            let cells = cells(
-                &s.domain,
-                d,
-                &mut rng,
-                if si == exit_seg { pin } else { None },
-                prm.lloyd,
-            );
+            let cells = cells(&s.domain, d, &mut rng, &pins[si], prm.lloyd);
             build(&mut g, cells, si);
             progress(si + 1, segments.len() + 1);
         }
-        let ends = match stem(&mut g, segments, opening) {
-            Ok(e) => e,
-            Err(Retry) => continue,
-        };
-        if two_factor(&mut g, &mut rng).is_err() {
+        let mut ends = Vec::new();
+        for &opening in &input.openings {
+            match stem(&mut g, segments, opening) {
+                Ok(e) => ends.push(e),
+                Err(Retry) => break,
+            }
+        }
+        if ends.len() < input.openings.len() || two_factor(&mut g, &mut rng).is_err() {
             continue;
         }
-        built = Some((g, ends));
-        break;
-    }
-    let (mut g, (a, b)) = built.ok_or("could not build the curve's graph")?;
-    let cells = g.faces.len();
-    centres(&mut g);
-    let mut u = Union::new(g.pts.len());
-    for x in 0..g.pts.len() {
-        for &y in &g.nbr[x] {
-            u.join(x, y);
+        let cells = g.faces.len();
+        centres(&mut g);
+        let mut u = Union::new(g.pts.len());
+        for x in 0..g.pts.len() {
+            for &y in &g.nbr[x] {
+                u.join(x, y);
+            }
         }
-    }
-    merge(&mut g, &mut u);
-    join_segments(&mut g, &mut u, segments, &input.borders, spacing);
-    let root = u.find(a);
-    let mut order = vec![b, a]; // (walk from a away from b: the stem between them)
-    for _ in 0..g.pts.len() + 2 {
-        let last = order[order.len() - 1];
-        let before = order[order.len() - 2];
-        let Some(&nxt) = g.nbr[last].iter().find(|&&x| x != before) else {
-            return Err("the curve's graph does not close".into());
-        };
-        if nxt == b {
+        merge(&mut g, &mut u);
+        join_segments(&mut g, &mut u, segments, &input.borders, spacing);
+        let roots: HashSet<usize> = ends.iter().map(|&(a, _)| u.find(a)).collect();
+        let lost = (0..g.pts.len())
+            .filter(|&v| !g.nbr[v].is_empty() && !roots.contains(&u.find(v)))
+            .count();
+        if best.as_ref().is_none_or(|b| lost < b.4) {
+            best = Some((g, u, ends, cells, lost));
+        }
+        if lost == 0 {
             break;
         }
-        order.push(nxt);
     }
-    order.remove(0);
-    order.push(b);
+    let (g, mut u, ends, cells, _) = best.ok_or("could not build the curve's graph")?;
     let region = |v: usize| segments[g.seg[v]].region;
+    let mut curves = Vec::new();
+    let mut roots = HashSet::new();
+    for &(a, b) in &ends {
+        roots.insert(u.find(a));
+        let mut order = vec![b, a]; // (walk from a away from b: the stem between them)
+        for _ in 0..g.pts.len() + 2 {
+            let last = order[order.len() - 1];
+            let before = order[order.len() - 2];
+            let Some(&nxt) = g.nbr[last].iter().find(|&&x| x != before) else {
+                return Err("the curve's graph does not close".into());
+            };
+            if nxt == b {
+                break;
+            }
+            order.push(nxt);
+        }
+        order.remove(0);
+        order.push(b);
+        curves.push((
+            order.iter().map(|&v| g.pts[v]).collect(),
+            order.iter().map(|&v| region(v)).collect(),
+        ));
+    }
+    if roots.len() < ends.len() {
+        return Err("two exits' curves were joined".into());
+    }
     let all: HashSet<usize> = (0..g.pts.len())
         .filter(|&v| !g.nbr[v].is_empty())
         .map(region)
         .collect();
     let reached: HashSet<usize> = (0..g.pts.len())
-        .filter(|&v| !g.nbr[v].is_empty() && u.find(v) == root)
+        .filter(|&v| !g.nbr[v].is_empty() && roots.contains(&u.find(v)))
         .map(region)
         .collect();
-    Ok(Curve {
-        pts: order.iter().map(|&v| g.pts[v]).collect(),
-        region: order.iter().map(|&v| region(v)).collect(),
+    Ok(Curves {
+        curves,
         cells,
         left: all.difference(&reached).count(),
     })
@@ -341,10 +369,10 @@ fn voronoi(seeds: &[P], domain: &Rings, frame: [f64; 4], d: f64, edges: &Segs) -
 }
 
 /// A centroidal Voronoi tessellation of the domain (Lloyd iterations), cells clipped by it,
-/// cells holding a hole split through it. A seed at `pin` stays there.
-pub fn cells(domain: &Rings, d: f64, rng: &mut Rng, pin: Option<P>, lloyd: usize) -> Vec<Rings> {
+/// cells holding a hole split through it. Seeds at `pins` stay there.
+pub fn cells(domain: &Rings, d: f64, rng: &mut Rng, pins: &[P], lloyd: usize) -> Vec<Rings> {
     let mut s = seeds(domain, d, rng);
-    if let Some(pin) = pin {
+    for &pin in pins {
         s.retain(|q| dist(*q, pin) > 0.75 * d);
         s.push(pin);
     }
@@ -385,7 +413,7 @@ pub fn cells(domain: &Rings, d: f64, rng: &mut Rng, pin: Option<P>, lloyd: usize
                 }
             })
             .collect();
-        if let Some(pin) = pin {
+        for &pin in pins {
             if let Some(k) =
                 (0..s.len()).min_by(|&a, &b| dist(s[a], pin).total_cmp(&dist(s[b], pin)))
             {
@@ -473,47 +501,68 @@ fn stem(g: &mut Graph, segments: &[Segment], opening: [P; 2]) -> Result<(usize, 
         return Err(Retry);
     }
     let gap = |e: &Edge, q: P| dist(closest(q, g.pts[e.0], g.pts[e.1]).0, q);
-    let near: Vec<usize> = opening
-        .iter()
-        .map(|&q| {
-            (0..rim.len())
-                .min_by(|&i, &j| gap(&rim[i], q).total_cmp(&gap(&rim[j], q)))
-                .unwrap()
-        })
-        .collect();
-    if near[0] != near[1] || gap(&rim[near[0]], opening[0]) > 1e-6 {
+    // (the edge nearest both ends: an end on a corner is as near the next edge too)
+    let both = |e: &Edge| gap(e, opening[0]).max(gap(e, opening[1]));
+    let near = (0..rim.len())
+        .min_by(|&i, &j| both(&rim[i]).total_cmp(&both(&rim[j])))
+        .unwrap();
+    if both(&rim[near]) > 1e-6 {
         return Err(Retry); // (a cell wall between the ends, or the opening off the rim)
     }
-    let (mut x, mut y) = rim[near[0]];
+    let (x, y) = rim[near];
     let (px, py) = (g.pts[x], g.pts[y]);
     let len = dist(px, py);
     let t: Vec<f64> = opening
         .iter()
         .map(|&q| closest(q, px, py).1 * len)
         .collect();
-    let lo = t[0].min(t[1]);
-    let hi = t[0].max(t[1]);
-    if lo <= 1e-6 && hi < len - 1e-6 {
+    // (an end on the edge's corner: that corner, as where the opening is just as wide as
+    // the segment there; else a vertex splitting the edge)
+    let eps = 1e-6;
+    let along = |ti: f64| add(px, scale(sub(py, px), ti / len.max(1e-12)));
+    let mut end = |ti: f64| {
+        if ti <= eps {
+            x
+        } else if ti >= len - eps {
+            y
+        } else {
+            g.add(along(ti), seg)
+        }
+    };
+    let (a, b) = (end(t[0]), end(t[1]));
+    if a == b {
         return Err(Retry);
     }
-    let along = |ti: f64| add(px, scale(sub(py, px), ti / len.max(1e-12)));
-    if t[0] > t[1] {
-        std::mem::swap(&mut x, &mut y); // (x on the side of the first end)
-    }
-    let a = g.add(along(t[0]), seg);
-    let b = g.add(along(t[1]), seg);
-    g.adj[x].remove(&y);
-    g.adj[y].remove(&x);
-    for (u, v) in [(x, a), (a, b), (b, y)] {
-        g.connect(u, v);
-    }
-    for (ids, _, _) in g.faces.iter_mut() {
-        // (the cell along that edge: through the new vertices)
-        let n = ids.len();
-        if let Some(j) = (0..n).find(|&j| key(ids[j], ids[(j + 1) % n]) == key(x, y)) {
-            let ins = if ids[j] == x { [a, b] } else { [b, a] };
-            ids.splice(j + 1..j + 1, ins);
-            break;
+    let order = if t[0] < t[1] {
+        [x, a, b, y]
+    } else {
+        [x, b, a, y]
+    };
+    let chain: Vec<usize> = order.into_iter().fold(Vec::new(), |mut c, v| {
+        if c.last() != Some(&v) {
+            c.push(v);
+        }
+        c
+    });
+    if chain.len() > 2 {
+        g.adj[x].remove(&y);
+        g.adj[y].remove(&x);
+        for w in chain.windows(2) {
+            g.connect(w[0], w[1]);
+        }
+        for (ids, _, _) in g.faces.iter_mut() {
+            // (the cell along that edge: through the new vertices)
+            let n = ids.len();
+            if let Some(j) = (0..n).find(|&j| key(ids[j], ids[(j + 1) % n]) == key(x, y)) {
+                let inner = &chain[1..chain.len() - 1];
+                let ins: Vec<usize> = if ids[j] == x {
+                    inner.to_vec()
+                } else {
+                    inner.iter().rev().copied().collect()
+                };
+                ids.splice(j + 1..j + 1, ins);
+                break;
+            }
         }
     }
     g.fixed.insert(key(a, b));
@@ -1032,13 +1081,23 @@ fn join_segments(
     }
     let none = Vec::new();
     for (ri, rj, lines) in borders {
-        for line in lines {
-            if polyline_length(line) >= 2.0 * spacing {
-                let va = by_region.get(ri).unwrap_or(&none).clone();
-                let vb = by_region.get(rj).unwrap_or(&none).clone();
-                if connect(g, u, segments, &va, &vb, line, spacing) {
-                    break;
-                }
+        // (one join a pair, but more where a region's cycles are not yet all of a piece:
+        // each as it comes, while one can be made)
+        let va = by_region.get(ri).unwrap_or(&none).clone();
+        let vb = by_region.get(rj).unwrap_or(&none).clone();
+        let roots = |u: &mut Union, vs: &[usize]| {
+            let mut r: Vec<usize> = vs.iter().map(|&v| u.find(v)).collect();
+            r.sort_unstable();
+            r.dedup();
+            r.len()
+        };
+        for _ in 0..roots(u, &va) + roots(u, &vb) {
+            let joined = lines.iter().any(|line| {
+                polyline_length(line) >= 2.0 * spacing
+                    && connect(g, u, segments, &va, &vb, line, spacing)
+            });
+            if !joined {
+                break;
             }
         }
     }

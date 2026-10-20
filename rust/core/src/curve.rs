@@ -116,7 +116,7 @@ pub fn relax(
         }
         cap_moves(&old, &mut p, step / 2.0);
         keep_in(&zones, &old, &mut p);
-        free = within(&zones, even(&untangle(&old, &p), k, step, false));
+        free = even(&untangle(&old, &p), k, step, false);
     }
 
     step = spacing / 4.0;
@@ -128,14 +128,11 @@ pub fn relax(
     .concat();
     let r = resample(&ends, step);
     inner = r[1..r.len() - 1].to_vec();
-    free = within(
-        &zones,
-        even(
-            &[free.clone(), inner.clone()].concat(),
-            free.len(),
-            step,
-            true,
-        ),
+    free = even(
+        &[free.clone(), inner.clone()].concat(),
+        free.len(),
+        step,
+        true,
     );
     let want = prm.push_margin * least;
     let window = prm.window * least;
@@ -170,7 +167,7 @@ pub fn relax(
     let mut hot: Option<HashSet<(i64, i64)>> = None;
     for it in 0..prm.repair {
         progress(prm.lloyd_curve + it.min(prm.repair / 4), total);
-        let free = within(&zones, respace(&p[..k], step));
+        let free = respace(&p[..k], step);
         p = [free.clone(), inner.clone()].concat();
         k = free.len();
         let which: Vec<usize> = match &hot {
@@ -206,7 +203,9 @@ pub fn relax(
                 }
             }
         }
-        if !hit && !sharp.iter().any(|&s| s) {
+        let mut back = vec![[0.0, 0.0]; p.len()];
+        let out = pull_in(&zones, &edges, &edge, &p, k, &mut back);
+        if !hit && !out && !sharp.iter().any(|&s| s) {
             break;
         }
         let m = p.len();
@@ -224,6 +223,11 @@ pub fn relax(
             mv[i] = add(mv[i], soft[i]);
         }
         openings(&p, k, &mut mv);
+        for i in 0..m {
+            if back[i] != [0.0, 0.0] {
+                mv[i] = back[i];
+            }
+        }
         let moved: Vec<bool> = mv.iter().map(|v| norm(*v) > 0.0).collect();
         let mut new: Vec<P> = (0..m).map(|i| add(p[i], mv[i])).collect();
         cap_moves(&p, &mut new, step / 2.0);
@@ -231,6 +235,7 @@ pub fn relax(
         p = untangle(&p, &new);
         hot = Some(hot_cells((0..k).filter(|&i| moved[i]).map(|i| p[i]), want));
     }
+    straighten(&mut p, k, 1.5 * spacing);
     (p, k)
 }
 
@@ -257,7 +262,7 @@ fn grow(
     let mut hot: Option<HashSet<(i64, i64)>> = None;
     let mut lengths: Vec<f64> = Vec::new();
     for _ in 0..prm.grow {
-        let free = within(zones, respace(&p[..k], step));
+        let free = respace(&p[..k], step);
         p = [free.clone(), p[k..].to_vec()].concat();
         k = free.len();
         let length: f64 = free.windows(2).map(|w| dist(w[0], w[1])).sum();
@@ -326,6 +331,7 @@ fn grow(
             })
             .collect();
         openings(&p, k, &mut mv);
+        pull_in(zones, edges, edge, &p, k, &mut mv);
         let mut new: Vec<P> = (0..m).map(|i| add(p[i], mv[i])).collect();
         cap_moves(&p, &mut new, step / 2.0);
         keep_in(zones, &p, &mut new);
@@ -500,6 +506,35 @@ fn openings(p: &[P], k: usize, mv: &mut [P]) {
     mv[k..].iter_mut().for_each(|v| *v = [0.0, 0.0]);
 }
 
+/// The curve's vertices within `reach` of each of the stem's openings on the line the stem
+/// leaves along (where the relaxation only steers them): the curve's traces there laid as
+/// the stem's, at the pitch, beside a longer stem with no room to spare.
+fn straighten(p: &mut [P], k: usize, reach: f64) {
+    let n = p.len();
+    for (end, prev, sign) in [(0, n - 1, 1isize), (k - 1, k, -1isize)] {
+        let t = sub(p[end], p[prev]);
+        let t = scale(t, 1.0 / norm(t).max(1e-12));
+        let mut m = 1isize;
+        loop {
+            let i = end as isize + sign * m;
+            if i <= 0 || i as usize >= k - 1 {
+                break;
+            }
+            let i = i as usize;
+            let along = dot(sub(p[i], p[end]), t);
+            let far = dist(p[i], p[end]);
+            if far > reach || along <= 0.0 {
+                break;
+            }
+            // (all the way near the stem, less and less further on: no kink where it turns)
+            let w = ((reach - far) / (0.5 * reach)).min(1.0);
+            let on = add(p[end], scale(t, along));
+            p[i] = add(p[i], scale(sub(on, p[i]), w));
+            m += 1;
+        }
+    }
+}
+
 /// Each move of `new` from `old` shortened to `most`.
 fn cap_moves(old: &[P], new: &mut [P], most: f64) {
     for i in 0..old.len() {
@@ -524,15 +559,33 @@ fn keep_in(zones: &Zones, old: &[P], new: &mut [P]) {
     }
 }
 
-/// The open curve without the vertices out of the zones (but its ends): resampled, a chord
-/// across a corner of the edge puts them there, and pushed off the edge they would leave.
-fn within(zones: &Zones, free: Vec<P>) -> Vec<P> {
-    let k = free.len();
-    let keep: Vec<bool> = pmap(k, |i| i == 0 || i + 1 == k || zones.of(free[i]).is_some());
-    free.into_iter()
-        .zip(keep)
-        .filter_map(|(q, k)| k.then_some(q))
-        .collect()
+/// Each of the curve's free vertices out of the zones (a resampled chord across a corner
+/// of the edge puts one there) moved back onto the edge (`mv` amended; else pushed off the
+/// edge, it would go on out): whether there were any.
+fn pull_in(zones: &Zones, edges: &Grid, edge: &[P], p: &[P], k: usize, mv: &mut [P]) -> bool {
+    let back: Vec<Option<P>> = pmap(k, |i| {
+        if i == 0 || i + 1 >= k || zones.of(p[i]).is_some() {
+            return None;
+        }
+        let mut r = 1e-3;
+        loop {
+            if let Some((_, e)) = nearest_edge(edges, p[i], r) {
+                return Some(sub(edge[e], p[i]));
+            }
+            r *= 2.0;
+            if r > 1e3 {
+                return None;
+            }
+        }
+    });
+    let mut any = false;
+    for (i, b) in back.into_iter().enumerate() {
+        if let Some(v) = b {
+            mv[i] = v;
+            any = true;
+        }
+    }
+    any
 }
 
 /// The closed curve `new` (`old` moved, `old` crossing nowhere) with the vertices of every
