@@ -62,8 +62,8 @@ def test_layout(n, side, corner):
         assert AREA.buffer(-PITCH / 4).contains(line.difference(edge.buffer(PITCH)))
         # the curve joins the two zones once: each trace crosses their border twice
         assert len(shapely.get_parts(line.intersection(FOLD))) == 2
-    for a, b in itertools.combinations(lines, 2):  # no two traces touch (no shorts)
-        assert a.distance(b) > PITCH / 2
+    for a, b in itertools.combinations(lines, 2):  # no two traces nearer than the pitch
+        assert a.distance(b) > 0.99 * PITCH
     # the space between the traces: rarely below the nominal one, much of it within -5 /
     # +20 % (settled, the room left over is shared out evenly, a little over that)
     sp = mesh.spacing(m.traces, PITCH / 2, PITCH / 2)

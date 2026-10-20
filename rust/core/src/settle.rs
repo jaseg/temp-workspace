@@ -182,6 +182,9 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         for (k, &i) in look.iter().enumerate() {
             push[i] = pushes[k] * prm.rate * cool;
         }
+        // copper nearer than the pitch (as laid: at a sharp corner, off to the side where
+        // centring does not look): straight away from it
+        let crowd: Vec<P> = pmap(tr.len(), |i| crowded(&tr, &arc, &verts, i, &cx));
         // a tight bend: no move along its axis into it (its tip pinned, its legs may close)
         let axis = bend_axes(&tr, &curv, &normal, prm.pin * pitch);
         let bend = tr.bends();
@@ -204,7 +207,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
             if fixed[i] {
                 return [0.0, 0.0];
             }
-            let mut m = scale(normal[i], push[i]);
+            let mut m = add(scale(normal[i], push[i]), crowd[i]);
             // down the density's slope, the whole ribbon at once: into the holes
             if let Some(d) = &density {
                 let down = -dot(d.slope(p[i]), normal[i]) * blur * blur;
@@ -274,6 +277,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         }
         let checked;
         (new, checked) = keep_clear(&tr, &p, new, &cx);
+
         mv.iter_mut()
             .enumerate()
             .for_each(|(i, m)| *m = sub(new[i], p[i]));
@@ -302,6 +306,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         hot = Some(h);
         tr.p = new;
         tr = tr.respaced(step);
+
         gained = minus(&tr.binned(bins), &base);
         status.apart = apart(&gained);
         progress(&status);
@@ -419,8 +424,12 @@ fn held(tr: &Traces, cx: &Ctx) -> (Vec<bool>, Vec<Option<usize>>) {
         .collect();
     fixed = spread(tr, fixed, 4);
     let zone: Vec<Option<usize>> = pmap(tr.len(), |i| cx.zones.of(tr.p[i]));
+    // (from one zone into another: not out of them all, as the leads leave through the exit)
     let join: Vec<bool> = (0..tr.len())
-        .map(|i| tr.next[i] != NONE && zone[i] != zone[tr.next[i]])
+        .map(|i| {
+            let j = tr.next[i];
+            j != NONE && zone[i].is_some() && zone[j].is_some() && zone[i] != zone[j]
+        })
         .collect();
     let join = spread(tr, join, cx.pin);
     (
@@ -440,6 +449,35 @@ fn spread(tr: &Traces, mut mask: Vec<bool>, k: usize) -> Vec<bool> {
         }
     }
     mask
+}
+
+/// The way out of copper nearer than a pitch to vertex `i` (other traces', or its own
+/// across from it), as far as it is too near: none, mostly.
+fn crowded(tr: &Traces, arc: &[f64], verts: &Grid, i: usize, cx: &Ctx) -> P {
+    let need = 1.01 * cx.pitch;
+    let q = tr.p[i];
+    let mut out = [0.0, 0.0];
+    verts.within(q, need + cx.step, |s, _| {
+        let s1 = tr.next[s];
+        if s1 == NONE {
+            return;
+        }
+        let (c, t) = closest(q, tr.p[s], tr.p[s1]);
+        let v = sub(q, c);
+        let d = norm(v);
+        if d >= need || d < 1e-12 {
+            return;
+        }
+        if tr.net[s] == tr.net[i] && (arc[s] + t * (arc[s1] - arc[s]) - arc[i]).abs() <= 2.0 * need
+        {
+            return; // (its own copper, just along it)
+        }
+        let away = scale(v, (need - d) / 2.0 / d);
+        if norm(away) > norm(out) {
+            out = away;
+        }
+    });
+    out
 }
 
 /// How far (to the left: positive) the middle between the nearest copper either side of
@@ -530,6 +568,9 @@ fn bend_axes(tr: &Traces, curv: &[f64], normal: &[P], radius: f64) -> Vec<P> {
     axis
 }
 
+/// Rounds of taking back clashing moves at most.
+const ROUNDS: usize = 100;
+
 /// `new` with the vertices that would come nearer other copper than a pitch (with a margin),
 /// or whose segments would cross, back where they were (`old`). A trace's own copper counts
 /// where it faces itself (straight across, or much further along it than away): it may
@@ -540,7 +581,8 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
     let mut check: Vec<usize> = (0..len).filter(|&i| new[i] != old[i]).collect();
     let mut measured = 0;
     let grow = (0..len).map(|i| dist(new[i], old[i])).fold(0.0, f64::max);
-    for _ in 0..6 {
+    let mut clear = false;
+    for _ in 0..ROUNDS {
         if check.is_empty() {
             break;
         }
@@ -555,51 +597,66 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
         let reach = need + longest;
         // (segments by their first vertex)
         let segs = Grid::new(&new, reach / 2.0, |i| tr.next[i] != NONE);
-        let found: Vec<(bool, usize)> = pmap(check.len(), |k| {
-            let q = check[k];
-            let tangent = [normal[q][1], -normal[q][0]];
-            let (mut bad, mut count) = (false, 0);
+        let moved = |i: usize| new[i] != old[i];
+        // (the vertices that moved, and those that did not near them: two segments come
+        // nearest at an end of one, maybe one that stayed, facing a segment that moved)
+        let mut near = vec![false; len];
+        for &q in &check {
+            near[q] = true;
             segs.within(new[q], reach, |s, _| {
-                if bad {
+                near[s] = true;
+                near[tr.next[s]] = true;
+            });
+        }
+        let look: Vec<usize> = (0..len).filter(|&i| near[i]).collect();
+        let found: Vec<(Vec<usize>, usize)> = pmap(look.len(), |k| {
+            let q = look[k];
+            let tangent = [normal[q][1], -normal[q][0]];
+            let (mut bad, mut count) = (Vec::new(), 0);
+            segs.within(new[q], reach, |s, _| {
+                if !bad.is_empty() {
+                    return;
+                }
+                let s1 = tr.next[s];
+                if !(moved(q) || moved(s) || moved(s1)) {
                     return;
                 }
                 count += 1;
-                let s1 = tr.next[s];
                 let (c, t) = closest(new[q], new[s], new[s1]);
                 let v = sub(c, new[q]);
                 let d = norm(v);
-                if d >= need {
+                // (too near already, as laid: it may only get further)
+                if d >= need || d >= dist(closest(old[q], old[s], old[s1]).0, old[q]) {
                     return;
                 }
-                if tr.net[s] != tr.net[q] {
-                    bad = true;
-                    return;
-                }
-                let sep = (arc[s] + t * (arc[s1] - arc[s]) - arc[q]).abs();
-                if sep > cx.own && (dot(v, tangent).abs() < 0.5 * d.max(1e-12) || sep > 2.0 * d) {
-                    bad = true;
+                let clash = tr.net[s] != tr.net[q] || {
+                    let sep = (arc[s] + t * (arc[s1] - arc[s]) - arc[q]).abs();
+                    sep > cx.own && (dot(v, tangent).abs() < 0.5 * d.max(1e-12) || sep > 2.0 * d)
+                };
+                if clash {
+                    // (back: whichever of the two moved)
+                    bad.extend([q, s, s1].into_iter().filter(|&i| moved(i)));
                 }
             });
             // the edge (the area's, the zones' borders): no nearer than half a pitch, so
             // that copper on the far side of a fold need never be looked at (as a panel's
             // worker cannot); a vertex already nearer may only move away
             let half = cx.pitch / 2.0;
-            if !bad && cx.edges.any_around(new[q], half) {
+            if bad.is_empty() && moved(q) && cx.edges.any_around(new[q], half) {
                 let near = |at: P| {
                     let mut d = f64::MAX;
                     cx.edges.within(at, half, |_, d2| d = d.min(d2.sqrt()));
                     d
                 };
                 let now = near(new[q]);
-                bad = now < half && now < near(old[q]);
+                if now < half && now < near(old[q]) {
+                    bad.push(q);
+                }
             }
             (bad, count)
         });
         measured += found.iter().map(|f| f.1).sum::<usize>();
-        let mut back: Vec<usize> = (0..check.len())
-            .filter(|&k| found[k].0)
-            .map(|k| check[k])
-            .collect();
+        let mut back: Vec<usize> = found.into_iter().flat_map(|f| f.0).collect();
         // segments that cross (not merely sharing an end with their neighbours)
         let mut checking = vec![false; len];
         for &q in &check {
@@ -626,6 +683,7 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
         back.sort_unstable();
         back.dedup();
         if back.is_empty() {
+            clear = true;
             break;
         }
         for &b in &back {
@@ -649,6 +707,12 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
         next.sort_unstable();
         next.dedup();
         check = next.into_iter().filter(|&i| new[i] != old[i]).collect();
+    }
+    // (each round takes back the moves that clash, which may leave others clashing: a
+    // step with many moves takes a few dozen rounds; one that does not settle in time is
+    // not taken at all)
+    if !clear && !check.is_empty() {
+        return (old.to_vec(), measured);
     }
     (new, measured)
 }

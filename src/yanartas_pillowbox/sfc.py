@@ -576,7 +576,9 @@ def generate(
             raise MeshError("a trace does not leave through the exit")
         lines.append(np.asarray(line.coords))
     if SETTLE:
-        keep = shapely.box(x0 - c, ytop - c, x0 + 2 * c, ym + spacing)  # (the exit: as laid)
+        # (the leads, beyond the area's edge: as laid; all else settles, the curve's turns
+        # round the tongue too, or holes are left either side of it)
+        keep = shapely.box(x0, ytop - c, x0 + c, y0)
         progress.report("lanes", traces=len(lines))
         lines = _settle(lines, pitch, area, regions, keep)
     progress.report("match", 1, 1)

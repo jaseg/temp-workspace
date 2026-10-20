@@ -1,7 +1,7 @@
 //! Open polylines held as one array: each vertex's trace, where along its trace it was as
 //! laid (a share of it), and the vertex before and after it (`NONE` at its ends).
 
-use crate::geom::{add, dist, norm, scale, sub, P};
+use crate::geom::{add, closest, dist, norm, scale, sub, P};
 
 pub const NONE: usize = usize::MAX;
 
@@ -105,10 +105,13 @@ impl Traces {
             let (t, u) = (&self.p[w[0]..w[1]], &self.u[w[0]..w[1]]);
             let m = t.len();
             // (a vertex whose segments together are shorter than the step, but not one
-            // after another such: the one before it stays)
+            // after another such: the one before it stays; and only where it is about on
+            // the line between its neighbours: cutting a kink's corner would bring the
+            // trace nearer other copper than it was checked to be)
             let mut short = vec![false; m];
             for k in 1..m.saturating_sub(1) {
-                short[k] = dist(t[k - 1], t[k]) + dist(t[k], t[k + 1]) < step;
+                short[k] = dist(t[k - 1], t[k]) + dist(t[k], t[k + 1]) < step
+                    && dist(closest(t[k], t[k - 1], t[k + 1]).0, t[k]) < 0.02 * step;
             }
             let drop: Vec<bool> = (0..m)
                 .map(|k| short[k] && !(k > 0 && short[k - 1]))
