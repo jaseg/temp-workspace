@@ -302,7 +302,11 @@ inner flap's free edge.
      distance; where the traces cross a border, at the curve's joins, they stay as laid). Smoothness
      counts for little: a trace may kink into a hole's corner (only jitter is smoothed, by
      a Taubin step); but in a bend tighter than 1.5 pitches nothing moves along its axis
-     into it, so a U-turn's innermost trace keeps its tip and closes up its legs. Filling
+     into it, so a U-turn's innermost trace keeps its tip and closes up its legs. A U-turn's
+     tip (bends about as tight as a ribbon's) goes on out along its axis instead of to
+     the middle of the room before it, up to a pitch from the copper ahead: the outermost
+     trace first, the ones inside after it, so the U grows longer into a gap rather than
+     its traces spreading apart (each trace gains about as much: little skew). Filling
      holes lengthens the outermost traces (only they face holes), so length is steered:
      by each trace's length run from the exit at its place along the curve (a place kept
      per vertex as laid, against the traces' lengths as laid), a trace behind a neighbour

@@ -104,6 +104,8 @@ SETTLE_TUNE = 3.0  # ... a trace this many pitches behind (or ahead): steered at
 SETTLE_STEER = 0.6  # ... the share of its bends' depth a step grows (or straightens) them by
 SETTLE_SPAN = 25  # ... (where along the curve it gains more, over this many places)
 SETTLE_STEER_COOL = 2.0  # ... (the steering dying down as the moves, to this)
+SETTLE_TIP = 1.0  # ... U-turns tighter than this many pitches per trace's radius: tips
+SETTLE_REACH_OUT = 1.0  # ... leaning out along their axis by this share of the room
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -1596,12 +1598,19 @@ def _settle(
         if hot is not None:
             cell = np.floor(p / near).astype(np.int64)
             look = np.nonzero(np.isin(cell[:, 0] * 1_000_003 + cell[:, 1], hot))[0]
+        curv = tr.turning()
+        # a U-turn's tip, as tight as a ribbon's: not to the middle of the room, but on out
+        # along its axis (the outermost trace first, the ones inside after it: the U grows
+        # longer into the gap before it rather than its traces spreading apart)
+        tip = _bend_axes(tr, curv, SETTLE_TIP * n * pitch)
+        lean = -SETTLE_REACH_OUT * np.sum(tip * normal, axis=1)
         push = np.zeros(len(p))
         if len(look):
-            push[look] = _centring(p, net, arc, normal, look, edge, edges, near, far, own, pitch)
+            push[look] = _centring(
+                p, net, arc, normal, look, edge, edges, near, far, own, pitch, lean[look]
+            )
         push *= SETTLE_RATE * cool
         # a tight bend: no move along its axis into it (its tip pinned, its legs may close)
-        curv = tr.turning()
         axis = _bend_axes(tr, curv, SETTLE_PIN * pitch)
         move = normal * push[:, None]
         into = np.sum(move * axis, axis=1)
@@ -1789,6 +1798,7 @@ def _centring(
     far: float,
     own: float,
     pitch: float,
+    lean: np.ndarray,
 ) -> np.ndarray:
     """For the vertices ``look``: how far (to the left: positive) the middle between the
     nearest copper either side of each is, short of a pitch from it (half one from the
@@ -1825,7 +1835,7 @@ def _centring(
         de = np.where(e >= 0, np.hypot(*(edge[np.maximum(e, 0)] - p[q]).T), far)
         out.append((np.minimum(d, 2 * de), de))
     (left, eleft), (right, eright) = out
-    push = (left - right) / 2
+    push = (left - right) / 2 + lean * np.maximum((left + right) / 2 - pitch, 0.0)
     return np.where(
         push > 0,
         np.minimum(push, np.minimum(left - pitch, eleft - pitch / 2)),
