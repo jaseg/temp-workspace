@@ -25,6 +25,7 @@ import io
 import json
 import re
 import shutil
+import subprocess
 import tarfile
 import urllib.request
 from pathlib import Path
@@ -43,7 +44,7 @@ PYODIDE_FILES = ("pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "pyodide-l
 # The package modules the API needs (no Flask, no file persistence).
 PY_MODULES = (
     "__init__", "api", "config", "crosssection", "dimensions", "fpc", "geometry", "kimesh",
-    "mesh", "payload", "pcb", "presets", "scad", "sfc", "svg",
+    "mesh", "payload", "pcb", "presets", "progress", "scad", "sfc", "svg",
 )  # fmt: skip
 
 # The PCB layout's dependencies, loaded by the worker on the first PCB request. Pyodide's own
@@ -125,7 +126,31 @@ def pyodide_packages(lock: dict, names: tuple[str, ...]) -> list[dict]:
     return out
 
 
-def build(out: Path, tgz: Path | None) -> None:
+def build_mesh(out: Path) -> None:
+    """The mesh settling's WebAssembly build (rust/wasm) and its glue, in DIR/mesh/: needs
+    cargo with the wasm32-unknown-unknown target and wasm-bindgen (the crate's version)."""
+    rust = HERE.parent / "rust"
+    for tool in ("cargo", "wasm-bindgen"):
+        if shutil.which(tool) is None:
+            raise SystemExit(
+                f"{tool} not found: install Rust (rustup target add wasm32-unknown-unknown; "
+                "cargo install wasm-bindgen-cli at the version in rust/Cargo.lock), "
+                "or pass --no-wasm (the browser then settles in numpy: far slower)"
+            )
+    subprocess.run(
+        ["cargo", "build", "--release", "-p", "pillowbox-mesh-wasm",
+         "--target", "wasm32-unknown-unknown"],
+        cwd=rust, check=True,
+    )  # fmt: skip
+    wasm = rust / "target/wasm32-unknown-unknown/release/pillowbox_mesh_wasm.wasm"
+    subprocess.run(
+        ["wasm-bindgen", "--target", "web", "--no-typescript", "--out-dir", str(out / "mesh"),
+         str(wasm)],
+        check=True,
+    )  # fmt: skip
+
+
+def build(out: Path, tgz: Path | None, mesh: bool = True) -> None:
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
@@ -179,6 +204,8 @@ def build(out: Path, tgz: Path | None) -> None:
 
     for name in ("pyshim.js", "pyworker.js"):
         shutil.copy(HERE / name, out / name)
+    if mesh:
+        build_mesh(out)
 
     # Frontend: verbatim except for the patches below.
     (out / "static/js/components").mkdir(parents=True)
@@ -256,8 +283,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, default=HERE / "dist", help="output directory")
     ap.add_argument("--pyodide-tgz", type=Path, help=f"local pyodide-{PYODIDE_VERSION}.tgz")
+    ap.add_argument(
+        "--no-wasm", action="store_true", help="leave out the mesh settling's WebAssembly build"
+    )
     args = ap.parse_args()
-    build(args.out, args.pyodide_tgz)
+    build(args.out, args.pyodide_tgz, mesh=not args.no_wasm)
     print("built", args.out)
 
 

@@ -92,12 +92,15 @@ struct Ctx<'a> {
     pin: usize,
     zones: &'a Zones,
     keep: [f64; 4],
+    edge: &'a [P],
+    edges: &'a Grid,
 }
 
 pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) -> Vec<Vec<P>> {
     let pitch = input.pitch;
     let step = prm.step * pitch;
     let zones = Zones::new(&input.zones, 2.0 * pitch);
+    let edges = Grid::new(&input.edge, prm.reach * pitch, |_| true);
     let cx = Ctx {
         pitch,
         step,
@@ -107,11 +110,12 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         pin: (prm.reach / prm.step).ceil() as usize,
         zones: &zones,
         keep: input.keep,
+        edge: &input.edge,
+        edges: &edges,
     };
     let lines: Vec<Vec<P>> = input.lines.iter().map(|t| resample(t, step)).collect();
     let mut tr = Traces::new(&lines, None);
     let n = tr.traces();
-    let edges = Grid::new(&input.edge, cx.far, |_| true);
     let total = input
         .lines
         .iter()
@@ -561,6 +565,19 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
                     bad = true;
                 }
             });
+            // the edge (the area's, the zones' borders): no nearer than half a pitch, so
+            // that copper on the far side of a fold need never be looked at (as a panel's
+            // worker cannot); a vertex already nearer may only move away
+            let half = cx.pitch / 2.0;
+            if !bad && cx.edges.any_around(new[q], half) {
+                let near = |at: P| {
+                    let mut d = f64::MAX;
+                    cx.edges.around(at, half, |e| d = d.min(dist(cx.edge[e], at)));
+                    d
+                };
+                let now = near(new[q]);
+                bad = now < half && now < near(old[q]);
+            }
             (bad, count)
         });
         measured += found.iter().map(|f| f.1).sum::<usize>();

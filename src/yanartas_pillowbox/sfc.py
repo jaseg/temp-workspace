@@ -49,7 +49,9 @@ from __future__ import annotations
 import itertools
 import math
 import random
+import sys
 from collections import defaultdict, deque
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -1573,8 +1575,9 @@ def _settle(
         edge = np.vstack([edge, borders[clear]])
     elif len(borders):
         edge = np.vstack([edge, borders])
-    if _native is not None and SETTLE_NATIVE:
-        out = _native.settle_traces(
+    settle = _native.settle_traces if _native is not None else _browser_settle()
+    if settle is not None and SETTLE_NATIVE:
+        out = settle(
             [np.ascontiguousarray(t, float) for t in lines],
             pitch,
             np.ascontiguousarray(edge, float),
@@ -1742,6 +1745,49 @@ def _settle(
             _TRACE.append((int(moved.sum()), gained.sum(axis=1).round(1).tolist(), apart))
     tr = _match(tr, base, bins, pitch, regions, keep, pin, own)
     return tr.lines()
+
+
+def _browser_settle() -> Callable[..., list[np.ndarray]] | None:
+    """In the browser (Pyodide), the settling's WebAssembly build that the web worker loaded
+    (``self.pillowboxMesh``), called like the Rust extension's ``settle_traces``; else none."""
+    if sys.platform != "emscripten":
+        return None
+    import js  # type: ignore[import-not-found]
+    from pyodide.ffi import create_proxy, to_js  # type: ignore[import-not-found]
+
+    mesh = getattr(js, "pillowboxMesh", None)
+    if mesh is None:
+        return None
+
+    def flat(points: list[np.ndarray]) -> tuple[object, object]:
+        both = np.ascontiguousarray(np.vstack(points), float).ravel() if points else np.zeros(0)
+        return to_js(both), to_js(np.array([len(q) for q in points], np.uint32))
+
+    def settle(lines, pitch, edge, zones, keep, params, report):  # noqa: ANN001, ANN202
+        rings = [r for z in zones for r in z]
+        line_pts, line_lens = flat(lines)
+        ring_pts, ring_lens = flat(rings)
+        hook = create_proxy(lambda o: report(o.to_py()))
+        try:
+            out = mesh.settle(
+                line_pts,
+                line_lens,
+                pitch,
+                to_js(np.ascontiguousarray(edge, float).ravel()),
+                ring_pts,
+                ring_lens,
+                to_js(np.array([len(z) for z in zones], np.uint32)),
+                to_js(np.array(keep, float)),
+                to_js(params, dict_converter=js.Object.fromEntries),
+                hook,
+            )
+        finally:
+            hook.destroy()
+        pts = np.asarray(out.points.to_py(), float).reshape(-1, 2)
+        lens = np.asarray(out.lens.to_py(), int)
+        return np.split(pts, np.cumsum(lens)[:-1])
+
+    return settle
 
 
 def _params() -> dict[str, float]:
