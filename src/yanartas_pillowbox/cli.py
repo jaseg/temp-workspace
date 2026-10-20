@@ -207,7 +207,7 @@ def _status(e: dict) -> str:
             parts.append(f"{_count(e[key])} {name}")
     if "checked" in e:
         parts.append(f"{_count(e['checked'])} clearances")
-    if e.get("apart"):
+    if e.get("apart") and e["phase"] == "match":  # (settling's swing wide before)
         parts.append("skew " + "/".join(f"{a:.1f}" for a in e["apart"]) + " mm")
     return text + (f" ({', '.join(parts)})" if parts else "")
 

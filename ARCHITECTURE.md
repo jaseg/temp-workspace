@@ -359,7 +359,10 @@ inner flap's free edge.
   lanes, settle, match; the stage: the mesh's layer) with figures (vertices, moved,
   clearances measured, the traces' length differences) and the whole layout's share done.
   The CLI shows a bar redrawn in place on a terminal (each phase's last figures kept above
-  it), otherwise a status line per step.
+  it), otherwise a status line per step. The web UI polls `GET /api/progress` while a PCB
+  layout runs (the latest event: the server keeps it; in the browser build the worker posts
+  each to the page, and `pyshim.js` answers the poll) and shows a bar and the phase in the
+  header. The lengths' differences are shown only once matching: settling's swing wide.
 - **Later.** The rest of the curve layout in Rust; an alignment field (the reference's
   needles) to lay the curve along the edges; settling's hard skew limit (`SETTLE_SKEW`, off:
   the steering keeps neighbouring traces within a few mm instead): reconsider it; a

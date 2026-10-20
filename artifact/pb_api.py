@@ -20,6 +20,16 @@ from yanartas_pillowbox.svg import SvgImportError, extract_config
 
 JSON = "application/json"
 
+try:  # (in the web worker: each progress event posted to the page, which shows the bar)
+    import js  # type: ignore[import-not-found]
+
+    def _post(event: dict[str, Any]) -> None:
+        js.postMessage(js.JSON.parse(json.dumps({"progress": event})))
+
+    api.forward = _post
+except ImportError:  # (natively, under the tests)
+    pass
+
 
 def _reply(status: int, data: Any, content_type: str = JSON) -> str:
     if isinstance(data, bytes):
@@ -62,6 +72,8 @@ def _route(method: str, path: str, body: str | None, stored: str | None) -> str:
         return _reply(200, render_scad(api.parse_config(data)), "text/plain")
     if method == "POST" and path == "/api/payload":
         return _reply(200, api.payload_action(data))
+    if method == "GET" and path == "/api/progress":  # (pyshim.js answers it while busy)
+        return _reply(200, api.layout_progress())
     if method == "POST" and path == "/api/pcb":
         return _reply(200, api.pcb_preview(api.parse_config(data)))
     if method == "POST" and path == "/api/pcb/files":

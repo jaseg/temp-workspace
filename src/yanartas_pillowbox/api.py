@@ -3,10 +3,11 @@ in-browser build (``artifact/pb_api.py``) answer every request through these fun
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from yanartas_pillowbox import dimensions as dims
-from yanartas_pillowbox import payload
+from yanartas_pillowbox import payload, progress
 from yanartas_pillowbox.config import Config, ConfigError, SchemaVersionError, field_specs_json
 from yanartas_pillowbox.geometry import build_cross_section, build_model3d, build_pattern
 from yanartas_pillowbox.presets import presets_json
@@ -63,6 +64,23 @@ def render(cfg: Config) -> dict[str, Any]:
     }
 
 
+_progress: dict[str, Any] | None = None  # the PCB layout's latest progress event
+forward: Callable[[dict[str, Any]], None] | None = None  # (also handed each, when set)
+
+
+def _track(event: dict[str, Any]) -> None:
+    global _progress
+    _progress = event
+    if forward is not None:
+        forward(event)
+
+
+def layout_progress() -> dict[str, Any]:
+    """``{progress}``: how far the PCB layout in hand (or the last) has got (``progress``'s
+    event; null before any)."""
+    return {"progress": _progress}
+
+
 def _pcb_layout(cfg: Config) -> tuple[Any, Any]:
     """The PCB layout (``pcb``: heavy dependencies, imported on demand)."""
     try:
@@ -71,8 +89,11 @@ def _pcb_layout(cfg: Config) -> tuple[Any, Any]:
         raise ApiError(
             501, {"error": f"PCB layout unavailable here: {exc}", "errors": {}}
         ) from None
+    global _progress
+    _progress = None
     try:
-        return pcb, pcb.layout(cfg)
+        with progress.listening(_track):
+            return pcb, pcb.layout(cfg)
     except pcb.PcbError as exc:
         raise ApiError(422, {"error": str(exc), "errors": {}}) from None
 

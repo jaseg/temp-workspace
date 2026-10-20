@@ -821,6 +821,7 @@ def _curve(
         g = _Graph()
         for si, s in enumerate(segments):
             _build(g, _cells(s.domain, d, rng, pin if si == exit_seg else None), si)
+            progress.report("graph", si + 1, len(segments) + 1, cells=len(g.pts))
         try:
             ends = _tongue(g, segments, mouth)
             _two_factor(g, rng)
@@ -1049,7 +1050,8 @@ def _relax(
     samples, sreg = _samples(regions, spacing / 3, rng)
     inner = tongue[1:-1]
     bend = _bend(round(least / pitch), pitch)
-    for _ in range(LLOYD_CURVE):
+    for it in range(LLOYD_CURVE):
+        progress.report("relax", it, LLOYD_CURVE + REPAIR // 4)
         p = np.vstack([free, inner])
         k = len(free)
         old = p.copy()
@@ -1099,6 +1101,8 @@ def _relax(
     free = p[:k]
     hot = None
     for it in range(REPAIR):
+        # (the pushing apart mostly stops within a quarter of its steps)
+        progress.report("relax", LLOYD_CURVE + min(it, REPAIR // 4), LLOYD_CURVE + REPAIR // 4)
         free = _respace(p[:k], step)
         p = np.vstack([free, inner])
         k = len(free)

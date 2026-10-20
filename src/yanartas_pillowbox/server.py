@@ -106,6 +106,11 @@ def create_app(settings_path: Path) -> Flask:
         """``{config}`` -> the PCB layout's copper for the previews."""
         return jsonify(api.pcb_preview(api.parse_config(body)))
 
+    @app.get("/api/progress")
+    def layout_progress() -> Response:
+        """How far the PCB layout in hand has got (polled while it runs)."""
+        return jsonify(api.layout_progress())
+
     @app.post("/api/pcb/files")
     @_json_route
     def pcb_files(body: Any) -> Any:

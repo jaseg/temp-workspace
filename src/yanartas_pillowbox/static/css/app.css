@@ -84,6 +84,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .brand h1 { font-size: 16px; margin: 0; letter-spacing: 0.01em; }
 .status { color: var(--text-muted); font-size: 12px; }
 .status.error { color: var(--error); }
+#mesh-progress { width: 120px; height: 6px; align-self: center; accent-color: var(--accent); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .banner {

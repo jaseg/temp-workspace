@@ -62,10 +62,14 @@ def test_progress_lines_name_stage_phase_step_and_figures():
     out = io.StringIO()
     bar = _Progress(out)
     with progress.listening(bar), progress.stage("F.Cu", 1, 2):
-        progress.report("settle", 3, 40, vertices=1_500_000, moved=420, apart=[1.25, 0.5])
+        progress.report("settle", 3, 40, vertices=1_500_000, moved=420, apart=[9.0, 9.0])
+        progress.report("match", 2, 20, vertices=1_500_000, apart=[1.25, 0.5])
     bar.close()
-    line = out.getvalue().strip()
-    assert line == "F.Cu: settle 3/40 (1.50 M vertices, 420 moved, skew 1.2/0.5 mm)"
+    lines = out.getvalue().splitlines()
+    assert lines == [
+        "F.Cu: settle 3/40 (1.50 M vertices, 420 moved)",
+        "F.Cu: match 2/20 (1.50 M vertices, skew 1.2/0.5 mm)",
+    ]
     events = []
     with progress.listening(events.append), progress.stage("B.Cu", 1, 2):
         progress.report("match", 20, 20)

@@ -52,6 +52,7 @@ def same(flask_response, status, body):
         ("POST", "/api/payload", {"config": {}, "action": "bogus"}),
         ("POST", "/api/pcb", {"config": {"mesh_traces": 2}}),
         ("POST", "/api/pcb", {"config": {"fpc_cable": "none"}}),
+        ("GET", "/api/progress", None),
     ],
 )
 def test_routes_match_server(client, method, path, data):

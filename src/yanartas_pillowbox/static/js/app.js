@@ -20,6 +20,7 @@ const downloadBtn = $("#btn-download");
 const scadBtn = $("#btn-scad");
 const pcbBtn = $("#btn-pcb");
 const MESH_DELAY = 400; // ms after a render: the PCB layout takes a second or two
+const PROGRESS_POLL = 500; // ms between looks at a running layout's progress
 
 const params = new Map(); // name -> <pb-param>
 let payloadPresets = []; // board sizes from /api/defaults
@@ -276,8 +277,9 @@ function scheduleMesh(delay = MESH_DELAY) {
     if (!lastValid) return;
     setStatus("Laying out the mesh…");
     setMeshBusy(true);
-    const { ok, data } = await api("POST", "/api/pcb", { config: lastValid.config }, { raw: true })
+    const request = api("POST", "/api/pcb", { config: lastValid.config }, { raw: true })
       .catch((err) => ({ ok: false, data: { error: err.message } }));
+    const { ok, data } = await watchProgress(request, seq);
     if (seq !== meshSeq) return;
     setMeshBusy(false);
     if (!ok) {
@@ -288,6 +290,41 @@ function scheduleMesh(delay = MESH_DELAY) {
     const missed = data.meshes.front.unreached + data.meshes.back.unreached;
     setStatus(missed ? `Mesh laid out; ${missed} cells out of reach` : "Mesh laid out", missed > 0);
   }, delay);
+}
+
+/** `request`'s reply; while it runs, the layout's progress (polled) on the bar and in the
+ *  status line. */
+async function watchProgress(request, seq) {
+  const bar = $("#mesh-progress");
+  let running = true;
+  request.finally(() => { running = false; });
+  bar.value = 0;
+  bar.hidden = false;
+  try {
+    while (running && seq === meshSeq) {
+      await Promise.race([request, new Promise((r) => setTimeout(r, PROGRESS_POLL))]);
+      if (!running || seq !== meshSeq) break;
+      const reply = await api("GET", "/api/progress").catch(() => null);
+      const e = reply?.progress;
+      if (!e || !running || seq !== meshSeq) continue;
+      bar.value = e.done;
+      setStatus(`Laying out the mesh… ${Math.round(100 * e.done)} % (${describeProgress(e)})`);
+    }
+    return await request;
+  } finally {
+    if (seq === meshSeq) bar.hidden = true;
+  }
+}
+
+/** A progress event in a few words: "F.Cu: settle 12/40, skew 3.1/2.0/1.2 mm". */
+function describeProgress(e) {
+  let text = `${e.stage ? `${e.stage}: ` : ""}${e.phase}`;
+  if (e.steps > 1) text += ` ${e.step}/${e.steps}`;
+  // (settling's lengths swing wide before they are steered and matched: shown from then on)
+  if (e.phase === "match" && e.apart?.length) {
+    text += `, skew ${e.apart.map((a) => a.toFixed(1)).join("/")} mm`;
+  }
+  return text;
 }
 
 function scheduleSave(config) {

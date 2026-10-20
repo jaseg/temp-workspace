@@ -322,6 +322,28 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
     assert pcb.preview_json(result)["meshes"]["front"]["algorithm"] == "sfc"
 
 
+def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
+    """What the mesh layout reports while it runs is polled at /api/progress: its stage
+    (the layer), phase, step and the whole layout's share done."""
+    import dataclasses
+
+    from yanartas_pillowbox import kimesh, progress, sfc
+    from yanartas_pillowbox.server import create_app
+
+    def fake(mask, corner, side, n, pitch, seed=0, zones=()):
+        progress.report("settle", 20, 40, vertices=1000)
+        m = kimesh.generate(mask, corner, side, n, pitch, seed=seed)
+        return dataclasses.replace(m, algorithm="sfc")
+
+    monkeypatch.setattr(sfc, "generate", fake)
+    client = create_app(tmp_path / "s.json").test_client()
+    config = D.with_values(mesh_traces=2, mesh_algorithm="sfc").to_dict()
+    assert client.post("/api/pcb", json={"config": config}).status_code == 200
+    e = client.get("/api/progress").json["progress"]
+    assert (e["stage"], e["phase"], e["step"], e["steps"]) == ("B.Cu", "settle", 20, 40)
+    assert e["vertices"] == 1000 and 0.5 < e["done"] < 1
+
+
 @pytest.mark.slow
 def test_space_filling_curve_full_size():
     """The default box with the curve layout: checked (open, shorts) by the layout itself,

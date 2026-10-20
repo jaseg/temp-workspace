@@ -28,7 +28,13 @@ const tick = setInterval(() => {
   if (el) el.textContent = `Starting the geometry engine (Python in your browser)… ${s} s`;
 }, 500);
 
+let progress = null; // (the PCB layout's latest progress event, from the worker)
+
 worker.onmessage = ({ data }) => {
+  if (data.progress) {
+    progress = data.progress;
+    return;
+  }
   if (data.ready) {
     clearInterval(tick);
     return;
@@ -87,6 +93,12 @@ window.fetch = async (input, init = {}) => {
     return realFetch(input, init);
   }
   const method = (init.method || "GET").toUpperCase();
+  if (method === "GET" && url.pathname === "/api/progress") { // (the worker is busy laying out)
+    return new Response(JSON.stringify({ progress }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (method === "POST" && url.pathname === "/api/pcb") progress = null;
   let body = init.body ?? null;
   if (body instanceof FormData) {
     const file = body.get("file");
