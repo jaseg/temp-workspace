@@ -6,6 +6,7 @@ import "./components/pb-param.js";
 import "./components/pb-preview2d.js";
 import "./components/pb-preview3d.js";
 import "./components/pb-section.js";
+import { initPanels } from "./panels.js";
 
 const RENDER_DELAY = 60; // ms; server round-trip is a few ms, so previews update well < 300 ms
 const SAVE_DELAY = 600;
@@ -221,6 +222,10 @@ function renderMeshStats(pcb) {
   const share = (x) => pct(x, "within");
   const wide = (x) => `${pct(x, "wide")}, ≤ ${x.spacing.largest.toFixed(2)} mm`;
   const below = (x) => `${x.spacing.below.toFixed(1)} mm`;
+  // (coverage: how much the copper's local share of the area varies, and where it falls
+  // under 70 % of the nominal: holes between runs)
+  const cover = (x) =>
+    `${(100 * x.density.spread).toFixed(1)} % / ${(100 * x.density.thin).toFixed(2)} %`;
   const worst = (x, key) => Math.max(0, ...x.skew.map((p) => p[key]));
   const skew = (x) => `${worst(x, "total").toFixed(1)} / ${worst(x, "local").toFixed(1)} mm`;
   const rows = [
@@ -239,6 +244,10 @@ function renderMeshStats(pcb) {
     ["Space within −5…+20 % (front / back)", both(share)],
     ["Below nominal space (front / back)", both(below), front.spacing.under + back.spacing.under > 0],
     ["Gaps over twice the space, widest (front / back)", both(wide)],
+    ...(front.density && back.density
+      ? [["Coverage spread / thin area (front / back)", both(cover),
+          front.density.thin + back.density.thin > 0.001]]
+      : []),
     ["Pair skew, total / local (front)", skew(front)],
     ["Pair skew, total / local (back)", skew(back)],
   ];
@@ -539,6 +548,7 @@ async function main() {
   await render();
 }
 
+initPanels($(".layout")); // (dividers and maximizing work before the first render)
 main().catch((err) => {
   setStatus("Failed to start", true);
   showBanner(`Failed to start: ${err.message}`);

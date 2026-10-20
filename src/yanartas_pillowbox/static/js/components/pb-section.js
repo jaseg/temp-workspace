@@ -3,6 +3,7 @@
 // so this section holds along the whole straight part of the box.
 
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
+import { MAXIMIZE_STYLE, maximizeButton } from "../panels.js";
 import { attachPanZoom, unitsPerPixel } from "../panzoom.js";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -13,8 +14,8 @@ template.innerHTML = `
   :host { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--border);
           border-radius: var(--radius); background: var(--surface); overflow: hidden;
           box-shadow: var(--panel-shadow); }
-  header { display: flex; align-items: center; gap: 10px; padding: 6px 10px;
-           border-bottom: 1px solid var(--border); }
+  header { display: flex; align-items: center; gap: 6px 10px; padding: 6px 10px;
+           border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   h2 { font-size: 13px; margin: 0; white-space: nowrap; }
   .info { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1;
           min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -35,6 +36,7 @@ template.innerHTML = `
           --material-fill: color-mix(in srgb, #c2459b 30%, transparent);
           --payload-fill: color-mix(in srgb, var(--accent) 22%, transparent); }
   ${DIM_STYLE}
+  ${MAXIMIZE_STYLE}
   .payload { fill: var(--payload-fill); stroke: var(--accent);
              stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
   .payload-clearance { fill: none; stroke: var(--accent); stroke-width: 1px; stroke-dasharray: 4 3;
@@ -92,6 +94,7 @@ export class PbSection extends HTMLElement {
     this.#stage = root.querySelector(".stage");
     this.#info = root.querySelector(".info");
     this.#legend = root.querySelector(".legend");
+    root.querySelector("header").append(maximizeButton(this));
     const toggle = root.querySelector("[data-dims]");
     toggle.addEventListener("click", () => {
       this.#showDims = !this.#showDims;

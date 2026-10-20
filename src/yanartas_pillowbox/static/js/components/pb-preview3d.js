@@ -4,6 +4,7 @@
 import * as THREE from "../../vendor/three/three.module.min.js";
 import { OrbitControls } from "../../vendor/three/OrbitControls.js";
 import { rasterize } from "../meshtex.js";
+import { MAXIMIZE_STYLE, maximizeButton } from "../panels.js";
 
 const template = document.createElement("template");
 template.innerHTML = `
@@ -11,10 +12,11 @@ template.innerHTML = `
   :host { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--border);
           border-radius: var(--radius); background: var(--surface); overflow: hidden;
           box-shadow: var(--panel-shadow); }
-  header { display: flex; align-items: center; gap: 10px; padding: 6px 10px;
-           border-bottom: 1px solid var(--border); }
-  h2 { font-size: 13px; margin: 0; }
-  .info { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1; }
+  header { display: flex; align-items: center; gap: 6px 10px; padding: 6px 10px;
+           border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  h2 { font-size: 13px; margin: 0; white-space: nowrap; }
+  .info { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1 1 auto;
+          min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border);
            border-radius: 5px; padding: 2px 9px; cursor: pointer; }
   /* Spinner while the PCB layout runs. */
@@ -25,6 +27,7 @@ template.innerHTML = `
   @media (prefers-reduced-motion: reduce) { button[aria-busy="true"]::before { animation-duration: 2.4s; } }
   button[aria-pressed="true"] { background: var(--surface-2); border-color: var(--text-muted); }
   .stage { position: relative; flex: 1; min-height: 0; }
+  ${MAXIMIZE_STYLE}
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
   /* Dimension labels are HTML, positioned over the canvas each frame: crisp, and the same
      font and size as the rest of the UI regardless of camera distance. */
@@ -74,6 +77,7 @@ export class PbPreview3d extends HTMLElement {
     root.append(template.content.cloneNode(true));
     this.#stage = root.querySelector(".stage");
     this.#info = root.querySelector(".info");
+    root.querySelector("header").append(maximizeButton(this));
     root.querySelector(".reset").addEventListener("click", () => this.#resetCamera());
     root.querySelector("[data-mesh]").addEventListener("click", () => {
       this.dispatchEvent(new CustomEvent("pb-mesh-toggle", { bubbles: true, composed: true }));

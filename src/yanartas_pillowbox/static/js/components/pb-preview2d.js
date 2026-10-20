@@ -7,6 +7,7 @@
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
 import { LINE_STYLES, lineSwatch } from "../lines.js";
 import { COPPER, rasterize } from "../meshtex.js";
+import { MAXIMIZE_STYLE, maximizeButton } from "../panels.js";
 import { attachPanZoom, unitsPerPixel } from "../panzoom.js";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -20,7 +21,7 @@ template.innerHTML = `
   header { display: flex; align-items: center; gap: 10px; padding: 6px 10px;
            border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   h2 { font-size: 13px; margin: 0; }
-  .size { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1; min-width: 0; }
+  .size { font-family: var(--mono); font-size: 12px; color: var(--text-muted); flex: 1 1 auto; min-width: 0; }
   /* Spinner while the PCB layout runs. */
   button[aria-busy="true"]::before { content: ""; display: inline-block; width: 0.8em; height: 0.8em;
     margin-right: 6px; vertical-align: -0.1em; border: 2px solid currentColor;
@@ -48,6 +49,7 @@ template.innerHTML = `
   .stage svg .sheet { fill: none; stroke: var(--sheet-stroke); stroke-dasharray: 4 3;
                       stroke-width: 1px; vector-effect: non-scaling-stroke; }
   ${DIM_STYLE}
+  ${MAXIMIZE_STYLE}
   .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; font-size: 12px;
             border-top: 1px solid var(--border); }
@@ -100,6 +102,7 @@ export class PbPreview2d extends HTMLElement {
     this.#dims = root.querySelector(".size");
     this.#legend = root.querySelector(".legend");
     this.#meshButton = root.querySelector("[data-mesh]");
+    root.querySelector("header").append(maximizeButton(this));
 
     root.querySelector(".tools").addEventListener("click", (e) => {
       const button = e.target.closest("button");
