@@ -190,7 +190,7 @@ pub fn relax_curve(
     }
     take!(lloyd_curve: usize, gain: f64, push_margin: f64, window: f64, bend_slack: f64,
         grow: usize, reach: f64, grow_rate: f64, hard: usize, stall: usize, repair: usize,
-        inside: f64);
+        inside: f64, hold: usize);
     let mut failed: Option<JsValue> = None;
     let (out, k) = relax(&input, &p, &mut |step, steps| {
         if let (Some(f), None) = (&progress, &failed) {

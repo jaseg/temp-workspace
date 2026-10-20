@@ -26,6 +26,9 @@ pub struct CurveParams {
     pub stall: usize,       // STALL
     pub repair: usize,      // REPAIR
     pub inside: f64,        // INSIDE
+    /// Which of the stem's rails (1: the one the curve starts from, 2: the one it ends at,
+    /// 3: both) run beside a longer stem: the curve kept from straying outwards off them.
+    pub hold: usize,
 }
 
 impl Default for CurveParams {
@@ -43,6 +46,7 @@ impl Default for CurveParams {
             stall: 10,
             repair: 100,
             inside: 0.9,
+            hold: 0,
         }
     }
 }
@@ -235,7 +239,7 @@ pub fn relax(
         p = untangle(&p, &new);
         hot = Some(hot_cells((0..k).filter(|&i| moved[i]).map(|i| p[i]), want));
     }
-    straighten(&mut p, k, 1.5 * spacing);
+    straighten(&mut p, k, 1.5 * spacing, prm.hold);
     (p, k)
 }
 
@@ -506,14 +510,21 @@ fn openings(p: &[P], k: usize, mv: &mut [P]) {
     mv[k..].iter_mut().for_each(|v| *v = [0.0, 0.0]);
 }
 
-/// The curve's vertices within `reach` of each of the stem's openings on the line the stem
-/// leaves along (where the relaxation only steers them): the curve's traces there laid as
-/// the stem's, at the pitch, beside a longer stem with no room to spare.
-fn straighten(p: &mut [P], k: usize, reach: f64) {
+/// The curve's vertices within `reach` of the stem's openings on the rails in `hold` put on
+/// the line the rail leaves along (where the relaxation only steers them; all the way at
+/// first, less and less from half way on): beside a longer stem, the curve's traces there
+/// keep their pitch from its traces (further on, the area keeps off it).
+fn straighten(p: &mut [P], k: usize, reach: f64, hold: usize) {
     let n = p.len();
-    for (end, prev, sign) in [(0, n - 1, 1isize), (k - 1, k, -1isize)] {
+    for (bit, end, prev, other, sign) in [(1, 0, n - 1, k - 1, 1isize), (2, k - 1, k, 0, -1)] {
+        if hold & bit == 0 {
+            continue;
+        }
         let t = sub(p[end], p[prev]);
         let t = scale(t, 1.0 / norm(t).max(1e-12));
+        let o = sub(p[end], p[other]);
+        let o = sub(o, scale(t, dot(o, t)));
+        let o = scale(o, 1.0 / norm(o).max(1e-12));
         let mut m = 1isize;
         loop {
             let i = end as isize + sign * m;
@@ -521,15 +532,14 @@ fn straighten(p: &mut [P], k: usize, reach: f64) {
                 break;
             }
             let i = i as usize;
-            let along = dot(sub(p[i], p[end]), t);
             let far = dist(p[i], p[end]);
-            if far > reach || along <= 0.0 {
+            if far > reach || dot(sub(p[i], p[end]), t) <= 0.0 {
                 break;
             }
             // (all the way near the stem, less and less further on: no kink where it turns)
             let w = ((reach - far) / (0.5 * reach)).min(1.0);
-            let on = add(p[end], scale(t, along));
-            p[i] = add(p[i], scale(sub(on, p[i]), w));
+            let off = dot(sub(p[i], p[end]), o);
+            p[i] = sub(p[i], scale(o, w * off));
             m += 1;
         }
     }

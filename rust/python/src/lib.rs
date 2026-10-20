@@ -203,7 +203,8 @@ fn relax_curve<'py>(
         hard,
         stall,
         repair,
-        inside
+        inside,
+        hold
     );
     let mut failed: Option<PyErr> = None;
     let (p, k) = py.allow_threads(|| {

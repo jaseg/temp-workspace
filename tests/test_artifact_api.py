@@ -92,3 +92,28 @@ def test_pcb_files_travel_base64(client):
     names = zipfile.ZipFile(io.BytesIO(base64.b64decode(reply["content"]))).namelist()
     expected = client.post("/api/pcb/files", data=content, content_type="application/json")
     assert names == zipfile.ZipFile(io.BytesIO(expected.data)).namelist()
+
+
+def test_the_build_ships_every_module_the_api_imports():
+    """Each of the package's modules a shipped one imports is shipped too (else the browser
+    fails at its first use, as the PCB layout's partitions once did)."""
+    import ast
+
+    root = Path(__file__).parents[1]
+    spec = importlib.util.spec_from_file_location("build", root / "artifact/build.py")
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    shipped = set(build.PY_MODULES)
+    pkg = root / "src/yanartas_pillowbox"
+    for name in shipped:
+        tree = ast.parse((pkg / f"{name}.py").read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "yanartas_pillowbox":
+                needed = {a.name for a in node.names if (pkg / f"{a.name}.py").exists()}
+            elif isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
+                "yanartas_pillowbox."
+            ):
+                needed = {node.module.split(".")[1]}
+            else:
+                continue
+            assert needed <= shipped, (name, needed - shipped)

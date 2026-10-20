@@ -95,8 +95,7 @@ def cells(
             pts = np.vstack([mine, pts[far]])
         box = shapely.box(x0, y0, x1, y1).buffer(size)
         for it in range(LLOYD + 1):
-            vor = shapely.voronoi_polygons(shapely.multipoints(pts), extend_to=box, ordered=True)
-            got = shapely.intersection(np.asarray(shapely.get_parts(vor)), piece)
+            got = shapely.intersection(_voronoi(pts, box), piece)
             if it == LLOYD:
                 break
             pts = shapely.get_coordinates(shapely.centroid(got))
@@ -110,6 +109,18 @@ def cells(
         hit = [i for i, c in enumerate(out) if c.covers(shapely.Point(q))]
         at.append(hit[0] if hit else -1)
     return out, zone, at
+
+
+def _voronoi(pts: np.ndarray, box: Polygon) -> np.ndarray:
+    """Each point's Voronoi cell (within ``box``), in the points' order (shapely's
+    ``ordered`` is newer than the browser's shapely)."""
+    cells_ = np.asarray(shapely.get_parts(shapely.voronoi_polygons(
+        shapely.multipoints(pts), extend_to=box
+    )))  # fmt: skip
+    at, cell = shapely.STRtree(cells_).query(shapely.points(pts), predicate="intersects")
+    out = np.empty(len(pts), dtype=object)
+    out[at] = cells_[cell]  # (a point on two cells' wall: either)
+    return out
 
 
 def _graph(polys: list[Polygon], zone: list[int], wall: float) -> list[list[tuple[int, float]]]:

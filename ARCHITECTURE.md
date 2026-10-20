@@ -98,7 +98,7 @@ outputs.
 | `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its strip (a port wide, no two neighbours as long); cells never across a fold, pinned seeds kept; the seed repeats the split, another differs; the mesh over partitions laid out at once (each partition's traces out through its port at the pitch, in it, apart, matched in length, no holes). |
 | `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (a layer's partitions, of equal area, laid out at once, their traces the layer's). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
-| `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded. |
+| `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded; the build ships every package module a shipped one imports. |
 
 Configs are parametrized across representative shapes (default, steepest arc, shallow,
 thick material, very large, zero thickness), so invariants are tested away from the
@@ -264,9 +264,11 @@ an exact isometry: the panels curve along it, not across it.
      and a stretch of its side face the open area. The stem's rails run along it (its
      traces at the pitch, held as laid in settling) and the curve opens at its end. (A
      strip made curve area instead, a corridor a spacing wide, left the stem a small cycle
-     of its own that no merge joins.) The area is kept a quarter pitch further off a
-     longer strip beside a curve's opening (from a spacing on): the curve there runs on
-     along it with nothing to spare.
+     of its own that no merge joins.) Beside a longer strip, a curve's opening has no room
+     to spare: relaxation puts the curve on its rail's line for a spacing (less and less
+     over the next half; `CurveParams::hold`, only the rails beside a longer strip, as
+     elsewhere it turns as it would), its lanes there are laid at the pitch, and from a
+     spacing on the area is kept a quarter pitch further off the strip.
   2. *Cells:* Voronoi cells 2.5 ports across, Lloyd-relaxed, each zone (panel) on its own,
      so none straddles a fold; a cell pinned in front of each strip's end, a box two
      ports wide over the end all its own (its curve opens into room, not a corridor). Two
@@ -287,6 +289,9 @@ an exact isometry: the panels curve along it, not across it.
      split that comes out uneven is tried afresh (6 times at most).
   The graph is built afresh (up to `ATTEMPTS` times, the best kept) when a cycle ends up
   joined to no exit's curve; across a border it joins as long as cycles there are apart.
+  Seeds that the Lloyd steps bring near an exit's pinned seed are left out each step (a
+  seed in a corner beside an opening otherwise comes back each time, its cell's wall
+  across the opening).
 - **Mesh.** `kimesh.generate` aligns the grid on the exit cell. Cells inside the mask are
   found in one vectorized `shapely.contains`; the walk is KiMesh's (iterative, with its
   "keep going straight" bias for `randomness < 1`); tiles are KiMesh's look-up table with

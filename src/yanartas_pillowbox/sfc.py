@@ -249,6 +249,7 @@ def _relax(
     least: float,
     pitch: float,
     rng: np.random.Generator,
+    hold: int = 0,
 ) -> tuple[np.ndarray, int]:
     """The curve, relaxed by the Rust core (``curve::relax``; see ARCHITECTURE.md, 6. and 7.):
     ``curve`` an open polyline from the stem's left end round to its right end, the stem
@@ -281,6 +282,7 @@ def _relax(
             "stall": STALL,
             "repair": REPAIR,
             "inside": INSIDE,
+            "hold": hold,
         },
         lambda step, steps: progress.report("relax", step, steps),
     )
@@ -664,7 +666,14 @@ def generate(
         stem = np.array([(bx, ym), (bx, ytop), (ax, ytop), (ax, ym)])
         curve = np.vstack([[(ax, ym)], pts, [(bx, ym)]])
         mine = [r for r, o in zip(regions, owner, strict=True) if o == k]
-        p, kk = _relax(curve, stem, parts[k], mine, spacing, least, pitch, nrng)
+        # (the rails beside a longer stem: the curve kept from straying out off them)
+        hold = sum(
+            bit
+            for bit, side in ((1, -c), (2, c))
+            for (xj, _), yj in zip(exits, tops, strict=True)
+            if abs(xj - x0 - side) < 1e-6 and yj > ym + spacing
+        )
+        p, kk = _relax(curve, stem, parts[k], mine, spacing, least, pitch, nrng, hold)
         progress.report("relax", vertices=len(p))
         exact = np.zeros(len(p), bool)  # (the stem's rails: the traces at the pitch)
         exact[kk:] = True

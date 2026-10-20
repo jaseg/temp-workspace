@@ -413,6 +413,9 @@ pub fn cells(domain: &Rings, d: f64, rng: &mut Rng, pins: &[P], lloyd: usize) ->
                 }
             })
             .collect();
+        // (the pins where they were, the seeds that came near one since left out: else a
+        // seed in a corner beside an exit's opening comes back each step, its cell's wall
+        // across the opening)
         for &pin in pins {
             if let Some(k) =
                 (0..s.len()).min_by(|&a, &b| dist(s[a], pin).total_cmp(&dist(s[b], pin)))
@@ -420,6 +423,7 @@ pub fn cells(domain: &Rings, d: f64, rng: &mut Rng, pins: &[P], lloyd: usize) ->
                 s[k] = pin;
             }
         }
+        s.retain(|q| pins.contains(q) || pins.iter().all(|&pin| dist(*q, pin) > 0.75 * d));
     }
     pieces
         .into_iter()
