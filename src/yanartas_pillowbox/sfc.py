@@ -103,6 +103,7 @@ SETTLE_BAND = 1.0  # ... traces within this many pitches of length of each other
 SETTLE_LEAP = 0.34  # ... a vertex moved at most this many of the steps between vertices
 SETTLE_TUNE = 3.0  # ... a trace this many pitches behind (or ahead): steered at full strength
 SETTLE_STEER = 0.6  # ... the share of its bends' depth a step grows (or straightens) them by
+SETTLE_SPAN = 25  # ... (where along the curve it gains more, over this many places)
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -1541,7 +1542,9 @@ def _settle(
     shapely.prepare(keep)
     total = np.array([float(np.sum(np.hypot(*np.diff(t, axis=0).T))) for t in lines])
     bins = max(int(np.max(total) / (2 * pitch)), 1)  # (positions along the curve)
-    base = _binned(tr, bins)  # (each trace's length by position, as laid)
+    # (each trace's length by position, as laid: before resampling, which shaves more off
+    # some, the inner in tight turns)
+    base = _binned(_Traces([np.asarray(t, float) for t in lines]), bins)
     gained = np.zeros((n, bins))
     limit = SETTLE_SKEW * pitch
     sides = _neighbour_sides(tr)
@@ -1587,10 +1590,15 @@ def _settle(
             b = np.where(tr.next[b] >= 0, tr.next[b], b)
         bend = (p[a] + p[b]) / 2 - p  # (towards the bend's inside)
         grow = np.zeros(len(p))
+        window = np.ones(SETTLE_SPAN) / SETTLE_SPAN
         for t, u in [(i, j) for i in range(n) for j in (i - 1, i + 1) if 0 <= j < n]:
             mine = net == t
-            lead = (run[t] - run[u])[where[mine]]
+            lead = run[t] - run[u]
+            # (steered only where the lead is still being built up, not all along after it:
+            # that would take back many times over what is too much)
+            making = np.convolve(gained[t] - gained[u], window, "same")
             lead = np.sign(lead) * np.maximum(np.abs(lead) - SETTLE_BAND * pitch, 0.0)
+            lead = np.where(lead * making > 0, lead, 0.0)[where[mine]]
             lead /= SETTLE_TUNE * pitch
             grow[mine] = np.maximum(grow[mine], np.clip(-lead, 0.0, 1.0))
             toward = sides[t, u] * normal[mine]  # (to the neighbour)
