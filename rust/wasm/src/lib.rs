@@ -4,6 +4,8 @@
 
 use js_sys::{Array, Float64Array, Function, Object, Reflect, Uint32Array};
 use wasm_bindgen::prelude::*;
+use yanartas_mesh_core::curve::{relax, CurveInput, CurveParams};
+use yanartas_mesh_core::lanes::{lanes, LaneParams};
 use yanartas_mesh_core::{geom::P, settle as settle_core, Input, Params, Status};
 
 fn points(flat: &[f64]) -> Vec<P> {
@@ -111,6 +113,130 @@ pub fn settle(
     if let Some(e) = failed {
         return Err(e);
     }
+    let flat: Vec<f64> = out.iter().flatten().flat_map(|q| [q[0], q[1]]).collect();
+    let lens: Vec<u32> = out.iter().map(|t| t.len() as u32).collect();
+    let o = Object::new();
+    Reflect::set(&o, &"points".into(), &Float64Array::from(flat.as_slice()))?;
+    Reflect::set(&o, &"lens".into(), &Uint32Array::from(lens.as_slice()))?;
+    Ok(o)
+}
+
+/// The zones (regions) from flat rings: `ring_lens` each ring's count, `zone_rings` each
+/// zone's number of rings.
+fn zones_of(points: &[f64], ring_lens: &[u32], zone_rings: &[u32]) -> Vec<Vec<Vec<P>>> {
+    let rings = runs(points, ring_lens);
+    let mut at = 0;
+    zone_rings
+        .iter()
+        .map(|&n| {
+            let z = rings[at..at + n as usize].to_vec();
+            at += n as usize;
+            z
+        })
+        .collect()
+}
+
+fn number(obj: &JsValue, name: &str) -> Result<Option<f64>, JsValue> {
+    Ok(Reflect::get(obj, &name.into())?.as_f64())
+}
+
+/// The curve relaxed (`sfc._relax`; the Python extension's `relax_curve`): returns
+/// `{points, k}`, the closed curve and the number of vertices before the tongue's.
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn relax_curve(
+    curve: &[f64],
+    tongue: &[f64],
+    regions: &[f64],
+    ring_lens: &[u32],
+    zone_rings: &[u32],
+    target: f64,
+    edge: &[f64],
+    borders: &[f64],
+    spacing: f64,
+    least: f64,
+    pitch: f64,
+    offset: &[f64],
+    params_obj: JsValue,
+    progress: Option<Function>,
+) -> Result<Object, JsValue> {
+    let input = CurveInput {
+        curve: points(curve),
+        tongue: points(tongue),
+        regions: zones_of(regions, ring_lens, zone_rings),
+        target,
+        edge: points(edge),
+        borders: points(borders),
+        spacing,
+        least,
+        pitch,
+        offset: [offset[0], offset[1]],
+    };
+    let mut p = CurveParams::default();
+    macro_rules! take {
+        ($($field:ident: $t:ty),*) => {$(
+            if let Some(v) = number(&params_obj, stringify!($field))? {
+                p.$field = v as $t;
+            }
+        )*};
+    }
+    take!(lloyd_curve: usize, gain: f64, push_margin: f64, window: f64, bend_slack: f64,
+        grow: usize, reach: f64, grow_rate: f64, hard: usize, stall: usize, repair: usize,
+        inside: f64);
+    let mut failed: Option<JsValue> = None;
+    let (out, k) = relax(&input, &p, &mut |step, steps| {
+        if let (Some(f), None) = (&progress, &failed) {
+            if let Err(e) = f.call2(
+                &JsValue::NULL,
+                &(step as f64).into(),
+                &(steps as f64).into(),
+            ) {
+                failed = Some(e);
+            }
+        }
+    });
+    if let Some(e) = failed {
+        return Err(e);
+    }
+    let flat: Vec<f64> = out.iter().flat_map(|q| [q[0], q[1]]).collect();
+    let o = Object::new();
+    Reflect::set(&o, &"points".into(), &Float64Array::from(flat.as_slice()))?;
+    Reflect::set(&o, &"k".into(), &(k as f64).into())?;
+    Ok(o)
+}
+
+/// The traces round the closed curve (`sfc._lanes`; the extension's `offset_lanes`):
+/// returns `{points, lens}`.
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn offset_lanes(
+    p: &[f64],
+    k: usize,
+    edge_a: &[f64],
+    edge_b: &[f64],
+    n: usize,
+    pitch: f64,
+    spacing: f64,
+    exact: &[u8],
+    params_obj: JsValue,
+) -> Result<Object, JsValue> {
+    let edge: Vec<[P; 2]> = points(edge_a)
+        .into_iter()
+        .zip(points(edge_b))
+        .map(|(a, b)| [a, b])
+        .collect();
+    let exact: Vec<bool> = exact.iter().map(|&x| x != 0).collect();
+    let mut q = LaneParams::default();
+    macro_rules! take {
+        ($($field:ident: $t:ty),*) => {$(
+            if let Some(v) = number(&params_obj, stringify!($field))? {
+                q.$field = v as $t;
+            }
+        )*};
+    }
+    take!(spread: f64, smooth: usize, fine: usize, ramp: f64, margin: f64, inside: f64,
+        window: f64, straight: f64);
+    let out = lanes(&points(p), k, &edge, n, pitch, spacing, &exact, &q);
     let flat: Vec<f64> = out.iter().flatten().flat_map(|q| [q[0], q[1]]).collect();
     let lens: Vec<u32> = out.iter().map(|t| t.len() as u32).collect();
     let o = Object::new();

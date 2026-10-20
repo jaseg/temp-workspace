@@ -88,8 +88,15 @@ pub fn crossing(p: &[P], which: &[usize]) -> Vec<(usize, usize)> {
     }
     let next = |i: usize| p[(i + 1) % n];
     // (cells a few typical segments wide: a long one is put in every cell its box touches)
-    let mean = (0..n).map(|i| crate::geom::dist(p[i], next(i))).sum::<f64>() / n as f64;
-    let segs = Segs::new(p.to_vec(), (0..n).map(next).collect(), (4.0 * mean).max(1e-6));
+    let mean = (0..n)
+        .map(|i| crate::geom::dist(p[i], next(i)))
+        .sum::<f64>()
+        / n as f64;
+    let segs = Segs::new(
+        p.to_vec(),
+        (0..n).map(next).collect(),
+        (4.0 * mean).max(1e-6),
+    );
     let found: Vec<Vec<(usize, usize)>> = pmap(which.len(), |k| {
         let i = which[k];
         let (a, b) = (p[i], next(i));
