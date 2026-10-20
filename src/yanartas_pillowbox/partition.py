@@ -516,6 +516,9 @@ def _areas(
     out = _reattach(out, ports, corridors)
     own = [shapely.union_all([ports[k], corridors[k]]) for k in range(count)]
     out, given = _narrows(out, ports, corridors, own, width)
+    # (of a piece, and without the hairline gaps the cells leave where panels meet: else the
+    # margin cuts round the slivers, and a curve cannot take holes so thin)
+    out = [_one(_sealed(g, area, width / 10), ports[k]) for k, g in enumerate(out)]
     if margin > 0:  # (each but its port and corridor kept off the others)
         out = [
             shapely.difference(
@@ -535,7 +538,7 @@ def _areas(
         ]).intersection(g), ports[k])
         for k, g in enumerate(out)
     ]  # fmt: skip
-    return out, given
+    return [_sealed(g, area, width / 10) for g in out], given
 
 
 def _narrows(
@@ -604,6 +607,18 @@ def _reattach(out: list, ports: list[Polygon], corridors: list) -> list:
                 out[best] = shapely.union_all([out[best], g])
                 out[k] = shapely.difference(out[k], g)
     return out
+
+
+def _sealed(g: shapely.Geometry, area: shapely.Geometry, size: float) -> shapely.Geometry:
+    """``g`` with its holes smaller than ``size`` square filled, but where ``area`` has them."""
+    polys = []
+    for q in _parts(g):
+        keep = [
+            r for r in q.interiors
+            if Polygon(r).area >= size * size or not area.contains(Polygon(r).representative_point())
+        ]  # fmt: skip
+        polys.append(Polygon(q.exterior, keep))
+    return shapely.union_all(polys)
 
 
 def _one(g: shapely.Geometry, port: Polygon) -> Polygon:
