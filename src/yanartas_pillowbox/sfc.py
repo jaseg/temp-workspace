@@ -1845,16 +1845,18 @@ def _keep_clear(
         same = net[pi] == net[q]
         sep = np.abs(arc[pi] - arc[q])
         keep = ~same | (sep > own)
-        q, pi, same = q[keep], pi[keep], same[keep]
+        q, pi, same, sep = q[keep], pi[keep], same[keep], sep[keep]
         v = new[pi] - new[q]
         d = np.hypot(v[:, 0], v[:, 1])
         for nb in (tr.prev, tr.next):  # (other traces: to their segments, exactly)
             o = np.where(nb[pi] >= 0, nb[pi], pi)
             d = np.where(same, d, np.minimum(d, _to_segment(new[q], new[pi], new[o])))
-        # (its own copper: only straight across, not along it round a kink)
+        # (its own copper: straight across, or much further along it than away, as across
+        # a finger's pinched legs; not along it round a kink)
         across = np.abs(v[:, 0] * tangent[q, 0] + v[:, 1] * tangent[q, 1]) < 0.5 * np.maximum(
             d, 1e-12
         )
+        across |= sep > 2 * d
         bad = np.unique(q[(d < need) & (~same | across)])
         # segments that cross
         seg = np.nonzero(tr.next >= 0)[0]
