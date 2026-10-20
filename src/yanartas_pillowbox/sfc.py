@@ -1588,7 +1588,7 @@ def _settle(
         for _ in range(4):  # (and a few vertices on from the ends)
             fixed |= fixed[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
             fixed |= fixed[np.maximum(tr.next, 0)] & (tr.next >= 0)
-        zone = _region_of(regions, p)
+        zone = _region_of(regions, p)  # (no vertex moves from one zone into another)
         join = (tr.next >= 0) & (zone != zone[np.maximum(tr.next, 0)])
         for _ in range(pin):
             join |= join[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
@@ -1672,6 +1672,8 @@ def _settle(
         new[np.hypot(*(new - p).T) < SETTLE_STILL * pitch / 4] = p[
             np.hypot(*(new - p).T) < SETTLE_STILL * pitch / 4
         ]  # (the smoothing's least touches: not moves)
+        strayed = _region_of(regions, new) != zone
+        new[strayed] = p[strayed]
         new = _keep_clear(tr, p, new, pitch, own)
         # skew, exactly: where a pair's running difference passes the limit and grew, the
         # moves of the trace that gained more there taken back
