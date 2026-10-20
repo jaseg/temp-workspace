@@ -255,6 +255,33 @@ def _dedupe(pts: list[Point]) -> list[Point]:
     return out
 
 
+def mesh_zones(pattern: Pattern) -> list[Polygon]:
+    """The pattern's faces as the mesh's zones: those that meet along neither a fold nor a
+    slit (e.g. the small pieces of the front panel by its flaps' ends, out past its
+    straight fold's line) in one, so that the mesh keeps off only real folds."""
+    polys = [Polygon(sample(f.boundary)) for f in pattern.faces]
+    folds = [LineString(sample([f.segment])) for f in pattern.folds]
+    cuts = shapely.union_all(folds + [LineString(sample(c)) for c in pattern.slits]).buffer(1e-4)
+    parent = list(range(len(polys)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    tree = shapely.STRtree(polys)
+    for i, j in zip(*tree.query(polys, predicate="intersects"), strict=True):
+        if i < j:
+            border = polys[i].boundary.intersection(polys[j].buffer(1e-6))
+            if border.difference(cuts).length > 1e-3:
+                parent[find(i)] = find(j)
+    groups: dict[int, list[Polygon]] = defaultdict(list)
+    for i, poly in enumerate(polys):
+        groups[find(i)].append(poly)
+    return [g[0] if len(g) == 1 else shapely.union_all(g) for g in groups.values()]
+
+
 # ----------------------------------------------------------------------------- layout
 def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     """The PCB layout for the configuration. Raises ``PcbError``."""
@@ -343,7 +370,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         seed = int(cfg.mesh_seed) * 2 + i
         if cfg.mesh_algorithm == "sfc":
             # (the panels as zones: the curve crosses the folds as seldom as can be)
-            zones = [Polygon(sample(f.boundary)) for f in pattern.faces]
+            zones = mesh_zones(pattern)
             return sfc.generate(
                 area, corner, side, n, pitch, seed=seed, zones=zones,
                 arcs=cfg.mesh_shape == "arcs",

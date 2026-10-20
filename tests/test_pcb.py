@@ -8,7 +8,7 @@ from collections import defaultdict
 
 import pytest
 import shapely
-from shapely.geometry import LineString, Point, box
+from shapely.geometry import LineString, Point, Polygon, box
 
 from yanartas_pillowbox import pcb
 from yanartas_pillowbox.cli import main
@@ -338,8 +338,24 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
 
     monkeypatch.setattr(sfc, "generate", fake)
     result = pcb.layout(D.with_values(mesh_algorithm="sfc"))
-    assert seen == [len(build_pattern(D).faces)] * 2
+    assert seen == [len(pcb.mesh_zones(build_pattern(D)))] * 2
     assert pcb.preview_json(result)["meshes"]["front"]["algorithm"] == "sfc"
+
+
+def test_mesh_zones_join_faces_but_across_folds_and_slits():
+    """The front panel's small pieces by its flaps' ends, out past its straight fold's line,
+    are of a piece with it (no fold between): one zone; all else as the faces."""
+    from yanartas_pillowbox.geometry import build_pattern
+
+    pattern = build_pattern(D)
+    zones = pcb.mesh_zones(pattern)
+    names = [f.name for f in pattern.faces]
+    pieces = [n for n in names if n.startswith("front-") and n.endswith(("-left", "-right"))]
+    assert len(pieces) == 4 and len(zones) == len(names) - 4
+    faces = {f.name: Polygon(pcb.sample(f.boundary)) for f in pattern.faces}
+    (front,) = [z for z in zones if z.contains(faces["front-panel"].representative_point())]
+    assert front.area == pytest.approx(sum(faces[n].area for n in ["front-panel", *pieces]))
+    assert front.geom_type == "Polygon"
 
 
 def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
