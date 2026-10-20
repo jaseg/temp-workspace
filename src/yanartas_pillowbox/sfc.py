@@ -448,8 +448,28 @@ def _browser_core() -> object | None:
         )  # fmt: skip
         return unflat(out.points, out.lens)
 
+    def curve_graph(segments, borders, mouth, spacing, seed, params, report):  # noqa: ANN001, ANN202
+        rings = [r for _, rs in segments for r in rs]
+        lines = [ln for _, _, ls in borders for ln in ls]
+        try:
+            out = call(
+                mesh.curve_graph, u32([r for r, _ in segments]), *flat(rings),
+                u32([len(rs) for _, rs in segments]),
+                u32([v for i, j, _ in borders for v in (i, j)]),
+                u32([len(ls) for _, _, ls in borders]), *flat(lines),
+                f64(np.array(mouth)), spacing, seed >> 32, seed & 0xFFFFFFFF, obj(params),
+                report=report,
+            )  # fmt: skip
+        except Exception as e:  # (pyodide's JsException: what the core refused)
+            raise ValueError(str(e)) from e
+        pts = np.asarray(out.points.to_py(), float).reshape(-1, 2)
+        return pts, list(out.region.to_py()), int(out.cells), int(out.left)
+
     return types.SimpleNamespace(
-        settle_traces=settle_traces, relax_curve=relax_curve, offset_lanes=offset_lanes
+        settle_traces=settle_traces,
+        relax_curve=relax_curve,
+        offset_lanes=offset_lanes,
+        curve_graph=curve_graph,
     )
 
 

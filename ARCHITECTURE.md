@@ -352,13 +352,18 @@ inner flap's free edge.
   sample matched to the nearest point of its neighbour a little ahead of the last match
   (monotone); the largest difference of the lengths run to the matched points, and the
   difference of the totals.
-- **Rust.** Settling and length matching run in Rust only (`rust/`, see its README;
-  AGPL-3.0-or-later): natively the PyO3 extension `yanartas_mesh` (a dependency, built from
-  `rust/python`; on all cores: the default box's settling about 2 min), in the browser its
-  WebAssembly build, which the web worker loads (`artifact/build.py` builds it). `sfc.py`
-  prepares what needs shapely (the edge's points, the zones' rings, the exit) and keeps
-  the constants, passed in by name. Settling also keeps half a pitch from the edge and the
-  folds, so that a panel never needs the copper beyond its folds.
+- **Rust.** The curve layout runs in Rust (`rust/`, see its README; AGPL-3.0-or-later):
+  the graph (step 2 to 5: Lloyd's Voronoi cells as boxes cut by the bisectors with the
+  seeds near, clipped by the domain with `geo`'s boolean operations only where its edge is
+  near; Edmonds' matching; centres, threaded only into a cycle edge they face, between its
+  ends, or the detour folds back; merges, doubled edges, joins), the relaxation and growth
+  (6, 7), the lanes, settling and length matching (9). Natively the PyO3 extension
+  `yanartas_mesh` (a dependency, built from `rust/python`; on all cores), in the browser
+  its WebAssembly build, which the web worker loads (`artifact/build.py` builds it, with
+  SIMD). `sfc.py` keeps what needs shapely on whole regions (the regions, the segments'
+  domains, the borders between regions, the edge's points, the exit's cut) and the
+  constants, passed in by name. The default box lays out in about 2 min a side natively,
+  nearly all of it settling.
 - **Both sides at once.** The front and back meshes are independent: `pcb.layout` works
   out both exit corners first, then lays both out together (`progress.side_by_side`:
   threads, as the heavy parts release the GIL; each with its own copy of the mask, since

@@ -5,6 +5,7 @@
 use js_sys::{Array, Float64Array, Function, Object, Reflect, Uint32Array};
 use wasm_bindgen::prelude::*;
 use yanartas_mesh_core::curve::{relax, CurveInput, CurveParams};
+use yanartas_mesh_core::graph::{curve, GraphInput, GraphParams, Segment};
 use yanartas_mesh_core::lanes::{lanes, LaneParams};
 use yanartas_mesh_core::{geom::P, settle as settle_core, Input, Params, Status};
 
@@ -242,5 +243,91 @@ pub fn offset_lanes(
     let o = Object::new();
     Reflect::set(&o, &"points".into(), &Float64Array::from(flat.as_slice()))?;
     Reflect::set(&o, &"lens".into(), &Uint32Array::from(lens.as_slice()))?;
+    Ok(o)
+}
+
+/// The curve's graph walked into a curve (`sfc._curve`; the extension's `curve_graph`):
+/// `seg_region` each segment's region, its domain's rings flat (`rings`, `ring_lens`,
+/// `seg_rings`); the borders: `pairs` (region, region) flat, `pair_lines` each pair's
+/// number of lines, the lines flat (`lines`, `line_lens`); the seed in two halves. Returns
+/// `{points, region, cells, left}`.
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn curve_graph(
+    seg_region: &[u32],
+    rings: &[f64],
+    ring_lens: &[u32],
+    seg_rings: &[u32],
+    pairs: &[u32],
+    pair_lines: &[u32],
+    lines: &[f64],
+    line_lens: &[u32],
+    mouth: &[f64],
+    spacing: f64,
+    seed_hi: u32,
+    seed_lo: u32,
+    params_obj: JsValue,
+    progress: Option<Function>,
+) -> Result<Object, JsValue> {
+    let domains = zones_of(rings, ring_lens, seg_rings);
+    let segments: Vec<Segment> = seg_region
+        .iter()
+        .zip(domains)
+        .map(|(&r, domain)| Segment {
+            region: r as usize,
+            domain,
+        })
+        .collect();
+    let all = runs(lines, line_lens);
+    let mut at = 0;
+    let borders: Vec<(usize, usize, Vec<Vec<P>>)> = pair_lines
+        .iter()
+        .enumerate()
+        .map(|(k, &n)| {
+            let ls = all[at..at + n as usize].to_vec();
+            at += n as usize;
+            (pairs[2 * k] as usize, pairs[2 * k + 1] as usize, ls)
+        })
+        .collect();
+    let input = GraphInput {
+        segments,
+        borders,
+        mouth: [[mouth[0], mouth[1]], [mouth[2], mouth[3]]],
+        spacing,
+        seed: ((seed_hi as u64) << 32) | seed_lo as u64,
+    };
+    let mut p = GraphParams::default();
+    if let Some(v) = number(&params_obj, "seed_spacing")? {
+        p.seed_spacing = v;
+    }
+    if let Some(v) = number(&params_obj, "lloyd")? {
+        p.lloyd = v as usize;
+    }
+    if let Some(v) = number(&params_obj, "attempts")? {
+        p.attempts = v as usize;
+    }
+    let mut failed: Option<JsValue> = None;
+    let out = curve(&input, &p, &mut |step, steps| {
+        if let (Some(f), None) = (&progress, &failed) {
+            if let Err(e) = f.call2(
+                &JsValue::NULL,
+                &(step as f64).into(),
+                &(steps as f64).into(),
+            ) {
+                failed = Some(e);
+            }
+        }
+    });
+    if let Some(e) = failed {
+        return Err(e);
+    }
+    let c = out.map_err(|e| JsValue::from_str(&e))?;
+    let flat: Vec<f64> = c.pts.iter().flat_map(|q| [q[0], q[1]]).collect();
+    let region: Vec<u32> = c.region.iter().map(|&r| r as u32).collect();
+    let o = Object::new();
+    Reflect::set(&o, &"points".into(), &Float64Array::from(flat.as_slice()))?;
+    Reflect::set(&o, &"region".into(), &Uint32Array::from(region.as_slice()))?;
+    Reflect::set(&o, &"cells".into(), &(c.cells as f64).into())?;
+    Reflect::set(&o, &"left".into(), &(c.left as f64).into())?;
     Ok(o)
 }
