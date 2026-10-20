@@ -188,12 +188,12 @@ impl Traces {
             .collect()
     }
 
-    /// From each vertex towards the middle of the chord two vertices either way: towards
-    /// its bend's inside, as deep as the bend about a pitch across.
-    pub fn bends(&self) -> Vec<P> {
+    /// From each vertex towards the middle of the chord `reach` vertices either way:
+    /// towards its bend's inside, as deep as the bend that wide.
+    pub fn bends(&self, reach: usize) -> Vec<P> {
         (0..self.len())
             .map(|i| {
-                let (a, b) = (self.back(i, 2), self.on(i, 2));
+                let (a, b) = (self.back(i, reach), self.on(i, reach));
                 sub(scale(add(self.p[a], self.p[b]), 0.5), self.p[i])
             })
             .collect()

@@ -32,6 +32,9 @@ pub struct Params {
     pub reach_out: f64,     // SETTLE_REACH_OUT
     pub fill: f64,          // SETTLE_FILL
     pub fill_blur: f64,     // SETTLE_FILL_BLUR
+    pub bend: usize,        // SETTLE_BEND
+    pub smooth: usize,      // SETTLE_SMOOTH
+    pub finish: usize,      // SETTLE_FINISH
     pub match_steps: usize, // MATCH
     pub match_band: f64,    // MATCH_BAND
     pub match_rate: f64,    // MATCH_RATE
@@ -57,6 +60,9 @@ impl Default for Params {
             reach_out: 1.0,
             fill: 2.0,
             fill_blur: 0.5,
+            bend: 2,
+            smooth: 3,
+            finish: 10,
             match_steps: 20,
             match_band: 15.0,
             match_rate: 0.5,
@@ -187,7 +193,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         let crowd: Vec<P> = pmap(tr.len(), |i| crowded(&tr, &arc, &verts, i, &cx));
         // a tight bend: no move along its axis into it (its tip pinned, its legs may close)
         let axis = bend_axes(&tr, &curv, &normal, prm.pin * pitch);
-        let bend = tr.bends();
+        let bend = tr.bends(prm.bend);
         let run: Vec<Vec<f64>> = gained.iter().map(|g| cumsum(g)).collect();
         // (per neighbouring pair: where along the curve the first gains on the second)
         let making: Vec<Vec<Vec<f64>>> = (0..n)
@@ -253,7 +259,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
                 a != NONE && b != NONE && !fixed[i] && (moving[i] || moving[a] || moving[b])
             })
             .collect();
-        for f in [0.3, -0.32] {
+        for f in [0.3, -0.32].repeat(prm.smooth) {
             let lap: Vec<P> = (0..tr.len())
                 .map(|i| {
                     if !busy[i] {
@@ -311,7 +317,42 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         status.apart = apart(&gained);
         progress(&status);
     }
+    let tr = smoothed(tr, prm, &cx);
     matched(tr, &base, bins, prm, &cx, progress).lines()
+}
+
+/// The traces smoothed at the end (`finish` Taubin steps, each kept clear as settling's
+/// moves): the jitter and the shortest bumps the steering left taken out, the bends
+/// wider than a few vertices kept (as their coverage).
+fn smoothed(mut tr: Traces, prm: &Params, cx: &Ctx) -> Traces {
+    for _ in 0..prm.finish {
+        let (fixed, zone) = held(&tr, cx);
+        let p = tr.p.clone();
+        let mut new = p.clone();
+        for f in [0.5, -0.53] {
+            let lap: Vec<P> = (0..tr.len())
+                .map(|i| {
+                    let (a, b) = (tr.prev[i], tr.next[i]);
+                    if a == NONE || b == NONE || fixed[i] {
+                        return [0.0, 0.0];
+                    }
+                    sub(scale(add(new[a], new[b]), 0.5), new[i])
+                })
+                .collect();
+            for i in 0..tr.len() {
+                new[i] = add(new[i], scale(lap[i], f));
+            }
+        }
+        for i in 0..tr.len() {
+            if cx.zones.of(new[i]) != zone[i] {
+                new[i] = p[i];
+            }
+        }
+        (new, _) = keep_clear(&tr, &p, new, cx);
+        tr.p = new;
+        tr = tr.respaced(cx.step);
+    }
+    tr
 }
 
 /// The settled traces matched in length (`sfc._match`): where one runs (from the exit) more
@@ -358,7 +399,7 @@ fn matched(
         let p = tr.p.clone();
         let at = tr.bins(bins);
         let (fixed, zone) = held(&tr, cx);
-        let bend = tr.bends();
+        let bend = tr.bends(prm.bend);
         let mut new: Vec<P> = (0..tr.len())
             .map(|i| {
                 if fixed[i] {
