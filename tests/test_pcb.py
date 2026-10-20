@@ -197,6 +197,26 @@ def test_export(layout, tmp_path):
     assert rules["clearance"] == pytest.approx(D.mesh_trace_space)
 
 
+def test_export_draws_arcs(layout, tmp_path):
+    """A track in lines and arcs goes out as those: KiCad track arcs through their middles."""
+    import copy
+    import dataclasses
+
+    from gerbonara.cad.kicad.pcb import Board
+
+    t = next(t for t in layout.tracks if t.net.startswith("MESH"))
+    (a, b), rest = t.points[:2], t.points[1:]
+    mid = ((a[0] + b[0]) / 2 + 0.01, (a[1] + b[1]) / 2)
+    pieces = ((a, mid, b), *((p, None, q) for p, q in itertools.pairwise(rest)))
+    result = copy.copy(layout)
+    result.tracks = [dataclasses.replace(u, arcs=pieces) if u is t else u for u in layout.tracks]
+    pcb.export(result, tmp_path, "arcs")
+    board = Board.open(tmp_path / "arcs.kicad_pcb")
+    (arc,) = board.track_arcs
+    assert (arc.start.x, arc.mid.x, arc.end.x) == pytest.approx((a[0], mid[0], b[0]))
+    assert len(board.track_segments) == sum(len(u.points) - 1 for u in layout.tracks) - 1
+
+
 def test_preview_json(layout):
     data = pcb.preview_json(layout, (10.0, 20.0))
     assert set(data["layers"]) == {"front", "back"}
@@ -311,7 +331,7 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
 
     seen = []
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=()):
+    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False):
         seen.append(len(zones))
         m = kimesh.generate(mask, corner, side, n, pitch, seed=seed)
         return dataclasses.replace(m, algorithm="sfc")
@@ -330,7 +350,7 @@ def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     from yanartas_pillowbox import kimesh, progress, sfc
     from yanartas_pillowbox.server import create_app
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=()):
+    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False):
         progress.report("settle", 20, 40, vertices=1000)
         m = kimesh.generate(mask, corner, side, n, pitch, seed=seed)
         return dataclasses.replace(m, algorithm="sfc")

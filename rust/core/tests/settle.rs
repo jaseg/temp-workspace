@@ -114,3 +114,33 @@ fn untangle_keeps_the_curve_simple() {
     let out = untangle(&old, &new);
     assert!(crossing(&out, &all).is_empty());
 }
+
+#[test]
+fn arcs_follow_the_polyline_within_the_tolerance() {
+    use yanartas_mesh_core::arcs::{fit, sample, Piece};
+    use yanartas_mesh_core::geom::closest;
+    // a straight run, a quarter circle (radius 1) and a straight run again
+    let mut p: Vec<P> = (0..=10).map(|k| [k as f64 * 0.1, 0.0]).collect();
+    for k in 1..=30 {
+        let a = -std::f64::consts::FRAC_PI_2 + k as f64 / 30.0 * std::f64::consts::FRAC_PI_2;
+        p.push([1.0 + a.cos(), 1.0 + a.sin()]);
+    }
+    p.extend((1..=10).map(|k| [2.0, 1.0 + k as f64 * 0.1]));
+    let tol = 0.002;
+    let pieces = fit(&p, tol);
+    assert_eq!(pieces.len(), 3, "{pieces:?}");
+    assert!(matches!(pieces[0], Piece::Line(..)));
+    assert!(matches!(pieces[1], Piece::Arc(..)));
+    assert!(matches!(pieces[2], Piece::Line(..)));
+    // drawn again, within the tolerance of the polyline (and the polyline of it)
+    let q = sample(&pieces, 0.01);
+    let near = |x: P, line: &[P]| {
+        line.windows(2)
+            .map(|w| dist(closest(x, w[0], w[1]).0, x))
+            .fold(f64::MAX, f64::min)
+    };
+    assert!(q.iter().all(|&x| near(x, &p) <= tol + 1e-9));
+    assert!(p.iter().all(|&x| near(x, &q) <= tol + 1e-6));
+    assert_eq!(q[0], p[0]);
+    assert_eq!(*q.last().unwrap(), *p.last().unwrap());
+}

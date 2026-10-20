@@ -70,6 +70,8 @@ class Track:
     layer: str
     net: str
     width: float
+    # the track as lines and arcs (``points``: these drawn as a polyline), if fitted
+    arcs: tuple[meshgen.Piece, ...] | None = None
 
 
 @dataclass
@@ -329,7 +331,10 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         if cfg.mesh_algorithm == "sfc":
             # (the panels as zones: the curve crosses the folds as seldom as can be)
             zones = [Polygon(sample(f.boundary)) for f in pattern.faces]
-            return sfc.generate(area, corner, side, n, pitch, seed=seed, zones=zones)
+            return sfc.generate(
+                area, corner, side, n, pitch, seed=seed, zones=zones,
+                arcs=cfg.mesh_shape == "arcs",
+            )  # fmt: skip
         return kimesh.generate(area, corner, side, n, pitch, seed=seed)
 
     # The two sides are independent: laid out at once.
@@ -343,7 +348,8 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         result.meshes[layer] = m
         side = "F" if layer == FRONT else "B"
         for net, trace in enumerate(m.traces):
-            result.tracks.append(Track(trace, layer, f"MESH_{side}{net + 1}", w))
+            arcs = m.arcs[net] if m.arcs else None
+            result.tracks.append(Track(trace, layer, f"MESH_{side}{net + 1}", w, arcs))
         # The loops' ends, across the cable from pin 1's side: they run on into the cable.
         tracks[layer] = sorted(
             (
@@ -624,6 +630,23 @@ def to_kicad(result: Layout, name: str = "pillowbox") -> Any:
 
     for track in result.tracks:
         net = board.net_id(track.net)
+        if track.arcs:
+            for a, m, b in track.arcs:
+                board.add(
+                    kpcb.TrackSegment(
+                        start=xy(a), end=xy(b), width=track.width, layer=track.layer, net=net
+                    )
+                    if m is None
+                    else kpcb.TrackArc(
+                        start=xy(a),
+                        mid=xy(m),
+                        end=xy(b),
+                        width=track.width,
+                        layer=track.layer,
+                        net=net,
+                    )
+                )
+            continue
         for a, b in itertools.pairwise(track.points):
             board.add(
                 kpcb.TrackSegment(

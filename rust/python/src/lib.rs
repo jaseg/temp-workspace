@@ -5,6 +5,7 @@ use numpy::ndarray::Array2;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use yanartas_mesh_core::arcs::{fit, Piece};
 use yanartas_mesh_core::curve::{relax, CurveInput, CurveParams};
 use yanartas_mesh_core::graph::{curve, GraphInput, GraphParams, Segment};
 use yanartas_mesh_core::lanes::{lanes, LaneParams};
@@ -312,8 +313,51 @@ fn _cells<'py>(
     PyList::new(py, out.iter().map(|c| array(py, &c[0])))
 }
 
+/// Each polyline as lines and circular arcs within `tol` of it: per line an (m, 7) array,
+/// a row per piece: kind (0 line, 1 arc), start, middle (an arc's halfway point; a line's
+/// middle), end.
+#[pyfunction]
+fn fit_arcs<'py>(
+    py: Python<'py>,
+    lines: Vec<PyReadonlyArray2<'py, f64>>,
+    tol: f64,
+) -> PyResult<Bound<'py, PyList>> {
+    let lines: Vec<Vec<P>> = lines.iter().map(points).collect::<PyResult<_>>()?;
+    let out: Vec<Vec<[f64; 7]>> = py.allow_threads(|| {
+        lines
+            .iter()
+            .map(|l| fit(l, tol).iter().map(row).collect())
+            .collect()
+    });
+    PyList::new(
+        py,
+        out.iter().map(|rows| {
+            let flat: Vec<f64> = rows.iter().flatten().copied().collect();
+            Array2::from_shape_vec((rows.len(), 7), flat)
+                .expect("(m, 7)")
+                .into_pyarray(py)
+        }),
+    )
+}
+
+fn row(p: &Piece) -> [f64; 7] {
+    match *p {
+        Piece::Line(a, b) => [
+            0.0,
+            a[0],
+            a[1],
+            (a[0] + b[0]) / 2.0,
+            (a[1] + b[1]) / 2.0,
+            b[0],
+            b[1],
+        ],
+        Piece::Arc(a, m, b) => [1.0, a[0], a[1], m[0], m[1], b[0], b[1]],
+    }
+}
+
 #[pymodule]
 fn yanartas_mesh(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(fit_arcs, m)?)?;
     m.add_function(wrap_pyfunction!(_cells, m)?)?;
     m.add_function(wrap_pyfunction!(curve_graph, m)?)?;
     m.add_function(wrap_pyfunction!(settle_traces, m)?)?;

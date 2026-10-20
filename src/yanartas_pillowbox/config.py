@@ -404,6 +404,20 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "but takes a minute or more per layer.",
     ),
     FieldSpec(
+        "mesh_shape",
+        "Mesh traces",
+        "choice",
+        "PCB mesh",
+        choices=(
+            ("lines", "Straight segments"),
+            ("arcs", "Lines and arcs"),
+        ),
+        help="Space-filling curve: how its traces are drawn. Straight segments: the "
+        "polylines, simplified. Lines and arcs: each trace redrawn in straight lines and "
+        "circular arcs (KiCad track arcs) within a few micrometres of it, for far fewer, "
+        "smoother pieces.",
+    ),
+    FieldSpec(
         "mesh_back_offset",
         "Back mesh offset",
         "choice",
@@ -479,6 +493,7 @@ class Config:
     mesh_edge_clearance: float = 0.5
     mesh_seed: float = 0.0
     mesh_algorithm: str = "kimesh"
+    mesh_shape: str = "lines"
     mesh_back_offset: str = "cell"
     thickness: float = 0.2
     print_side: str = "outside"

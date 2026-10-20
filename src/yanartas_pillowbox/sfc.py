@@ -62,8 +62,10 @@ from yanartas_pillowbox.mesh import (
     Grid,
     Mesh,
     MeshError,
+    Piece,
     Point,
     resample,
+    sample_arcs,
 )
 
 try:  # (the settling's Rust core, on all cores: rust/python; the browser has its wasm)
@@ -84,6 +86,7 @@ FINE = 4  # the traces offset from the curve split this many times finer
 RAMP = 3  # ... ramped in over this many vertices off the tongue
 MARGIN = 0.02  # ... at a pitch this much above the least (but at the exit)
 SIMPLIFY = 0.002  # the traces simplified within this (mm; well within the margin)
+ARCS = 0.002  # drawn in lines and arcs (``arcs``): within this of the traces (mm)
 INSIDE = 0.9  # traces inside a bend keep within this share of its radius
 PUSH_MARGIN = 1.04  # runs closer than this many times their least spacing: pushed apart
 BEND_SLACK = 0.85  # bends this much tighter than the tightest: smoothed (U-turns sit at it)
@@ -465,7 +468,13 @@ def _browser_core() -> object | None:
         pts = np.asarray(out.points.to_py(), float).reshape(-1, 2)
         return pts, list(out.region.to_py()), int(out.cells), int(out.left)
 
+    def fit_arcs(lines, tol):  # noqa: ANN001, ANN202
+        out = mesh.fit_arcs(*flat(lines), tol)
+        rows = np.asarray(out.rows.to_py(), float).reshape(-1, 7)
+        return np.split(rows, np.cumsum(np.asarray(out.counts.to_py(), int))[:-1])
+
     return types.SimpleNamespace(
+        fit_arcs=fit_arcs,
         settle_traces=settle_traces,
         relax_curve=relax_curve,
         offset_lanes=offset_lanes,
@@ -506,6 +515,7 @@ def generate(
     pitch: float,
     seed: int | str | None = 0,
     zones: tuple[Polygon, ...] | list[Polygon] = (),
+    arcs: bool = False,
 ) -> Mesh:
     """The mesh over ``mask``: ``traces`` nets at ``pitch`` (trace plus space) round a closed
     space-filling curve, out through the exit cell (as ``kimesh.generate``: its corner with
@@ -562,14 +572,32 @@ def generate(
         progress.report("lanes", traces=len(lines))
         lines = _settle(lines, pitch, area, regions, keep)
     progress.report("match", 1, 1)
-    for xy in lines:
-        line = LineString(xy)
-        tol = SIMPLIFY * pitch / 0.3
-        fast = line.simplify(tol, preserve_topology=False)
-        line = fast if fast.is_simple else line.simplify(tol, preserve_topology=True)
-        out.append(frame.inv(np.asarray(line.coords)))
+    shapes: list[tuple[Piece, ...] | None] = []
+    if arcs:
+        tol = ARCS * pitch / 0.3
+        for rows in _core().fit_arcs([np.ascontiguousarray(xy, float) for xy in lines], tol):
+            ends = frame.inv(np.asarray(rows, float)[:, 1:].reshape(-1, 2)).reshape(-1, 3, 2)
+            pieces = tuple(
+                (
+                    (float(a[0]), float(a[1])),
+                    (float(m[0]), float(m[1])) if kind else None,
+                    (float(b[0]), float(b[1])),
+                )
+                for kind, (a, m, b) in zip(np.asarray(rows)[:, 0], ends, strict=True)
+            )
+            shapes.append(pieces)
+            out.append(np.asarray(sample_arcs(pieces, tol)))
+    else:
+        for xy in lines:
+            line = LineString(xy)
+            tol = SIMPLIFY * pitch / 0.3
+            fast = line.simplify(tol, preserve_topology=False)
+            line = fast if fast.is_simple else line.simplify(tol, preserve_topology=True)
+            out.append(frame.inv(np.asarray(line.coords)))
+            shapes.append(None)
     # net 1 outermost: its ends farthest from the exit's middle
     mid = frame.inv(np.array([[(ax + bx) / 2, y0]]))[0]
-    out.sort(key=lambda t: -math.dist(t[0], mid))
-    nets = tuple(tuple((float(x), float(y)) for x, y in t) for t in out)
-    return Mesh(nets, c, cells, left, exit_corner, "sfc")
+    order = sorted(range(len(out)), key=lambda i: -math.dist(out[i][0], mid))
+    nets = tuple(tuple((float(x), float(y)) for x, y in out[i]) for i in order)
+    shaped = tuple(shapes[i] for i in order) if arcs else None
+    return Mesh(nets, c, cells, left, exit_corner, "sfc", shaped)

@@ -2,6 +2,7 @@
 //! extension, on all cores) and in the browser (WebAssembly). The algorithm follows
 //! `sfc._settle` and `sfc._match`; see ARCHITECTURE.md.
 
+pub mod arcs;
 pub mod closed;
 pub mod curve;
 pub mod geom;

@@ -23,6 +23,8 @@ from dataclasses import dataclass
 import numpy as np
 
 Point = tuple[float, float]
+# A piece of a trace drawn in lines and arcs: start, an arc's halfway point (a line: None), end.
+Piece = tuple[Point, Point | None, Point]
 CHUNK = 50_000  # queries at a time (bounds the memory a query takes)
 PAIRS = 2_000_000  # ray-segment pairs at a time (bounds the memory a ray cast takes)
 
@@ -46,10 +48,40 @@ class Mesh:
     unreached: int  # parts the mesh could not reach (KiMesh: grid cells; sfc: regions)
     origin: Point = (0.0, 0.0)  # the exit cell's corner: the grid's alignment
     algorithm: str = "kimesh"  # what laid it out: "kimesh" or "sfc"
+    # each net as lines and arcs (``traces`` then: these drawn as a polyline), if fitted
+    arcs: tuple[tuple[Piece, ...], ...] | None = None
 
     @property
     def ends(self) -> tuple[tuple[Point, Point], ...]:
         return tuple((t[0], t[-1]) for t in self.traces)
+
+
+def sample_arcs(pieces: Sequence[Piece], tol: float) -> tuple[Point, ...]:
+    """The pieces as a polyline: each arc's chords within ``tol`` of it."""
+    out: list[Point] = [pieces[0][0]] if pieces else []
+    for a, m, b in pieces:
+        if m is not None:
+            # (the circle through the three points; the way round from a through m to b)
+            (ax, ay), (mx, my), (bx, by) = a, m, b
+            d = 2 * (ax * (my - by) + mx * (by - ay) + bx * (ay - my))
+            if abs(d) > 1e-12:
+                a2, m2, b2 = ax * ax + ay * ay, mx * mx + my * my, bx * bx + by * by
+                ox = (a2 * (my - by) + m2 * (by - ay) + b2 * (ay - my)) / d
+                oy = (a2 * (bx - mx) + m2 * (ax - bx) + b2 * (mx - ax)) / d
+                r = math.dist((ox, oy), a)
+                t0 = math.atan2(ay - oy, ax - ox)
+                tm = (math.atan2(my - oy, mx - ox) - t0) % math.tau
+                sweep = (math.atan2(by - oy, bx - ox) - t0) % math.tau
+                if tm > sweep:
+                    sweep -= math.tau
+                step = 2 * math.acos(max(1 - tol / r, -1.0))
+                k = max(2, math.ceil(abs(sweep) / step))
+                out += [
+                    (ox + r * math.cos(t0 + sweep * i / k), oy + r * math.sin(t0 + sweep * i / k))
+                    for i in range(1, k)
+                ]
+        out.append(b)
+    return tuple(out)
 
 
 def straighten(pts: list[Point]) -> tuple[Point, ...]:
