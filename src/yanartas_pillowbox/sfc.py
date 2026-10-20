@@ -1519,7 +1519,11 @@ class _Traces:
 
 
 def _settle(
-    lines: list[np.ndarray], pitch: float, area: shapely.Geometry, keep: shapely.Geometry
+    lines: list[np.ndarray],
+    pitch: float,
+    area: shapely.Geometry,
+    regions: list[Polygon],
+    keep: shapely.Geometry,
 ) -> list[np.ndarray]:
     """The traces, each settled on its own into the room around it: every vertex moved
     towards the middle between the nearest copper on either side of it (the area's edge
@@ -1537,7 +1541,22 @@ def _settle(
     own = 0.5 * pitch  # (the trace's own vertices nearer along it: not copper across)
     tr = _Traces([resample(np.asarray(t, float), step) for t in lines])
     n = len(lines)
+    # (the area's edge, and the zones' borders but where the traces cross them, at the
+    # curve's joins: there the traces stay as laid, a few pitches either way)
     edge = np.vstack([resample(np.asarray(r.coords), step / 2) for r in _rings(area)])
+    borders = _borders(regions, area, step / 2)
+    xs = shapely.get_coordinates(
+        shapely.intersection(
+            shapely.MultiLineString(lines), shapely.union_all([r.boundary for r in regions])
+        )
+    )
+    if len(borders) and len(xs):
+        near_x = Grid(xs, far).nearest(borders)
+        clear = (near_x < 0) | (np.hypot(*(borders - xs[np.maximum(near_x, 0)]).T) > far)
+        edge = np.vstack([edge, borders[clear]])
+    elif len(borders):
+        edge = np.vstack([edge, borders])
+    pin = math.ceil(SETTLE_REACH / SETTLE_STEP)  # (vertices either way)
     edges = Grid(edge, far)
     shapely.prepare(keep)
     total = np.array([float(np.sum(np.hypot(*np.diff(t, axis=0).T))) for t in lines])
@@ -1563,6 +1582,12 @@ def _settle(
         for _ in range(4):  # (and a few vertices on from the ends)
             fixed |= fixed[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
             fixed |= fixed[np.maximum(tr.next, 0)] & (tr.next >= 0)
+        zone = _region_of(regions, p)
+        join = (tr.next >= 0) & (zone != zone[np.maximum(tr.next, 0)])
+        for _ in range(pin):
+            join |= join[np.maximum(tr.prev, 0)] & (tr.prev >= 0)
+            join |= join[np.maximum(tr.next, 0)] & (tr.next >= 0)
+        fixed |= join
         look = np.arange(len(p))
         if hot is not None:
             cell = np.floor(p / near).astype(np.int64)
@@ -1919,7 +1944,7 @@ def generate(
         lines.append(np.asarray(line.coords))
     if SETTLE:
         keep = shapely.box(x0 - c, ytop - c, x0 + 2 * c, ym + spacing)  # (the exit: as laid)
-        lines = _settle(lines, pitch, area, keep)
+        lines = _settle(lines, pitch, area, regions, keep)
     for xy in lines:
         line = LineString(xy)
         tol = SIMPLIFY * pitch / 0.3

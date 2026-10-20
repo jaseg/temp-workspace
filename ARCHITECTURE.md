@@ -92,7 +92,7 @@ outputs.
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
 | `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
 | `test_mesh.py` | The shared metrics: spacing of parallel traces and across islands (not past the edge), skew of detours. |
-| `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing mostly within band and few islands, repeatable seeds, holes. |
+| `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing rarely below the nominal and few islands (settled), repeatable seeds, holes. |
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
 | `test_pcb.py` | The PCB layout: the pinout, both meshes, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring. A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
@@ -304,10 +304,13 @@ inner flap's free edge.
      into it, so a U-turn's innermost trace keeps its tip and closes up its legs. Filling
      holes lengthens the outermost traces (only they face holes), so length is steered:
      by each trace's length run from the exit at its place along the curve (a place kept
-     per vertex as laid), a trace behind a neighbour has its bends about a pitch across
-     grown into what room there is (fingers, squiggles), one ahead has the bumps it pushes
-     towards that neighbour straightened, giving the room up to it (well ahead, its fingers
-     into holes too: skew before coverage). All moves die down over the steps
+     per vertex as laid, against the traces' lengths as laid), a trace behind a neighbour
+     has its bends about a pitch across grown into what room there is (fingers,
+     squiggles), one ahead has the bumps it pushes towards that neighbour straightened,
+     giving the room up to it (well ahead, its fingers into holes too: skew before
+     coverage). It is steered only where the lead is still being built up (over about 15
+     mm of curve it gains on the neighbour the way it leads): steered all along after a
+     lead, a long trace took it back many times over and swung. All moves die down over the steps
      (annealing), or the layout churns and the steering chases its tail. Every move keeps
      a pitch (+1 %) from other copper, measured to segments, and from the trace itself
      where it faces itself across; none crosses. Only vertices near ones that moved are

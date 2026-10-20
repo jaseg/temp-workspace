@@ -64,11 +64,12 @@ def test_layout(n, side, corner):
         assert len(shapely.get_parts(line.intersection(FOLD))) == 2
     for a, b in itertools.combinations(lines, 2):  # no two traces touch (no shorts)
         assert a.distance(b) > PITCH / 2
-    # the space between the traces: mostly within the nominal one -5 / +20 %, rarely below
+    # the space between the traces: rarely below the nominal one, much of it within -5 /
+    # +20 % (settled, the room left over is shared out evenly, a little over that)
     sp = mesh.spacing(m.traces, PITCH / 2, PITCH / 2)
     assert sp.under < 0.05 * sp.measured and sp.below < 0.1 * sp.measured
-    assert sp.within > 0.5 * sp.measured and sp.least > 0  # (rare tight spots allowed)
-    assert sp.wide < 0.15 * sp.measured  # (few islands between the curve's runs)
+    assert sp.within > 0.35 * sp.measured and sp.least > 0  # (rare tight spots allowed)
+    assert sp.wide < 0.08 * sp.measured  # (few islands between the curve's runs, settled)
 
 
 def test_seed_repeats_the_layout():
