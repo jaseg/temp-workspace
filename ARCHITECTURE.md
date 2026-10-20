@@ -294,7 +294,26 @@ inner flap's free edge.
      where that pays back the skew run up so far (eased in and out over a few vertices).
      Loops and backward runs an offset makes inside a tight bend are cut out; the traces are
      cut where the tongue leaves through the exit.
-  The default box takes about 2.5 min per layer.
+  9. *Settling* (`_settle`, not in the reference): the traces, offsets of one curve, leave
+     every gap between two runs as wide as the runs are apart, and the holes where runs
+     meet. So each trace is then moved on its own, by steps (`SETTLE`), towards the middle
+     between the nearest copper on either side of it (nothing within three pitches: a hole,
+     moved into; the area's edge standing for copper at twice its distance). Smoothness
+     counts for little: a trace may kink into a hole's corner (only jitter is smoothed, by
+     a Taubin step); but in a bend tighter than 1.5 pitches nothing moves along its axis
+     into it, so a U-turn's innermost trace keeps its tip and closes up its legs. Filling
+     holes lengthens the outermost traces (only they face holes), so length is steered:
+     by each trace's length run from the exit at its place along the curve (a place kept
+     per vertex as laid), a trace behind a neighbour has its bends about a pitch across
+     grown into what room there is (fingers, squiggles), one ahead has the bumps it pushes
+     towards that neighbour straightened, giving the room up to it (well ahead, its fingers
+     into holes too: skew before coverage). All moves die down over the steps
+     (annealing), or the layout churns and the steering chases its tail. Every move keeps
+     a pitch (+1 %) from other copper, measured to segments, and from the trace itself
+     where it faces itself across; none crosses. Only vertices near ones that moved are
+     looked at again (a grid query of all pairs within a radius).
+  The default box takes about 2.5 min per layer, and settling as long again or more (see
+  Later).
 - **Check** (`verify`, run at the end of every `layout`): the tracks' points joined along
   each track and through the vias (union-find on µm-rounded points): every mesh net one
   piece, ending on exactly its two contact pads; per layer, every pair of copper pieces of
@@ -316,10 +335,9 @@ inner flap's free edge.
 - **Later.** A port of the curve layout to Rust compiled to WebAssembly (run natively in
   the browser, and from the Python CLI through wasmtime) for speed, once the algorithm is
   settled; an alignment field (the reference's needles) to lay the curve along the edges;
-  a progress bar for the mesh layout; per-trace settling (`sfc._settle`, off for now:
-  `SETTLE = 0`) still lets a trace pinch within 0.06 mm of itself near tight hairpins, and
-  takes minutes on a small area; its skew limit (`SETTLE_SKEW`) is off: reconsider it,
-  since filling holes with the outer traces alone skews pairs by ~100 mm over 3 m; a switch to draw the traces as circular arcs (now
+  a progress bar for the mesh layout; settling's hard skew limit (`SETTLE_SKEW`, off:
+  the steering keeps neighbouring traces within a few mm instead): reconsider it; a
+  switch to draw the traces as circular arcs (now
   polylines, simplified within 2 µm).
 - **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board
   renderer fails on footprints, so `render_stack` draws the tracks, vias, graphics and

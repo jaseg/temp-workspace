@@ -96,8 +96,13 @@ SETTLE_RATE = 0.5  # ... the share of the way there a step goes
 SETTLE_REACH = 3.0  # ... copper looked for this many pitches out (beyond: a hole, moved into)
 SETTLE_PIN = 1.5  # ... bends tighter than this many pitches' radius do not move inwards
 SETTLE_COOL = 2.0  # ... the moves dying down over the steps as (1 - step / steps) to this
-SETTLE_TUNE = 6.0  # ... a trace this many pitches behind (or ahead): steered at full strength
-SETTLE_STEER = 0.3  # ... the share of its bends' depth a step grows (or straightens) them by
+SETTLE_STEP = 0.5  # ... the traces held at this many pitches between vertices
+SETTLE_STILL = 0.005  # ... moves shorter than this many pitches: none
+SETTLE_TRIM = 0  # ... then steps of length steering alone, trimming the skew left
+SETTLE_BAND = 1.0  # ... traces within this many pitches of length of each other: not steered
+SETTLE_LEAP = 0.34  # ... a vertex moved at most this many of the steps between vertices
+SETTLE_TUNE = 3.0  # ... a trace this many pitches behind (or ahead): steered at full strength
+SETTLE_STEER = 0.6  # ... the share of its bends' depth a step grows (or straightens) them by
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -1526,7 +1531,7 @@ def _settle(
     curve: where one is ahead, it stops gaining (or the other losing) until the other
     catches up. Only vertices near ones that moved are looked at again. The ends and the
     exit (``keep``) stay as laid."""
-    step = pitch / 2
+    step = SETTLE_STEP * pitch
     near, far = 2 * pitch, SETTLE_REACH * pitch
     own = 0.5 * pitch  # (the trace's own vertices nearer along it: not copper across)
     tr = _Traces([np.asarray(t, float) for t in lines]).respaced(step)
@@ -1541,8 +1546,12 @@ def _settle(
     limit = SETTLE_SKEW * pitch
     sides = _neighbour_sides(tr)
     hot = None
-    for it in range(SETTLE):
-        cool = (1 - it / SETTLE) ** SETTLE_COOL  # (annealed: the moves die down)
+    it = 0
+    while it < SETTLE + SETTLE_TRIM:
+        # annealed: the moves die down over the steps; then a few steps of length steering
+        # alone (from half strength, dying down too) trim what skew is left
+        cool = (1 - it / SETTLE) ** SETTLE_COOL if it < SETTLE else 0.0
+        steer = cool if it < SETTLE else 0.5 * (1 - (it - SETTLE) / SETTLE_TRIM) ** SETTLE_COOL
         p, net = tr.p, tr.net
         arc = tr.arc()
         where = np.minimum((tr.u * bins).astype(int), bins - 1)
@@ -1553,7 +1562,7 @@ def _settle(
             fixed |= fixed[np.maximum(tr.next, 0)] & (tr.next >= 0)
         look = np.arange(len(p))
         if hot is not None:
-            cell = np.floor(p / far).astype(np.int64)
+            cell = np.floor(p / near).astype(np.int64)
             look = np.nonzero(np.isin(cell[:, 0] * 1_000_003 + cell[:, 1], hot))[0]
         push = np.zeros(len(p))
         if len(look):
@@ -1580,14 +1589,16 @@ def _settle(
         grow = np.zeros(len(p))
         for t, u in [(i, j) for i in range(n) for j in (i - 1, i + 1) if 0 <= j < n]:
             mine = net == t
-            lead = (run[t] - run[u])[where[mine]] / (SETTLE_TUNE * pitch)
+            lead = (run[t] - run[u])[where[mine]]
+            lead = np.sign(lead) * np.maximum(np.abs(lead) - SETTLE_BAND * pitch, 0.0)
+            lead /= SETTLE_TUNE * pitch
             grow[mine] = np.maximum(grow[mine], np.clip(-lead, 0.0, 1.0))
             toward = sides[t, u] * normal[mine]  # (to the neighbour)
             pushes = np.sum(bend[mine] * toward, axis=1) < 0  # (a bump towards it)
             # (well ahead, its other bumps, out into holes, too: skew before coverage)
             give = np.clip(lead, 0.0, 1.0) * np.where(pushes, 1.0, np.clip(lead - 1, 0.0, 1.0))
-            move[mine] += (SETTLE_STEER * cool * give)[:, None] * bend[mine]
-        move -= (SETTLE_STEER * cool * grow)[:, None] * bend
+            move[mine] += (SETTLE_STEER * steer * give)[:, None] * bend[mine]
+        move -= (SETTLE_STEER * steer * grow)[:, None] * bend
         ahead = np.zeros((n, bins))
         for t in range(n - 1):
             ahead[t] = np.maximum(ahead[t], run[t] - run[t + 1])
@@ -1602,7 +1613,8 @@ def _settle(
         )
         move[stop | fixed] = 0.0
         size = np.hypot(move[:, 0], move[:, 1])
-        move *= np.minimum(1.0, (step / 3) / np.maximum(size, 1e-12))[:, None]
+        move *= np.minimum(1.0, SETTLE_LEAP * step / np.maximum(size, 1e-12))[:, None]
+        move[size < SETTLE_STILL * pitch] = 0.0  # (too little to bother with)
         new = p + move
         # jitter smoothed away (Taubin: no shrinking) round what moved, but where fixed
         busy = np.hypot(move[:, 0], move[:, 1]) > 0
@@ -1611,6 +1623,9 @@ def _settle(
         for f in (0.3, -0.32):
             lap = (new[np.maximum(tr.prev, 0)] + new[np.maximum(tr.next, 0)]) / 2 - new
             new[busy] += f * lap[busy]
+        new[np.hypot(*(new - p).T) < SETTLE_STILL * pitch / 4] = p[
+            np.hypot(*(new - p).T) < SETTLE_STILL * pitch / 4
+        ]  # (the smoothing's least touches: not moves)
         new = _keep_clear(tr, p, new, pitch, own)
         # skew, exactly: where a pair's running difference passes the limit and grew, the
         # moves of the trace that gained more there taken back
@@ -1633,9 +1648,13 @@ def _settle(
             new[back] = p[back]
             new = _keep_clear(tr, p, new, pitch, own)
         moved = np.hypot(*(new - p).T) > 0.02 * pitch
+        it += 1
         if not moved.any():
-            break
-        cell = np.unique(np.floor(new[moved] / far).astype(np.int64), axis=0)
+            if it > SETTLE:
+                break
+            it, hot = SETTLE, None  # (settled: on to the trimming, all looked at again)
+            continue
+        cell = np.unique(np.floor(new[moved] / near).astype(np.int64), axis=0)
         cell = np.unique((cell[:, None, :] + _AROUND[None]).reshape(-1, 2), axis=0)
         hot = cell[:, 0] * 1_000_003 + cell[:, 1]
         tr.p = new
@@ -1802,6 +1821,10 @@ def _keep_clear(
         bad = np.unique(q[(d < need) & (~same | across)])
         # segments that cross
         seg = np.nonzero(tr.next >= 0)[0]
+        if len(check) < len(new) // 4:  # (few: only the segments near them can be crossed)
+            _, near = Grid(new, reach).within(new[check], reach)
+            near = np.unique(np.concatenate([near, tr.prev[near], check]))
+            seg = np.intersect1d(seg, near[near >= 0])
         touch = np.isin(seg, check) | np.isin(tr.next[seg], check)
         a, b = new[seg], new[tr.next[seg]]
         e = b - a
