@@ -10,5 +10,6 @@ default = ["parallel"]
 parallel = ["dep:rayon"]
 
 [dependencies]
+geo = { version = "0.33.1", default-features = false }
 rayon = { version = "1.10", optional = true }
 wide = "1.0"

@@ -5,9 +5,11 @@
 pub mod closed;
 pub mod curve;
 pub mod geom;
+pub mod graph;
 pub mod grid;
 pub mod lanes;
 pub(crate) mod par;
+pub mod poly;
 pub mod segs;
 pub mod settle;
 pub mod traces;

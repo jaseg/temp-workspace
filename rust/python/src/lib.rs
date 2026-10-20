@@ -6,6 +6,7 @@ use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use yanartas_mesh_core::curve::{relax, CurveInput, CurveParams};
+use yanartas_mesh_core::graph::{curve, GraphInput, GraphParams, Segment};
 use yanartas_mesh_core::lanes::{lanes, LaneParams};
 use yanartas_mesh_core::{geom::P, settle, Input, Params, Status};
 
@@ -238,8 +239,83 @@ fn offset_lanes<'py>(
     PyList::new(py, out.iter().map(|t| array(py, t)))
 }
 
+/// The curve's graph walked into a curve (`sfc._curve`): `segments` each (region, its
+/// domain's rings), `borders` each (region, region, the lines of their shared border; the
+/// longest first), `mouth` the tongue's ends, `seed` the random seed. Returns the curve's
+/// points, each one's region, the number of cells and of regions left out.
+#[pyfunction]
+#[pyo3(signature = (segments, borders, mouth, spacing, seed, params, progress=None))]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+fn curve_graph<'py>(
+    py: Python<'py>,
+    segments: Vec<(usize, Vec<PyReadonlyArray2<'py, f64>>)>,
+    borders: Vec<(usize, usize, Vec<PyReadonlyArray2<'py, f64>>)>,
+    mouth: ((f64, f64), (f64, f64)),
+    spacing: f64,
+    seed: u64,
+    params: &Bound<'py, PyDict>,
+    progress: Option<PyObject>,
+) -> PyResult<(Bound<'py, PyArray2<f64>>, Vec<usize>, usize, usize)> {
+    let input = GraphInput {
+        segments: segments
+            .iter()
+            .map(|(r, rings)| {
+                Ok(Segment {
+                    region: *r,
+                    domain: rings.iter().map(points).collect::<PyResult<_>>()?,
+                })
+            })
+            .collect::<PyResult<_>>()?,
+        borders: borders
+            .iter()
+            .map(|(i, j, lines)| Ok((*i, *j, lines.iter().map(points).collect::<PyResult<_>>()?)))
+            .collect::<PyResult<_>>()?,
+        mouth: [[mouth.0 .0, mouth.0 .1], [mouth.1 .0, mouth.1 .1]],
+        spacing,
+        seed,
+    };
+    let mut prm = GraphParams::default();
+    read!(params, prm, seed_spacing, lloyd, attempts);
+    let mut failed: Option<PyErr> = None;
+    let out = py.allow_threads(|| {
+        curve(&input, &prm, &mut |step, steps| {
+            if let (Some(cb), None) = (&progress, &failed) {
+                Python::with_gil(|py| {
+                    if let Err(e) = cb.call1(py, (step, steps)) {
+                        failed = Some(e);
+                    }
+                });
+            }
+        })
+    });
+    if let Some(e) = failed {
+        return Err(e);
+    }
+    let c = out.map_err(pyo3::exceptions::PyValueError::new_err)?;
+    Ok((array(py, &c.pts), c.region, c.cells, c.left))
+}
+
+/// (testing) The tessellation of one domain: its cells' outlines.
+#[pyfunction]
+fn _cells<'py>(
+    py: Python<'py>,
+    domain: Vec<PyReadonlyArray2<'py, f64>>,
+    d: f64,
+    seed: u64,
+    pin: Option<(f64, f64)>,
+    lloyd: usize,
+) -> PyResult<Bound<'py, PyList>> {
+    let domain: Vec<Vec<P>> = domain.iter().map(points).collect::<PyResult<_>>()?;
+    let mut rng = yanartas_mesh_core::graph::Rng::new(seed);
+    let out =
+        yanartas_mesh_core::graph::cells(&domain, d, &mut rng, pin.map(|p| [p.0, p.1]), lloyd);
+    PyList::new(py, out.iter().map(|c| array(py, &c[0])))
+}
+
 #[pymodule]
 fn yanartas_mesh(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(_cells, m)?)?;
+    m.add_function(wrap_pyfunction!(curve_graph, m)?)?;
     m.add_function(wrap_pyfunction!(settle_traces, m)?)?;
     m.add_function(wrap_pyfunction!(relax_curve, m)?)?;
     m.add_function(wrap_pyfunction!(offset_lanes, m)?)?;

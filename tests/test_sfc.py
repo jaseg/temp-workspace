@@ -5,6 +5,7 @@ across their border as seldom as can be."""
 import itertools
 import math
 
+import numpy as np
 import pytest
 import shapely
 from shapely.geometry import LineString
@@ -88,3 +89,19 @@ def test_without_zones_and_with_a_hole():
 def test_no_room_for_the_exit():
     with pytest.raises(mesh.MeshError):
         sfc.generate(shapely.box(0, 0, 1, 1), (0, 0), mesh.UP, 4, PITCH)
+
+
+def test_cells_tile_their_domain():
+    """The Rust core's centroidal Voronoi cells cover the domain once (no gaps, no overlap,
+    no slivers), round a hole too."""
+    import yanartas_mesh
+    from shapely.geometry import Polygon
+
+    domain = shapely.box(0, 0, 12, 8).difference(shapely.box(5, 3, 7, 5))
+    rings = [np.asarray(r.coords)[:-1] for r in (domain.exterior, *domain.interiors)]
+    cells = [Polygon(c) for c in yanartas_mesh._cells(rings, 1.5, 3, None, 6)]
+    union = shapely.union_all(cells)
+    assert all(c.is_valid for c in cells)
+    assert math.isclose(sum(c.area for c in cells), domain.area, rel_tol=1e-9)
+    assert math.isclose(union.area, domain.area, rel_tol=1e-9)
+    assert min(c.area for c in cells) > 0.05 * 1.5**2
