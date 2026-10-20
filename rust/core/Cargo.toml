@@ -1,0 +1,12 @@
+[package]
+name = "pillowbox-mesh-core"
+description = "The mesh layout's settling for yanartas-pillowbox (the traces moved into the room round them)."
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = ["parallel"]
+parallel = ["dep:rayon"]
+
+[dependencies]
+rayon = { version = "1.10", optional = true }

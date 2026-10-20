@@ -9,3 +9,4 @@ build/
 /yanartas-pillowbox.json
 /artifact/dist/
 /artifact/.cache/
+/rust/target/

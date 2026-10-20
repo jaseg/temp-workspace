@@ -68,6 +68,11 @@ from yanartas_pillowbox.mesh import (
     resample,
 )
 
+try:  # (the settling in Rust, on all cores: rust/python; else the numpy below)
+    import pillowbox_mesh as _native
+except ImportError:  # pragma: no cover
+    _native = None
+
 SPACING = 1.0  # the curve's target spacing, in multiples of its least (n pitches)
 SEED_SPACING = 1.4  # the CVT seeds' spacing, in target spacings (the cycle comes out sparser)
 LLOYD = 6  # Lloyd iterations of the seeds
@@ -110,6 +115,8 @@ MATCH = 20  # steps matching the settled traces' lengths (taking it out of the l
 # (the band above how far the leads swing to and fro through the bends: else every swing is cut)
 MATCH_BAND = 15.0  # ... no trace more than this many pitches ahead of the shortest
 MATCH_RATE = 0.5  # ... the share of their bends' depth a step straightens them by, at most
+SETTLE_NATIVE = True  # ... in Rust when its extension is installed (pillowbox_mesh)
+PROGRESS = None  # called with each settling step's figures (a dict), when set
 SETTLE_SKEW = math.inf  # ... neighbouring traces kept within this many pitches of length (TODO)
 ATTEMPTS = 8  # tries with fresh seeds when a graph comes out degenerate
 
@@ -1562,6 +1569,17 @@ def _settle(
         edge = np.vstack([edge, borders[clear]])
     elif len(borders):
         edge = np.vstack([edge, borders])
+    if _native is not None and SETTLE_NATIVE:
+        out = _native.settle_traces(
+            [np.ascontiguousarray(t, float) for t in lines],
+            pitch,
+            np.ascontiguousarray(edge, float),
+            [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
+            tuple(float(v) for v in keep.bounds),
+            _params(),
+            PROGRESS,
+        )
+        return [np.asarray(t) for t in out]
     pin = math.ceil(SETTLE_REACH / SETTLE_STEP)  # (vertices either way)
     edges = Grid(edge, far)
     shapely.prepare(keep)
@@ -1709,6 +1727,30 @@ def _settle(
             _TRACE.append((int(moved.sum()), gained.sum(axis=1).round(1).tolist(), apart))
     tr = _match(tr, base, bins, pitch, regions, keep, pin, own)
     return tr.lines()
+
+
+def _params() -> dict[str, float]:
+    """The settling's constants, by the Rust core's names for them."""
+    return {
+        "steps": SETTLE,
+        "rate": SETTLE_RATE,
+        "reach": SETTLE_REACH,
+        "pin": SETTLE_PIN,
+        "cool": SETTLE_COOL,
+        "step": SETTLE_STEP,
+        "still": SETTLE_STILL,
+        "band": SETTLE_BAND,
+        "leap": SETTLE_LEAP,
+        "tune": SETTLE_TUNE,
+        "steer": SETTLE_STEER,
+        "span": SETTLE_SPAN,
+        "steer_cool": SETTLE_STEER_COOL,
+        "tip": SETTLE_TIP,
+        "reach_out": SETTLE_REACH_OUT,
+        "match_steps": MATCH,
+        "match_band": MATCH_BAND,
+        "match_rate": MATCH_RATE,
+    }
 
 
 def _held(

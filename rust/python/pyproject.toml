@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "pillowbox-mesh"
+description = "The mesh layout's settling for yanartas-pillowbox, in Rust (optional: the package falls back to numpy)."
+requires-python = ">=3.11"
+dependencies = ["numpy"]
+dynamic = ["version"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "pillowbox_mesh"
