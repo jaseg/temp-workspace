@@ -279,61 +279,80 @@ function checkMeshCurrent(config) {
   }
 }
 
-/** The mesh's figures, under their own title in the Derived geometry box (none: hidden). */
+/** Rows of a stats table: [label, value, unit, bad, title]; a number value is shown with
+ *  ``digits`` places (default 2), a string as it is. */
+function fillStats(table, rows) {
+  table.replaceChildren(...rows.map(([label, value, unit = "", bad = false, title = "", digits = 2]) => {
+    const tr = document.createElement("tr");
+    if (bad) tr.classList.add("bad");
+    if (title) tr.title = title;
+    const th = Object.assign(document.createElement("th"), { scope: "row", textContent: label });
+    const v = Object.assign(document.createElement("td"), {
+      className: "value",
+      textContent: typeof value === "number" ? value.toFixed(digits) : value,
+    });
+    const u = Object.assign(document.createElement("td"), { className: "unit", textContent: unit });
+    tr.append(th, v, u);
+    return tr;
+  }));
+}
+
+/** The mesh's figures, under their own title in the Derived geometry box (none yet: a
+ *  placeholder). */
 function renderMeshStats(pcb) {
-  $("#mesh-stats").hidden = !pcb;
-  if (!pcb) return;
+  if (!pcb) {
+    const td = Object.assign(document.createElement("td"), {
+      colSpan: 3, className: "placeholder", textContent: "Computed when the mesh is generated.",
+    });
+    const tr = document.createElement("tr");
+    tr.append(td);
+    $("#mesh-derived").replaceChildren(tr);
+    return;
+  }
   const { front, back } = pcb.meshes;
-  const m = (mm) => `${(mm / 1000).toFixed(2)} m`;
-  const both = (f) => `${f(front)} / ${f(back)}`;
+  // (a row per layer: the front's and the back's)
+  const perSide = (label, f, unit, digits = 2, bad = () => false) => [
+    [`${label}, front`, f(front), unit, bad(front), "", digits],
+    [`${label}, back`, f(back), unit, bad(back), "", digits],
+  ];
   const sfc = front.algorithm === "sfc";
   // (spacing: the share of the traces' measured sides within the nominal space -5 / +20 %,
   // and over twice it, how much of them is below it and the widest gap; skew: the worst
   // neighbouring pair of each mesh)
-  const pct = (x, key) => `${((100 * x.spacing[key]) / Math.max(x.spacing.measured, 1e-9)).toFixed(1)} %`;
-  const share = (x) => pct(x, "within");
-  const wide = (x) => `${pct(x, "wide")}, ≤ ${x.spacing.largest.toFixed(2)} mm`;
-  const below = (x) => `${x.spacing.below.toFixed(1)} mm`;
+  const pct = (x, key) => (100 * x.spacing[key]) / Math.max(x.spacing.measured, 1e-9);
   // (coverage: how much the copper's local share of the area varies, and where it falls
   // under 70 % of the nominal: holes between runs)
-  const cover = (x) =>
-    `${(100 * x.density.spread).toFixed(1)} % / ${(100 * x.density.thin).toFixed(2)} %`;
   const worst = (x, key) => Math.max(0, ...x.skew.map((p) => p[key]));
-  const skew = (x) => `${worst(x, "total").toFixed(1)} / ${worst(x, "local").toFixed(1)} mm`;
   const rows = [
     ["Layout", sfc ? "Space-filling curve" : "KiMesh grid"],
     ["Traces per side", `${front.traces}`],
     ...(sfc
-      ? [["Curve graph cells (front / back)", both((x) => x.cells)]]
-      : [
-          ["Cell size", `${front.cell.toFixed(2)} mm`],
-          ["Cells (front / back)", both((x) => x.cells)],
-        ]),
+      ? perSide("Curve graph cells", (x) => `${x.cells}`, "")
+      : [["Cell size", front.cell, "mm"], ...perSide("Cells", (x) => `${x.cells}`, "")]),
     ...(front.unreached + back.unreached
-      ? [[sfc ? "Panels out of reach" : "Cells out of reach", both((x) => x.unreached), true]]
+      ? perSide(sfc ? "Panels out of reach" : "Cells out of reach", (x) => `${x.unreached}`, "",
+                0, (x) => x.unreached > 0)
       : []),
-    ["Longest trace (front / back)", both((x) => m(x.longest))],
-    ["Longest trace", `${m(pcb.longest_trace.length)} (${pcb.longest_trace.net})`],
+    ...perSide("Longest trace", (x) => x.longest / 1000, "m"),
+    [`Longest trace (${pcb.longest_trace.net})`, pcb.longest_trace.length / 1000, "m"],
+    ["Least space set", pcb.space, "mm"],
     ...(front.average_space != null && back.average_space != null
-      ? [[`Average space, set least ${pcb.space.toFixed(2)} mm (front / back)`,
-          both((x) => `${x.average_space.toFixed(3)} mm`)]]
+      ? perSide("Average space", (x) => x.average_space, "mm", 3)
       : []),
-    ["Space within −5…+20 % (front / back)", both(share)],
-    ["Below nominal space (front / back)", both(below), front.spacing.under + back.spacing.under > 0],
-    ["Gaps over twice the space, widest (front / back)", both(wide)],
+    ...perSide("Space within −5…+20 %", (x) => pct(x, "within"), "%", 1),
+    ...perSide("Below nominal space", (x) => x.spacing.below, "mm", 1, (x) => x.spacing.under > 0),
+    ...perSide("Gaps over twice the space", (x) => pct(x, "wide"), "%", 1),
+    ...perSide("Widest gap", (x) => x.spacing.largest, "mm"),
     ...(front.density && back.density
-      ? [["Coverage spread / thin area (front / back)", both(cover),
-          front.density.thin + back.density.thin > 0.001]]
+      ? [
+          ...perSide("Coverage spread", (x) => 100 * x.density.spread, "%", 1),
+          ...perSide("Thin area", (x) => 100 * x.density.thin, "%", 2, (x) => x.density.thin > 0.001),
+        ]
       : []),
-    ["Pair skew, total / local (front)", skew(front)],
-    ["Pair skew, total / local (back)", skew(back)],
+    ...perSide("Pair skew, total", (x) => worst(x, "total"), "mm", 1),
+    ...perSide("Pair skew, local", (x) => worst(x, "local"), "mm", 1),
   ];
-  $("#mesh-derived").replaceChildren(...rows.flatMap(([k, v, bad]) => {
-    const dt = Object.assign(document.createElement("dt"), { textContent: k });
-    const dd = Object.assign(document.createElement("dd"), { textContent: v });
-    if (bad) dd.classList.add("bad");
-    return [dt, dd];
-  }));
+  fillStats($("#mesh-derived"), rows);
 }
 
 /** Spinner on the Mesh buttons while the layout runs; Generate becomes Cancel. */
@@ -489,54 +508,49 @@ function scheduleSave(config) {
   }, SAVE_DELAY);
 }
 
-function pair(a, b) {
-  return `${a.toFixed(2)} / ${b.toFixed(2)} mm`;
-}
-
 function renderDerived(info, payload) {
-  const outside = ["Outside (w × h × l)", `${[info.outer_width, info.outer_height, info.outer_length].map((v) => v.toFixed(2)).join(" × ")} mm`];
   // (two pieces: both panels alike, each piece made twice)
   const panels = info.pieces === 2 ? [
-    ["Pieces", "2 identical (one print side out, one in)"],
-    ["Straight edge", info.front_edge_length],
-    ["Panel width", info.front_panel_width],
-    ["Fold sagitta / radius", pair(info.front_fold_sagitta, info.front_fold_radius)],
-    ["Outer / inner flap cut sagitta", pair(info.front_cut_sagitta, info.back_cut_sagitta)],
-    ["Glue-tab taper (top / bottom)", pair(info.glue_tab_taper, info.glue_tab_taper_end)],
+    ["Pieces", "2", "", false, "Two identical pieces: one folded print side out, one in"],
+    ["Straight edge", info.front_edge_length, "mm"],
+    ["Panel width", info.front_panel_width, "mm"],
+    ["Fold sagitta", info.front_fold_sagitta, "mm"],
+    ["Fold radius", info.front_fold_radius, "mm"],
+    ["Outer flap cut sagitta", info.front_cut_sagitta, "mm"],
+    ["Inner flap cut sagitta", info.back_cut_sagitta, "mm"],
+    ["Glue-tab taper, top", info.glue_tab_taper, "mm"],
+    ["Glue-tab taper, bottom", info.glue_tab_taper_end, "mm"],
   ] : [
-    ["Front / back straight edge", pair(info.front_edge_length, info.edge_length)],
-    ["Circumference", info.circumference],
-    ["Front / back panel width", pair(info.front_panel_width, info.back_panel_width)],
-    ["Front / back fold sagitta", pair(info.front_fold_sagitta, info.back_fold_sagitta)],
-    ["Front / back fold radius", pair(info.front_fold_radius, info.back_fold_radius)],
-    ["Outer / inner flap cut sagitta", pair(info.front_cut_sagitta, info.back_cut_sagitta)],
-    ["Glue-tab taper", info.glue_tab_taper],
+    ["Front straight edge", info.front_edge_length, "mm"],
+    ["Back straight edge", info.edge_length, "mm"],
+    ["Circumference", info.circumference, "mm"],
+    ["Front panel width", info.front_panel_width, "mm"],
+    ["Back panel width", info.back_panel_width, "mm"],
+    ["Front fold sagitta", info.front_fold_sagitta, "mm"],
+    ["Back fold sagitta", info.back_fold_sagitta, "mm"],
+    ["Front fold radius", info.front_fold_radius, "mm"],
+    ["Back fold radius", info.back_fold_radius, "mm"],
+    ["Outer flap cut sagitta", info.front_cut_sagitta, "mm"],
+    ["Inner flap cut sagitta", info.back_cut_sagitta, "mm"],
+    ["Glue-tab taper", info.glue_tab_taper, "mm"],
   ];
   const rows = [
-    outside,
+    ["Outside width", info.outer_width, "mm"],
+    ["Outside height", info.outer_height, "mm"],
+    ["Outside length", info.outer_length, "mm"],
     ...panels,
     ...(info.end_width_increase == null ? [] : [
-      ["Ends wider / taller by", pair(info.end_width_increase, info.end_height_increase)],
+      ["Ends wider by", info.end_width_increase, "mm"],
+      ["Ends taller by", info.end_height_increase, "mm"],
     ]),
   ];
-  $("#derived").replaceChildren(...rows.flatMap(([k, v]) => {
-    const dt = document.createElement("dt");
-    dt.textContent = k;
-    const dd = document.createElement("dd");
-    dd.textContent = typeof v === "number" ? `${v.toFixed(2)} mm` : v;
-    return [dt, dd];
-  }));
   if (!payload.empty) {
     // True distance from the payload to the box surface; must be at least the required clearance.
     const c = payload.clearance;
-    const dt = Object.assign(document.createElement("dt"), { textContent: "Payload clearance" });
-    const dd = Object.assign(document.createElement("dd"), {
-      textContent: c < 0 ? "does not fit" : `${c.toFixed(2)} mm`,
-      title: `Clearance required: ${payload.min_clearance} mm`,
-    });
-    if (!payload.fits) dd.classList.add("bad");
-    $("#derived").append(dt, dd);
+    rows.push(["Payload clearance", c < 0 ? "does not fit" : c, c < 0 ? "" : "mm", !payload.fits,
+               `Clearance required: ${payload.min_clearance} mm`]);
   }
+  fillStats($("#derived"), rows);
 }
 
 // ----------------------------------------------------------------------------- import/export
@@ -717,6 +731,7 @@ async function main() {
   document.addEventListener("pb-mesh-toggle", toggleMesh);
   setupSidebar();
   $("#stats > header").append(maximizeButton($("#stats")));
+  renderMeshStats(null); // (its placeholder, until a mesh is generated)
   $("#banner-close").addEventListener("click", hideBanner);
   setupDragAndDrop();
   await render();

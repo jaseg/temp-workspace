@@ -52,11 +52,12 @@
         <section class="panel stats" id="stats" aria-label="Derived geometry">
           <header><h2>Derived geometry</h2></header>
           <div class="panel-body">
-            <dl id="derived"></dl>
-            <div id="mesh-stats" hidden>
-              <h3>PCB mesh</h3>
-              <dl id="mesh-derived"></dl>
-            </div>
+            <table class="stats-table">
+              <tbody><tr><th colspan="3" class="section first">Box</th></tr></tbody>
+              <tbody id="derived"></tbody>
+              <tbody><tr><th colspan="3" class="section">PCB mesh</th></tr></tbody>
+              <tbody id="mesh-derived"></tbody>
+            </table>
           </div>
         </section>
       </div>

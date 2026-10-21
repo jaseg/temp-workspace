@@ -183,11 +183,18 @@ details.group[open] > summary::before { transform: rotate(45deg); }
                              border-radius: 5px; }
 .panel > header button.max svg { width: 14px; height: 1.4em; display: block; }
 .panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 12px; }
-.stats h3 { font-size: 12px; margin: 10px 0 4px; padding-top: 8px; border-top: 1px solid var(--border); }
-.stats dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 0; font-size: 12px; }
-.stats dt { color: var(--text-muted); }
-.stats dd { margin: 0; font-family: var(--mono); text-align: right; }
-.stats dd.bad { color: var(--error); font-weight: 600; }
+/* One table, a section header row per part: label (right-aligned) / value (right-aligned,
+   digits lined up) / unit. */
+.stats table { border-collapse: collapse; font-size: 12px; }
+.stats th { font-weight: normal; color: var(--text-muted); text-align: right; padding: 1px 10px 1px 0; }
+.stats th.section { text-align: left; font-weight: 600; color: var(--text); padding: 12px 0 4px; }
+.stats th.section.first { padding-top: 0; }
+.stats td.placeholder { color: var(--text-muted); font-style: italic; font-family: inherit;
+                        white-space: normal; padding-left: 0; }
+.stats td { font-family: var(--mono); padding: 1px 0; white-space: nowrap; }
+.stats td.value { text-align: right; font-variant-numeric: tabular-nums; }
+.stats td.unit { color: var(--text-muted); padding-left: 4px; }
+.stats tr.bad td.value { color: var(--error); font-weight: 600; }
 
 .error-dialog { max-width: min(520px, calc(100vw - 32px)); border: 1px solid var(--error);
                 border-radius: var(--radius); background: var(--surface); color: var(--text);
