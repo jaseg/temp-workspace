@@ -123,7 +123,7 @@ def test_layers_and_line_styles(cfg):
     root = svg_elements(render_svg(cfg, pattern))
     folds = (*pattern.folds, *(pattern.cable.folds if pattern.cable else ()))
     present = {d for d in FoldDirection if any(f.direction == d for f in folds)}
-    layers = [g for g in root.findall(q("g")) if g.get("id") != "labels"]
+    layers = [g for g in root.findall(q("g")) if g.get("id") not in ("labels", "user-1")]
     assert {g.get("id") for g in layers} == {"cut"} | {LAYERS[d][0] for d in present}
     for g in layers:
         assert g.get(f"{{{INKSCAPE_NS}}}groupmode") == "layer"
@@ -253,7 +253,7 @@ def test_print_inside_only_flips_fold_indicators():
     paths = lambda root: {el.get("id"): el.get("d") for el in root.iter(q("path"))}  # noqa: E731
     assert paths(ins) == paths(out)
     assert (ins.get("width"), ins.get("height")) == (out.get("width"), out.get("height"))
-    assert {g.get("id") for g in ins.findall(q("g"))} == {"cut", "fold-valley", "labels"}
+    assert {g.get("id") for g in ins.findall(q("g"))} == {"cut", "fold-valley", "labels", "user-1"}
     for el in ins.find(f"{q('g')}[@id='fold-valley']"):
         assert el.get("stroke-dasharray") == LAYERS[FoldDirection.VALLEY][2]
     assert {f.direction for f in build_pattern(ins_cfg).folds} == {FoldDirection.VALLEY}
@@ -299,3 +299,16 @@ def test_face_labels(gap):
                 assert text == side and name in names
             if name != "front-panel":  # centred on its face
                 assert x == pytest.approx((faces[name].x0 + faces[name].x1) / 2)
+
+
+def test_stiffeners_layer(cfg):
+    """The glue tab and the lens-shaped flaps again, closed outlines in a hidden layer of
+    their own (User.1, for stiffeners): not to be cut."""
+    pattern = build_pattern(cfg)
+    root = svg_elements(render_svg(cfg, pattern))
+    (g,) = [g for g in root.findall(q("g")) if g.get("id") == "user-1"]
+    assert g.get(f"{{{INKSCAPE_NS}}}groupmode") == "layer" and g.get("display") == "none"
+    faces = {f.name for f in pattern.faces if f.name == "glue-tab" or f.kind == "flap"}
+    assert {el.get("id") for el in g} == {f"stiffener-{n}" for n in faces}
+    for el in g:
+        assert el.get("d").rstrip().endswith("Z") and el.get("fill") == "none"

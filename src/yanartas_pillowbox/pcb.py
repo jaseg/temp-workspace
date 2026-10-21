@@ -61,6 +61,9 @@ SLIT_WIDTH = 0.1  # the slits' cut, as a slot (a closed board edge)
 TOLERANCE = 0.005  # arcs as polylines (chord error)
 FOLD_CLEARANCE = 1.0  # vias keep this far from the cable's folds
 STITCH_PITCH = 6.0  # GND stitching vias along the cable
+GND_VIA_EVERY = 4  # in a run of GND contacts, a via behind every this many (joined along)
+PAGE_MARGIN = (25.0, 50.0)  # KiCad page: around the design (x, y; the title block below)
+PAGE_MIN = (210.0, 148.0)  # ... and at least this big (A5 landscape)
 
 FRONT, BACK = "F.Cu", "B.Cu"
 
@@ -108,6 +111,8 @@ class Layout:
     clearance: float = 0.15
     width: float = 0.15
     cable_clearance: float = 0.15  # (the traces' along the cable: necked down, maybe less)
+    # the glue tab and the lens-shaped flaps: copies for stiffeners (User.1 in KiCad)
+    stiffeners: list[Polygon] = field(default_factory=list)
     _cache: dict = field(default_factory=dict, repr=False)
 
     def net_lengths(self) -> dict[str, float]:
@@ -178,9 +183,10 @@ class Layout:
 
 
 def pinout(pins: int, traces: int, group: int | None = None) -> list[str | None]:
-    """Each pin's signal, from pin 1: "GND" or "M<i>" (mesh end i, from 1), None if free;
-    ``traces``: the mesh's nets on each side; ``group``: the traces between two GND pins
-    (one partition's, its ends nested: 1s 2s … 2r 1r; default: a side's)."""
+    """Each pin's signal, from pin 1: "GND" or "M<i>" (mesh end i, from 1); the pins the
+    mesh leaves over GND too; ``traces``: the mesh's nets on each side; ``group``: the
+    traces between two GND pins (one partition's, its ends nested: 1s 2s … 2r 1r; default:
+    a side's)."""
     ends = 4 * traces  # two ends per loop, two sides
     size = 2 * (group or traces)
     out: list[str | None] = ["GND"]
@@ -190,7 +196,7 @@ def pinout(pins: int, traces: int, group: int | None = None) -> list[str | None]
             out.append("GND")
     if len(out) > pins:
         raise PcbError(f"the plug needs at least {len(out)} pins for the mesh's ends")
-    return out + [None] * (pins - len(out))
+    return out + ["GND"] * (pins - len(out))
 
 
 # ----------------------------------------------------------------------------- geometry
@@ -279,6 +285,27 @@ def _dedupe(pts: list[Point]) -> list[Point]:
     return out
 
 
+def stiffeners(pattern: Pattern) -> list[Polygon]:
+    """The glue tab and the lens-shaped flaps (outer and inner), as polygons: where
+    stiffeners may go."""
+    return [
+        Polygon(sample(f.boundary))
+        for f in pattern.faces
+        if f.name == "glue-tab" or f.kind == "flap"
+    ]
+
+
+def page(result: Layout) -> tuple[Point, tuple[float, float]]:
+    """The KiCad page for the layout: its offset (added to every coordinate: the design in
+    the page's middle) and its size, the design's bounds and ``PAGE_MARGIN`` around them,
+    at least ``PAGE_MIN``."""
+    x0, y0, x1, y1 = result.board.bounds
+    w = max(x1 - x0 + 2 * PAGE_MARGIN[0], PAGE_MIN[0])
+    h = max(y1 - y0 + 2 * PAGE_MARGIN[1], PAGE_MIN[1])
+    w, h = math.ceil(w), math.ceil(h)
+    return (round(w / 2 - (x0 + x1) / 2, 3), round(h / 2 - (y0 + y1) / 2, 3)), (w, h)
+
+
 def mesh_zones(pattern: Pattern) -> list[Polygon]:
     """The pattern's faces as the mesh's zones: those that meet along neither a fold nor a
     slit (e.g. the small pieces of the front panel by its flaps' ends, out past its
@@ -363,6 +390,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     }
 
     result = Layout(board, (*(f.segment for f in pattern.folds), *(f.segment for f in cable.folds)))
+    result.stiffeners = stiffeners(pattern)
     result.area = mask
     result.clearance, result.width = space, w
     cell = 2 * n * pitch
@@ -580,14 +608,21 @@ def _route_cable(
                 result.vias.append(Via(via, net))
             result.pads.append(_pad(j, at, plug, k_pin, u, net))
 
+    # GND contacts: each back to the GND vias' row; a run of them (the pins the mesh leaves
+    # over) joined along it, a via behind every few (vias at the pin pitch would crowd).
+    run = 0
     for j, signal in enumerate(pins, start=1):
-        if signal == "GND":
-            result.pads.append(_pad(j, at, plug, k_pin, u, "GND"))
-            via = at(row_gnd, k_pin(j))
-            result.tracks.append(Track((at(plug, k_pin(j)), via), FRONT, "GND", w))
+        if signal != "GND":
+            run = 0
+            continue
+        result.pads.append(_pad(j, at, plug, k_pin, u, "GND"))
+        via = at(row_gnd, k_pin(j))
+        result.tracks.append(Track((at(plug, k_pin(j)), via), FRONT, "GND", w))
+        if run:
+            result.tracks.append(Track((at(row_gnd, k_pin(j - 1)), via), FRONT, "GND", w))
+        if run % GND_VIA_EVERY == 0:
             result.vias.append(Via(via, "GND"))
-        elif signal is None:
-            result.pads.append(_pad(j, at, plug, k_pin, u, None))
+        run += 1
 
     # Stitching vias along both edges of the cable and between the two meshes' traces.
     edge = cable.width / 2 - space - VIA_SIZE / 2 - cfg.mesh_edge_clearance / 2
@@ -768,9 +803,11 @@ def verify(result: Layout) -> list[str]:
 
 def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> Any:
     """The layout as a gerbonara KiCad board: the foil's outline on Edge.Cuts, the folds on
-    Dwgs.User, the tracks (``tracks``: else left out, for ``kicad_text``), vias and the
-    plug's contacts (footprint J1), and the cable's GND zone on both copper layers (left
-    unfilled: KiCad fills it)."""
+    Dwgs.User, the glue tab and the flaps as filled polygons on User.1 (for stiffeners), the
+    tracks (``tracks``: else left out, for ``kicad_text``), vias and the plug's contacts
+    (footprint J1), and the cable's GND zone on both copper layers (left unfilled: KiCad
+    fills it); on a page that holds it all with a margin, centred (``page``)."""
+    from gerbonara.cad.kicad import base_types as kbt
     from gerbonara.cad.kicad import footprints as kfp
     from gerbonara.cad.kicad import graphical_primitives as kgr
     from gerbonara.cad.kicad import pcb as kpcb
@@ -780,13 +817,15 @@ def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> An
 
     board = kpcb.Board.empty_board()
     board.legacy_footprints = None  # (gerbonara cannot write an empty legacy list)
+    (ox, oy), (pw, ph) = page(result)
+    board.paper = kbt.PageSettings(page_format="User", width=pw, height=ph)
     board.nets[0] = ""
     nets = sorted({t.net for t in result.tracks} | {"GND"})
     for net in nets:
         board.net_id(net)
 
     def xy(p: Point) -> XYCoord:
-        return XYCoord(round(p[0], 6), round(p[1], 6))
+        return XYCoord(round(p[0] + ox, 6), round(p[1] + oy, 6))
 
     def stroke(width: float) -> Stroke:
         return Stroke(width=width, type=Atom.solid)
@@ -795,6 +834,15 @@ def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> An
         pts = list(ring.coords)
         for a, b in itertools.pairwise(pts):
             board.add(kgr.Line(start=xy(a), end=xy(b), layer="Edge.Cuts", stroke=stroke(0.05)))
+    for poly in result.stiffeners:
+        board.add(
+            kgr.Polygon(
+                pts=[xy(p) for p in list(poly.exterior.coords)[:-1]],
+                layer="User.1",
+                stroke=stroke(0.05),
+                fill=True,
+            )
+        )
     for seg in result.folds:
         if isinstance(seg, Arc):
             board.add(
@@ -858,7 +906,7 @@ def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> An
                 number=str(pad.number),
                 type=Atom.smd,
                 shape=Atom.rect,
-                at=AtPos(round(pad.at[0], 6), round(pad.at[1], 6), 0),
+                at=AtPos(round(pad.at[0] + ox, 6), round(pad.at[1] + oy, 6), 0),
                 size=XYCoord(*pad.size),
                 layers=[FRONT, "F.Mask"],
                 net=net,
@@ -917,9 +965,10 @@ def kicad_text(result: Layout, board: Any) -> str:
     the browser)."""
     nets = {n: board.net_id(n) for n in {t.net for t in result.tracks}}  # (before: see below)
     text = board.serialize().rstrip()  # (which leaves the board's nets a list)
+    offset, _ = page(result)
     jobs = [
-        (i, layer, [(nets[t.net], t.width, list(t.points), t.arcs)
-                    for t in result.tracks if t.layer == layer])
+        (i, layer, offset, [(nets[t.net], t.width, list(t.points), t.arcs)
+                            for t in result.tracks if t.layer == layer])
         for i, layer in enumerate((FRONT, BACK))
     ]  # fmt: skip
     parts: list[str] = []
@@ -937,13 +986,20 @@ def kicad_text(result: Layout, board: Any) -> str:
     return text[:-1] + "\n" + "\n".join(p for p in parts if p) + ")\n"
 
 
-def _tracks_text(job: tuple[int, str, list]) -> str:
-    """One copper layer's tracks as KiCad segments and arcs (their uuids made up: unique
-    per layer and segment)."""
-    index, layer, tracks = job
+def _tracks_text(job: tuple[int, str, Point, list]) -> str:
+    """One copper layer's tracks as KiCad segments and arcs, moved by the page's offset
+    (their uuids made up: unique per layer and segment)."""
+    index, layer, (ox, oy), tracks = job
     out: list[str] = []
     k = 0
     for net, width, points, arcs in tracks:
+        points = [(x + ox, y + oy) for x, y in points]
+        if arcs:
+            arcs = [
+                ((a[0] + ox, a[1] + oy), None if m is None else (m[0] + ox, m[1] + oy),
+                 (b[0] + ox, b[1] + oy))
+                for a, m, b in arcs
+            ]  # fmt: skip
         tail = f'(width {width}) (layer "{layer}") (net {net})'
         if arcs:
             for a, m, b in arcs:
@@ -980,11 +1036,18 @@ def render_stack(board: Any, result: Layout | None = None) -> Any:
     for obj in (*board.graphic_objects(), *board.track_segments, *board.track_arcs):
         if (layer := layers.get(obj.layer)) and obj not in own:
             stack[layer].objects.extend(obj.render())
+    (ox, oy), _ = page(result) if result is not None else ((0.0, 0.0), None)
+
+    def moved(p: Point) -> Point:  # (onto the board's page, as ``to_kicad`` put it)
+        return (p[0] + ox, p[1] + oy)
+
     for track in result.tracks if result is not None else ():
         objects = stack[layers[track.layer]].objects
         aperture = ap.CircleAperture(track.width, unit=MM)
         if track.arcs:
             for a, m, b in track.arcs:
+                a, b = moved(a), moved(b)
+                m = None if m is None else moved(m)
                 if m is None:
                     objects.append(go.Line(a[0], -a[1], b[0], -b[1], aperture=aperture, unit=MM))
                     continue
@@ -1002,7 +1065,7 @@ def render_stack(board: Any, result: Layout | None = None) -> Any:
                 objects.append(go.Arc(ax, ay, bx, by, cx - ax, cy - ay, aperture=aperture,
                                       clockwise=turn < 0, unit=MM))  # fmt: skip
             continue
-        for (x1, y1), (x2, y2) in itertools.pairwise(track.points):
+        for (x1, y1), (x2, y2) in itertools.pairwise(moved(p) for p in track.points):
             objects.append(go.Line(x1, -y1, x2, -y2, aperture=aperture, unit=MM))
     for via in board.vias:
         for name in via.layers:

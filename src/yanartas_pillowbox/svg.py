@@ -186,6 +186,30 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
                 },
             )
 
+    # The glue tab and the lens-shaped flaps again, for stiffeners (KiCad's User.1): a layer
+    # of its own, hidden (not to be cut).
+    g = ET.SubElement(
+        root,
+        f"{{{SVG_NS}}}g",
+        {
+            "id": "user-1",
+            f"{{{INKSCAPE_NS}}}groupmode": "layer",
+            f"{{{INKSCAPE_NS}}}label": "User.1 (stiffeners)",
+            "display": "none",
+        },
+    )
+    for face in pattern.faces:
+        if face.name == "glue-tab" or face.kind == "flap":
+            ET.SubElement(
+                g,
+                f"{{{SVG_NS}}}path",
+                {
+                    "id": f"stiffener-{face.name}",
+                    "d": path_data(list(face.boundary), offset, close=True),
+                    **stroke_attrs(None),
+                },
+            )
+
     _labels(root, cfg, pattern, offset)
 
     ET.indent(root, space="  ")

@@ -41,13 +41,13 @@ def copper(result, layer):
 
 def test_pinout():
     """GND, then each side's mesh ends, a GND pin after each group's (a side's), the rest
-    free."""
+    GND too."""
     pins = pcb.pinout(30, 4)
     assert pins[:19] == [
         "GND", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "GND",
         "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "GND",
     ]  # fmt: skip
-    assert pins[19:] == [None] * 11
+    assert pins[19:] == ["GND"] * 11
     with pytest.raises(pcb.PcbError):
         pcb.pinout(18, 4)
 
@@ -255,8 +255,65 @@ def test_export_draws_arcs(layout, tmp_path):
     pcb.export(result, tmp_path, "arcs")
     board = Board.open(tmp_path / "arcs.kicad_pcb")
     (arc,) = board.track_arcs
-    assert (arc.start.x, arc.mid.x, arc.end.x) == pytest.approx((a[0], mid[0], b[0]))
+    (ox, _), _ = pcb.page(layout)  # (the design moved into the page's middle)
+    assert (arc.start.x, arc.mid.x, arc.end.x) == pytest.approx((a[0] + ox, mid[0] + ox, b[0] + ox))
     assert len(board.track_segments) == sum(len(u.points) - 1 for u in layout.tracks) - 1
+
+
+def test_kicad_page_holds_the_design_centred(layout, tmp_path):
+    """The KiCad board's page is big enough for the design and a margin (the title block
+    below it), at least A5, the design (its outline on Edge.Cuts) in its middle; the tracks,
+    contacts and vias moved along with it."""
+    from gerbonara.cad.kicad.pcb import Board
+
+    pcb.export(layout, tmp_path, "page")
+    text = (tmp_path / "page.kicad_pcb").read_text()
+    board = Board.open(tmp_path / "page.kicad_pcb")
+    assert board.paper.page_format == "User"
+    w, h = board.paper.width, board.paper.height
+    xs = [c for ln in board.lines if ln.layer == "Edge.Cuts" for c in (ln.start.x, ln.end.x)]
+    ys = [c for ln in board.lines if ln.layer == "Edge.Cuts" for c in (ln.start.y, ln.end.y)]
+    assert (min(xs) + max(xs)) / 2 == pytest.approx(w / 2, abs=0.01)
+    assert (min(ys) + max(ys)) / 2 == pytest.approx(h / 2, abs=0.01)
+    assert min(xs) >= pcb.PAGE_MARGIN[0] - 0.01 and max(xs) <= w - pcb.PAGE_MARGIN[0] + 0.01
+    assert min(ys) >= pcb.PAGE_MARGIN[1] - 0.01 and max(ys) <= h - pcb.PAGE_MARGIN[1] + 0.01
+    assert (w, h) >= pcb.PAGE_MIN
+    # (everything inside the outline: the tracks and contacts too)
+    x0, y0, x1, y1 = min(xs), min(ys), max(xs), max(ys)
+    for seg in board.track_segments[:500]:
+        assert x0 <= seg.start.x <= x1 and y0 <= seg.start.y <= y1
+    assert '(paper "User"' in text
+
+
+def test_stiffeners_on_user_1(layout):
+    """The glue tab and the lens-shaped flaps, as filled polygons on User.1: their faces'
+    areas."""
+    from shapely.geometry import Polygon as SPolygon
+
+    from yanartas_pillowbox.geometry import build_pattern
+
+    pattern = build_pattern(D)
+    faces = [f for f in pattern.faces if f.name == "glue-tab" or f.kind == "flap"]
+    assert len(faces) == 5  # (the glue tab, two outer and two inner flaps)
+    board = pcb.to_kicad(layout, tracks=False)
+    polys = [p for p in board.polygons if p.layer == "User.1"]
+    assert len(polys) == len(faces) and all(p.fill for p in polys)
+    areas = sorted(SPolygon([(q.x, q.y) for q in p.pts]).area for p in polys)
+    expect = sorted(SPolygon(pcb.sample(f.boundary)).area for f in faces)
+    assert areas == pytest.approx(expect, rel=1e-6)
+
+
+def test_spare_pins_are_grounded(layout):
+    """The plug's pins the mesh leaves over are GND contacts, joined along the GND vias'
+    row, a via behind every few; the layout passes its check."""
+    pins = pcb.pinout(int(D.fpc_pins), D.mesh_nets)
+    assert None not in pins and pins[-1] == "GND"
+    pads = {p.number: p.net for p in layout.pads}
+    assert all(pads[j] == "GND" for j, s in enumerate(pins, start=1) if s == "GND")
+    # (a run of GND contacts: fewer vias than contacts, each run's first one with a via)
+    gnd_vias = [v for v in layout.vias if v.net == "GND"]
+    assert len(gnd_vias) < sum(1 for s in pins if s == "GND") + 200
+    assert pcb.verify(layout) == []
 
 
 def test_preview_json(layout):
