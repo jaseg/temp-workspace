@@ -285,7 +285,10 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   folds where they can and differing between the two sides. All are laid out in one pass:
   a partition's border is kept like a fold (each curve half a spacing off it, so
   neighbouring partitions' traces run a pitch apart, nothing between them) and all traces
-  settle together, lengths matched within each partition. Each partition's curve is
+  settle together, lengths matched within each partition; then each hole left more than a
+  pitch from any trace is filled on its own: the pairs of traces round it re-settled in a
+  box round it as one trace along each pair's middle, then split again, kept only where
+  every trace still keeps the pitch. Each partition's curve is
   relaxed towards an even spacing of as many pitches as it carries traces (folds and edges hold it off by
   half that), the mesh's traces are its offsets, spread to share its spacing, and the exit
   is a "stem" of two straight rails built into the curve's graph. It follows edges and
@@ -485,6 +488,12 @@ uv run --group dev pytest        # tests
 uv run --group dev ruff check .  # lint
 uv run --group dev ruff format . # format
 ```
+
+A PCB layout's steps are timed (`checkpoint.report()`). To work on one step without laying
+out the whole board again, set `YANARTAS_CHECKPOINT=<dir>`: every step's inputs and result
+are written there as gzipped JSON, and `checkpoint.resume("<dir>/<nnn>-<layer>-<step>.in.json.gz")`
+runs that step again on its own. `scripts/crop_checkpoint.py` cuts a window out of a
+settling step's checkpoint for a small case of one spot.
 
 Layout:
 

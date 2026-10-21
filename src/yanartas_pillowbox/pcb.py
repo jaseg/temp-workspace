@@ -38,7 +38,7 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString, Polygon
 
-from yanartas_pillowbox import kimesh, partition, progress, sfc
+from yanartas_pillowbox import checkpoint, kimesh, partition, progress, sfc
 from yanartas_pillowbox import mesh as meshgen
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.geometry import (
@@ -292,6 +292,7 @@ def mesh_zones(pattern: Pattern) -> list[Polygon]:
 
 
 # ----------------------------------------------------------------------------- layout
+@checkpoint.timed_step("layout")
 def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     """The PCB layout for the configuration. Raises ``PcbError``."""
     pattern = pattern or build_pattern(cfg)
@@ -556,6 +557,7 @@ def _clean(pts: Sequence[Point]) -> tuple[Point, ...]:
 
 
 # ----------------------------------------------------------------------------- export
+@checkpoint.timed_step("verify")
 def verify(result: Layout) -> list[str]:
     """The layout's electrical check, as a list of problems (none: it passes):
 

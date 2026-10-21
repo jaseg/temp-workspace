@@ -42,7 +42,7 @@ fn params(obj: &JsValue) -> Result<Params, JsValue> {
         steps: usize, rate: f64, reach: f64, pin: f64, cool: f64, step: f64, still: f64,
         band: f64, leap: f64, tune: f64, steer: f64, span: usize, steer_cool: f64, tip: f64,
         reach_out: f64, fill: f64, fill_blur: f64, bend: usize, smooth: usize, finish: usize, match_steps: usize, match_band: f64, match_rate: f64,
-        ribbon: f64, share: f64
+        ribbon: f64, share: f64, holes: f64, hole_steps: usize, hole_margin: f64, hole_ribbon: f64, phases: usize
     );
     Ok(p)
 }
@@ -57,6 +57,7 @@ fn status(s: &Status) -> Result<Object, JsValue> {
         ("looked", s.looked),
         ("moved", s.moved),
         ("checked", s.checked),
+        ("filled", s.filled),
     ] {
         Reflect::set(&o, &k.into(), &(v as f64).into())?;
     }
@@ -85,6 +86,8 @@ pub fn settle(
     keep_lens: &[u32],
     keep_rings: &[u32],
     groups: &[u32],
+    base: &[f64],
+    base_lens: &[u32],
     params_obj: JsValue,
     progress: Option<Function>,
 ) -> Result<Object, JsValue> {
@@ -109,6 +112,9 @@ pub fn settle(
         zones,
         keep,
         groups: groups.iter().map(|&g| g as usize).collect(),
+        hold: Vec::new(),
+        core: None,
+        base: runs(base, base_lens),
     };
     let prm = params(&params_obj)?;
     let mut failed: Option<JsValue> = None;

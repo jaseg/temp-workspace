@@ -30,6 +30,7 @@ import shapely
 import shapely.affinity
 from shapely.geometry import Polygon
 
+from yanartas_pillowbox import checkpoint
 from yanartas_pillowbox.mesh import MeshError
 
 LLOYD = 3  # Lloyd iterations of the cells
@@ -265,6 +266,7 @@ def _refine(
     return owner
 
 
+@checkpoint.step("partition")
 def partition(
     area: shapely.Geometry,
     zones: list[Polygon],

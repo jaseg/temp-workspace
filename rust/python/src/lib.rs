@@ -55,7 +55,12 @@ fn read_params(d: &Bound<'_, PyDict>) -> PyResult<Params> {
         match_band,
         match_rate,
         ribbon,
-        share
+        share,
+        holes,
+        hole_steps,
+        hole_margin,
+        hole_ribbon,
+        phases
     );
     Ok(p)
 }
@@ -70,6 +75,7 @@ fn status<'py>(py: Python<'py>, s: &Status) -> PyResult<Bound<'py, PyDict>> {
     d.set_item("moved", s.moved)?;
     d.set_item("checked", s.checked)?;
     d.set_item("apart", s.apart.clone())?;
+    d.set_item("filled", s.filled)?;
     Ok(d)
 }
 
@@ -77,9 +83,10 @@ fn status<'py>(py: Python<'py>, s: &Status) -> PyResult<Bound<'py, PyDict>> {
 /// (n, 2) array), `edge` points along the edge, `zones` each zone's rings, `keep` what is
 /// left as laid (the exits: polygons, each its rings), `params` the constants by name,
 /// `progress` called with a dict after each step (phase, step, steps, vertices, looked,
-/// moved, checked, apart), `groups` each trace's group (lengths matched within it).
+/// moved, checked, apart, filled), `groups` each trace's group (lengths matched within it),
+/// `base` the traces as first laid (when a later phase is run on its own: `params`' `phases`).
 #[pyfunction]
-#[pyo3(signature = (lines, pitch, edge, zones, keep, params, progress=None, groups=None))]
+#[pyo3(signature = (lines, pitch, edge, zones, keep, params, progress=None, groups=None, base=None))]
 #[allow(clippy::too_many_arguments)]
 fn settle_traces<'py>(
     py: Python<'py>,
@@ -91,6 +98,7 @@ fn settle_traces<'py>(
     params: &Bound<'py, PyDict>,
     progress: Option<PyObject>,
     groups: Option<Vec<usize>>,
+    base: Option<Vec<PyReadonlyArray2<'py, f64>>>,
 ) -> PyResult<Bound<'py, PyList>> {
     let input = Input {
         lines: lines.iter().map(points).collect::<PyResult<_>>()?,
@@ -105,6 +113,12 @@ fn settle_traces<'py>(
             .map(|z| z.iter().map(points).collect::<PyResult<Vec<_>>>())
             .collect::<PyResult<_>>()?,
         groups: groups.unwrap_or_default(),
+        hold: Vec::new(),
+        core: None,
+        base: match base {
+            Some(b) => b.iter().map(points).collect::<PyResult<_>>()?,
+            None => Vec::new(),
+        },
     };
     let prm = read_params(params)?;
     let mut failed: Option<PyErr> = None;

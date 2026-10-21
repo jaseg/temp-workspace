@@ -136,3 +136,23 @@ def test_cells_tile_their_domain():
     assert math.isclose(sum(c.area for c in cells), domain.area, rel_tol=1e-9)
     assert math.isclose(union.area, domain.area, rel_tol=1e-9)
     assert min(c.area for c in cells) > 0.05 * 1.5**2
+
+
+@pytest.mark.parametrize(("w", "h"), [(1.5, 1.5), (1.8, 1.2), (1.5, 3.0)])
+def test_a_pair_fills_a_hole_together(w, h):
+    """A lane of two pairs along an edge with a pocket off it, too wide for one trace's U-turn
+    alone: after settling, the pair beside it fills it, both its traces' U-turns in it (one
+    inside the other), every trace still a pitch from the others."""
+    p, n = 0.3, 4
+    area = shapely.union_all(
+        [shapely.box(0, 0, 20, n * p), shapely.box(9, n * p, 9 + w, n * p + h)]
+    )
+    pocket = shapely.box(9, n * p + 0.05, 9 + w, n * p + h)
+    x = np.linspace(0, 20, 400)
+    lines = [np.column_stack([x, np.full(400, (j + 0.5) * p)]) for j in range(n)]
+    out = sfc._settle(lines, p, area, [area], shapely.Polygon(), [0, 0, 1, 1], n)
+    ls = [LineString(t) for t in out]
+    inside = [line.intersection(pocket).length for line in ls]
+    assert inside[2] > 1.0 and inside[3] > inside[2] + 0.5
+    assert min(a.distance(b) for a, b in itertools.combinations(ls, 2)) > 0.99 * p
+    assert all(line.is_simple for line in ls)

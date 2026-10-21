@@ -37,6 +37,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | `kimesh.py` | The security mesh generator, a port of KiMesh: tiles, the randomized depth-first walk over the cells inside a mask, and joining each net's segments into one path. Needs shapely. |
 | `sfc.py` | The second mesh layout: a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across the folds as seldom as possible, relaxed to an even spacing, the traces offset from it, then settled by the Rust core (`yanartas_mesh`). Needs shapely and numpy. |
 | `progress.py` | How far a long layout has got: the layouts report phases and steps, the CLI and the web UI show them. |
+| `checkpoint.py` | The layout's steps timed, and (with `YANARTAS_CHECKPOINT` set) their inputs and results written as gzipped JSON, any one step then run again alone (`resume`). |
 | `pcb.py` | The flex-PCB layout (mask, both meshes, the cable's traces, fan-out, vias and plug contacts, GND zone) and its export through gerbonara (KiCad board and project, Gerber, SVG). Imported on demand: its dependencies are heavy (the in-browser build loads them on the first PCB request). |
 | `fpc.py` | The FPC cable's layout: it leaves the middle of the front panel's free edge (x = 0) and turns up or down along it; the meander (laid out in a frame of its own, turned into the pattern's), its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
@@ -408,6 +409,30 @@ an exact isometry: the panels curve along it, not across it.
      Pyodide's build): one of the vertices per step for the centring, one of the segments
      per step for the clearance (distances to segments exactly; a vertex taken back is
      looked for as far again as it moved).
+  10. *Holes* (`SETTLE_HOLE*`, in `settle.rs`): settled as above, a pair's outer trace
+     grows into a hole alone and its partner never follows: centring sees the room
+     inside the outer trace's U-turn as its own, and the annealing ends long before the
+     partner would get in (with the steps raised globally: 160 fill a 1.5 × 3 mm pocket
+     with both traces, at several times the cost, and the rest of the layout churns). So
+     after settling, holes are found on a grid half a pitch apart (inside the area, a pitch
+     off its edge: places more than a pitch from any trace, joined; kept if one is more than
+     `SETTLE_HOLE` pitches from it), and each is filled on its own, in a box
+     `SETTLE_HOLE_MARGIN` pitches wider. The traces nearest the hole's places, and their
+     pairs, are cut out of it (their runs in the box; all others there held as laid, as
+     obstacles), and: (1) each pair is settled as one trace along its middle at twice the
+     pitch (`SETTLE_HOLE_STEPS` steps, the density blurred as for `SETTLE_HOLE_RIBBON`
+     traces): its U-turn into the hole is the pair's two, one inside the other; (2) its
+     traces are offset half a pitch either side of it again (mitred at corners), spliced
+     into their runs where in the box; (3) all the moved runs are settled at the pitch for
+     a quarter of the steps, each trace's own room across counting as its partner's too
+     (`SETTLE_SHARE`: the outer trace's U-turn stays open for the inner's), without length
+     steering; (4) whatever is still a little too near is pushed straight away from it.
+     The result is kept only if every moved run keeps a pitch (−1 %) from all other copper
+     (the held runs as they are: settling resamples what it is given, a U-turn's tip cut a
+     little; and every vertex against every segment, either moved)
+     and crosses none (and from itself, but where it turns: a U-turn as tight as laid is
+     half a pitch across); else the hole stays as it was. Each hole costs a few hundred
+     vertices' work (the length matching after takes up the skew it adds).
   The default box takes about 2 min per layer to lay, and about 20 min more to settle
   (see Later).
 - **Check** (`verify`, run at the end of every `layout`): the tracks' points joined along
@@ -450,13 +475,28 @@ an exact isometry: the panels curve along it, not across it.
   shapely crashes when two threads prepare one geometry; one after the other in the
   browser), their progress merged (the share done: their mean).
 - **Progress** (`progress.py`): the layouts report their phases and steps (graph, relax,
-  lanes, settle, match; the stage: the mesh's layer) with figures (vertices, moved,
+  lanes, settle, fill, match; the stage: the mesh's layer) with figures (vertices, moved,
   clearances measured, the traces' length differences) and the whole layout's share done.
   The CLI shows a bar redrawn in place on a terminal (each phase's last figures kept above
   it), otherwise a status line per step. The web UI polls `GET /api/progress` while a PCB
   layout runs (the latest event: the server keeps it; in the browser build the worker posts
   each to the page, and `pyshim.js` answers the poll) and shows a bar and the phase in the
   top bar. The lengths' differences are shown only once matching: settling's swing wide.
+- **Timing and checkpoints** (`checkpoint.py`): the layout's steps (`partition`; per
+  layer `graph`, `relax`, `lanes`, `settle`, `fill`, `finish`, `output`; `verify`,
+  `layout` in all) are timed (`checkpoint.report()`: seconds per step and layer; the
+  layers run side by side, so theirs add up to more than the wall-clock time). With
+  `YANARTAS_CHECKPOINT=<dir>` each step's arguments and result are also written there,
+  gzipped JSON (arrays exactly, as base64 of their bytes; geometries as WKB), numbered in
+  order: `checkpoint.resume(<…in.json.gz>)` runs that step alone again, as it ran.
+  Settling is three calls of the Rust core for this (its `phases`: settling, the holes,
+  smoothing and matching; `base` the traces as first laid, for their lengths), so a fix
+  to filling holes is tried in seconds on a whole board's layer.
+  `scripts/crop_checkpoint.py` cuts a window out of a settling phase's checkpoint (each
+  trace's runs in it traces of their own, a pair's runs side by side) for a smaller case
+  of the same spot. On the default box (4 cores, per layer, the two at once): settling
+  250 s, smoothing and matching 68 s, relaxation 13 s, graph 3–6 s, filling holes 3 s,
+  output 1.5 s; then `verify` 18 s; the layout 385 s in all.
 - **Later.** The rest of the curve layout in Rust; an alignment field (the reference's
   needles) to lay the curve along the edges; a hard skew limit in settling
   (dropped: it cost coverage; steering and matching keep the skew within 10 mm instead):

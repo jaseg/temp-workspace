@@ -2,7 +2,7 @@
 whoever listens (the CLI's progress bar, the web UI's) shows them.
 
 An event is a dict: ``stage`` (the mesh's layer, as ``pcb.layout`` names it), ``phase``
-(``graph``, ``relax``, ``lanes``, ``settle``, ``match``, ``done``), ``step`` and ``steps``
+(``graph``, ``relax``, ``lanes``, ``settle``, ``fill``, ``match``, ``done``), ``step`` and ``steps``
 (the most there may be: a phase may finish early), ``done`` (the whole layout's share done,
 0 to 1, over all stages), and figures of the phase (vertices, moved, apart, ...)."""
 
@@ -18,7 +18,7 @@ from typing import TypeVar
 T = TypeVar("T")
 
 # each phase's rough share of a mesh's time (settling natively: about as long as laying)
-WEIGHT = {"graph": 0.25, "relax": 0.2, "lanes": 0.05, "settle": 0.4, "match": 0.1}
+WEIGHT = {"graph": 0.25, "relax": 0.2, "lanes": 0.05, "settle": 0.35, "fill": 0.05, "match": 0.1}
 _ORDER = list(WEIGHT)
 
 _local = threading.local()
@@ -52,6 +52,11 @@ def stage(name: str, index: int = 0, stages: int = 1) -> Iterator[None]:
         yield
     finally:
         s["stage"], s["index"], s["stages"] = was
+
+
+def current() -> str:
+    """The stage events reported here now are of (``""``: none)."""
+    return _state()["stage"]
 
 
 def report(phase: str, step: int = 1, steps: int = 1, **figures: object) -> None:

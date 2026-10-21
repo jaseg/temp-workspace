@@ -39,6 +39,11 @@ pub struct Params {
     pub match_band: f64,    // MATCH_BAND
     pub match_rate: f64,    // MATCH_RATE
     pub ribbon: f64,        // (traces abreast in a lane; 0: a group's)
+    pub holes: f64,         // SETTLE_HOLE (0: none filled after)
+    pub hole_steps: usize,  // SETTLE_HOLE_STEPS
+    pub hole_margin: f64,   // SETTLE_HOLE_MARGIN
+    pub hole_ribbon: f64,   // SETTLE_HOLE_RIBBON
+    pub phases: usize,      // (which to run: 1 settling, 2 the holes, 4 smoothing and matching)
     pub share: f64,         // SETTLE_SHARE (0: off)
 }
 
@@ -70,6 +75,11 @@ impl Default for Params {
             match_rate: 0.5,
             ribbon: 0.0,
             share: 0.0,
+            holes: 0.0,
+            hole_steps: 160,
+            hole_margin: 4.0,
+            hole_ribbon: 4.0,
+            phases: 7,
         }
     }
 }
@@ -86,6 +96,13 @@ pub struct Input {
     /// Each trace's group (its mesh's partition): lengths matched only within a group, of
     /// neighbours in turn (none given: one group).
     pub groups: Vec<usize>,
+    /// The traces left as laid, whole (none given: none), and the box (x0, y0, x1, y1)
+    /// outside which nothing moves (none: the whole area).
+    pub hold: Vec<bool>,
+    pub core: Option<[f64; 4]>,
+    /// The traces as first laid, for their lengths (none given: `lines`; given when a
+    /// later phase is run on its own).
+    pub base: Vec<Vec<P>>,
 }
 
 /// How far settling has got, after each step.
@@ -99,6 +116,7 @@ pub struct Status {
     pub moved: usize,    // (vertices that moved)
     pub checked: usize,  // (vertex-segment pairs measured for clearance)
     pub apart: Vec<f64>, // (each neighbouring pair's largest difference in length run)
+    pub filled: usize,   // (holes filled so far)
 }
 
 struct Ctx<'a> {
@@ -111,6 +129,8 @@ struct Ctx<'a> {
     zones: &'a Zones,
     keep: &'a Zones,
     group: &'a [usize],
+    hold: &'a [bool],
+    core: Option<[f64; 4]>,
     edge: &'a [P],
     edges: &'a Grid,
 }
@@ -136,21 +156,32 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         zones: &zones,
         keep: &keep,
         group: &group,
+        hold: &input.hold,
+        core: input.core,
         edge: &input.edge,
         edges: &edges,
     };
-    let lines: Vec<Vec<P>> = input.lines.iter().map(|t| resample(t, step)).collect();
+    let laid = if input.base.is_empty() {
+        &input.lines
+    } else {
+        &input.base
+    };
+    // (resampled to the step to settle; as given to go on from an earlier phase)
+    let lines: Vec<Vec<P>> = if prm.phases & 1 != 0 {
+        input.lines.iter().map(|t| resample(t, step)).collect()
+    } else {
+        input.lines.clone()
+    };
     let mut tr = Traces::new(&lines, None);
     let n = tr.traces();
-    let total = input
-        .lines
+    let total = laid
         .iter()
         .map(|t| t.windows(2).map(|w| dist(w[0], w[1])).sum::<f64>())
         .fold(0.0, f64::max);
     let bins = ((total / (2.0 * pitch)) as usize).max(1);
     // (each trace's length by position, as laid: before resampling, which shaves more off
     // some, the inner in tight turns)
-    let base = Traces::new(&input.lines, None).binned(bins);
+    let base = Traces::new(laid, None).binned(bins);
     let mut gained = minus(&tr.binned(bins), &base);
     let sides = neighbour_sides(&tr, &group);
     // (per trace and side, left then right: how many of its group's traces' legs belong
@@ -181,15 +212,20 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
     let lane = if prm.ribbon > 0.0 { prm.ribbon } else { ribbon };
     let blur = prm.fill_blur * lane * pitch;
     let mut density = (prm.fill > 0.0).then(|| {
-        let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
-        for q in input.zones.iter().flatten().flatten() {
-            b = [
-                b[0].min(q[0]),
-                b[1].min(q[1]),
-                b[2].max(q[0]),
-                b[3].max(q[1]),
-            ];
-        }
+        // (over the zones; a hole's run: round its box)
+        let z = bounds(input.zones.iter().flatten().flatten());
+        let b = match input.core {
+            None => z,
+            Some(c) => {
+                let m = 3.0 * cx.far;
+                [
+                    z[0].max(c[0] - m),
+                    z[1].max(c[1] - m),
+                    z[2].min(c[2] + m),
+                    z[3].min(c[3] + m),
+                ]
+            }
+        };
         Density::new(b, blur, |q| zones.of(q).is_some())
     });
     let mut status = Status {
@@ -197,7 +233,7 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         steps: prm.steps,
         ..Default::default()
     };
-    for it in 0..prm.steps {
+    for it in 0..if prm.phases & 1 != 0 { prm.steps } else { 0 } {
         let f = 1.0 - it as f64 / prm.steps as f64;
         let (cool, steer) = (f.powf(prm.cool), prm.steer * f.powf(prm.steer_cool));
         let p = tr.p.clone();
@@ -347,7 +383,6 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         }
         let checked;
         (new, checked) = keep_clear(&tr, &p, new, &cx);
-
         mv.iter_mut()
             .enumerate()
             .for_each(|(i, m)| *m = sub(new[i], p[i]));
@@ -381,8 +416,569 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         status.apart = apart(&gained, cx.group);
         progress(&status);
     }
+    if prm.holes > 0.0 && prm.phases & 2 != 0 {
+        tr = filled(tr, input, prm, &cx, progress);
+    }
+    if prm.phases & 4 == 0 {
+        return tr.lines();
+    }
     let tr = smoothed(tr, prm, &cx);
     matched(tr, &base, bins, prm, &cx, progress).lines()
+}
+
+/// The traces with the holes settling left (`holes`) filled where they can be: each hole in
+/// turn, the traces round it (those nearest it, and their groups: the pairs) settled again
+/// on their own in a box round it (`hole_margin` pitches wider), for `hole_steps` steps,
+/// each trace's own room shared with its pair's (`share`), all else there held as laid. A
+/// pair's U-turns into a hole grow one inside the other, the outer first: too slow to wait
+/// for over the whole area, a few hundred vertices' work each here.
+fn filled(
+    tr: Traces,
+    input: &Input,
+    prm: &Params,
+    cx: &Ctx,
+    progress: &mut dyn FnMut(&Status),
+) -> Traces {
+    let found = holes(
+        &tr,
+        bounds(input.zones.iter().flatten().flatten()),
+        cx,
+        prm.holes,
+    );
+    let pitch = cx.pitch;
+    let mut lines = tr.lines();
+    let n = lines.len();
+    let inside = |q: P, b: [f64; 4]| q[0] >= b[0] && q[1] >= b[1] && q[0] <= b[2] && q[1] <= b[3];
+    let grow = |b: [f64; 4], m: f64| [b[0] - m, b[1] - m, b[2] + m, b[3] + m];
+    let mut status = Status {
+        phase: "fill",
+        steps: found.len(),
+        ..Default::default()
+    };
+    for (h, cells) in found.iter().enumerate() {
+        status.step = h;
+        progress(&status);
+        let hb = bounds(cells.iter());
+        let centre = [(hb[0] + hb[2]) / 2.0, (hb[1] + hb[3]) / 2.0];
+        let core = grow(hb, prm.hole_margin * pitch);
+        // (what anything moving in the core looks at, held)
+        let outer = grow(core, 2.0 * cx.far + pitch);
+        // the traces round it: the one nearest each of its places (not filled since)
+        let reach = (prm.holes + 2.0) * pitch;
+        let pts: Vec<(P, usize)> = lines
+            .iter()
+            .enumerate()
+            .flat_map(|(t, l)| {
+                l.iter()
+                    .filter(|q| inside(**q, grow(hb, reach)))
+                    .map(move |q| (*q, t))
+            })
+            .collect();
+        let mut free = vec![false; n];
+        let mut open = false;
+        for &c in cells {
+            let best = pts
+                .iter()
+                .map(|&(q, t)| (dist(q, c), t))
+                .fold((f64::MAX, NONE), |a, b| if b.0 < a.0 { b } else { a });
+            if best.1 != NONE {
+                free[best.1] = true;
+                open |= best.0 > pitch;
+            }
+        }
+        if !open {
+            continue;
+        }
+        let free: Vec<bool> = (0..n)
+            .map(|t| (0..n).any(|u| free[u] && cx.group[u] == cx.group[t]))
+            .collect();
+        // each trace's runs in the box: those of the traces round it that reach into the
+        // core moved, the others held
+        let mut pieces: Vec<(usize, usize, usize, bool)> = Vec::new(); // (trace, from, to, moved)
+        for (t, l) in lines.iter().enumerate() {
+            let mut k = 0;
+            while k < l.len() {
+                if !inside(l[k], outer) {
+                    k += 1;
+                    continue;
+                }
+                let a = k;
+                while k < l.len() && inside(l[k], outer) {
+                    k += 1;
+                }
+                if k - a >= 2 {
+                    let moved = free[t] && l[a..k].iter().any(|&q| inside(q, core));
+                    pieces.push((t, a, k, moved));
+                }
+            }
+        }
+        // the moved runs side by side as the traces are, a pair's in turn: from each run of
+        // a group's first trace, the next trace's run nearest it, and so on
+        let rep = |j: usize| {
+            let (t, a, b, _) = pieces[j];
+            lines[t][a..b]
+                .iter()
+                .copied()
+                .fold((f64::MAX, centre), |m, q| {
+                    let d = dist(q, centre);
+                    if d < m.0 {
+                        (d, q)
+                    } else {
+                        m
+                    }
+                })
+                .1
+        };
+        let gap = |j: usize, q: P| {
+            let (t, a, b, _) = pieces[j];
+            lines[t][a..b]
+                .iter()
+                .map(|&r| dist(r, q))
+                .fold(f64::MAX, f64::min)
+        };
+        let mut used = vec![false; pieces.len()];
+        let mut chains: Vec<Vec<usize>> = Vec::new(); // (moved runs side by side, in turn)
+        for j in 0..pieces.len() {
+            let t = pieces[j].0;
+            if used[j] || !pieces[j].3 || (t > 0 && cx.group[t - 1] == cx.group[t]) {
+                continue;
+            }
+            used[j] = true;
+            let mut chain = vec![j];
+            let mut u = t + 1;
+            while u < n && cx.group[u] == cx.group[t] {
+                let q = rep(*chain.last().unwrap());
+                let next = (0..pieces.len())
+                    .filter(|&k| !used[k] && pieces[k].3 && pieces[k].0 == u)
+                    .map(|k| (gap(k, q), k))
+                    .fold((f64::MAX, NONE), |a, b| if b.0 < a.0 { b } else { a });
+                if next.1 == NONE || next.0 > 2.0 * pitch {
+                    break;
+                }
+                used[next.1] = true;
+                chain.push(next.1);
+                u += 1;
+            }
+            chains.push(chain);
+        }
+        // (a moved run alone: its own chain)
+        for j in 0..pieces.len() {
+            if pieces[j].3 && !used[j] {
+                used[j] = true;
+                chains.push(vec![j]);
+            }
+        }
+        if chains.is_empty() {
+            continue;
+        }
+        let held: Vec<Vec<P>> = (0..pieces.len())
+            .filter(|&j| !pieces[j].3)
+            .map(|j| {
+                let (t, a, b, _) = pieces[j];
+                lines[t][a..b].to_vec()
+            })
+            .collect();
+        let run = |j: usize| {
+            let (t, a, b, _) = pieces[j];
+            lines[t][a..b].to_vec()
+        };
+        let edge: Vec<P> = input
+            .edge
+            .iter()
+            .copied()
+            .filter(|&q| inside(q, grow(outer, cx.far)))
+            .collect();
+        let local = |lines: Vec<Vec<P>>, moved: usize, groups: Vec<usize>, pitch: f64| Input {
+            hold: (0..lines.len()).map(|k| k >= moved).collect(),
+            lines,
+            pitch,
+            edge: edge.clone(),
+            zones: input.zones.clone(),
+            keep: input.keep.clone(),
+            groups,
+            core: Some(core),
+            base: Vec::new(),
+        };
+        // (smoothed first, kept clear: a kinked run faces itself nearer than a pitch, and
+        // may only move apart there)
+        let even = |sub: Input, prm: &Params| -> Input {
+            let only = Params {
+                steps: 0,
+                finish: prm.finish,
+                match_steps: 0,
+                holes: 0.0,
+                phases: 5,
+                ..prm.clone()
+            };
+            Input {
+                lines: settle(&sub, &only, &mut |_| {}),
+                ..sub
+            }
+        };
+        // 1. each chain as one trace along its middle, as wide as its traces: into the hole
+        // as one U-turn (its traces' U-turns one inside the other; settled apart, the outer
+        // fills it alone), then its traces offset from it again
+        let mut moved: Vec<Vec<Vec<P>>> = chains
+            .iter()
+            .map(|c| c.iter().map(|&j| run(j)).collect())
+            .collect();
+        let wide = chains.iter().map(|c| c.len()).max().unwrap_or(1);
+        if wide > 1 {
+            let mids: Vec<usize> = (0..chains.len()).filter(|&c| chains[c].len() > 1).collect();
+            let mut ls: Vec<Vec<P>> = mids.iter().map(|&c| middle(&moved[c])).collect();
+            let before = ls.clone();
+            let k = ls.len();
+            ls.extend(chains.iter().filter(|c| c.len() == 1).map(|c| run(c[0])));
+            ls.extend(held.iter().cloned());
+            let groups = (0..ls.len()).collect();
+            let wp = wide as f64 * pitch;
+            let one = Params {
+                steps: prm.hole_steps,
+                share: 0.0,
+                steer: 0.0,
+                ribbon: prm.hole_ribbon / wide as f64,
+                holes: 0.0,
+                match_steps: 0,
+                phases: 5,
+                ..prm.clone()
+            };
+            let sub = even(local(ls, k, groups, wp), &one);
+            let out = settle(&sub, &one, &mut |_| {});
+            for (m, &c) in mids.iter().enumerate() {
+                let w = chains[c].len();
+                let side = side_of(&before[m], &moved[c][0]);
+                for (j, r) in moved[c].iter_mut().enumerate() {
+                    let off = side * ((w - 1) as f64 / 2.0 - j as f64) * pitch;
+                    *r = spliced(r, &offset(&out[m], off), core);
+                }
+            }
+        }
+        // 2. all the moved runs settled at the pitch, a chain's together (its room shared)
+        let mut ls: Vec<Vec<P>> = Vec::new();
+        let mut groups = Vec::new();
+        for (c, rs) in moved.iter().enumerate() {
+            for r in rs {
+                ls.push(r.clone());
+                groups.push(c);
+            }
+        }
+        let k = ls.len();
+        ls.extend(held.iter().cloned());
+        groups.extend(chains.len()..chains.len() + held.len());
+        let two = Params {
+            steps: prm.hole_steps / 4,
+            share: 1.0,
+            steer: 0.0,
+            ribbon: prm.hole_ribbon,
+            holes: 0.0,
+            finish: 0,
+            match_steps: 0,
+            phases: 5,
+            ..prm.clone()
+        };
+        let sub = even(local(ls, k, groups, pitch), &two);
+        // (the held runs as they are, not as settling resampled them: a resampled U-turn's
+        // tip is cut a little, and what moved measured against that comes too near)
+        let mut out = settle(&sub, &two, &mut |_| {});
+        out.truncate(k);
+        out.extend(held.iter().cloned());
+        let out = pushed_apart(out, k, pitch, core);
+        // 3. kept only if clear (else the hole stays as it was)
+        if !clear(&out, k, pitch) {
+            continue;
+        }
+        // (back in place, each trace's later runs first: its earlier ones' places unchanged)
+        let mut back: Vec<(usize, usize, usize, Vec<P>)> = chains
+            .iter()
+            .flatten()
+            .zip(out)
+            .map(|(&j, l)| (pieces[j].0, pieces[j].1, pieces[j].2, l))
+            .collect();
+        back.sort_by_key(|b| (b.0, std::cmp::Reverse(b.1)));
+        for (t, a, b, l) in back {
+            lines[t].splice(a..b, l);
+        }
+        let moved = k;
+        status.moved = moved;
+        status.filled += 1;
+    }
+    status.step = found.len();
+    progress(&status);
+    Traces::new(&lines, None)
+}
+
+/// The holes left in `b` (each its places, on a grid half a pitch apart: inside the zones, not in
+/// what is kept as laid, a pitch or more from the edge and further than a pitch from any
+/// trace), those whose furthest place is more than `least` pitches from a trace.
+fn holes(tr: &Traces, b: [f64; 4], cx: &Ctx, least: f64) -> Vec<Vec<P>> {
+    let (pitch, h) = (cx.pitch, cx.pitch / 2.0);
+    let nx = ((b[2] - b[0]) / h) as usize + 1;
+    let ny = ((b[3] - b[1]) / h) as usize + 1;
+    let at = |k: usize| [b[0] + (k % nx) as f64 * h, b[1] + (k / nx) as f64 * h];
+    let verts = Grid::new(&tr.p, pitch, |_| true);
+    let cap = (least + 1.0) * pitch;
+    let d: Vec<f64> = pmap(nx * ny, |k| {
+        let q = at(k);
+        let mut m = cap;
+        verts.within(q, pitch, |_, d2| m = m.min(d2.sqrt()));
+        if m < pitch || cx.zones.of(q).is_none() || cx.keep.of(q).is_some() {
+            return 0.0;
+        }
+        let mut edge = false;
+        if cx.edges.any_around(q, pitch) {
+            cx.edges.within(q, pitch, |_, _| edge = true);
+        }
+        if edge {
+            return 0.0;
+        }
+        verts.within(q, cap, |_, d2| m = m.min(d2.sqrt()));
+        m
+    });
+    let mut seen = vec![false; nx * ny];
+    let mut out = Vec::new();
+    for k0 in 0..nx * ny {
+        if seen[k0] || d[k0] <= pitch {
+            continue;
+        }
+        seen[k0] = true;
+        let (mut stack, mut cells, mut peak) = (vec![k0], Vec::new(), 0.0f64);
+        while let Some(k) = stack.pop() {
+            cells.push(at(k));
+            peak = peak.max(d[k]);
+            let (i, j) = (k % nx, k / nx);
+            for (di, dj) in [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)] {
+                let (a, c) = (i as i64 + di, j as i64 + dj);
+                if a < 0 || c < 0 || a >= nx as i64 || c >= ny as i64 {
+                    continue;
+                }
+                let kk = c as usize * nx + a as usize;
+                if !seen[kk] && d[kk] > pitch {
+                    seen[kk] = true;
+                    stack.push(kk);
+                }
+            }
+        }
+        if peak > least * pitch {
+            out.push(cells);
+        }
+    }
+    out
+}
+
+/// The middle of some runs side by side (each resampled to as many points, by its share of
+/// its length; their mean).
+fn middle(runs: &[Vec<P>]) -> Vec<P> {
+    let m = runs.iter().map(|r| r.len()).max().unwrap_or(2).max(2);
+    let at = |r: &[P], f: f64| -> P {
+        let mut arc = vec![0.0];
+        for w in r.windows(2) {
+            arc.push(arc.last().unwrap() + dist(w[0], w[1]));
+        }
+        let want = f * arc.last().unwrap();
+        let k = arc.partition_point(|&a| a < want).clamp(1, r.len() - 1);
+        let span = (arc[k] - arc[k - 1]).max(1e-12);
+        add(
+            r[k - 1],
+            scale(sub(r[k], r[k - 1]), (want - arc[k - 1]) / span),
+        )
+    };
+    (0..m)
+        .map(|i| {
+            let f = i as f64 / (m - 1) as f64;
+            let sum = runs.iter().fold([0.0, 0.0], |s, r| add(s, at(r, f)));
+            scale(sum, 1.0 / runs.len() as f64)
+        })
+        .collect()
+}
+
+/// On which side (along its normals: 1 left, -1 right) of `line` most of `other` runs.
+fn side_of(line: &[P], other: &[P]) -> f64 {
+    let normal = Traces::new(&[line.to_vec()], None).normals();
+    let mut left = 0i64;
+    for &q in other.iter().step_by((other.len() / 30).max(1)) {
+        let (k, _) = line
+            .iter()
+            .enumerate()
+            .map(|(k, &r)| (k, dist(r, q)))
+            .fold((0, f64::MAX), |a, b| if b.1 < a.1 { b } else { a });
+        left += if dot(sub(q, line[k]), normal[k]) > 0.0 {
+            1
+        } else {
+            -1
+        };
+    }
+    if left >= 0 {
+        1.0
+    } else {
+        -1.0
+    }
+}
+
+/// `line` moved `by` to its left, mitred: at a corner along the middle of its segments'
+/// normals, as far as keeps each segment `by` off (at most twice).
+fn offset(line: &[P], by: f64) -> Vec<P> {
+    let left = |a: P, b: P| {
+        let v = sub(b, a);
+        let l = norm(v).max(1e-12);
+        [-v[1] / l, v[0] / l]
+    };
+    let m = line.len();
+    (0..m)
+        .map(|i| {
+            let n1 = if i > 0 {
+                left(line[i - 1], line[i])
+            } else {
+                left(line[0], line[1])
+            };
+            let n2 = if i + 1 < m {
+                left(line[i], line[i + 1])
+            } else {
+                n1
+            };
+            let mid = add(n1, n2);
+            let l = norm(mid);
+            if l < 1e-9 {
+                return add(line[i], scale(n1, by));
+            }
+            let b = scale(mid, 1.0 / l);
+            add(line[i], scale(b, by / dot(b, n1).max(0.5)))
+        })
+        .collect()
+}
+
+/// `old` with its part in box `b` (from its first point in it to its last) that of `new`.
+fn spliced(old: &[P], new: &[P], b: [f64; 4]) -> Vec<P> {
+    let inside = |q: &P| q[0] >= b[0] && q[1] >= b[1] && q[0] <= b[2] && q[1] <= b[3];
+    let (Some(a0), Some(a1)) = (old.iter().position(inside), old.iter().rposition(inside)) else {
+        return old.to_vec();
+    };
+    let (Some(b0), Some(b1)) = (new.iter().position(inside), new.iter().rposition(inside)) else {
+        return old.to_vec();
+    };
+    let mut out = old[..a0].to_vec();
+    out.extend_from_slice(&new[b0..=b1]);
+    out.extend_from_slice(&old[a1 + 1..]);
+    out
+}
+
+/// The first `moved` of `lines` pushed (where in box `b`, a few times) straight away from
+/// copper nearer than a pitch, as far as it is too near: what an offset's corners and
+/// settling's last steps leave a little too near.
+fn pushed_apart(mut lines: Vec<Vec<P>>, moved: usize, pitch: f64, b: [f64; 4]) -> Vec<Vec<P>> {
+    let inside = |q: P| q[0] >= b[0] && q[1] >= b[1] && q[0] <= b[2] && q[1] <= b[3];
+    let need = 1.01 * pitch;
+    for _ in 0..20 {
+        let tr = Traces::new(&lines, None);
+        let arc = tr.arc();
+        let verts = Grid::new(&tr.p, pitch, |_| true);
+        let can = |i: usize| {
+            tr.net[i] < moved && tr.prev[i] != NONE && tr.next[i] != NONE && inside(tr.p[i])
+        };
+        // (each vertex near a segment of other copper, one of the two moved: the vertex, or
+        // the segment's ends, pushed away from the other, all the way if it is held, else
+        // half: it moves too)
+        let found: Vec<Vec<(usize, P)>> = pmap(tr.len(), |i| {
+            let mut out = Vec::new();
+            verts.within(tr.p[i], need + pitch, |s, _| {
+                let s1 = tr.next[s];
+                if s1 == NONE || s == i || s1 == i || !(can(i) || can(s) || can(s1)) {
+                    return;
+                }
+                let (c, t) = closest(tr.p[i], tr.p[s], tr.p[s1]);
+                let v = sub(tr.p[i], c);
+                let d = norm(v);
+                if d >= need || d < 1e-12 {
+                    return;
+                }
+                if tr.net[s] == tr.net[i]
+                    && (arc[s] + t * (arc[s1] - arc[s]) - arc[i]).abs() <= 2.0 * need
+                {
+                    return;
+                }
+                let segment = can(s) || can(s1);
+                let share = if can(i) && segment { 0.5 } else { 1.0 };
+                let away = scale(v, share * (need - d) / d);
+                if can(i) {
+                    out.push((i, away));
+                }
+                for e in [s, s1] {
+                    if can(e) {
+                        out.push((e, scale(away, -1.0)));
+                    }
+                }
+            });
+            out
+        });
+        let mut push = vec![[0.0, 0.0]; tr.len()];
+        for (i, m) in found.into_iter().flatten() {
+            if norm(m) > norm(push[i]) {
+                push[i] = m;
+            }
+        }
+        if push.iter().all(|m| m[0] == 0.0 && m[1] == 0.0) {
+            break;
+        }
+        for (i, m) in push.iter().enumerate() {
+            let (t, k) = (tr.net[i], i - tr.first[tr.net[i]]);
+            lines[t][k] = add(lines[t][k], *m);
+        }
+    }
+    lines
+}
+
+/// Whether the first `moved` lines keep a pitch (but 1 %) from all other copper and from
+/// themselves where they face themselves (as `keep_clear`), and cross none.
+fn clear(lines: &[Vec<P>], moved: usize, pitch: f64) -> bool {
+    let tr = Traces::new(lines, None);
+    let arc = tr.arc();
+    let longest = (0..tr.len())
+        .filter(|&i| tr.next[i] != NONE)
+        .map(|i| dist(tr.p[i], tr.p[tr.next[i]]))
+        .fold(0.0, f64::max);
+    let need = 0.99 * pitch;
+    let segs = Grid::new(&tr.p, pitch, |i| tr.next[i] != NONE);
+    // (each vertex against the segments near it, the one or the other moved)
+    let bad = pmap(tr.len(), |q| {
+        let mut bad = false;
+        segs.within(tr.p[q], need + longest, |s, _| {
+            let s1 = tr.next[s];
+            if bad || s == q || s1 == q || (tr.net[q] >= moved && tr.net[s] >= moved) {
+                return;
+            }
+            // (its segment on, across another not next to it)
+            let q1 = tr.next[q];
+            if q1 != NONE && s != q1 && crosses(tr.p[q], tr.p[q1], tr.p[s], tr.p[s1]) {
+                bad = true;
+                return;
+            }
+            let (c, t) = closest(tr.p[q], tr.p[s], tr.p[s1]);
+            let v = sub(c, tr.p[q]);
+            let d = norm(v);
+            if d >= need {
+                return;
+            }
+            // (its own: only much further along it than across, more than a U-turn as
+            // tight as laid takes, half a pitch across)
+            bad = tr.net[s] != tr.net[q] || {
+                let sep = (arc[s] + t * (arc[s1] - arc[s]) - arc[q]).abs();
+                sep > 2.0 * d.max(pitch)
+            };
+        });
+        bad
+    });
+    !bad.iter().any(|&b| b)
+}
+
+/// The bounds (x0, y0, x1, y1) of some points.
+fn bounds<'a>(ps: impl Iterator<Item = &'a P>) -> [f64; 4] {
+    ps.fold([f64::MAX, f64::MAX, f64::MIN, f64::MIN], |b, q| {
+        [
+            b[0].min(q[0]),
+            b[1].min(q[1]),
+            b[2].max(q[0]),
+            b[3].max(q[1]),
+        ]
+    })
 }
 
 /// The traces smoothed at the end (`finish` Taubin steps, each kept clear as settling's
@@ -523,7 +1119,14 @@ fn excess(gained: &[Vec<f64>], band: f64, group: &[usize]) -> Vec<Vec<f64>> {
 /// and each vertex's zone (none moves from one into another).
 fn held(tr: &Traces, cx: &Ctx) -> (Vec<bool>, Vec<Option<usize>>) {
     let mut fixed: Vec<bool> = pmap(tr.len(), |i| {
-        tr.prev[i] == NONE || tr.next[i] == NONE || cx.keep.of(tr.p[i]).is_some()
+        let q = tr.p[i];
+        tr.prev[i] == NONE
+            || tr.next[i] == NONE
+            || cx.hold.get(tr.net[i]).copied().unwrap_or(false)
+            || cx
+                .core
+                .is_some_and(|b| q[0] < b[0] || q[1] < b[1] || q[0] > b[2] || q[1] > b[3])
+            || cx.keep.of(q).is_some()
     });
     fixed = spread(tr, fixed, 4);
     let zone: Vec<Option<usize>> = pmap(tr.len(), |i| cx.zones.of(tr.p[i]));

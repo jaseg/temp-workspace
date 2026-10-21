@@ -50,12 +50,13 @@ import math
 import random
 import sys
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import shapely
 from shapely.geometry import LineString, Polygon
 
-from yanartas_pillowbox import progress
+from yanartas_pillowbox import checkpoint, progress
 from yanartas_pillowbox.mesh import (
     DOWN,
     LEFT,
@@ -116,7 +117,12 @@ SETTLE_TIP = 1.0  # ... U-turns tighter than this many pitches per trace's radiu
 SETTLE_REACH_OUT = 1.0  # ... leaning out along their axis by this share of the room
 SETTLE_FILL = 2.0  # ... down the slope of the traces' density (into holes) by this much
 SETTLE_FILL_BLUR = 0.5  # ... (the density blurred over this many pitches per trace)
+SETTLE_RIBBON = 0  # ... (the density blurred as for this many traces abreast; 0: a pair)
 SETTLE_SHARE = 0  # ... a trace's own copper across, the room its pair's legs': theirs (0: off)
+SETTLE_HOLE = 1.0  # then holes this many pitches from copper and more filled, each alone (0: none)
+SETTLE_HOLE_STEPS = 160  # ... by this many steps' settling of the pairs round it, room shared
+SETTLE_HOLE_MARGIN = 4.0  # ... in a box this many pitches wider than the hole
+SETTLE_HOLE_RIBBON = 4  # ... the density blurred there as for this many traces abreast
 SETTLE_BEND = 2  # ... the bends it grows (or straightens): this many vertices either way
 SETTLE_SMOOTH = 3  # ... jitter smoothed this many times a step
 SETTLE_FINISH = 10  # ... then all smoothed this many times (kept clear)
@@ -179,6 +185,7 @@ def _regions(area: shapely.Geometry, zones: list[Polygon], least: float) -> list
 
 
 # ----------------------------------------------------------------------------- curve
+@checkpoint.step("graph")
 def _curve(
     regions: list[Polygon],
     owner: list[int],
@@ -242,6 +249,7 @@ def _lines(g: shapely.Geometry) -> list[LineString]:
 
 
 # ----------------------------------------------------------------------------- geometry
+@checkpoint.step("relax")
 def _relax(
     curve: np.ndarray,
     stem: np.ndarray,
@@ -354,6 +362,7 @@ def _rings(g: shapely.Geometry) -> list[shapely.LinearRing]:
     return [r for poly in _polygons(g) for r in (poly.exterior, *poly.interiors)]
 
 
+@checkpoint.step("lanes")
 def _lanes(
     p: np.ndarray,
     k: int,
@@ -424,22 +433,58 @@ def _settle(
         edge = np.vstack([edge, borders[clear]])
     elif len(borders):
         edge = np.vstack([edge, borders])
-    settle = _core().settle_traces
-
-    def report(d: dict) -> None:
-        progress.report(d.pop("phase"), d.pop("step"), d.pop("steps"), **d)
-
-    out = settle(
-        [np.ascontiguousarray(t, float) for t in lines],
+    laid = [np.ascontiguousarray(t, float) for t in lines]
+    room = (
         pitch,
         np.ascontiguousarray(edge, float),
         [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
         [[np.asarray(r.coords, float) for r in _rings(g)] for g in _polygons(keep)],
-        _params(len(lines) if ribbon is None else ribbon),
-        report,
-        groups,
     )
+    params = _params(len(lines) if ribbon is None else ribbon)
+    # (in its phases, each a step of its own: timed, and checkpointed when asked)
+    out = _settling(laid, *room, params, groups)
+    out = _filling(out, *room, params, groups, laid)
+    return _finishing(out, *room, params, groups, laid)
+
+
+def _settle_phase(
+    phases: int,
+    lines: list[np.ndarray],
+    pitch: float,
+    edge: np.ndarray,
+    zones: list[list[np.ndarray]],
+    keep: list[list[np.ndarray]],
+    params: dict[str, float],
+    groups: list[int] | None,
+    base: list[np.ndarray] | None = None,
+) -> list[np.ndarray]:
+    """``_settle``'s ``phases`` (1: settling, 2: filling the holes, 4: smoothing and
+    matching) by the Rust core, on from ``lines`` (``base``: the traces as first laid)."""
+
+    def report(d: dict) -> None:
+        progress.report(d.pop("phase"), d.pop("step"), d.pop("steps"), **d)
+
+    out = _core().settle_traces(
+        [np.ascontiguousarray(t, float) for t in lines], pitch, edge, zones, keep,
+        {**params, "phases": phases}, report, groups,
+        None if base is None else [np.ascontiguousarray(t, float) for t in base],
+    )  # fmt: skip
     return [np.asarray(t) for t in out]
+
+
+@checkpoint.step("settle")
+def _settling(*a: Any) -> list[np.ndarray]:
+    return _settle_phase(1, *a)
+
+
+@checkpoint.step("fill")
+def _filling(*a: Any) -> list[np.ndarray]:
+    return _settle_phase(2, *a)
+
+
+@checkpoint.step("finish")
+def _finishing(*a: Any) -> list[np.ndarray]:
+    return _settle_phase(4, *a)
 
 
 def _core() -> object:
@@ -493,13 +538,13 @@ def _browser_core() -> object | None:
             if hook is not None:
                 hook.destroy()
 
-    def settle_traces(lines, pitch, edge, zones, keep, params, report, groups=None):  # noqa: ANN001, ANN202
+    def settle_traces(lines, pitch, edge, zones, keep, params, report, groups=None, base=None):  # noqa: ANN001, ANN202
         rings = [r for z in zones for r in z]
         held = [r for z in keep for r in z]
         out = call(
             mesh.settle, *flat(lines), pitch, f64(edge), *flat(rings),
             u32([len(z) for z in zones]), *flat(held), u32([len(z) for z in keep]),
-            u32(groups or []), obj(params), report=lambda o: report(o.to_py()),
+            u32(groups or []), *flat(base or []), obj(params), report=lambda o: report(o.to_py()),
         )  # fmt: skip
         return unflat(out.points, out.lens)
 
@@ -583,8 +628,12 @@ def _params(traces: int = SCALE) -> dict[str, float]:
         "match_steps": MATCH,
         "match_band": MATCH_BAND,
         "match_rate": MATCH_RATE,
-        "ribbon": 0.0,
+        "ribbon": float(SETTLE_RIBBON),
         "share": float(SETTLE_SHARE),
+        "holes": SETTLE_HOLE,
+        "hole_steps": SETTLE_HOLE_STEPS,
+        "hole_margin": SETTLE_HOLE_MARGIN,
+        "hole_ribbon": float(SETTLE_HOLE_RIBBON),
     }
 
 
@@ -710,6 +759,28 @@ def generate(
         # (the partitions' borders kept as the zones': each trace in its own)
         flat = _settle(flat, pitch, area, regions, keep, pair, n)
     progress.report("match", 1, 1)
+    with checkpoint.timed("output"):
+        return _output(
+            flat, frame, arcs, pitch, exits, c, groups, pair, partitions, cells, left, corners
+        )  # fmt: skip
+
+
+def _output(
+    flat: list[np.ndarray],
+    frame: _Frame,
+    arcs: bool,
+    pitch: float,
+    exits: list[tuple[float, float]],
+    c: float,
+    groups: list[int],
+    pair: list[int],
+    partitions: Sequence[shapely.Geometry],
+    cells: int,
+    left: int,
+    corners: list[tuple[float, float]],
+) -> Mesh:
+    """``generate``'s mesh from its settled traces: simplified (or fitted with arcs), back in
+    the board's frame, its nets in order."""
     out: list[np.ndarray] = []
     shapes: list[tuple[Piece, ...] | None] = []
     if arcs:
