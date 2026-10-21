@@ -196,3 +196,61 @@ def test_regions_no_curve_reaches_go_to_the_partition_beside():
     # Nothing left out: nothing moves.
     every = [(np.zeros((1, 2)), np.array([0, 1, 2, 3]))]
     assert sfc._reassigned(regions, [0, 1, 1, 1], every, 4.0) is None
+
+
+# A small region (a lid's glue tab: a single cell of the curve's graph, its ring's edge along
+# the border running nearly end to end) beside a narrow one (the lid: room for one run in and
+# out): laid out by itself, at the real board's proportions (in spacings).
+TAB_MAIN = shapely.box(0, 0, 30, 20)
+TAB_SP = 2 * PITCH  # (the spacing: two traces' pitches)
+TAB_BAND_TOP = shapely.box(0, 20, 30, 20 + 2.3 * TAB_SP)
+TAB_BAND_SIDE = shapely.box(30, 0, 30 + 2.3 * TAB_SP, 20)
+
+
+def _tab_case(name, w, h):
+    top = TAB_BAND_TOP.bounds[3]
+    side = TAB_BAND_SIDE.bounds[2]
+    band, tab = {
+        "band-end": (
+            TAB_BAND_TOP,
+            shapely.box(0.5 * TAB_SP, top, (0.5 + w) * TAB_SP, top + h * TAB_SP),
+        ),
+        "band-middle": (TAB_BAND_TOP, shapely.box(12, top, 12 + w * TAB_SP, top + h * TAB_SP)),
+        "band-side": (TAB_BAND_SIDE, shapely.box(side, 9, side + h * TAB_SP, 9 + w * TAB_SP)),
+    }[name]
+    return [TAB_MAIN, band, tab], tab
+
+
+@pytest.mark.parametrize("seed", range(1, 5))
+@pytest.mark.parametrize("size", [(3.1, 2.6), (2.6, 2.6)], ids=["lid-tab", "small"])
+@pytest.mark.parametrize("name", ["band-end", "band-middle", "band-side"])
+def test_a_small_tab_beside_a_narrow_band_is_covered(name, size, seed):
+    """The tab's single cell joins the band's run beside it: the join takes the middle of the
+    edges along the border (split off where the border's ends' margins begin), not just
+    edges clear of them (a lid's glue tab was left bare)."""
+    zones, tab = _tab_case(name, *size)
+    area = shapely.union_all(zones)
+    m = sfc.generate(area, (7, 0), mesh.UP, 2, PITCH, seed=seed, zones=zones)
+    assert m.unreached == 0
+    copper = shapely.union_all([LineString(t).buffer(PITCH) for t in m.traces])
+    assert copper.intersection(tab).area > 0.8 * tab.area
+    lines = [LineString(t) for t in m.traces]
+    assert all(line.is_simple for line in lines)
+    # (apart; the spacing's own tests hold it to 1 %: here, beside the stem, 2 %)
+    for a, b in itertools.combinations(lines, 2):
+        assert a.distance(b) > 0.98 * PITCH
+
+
+def test_a_region_no_curve_reaches_merges_into_its_partitions_neighbour():
+    """A small region still left out (no run beside it to join across their border) becomes
+    one region with the reached one of its partition beside it; nothing to merge: None."""
+    lid = shapely.box(0, 0, 40, 10)
+    tab = shapely.box(30, 10, 40, 20)  # (left out)
+    other = shapely.box(0, 10, 30, 30)  # (another partition's: not merged into)
+    found = [(np.zeros((1, 2)), np.array([0])), (np.zeros((1, 2)), np.array([2]))]
+    regions, owner = sfc._merged([lid, tab, other], [0, 0, 1], found, 4.0)
+    assert owner == [0, 1] and regions[0].equals(shapely.union_all([lid, tab]))
+    # (no reached region of its own partition beside it: left for the partitions' pass)
+    assert sfc._merged([lid, tab, other], [0, 2, 1], found, 4.0) is None
+    every = [(np.zeros((1, 2)), np.array([0, 1, 2]))]
+    assert sfc._merged([lid, tab, other], [0, 0, 1], every, 4.0) is None

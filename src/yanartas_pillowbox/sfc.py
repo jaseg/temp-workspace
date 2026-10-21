@@ -254,12 +254,7 @@ def _reassigned(
     domains not empty) given to a partition whose curve does reach a region beside them
     (along a border a curve can cross, the longest), and so on from those; None if none
     moves."""
-    reached = {int(r) for _, regs in found for r in np.asarray(regs).ravel()}
-    lost = {
-        i
-        for i, r in enumerate(regions)
-        if i not in reached and any(d.area >= spacing**2 for d in _polygons(r.buffer(-spacing / 2)))
-    }
+    lost = _lost(regions, found, spacing)
     if not lost:
         return None
     out = list(owner)
@@ -274,6 +269,44 @@ def _reassigned(
                     lost.discard(a)
                     changed = True
     return out if out != list(owner) else None
+
+
+def _merged(
+    regions: list[Polygon],
+    owner: list[int],
+    found: list[tuple[np.ndarray, np.ndarray]],
+    spacing: float,
+) -> tuple[list[Polygon], list[int]] | None:
+    """The regions with each one no curve reached (and that could take one) merged into the
+    reached region of its partition beside it, across the longest border a curve can cross;
+    None if there is none to merge."""
+    lost = _lost(regions, found, spacing)
+    if not lost:
+        return None
+    into: dict[int, int] = {}
+    for i, j, _ in _shared_borders(regions, spacing):  # (longest first)
+        for a, b in ((i, j), (j, i)):
+            if a in lost and a not in into and b not in lost and owner[a] == owner[b]:
+                into[a] = b
+    if not into:
+        return None
+    out = list(regions)
+    for a, b in into.items():
+        out[b] = shapely.union_all([out[b], out[a]])
+    keep = [i for i in range(len(regions)) if i not in into]
+    return [out[i] for i in keep], [owner[i] for i in keep]
+
+
+def _lost(
+    regions: list[Polygon], found: list[tuple[np.ndarray, np.ndarray]], spacing: float
+) -> set[int]:
+    """The regions no curve reached that could take one (their domains not empty)."""
+    reached = {int(r) for _, regs in found for r in np.asarray(regs).ravel()}
+    return {
+        i
+        for i, r in enumerate(regions)
+        if i not in reached and any(d.area >= spacing**2 for d in _polygons(r.buffer(-spacing / 2)))
+    }
 
 
 def _lines(g: shapely.Geometry) -> list[LineString]:
@@ -762,6 +795,13 @@ def generate(
                     partitions[owner[i]] = shapely.difference(partitions[owner[i]], back)
                     partitions[k] = shapely.union_all([partitions[k], back])
         owner = moved
+        found, cells, left = _curve(regions, owner, spacing, openings, rng.getrandbits(64))
+    # (and a small one that still none reaches, e.g. a lid's glue tab whose one cell finds no
+    # run of the narrow lid beside it to join across their border: one region with that
+    # neighbour, its curve crossing the fold between them inside it)
+    merged = _merged(regions, owner, found, spacing)
+    if merged is not None:
+        regions, owner = merged
         found, cells, left = _curve(regions, owner, spacing, openings, rng.getrandbits(64))
     progress.report("graph", cells=cells)
     lines = []

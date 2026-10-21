@@ -482,6 +482,31 @@ def test_space_filling_curve_full_size():
         assert sp.under < 0.01 * sp.measured and sp.within > 0.6 * sp.measured
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "changes",
+    [
+        # (a partition's back-panel piece past a sliver of the front panel: left bare)
+        {"mesh_algorithm": "sfc", "mesh_trace_space": 1.0},
+        # (two pieces: a lid's glue tab, one cell beside the lid's one run, left bare)
+        {
+            "pieces": "two",
+            "lid_offset": 1.75,
+            "mesh_algorithm": "sfc",
+            "mesh_trace_width": 0.1,
+            "mesh_trace_space": 1.0,
+            "mesh_shape": "arcs",
+        },
+    ],
+    ids=["back-panel-piece", "lid-tab"],
+)
+def test_space_filling_curve_covers_every_face(changes):
+    """Boards that came out with a face bare on a layer: every region reached on both."""
+    result = pcb.layout(D.with_values(**changes))
+    assert pcb.verify(result) == []
+    assert [m.unreached for m in result.meshes.values()] == [0, 0]
+
+
 def test_traces_neck_down_where_the_exits_do_not_fit_the_cable():
     """With a space wider than the plug's pitch and more traces than fit the cable centred
     on their pins, the exits sit side by side across a junction widened for them and the

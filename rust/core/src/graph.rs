@@ -1045,6 +1045,25 @@ fn project(line: &[P], q: P) -> (f64, f64) {
     (at, best)
 }
 
+/// How far along the polyline the segment `p`-`q` crosses it (the first crossing), if it does.
+fn crosses_at(line: &[P], p: P, q: P) -> Option<f64> {
+    let mut run = 0.0;
+    for w in line.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let (d, e) = (sub(q, p), sub(b, a));
+        let den = cross(d, e);
+        if den.abs() > 1e-12 {
+            let f = sub(a, p);
+            let (t, k) = (cross(f, e) / den, cross(f, d) / den);
+            if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&k) {
+                return Some(run + k * dist(a, b));
+            }
+        }
+        run += dist(a, b);
+    }
+    None
+}
+
 /// Whether segments `a`-`b` and `c`-`d` meet (touching counts).
 fn meet(a: P, b: P, c: P, d: P) -> bool {
     let o = |p: P, q: P, r: P| {
@@ -1093,8 +1112,21 @@ fn join_segments(
     for (ri, rj, lines) in borders {
         // (one join a pair, but more where a region's cycles are not yet all of a piece:
         // each as it comes, while one can be made)
-        let va = by_region.get(ri).unwrap_or(&none).clone();
-        let vb = by_region.get(rj).unwrap_or(&none).clone();
+        let mut va = by_region.get(ri).unwrap_or(&none).clone();
+        let mut vb = by_region.get(rj).unwrap_or(&none).clone();
+        // (a cycle edge along the border running into its ends, as a small region's one cell
+        // has: split where the ends' margins begin, so its middle can take the join)
+        for line in lines {
+            let length = polyline_length(line);
+            if length >= 2.0 * spacing {
+                let end = (2.0 * spacing).min(length / 6.0);
+                for vs in [&mut va, &mut vb] {
+                    split_at(g, u, segments, vs, line, spacing, &[end, length - end]);
+                }
+            }
+        }
+        by_region.insert(*ri, va.clone());
+        by_region.insert(*rj, vb.clone());
         let roots = |u: &mut Union, vs: &[usize]| {
             let mut r: Vec<usize> = vs.iter().map(|&v| u.find(v)).collect();
             r.sort_unstable();
@@ -1109,6 +1141,53 @@ fn join_segments(
             if !joined {
                 break;
             }
+        }
+    }
+}
+
+/// Split the cycle edges of `vs` that run along their domain's boundary within `near` of
+/// `line` across any of the positions `cuts` along it (each at its projection there), the
+/// new vertices added to `vs`.
+fn split_at(
+    g: &mut Graph,
+    u: &mut Union,
+    segments: &[Segment],
+    vs: &mut Vec<usize>,
+    line: &[P],
+    near: f64,
+    cuts: &[f64],
+) {
+    for &cut in cuts {
+        let mut edges = Vec::new();
+        for &a in vs.iter() {
+            for &b in &g.nbr[a] {
+                if a > b || g.fixed.contains(&(a, b)) || g.seg[a] != g.seg[b] {
+                    continue;
+                }
+                let (pa, pb) = (g.pts[a], g.pts[b]);
+                let (sa, da) = project(line, pa);
+                let (sb, db) = project(line, pb);
+                if da.max(db) > near
+                    || boundary_distance(&segments[g.seg[a]].domain, scale(add(pa, pb), 0.5)) > 1e-6
+                {
+                    continue;
+                }
+                let (lo, hi) = (sa.min(sb), sa.max(sb));
+                // (both pieces worth keeping)
+                if lo + 0.05 * near < cut && cut < hi - 0.05 * near {
+                    edges.push((a, b, (cut - sa) / (sb - sa)));
+                }
+            }
+        }
+        for (a, b, t) in edges {
+            let p = add(g.pts[a], scale(sub(g.pts[b], g.pts[a]), t));
+            let v = g.add(p, g.seg[a]);
+            u.grow(g.pts.len());
+            u.join(a, v);
+            g.unlink(a, b);
+            g.link(a, v);
+            g.link(v, b);
+            vs.push(v);
         }
     }
 }
@@ -1141,13 +1220,31 @@ fn connect(
         spacing,
     );
     let mid = length / 2.0;
-    for (along, near, reach) in [(true, 1.0, 2.0), (false, 1.8, 2.6)] {
-        let ea = border_edges(g, segments, va, line, near * spacing, end, along);
-        let eb = border_edges(g, segments, vb, line, near * spacing, end, along);
+    // (the last pass: edges anywhere near the border, ends' margins or not, as long as both
+    // joins cross it away from its ends; a run that keeps to the border's far end, where its
+    // narrow region leaves room, reaches a small region's cycle across its middle)
+    for (along, near, reach, crossing) in [
+        (true, 1.0, 2.0, false),
+        (false, 1.8, 2.6, false),
+        (false, 1.8, 2.6, true),
+    ] {
+        let margin = if crossing { 0.0 } else { end };
+        let ea = border_edges(g, segments, va, line, near * spacing, margin, along);
+        let eb = border_edges(g, segments, vb, line, near * spacing, margin, along);
         let mut cands: Vec<(f64, usize, usize, usize, usize)> = Vec::new();
         for &(a1, a2, s1, s2) in &ea {
             for &(b1, b2, t1, t2) in &eb {
-                if u.find(a1) == u.find(b1) || s2.min(t2) - s1.max(t1) < 0.1 * spacing {
+                if u.find(a1) == u.find(b1) {
+                    continue;
+                }
+                let inside = |p: P, q: P| {
+                    crosses_at(line, p, q).is_some_and(|s| end <= s && s <= length - end)
+                };
+                if crossing {
+                    if !(inside(g.pts[a1], g.pts[b1]) && inside(g.pts[a2], g.pts[b2])) {
+                        continue;
+                    }
+                } else if s2.min(t2) - s1.max(t1) < 0.1 * spacing {
                     continue;
                 }
                 let (l1, l2) = (dist(g.pts[a1], g.pts[b1]), dist(g.pts[a2], g.pts[b2]));
@@ -1233,7 +1330,10 @@ fn border_edges(
                 continue;
             }
             let (sa, sb) = (project(line, pa).0, project(line, pb).0);
-            if sa.min(sb) < end || sa.max(sb) > length - end {
+            // (a little past the ends' margins is clear enough: an edge further past them is
+            // split there first, `split_at`)
+            let slack = 0.1 * near;
+            if sa.min(sb) < end - slack || sa.max(sb) > length - end + slack {
                 continue;
             }
             out.push(if sa <= sb {

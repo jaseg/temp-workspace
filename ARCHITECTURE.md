@@ -357,8 +357,17 @@ an exact isometry: the panels curve along it, not across it.
      piece across them not) goes to the partition whose curve reaches the piece beside
      it, across the longest border a curve can cross, and so on from there; the curves
      are then found again. The partitions' areas come out less even, the box covered.
+     A small region still left out (a lid's glue tab: one cell, beside the lid's narrow
+     band whose run keeps to the far end of their border) is merged into the reached
+     region of its own partition beside it (`sfc._merged`), and the curves found again:
+     its curve then crosses the fold between them inside the merged region.
   The graph is built afresh (up to `ATTEMPTS` times, the best kept) when a cycle ends up
   joined to no exit's curve; across a border it joins as long as cycles there are apart.
+  A join keeps off the border's ends (by `min(2 spacings, length / 6)`): a cycle edge along
+  the border that runs into those margins (a small region's one cell has one from end to
+  end) is first split where they begin, an edge a tenth of a spacing past them counts as
+  clear, and a last pass takes edges anywhere near the border as long as both joins cross
+  it clear of its ends.
   Seeds that the Lloyd steps bring near an exit's pinned seed are left out each step (a
   seed in a corner beside an opening otherwise comes back each time, its cell's wall
   across the opening).
