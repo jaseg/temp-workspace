@@ -65,6 +65,7 @@ from yanartas_pillowbox.mesh import (
     MeshError,
     Piece,
     Point,
+    matching,
     resample,
     sample_arcs,
 )
@@ -398,9 +399,10 @@ def _settle(
     regions: list[Polygon],
     keep: shapely.Geometry,
     groups: list[int] | None = None,
+    ribbon: int | None = None,
 ) -> list[np.ndarray]:
     """The traces, each settled on its own into the room around it, then matched in length
-    (within each of their ``groups``: partitions),
+    (within each of their ``groups``: ``mesh.matching``'s pairs; ``ribbon`` traces abreast),
     by the Rust core (rust/core; see ARCHITECTURE.md, Settling): natively its extension
     (yanartas_mesh, on all cores), in the browser its WebAssembly build. Here, what needs
     shapely: the edge's points (the area's edge, and the zones' borders but where the
@@ -432,7 +434,7 @@ def _settle(
         np.ascontiguousarray(edge, float),
         [[np.asarray(r.coords, float) for r in _rings(z)] for z in regions],
         [[np.asarray(r.coords, float) for r in _rings(g)] for g in _polygons(keep)],
-        _params(len(lines) if groups is None else max(groups.count(g) for g in set(groups))),
+        _params(len(lines) if ribbon is None else ribbon),
         report,
         groups,
     )
@@ -686,6 +688,12 @@ def generate(
             for ring in _lanes(p, kk, parts[k], n, pitch, spacing, exact)
         ])  # fmt: skip
     groups = [k for k, ls in enumerate(lines) for _ in ls]
+    # (matched in length in pairs, each partition's: see ``mesh.matching``)
+    each = matching(n)
+    pair = [k * len(each) + g for k, ls in enumerate(lines) for g, size in enumerate(each)
+            for _ in range(size)]  # fmt: skip
+    if any(len(ls) != n for ls in lines):  # (lanes lost: one group a partition)
+        pair = groups
     flat = [line for ls in lines for line in ls]
     if SETTLE:
         # (the stems: their leads beyond the area's edge, their rails through the exit
@@ -697,7 +705,7 @@ def generate(
         ])  # fmt: skip
         progress.report("lanes", traces=len(flat))
         # (the partitions' borders kept as the zones': each trace in its own)
-        flat = _settle(flat, pitch, area, regions, keep, groups)
+        flat = _settle(flat, pitch, area, regions, keep, pair, n)
     progress.report("match", 1, 1)
     out: list[np.ndarray] = []
     shapes: list[tuple[Piece, ...] | None] = []
@@ -731,7 +739,8 @@ def generate(
         order += sorted(mine, key=lambda i, m=mid: -math.dist(out[i][0], m))
     nets = tuple(tuple((float(x), float(y)) for x, y in out[i]) for i in order)
     shaped = tuple(shapes[i] for i in order) if arcs else None
-    if not partitions:
-        return Mesh(nets, c, cells, left, corners[0], "sfc", shaped)
     sizes = tuple(groups.count(k) for k in range(len(exits)))
-    return Mesh(nets, c, cells, left, corners[0], "sfc", shaped, sizes, tuple(partitions))
+    matched = sum((matching(m) for m in sizes), ()) if pair is not groups else ()
+    if not partitions:
+        return Mesh(nets, c, cells, left, corners[0], "sfc", shaped, matched=matched)
+    return Mesh(nets, c, cells, left, corners[0], "sfc", shaped, sizes, tuple(partitions), matched)

@@ -53,11 +53,14 @@ class Mesh:
     # the partitions' traces in turn (how many each; one partition: all), and their areas
     groups: tuple[int, ...] = ()
     parts: tuple = ()  # (shapely polygons)
+    # the traces matched in length together, in turn (how many each: ``matching``; none
+    # given: each partition's)
+    matched: tuple[int, ...] = ()
 
     @property
     def pairs(self) -> list[tuple[int, int]]:
-        """The neighbouring traces of each partition (as differential pairs)."""
-        sizes = self.groups or (len(self.traces),)
+        """The neighbouring traces matched in length together (as differential pairs)."""
+        sizes = self.matched or self.groups or (len(self.traces),)
         out, first = [], 0
         for size in sizes:
             out += [(i, i + 1) for i in range(first, first + size - 1)]
@@ -67,6 +70,18 @@ class Mesh:
     @property
     def ends(self) -> tuple[tuple[Point, Point], ...]:
         return tuple((t[0], t[-1]) for t in self.traces)
+
+
+def matching(n: int) -> tuple[int, ...]:
+    """How a ribbon's ``n`` neighbouring traces are matched in length: in pairs (1-2, 3-4,
+    ...), an odd one's middle group three (7: 1-2, 3-4-5, 6-7); between groups not, so that
+    a pair can grow into a hole its ribbon cannot."""
+    if n < 2:
+        return (n,) if n else ()
+    sizes = [2] * (n // 2)
+    if n % 2:
+        sizes[len(sizes) // 2] += 1
+    return tuple(sizes)
 
 
 def sample_arcs(pieces: Sequence[Piece], tol: float) -> tuple[Point, ...]:

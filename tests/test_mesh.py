@@ -59,3 +59,24 @@ def test_density_sees_holes_but_not_the_edge():
     holed = [t for i, t in enumerate(full) if not 16 <= i < 24]  # (a 2.4 mm wide gap)
     h = mesh.density(holed, area, 0.15, 0.15)
     assert h.thin > 0.05 and h.least < 0.3 and h.spread > 0.1
+
+
+def test_matching_pairs_a_ribbon_its_middle_three_when_odd():
+    assert [mesh.matching(n) for n in range(1, 8)] == [
+        (1,),
+        (2,),
+        (3,),
+        (2, 2),
+        (2, 3),
+        (2, 2, 2),
+        (2, 3, 2),
+    ]
+    m = mesh.Mesh(tuple(((0, i), (1, i)) for i in range(7)), 1, 1, 0, matched=(2, 3, 2))
+    assert m.pairs == [(0, 1), (2, 3), (3, 4), (5, 6)]
+    assert mesh.Mesh(m.traces, 1, 1, 0, groups=(3, 4)).pairs == [
+        (0, 1),
+        (1, 2),
+        (3, 4),
+        (4, 5),
+        (5, 6),
+    ]

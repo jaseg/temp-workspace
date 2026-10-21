@@ -295,9 +295,14 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   along every trace on both sides (the share within −5 %…+20 % of `mesh_trace_space` and the
   length below it), the coverage (the copper's share of the area about each point, blurred
   over 1 mm, against the nominal share: how much it varies, and the share of the area
-  under 70 % of nominal, i.e. holes between runs), and, taking each pair of neighbouring traces (1+2, 2+3, 3+4) as a
-  differential pair, the difference in their lengths and the largest local difference (the
-  most one is longer than the other along the way), over the mesh.
+  under 70 % of nominal, i.e. holes between runs), and, taking each pair of neighbouring
+  traces matched in length as a differential pair, the difference in their lengths and the
+  largest local difference (the most one is longer than the other along the way), over the
+  mesh. KiMesh matches every neighbouring pair (1+2, 2+3, 3+4); the space-filling curve
+  matches a partition's traces in pairs (1+2, 3+4, ...; with an odd count the middle three
+  together, e.g. 1+2, 3+4+5, 6+7) and not between pairs, so that a pair can grow into a
+  hole at a tight corner that the whole ribbon cannot fill: the pairs of a ribbon may then
+  differ in length.
 * **Check:** every layout is checked before it is given out (preview, download, CLI):
   each mesh net one piece of copper from its contact pad to its other one (no opens), no
   copper of two nets touching on a layer (no shorts). A layout that fails is an error.

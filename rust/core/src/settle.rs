@@ -659,38 +659,50 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
     let mut measured = 0;
     let grow = (0..len).map(|i| dist(new[i], old[i])).fold(0.0, f64::max);
     let mut clear = false;
-    for _ in 0..ROUNDS {
+    // (once a call: where the vertices are as moved, the arc and normals there, and the
+    // segments by their first vertex; a round only puts some back where they were, at
+    // most `grow` off, so the grid is looked up that much further)
+    let (arc, normal) = {
+        let mut at = tr.clone();
+        at.p = new.clone();
+        (at.arc(), at.normals())
+    };
+    let longest = (0..len)
+        .filter(|&i| tr.next[i] != NONE)
+        .map(|i| dist(new[i], new[tr.next[i]]).max(dist(old[i], old[tr.next[i]])))
+        .fold(0.0, f64::max);
+    let reach = need + longest;
+    let segs = Grid::new(&new, (reach + grow) / 2.0, |i| tr.next[i] != NONE);
+    let mut seen = vec![usize::MAX; len]; // (the round a vertex was last taken in)
+    for round in 0..ROUNDS {
         if check.is_empty() {
             break;
         }
-        let mut at = tr.clone();
-        at.p = new.clone();
-        let arc = at.arc();
-        let normal = at.normals();
-        let longest = (0..len)
-            .filter(|&i| tr.next[i] != NONE)
-            .map(|i| dist(new[i], new[tr.next[i]]))
-            .fold(0.0, f64::max);
-        let reach = need + longest;
-        // (segments by their first vertex)
-        let segs = Grid::new(&new, reach / 2.0, |i| tr.next[i] != NONE);
         let moved = |i: usize| new[i] != old[i];
         // (the vertices that moved, and those that did not near them: two segments come
         // nearest at an end of one, maybe one that stayed, facing a segment that moved)
-        let mut near = vec![false; len];
+        let mut look: Vec<usize> = Vec::new();
         for &q in &check {
-            near[q] = true;
-            segs.within(new[q], reach, |s, _| {
-                near[s] = true;
-                near[tr.next[s]] = true;
+            for i in [q] {
+                if seen[i] != round {
+                    seen[i] = round;
+                    look.push(i);
+                }
+            }
+            segs.within(new[q], reach + grow, |s, _| {
+                for i in [s, tr.next[s]] {
+                    if seen[i] != round {
+                        seen[i] = round;
+                        look.push(i);
+                    }
+                }
             });
         }
-        let look: Vec<usize> = (0..len).filter(|&i| near[i]).collect();
         let found: Vec<(Vec<usize>, usize)> = pmap(look.len(), |k| {
             let q = look[k];
             let tangent = [normal[q][1], -normal[q][0]];
             let (mut bad, mut count) = (Vec::new(), 0);
-            segs.within(new[q], reach, |s, _| {
+            segs.within(new[q], reach + grow, |s, _| {
                 if !bad.is_empty() {
                     return;
                 }
@@ -743,18 +755,18 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
         measured += found.iter().map(|f| f.1).sum::<usize>();
         let mut back: Vec<usize> = found.into_iter().flat_map(|f| f.0).collect();
         // segments that cross (not merely sharing an end with their neighbours)
-        let mut checking = vec![false; len];
-        for &q in &check {
-            checking[q] = true;
-        }
-        let touched: Vec<usize> = (0..len)
-            .filter(|&s| tr.next[s] != NONE && (checking[s] || checking[tr.next[s]]))
+        let mut touched: Vec<usize> = check
+            .iter()
+            .flat_map(|&q| [q, tr.prev[q]])
+            .filter(|&s| s != NONE && tr.next[s] != NONE)
             .collect();
+        touched.sort_unstable();
+        touched.dedup();
         let crossed: Vec<Vec<usize>> = pmap(touched.len(), |k| {
             let s = touched[k];
             let s1 = tr.next[s];
             let mut out = Vec::new();
-            segs.within(new[s], dist(new[s], new[s1]) + longest, |h, _| {
+            segs.within(new[s], dist(new[s], new[s1]) + longest + grow, |h, _| {
                 if h == s || h == tr.prev[s] || h == s1 {
                     return;
                 }
@@ -784,7 +796,7 @@ fn keep_clear(tr: &Traces, old: &[P], mut new: Vec<P>, cx: &Ctx) -> (Vec<P>, usi
             if tr.next[b] != NONE {
                 next.push(tr.next[b]);
             }
-            segs.within(old[b], reach + grow, |s, _| {
+            segs.within(old[b], reach + 2.0 * grow, |s, _| {
                 next.push(s);
                 next.push(tr.next[s]);
             });

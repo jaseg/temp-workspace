@@ -270,8 +270,8 @@ an exact isometry: the panels curve along it, not across it.
      elsewhere it turns as it would), its lanes there are laid at the pitch, and from a
      spacing on the area is kept a quarter pitch further off the strip.
   2. *Cells:* Voronoi cells 2.5 ports across, Lloyd-relaxed, each zone (panel) on its own,
-     so none straddles a fold; a cell pinned in front of each strip's end, a box two
-     ports wide over the end all its own (its curve opens into room, not a corridor). Two
+     so none straddles a fold; a cell pinned in front of each strip's end, a box over the
+     end all its own (wider, it left narrow pockets beside the strip no curve fills). Two
      cells are neighbours only through a wall at least a port long: no partition narrows
      below a curve's run in and back out.
   3. *Grown from the strips' ends:* each cell to the strip its cheapest path starts from,
@@ -384,7 +384,12 @@ an exact isometry: the panels curve along it, not across it.
      squiggles and spurs) by that much (`_match`; the band above how far leads swing to
      and fro through the bends, or every swing is cut). Only ever shortening, it costs
      little coverage (on the default box: skew 21 → 10 mm at most, length and islands as
-     before). With more traces the holes where a ribbon's bends meet grow (the ribbon
+     before). Neighbours are matched in pairs only (`mesh.matching`: 1-2, 3-4, ..., an odd
+     ribbon's middle three together; `settle`'s `groups`, each pair's own, and the
+     ribbon's width, the density's blur and the U-turn tips, a pair's): steered across the
+     whole ribbon, a hole at a tight corner too small for the ribbon's U-turn stayed open,
+     while a pair's fits (on the default box the holes' area more than halved, the pairs
+     of a ribbon then a few cm apart in length). With more traces the holes where a ribbon's bends meet grow (the ribbon
      is as wide as its traces), past what centring fills: there a hole fills only as a
      wave, the trace facing it first and each one behind it a step later. So every vertex
      is also moved down the slope of the traces' density (`density.rs`: their length per
@@ -406,10 +411,13 @@ an exact isometry: the panels curve along it, not across it.
   The default box takes about 2 min per layer to lay, and about 20 min more to settle
   (see Later).
 - **Check** (`verify`, run at the end of every `layout`): the tracks' points joined along
-  each track and through the vias (union-find on µm-rounded points): every mesh net one
-  piece, ending on exactly its two contact pads; per layer, every pair of copper pieces of
-  different nets (track segments, vias, pads; shapely `STRtree` `dwithin`) at least their
-  half widths apart. The tests add a DRC of their own (different nets at least the trace
+  each track and through the vias (union-find on µm-rounded points; only the points other
+  copper meets are nodes: a track's ends and any point of it another's end or a via lands
+  on): every mesh net one piece, ending on exactly its two contact pads; per layer, every
+  pair of copper pieces of different nets (track segments, vias, pads; shapely `STRtree`
+  `dwithin`, segments against segments only as near as two can touch, vias and pads
+  against all as near as each can) at least their half widths apart (the default box: 15
+  s; looked up as near as a via can reach for every segment, 80 s). The tests add a DRC of their own (different nets at least the trace
   space apart), all copper on the foil, vias off the cable's folds.
 - **Metrics.** `mesh.spacing` (from `mesh.gaps`, the per-sample profile): each trace
   sampled every pitch; on either side the nearest copper within 1.5 pitches in a cone

@@ -143,10 +143,11 @@ class Layout:
         return self._cache["density"]
 
     def skew(self) -> dict[str, list[tuple[str, str, float, float]]]:
-        """Each mesh's neighbouring traces (net 1 and 2, 2 and 3, ..., within each
-        partition) taken as differential pairs, by layer: the nets, the difference in their
-        lengths and the largest local difference (mm), over the mesh (the cable's runs left
-        out)."""
+        """Each mesh's neighbouring traces matched in length together (the curve's: net 1
+        and 2, 3 and 4, ..., an odd ribbon's middle three, within each partition, see
+        ``mesh.matching``; KiMesh's: 1 and 2, 2 and 3, ...) taken as differential pairs, by
+        layer: the nets, the difference in their lengths and the largest local difference
+        (mm), over the mesh (the cable's runs left out)."""
         if "skew" not in self._cache:
             out: dict[str, list[tuple[str, str, float, float]]] = {}
             for layer, m in self.meshes.items():
@@ -569,6 +570,8 @@ def verify(result: Layout) -> list[str]:
         return (round(p[0] * 1e4), round(p[1] * 1e4))
 
     # Connectivity: the tracks' points (by layer), joined along each track and through vias.
+    # (Only the points other copper meets need be nodes: a track's ends, and any point of
+    # it another track's end or a via lands on; a track joins its own.)
     parent: dict[tuple, tuple] = {}
 
     def find(a: tuple) -> tuple:
@@ -581,10 +584,20 @@ def verify(result: Layout) -> list[str]:
     def join(a: tuple, b: tuple) -> None:
         parent[find(a)] = find(b)
 
+    meets: dict[tuple, set] = defaultdict(set)  # (net, layer) -> keys other copper lands on
+    for t in result.tracks:
+        meets[(t.net, t.layer)] |= {key(t.points[0]), key(t.points[-1])}
+    for v in result.vias:
+        for layer in (FRONT, BACK):
+            meets[(v.net, layer)].add(key(v.at))
     for t in result.tracks:
         first = (t.net, t.layer, key(t.points[0]))
-        for p in t.points[1:]:
-            join(first, (t.net, t.layer, key(p)))
+        here = meets[(t.net, t.layer)]
+        pts = np.asarray(t.points, float)
+        ks = np.round(pts * 1e4).astype(np.int64)
+        for kx, ky in ks[np.isin(ks[:, 0], [k[0] for k in here])]:
+            if (int(kx), int(ky)) in here:
+                join(first, (t.net, t.layer, (int(kx), int(ky))))
     for v in result.vias:
         join((v.net, FRONT, key(v.at)), (v.net, BACK, key(v.at)))
     ends: dict[str, list[tuple]] = defaultdict(list)  # (track ends on a net's pads)
@@ -599,11 +612,14 @@ def verify(result: Layout) -> list[str]:
                         problems.append(f"{t.net} ends on pad {pad.number} ({pad.net})")
                     ends[t.net].append((pad.number, find((t.net, FRONT, key(p)))))
     nets = sorted({t.net for t in result.tracks if t.net.startswith("MESH_")})
+    nodes: dict[str, list[tuple]] = defaultdict(list)
+    for n in list(parent):
+        nodes[n[0]].append(n)
     for net in nets:
         pads = {num for num, _ in ends[net]}
         if len(pads) != 2:
             problems.append(f"{net} reaches {len(pads)} contact pads, not 2")
-        roots = {find(n) for n in parent if n[0] == net}
+        roots = {find(n) for n in nodes[net]}
         if len(roots) != 1:
             problems.append(f"{net} is open: {len(roots)} separate pieces of copper")
 
@@ -616,6 +632,7 @@ def verify(result: Layout) -> list[str]:
                 geoms += list(shapely.linestrings(np.stack([pts[:-1], pts[1:]], 1)))
                 nets_ += [t.net] * (len(pts) - 1)
                 radius += [t.width / 2] * (len(pts) - 1)
+        segs = len(geoms)
         for v in result.vias:
             geoms.append(shapely.Point(v.at))
             nets_.append(v.net)
@@ -631,9 +648,24 @@ def verify(result: Layout) -> list[str]:
         g = np.array(geoms, dtype=object)
         net_arr = np.array(nets_, dtype=object)
         rad = np.array(radius)
-        i, j = shapely.STRtree(g).query(g, predicate="dwithin", distance=2 * float(rad.max()))
-        keep = (i < j) & (net_arr[i] != net_arr[j])
+        # (the tracks' segments against each other only as near as two of them can touch;
+        # the vias and pads, few, against all as near as each can: else every segment
+        # meets its neighbours a pitch off, many millions of pairs)
+        tree = shapely.STRtree(g)
+        lines, rest = np.arange(segs), np.arange(segs, len(geoms))
+        reach = 2 * float(rad[:segs].max()) if segs else 0.0
+        i, j = tree.query(g[lines], predicate="dwithin", distance=reach)
+        i = lines[i]
+        if len(rest):
+            reach = float(rad[rest].max() + rad.max())
+            i2, j2 = tree.query(g[rest], predicate="dwithin", distance=reach)
+            i, j = np.concatenate([i, rest[i2]]), np.concatenate([j, j2])
+        keep = (i != j) & (net_arr[i] != net_arr[j])
         i, j = i[keep], j[keep]
+        i, j = np.minimum(i, j), np.maximum(i, j)
+        if len(i):
+            pairs = np.unique(np.stack([i, j], 1), axis=0)
+            i, j = pairs[:, 0], pairs[:, 1]
         if len(i):
             d = shapely.distance(g[i], g[j])
             short = d < rad[i] + rad[j] - 1e-9

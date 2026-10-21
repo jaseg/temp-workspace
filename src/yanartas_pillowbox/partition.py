@@ -335,7 +335,7 @@ def _partition(
     if len(polys) < 2 * count or min(front) < 0 or len(set(front)) < count:
         raise MeshError("no room for the mesh's partitions")
     # (and the strip's end all its own: a box over it, out of the cells beside)
-    side = np.array([-inv[1], inv[0]]) * width  # (a port either side too: never a corridor)
+    side = np.array([-inv[1], inv[0]]) * width / 2
     for k, end in enumerate(ends):
         e = np.asarray(end) - inv * CELL * width / 2  # (the strip's end's middle)
         f = e + inv * 0.75 * width
