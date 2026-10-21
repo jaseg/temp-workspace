@@ -1,6 +1,9 @@
 """What the mesh layouts share: the spacing profile and the pair skew."""
 
+import math
+
 import pytest
+import shapely
 
 from yanartas_pillowbox import mesh
 
@@ -80,3 +83,16 @@ def test_matching_pairs_a_ribbon_its_middle_three_when_odd():
         (4, 5),
         (5, 6),
     ]
+
+
+def test_holes_are_what_no_trace_is_near():
+    """Traces at the pitch leave no holes; one taken out leaves one, as long as the box and
+    a pitch wide (less a third of a pitch either side)."""
+    p = 0.3
+    box = shapely.box(0, 0, 6, 10 * p)
+    rows = [[(0.0, (j + 0.5) * p), (6.0, (j + 0.5) * p)] for j in range(10)]
+    full = mesh.holes(rows, box, 2 * p / 3, p)
+    assert full.share == 0 and full.count == 0
+    gap = mesh.holes(rows[:5] + rows[6:], box, 2 * p / 3, p)
+    assert gap.count == 1
+    assert math.isclose(gap.largest, (6 - 2 * p) * (2 * p - 4 * p / 3), rel_tol=1e-3)

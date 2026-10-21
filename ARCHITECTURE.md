@@ -33,7 +33,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 |---|---|
 | `config.py` | `Config`, a frozen dataclass and the single validated input. It also holds `FieldSpec` metadata that drives the UI form, `from_dict` (the only entry point for untrusted data), cross-field validation, and the schema version (other versions are rejected). |
 | `crosssection.py` | Pure math for the closed shell: one panel's cross-section (`CrossSection`), the panel width solver, and `Shell`, the material model around the interior (section 4.3). |
-| `mesh.py` | What the mesh layouts share: the `Mesh` result, `MeshError`, the side bits, `straighten`, a nearest-point `Grid`, and the metrics: `spacing` (the space between traces along them) and `skew` (neighbouring traces as a differential pair). Needs numpy. |
+| `mesh.py` | What the mesh layouts share: the `Mesh` result, `MeshError`, the side bits, `straighten`, a nearest-point `Grid`, and the metrics: `spacing` (the space between traces along them), `density`, `holes` (what is farther from copper than it should be) and `skew` (neighbouring traces as a differential pair). Needs numpy. |
 | `kimesh.py` | The security mesh generator, a port of KiMesh: tiles, the randomized depth-first walk over the cells inside a mask, and joining each net's segments into one path. Needs shapely. |
 | `sfc.py` | The second mesh layout: a closed space-filling curve after Bedel et al. (2022), the folding pattern's panels filled one by one and joined across the folds as seldom as possible, relaxed to an even spacing, the traces offset from it, then settled by the Rust core (`yanartas_mesh`). Needs shapely and numpy. |
 | `progress.py` | How far a long layout has got: the layouts report phases and steps, the CLI and the web UI show them. |
@@ -73,12 +73,17 @@ One render touches the same shell many times, so this keeps a render under about
 
 ## 3. Test suite architecture
 
-`pytest` with about 560 tests, run in parallel with pytest-xdist (a couple of minutes), plus
+`pytest` with about 730 tests, run in parallel with pytest-xdist (a couple of minutes), plus
 `ruff` for linting. The tests use the same defaults as the UI: a box fitting the Raspberry
 Pi Model B + HAT preset in 0.2 mm material, with the FPC cable on. Tests about other parts
 of the geometry switch the cable off where it does not fit or would get in the way.
 `tests/helpers.py` parses SVG paths back into `Line`/`Arc` segments and has
-polygon utilities: exact loop area, self-intersection, point in polygon.
+polygon utilities: exact loop area, self-intersection, point in polygon. `tests/conftest.py`
+has `even`, the check every small mesh layout must pass: its copper's density near the
+nominal everywhere (`mesh.density`: mean 85–95 %, spread under 3 %, no dip under 70 %),
+no hole (`mesh.holes`: under 1 % of the area farther than two thirds of a pitch from a
+trace, no spot over 0.15 mm²) and the space between traces mostly within −5 / +20 % of
+the nominal, never much less (`mesh.spacing`).
 
 The tests deliberately check properties against independent computations, not snapshot
 outputs.
@@ -93,10 +98,10 @@ outputs.
 | `test_fpc.py` | The FPC cable: one simple outline, a folded straight strip of the set length, corner creases that lay each run back along the one before and end on the cut, where it leaves the front panel's free edge, its clearances, the sharp plug and the rounded other corners, turning down mirroring turning up, the pattern growing only beside the edge, the folded route (on the back panel, the layer over it, onto the front panel; isometric, inside the box), the cross-section, the default pins, and validation. |
 | `test_payload.py` | Clearance against a brute-force distance to a fine mesh, tightness of maximize, and *Fit box* against a brute-force grid search. |
 | `test_scad.py` | The OpenSCAD spaces against the interior and the end walls. |
-| `test_mesh.py` | The shared metrics: spacing of parallel traces and across islands (not past the edge), skew of detours. |
-| `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing rarely below the nominal and few islands (settled), repeatable seeds, holes. |
+| `test_mesh.py` | The shared metrics: spacing of parallel traces and across islands (not past the edge), skew of detours, holes (none between traces at the pitch, one where a trace is missing), the pairs matched. |
+| `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing rarely below the nominal and few islands (settled), density, coverage and uniformity (`even`), repeatable seeds; a pocket off a lane filled by the pair beside it (both its traces, `even` there too), and left bare without filling holes (the checks see it). |
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
-| `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its strip (a port wide, no two neighbours as long); cells never across a fold, pinned seeds kept; the seed repeats the split, another differs; the mesh over partitions laid out at once (each partition's traces out through its port at the pitch, in it, apart, matched in length, no holes). |
+| `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its strip (a port wide, no two neighbours as long); cells never across a fold, pinned seeds kept; the seed repeats the split, another differs; the mesh over partitions laid out at once (each partition's traces out through its port at the pitch, in it, apart, matched in length, `even`). |
 | `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (a layer's partitions, of equal area, laid out at once, their traces the layer's). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded; the build ships every package module a shipped one imports. |

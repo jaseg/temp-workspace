@@ -401,6 +401,33 @@ def density(
     return Density(float(v.mean()), float(v.std()), float((v < THIN).mean()), float(v.min()))
 
 
+@dataclass(frozen=True)
+class Holes:
+    """What a mesh leaves bare: the area farther than ``reach`` from any trace's centre line
+    (with traces at the pitch, none is farther than half of it), in from the area's edge."""
+
+    share: float  # of the area measured
+    largest: float  # the largest bare spot (mm²)
+    count: int  # bare spots
+
+    def to_dict(self) -> dict[str, float]:
+        return {k: round(v, 4) for k, v in self.__dict__.items()}
+
+
+def holes(traces: Sequence[Sequence[Point]], area: object, reach: float, inset: float) -> Holes:
+    """The holes ``traces`` leave in ``area`` (shapely geometry) measured ``inset`` in from
+    its edge: the places farther than ``reach`` from them (exactly, by buffering: for small
+    layouts; a whole board's takes long)."""
+    import shapely
+
+    inner = area.buffer(-inset)
+    if inner.is_empty:
+        return Holes(0.0, 0.0, 0)
+    bare = inner.difference(shapely.MultiLineString([list(t) for t in traces]).buffer(reach))
+    spots = [g.area for g in shapely.get_parts(bare) if g.area > 0]
+    return Holes(bare.area / inner.area, max(spots, default=0.0), len(spots))
+
+
 def gaps(
     traces: Sequence[Sequence[Point]], width: float, space: float, step: float | None = None
 ) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:

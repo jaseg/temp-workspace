@@ -38,7 +38,7 @@ def exit_edge(corner, side, c):
         (2, mesh.RIGHT, (28.8, 9)),
     ],
 )
-def test_layout(n, side, corner):
+def test_layout(n, side, corner, even):
     m = sfc.generate(AREA, corner, side, n, PITCH, seed=1, zones=ZONES)
     c = 2 * n * PITCH
     assert m.algorithm == "sfc" and len(m.traces) == n and m.unreached == 0
@@ -70,6 +70,7 @@ def test_layout(n, side, corner):
     assert sp.under < 0.05 * sp.measured and sp.below < 0.1 * sp.measured
     assert sp.within > 0.35 * sp.measured and sp.least > 0  # (rare tight spots allowed)
     assert sp.wide < 0.08 * sp.measured  # (few islands between the curve's runs, settled)
+    even(m.traces, AREA, PITCH)  # (density, coverage, uniformity)
 
 
 def test_seed_repeats_the_layout():
@@ -138,21 +139,44 @@ def test_cells_tile_their_domain():
     assert min(c.area for c in cells) > 0.05 * 1.5**2
 
 
-@pytest.mark.parametrize(("w", "h"), [(1.5, 1.5), (1.8, 1.2), (1.5, 3.0)])
-def test_a_pair_fills_a_hole_together(w, h):
-    """A lane of two pairs along an edge with a pocket off it, too wide for one trace's U-turn
-    alone: after settling, the pair beside it fills it, both its traces' U-turns in it (one
-    inside the other), every trace still a pitch from the others."""
-    p, n = 0.3, 4
+def pocket(w: float, h: float, n: int = 4, p: float = PITCH):
+    """A lane of ``n`` traces along an edge, a ``w`` x ``h`` pocket off it: the area, the
+    pocket (a little in from the lane) and the traces, straight along the lane."""
     area = shapely.union_all(
         [shapely.box(0, 0, 20, n * p), shapely.box(9, n * p, 9 + w, n * p + h)]
     )
-    pocket = shapely.box(9, n * p + 0.05, 9 + w, n * p + h)
+    inside = shapely.box(9, n * p + 0.05, 9 + w, n * p + h)
     x = np.linspace(0, 20, 400)
-    lines = [np.column_stack([x, np.full(400, (j + 0.5) * p)]) for j in range(n)]
-    out = sfc._settle(lines, p, area, [area], shapely.Polygon(), [0, 0, 1, 1], n)
+    return area, inside, [np.column_stack([x, np.full(400, (j + 0.5) * p)]) for j in range(n)]
+
+
+POCKETS = [(1.5, 1.5), (1.8, 1.2), (1.5, 3.0)]
+# (the lane and pocket narrow: the density taken over less, 1.5 pitches, on a finer grid)
+NARROW = {"blur": 1.5 * PITCH, "cell": 0.05}
+
+
+@pytest.mark.parametrize(("w", "h"), POCKETS)
+def test_a_pair_fills_a_hole_together(w, h, even):
+    """A lane of two pairs along an edge with a pocket off it, too wide for one trace's U-turn
+    alone: after settling, the pair beside it fills it, both its traces' U-turns in it (one
+    inside the other), every trace still a pitch from the others; the copper as even there
+    as anywhere."""
+    area, inside, lines = pocket(w, h)
+    out = sfc._settle(lines, PITCH, area, [area], shapely.Polygon(), [0, 0, 1, 1], 4)
     ls = [LineString(t) for t in out]
-    inside = [line.intersection(pocket).length for line in ls]
-    assert inside[2] > 1.0 and inside[3] > inside[2] + 0.5
-    assert min(a.distance(b) for a, b in itertools.combinations(ls, 2)) > 0.99 * p
+    into = [line.intersection(inside).length for line in ls]
+    assert into[2] > 1.0 and into[3] > into[2] + 0.5
+    assert min(a.distance(b) for a, b in itertools.combinations(ls, 2)) > 0.99 * PITCH
     assert all(line.is_simple for line in ls)
+    even(out, area, PITCH, **NARROW, within=0.85)
+
+
+@pytest.mark.parametrize(("w", "h"), POCKETS)
+def test_without_filling_the_pocket_stays_a_hole(w, h, monkeypatch):
+    """The checks see the hole: the holes left as settled (none filled after), the pocket
+    is mostly bare and thin."""
+    monkeypatch.setattr(sfc, "SETTLE_HOLE", 0.0)
+    area, _, lines = pocket(w, h)
+    out = sfc._settle(lines, PITCH, area, [area], shapely.Polygon(), [0, 0, 1, 1], 4)
+    assert mesh.holes(out, area, 2 * PITCH / 3, PITCH).largest > 0.15
+    assert mesh.density(out, area, PITCH / 2, PITCH / 2, **NARROW).thin > 0.1

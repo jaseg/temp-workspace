@@ -65,10 +65,10 @@ def test_cells_keep_to_the_zones_and_their_pins():
         assert polys[i].covers(shapely.Point(q))
 
 
-def test_the_mesh_over_partitions():
+def test_the_mesh_over_partitions(even):
     """Each partition's traces leave through its port at the pitch, in a row with the
     next's, stay in it and fill it; none nearer another than about the pitch; their lengths
-    matched within each partition."""
+    matched within each partition; the copper as even as in one partition's mesh."""
     n, count = 2, 2
     zones = [shapely.box(0, 0, 15, 20), shapely.box(15, 0, 30, 20)]
     ps = ports(count, n, 10)
@@ -93,5 +93,4 @@ def test_the_mesh_over_partitions():
         assert all(beyond.contains(line) for line in mine)
         lengths = [line.length for line in mine]
         assert max(lengths) - min(lengths) < 15 * PITCH
-    cover = mesh.density(m.traces, area, PITCH / 2, PITCH / 2)
-    assert cover.thin < 0.02  # (nothing left much emptier than the rest: no holes)
+    even(m.traces, area, PITCH)  # (density, coverage, uniformity: no holes)
