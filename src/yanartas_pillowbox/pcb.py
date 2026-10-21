@@ -61,7 +61,6 @@ SLIT_WIDTH = 0.1  # the slits' cut, as a slot (a closed board edge)
 TOLERANCE = 0.005  # arcs as polylines (chord error)
 FOLD_CLEARANCE = 1.0  # vias keep this far from the cable's folds
 STITCH_PITCH = 6.0  # GND stitching vias along the cable
-GROUPS = 4  # mesh ends between GND pins on the plug
 
 FRONT, BACK = "F.Cu", "B.Cu"
 
@@ -178,14 +177,16 @@ class Layout:
         return self._cache["skew"]
 
 
-def pinout(pins: int, traces: int) -> list[str | None]:
+def pinout(pins: int, traces: int, group: int | None = None) -> list[str | None]:
     """Each pin's signal, from pin 1: "GND" or "M<i>" (mesh end i, from 1), None if free;
-    ``traces``: the mesh's nets on each side."""
+    ``traces``: the mesh's nets on each side; ``group``: the traces between two GND pins
+    (one partition's, its ends nested: 1s 2s … 2r 1r; default: a side's)."""
     ends = 4 * traces  # two ends per loop, two sides
+    size = 2 * (group or traces)
     out: list[str | None] = ["GND"]
     for i in range(ends):
         out.append(f"M{i + 1}")
-        if (i + 1) % GROUPS == 0:
+        if (i + 1) % size == 0:
             out.append("GND")
     if len(out) > pins:
         raise PcbError(f"the plug needs at least {len(out)} pins for the mesh's ends")
@@ -316,7 +317,9 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     n = cfg.mesh_nets
     w, space = cfg.mesh_trace_width, cfg.mesh_trace_space
     pitch = w + space
-    pins = pinout(int(cfg.fpc_pins), n)
+    # (a GND pin after each partition's ends: the curve's; KiMesh, a side's)
+    each = int(cfg.mesh_traces) if cfg.mesh_algorithm == "sfc" else n
+    pins = pinout(int(cfg.fpc_pins), n, each)
     ec = cfg.mesh_edge_clearance
 
     # The foil: the outline, less the slits (as narrow slots) and the scraps.

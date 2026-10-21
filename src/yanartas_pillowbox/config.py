@@ -535,7 +535,7 @@ class Config:
     fpc_cable: str = "up"
     fpc_entry_offset: float = 0.0  # (0: the lowest it can go, the cable turning up)
     fpc_cable_length: float = 55.0  # (one row, beside the default pattern's free edge)
-    fpc_pins: float = 61.0  # (the default curve mesh's ends and the GND pins between them)
+    fpc_pins: float = 61.0  # (the default curve mesh's ends and GND pins take 55)
     fpc_pitch: float = 0.5
     fpc_edge_margin: float = 0.5
     fpc_plug_length: float = 4.0

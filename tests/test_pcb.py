@@ -40,15 +40,25 @@ def copper(result, layer):
 
 
 def test_pinout():
-    """GND, then the mesh's ends in groups of four between GND pins, the rest free."""
+    """GND, then each side's mesh ends, a GND pin after each group's (a side's), the rest
+    free."""
     pins = pcb.pinout(30, 4)
-    assert pins[:21] == [
-        "GND", "M1", "M2", "M3", "M4", "GND", "M5", "M6", "M7", "M8", "GND",
-        "M9", "M10", "M11", "M12", "GND", "M13", "M14", "M15", "M16", "GND",
+    assert pins[:19] == [
+        "GND", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "GND",
+        "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "GND",
     ]  # fmt: skip
-    assert pins[21:] == [None] * 9
+    assert pins[19:] == [None] * 11
     with pytest.raises(pcb.PcbError):
-        pcb.pinout(20, 4)
+        pcb.pinout(18, 4)
+
+
+def test_pinout_groups_each_partitions_ends():
+    """Two partitions of three traces a side: each partition's six ends (1s 2s 3s 3r 2r 1r)
+    between GND pins, not groups across them."""
+    pins = pcb.pinout(29, 6, 3)
+    gnd = [j for j, s in enumerate(pins) if s == "GND"]
+    assert gnd == [0, 7, 14, 21, 28]
+    assert pins[1:7] == [f"M{i}" for i in range(1, 7)]
 
 
 def test_meshes_cover_both_sides(layout):
@@ -421,6 +431,20 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
     assert len(result.skew()[pcb.FRONT]) == count * (each - 1)
     pads = [p for p in result.pads if p.net and p.net.startswith("MESH_")]
     assert len(pads) == 4 * n <= D.fpc_pins
+    # On the plug, each partition's ends between GND pins: its nets only, each twice.
+    groups, run = [], []
+    for pad in sorted(result.pads, key=lambda p: p.number):
+        if pad.net == "GND" and run:
+            groups.append(run)
+            run = []
+        elif pad.net and pad.net.startswith("MESH_"):
+            run.append(pad.net)
+    assert len(groups) == 2 * count
+    for g in groups:
+        side, nets = g[0][5], sorted({int(net[6:]) for net in g})
+        assert len(g) == 2 * each and all(net[5] == side for net in g)
+        assert all(g.count(net) == 2 for net in g)
+        assert nets[-1] - nets[0] == each - 1 and (nets[0] - 1) % each == 0
     assert pcb.verify(result) == []
 
 

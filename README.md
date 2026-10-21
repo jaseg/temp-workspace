@@ -347,12 +347,13 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   its pins. The turns nest, none crossing; no stitching vias in the stub and that corner.
   The design rules (and the GND zone's clearance) are then the cable's space.
 * **Plug pinout,** from pin 1 (on the cable's left, looking from the edge towards the tip):
-  GND, mesh ends 1–4, GND, 5–8, GND, …, a GND pin after every four ends; the rest are free.
-  With `N` traces per side (KiMesh: `mesh_traces`; the curve: `mesh_partitions ×
-  mesh_traces`), ends 1–2N are the F.Cu mesh's, the next 2N the B.Cu mesh's; within each
-  side's ends, a loop's two ends are mirrored about the middle (1 and 2N are the first
-  loop). The default KiMesh layout (N = 4) uses pins 1–21; the default curve layout
-  (N = 12) all 61. Contacts are 0.6 pitch wide and stop 0.2 mm short of the tip.
+  GND, then each group of mesh ends followed by a GND pin; the rest are free. With `N`
+  traces per side (KiMesh: `mesh_traces`; the curve: `mesh_partitions × mesh_traces`),
+  ends 1–2N are the F.Cu mesh's, the next 2N the B.Cu mesh's. A group is one partition's
+  ends (KiMesh: a side's), nested: its loops' two ends mirrored about its middle
+  (`p1t1s p1t2s p1t3s p1t3r p1t2r p1t1r GND p2t1s …`). The default KiMesh layout (N = 4)
+  uses pins 1–19; the default curve layout (N = 12, three partitions of four) pins 1–55.
+  Contacts are 0.6 pitch wide and stop 0.2 mm short of the tip.
 * **Ground:** the cable is a GND zone on both layers. It is a KiCad zone, filled in KiCad;
   the Gerber and SVG output leaves it out (fill and re-export in KiCad for fabrication).
   Vias behind the GND contacts and stitching vias along the cable (kept 1 mm off its folds
