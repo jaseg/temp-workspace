@@ -92,6 +92,8 @@ SIMPLIFY = 0.002  # the traces simplified within this (mm; well within the margi
 LOOP = 3.0  # loops the traces' offsets leave in tight bends: cut out up to this many spacings long
 ARCS = 0.002  # drawn in lines and arcs (``arcs``): within this of the traces (mm)
 ARCS_ROOM = 0.03  # ... and where they have room, up to this many pitches
+MAX_TURN = math.radians(10)  # drawn, no two segments turn more than this from one another
+TURN_GIVE = 0.0  # ... where smoothing costs no more than this share of the pitch in space
 INSIDE = 0.9  # traces inside a bend keep within this share of its radius
 PUSH_MARGIN = 1.04  # runs closer than this many times their least spacing: pushed apart
 BEND_SLACK = 0.85  # bends this much tighter than the tightest: smoothed (U-turns sit at it)
@@ -652,13 +654,18 @@ def _browser_core() -> object | None:
         region = np.split(np.asarray(out.region.to_py(), int), ends)
         return list(zip(pts, region, strict=True)), int(out.cells), int(out.left)
 
-    def fit_arcs(lines, tol, pitch=0.0, most=0.0, edges=None):  # noqa: ANN001, ANN202
-        out = mesh.fit_arcs(*flat(lines), tol, pitch, most, *flat(edges or []))
+    def fit_arcs(lines, tol, pitch=0.0, most=0.0, edges=None, max_turn=0.0, give=0.0):  # noqa: ANN001, ANN202
+        out = mesh.fit_arcs(*flat(lines), tol, pitch, most, *flat(edges or []), max_turn, give)
         rows = np.asarray(out.rows.to_py(), float).reshape(-1, 7)
         return np.split(rows, np.cumsum(np.asarray(out.counts.to_py(), int))[:-1])
 
+    def smooth_traces(lines, tol, max_turn, pitch=0.0, edges=None, give=0.0):  # noqa: ANN001, ANN202
+        out = mesh.smooth_traces(*flat(lines), tol, max_turn, pitch, *flat(edges or []), give)
+        return unflat(out.points, out.lens)
+
     return types.SimpleNamespace(
         fit_arcs=fit_arcs,
+        smooth_traces=smooth_traces,
         settle_traces=settle_traces,
         relax_curve=relax_curve,
         offset_lanes=offset_lanes,
@@ -853,7 +860,7 @@ def generate(
     with checkpoint.timed("output"):
         return _output(
             flat, frame, arcs, pitch, exits, c, groups, pair, partitions, cells, left, corners,
-            area,
+            area, regions,
         )  # fmt: skip
 
 
@@ -871,22 +878,27 @@ def _output(
     left: int,
     corners: list[tuple[float, float]],
     area: shapely.Geometry | None = None,
+    regions: Sequence[Polygon] = (),
 ) -> Mesh:
-    """``generate``'s mesh from its settled traces: simplified (or fitted with arcs: within
-    ``ARCS`` scaled to the pitch, and where a trace has room to the copper beside it and to
-    the ``area``'s edge, further, up to ``ARCS_ROOM`` pitches), back in the board's frame,
-    its nets in order."""
+    """``generate``'s mesh from its settled traces, each drawn as the smooth curve through
+    its vertices: in segments within ``SIMPLIFY`` (scaled to the pitch) of it, no two
+    turning more than ``MAX_TURN`` from one another; or fitted with arcs, within ``ARCS``
+    of it and where a trace has room to the copper beside it and to the ``area``'s edge,
+    further, up to ``ARCS_ROOM`` pitches (the ``regions``' borders, e.g. folds, kept as
+    the area's edges). Back in the board's frame, its nets in order."""
     out: list[np.ndarray] = []
     shapes: list[tuple[Piece, ...] | None] = []
+    edges = [
+        np.ascontiguousarray(np.asarray(ring.coords, float)[:-1])
+        for poly in [*([] if area is None else _polygons(area)), *regions]
+        for ring in (poly.exterior, *poly.interiors)
+    ]
+    lines = [np.ascontiguousarray(xy, float) for xy in flat]
     if arcs:
         tol = ARCS * pitch / 0.3
-        edges = [
-            np.ascontiguousarray(np.asarray(ring.coords, float)[:-1])
-            for poly in ([] if area is None else _polygons(area))
-            for ring in (poly.exterior, *poly.interiors)
-        ]
-        lines = [np.ascontiguousarray(xy, float) for xy in flat]
-        for rows in _core().fit_arcs(lines, tol, pitch, ARCS_ROOM * pitch, edges):
+        for rows in _core().fit_arcs(
+            lines, tol, pitch, ARCS_ROOM * pitch, edges, MAX_TURN, TURN_GIVE
+        ):
             ends = frame.inv(np.asarray(rows, float)[:, 1:].reshape(-1, 2)).reshape(-1, 3, 2)
             pieces = tuple(
                 (
@@ -899,12 +911,9 @@ def _output(
             shapes.append(pieces)
             out.append(np.asarray(sample_arcs(pieces, tol)))
     else:
-        for xy in flat:
-            line = LineString(xy)
-            tol = SIMPLIFY * pitch / 0.3
-            fast = line.simplify(tol, preserve_topology=False)
-            line = fast if fast.is_simple else line.simplify(tol, preserve_topology=True)
-            out.append(frame.inv(np.asarray(line.coords)))
+        tol = SIMPLIFY * pitch / 0.3
+        for xy in _core().smooth_traces(lines, tol, MAX_TURN, pitch, edges, TURN_GIVE):
+            out.append(frame.inv(np.asarray(xy, float)))
             shapes.append(None)
     # each partition's net 1 outermost: its ends farthest from its exit's middle
     order = []

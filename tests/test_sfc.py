@@ -60,8 +60,11 @@ def test_layout(n, side, corner, even):
         assert line.is_simple and AREA.buffer(1e-9).contains(line)
         # (the copper inside, but where the traces leave)
         assert AREA.buffer(-PITCH / 4).contains(line.difference(edge.buffer(PITCH)))
-        # the curve joins the two zones once: each trace crosses their border twice
-        assert len(shapely.get_parts(line.intersection(FOLD))) == 2
+        # the curve joins the two zones once: each trace in the one it does not leave from
+        # in one piece (counted a little inside it: a trace may run along their border,
+        # touching it, and drawn smooth, graze it by a few µm)
+        parts = [len(shapely.get_parts(line.intersection(z.buffer(-0.01)))) for z in ZONES]
+        assert min(parts) == 1
     for a, b in itertools.combinations(lines, 2):  # no two traces nearer than the pitch
         assert a.distance(b) > 0.99 * PITCH
     # the space between the traces: rarely below the nominal one, much of it within -5 /
@@ -291,3 +294,39 @@ def test_arcs_take_a_wobbly_bend_where_it_has_room():
     edge = _wobbly_circle(5.0 + pitch / 2, 200, 0.0, 3)
     rows = sfc._core().fit_arcs([alone], tol, pitch, sfc.ARCS_ROOM * pitch, [edge])[0]
     assert len(rows) > 4 * 6
+
+
+def _turns(traces):
+    out = []
+    for t in traces:
+        d = np.diff(np.asarray(t), axis=0)
+        a = np.arctan2(d[:, 1], d[:, 0])
+        out += list(np.abs((np.diff(a) + np.pi) % (2 * np.pi) - np.pi))
+    return np.asarray(out)
+
+
+@pytest.mark.parametrize("arcs", [False, True])
+def test_traces_are_drawn_smooth_and_as_far_apart(arcs):
+    """Drawn as the smooth curve through the settled vertices: the segments turn far less
+    from one another (no more than ``MAX_TURN``, but where smoothing would bring copper
+    nearer: there the settled corner stays), and the traces keep as far apart as the
+    settled polylines; in arcs, mostly arcs."""
+    saved = sfc.MAX_TURN
+    try:
+        sfc.MAX_TURN = 0.0
+        plain = sfc.generate(AREA, (7, 0), mesh.UP, 2, PITCH, seed=3, zones=ZONES)
+    finally:
+        sfc.MAX_TURN = saved
+    m = sfc.generate(AREA, (7, 0), mesh.UP, 2, PITCH, seed=3, zones=ZONES, arcs=arcs)
+    if arcs:
+        kinds = [mid is not None for tr in m.arcs for _, mid, _ in tr]
+        assert sum(kinds) > 0.8 * len(kinds)
+    else:
+        over = _turns(m.traces) > sfc.MAX_TURN * 1.05
+        assert over.mean() < 0.1 < (_turns(plain.traces) > sfc.MAX_TURN * 1.05).mean()
+
+    def least(mm):
+        lines = [LineString(t) for t in mm.traces]
+        return min(a.distance(b) for a, b in itertools.combinations(lines, 2))
+
+    assert least(m) > least(plain) - 2 * sfc.ARCS * PITCH / 0.3

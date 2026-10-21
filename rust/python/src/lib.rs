@@ -5,7 +5,7 @@ use numpy::ndarray::Array2;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use yanartas_mesh_core::arcs::{fit_all, Piece};
+use yanartas_mesh_core::arcs::{fit_all, smooth_all, Piece};
 use yanartas_mesh_core::curve::{relax, CurveInput, CurveParams};
 use yanartas_mesh_core::graph::{curve, GraphInput, GraphParams, Segment};
 use yanartas_mesh_core::lanes::{lanes, LaneParams};
@@ -364,7 +364,7 @@ fn _cells<'py>(
 /// an (m, 7) array, a row per piece: kind (0 line, 1 arc), start, middle (an arc's halfway
 /// point; a line's middle), end.
 #[pyfunction]
-#[pyo3(signature = (lines, tol, pitch = 0.0, most = 0.0, edges = None))]
+#[pyo3(signature = (lines, tol, pitch = 0.0, most = 0.0, edges = None, max_turn = 0.0, give = 0.0))]
 fn fit_arcs<'py>(
     py: Python<'py>,
     lines: Vec<PyReadonlyArray2<'py, f64>>,
@@ -372,6 +372,8 @@ fn fit_arcs<'py>(
     pitch: f64,
     most: f64,
     edges: Option<Vec<PyReadonlyArray2<'py, f64>>>,
+    max_turn: f64,
+    give: f64,
 ) -> PyResult<Bound<'py, PyList>> {
     let lines: Vec<Vec<P>> = lines.iter().map(points).collect::<PyResult<_>>()?;
     let edges: Vec<Vec<P>> = edges
@@ -380,7 +382,7 @@ fn fit_arcs<'py>(
         .map(points)
         .collect::<PyResult<_>>()?;
     let out: Vec<Vec<[f64; 7]>> = py.allow_threads(|| {
-        fit_all(&lines, &edges, tol, pitch, most)
+        fit_all(&lines, &edges, tol, pitch, most, max_turn, give)
             .iter()
             .map(|pieces| pieces.iter().map(row).collect())
             .collect()
@@ -394,6 +396,31 @@ fn fit_arcs<'py>(
                 .into_pyarray(py)
         }),
     )
+}
+
+/// The traces as the smooth curves through their vertices, simplified again within `tol`,
+/// no two segments turning more than `max_turn` radians (`arcs::smooth_all`).
+/// Straight where the curve would crowd the copper beside it (the traces' `pitch`, the
+/// area's `edges`).
+#[pyfunction]
+#[pyo3(signature = (lines, tol, max_turn, pitch = 0.0, edges = None, give = 0.0))]
+fn smooth_traces<'py>(
+    py: Python<'py>,
+    lines: Vec<PyReadonlyArray2<'py, f64>>,
+    tol: f64,
+    max_turn: f64,
+    pitch: f64,
+    edges: Option<Vec<PyReadonlyArray2<'py, f64>>>,
+    give: f64,
+) -> PyResult<Bound<'py, PyList>> {
+    let lines: Vec<Vec<P>> = lines.iter().map(points).collect::<PyResult<_>>()?;
+    let edges: Vec<Vec<P>> = edges
+        .unwrap_or_default()
+        .iter()
+        .map(points)
+        .collect::<PyResult<_>>()?;
+    let out = py.allow_threads(|| smooth_all(&lines, &edges, pitch, tol, max_turn, give));
+    PyList::new(py, out.iter().map(|t| array(py, t)))
 }
 
 fn row(p: &Piece) -> [f64; 7] {
@@ -421,6 +448,7 @@ fn cancel(on: bool) {
 fn yanartas_mesh(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cancel, m)?)?;
     m.add_function(wrap_pyfunction!(fit_arcs, m)?)?;
+    m.add_function(wrap_pyfunction!(smooth_traces, m)?)?;
     m.add_function(wrap_pyfunction!(_cells, m)?)?;
     m.add_function(wrap_pyfunction!(curve_graph, m)?)?;
     m.add_function(wrap_pyfunction!(settle_traces, m)?)?;

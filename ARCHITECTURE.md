@@ -581,16 +581,31 @@ an exact isometry: the panels curve along it, not across it.
   needles) to lay the curve along the edges; a hard skew limit in settling
   (dropped: it cost coverage; steering and matching keep the skew within 10 mm instead):
   reconsider it.
-- **Lines and arcs** (`mesh_shape = arcs`, `arcs::fit_all`): each settled trace redrawn
-  greedily, the longest piece from each vertex that a line or an arc through the run's two
-  ends follows. The arc is the one of those (one per sagitta) nearest the run at its worst,
-  searched between the sagittas of the circles through a few of its vertices: settling
-  leaves a wobble of a few micrometres, and one middle vertex alone misses it. The
-  tolerance is per vertex: `ARCS` scaled to the pitch everywhere, and where the trace has
-  room, up to `ARCS_ROOM` pitches: half of how much further than the pitch the nearest
-  copper beside it is (another trace, or its own more than 1.2 pitches along it, as round
-  a U-turn), and all of how much further than half a pitch the area's edge is. So the
-  traces keep as far apart as before, in far fewer pieces, mostly arcs.
+- **Smooth redraw** (`arcs::refine_all`, both shapes): the settled vertices are a
+  pitch's third or so apart, and the polyline turns at each, so it looks rough.
+  Each trace is redrawn as the C¹ cubic Hermite curve through its vertices (tangents along
+  the neighbours' chord, scaled to the segment), subdivided so no step turns more than
+  half of `MAX_TURN` (10°). The curve bulges out of the polyline a little, so where that
+  costs room it is not taken: a segment stays straight wherever a point of its curve would
+  have less room (to another trace, half of how much further than the pitch; to the
+  area's edge or a zone's border, e.g. a fold, how much further than half a pitch) than
+  the less of its two ends and zero, and so does the other trace's segment it would crowd
+  (repeated until nothing changes, at most 6 times). `TURN_GIVE` allows a share of the
+  pitch more (0: no clearance lost; about 5 % of the vertices keep their sharper turn).
+  Straight segments (`smooth_traces`) are that curve simplified greedily: the longest
+  chord within `SIMPLIFY` of it whose dense steps each stay within `MAX_TURN / 4` of the
+  chord's own heading, so two chords turn at most `MAX_TURN` from one another.
+- **Lines and arcs** (`mesh_shape = arcs`, `arcs::fit_all`): the same smooth curve
+  redrawn greedily, the longest piece from each vertex that a line or an arc through the
+  run's two ends follows. The arc is the one of those (one per sagitta) nearest the run at
+  its worst, found by a golden-section search over the sagitta. The tolerance is per
+  vertex: the error the polyline itself makes there (its chords' sagitta, `L·θ/8`, plus
+  10 % for rounding), at least `ARCS` scaled to the pitch; and where the trace has room,
+  up to `ARCS_ROOM` pitches: half of how much further than the pitch the nearest copper
+  beside it is (another trace, or its own more than 1.2 pitches along it, as round a
+  U-turn), and all of how much further than half a pitch the area's edge is. So the
+  traces keep as far apart as before, in far fewer pieces, about 90 % of their length
+  arcs.
 - **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board
   renderer fails on footprints, so `render_stack` draws the tracks, vias, graphics and
   footprint into the layer stack itself.

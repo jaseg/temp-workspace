@@ -4,7 +4,7 @@
 
 use js_sys::{Array, Float64Array, Function, Object, Reflect, Uint32Array};
 use wasm_bindgen::prelude::*;
-use yanartas_mesh_core::arcs::{fit_all, Piece};
+use yanartas_mesh_core::arcs::{fit_all, smooth_all, Piece};
 use yanartas_mesh_core::curve::{relax, CurveInput, CurveParams};
 use yanartas_mesh_core::graph::{curve, GraphInput, GraphParams, Segment};
 use yanartas_mesh_core::lanes::{lanes, LaneParams};
@@ -360,6 +360,36 @@ pub fn curve_graph(
     Ok(o)
 }
 
+/// The traces (`lines`/`line_lens`) as the smooth curves through their vertices,
+/// simplified within `tol`, turning at most `max_turn` a vertex (the extension's
+/// `smooth_traces`): `{points, lens}`.
+#[wasm_bindgen]
+pub fn smooth_traces(
+    lines: &[f64],
+    line_lens: &[u32],
+    tol: f64,
+    max_turn: f64,
+    pitch: f64,
+    edges: &[f64],
+    edge_lens: &[u32],
+    give: f64,
+) -> Result<Object, JsValue> {
+    let out = smooth_all(
+        &runs(lines, line_lens),
+        &runs(edges, edge_lens),
+        pitch,
+        tol,
+        max_turn,
+        give,
+    );
+    let flat: Vec<f64> = out.iter().flatten().flat_map(|q| [q[0], q[1]]).collect();
+    let lens: Vec<u32> = out.iter().map(|t| t.len() as u32).collect();
+    let o = Object::new();
+    Reflect::set(&o, &"points".into(), &Float64Array::from(flat.as_slice()))?;
+    Reflect::set(&o, &"lens".into(), &Uint32Array::from(lens.as_slice()))?;
+    Ok(o)
+}
+
 /// Each polyline (`lines`/`line_lens`) as lines and circular arcs within `tol` of it,
 /// further where it has room (the extension's `fit_arcs`, with the area's `edges`/
 /// `edge_lens`): `{rows, counts}`, seven numbers a piece (kind, start, middle, end), each
@@ -373,12 +403,14 @@ pub fn fit_arcs(
     most: f64,
     edges: &[f64],
     edge_lens: &[u32],
+    max_turn: f64,
+    give: f64,
 ) -> Result<Object, JsValue> {
     let mut rows = Vec::new();
     let mut counts = Vec::new();
     let lines = runs(lines, line_lens);
     let edges = runs(edges, edge_lens);
-    for pieces in fit_all(&lines, &edges, tol, pitch, most) {
+    for pieces in fit_all(&lines, &edges, tol, pitch, most, max_turn, give) {
         counts.push(pieces.len() as u32);
         for p in pieces {
             rows.extend(match p {
