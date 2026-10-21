@@ -1,4 +1,5 @@
 import {decodeAudio} from '../live/ogg';
+import {setContextRunning} from '../utils/audioContextState';
 if (typeof AFRAME === 'undefined') {
 	throw new Error('Component attempted to register before AFRAME was available.');
 }
@@ -240,12 +241,12 @@ AFRAME.registerComponent('audioanalyser', {
 	},
 
 	suspendContext: function () {
-		if (this.context) this.context.suspend();
+		if (this.context) setContextRunning(this.context, false);
 	},
 
 	resumeContext: function () {
 		if (!this.firefoxZeroed) {
-			this.ensureContext().resume();
+			setContextRunning(this.ensureContext(), true);
 		}
 	},
 

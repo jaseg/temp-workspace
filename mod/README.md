@@ -11,6 +11,7 @@
 | `tools/viewer-smoke.cjs` | Same for the real viewer (`--www ../viewer/dist`): screenshots, errors, score state, extrapolation horizon. |
 | `tools/levels-smoke.cjs` | Checks the level browser (list, covers, BeatLeader stars, details, audio preview) on desktop and phone sizes. |
 | `tools/ogg-fallback-smoke.cjs` | Simulates a browser without Ogg Vorbis (Safari before 18.4): song, hit sound and level preview must decode with the WebAssembly fallback under the real CSP; a normal browser must not load it. |
+| `tools/firefox-audio-smoke.cjs` | Checks in Firefox that song audio runs from the first song on, across transitions (setup in the file). |
 | `tools/viewer-transitions.cjs` | Follows the viewer across several songs (`--loop --start 166`); can approve through the host console via a FIFO. |
 | `PROTOCOL.md` | The WebSocket protocol. |
 

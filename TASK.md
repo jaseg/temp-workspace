@@ -158,8 +158,14 @@ environments.
   now waits for the song to end (MapError 5, "busy"); the live stream and the song audio for late viewers still
   allocate a little per message. Measured on the Frame: the managed heap grew about 13 MB per minute with one
   viewer in a long pause, mostly not the mod's.
-- **CSP warning in Firefox** about a blocked inline script: the page has none, and Chromium reports nothing;
-  probably injected by a browser extension. Harmless.
+- **CSP warning in Firefox** about a blocked inline script: the page has none, and Chromium reports nothing.
+  The reported source is a `moz-extension` UUID, so it's an extension's content script. Harmless.
+- **Firefox: no audio on the first song (fixed 2026-10-21).** Firefox can settle an AudioContext `suspend()` that
+  was immediately followed by `resume()` after the resume, which left the context suspended. The viewer did that at
+  the first click and at every song start. Context state changes now go through `utils/audioContextState.js`
+  (the latest request wins, re-applied when a call settles). `mod/tools/firefox-audio-smoke.cjs` checks Firefox
+  across song transitions; it needs Playwright's Firefox, Xvfb and an audio sink (setup in the file). The
+  autoplay warning at page load came from a leftover `<audio autoplay>` element, now removed.
 - **The level page also receives the live stream** (poses every frame), since it shares the viewer's connection.
   That's about 12 KB/s per viewer.
 - **The waiting room approves by match code only.** The approval screen shows IP and browser to help, but anyone

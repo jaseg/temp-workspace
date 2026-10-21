@@ -1,4 +1,5 @@
 import {decodeAudio} from '../live/ogg';
+import {setContextRunning} from '../utils/audioContextState';
 var sourceCreatedCallback;
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -67,11 +68,11 @@ AFRAME.registerComponent('beat-hit-sound', {
 	},
 
 	suspendContext: function () {
-		if (this.context) this.context.suspend();
+		if (this.context) setContextRunning(this.context, false);
 	},
 
 	resumeContext: function () {
-		this.ensureContext().resume();
+		setContextRunning(this.ensureContext(), true);
 	},
 
 	setVolume: function (value) {

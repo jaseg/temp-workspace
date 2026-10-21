@@ -60,12 +60,8 @@ AFRAME.registerComponent('song', {
 				this.context = this.audioAnalyser.ensureContext();
 				this.audioAnalyser.gainNode.gain.value = this.settings.settings.volume || BASE_VOLUME;
 			}
-			this.hitSound.ensureContext();
-
-			this.audioAnalyser.suspendContext();
+			// Inside the gesture, so browsers let the contexts start.
 			this.audioAnalyser.resumeContext();
-
-			this.hitSound.suspendContext();
 			this.hitSound.resumeContext();
 
 			if (this.data.isPaused && !this.data.isReplayLoading && this.source && this.songStartTime === undefined) {
@@ -223,12 +219,19 @@ AFRAME.registerComponent('song', {
 		if (!this.metadataAudioLoading) {
 			try {
 				this.playRequest = this.audio.play();
-				this.playRequest.then(_ => {
-					this.playRequest = null;
-					this.metadataAudioLoading = false;
+				this.playRequest.then(
+					_ => {
+						this.playRequest = null;
+						this.metadataAudioLoading = false;
 
-					this.el.emit('songstartaudio');
-				});
+						this.el.emit('songstartaudio');
+					},
+					_ => {
+						// Blocked or interrupted (a newer play or pause): let the next start try again.
+						this.playRequest = null;
+						this.metadataAudioLoading = false;
+					}
+				);
 
 				this.metadataAudioLoading = true;
 			} catch (e) {
