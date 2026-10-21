@@ -269,12 +269,44 @@ def test_model_dimensions(cfg):
 
 # ------------------------------------------------------------------ API
 def test_render_returns_dimensions(tmp_path):
-    """The render API serves the dimensions of all three views, as JSON."""
+    """The render API serves the dimensions of all three views, as JSON (the pattern's with
+    the inner flaps' landing outlines)."""
     client = create_app(tmp_path / "s.json").test_client()
     dims = client.post("/api/render", json={"config": D.to_dict()}).get_json()["dimensions"]
     pattern = build_pattern(D)
+    offset = sheet_offset(pattern)
     assert dims == {
-        "pattern": dm.to_json(dm.pattern_dimensions(D, pattern, sheet_offset(pattern))),
+        "pattern": [
+            *dm.to_json(dm.pattern_dimensions(D, pattern, offset)),
+            *dm.landing_outlines(D, pattern, offset),
+        ],
         "section": dm.to_json(dm.section_dimensions(D, build_cross_section(D))),
         "model": dm.to_json(dm.model_dimensions(D)),
     }
+
+
+@pytest.mark.parametrize("pieces", ["one", "two"])
+def test_inner_flaps_landing_outlines_lie_on_the_outer_flaps(pieces):
+    """Where each inner flap lands, folded, on the outer flap over it: a closed outline, in
+    the dimensions layer, within that flap (its fold along the other panel, its cut edge
+    inside the box); one per outer flap."""
+    import shapely
+    from shapely.geometry import Point as SPoint
+    from shapely.geometry import Polygon
+
+    from yanartas_pillowbox.pcb import sample
+
+    cfg = Config.defaults().with_values(pieces=pieces, lid_offset=1.5)
+    pattern = build_pattern(cfg)
+    dx, dy = sheet_offset(pattern)
+    outlines = dm.landing_outlines(cfg, pattern, (dx, dy))
+    assert len(outlines) == (1 if pieces == "two" else 2)
+    for o in outlines:
+        assert o["kind"] == "outline" and o["param"] is None
+        assert o["points"][0] == o["points"][-1]
+        end = "top" if "top" in o["label"] else "bottom"
+        # (the flap, and the overhangs beside it: by the glued edge the other panel runs on
+        # a little past this one's free edge)
+        faces = [f for f in pattern.faces if f.name.startswith(f"front-{end}-")]
+        flap = shapely.union_all([Polygon(sample(f.boundary)) for f in faces]).buffer(0.05)
+        assert all(flap.contains(SPoint(x - dx, y - dy)) for x, y in o["points"])

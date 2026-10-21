@@ -57,7 +57,11 @@ def render(cfg: Config) -> dict[str, Any]:
         "info": pattern.info,
         "payload": payload.summary(cfg),
         "dimensions": {
-            "pattern": dims.to_json(dims.pattern_dimensions(cfg, pattern, sheet_offset(pattern))),
+            # (and where the inner flaps land on the outer flaps: dashed outlines)
+            "pattern": [
+                *dims.to_json(dims.pattern_dimensions(cfg, pattern, sheet_offset(pattern))),
+                *dims.landing_outlines(cfg, pattern, sheet_offset(pattern)),
+            ],
             "section": dims.to_json(dims.section_dimensions(cfg, section)),
             "model": dims.to_json(dims.model_dimensions(cfg)),
         },

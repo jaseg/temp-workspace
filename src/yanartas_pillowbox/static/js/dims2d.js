@@ -7,7 +7,7 @@ const NS = "http://www.w3.org/2000/svg";
 export const DIM_STYLE = `
   .dim line, .dim path.ln { stroke: var(--dim-color); stroke-width: 1px; fill: none;
                             vector-effect: non-scaling-stroke; }
-  .dim line.ext { stroke-dasharray: 3 2; opacity: 0.8; }
+  .dim line.ext, .dim path.ext { stroke-dasharray: 3 2; opacity: 0.8; }
   .dim path.arrow { fill: var(--dim-color); stroke: none; }
   .dim text { fill: var(--dim-color); font-family: var(--ui-font, system-ui, sans-serif); }
   .dim rect.plate { fill: var(--dim-halo); stroke: none; }
@@ -19,7 +19,8 @@ export const DIM_STYLE = `
 `;
 
 /**
- * @param dims    list from /api/render (kinds horizontal, vertical, path)
+ * @param dims    list from /api/render (kinds horizontal, vertical, path; outline: a dashed
+ *                guide, no label)
  * @param fs      label font size in user units
  * @param flipY   true when the data frame has y up (plotted as -y)
  * @returns {{group: SVGGElement, bounds: number[]}} bounds = [minX, minY, maxX, maxY]
@@ -36,7 +37,8 @@ export function drawDims2d(dims, { fs, flipY = false }) {
     const g = el("g", { class: "dim" });
     if (d.param) g.dataset.param = d.param;
     const title = el("title");
-    title.textContent = d.param ? `${d.label} mm (${d.param})` : `${d.label} mm (derived)`;
+    title.textContent = d.kind === "outline" ? d.label
+      : d.param ? `${d.label} mm (${d.param})` : `${d.label} mm (derived)`;
     g.append(title);
 
     if (d.kind === "horizontal" || d.kind === "vertical") {
@@ -57,6 +59,11 @@ export function drawDims2d(dims, { fs, flipY = false }) {
       const half = d.label.length * fs * 0.3;
       track(horiz ? [mid[0] - half, mid[1] - fs] : [mid[0] - fs, mid[1] - half],
             horiz ? [mid[0] + half, mid[1] + fs] : [mid[0] + fs, mid[1] + half]);
+    } else if (d.kind === "outline") {
+      // A guide (where an inner flap lands, folded): dashed, like the extension lines.
+      const pts = d.points.map(T);
+      g.append(el("path", { class: "ln ext", d: `M ${pts.map((q) => q.join(",")).join(" L ")}` }));
+      track(...pts);
     } else if (d.kind === "path") {
       // Offset the measured curve to the left of its direction of travel (in data frame).
       const src = d.points;

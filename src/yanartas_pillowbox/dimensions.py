@@ -290,6 +290,65 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
     return dims
 
 
+def landing_outlines(cfg: Config, pattern: Pattern, offset: Point) -> list[dict[str, Any]]:
+    """Where each inner flap lands on the outer flap closing over it, once folded: its
+    outline (fold and cut edge) carried along the box onto the outer flap's wall and drawn
+    in that flap's flat coordinates (+ ``offset``), as ``outline`` entries for the
+    dimensions layer. Two pieces: the other piece's inner flap, under this one's outer
+    flap."""
+    box = FoldedBox(cfg)
+    shell = box.shell
+    sec, zs = shell.front, shell.z_shift
+    dx, dy = offset
+    lid = lid_layout(cfg)
+    sp = 0.0 if lid is None else lid.spread
+
+    def flat_x(x3: float) -> float:
+        """The outer flap's flat x where its wall stands at X = x3 (the front panel's
+        section, continued over the overhangs)."""
+        lo, hi = -sp - sec.width, sec.width * 2 + sp
+        for _ in range(80):
+            mid = (lo + hi) / 2
+            try:
+                beyond = shell.front_x + sec.x_ext(mid) > x3
+            except ValueError:  # (past 45 degrees: beyond the box either way)
+                beyond = mid > sec.width / 2
+            lo, hi = (lo, mid) if beyond else (mid, hi)
+        return (lo + hi) / 2
+
+    # (inner flap face, outer flap face, its flat y from the folded Z, whose box)
+    if cfg.two_piece:
+        ends = [("back-bottom-flap", "front-top-flap", lambda z: z - zs, True)]
+    else:
+        length = cfg.front_length
+        ends = [
+            ("back-top-flap", "front-top-flap", lambda z: z - zs, False),
+            ("back-bottom-flap", "front-bottom-flap", lambda z: length + zs - z, False),
+        ]
+    out = []
+    for inner, outer, y_of, other in ends:
+        face = pattern.face(inner)
+        pts = []
+        for seg in face.boundary:
+            n = max(2, math.ceil(seg.length / 0.5))
+            for i in range(n):
+                q = box.map(inner, seg.point_at(i / n))
+                if other:
+                    q = box.other(q)
+                pts.append((flat_x(q[0]) + dx, y_of(q[2]) + dy))
+        pts.append(pts[0])
+        out.append(
+            {
+                "param": None,
+                "kind": "outline",
+                "label": f"inner flap, folded, on the {outer.split('-')[1]} outer flap",
+                "value": 0.0,
+                "points": [_r(p) for p in pts],
+            }
+        )
+    return out
+
+
 # ------------------------------------------------------------------------- cross-section
 def section_dimensions(cfg: Config, section: dict[str, Any]) -> list[Dimension]:
     """Dimensions for the shell cross-section, in its (X, Z) frame (Z up). Width and height
