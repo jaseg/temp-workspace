@@ -6,7 +6,6 @@ const STORE_KEY = "yanartas-pillowbox.config";
 const LOCAL_CMD =
   "uvx --from git+https://github.com/jaseg/temp-workspace@yanartas-pillowbox yanartas-pillowbox";
 
-const worker = new Worker(new URL("./pyworker.js", import.meta.url), { type: "module" });
 const pending = new Map();
 let seq = 0;
 let startError = null;
@@ -30,7 +29,7 @@ const tick = setInterval(() => {
 
 let progress = null; // (the PCB layout's latest progress event, from the worker)
 
-worker.onmessage = ({ data }) => {
+function onMessage({ data }) {
   if (data.progress) {
     progress = data.progress;
     return;
@@ -53,12 +52,32 @@ worker.onmessage = ({ data }) => {
   pending.delete(data.id);
   if (data.error) entry.reject(new Error(data.error));
   else entry.resolve(JSON.parse(data.reply));
-};
+}
 
-worker.onerror = (e) => {
-  e.preventDefault?.();
-  worker.onmessage({ data: { failed: e.message || "the worker failed to load" } });
-};
+function startWorker() {
+  const w = new Worker(new URL("./pyworker.js", import.meta.url), { type: "module" });
+  w.onmessage = onMessage;
+  w.onerror = (e) => {
+    e.preventDefault?.();
+    onMessage({ data: { failed: e.message || "the worker failed to load" } });
+  };
+  return w;
+}
+
+let worker = startWorker();
+
+/** Cancel the PCB layout under way: Python runs it in one go, so the worker goes (and every
+ *  request it had: the layout's answers "cancelled") and a fresh one starts. */
+function cancelLayout() {
+  worker.terminate();
+  const cancelled = JSON.stringify({ error: "the mesh layout was cancelled", cancelled: true, errors: {} });
+  for (const { resolve } of pending.values()) {
+    resolve({ status: 409, content: cancelled, type: "application/json" });
+  }
+  pending.clear();
+  progress = null;
+  worker = startWorker();
+}
 
 function call(request) {
   if (startError) return Promise.reject(new Error(startError));
@@ -95,6 +114,12 @@ window.fetch = async (input, init = {}) => {
   const method = (init.method || "GET").toUpperCase();
   if (method === "GET" && url.pathname === "/api/progress") { // (the worker is busy laying out)
     return new Response(JSON.stringify({ progress }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (method === "POST" && url.pathname === "/api/pcb/cancel") {
+    cancelLayout();
+    return new Response(JSON.stringify({ cancelled: true }), {
       status: 200, headers: { "Content-Type": "application/json" },
     });
   }

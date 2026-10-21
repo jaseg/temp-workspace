@@ -57,13 +57,33 @@ def cable_width(cfg: Config) -> float:
     return plug_width(cfg) - 2 * cfg.fpc_cable_inset
 
 
+def exit_width(cfg: Config) -> float:
+    """How much of the junction the meshes' exits take side by side (``pcb``): each layer's
+    exit cell (two pitches per net), the back one offset by half a cell (and a trace width,
+    if set), kept the edge clearance off the junction's ends' fillets."""
+    pitch = cfg.mesh_trace_width + cfg.mesh_trace_space
+    cell = 2 * cfg.mesh_nets * pitch
+    shift = cell / 2 + (cfg.mesh_trace_width if cfg.mesh_back_offset == "cell_trace" else 0.0)
+    return cell + shift + 2 * (cfg.mesh_edge_clearance + cfg.fpc_corner_radius) + 0.01
+
+
+def junction_width(cfg: Config) -> float:
+    """The cable's width where it leaves the edge: the cable's, or as wide as the meshes'
+    exits need (their traces then neck down to the cable's pitch in the first corner)."""
+    return max(cable_width(cfg), exit_width(cfg))
+
+
 @dataclass(frozen=True)
 class CableLayout:
     """The cable in pattern coordinates.
 
-    ``junction`` is its seam with the front panel's free edge (x = 0), as wide as the cable,
-    its ends in the order the outline (going up the free edge) meets them. ``path`` is the
-    centreline, from the junction's middle through every corner's centre to the tip;
+    ``junction`` is its seam with the front panel's free edge (x = 0), as wide as the cable
+    or (``junction_width``) as the meshes' exits need, its ends in the order the outline
+    (going up the free edge) meets them; wider, the stub widens on the side away from its
+    first turn, up to the first corner's far side (a rectangle there: the corner's square
+    on the turn's side, and beside it the stub's end). ``path`` is the centreline, from the
+    junction (the cable's width of it on the turn's side: its middle) through every
+    corner's centre to the tip;
     ``outline`` the cut from the junction's first end round the tip back to its other end,
     ``plug_corners`` its corners at the plug (kept sharp); ``creases`` the corners' flat
     folds, one per inner path point, in order."""
@@ -72,7 +92,7 @@ class CableLayout:
     width: float
     plug_width: float
     plug_length: float
-    junction: tuple[Point, Point]
+    junction: tuple[Point, Point]  # (as wide as the exits need: wider than the cable, maybe)
     path: tuple[Point, ...]
     outline: tuple[Point, ...]
     plug_corners: frozenset[Point]
@@ -158,7 +178,8 @@ def meander(
     min_first_row = max(w, first_run)  # the turn clear of the first corner (and the wall fold)
     if first_row < min_first_row:
         raise CableError(
-            "fpc_cable_length", "no room beside the edge's middle for the cable's first turn"
+            "fpc_cable_length",
+            "no room beside the junction for the cable's first turn (see Cable entry)",
         )
     # The fewest rows n whose folded reach, the tip at its side, holds the cable; then the
     # slack, spread over the 2 (n - 1) turns: each first row's turn, the two turns of every
@@ -185,12 +206,14 @@ def meander(
 
 
 def outline(
-    path: tuple[Point, ...], width: float, plug: float, plug_length: float
+    path: tuple[Point, ...], width: float, plug: float, plug_length: float, wide: float = 0.0
 ) -> tuple[tuple[Point, ...], frozenset[Point]]:
     """The cable's cut, from the start's left side (the junction's left end, in ``meander``'s
     frame) round the tip to its right side: the centreline offset by half the width on both
     sides, square at every corner, widened to the plug's half width over the last
-    ``plug_length``; and its corners at the plug (the tip's, and the steps to the ears)."""
+    ``plug_length``; the stub ``wide`` wider on its left (the first turn's outside), up to
+    the first corner's far side; and its corners at the plug (the tip's, and the steps to
+    the ears)."""
     h, hp = width / 2, plug / 2
     dirs = [_unit(a, b) for a, b in itertools.pairwise(path)]
 
@@ -208,6 +231,9 @@ def outline(
     centres = [*path[:-1], *((q, q, tip) if hp > h else (tip,))]
     left += plug_left
     right = [(2 * c[0] - p[0], 2 * c[1] - p[1]) for p, c in zip(left, centres, strict=True)]
+    if wide > 0:  # (the stub's left side, and the first corner's, out by as much)
+        n0 = _side(dirs[0])
+        left[0], left[1] = off(left[0], n0, wide), off(left[1], n0, wide)
     k = len(plug_left)
     return (*left, *reversed(right)), frozenset([*left[-k:], *right[-k:]])
 
@@ -225,6 +251,29 @@ def creases(path: tuple[Point, ...], width: float) -> tuple[tuple[Point, Point],
     return tuple(out)
 
 
+def entry_range(cfg: Config) -> tuple[float, float]:
+    """The lowest and highest the junction's middle may be along the free edge (pattern y,
+    so the top end first): folded into the box, the stub and the first corner's square
+    (the triangle of two layers it leaves, and the run folded back over it: the full
+    cable's width at every depth on one side) lie on the inside of the back panel, up to
+    the square's far side deep. There the inner flaps' walls stand ``e + z(u)`` in from the
+    back panel's ends (their fold's sagitta at that depth: more, deeper in), half a
+    thickness thick; the cable keeps the clearance from them."""
+    t, e, lf, gap = cfg.thickness, cfg.end_wall_gap, cfg.front_length, cfg.fpc_cable_gap
+    w, wj = cable_width(cfg), junction_width(cfg)
+    shell = cfg.shell
+    back = shell.back
+    # (the junction: where the front panel's free edge rests on the back panel, at u0)
+    x0, lo, hi = shell.front_point(0.0)[0], 0.0, back.width
+    for _ in range(60):  # (X falls with u along the back panel)
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if shell.back_x - back.x(mid) > x0 else (lo, mid)
+    deep = gap + cfg.fpc_cable_inset + t + w  # (the stub and the square, from the junction)
+    z = back.z(lo - deep - t)  # (a thickness deeper: on the safe side)
+    margin = wj / 2 + t / 2 + gap  # (the junction's middle: half of it each way)
+    return (e + z + margin, lf - e - z - margin)
+
+
 @lru_cache(maxsize=64)
 def layout(cfg: Config) -> CableLayout | None:
     """The cable, or None without one. Raises ``CableError``."""
@@ -232,20 +281,40 @@ def layout(cfg: Config) -> CableLayout | None:
         return None
     e, lf, t = cfg.end_wall_gap, cfg.front_length, cfg.thickness
     w, wp, gap = cable_width(cfg), plug_width(cfg), cfg.fpc_cable_gap
+    wj = junction_width(cfg)
     # Laid out in ``meander``'s frame: the junction level at y = 0, centred on x = 0, the stub
-    # going up (out of the edge), the first turn to the right (along the edge, up or down).
-    junction = ((-w / 2, 0.0), (w / 2, 0.0))
+    # going up (out of the edge), the first turn to the right (along the edge, up or down);
+    # the cable's own width of it on the right (the turn's side): its centreline's start.
+    junction = ((-wj / 2, 0.0), (wj / 2, 0.0))
+    narrow = ((wj / 2 - w, 0.0), (wj / 2, 0.0))
+    # Where it leaves the edge: ``fpc_entry_offset`` from as near the end it turns away
+    # from as the inner flap there allows (cable up: the lowest; down: the highest).
+    lo, hi = entry_range(cfg)
+    if lo > hi:
+        raise CableError(
+            "fpc_pins", "the cable is too wide to fold into the box clear of the inner flaps"
+        )
+    if cfg.fpc_entry_offset > hi - lo + 1e-9:
+        raise CableError(
+            "fpc_entry_offset",
+            f"must be at most {_fmt(math.floor((hi - lo) * 100) / 100)} mm (folded into the "
+            "box, the cable's first corner must stay clear of the inner flaps)",
+        )
+    k = -1.0 if cfg.fpc_cable == "up" else 1.0
+    yj = hi - cfg.fpc_entry_offset if k < 0 else lo + cfg.fpc_entry_offset
     # The rows clear the end sections beside the edge (beyond the back panel's ends: the
-    # overhangs, the lids' glue tabs, the outer flaps' corners) by the clearance.
-    reach = lf / 2 - e - gap
+    # overhangs, the lids' glue tabs, the outer flaps' corners) by the clearance: the frame's
+    # x runs along the edge from the junction, the way the cable turns.
+    top, bottom = e + gap, lf - e - gap  # (pattern y)
+    x_left, x_right = (yj - bottom, yj - top) if k < 0 else (top - yj, bottom - yj)
     # The stub clears the edge by the clearance (and the plug's ears), and is a thickness
     # longer: the first row, folded back over it, folds onto the front panel a thickness
     # short of the junction (on the panel's inner surface), clear of the corner square.
     stub = gap + cfg.fpc_cable_inset + t
     path = meander(
-        junction,
-        -reach,
-        reach,
+        narrow,
+        x_left,
+        x_right,
         cfg.fpc_cable_length,
         gap,
         cfg.fpc_cable_inset,
@@ -253,7 +322,7 @@ def layout(cfg: Config) -> CableLayout | None:
         stub,
         stub + w - t,  # the first row reaches past the wall fold
     )
-    pts, plug = outline(path, w, wp, cfg.fpc_plug_length)
+    pts, plug = outline(path, w, wp, cfg.fpc_plug_length, wj - w)
     # The wall fold: on the first row, where (folded back) it gets to a thickness short of
     # the junction again: the stub and half the width, less a thickness, past its corner.
     (cx, cy), (ex, _) = path[1], path[2]
@@ -268,12 +337,10 @@ def layout(cfg: Config) -> CableLayout | None:
     wall = ((x, cy + w / 2), (x, cy - w / 2))
 
     # Into the pattern: out of the edge (up in the frame) is -x, the first turn (right) up
-    # (-y) or down (+y) along it, from the edge's middle. Turning down mirrors the frame, so
-    # the outline then runs the other way round.
-    k = -1.0 if cfg.fpc_cable == "up" else 1.0
-
+    # (-y) or down (+y) along it, from the junction. Turning down mirrors the frame, so the
+    # outline then runs the other way round.
     def at(q: Point) -> Point:
-        return (q[1], lf / 2 + k * q[0])
+        return (q[1], yj + k * q[0])
 
     def line(pair: tuple[Point, Point]) -> tuple[Point, Point]:
         return (at(pair[0]), at(pair[1]))

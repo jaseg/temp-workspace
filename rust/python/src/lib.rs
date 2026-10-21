@@ -130,7 +130,10 @@ fn settle_traces<'py>(
             if let Some(cb) = &progress {
                 Python::with_gil(|py| {
                     if let Err(e) = status(py, s).and_then(|d| cb.call1(py, (d,)).map(|_| ())) {
-                        failed = Some(e);
+                        {
+                            yanartas_mesh_core::cancel(true);
+                            failed = Some(e);
+                        }
                     }
                 });
             }
@@ -228,7 +231,10 @@ fn relax_curve<'py>(
             if let (Some(cb), None) = (&progress, &failed) {
                 Python::with_gil(|py| {
                     if let Err(e) = cb.call1(py, (step, steps)) {
-                        failed = Some(e);
+                        {
+                            yanartas_mesh_core::cancel(true);
+                            failed = Some(e);
+                        }
                     }
                 });
             }
@@ -315,7 +321,10 @@ fn curve_graph<'py>(
             if let (Some(cb), None) = (&progress, &failed) {
                 Python::with_gil(|py| {
                     if let Err(e) = cb.call1(py, (step, steps)) {
-                        failed = Some(e);
+                        {
+                            yanartas_mesh_core::cancel(true);
+                            failed = Some(e);
+                        }
                     }
                 });
             }
@@ -392,8 +401,15 @@ fn row(p: &Piece) -> [f64; 7] {
     }
 }
 
+/// Stop (`on`) the layout under way at its next step, or (off) let the next one run.
+#[pyfunction]
+fn cancel(on: bool) {
+    yanartas_mesh_core::cancel(on);
+}
+
 #[pymodule]
 fn yanartas_mesh(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(cancel, m)?)?;
     m.add_function(wrap_pyfunction!(fit_arcs, m)?)?;
     m.add_function(wrap_pyfunction!(_cells, m)?)?;
     m.add_function(wrap_pyfunction!(curve_graph, m)?)?;

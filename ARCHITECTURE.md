@@ -39,7 +39,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | `progress.py` | How far a long layout has got: the layouts report phases and steps, the CLI and the web UI show them. |
 | `checkpoint.py` | The layout's steps timed, and (with `YANARTAS_CHECKPOINT` set) their inputs and results written as gzipped JSON, any one step then run again alone (`resume`). |
 | `pcb.py` | The flex-PCB layout (mask, both meshes, the cable's traces, fan-out, vias and plug contacts, GND zone) and its export through gerbonara (KiCad board and project, Gerber, SVG). Imported on demand: its dependencies are heavy (the in-browser build loads them on the first PCB request). |
-| `fpc.py` | The FPC cable's layout: it leaves the middle of the front panel's free edge (x = 0) and turns up or down along it; the meander (laid out in a frame of its own, turned into the pattern's), its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
+| `fpc.py` | The FPC cable's layout: it leaves the front panel's free edge (x = 0) where set (`entry_range`: by default as near the end it turns away from as the inner flap allows), as wide as the meshes' exits need (`junction_width`), and turns up or down along it; the meander (laid out in a frame of its own, turned into the pattern's), its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
 | `svg.py` | Serializes a `Pattern` to SVG (layers, dash styles, labels, embedded config) and reads the config back (`extract_config`). |
 | `dimensions.py` | Preview-only dimension annotations for all three views, measured on the same geometry. |
@@ -52,8 +52,16 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 
 **Frontend** (`static/`): plain ES modules and custom elements, with no build step.
 
-- `app.js` builds the form from the field specs, debounces renders and saves, and wires the
-  views together, including linked highlighting between fields and dimensions.
+- `app.js` builds the form from the field specs (collapsible groups, the payload's first),
+  debounces renders and saves, and wires the views together, including linked highlighting
+  between fields and dimensions. It runs the mesh's layout on *Generate mesh* (polling its
+  progress into a bar and a log; *Cancel* posts `/api/pcb/cancel`, which in the browser
+  build restarts the worker), keeps the result with the config it was made for (a different
+  design: out of date, the views' note says none is generated), and opens a dialog when a
+  layout fails.
+- `panels.js`: the dividers (the stats panel's sized in px from the right), maximizing a
+  view within the previews' area (the settings stay), and the settings' collapse.
+- `scalebar.js`: the 2D views' scale bars (a round length in mm, kept about 110 px long).
 - `pb-param` is one form field.
 - `pb-preview2d` shows the SVG with pan and zoom.
 - `pb-preview3d` uses vendored three.js r160.
@@ -230,8 +238,16 @@ planes by `e` accordingly; everything stays an exact isometric folding.
 point, which is slightly off-centre because the edge is not symmetric. The cut flattens the
 inner flap's free edge.
 
-The FPC cable is independent of it: it leaves the middle of the front panel's free straight
-edge. `fpc.meander` lays it out in a frame of its own (the junction level, the stub up, the
+The FPC cable is independent of it: it leaves the front panel's free straight edge where
+`fpc_entry_offset` puts it, measured from the lowest (turning up; turning down, the highest)
+it can go: folded in, its stub and first corner square lie on the back panel's inside up to
+the square's far side deep, where the inner flap's wall stands `e + z(u)` in from the back
+panel's end (`z` the back fold's sagitta at that depth, from where the front panel's edge
+rests); the cable keeps the clearance from it past half its thickness (`entry_range`; its
+rows, along the front panel, are not checked). Its junction is as wide as the meshes' exits
+need (`exit_width`), if wider than the cable: the stub widens on the side away from the first
+turn up to the first corner's far side (a rectangle there), whose crease is still the
+cable's square's diagonal, so the rows fold back as before. `fpc.meander` lays it out in a frame of its own (the junction level, the stub up, the
 first turn to the right); `fpc.layout` turns that into the pattern (out of the edge is -x,
 the first turn up or down along it; down mirrors, so the outline is reversed). In the box
 (`FoldedCable`), the front panel's free edge rests against the inside of the back panel by

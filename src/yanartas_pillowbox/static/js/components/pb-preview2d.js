@@ -9,6 +9,7 @@ import { LINE_STYLES, lineSwatch } from "../lines.js";
 import { COPPER, rasterize } from "../meshtex.js";
 import { MAXIMIZE_STYLE, maximizeButton } from "../panels.js";
 import { attachPanZoom, unitsPerPixel } from "../panzoom.js";
+import { SCALEBAR_STYLE, scaleBar, updateScaleBar } from "../scalebar.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -50,6 +51,12 @@ template.innerHTML = `
                       stroke-width: 1px; vector-effect: non-scaling-stroke; }
   ${DIM_STYLE}
   ${MAXIMIZE_STYLE}
+  ${SCALEBAR_STYLE}
+  .mesh-note { position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+               background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+               padding: 4px 10px; font-size: 12px; color: var(--text-muted); pointer-events: none;
+               white-space: nowrap; }
+  .mesh-note[hidden] { display: none; }
   .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; font-size: 12px;
             border-top: 1px solid var(--border); }
@@ -93,6 +100,8 @@ export class PbPreview2d extends HTMLElement {
   #detail = null; // {url, x, y, w, h}: the visible part at screen resolution
   #detailTimer = 0;
   #meshButton;
+  #scale = scaleBar();
+  #note = Object.assign(document.createElement("div"), { className: "mesh-note", hidden: true });
 
   constructor() {
     super();
@@ -136,7 +145,9 @@ export class PbPreview2d extends HTMLElement {
       if (!this.#svg) return;
       if (this.#zoomed) this.#drawDims();
       else this.fit();
+      if (this.#view) updateScaleBar(this.#scale, unitsPerPixel(this.#stage, this.#view));
     }).observe(this.#stage);
+    this.#stage.append(this.#scale, this.#note);
   }
 
   /** Show a new SVG. `info` holds pattern dimensions, `dims` the parameter dimensions in
@@ -154,7 +165,7 @@ export class PbPreview2d extends HTMLElement {
     this.#sheet = sheet;
 
     const keepView = this.#zoomed && this.#view;
-    this.#stage.replaceChildren(svg);
+    this.#stage.replaceChildren(svg, this.#scale, this.#note);
     this.#svg = svg;
     this.#dimFs = 0;
     if (keepView) this.#setView(this.#view);
@@ -168,6 +179,12 @@ export class PbPreview2d extends HTMLElement {
     this.#placeMesh();
     this.#drawLegend();
     this.highlight(this.#highlight);
+  }
+
+  /** A note over the view about the mesh (none: hidden), e.g. that none is laid out yet. */
+  set meshNote(text) {
+    this.#note.textContent = text || "";
+    this.#note.hidden = !text;
   }
 
   /** Whether the Mesh button shows as on (the app owns the state). */
@@ -324,6 +341,7 @@ export class PbPreview2d extends HTMLElement {
   #setView(v) {
     this.#view = v;
     this.#svg?.setAttribute("viewBox", v.map((n) => n.toFixed(4)).join(" "));
+    updateScaleBar(this.#scale, unitsPerPixel(this.#stage, v));
     this.#drawDims();
     if (this.#mesh?.url) this.#scheduleDetail();
   }

@@ -234,6 +234,9 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         ..Default::default()
     };
     for it in 0..if prm.phases & 1 != 0 { prm.steps } else { 0 } {
+        if crate::cancelled() {
+            break;
+        }
         let f = 1.0 - it as f64 / prm.steps as f64;
         let (cool, steer) = (f.powf(prm.cool), prm.steer * f.powf(prm.steer_cool));
         let p = tr.p.clone();
@@ -456,6 +459,9 @@ fn filled(
         ..Default::default()
     };
     for (h, cells) in found.iter().enumerate() {
+        if crate::cancelled() {
+            break;
+        }
         status.step = h;
         progress(&status);
         let hb = bounds(cells.iter());
@@ -986,6 +992,9 @@ fn bounds<'a>(ps: impl Iterator<Item = &'a P>) -> [f64; 4] {
 /// wider than a few vertices kept (as their coverage).
 fn smoothed(mut tr: Traces, prm: &Params, cx: &Ctx) -> Traces {
     for _ in 0..prm.finish {
+        if crate::cancelled() {
+            break;
+        }
         let (fixed, zone) = held(&tr, cx);
         let p = tr.p.clone();
         let mut new = p.clone();
@@ -1032,6 +1041,9 @@ fn matched(
         ..Default::default()
     };
     for it in 0..prm.match_steps {
+        if crate::cancelled() {
+            break;
+        }
         let gained = minus(&tr.binned(bins), base);
         let excess = excess(&gained, prm.match_band * cx.pitch, cx.group);
         let most = excess.iter().flatten().fold(0.0, |a: f64, &b| a.max(b));

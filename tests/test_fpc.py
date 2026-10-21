@@ -23,6 +23,9 @@ D = Config.defaults()
 CONFIGS = {
     "default": D,
     "down": D.with_values(fpc_cable="down"),
+    "entry": D.with_values(fpc_entry_offset=20),  # (higher up the edge)
+    # (the meshes' exits wider than the cable: its stub widened for them)
+    "wide": D.with_values(mesh_trace_space=1.0, mesh_traces=10),
     "long": D.with_values(fpc_cable_length=180),  # (more rows)
     "ears": D.with_values(fpc_cable_inset=1.5, fpc_plug_length=6),
     "no-lid": D.with_values(end_wall_gap=0),
@@ -100,18 +103,25 @@ def test_creases_run_from_cut_to_cut(cfg):
             assert pattern.outline.distance_to(fold.segment.point_at(i / 20)) > 1e-3
 
 
-def test_cable_leaves_the_middle_of_the_free_edge(cfg):
-    """The cable leaves the middle of the front panel's free straight edge (x = 0), outward,
-    and turns up or down along it; the rest of the pattern is the same as without it."""
+def test_cable_leaves_the_free_edge_at_its_entry(cfg):
+    """The cable leaves the front panel's free straight edge (x = 0) where set (by default
+    as low as it can, turning up; as high, turning down), outward, and turns up or down
+    along it; the rest of the pattern is the same as without it."""
     pattern = build_pattern(cfg)
     plain = build_pattern(cfg.with_values(fpc_cable="none"))
     cable = pattern.cable
     (xa, ya), (xb, yb) = cable.junction
     assert xa == xb == 0
-    assert abs(ya - yb) == pytest.approx(fpc.cable_width(cfg))
-    assert (ya + yb) / 2 == pytest.approx(cfg.front_length / 2)
+    assert abs(ya - yb) == pytest.approx(fpc.junction_width(cfg))
+    lo, hi = fpc.entry_range(cfg)
+    entry = hi - cfg.fpc_entry_offset if cfg.fpc_cable == "up" else lo + cfg.fpc_entry_offset
+    assert (ya + yb) / 2 == pytest.approx(entry)
+    # (the cable's centreline: in the junction's middle, or, widened, the cable's width of it
+    # on the first turn's side)
     (x0, y0), (x1, y1), (x2, y2) = cable.path[:3]
-    assert (x0, y0) == pytest.approx((0, cfg.front_length / 2)) and y1 == y0 and x1 < 0
+    turn = -1 if cfg.fpc_cable == "up" else 1
+    centre = entry + turn * (fpc.junction_width(cfg) - cable.width) / 2
+    assert (x0, y0) == pytest.approx((0, centre)) and y1 == y0 and x1 < 0
     assert x2 == x1 and (y2 < y1 if cfg.fpc_cable == "up" else y2 > y1)
     # Everything off the free edge is cut as before; on it, only the cable's cut is new.
     mine = {_key(s) for s in pattern.outline.segments}
@@ -207,10 +217,13 @@ def test_rows_are_as_few_as_fit_and_their_turns_spread_evenly():
     sections beside the edge); the slack moves all turns in from their sides alike, so the
     tip (needing no room for a turn) ends at its side; a single row runs to the side before
     it turns."""
-    e, gap, mid = D.end_wall_gap, D.fpc_cable_gap, D.front_length / 2
+    e, gap = D.end_wall_gap, D.fpc_cable_gap
+    mid = fpc.layout(D).path[0][1]  # (the centreline's start: as low as it goes, turning up)
     sides = (D.front_length - e - gap, e + gap)  # (up: the first row runs to the second)
     rows = lambda cable: (len(cable.path) - 1) // 2  # noqa: E731
-    one = fpc.layout(D.with_values(fpc_cable_length=57))
+    # (one row, its tip just short of the side: the stub, half the corner, then the row)
+    stub, h = gap + D.fpc_cable_inset + D.thickness, fpc.cable_width(D) / 2
+    one = fpc.layout(D.with_values(fpc_cable_length=math.floor(mid - sides[1] - stub - h)))
     assert rows(one) == 1 and one.path[-1][1] - sides[1] < 1
     for length in (100, 200, 320):
         cable = fpc.layout(D.with_values(fpc_cable_length=length))
@@ -355,19 +368,58 @@ def test_folded_cable_route(cfg):
 
 def test_folded_cable_stays_inside_the_box(cfg):
     """Every point of the folded cable lies inside the closed shell's section (its
-    mid-surfaces), within its length (between the curved folds)."""
+    mid-surfaces)."""
     model = build_model3d(cfg)
     section = build_cross_section(cfg)
     b = cfg.shell
     shell = Polygon([*_panel(b, "front", 0), *_panel(b, "back", 0)]).buffer(1e-4)
     pos = model["cable"]["positions"]
-    half = cfg.edge_length / 2 - cfg.shell.back.sagitta
     for i in range(0, len(pos), 3):
-        x, y, z = pos[i : i + 3]
+        x, _, z = pos[i : i + 3]
         assert shell.contains(Point(x, z)), (x, z)
-        assert abs(y) < half
     for line in section["cable"]:
         assert all(shell.contains(Point(*p)) for p in line)
+
+
+def _flap_walls(cfg, x):
+    """The box's Y of the inner flaps' walls (mid-surfaces: top end, bottom end) at X = x
+    across the box, on the back panel's side (the back panel's u there, by bisection)."""
+    shell, e, lf = cfg.shell, cfg.end_wall_gap, cfg.front_length
+    back = shell.back
+    lo, hi = 0.0, back.width  # (X falls with u along the back panel)
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if shell.back_x - back.x(mid) > x else (lo, mid)
+    z = back.z((lo + hi) / 2)
+    return lf / 2 - (e + z), lf / 2 - (lf - e - z)
+
+
+def _first_corner(cfg):
+    """The folded cable's stub and first corner square (the triangle of two layers and the
+    run back over it lie within it): box points of a grid over them, flat."""
+    pattern = build_pattern(cfg)
+    folded = FoldedCable(cfg, pattern.cable)
+    cable = pattern.cable
+    (x0, _), (x1, _) = cable.path[0], cable.path[1]
+    (_, ya), (_, yb) = cable.junction  # (across the stub: as wide as the junction)
+    h = cable.width / 2
+    xs = [x0 + (x1 - h - x0) * i / 40 for i in range(41)]  # (to the square's far side)
+    return [folded.map(0, (x, ya + (yb - ya) * k / 8)) for x in xs for k in range(9)]
+
+
+def test_first_corner_clears_the_inner_flaps(cfg):
+    """Folded into the box, the cable's stub and its first corner (the triangle) stay clear
+    of the inner flaps' walls: by the clearance, past half the flap's thickness; and at the
+    default entry as near the end it turns away from as that allows (the rest of the
+    cable, along the front panel, is not checked)."""
+    t, gap = cfg.thickness, cfg.fpc_cable_gap
+    least = math.inf
+    for x, y, _ in _first_corner(cfg):
+        top, bottom = _flap_walls(cfg, x)
+        assert bottom + t / 2 + 0.9 * gap < y < top - t / 2 - 0.9 * gap, (x, y, top, bottom)
+        least = min(least, (y - bottom) if cfg.fpc_cable == "up" else (top - y))
+    if cfg.fpc_entry_offset == 0:  # (no nearer than needed: a thickness more, at most)
+        assert least - t / 2 - gap < 2 * t + 0.05, least
 
 
 def test_cable_in_the_3d_model(cfg):
@@ -419,3 +471,20 @@ def test_cross_section_shows_the_cable():
     assert stub[0] == pytest.approx(list(folded.stub_at(0)), abs=1e-6)
     assert rest[-1] == pytest.approx(list(folded.section(D.fpc_cable_length)), abs=1e-6)
     assert build_cross_section(D.with_values(fpc_cable="none"))["cable"] is None
+
+
+def test_the_junction_widens_for_the_meshes_exits():
+    """Wider than the cable where the meshes' exits need it: by as much as they need, the
+    stub widening on the side away from the first turn up to the first corner's far side
+    (the rows as wide as the cable)."""
+    assert fpc.junction_width(D) == fpc.cable_width(D)
+    wide = CONFIGS["wide"]
+    assert fpc.junction_width(wide) == pytest.approx(fpc.exit_width(wide))
+    assert fpc.junction_width(wide) > fpc.cable_width(wide) + 5
+    cable = fpc.layout(wide)
+    (_, ya), (_, yb) = cable.junction
+    w, wj = fpc.cable_width(wide), fpc.junction_width(wide)
+    bottom = max(ya, yb)  # (turning up: widened downwards, to the outside of the turn)
+    deep = cable.path[1][0] - w / 2  # (the first corner's far side)
+    assert any(p == pytest.approx((deep, bottom)) for p in cable.outline)
+    assert abs(cable.path[0][1] - (bottom - wj + w / 2)) < 1e-9

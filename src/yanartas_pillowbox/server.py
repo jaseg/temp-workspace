@@ -111,6 +111,11 @@ def create_app(settings_path: Path) -> Flask:
         """How far the PCB layout in progress has got (polled while it runs)."""
         return jsonify(api.layout_progress())
 
+    @app.post("/api/pcb/cancel")
+    def pcb_cancel() -> Response:
+        """Stop the PCB layout under way (its own request then answers 409)."""
+        return jsonify(api.cancel_layout())
+
     @app.post("/api/pcb/files")
     @_json_route
     def pcb_files(data: Any) -> Any:

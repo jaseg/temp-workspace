@@ -87,6 +87,9 @@ pub fn relax(
     let n = (least / pitch).round();
     let bend = ((n - 1.0) / 2.0 * pitch / prm.inside).max(n * pitch / 2.0);
     for it in 0..prm.lloyd_curve {
+        if crate::cancelled() {
+            break;
+        }
         progress(it, total);
         let mut p = [free.clone(), inner.clone()].concat();
         let k = free.len();
@@ -170,6 +173,9 @@ pub fn relax(
     );
     let mut hot: Option<HashSet<(i64, i64)>> = None;
     for it in 0..prm.repair {
+        if crate::cancelled() {
+            break;
+        }
         progress(prm.lloyd_curve + it.min(prm.repair / 4), total);
         let free = respace(&p[..k], step);
         p = [free.clone(), inner.clone()].concat();
@@ -266,6 +272,9 @@ fn grow(
     let mut hot: Option<HashSet<(i64, i64)>> = None;
     let mut lengths: Vec<f64> = Vec::new();
     for _ in 0..prm.grow {
+        if crate::cancelled() {
+            break;
+        }
         let free = respace(&p[..k], step);
         p = [free.clone(), p[k..].to_vec()].concat();
         k = free.len();

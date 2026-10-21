@@ -8,12 +8,14 @@ const MIN = 160; // px: the smallest a preview panel gets
 const STEP = 16; // px per arrow key press (Shift: 4×)
 
 // Per divider (data-split): the axis it resizes along, the smallest sizes of the panels
-// before and after it, and how the size is applied. The sidebar keeps its width in px when
-// the window resizes; the others keep the first panel's share of the space.
+// before and after it, and how the size is applied. The sidebar (and the stats panel, the
+// panel after its divider: `second`) keeps its width in px when the window resizes; the
+// others keep the first panel's share of the space.
 const SPLITS = {
   sidebar: { axis: "x", min: [240, 320], px: true },
   previews: { axis: "y", min: [MIN, MIN] },
   lower: { axis: "x", min: [MIN, MIN] },
+  stats: { axis: "x", min: [MIN, 200], px: true, second: true },
 };
 
 function load() {
@@ -83,6 +85,8 @@ function initSplitter(splitter, sizes) {
     if (value == null) {
       container.style.removeProperty(`--${name}-a`);
       container.style.removeProperty(`--${name}-b`);
+    } else if (split.px && split.second) {
+      container.style.setProperty(`--${name}-b`, `${value}px`);
     } else if (split.px) {
       // (Still clamped by CSS when the window gets narrower.)
       container.style.setProperty(`--${name}-a`, `clamp(${split.min[0]}px, ${value}px, `
@@ -97,7 +101,7 @@ function initSplitter(splitter, sizes) {
   const resize = (a, total) => {
     const [minA, minB] = split.min;
     a = Math.round(Math.min(Math.max(a, minA), Math.max(minA, total - minB)));
-    sizes[name] = split.px ? a : a / total;
+    sizes[name] = split.second ? total - a : split.px ? a : a / total;
     apply(sizes[name]);
     updateAria();
   };

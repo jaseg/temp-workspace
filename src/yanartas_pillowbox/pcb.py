@@ -9,7 +9,10 @@ panel's free edge, so its loops' ends run straight on into the cable, on the plu
 side. The back (B.Cu) mesh's grid is offset by half a cell in x and y, so that the strips the
 two layers' whole cells leave bare along the edges differ: its exit cell sits half a cell
 into the panel, beside the front one's, and its loops' ends run straight on across the gap.
-Along the cable they keep the mesh's pitch, each on its own layer. Just before the plug they
+Along the cable they keep the mesh's pitch, each on its own layer (where the exit cells do
+not fit the cable centred on their pins, they sit side by side across the junction, which
+``fpc`` widens for them, and the traces neck down to the plug's pitch in the cable's first
+corner). Just before the plug they
 fan out to their contacts' places, and the back mesh's traces change to the contact side
 (F.Cu) through two staggered rows of vias.
 
@@ -28,6 +31,7 @@ from __future__ import annotations
 import functools
 import itertools
 import math
+import sys
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
@@ -104,6 +108,7 @@ class Layout:
     area: Polygon | None = None  # what the meshes cover
     clearance: float = 0.15
     width: float = 0.15
+    cable_clearance: float = 0.15  # (the traces' along the cable: necked down, maybe less)
     _cache: dict = field(default_factory=dict, repr=False)
 
     def net_lengths(self) -> dict[str, float]:
@@ -327,7 +332,10 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     cable_cut = [s for s in pattern.outline.segments if _segment_key(s) not in faces]
     cable_poly = Polygon(sample(cable_cut)).buffer(0)
     (xj, ya), (_, yb) = cable.junction
-    yc, lo, hi = (ya + yb) / 2, min(ya, yb), max(ya, yb)
+    # (across the cable from its centreline; the junction may be wider, on the side away
+    # from the first turn, for the meshes' exits: their traces then neck down in the turn)
+    yc, lo, hi = cable.path[0][1], min(ya, yb), max(ya, yb)
+    wide = hi - lo > cable.width + 1e-9
     out_dir = _unit(cable.path[0], cable.path[1])  # from the edge into the cable (-x)
     r = 2 * cfg.fpc_corner_radius + 1
     beyond = shapely.box(xj - r, lo - r, xj, hi + r)
@@ -357,26 +365,49 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     cell = 2 * n * pitch
     half = cable.width / 2
     tracks: dict[str, list[tuple[float, str, Point]]] = {}  # layer -> ends (k, net, point)
-    grid = None  # the front mesh's exit corner
-    corners = {}
-    for layer, side_pins in sides.items():
-        centre = sum(k_pin(j) for j in side_pins) / len(side_pins)
-        y0 = yc + centre * left0[1] - cell / 2  # (the exit cell centred on its pins)
-        if grid is None:
-            corner = (xj, y0)
-            grid = corner
-        else:
-            # The back mesh's grid is offset by half a cell both ways, so that the strips
-            # each layer's whole cells leave bare along the edges differ: its exit cell sits
-            # half a cell into the panel (its traces run straight on across the gap) and on
-            # the nearest row of its grid.
-            # (and optionally by a trace width more, so its traces lie over the front's gaps)
-            shift = cell / 2 + (w if cfg.mesh_back_offset == "cell_trace" else 0.0)
-            y0 = grid[1] + shift + round((y0 - grid[1] - shift) / cell) * cell
-            corner = (xj + shift, y0)
-        if abs(y0 + cell / 2 - yc) + cell / 2 > half - ec:
-            raise PcbError("no room for the mesh's exit at the cable's junction")
-        corners[layer] = corner
+
+    def place(compact: bool) -> dict[str, Point] | None:
+        """Each layer's exit corner: each exit cell centred on its pins, in the cable; or
+        (``compact``) side by side across the junction, from its end. None: no room."""
+        grid = None  # the front mesh's exit corner
+        corners = {}
+        for layer, side_pins in sides.items():
+            centre = sum(k_pin(j) for j in side_pins) / len(side_pins)
+            y0 = yc + centre * left0[1] - cell / 2  # (the exit cell centred on its pins)
+            end = ec + cfg.fpc_corner_radius  # (off the junction's ends' fillets)
+            if compact and grid is None:
+                y0 = lo + end + 0.005
+            if grid is None:
+                corner = (xj, y0)
+                grid = corner
+            else:
+                # The back mesh's grid is offset by half a cell both ways, so that the strips
+                # each layer's whole cells leave bare along the edges differ: its exit cell
+                # sits half a cell into the panel (its traces run straight on across the gap)
+                # and on the nearest row of its grid.
+                # (and optionally by a trace width more, so its traces lie over the front's)
+                shift = cell / 2 + (w if cfg.mesh_back_offset == "cell_trace" else 0.0)
+                if compact:  # (right beside the front one's)
+                    y0 = grid[1] + shift
+                y0 = grid[1] + shift + round((y0 - grid[1] - shift) / cell) * cell
+                corner = (xj + shift, y0)
+            inside = (
+                lo + end - 1e-6 <= y0 <= hi - end - cell + 1e-6
+                if compact
+                else abs(y0 + cell / 2 - yc) + cell / 2 <= half - ec
+            )
+            if not inside:
+                return None
+            corners[layer] = corner
+        return corners
+
+    # (side by side, their traces necked down to the cable's pitch in its first corner,
+    # where centred on their pins they do not fit: always, the junction wider than the cable)
+    corners = None if wide else place(False)
+    neck = corners is None
+    corners = corners or place(True)
+    if corners is None:
+        raise PcbError("no room for the mesh's exit at the cable's junction")
 
     def copy(g: shapely.Geometry) -> shapely.Geometry:
         # (each job its own: preparing a shared geometry from two threads crashes)
@@ -435,7 +466,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
             reverse=True,
         )
 
-    _route_cable(cfg, cable, result, sides, tracks, k_pin, pins)
+    _route_cable(cfg, cable, result, sides, tracks, k_pin, pins, neck)
     result.ground = cable_poly
     problems = verify(result)  # (a fail-safe: no layout leaves here open or shorted)
     if problems:
@@ -451,11 +482,45 @@ def _route_cable(
     ends: dict[str, list[tuple[float, str, Point]]],
     k_pin: Callable[[int], float],
     pins: list[str | None],
+    neck: bool = False,
 ) -> None:
     """The traces along the cable, their fan-out and vias before the plug, the plug's pads
-    and the GND stitching vias."""
-    w, pitch = result.width, result.width + result.clearance
+    and the GND stitching vias. Where the meshes' exits do not fit the cable centred on
+    their pins (``neck``: side by side across the junction, wider than the cable maybe),
+    each layer's traces neck down in the first corner to the plug's pitch (the mesh's, if
+    less), each its block centred on its pins: up the stub at the mesh's pitch, each turns
+    where its place up the stub meets its place along the row (the turns nested, none
+    crossing)."""
     path = list(cable.path)
+    wide = neck
+    w = result.width
+    pitch = min(w + result.clearance, cfg.fpc_pitch) if wide else w + result.clearance
+    space = pitch - w
+    result.cable_clearance = space
+    # (each end's place along the cable: as at the junction, or necked down)
+    along_k: dict[str, list[float]] = {}
+    for layer, side_pins in sides.items():
+        ks = [k for k, _, _ in ends[layer]]
+        if not wide:
+            along_k[layer] = ks
+            continue
+        centre = sum(k_pin(j) for j in side_pins) / len(side_pins)
+        m = len(ks)
+        along_k[layer] = [centre + ((m - 1) / 2 - i) * pitch for i in range(m)]
+        if max(abs(k) for k in along_k[layer]) + w / 2 + space > cable.width / 2:
+            raise PcbError("the cable is too narrow for the mesh's traces at its pitch")
+    d0, d1 = _unit(path[0], path[1]), _unit(path[1], path[2])
+    a0, a1 = _left(d0), _left(d1)
+
+    def route(k0: float, k: float) -> list[Point]:
+        """Along the cable at k from the junction, k0 there (turning at the first corner)."""
+        rest = offset_path(path, k)
+        if k0 == k:
+            return rest
+        p0, p1 = path[0], path[1]
+        turn = (p1[0] + k0 * a0[0] + k * a1[0], p1[1] + k0 * a0[1] + k * a1[1])
+        return [(p0[0] + k0 * a0[0], p0[1] + k0 * a0[1]), turn, *rest[2:]]
+
     tip, before = path[-1], path[-2]
     u = _unit(before, tip)  # along the last row, towards the tip
     nl = _left(u)
@@ -468,12 +533,12 @@ def _route_cable(
     # Rows before the plug: GND vias behind the GND contacts, then the back mesh's vias in
     # two staggered rows, then the fan-out.
     row_gnd = plug + 0.2 + VIA_SIZE / 2
-    rows = (row_gnd + VIA_SIZE + result.clearance, row_gnd + 2 * (VIA_SIZE + result.clearance))
+    rows = (row_gnd + VIA_SIZE + space, row_gnd + 2 * (VIA_SIZE + space))
     fans = {
-        layer: fan([k for k, _, _ in ends[layer]], [k_pin(j) for j in side_pins], pitch)
+        layer: fan(along_k[layer], [k_pin(j) for j in side_pins], pitch)
         for layer, side_pins in sides.items()
     }
-    fan_start = rows[1] + VIA_SIZE / 2 + result.clearance + max(f[0][-1][0] for f in fans.values())
+    fan_start = rows[1] + VIA_SIZE / 2 + space + max(f[0][-1][0] for f in fans.values())
     straight = math.dist(before, tip) - (cable.width / 2 if len(path) > 3 else 0.0)
     if fan_start > straight:
         raise PcbError(
@@ -487,12 +552,12 @@ def _route_cable(
         return shapely.Point(p).distance(folds) >= FOLD_CLEARANCE
 
     for layer, side_pins in sides.items():
-        for idx, ((k, net, start), j, local) in enumerate(
-            zip(ends[layer], side_pins, fans[layer], strict=True)
+        for idx, ((k0, net, start), k, j, local) in enumerate(
+            zip(ends[layer], along_k[layer], side_pins, fans[layer], strict=True)
         ):
             # From the mesh's end (straight on to the junction if its exit cell lies further
             # in), along the cable at k, up to the fan, then fanned out to the pin's place.
-            along = [start, *offset_path(path, k)[:-1], at(fan_start, k)]
+            along = [start, *route(k0, k)[:-1], at(fan_start, k)]
             fanned = [at(fan_start - du, dv) for du, dv in local[1:]]
             if layer == FRONT:
                 pts = [*along, *fanned, at(plug, k_pin(j))]
@@ -516,22 +581,22 @@ def _route_cable(
             result.pads.append(_pad(j, at, plug, k_pin, u, None))
 
     # Stitching vias along both edges of the cable and between the two meshes' traces.
-    edge = cable.width / 2 - result.clearance - VIA_SIZE / 2 - cfg.mesh_edge_clearance / 2
+    edge = cable.width / 2 - space - VIA_SIZE / 2 - cfg.mesh_edge_clearance / 2
     lanes = [edge, -edge]
-    bundles = sorted(k for layer in ends for k, _, _ in ends[layer])
+    bundles = sorted(k for layer in along_k for k in along_k[layer])
     gaps = [
-        (a + b) / 2
-        for a, b in itertools.pairwise(bundles)
-        if b - a >= VIA_SIZE + 2 * result.clearance + w
+        (a + b) / 2 for a, b in itertools.pairwise(bundles) if b - a >= VIA_SIZE + 2 * space + w
     ]
     lanes += gaps
     keep_out = shapely.union_all(
-        [shapely.Point(v.at).buffer(VIA_SIZE + result.clearance) for v in result.vias]
+        [shapely.Point(v.at).buffer(VIA_SIZE + space) for v in result.vias]
     )
+    # (necking down, the traces cross the lanes in the stub and the first corner: none there)
+    first = math.dist(path[0], path[1]) + cable.width / 2 + VIA_SIZE if wide else 0.0
     for k in lanes:
         line = LineString(offset_path(path, k))
         length = line.length - fan_start - VIA_SIZE
-        s = STITCH_PITCH / 2
+        s = max(STITCH_PITCH / 2, first)
         while s < length:
             q = line.interpolate(s)
             p = (q.x, q.y)
@@ -689,10 +754,11 @@ def verify(result: Layout) -> list[str]:
     return problems
 
 
-def to_kicad(result: Layout, name: str = "pillowbox") -> Any:
+def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> Any:
     """The layout as a gerbonara KiCad board: the foil's outline on Edge.Cuts, the folds on
-    Dwgs.User, the tracks, vias and the plug's contacts (footprint J1), and the cable's GND
-    zone on both copper layers (left unfilled: KiCad fills it)."""
+    Dwgs.User, the tracks (``tracks``: else left out, for ``kicad_text``), vias and the
+    plug's contacts (footprint J1), and the cable's GND zone on both copper layers (left
+    unfilled: KiCad fills it)."""
     from gerbonara.cad.kicad import footprints as kfp
     from gerbonara.cad.kicad import graphical_primitives as kgr
     from gerbonara.cad.kicad import pcb as kpcb
@@ -735,7 +801,7 @@ def to_kicad(result: Layout, name: str = "pillowbox") -> Any:
                 )
             )
 
-    for track in result.tracks:
+    for track in result.tracks if tracks else ():
         net = board.net_id(track.net)
         if track.arcs:
             for a, m, b in track.arcs:
@@ -790,7 +856,7 @@ def to_kicad(result: Layout, name: str = "pillowbox") -> Any:
 
     if result.ground is not None:
         zone = kpr.Zone(net=board.net_id("GND"), net_name="GND", layers=[FRONT, BACK], name="GND")
-        zone.connect_pads.clearance = result.clearance
+        zone.connect_pads.clearance = min(result.clearance, result.cable_clearance)
         zone.min_thickness = result.width
         polys = getattr(result.ground, "geoms", [result.ground])
         ring = max(polys, key=lambda g: g.area).exterior
@@ -802,7 +868,7 @@ def to_kicad(result: Layout, name: str = "pillowbox") -> Any:
 def kicad_project(result: Layout, name: str) -> dict:
     """A minimal KiCad project: the design rules the layout keeps (mesh trace and space,
     vias), as the default net class."""
-    w, c = result.width, result.clearance
+    w, c = result.width, min(result.clearance, result.cable_clearance)
     return {
         "board": {
             "design_settings": {
@@ -832,17 +898,100 @@ def kicad_project(result: Layout, name: str) -> dict:
     }
 
 
-def render_stack(board: Any) -> Any:
+def kicad_text(result: Layout, board: Any) -> str:
+    """The KiCad board file: ``board`` (made without the tracks: gerbonara takes minutes
+    over a mesh's millions of segments) with the layout's tracks written in as text, each
+    copper layer's in a process of its own (one after the other where there are none: in
+    the browser)."""
+    nets = {n: board.net_id(n) for n in {t.net for t in result.tracks}}  # (before: see below)
+    text = board.serialize().rstrip()  # (which leaves the board's nets a list)
+    jobs = [
+        (i, layer, [(nets[t.net], t.width, list(t.points), t.arcs)
+                    for t in result.tracks if t.layer == layer])
+        for i, layer in enumerate((FRONT, BACK))
+    ]  # fmt: skip
+    parts: list[str] = []
+    if sys.platform != "emscripten" and sum(len(j[2]) for j in jobs) > 200:
+        import concurrent.futures
+        import multiprocessing
+
+        try:
+            ctx = multiprocessing.get_context("forkserver")
+            with concurrent.futures.ProcessPoolExecutor(2, mp_context=ctx) as pool:
+                parts = list(pool.map(_tracks_text, jobs))
+        except (OSError, RuntimeError, concurrent.futures.process.BrokenProcessPool):
+            parts = []
+    parts = parts or [_tracks_text(j) for j in jobs]
+    return text[:-1] + "\n" + "\n".join(p for p in parts if p) + ")\n"
+
+
+def _tracks_text(job: tuple[int, str, list]) -> str:
+    """One copper layer's tracks as KiCad segments and arcs (their uuids made up: unique
+    per layer and segment)."""
+    index, layer, tracks = job
+    out: list[str] = []
+    k = 0
+    for net, width, points, arcs in tracks:
+        tail = f'(width {width}) (layer "{layer}") (net {net})'
+        if arcs:
+            for a, m, b in arcs:
+                mid = "" if m is None else f" (mid {m[0]:.6f} {m[1]:.6f})"
+                kind = "segment" if m is None else "arc"
+                out.append(
+                    f"  ({kind} (start {a[0]:.6f} {a[1]:.6f}){mid} (end {b[0]:.6f} {b[1]:.6f}) "
+                    f'{tail} (uuid "{index:08x}-0000-4000-8000-{k:012x}"))'
+                )
+                k += 1
+            continue
+        for (x1, y1), (x2, y2) in itertools.pairwise(points):
+            out.append(
+                f"  (segment (start {x1:.6f} {y1:.6f}) (end {x2:.6f} {y2:.6f}) {tail} "
+                f'(uuid "{index:08x}-0000-4000-8000-{k:012x}"))'
+            )
+            k += 1
+    return "\n".join(out)
+
+
+def render_stack(board: Any, result: Layout | None = None) -> Any:
     """The board's copper, mask, outline, drawing and drill layers as a gerbonara layer
-    stack (zones unfilled: left out)."""
+    stack (zones unfilled: left out); the tracks the layout's (``result``: drawn straight,
+    the board made without them), else the board's."""
+    from gerbonara import apertures as ap
+    from gerbonara import graphic_objects as go
     from gerbonara.cad.kicad.base_types import LAYER_MAP_K2G
     from gerbonara.layers import LayerStack
+    from gerbonara.utils import MM
 
     stack = LayerStack()
     layers = {k: g for k, g in LAYER_MAP_K2G.items() if g in stack}
+    own = () if result is None else (*board.track_segments, *board.track_arcs)
     for obj in (*board.graphic_objects(), *board.track_segments, *board.track_arcs):
-        if layer := layers.get(obj.layer):
+        if (layer := layers.get(obj.layer)) and obj not in own:
             stack[layer].objects.extend(obj.render())
+    for track in result.tracks if result is not None else ():
+        objects = stack[layers[track.layer]].objects
+        aperture = ap.CircleAperture(track.width, unit=MM)
+        if track.arcs:
+            for a, m, b in track.arcs:
+                if m is None:
+                    objects.append(go.Line(a[0], -a[1], b[0], -b[1], aperture=aperture, unit=MM))
+                    continue
+                # (the arc's centre from its ends and middle: KiCad's file gives the middle,
+                # not the centre; y flipped, as gerbonara draws KiCad's y down)
+                (ax, ay), (mx, my), (bx, by) = (a[0], -a[1]), (m[0], -m[1]), (b[0], -b[1])
+                d = 2 * (ax * (my - by) + mx * (by - ay) + bx * (ay - my))
+                if abs(d) < 1e-12:  # (straight)
+                    objects.append(go.Line(ax, ay, bx, by, aperture=aperture, unit=MM))
+                    continue
+                sa, sm, sb = ax * ax + ay * ay, mx * mx + my * my, bx * bx + by * by
+                cx = (sa * (my - by) + sm * (by - ay) + sb * (ay - my)) / d
+                cy = (sa * (bx - mx) + sm * (ax - bx) + sb * (mx - ax)) / d
+                turn = (mx - ax) * (by - my) - (my - ay) * (bx - mx)  # (< 0: clockwise)
+                objects.append(go.Arc(ax, ay, bx, by, cx - ax, cy - ay, aperture=aperture,
+                                      clockwise=turn < 0, unit=MM))  # fmt: skip
+            continue
+        for (x1, y1), (x2, y2) in itertools.pairwise(track.points):
+            objects.append(go.Line(x1, -y1, x2, -y2, aperture=aperture, unit=MM))
     for via in board.vias:
         for name in via.layers:
             if layer := layers.get(name):
@@ -861,11 +1010,11 @@ def export(result: Layout, directory: str | Path, name: str = "pillowbox") -> li
 
     out = Path(directory)
     out.mkdir(parents=True, exist_ok=True)
-    board = to_kicad(result, name)
+    board = to_kicad(result, name, tracks=False)
     pcb_file, pro_file = out / f"{name}.kicad_pcb", out / f"{name}.kicad_pro"
-    pcb_file.write_text(board.serialize())
+    pcb_file.write_text(kicad_text(result, board))
     pro_file.write_text(json.dumps(kicad_project(result, name), indent=2))
-    stack = render_stack(board)
+    stack = render_stack(board, result)
     gerbers = out / f"{name}-gerbers"
     stack.save_to_directory(gerbers, board_name=name)
     svgs = []

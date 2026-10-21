@@ -38,6 +38,11 @@ template.innerHTML = `
          color: var(--lbl-color); background: color-mix(in srgb, var(--surface) 80%, transparent);
          border-radius: 3px; will-change: transform; }
   .lbl.hl { color: var(--lbl-hl); font-weight: 650; }
+  .mesh-note { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 1;
+               background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+               padding: 4px 10px; font-size: 12px; color: var(--text-muted); pointer-events: none;
+               white-space: nowrap; }
+  .mesh-note[hidden] { display: none; }
   .fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
               color: var(--text-muted); text-align: center; }
 </style>
@@ -70,6 +75,7 @@ export class PbPreview3d extends HTMLElement {
   #lastDims = [];
   #surfaces = []; // [{part, geom, outside, inside}]: the paper's two sides, per face
   #textures = null; // {front, back, bbox}: the PCB layout's copper layers as textures
+  #note; // a note about the mesh (none laid out yet)
 
   constructor() {
     super();
@@ -77,6 +83,8 @@ export class PbPreview3d extends HTMLElement {
     root.append(template.content.cloneNode(true));
     this.#stage = root.querySelector(".stage");
     this.#info = root.querySelector(".info");
+    this.#note = Object.assign(document.createElement("div"), { className: "mesh-note", hidden: true });
+    this.#stage.append(this.#note);
     root.querySelector("header").append(maximizeButton(this));
     root.querySelector(".reset").addEventListener("click", () => this.#resetCamera());
     root.querySelector("[data-mesh]").addEventListener("click", () => {
@@ -216,6 +224,12 @@ export class PbPreview3d extends HTMLElement {
   }
 
   /** Whether the Mesh button shows as on (the app owns the state). */
+  /** A note over the view about the mesh (none: hidden), e.g. that none is laid out yet. */
+  set meshNote(text) {
+    this.#note.textContent = text || "";
+    this.#note.hidden = !text;
+  }
+
   set meshShown(on) {
     this.shadowRoot.querySelector("[data-mesh]").setAttribute("aria-pressed", String(Boolean(on)));
   }

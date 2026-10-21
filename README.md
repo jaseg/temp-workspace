@@ -64,10 +64,16 @@ the defaults. It never crashes because of the file.
 
 ## Web UI
 
-* **Left column:** the parameter form. Invalid values are flagged inline next to the field.
+* **Left column:** the parameter form, in collapsible groups (*Payload* first and the only
+  one open at first; which are open is remembered per browser). The button left of the title
+  hides the column (and shows it again). Invalid values are flagged inline next to the field.
   While any value is invalid, the previews keep showing the last valid design and
-  *Download* is disabled. Below the form, *Derived geometry* lists the computed fold and cut
-  radii, arc length, the straight-edge length, the circumference and the flat panel width.
+  *Download* is disabled.
+* **Derived geometry** (a panel beside the folded box and the cross-section): the computed
+  fold and cut radii, arc length, the straight-edge length, the circumference and the flat
+  panel width, and once a mesh is generated, its figures under *PCB mesh*.
+* Any preview (and the derived geometry) can be maximized from its title bar (Escape
+  restores): it fills the previews' area; the settings stay. The 2D views have a scale bar.
 * **Pattern (2D):** the exact SVG you will download. Zoom with the wheel, the +/− buttons or a
   pinch, drag to pan, and double-click or press *Fit* to reset (the
   cross-section view works the same way). The title bar shows the pattern and
@@ -79,14 +85,18 @@ the defaults. It never crashes because of the file.
   are drawn black, dashed by fold direction, and the visible cut edges solid. The inner end flaps, inside the box behind the
   end wall gaps, are drawn translucent purple through the paper. The camera has almost no inertia, and the
   dimension labels keep the same on-screen size at any zoom.
-* **Mesh** (in the pattern's and the folded box's title bars) shows the PCB layout's security
-  mesh: F.Cu (the box's outside) in copper red, B.Cu (inside) in blue. The layout takes a
-  second or two (a spinner shows on the button) and is redone after each change while the
-  mesh is shown. Its figures (cell size, cells per side, the longest trace) appear under
-  *PCB mesh* in the *Derived geometry* box. Its copper is
+* **Generate mesh** (at the end of the *PCB mesh* settings) lays out the PCB's security mesh
+  for the current design and shows it: F.Cu (the box's outside) in copper red, B.Cu (inside)
+  in blue. KiMesh takes seconds, the space-filling curve minutes; *Cancel* stops it. A bar
+  shows its progress, and a log below it its phases (collapsed: the latest line; open: all).
+  A layout that fails says why in a dialog. **Mesh** (in the pattern's and the folded box's
+  title bars) shows or hides the mesh; with none generated for the current design (none
+  yet, or the design changed since) the views say so. Its figures (cell size, cells per
+  side, the longest trace) appear under *PCB mesh* in *Derived geometry*. Its copper is
   drawn into a bitmap once (in 3D, a texture on each side of the paper), never as SVG
   paths; zoomed in, the 2D view draws the visible part again at screen resolution.
-  *Download PCB* saves the KiCad, Gerber and SVG files as a zip.
+  *Download PCB* saves the KiCad, Gerber and SVG files of the generated mesh as a zip
+  (generating it first if there is none for the design).
 * **Shell cross-section:** a 2D section through the closed shell, perpendicular to its length.
   The shell has this same section everywhere between the curved folds. It shows the closed
   width and height, and marks the two straight folds where they are seen end-on. Like the
@@ -165,7 +175,8 @@ All lengths are in millimetres.
 | `glue_tab_width` | 12 | Width of the glue tab, and of the lids' glue tabs. 3–100, and narrower than the front panel it is glued onto. The tab's ends are cut back only as far as needed to stay off the front panel's curved folds, from square up to 45° (*Glue-tab taper* in the UI); the default end wall gap needs none. |
 | `fpc_cutout` | `none` | `none`, `front`, `back` or `both`: cuts the top of the inner flaps' curved edge off level at that end of the box, leaving a slot for a flat cable (FPC). `front` is the end at the top of the pattern, `back` the one at the bottom. The outer flaps are never cut. |
 | `fpc_cutout_width` | 15 | Width of that flat section. 0 to the inner flaps' width − 1. The cut is level and exactly this wide. The flap's edge is not quite symmetric, so the section sits around its highest point, within about a millimetre of the flap's centre. |
-| `fpc_cable` | `up` | `none`, `up` or `down`: a flat cable of the flex PCB leaving the middle of the front panel's free straight edge (the glued edge), turning up (towards the top of the pattern, the box's front end) or down along it (see *FPC cable* below). |
+| `fpc_cable` | `up` | `none`, `up` or `down`: a flat cable of the flex PCB leaving the front panel's free straight edge (the glued edge), turning up (towards the top of the pattern, the box's front end) or down along it (see *FPC cable* below). |
+| `fpc_entry_offset` | 0 | Where the cable leaves the edge: how far (mm) from the lowest it can go (turning up; the highest, turning down). Folded into the box, its first corner lies on the back panel beside the edge and must stay clear of the inner flap at that end: 0 puts it as near as that allows. |
 | `fpc_cable_length` | 55 | From the front panel's edge to the plug's tip, with every corner folded flat. 10–2000. The cable sticks out beside the edge; every further row makes the pattern wider (the default takes one). |
 | `fpc_pins` | 61 | Contacts of the FPC connector, 2–200. The default holds the default space-filling-curve mesh: 3 partitions × 4 traces × 2 ends × 2 sides, and a GND pin after every four ends (plus pin 1). The PCB layout refuses a plug with too few pins. |
 | `fpc_pitch` | 0.5 | Contact pitch, 0.1–2.54. |
@@ -220,8 +231,18 @@ vertex of a fine 3D mesh.
 
 ### FPC cable
 
-The pattern can carry a flat cable for a flex PCB (`fpc.py`). It leaves the middle of the
-front panel's free straight edge (the glued edge, at the pattern's left), outward. The cable
+The pattern can carry a flat cable for a flex PCB (`fpc.py`). It leaves the front panel's
+free straight edge (the glued edge, at the pattern's left), outward, by default as low as it
+can (turning up; as high, turning down; `fpc_entry_offset` moves it from there): folded
+into the box, its stub and first corner lie on the inside of the back panel beside the edge,
+and keep the clearance (`fpc_cable_gap`) from the inner flap's wall at that end, past half
+its thickness (the wall stands further in, deeper into the box, by its fold's sagitta there;
+the rest of the cable, along the front panel, is not checked). Where it leaves the edge the
+cable is as wide as the meshes' exits need (`fpc.exit_width`: each layer's exit cell, the
+back one offset by half a cell, off the junction's fillets), if that is wider than the cable:
+the stub widens on the side away from its first turn, up to the first corner's far side, a
+rectangle there, its fold still the cable's square's diagonal. The mesh's traces then neck
+down in that corner (see *PCB layout*). The cable
 runs out from the edge for the clearance plus the inset plus a thickness (the stub), turns 90°
 up or down (`fpc_cable`) and then meanders in rows along the edge, stacked outward, between the
 end sections beside the edge (the overhangs and the lids' glue tabs, or the outer flaps). The last
@@ -316,6 +337,13 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   it at the mesh's pitch, each layer's on its own side (F.Cu's on pin 1's side). Before the
   plug they fan out with 45° jogs to their contacts' places; the B.Cu traces change to the
   contact side (F.Cu) through two staggered rows of vias (0.45 mm, 0.2 mm drill).
+  Where the exit cells do not fit the cable centred on their pins (a wide trace space, many
+  traces), they sit side by side across the junction, widened to hold them (see *FPC
+  cable*), and the traces neck down in the cable's first corner: up the stub at the mesh's
+  pitch, each turns into the first row where its place along the stub meets its place
+  across the row, at the plug's pitch (the mesh's, if less), each layer's block centred on
+  its pins. The turns nest, none crossing; no stitching vias in the stub and that corner.
+  The design rules (and the GND zone's clearance) are then the cable's space.
 * **Plug pinout,** from pin 1 (on the cable's left, looking from the edge towards the tip):
   GND, mesh ends 1–4, GND, 5–8, GND, …, a GND pin after every four ends; the rest are free.
   With `N` traces per side (KiMesh: `mesh_traces`; the curve: `mesh_partitions ×
@@ -331,7 +359,10 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   (outline on Edge.Cuts, with the slits as 0.1 mm slots; fold lines on Dwgs.User; plug
   contacts as footprint J1), a KiCad project carrying the design rules (net class Default:
   the trace width and space, the vias), Gerber and drill files, and SVG renderings of both
-  sides.
+  sides. The board is made without its tracks and they are written into its file as text,
+  each copper layer's in a process of its own (gerbonara takes minutes over a mesh's
+  millions of segments; in the browser, one after the other); the Gerbers and SVGs draw them
+  straight from the layout (a lines-and-arcs track's arcs through their true centres).
 
 ### Geometry model
 
@@ -478,7 +509,8 @@ layers keep the line types apart.
 | `POST /api/payload` | `{config, action: "fit"}` or `{config, action: "maximize", field}` | `{config}` with the fitted box or maximized payload (not saved); `422 {errors}` if impossible |
 | `POST /api/scad` | `{config}` | OpenSCAD source of the interior (`application/x-openscad`); `422` if invalid |
 | `POST /api/pcb` | `{config}` | The PCB layout's copper for the previews: `{layers: {front, back}, vias, pads, width, via_size, bbox, offset, meshes}` (tracks as flat coordinate lists); `422 {error}` if it cannot be laid out |
-| `POST /api/pcb/files` | `{config}` | The PCB layout's KiCad, Gerber and SVG files as a zip (`application/zip`) |
+| `POST /api/pcb/files` | `{config}` | The PCB layout's KiCad, Gerber and SVG files as a zip (`application/zip`); the last layout (and its files) is kept, so the files of the one the previews show are not laid out again |
+| `POST /api/pcb/cancel` | — | Stops the PCB layout under way: `{cancelled: true}` (the layout's own request answers `409 {error, cancelled: true}`) |
 | `POST /api/import` | SVG as raw text or a multipart `file` | `{config}`; `400 {error}` if unusable |
 
 ## Development

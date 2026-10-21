@@ -81,21 +81,41 @@ def layout_progress() -> dict[str, Any]:
     return {"progress": _progress}
 
 
+_last: dict[str, Any] = {}  # the last PCB layout (and its files): {config, layout, zip}
+
+
 def _pcb_layout(cfg: Config) -> tuple[Any, Any]:
-    """The PCB layout (``pcb``: heavy dependencies, imported on demand)."""
+    """The PCB layout (``pcb``: heavy dependencies, imported on demand). The last one is
+    kept: the files of the layout the previews just showed are made from it, not laid out
+    again (minutes, for the curve's mesh)."""
     try:
         from yanartas_pillowbox import pcb
     except ImportError as exc:  # (shapely or gerbonara missing)
         raise ApiError(
             501, {"error": f"PCB layout unavailable here: {exc}", "errors": {}}
         ) from None
+    if _last.get("config") == cfg:
+        return pcb, _last["layout"]
     global _progress
     _progress = None
+    progress.begin()
     try:
         with progress.listening(_track):
-            return pcb, pcb.layout(cfg)
+            result = pcb.layout(cfg)
     except pcb.PcbError as exc:
         raise ApiError(422, {"error": str(exc), "errors": {}}) from None
+    except progress.Cancelled:
+        raise ApiError(409, {"error": "the mesh layout was cancelled", "cancelled": True,
+                             "errors": {}}) from None  # fmt: skip
+    _last.clear()
+    _last.update(config=cfg, layout=result)
+    return pcb, result
+
+
+def cancel_layout() -> dict[str, Any]:
+    """Stop the PCB layout under way (its request then answers 409, ``cancelled``)."""
+    progress.cancel()
+    return {"cancelled": True}
 
 
 def pcb_preview(cfg: Config) -> dict[str, Any]:
@@ -108,7 +128,9 @@ def pcb_preview(cfg: Config) -> dict[str, Any]:
 def pcb_files(cfg: Config) -> bytes:
     """The PCB layout's KiCad, Gerber and SVG files, zipped."""
     pcb, layout = _pcb_layout(cfg)
-    return pcb.export_zip(layout)
+    if _last.get("zip") is None:
+        _last["zip"] = pcb.export_zip(layout)
+    return _last["zip"]
 
 
 def payload_action(request: Any) -> dict[str, Any]:

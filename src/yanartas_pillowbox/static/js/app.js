@@ -6,7 +6,7 @@ import "./components/pb-param.js";
 import "./components/pb-preview2d.js";
 import "./components/pb-preview3d.js";
 import "./components/pb-section.js";
-import { initPanels } from "./panels.js";
+import { initPanels, maximizeButton } from "./panels.js";
 
 const RENDER_DELAY = 60; // ms; server round-trip is a few ms, so previews update well < 300 ms
 const SAVE_DELAY = 600;
@@ -20,8 +20,12 @@ const statusEl = $("#status");
 const downloadBtn = $("#btn-download");
 const scadBtn = $("#btn-scad");
 const pcbBtn = $("#btn-pcb");
-const MESH_DELAY = 400; // ms after a render: the PCB layout takes a second or two
 const PROGRESS_POLL = 500; // ms between looks at a running layout's progress
+const GROUPS_KEY = "pb-groups"; // which settings groups are open (per viewer)
+const SIDEBAR_KEY = "pb-sidebar"; // whether the settings are collapsed (per viewer)
+const FIRST_GROUP = "Payload"; // shown first, and the only group open at first
+const MESH_GROUP = "PCB mesh"; // holds the Generate mesh button, progress and log
+const NOT_YET = "Mesh not yet generated: Generate mesh, in the PCB mesh settings";
 
 const params = new Map(); // name -> <pb-param>
 let payloadPresets = []; // board sizes from /api/defaults
@@ -33,7 +37,9 @@ let renderTimer = 0;
 let saveTimer = 0;
 let showMesh = false; // the previews show the PCB layout's security mesh
 let meshSeq = 0;
-let meshTimer = 0;
+let meshData = null; // the generated PCB layout (/api/pcb's reply), for meshConfig
+let meshConfig = null; // the config (JSON) it was generated for
+let meshRun = null; // the generation under way (a promise of its reply)
 
 // ----------------------------------------------------------------------------- API helpers
 async function api(method, url, content, { raw = false } = {}) {
@@ -50,24 +56,52 @@ async function api(method, url, content, { raw = false } = {}) {
   return data;
 }
 
+// ----------------------------------------------------------------------------- storage
+function loadPref(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+  } catch {
+    return fallback; // (no storage in private windows, sandboxes, …)
+  }
+}
+
+function savePref(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // (then only for as long as the page)
+  }
+}
+
 // ----------------------------------------------------------------------------- form
 function buildForm(specs, presets = []) {
   form.replaceChildren();
   const groups = new Map();
-  for (const spec of specs) {
+  const open = loadPref(GROUPS_KEY, { [FIRST_GROUP]: true });
+  // (the payload's group first: what goes in the box decides the rest)
+  const ordered = [...specs.filter((s) => s.group === FIRST_GROUP),
+    ...specs.filter((s) => s.group !== FIRST_GROUP)];
+  for (const spec of ordered) {
     if (!groups.has(spec.group)) {
-      const fs = document.createElement("fieldset");
-      const legend = document.createElement("legend");
-      legend.textContent = spec.group;
-      fs.append(legend);
-      groups.set(spec.group, fs);
-      form.append(fs);
+      const group = document.createElement("details");
+      group.className = "group";
+      group.open = Boolean(open[spec.group]);
+      const summary = document.createElement("summary");
+      summary.textContent = spec.group;
+      group.append(summary);
+      group.addEventListener("toggle", () => {
+        open[spec.group] = group.open;
+        savePref(GROUPS_KEY, open);
+      });
+      groups.set(spec.group, group);
+      form.append(group);
     }
     const param = document.createElement("pb-param");
     param.spec = spec;
     params.set(spec.name, param);
     groups.get(spec.group).append(param);
   }
+  groups.get(MESH_GROUP)?.append(meshControls());
   // Shell: compute the smallest box (width, length, height) that holds the payload.
   const fit = Object.assign(document.createElement("button"), {
     type: "button",
@@ -103,7 +137,28 @@ function buildForm(specs, presets = []) {
     params.get("payload_depth").value = preset.depth;
     params.get("payload_height").value = preset.height;
   });
-  groups.get("Payload")?.querySelector("legend").after(presetParam);
+  groups.get("Payload")?.querySelector("summary").after(presetParam);
+}
+
+/** The mesh's controls, for its settings group: generate (and cancel), the layout's progress
+ *  and its log (collapsed: the latest line). */
+function meshControls() {
+  const box = document.createElement("div");
+  box.className = "mesh-run";
+  box.innerHTML = `
+    <div class="buttons">
+      <button type="button" id="btn-generate" class="primary"
+        title="Lay out the PCB's security mesh for this design (and show it)">Generate mesh</button>
+      <button type="button" id="btn-cancel" hidden title="Stop the mesh layout">Cancel</button>
+    </div>
+    <progress id="mesh-progress" max="1" value="0" hidden aria-label="Mesh layout progress"></progress>
+    <details class="mesh-log" id="mesh-log" hidden>
+      <summary id="mesh-log-latest"></summary>
+      <ol id="mesh-log-list" aria-label="Mesh layout log"></ol>
+    </details>`;
+  box.querySelector("#btn-generate").addEventListener("click", () => generateMesh());
+  box.querySelector("#btn-cancel").addEventListener("click", cancelMesh);
+  return box;
 }
 
 /** Show the preset matching the current payload size, or "Custom". */
@@ -197,7 +252,7 @@ async function render() {
   downloadBtn.disabled = scadBtn.disabled = pcbBtn.disabled = false;
   setStatus("Up to date");
   scheduleSave(lastValid.config);
-  if (showMesh) scheduleMesh();
+  checkMeshCurrent(lastValid.config);
 }
 
 // ----------------------------------------------------------------------------- PCB mesh
@@ -205,6 +260,23 @@ function setMesh(pcb) {
   preview2d.setMesh(pcb);
   preview3d.setMesh(pcb);
   renderMeshStats(pcb);
+  updateMeshNote();
+}
+
+/** The views' note about the mesh: shown with it on but none to show (none generated yet,
+ *  or not for this design). */
+function updateMeshNote() {
+  const text = showMesh && !meshData ? (meshRun ? "Laying out the mesh…" : NOT_YET) : null;
+  preview2d.meshNote = preview3d.meshNote = text;
+}
+
+/** The mesh is out of date once the design changes (the next Generate mesh lays it out). */
+function checkMeshCurrent(config) {
+  if (meshData && JSON.stringify(config) !== meshConfig) {
+    meshData = meshConfig = null;
+    setMesh(null);
+    setStatus("Design changed: the mesh is out of date");
+  }
 }
 
 /** The mesh's figures, under their own title in the Derived geometry box (none: hidden). */
@@ -264,50 +336,78 @@ function renderMeshStats(pcb) {
   }));
 }
 
-/** Spinner on the Mesh buttons (and the PCB download) while the layout runs. */
+/** Spinner on the Mesh buttons while the layout runs; Generate becomes Cancel. */
 function setMeshBusy(busy) {
   preview2d.meshBusy = preview3d.meshBusy = busy;
+  $("#btn-generate").disabled = busy;
+  $("#btn-cancel").hidden = !busy;
 }
 
+/** The views' Mesh buttons: show or hide the mesh (generated with Generate mesh). */
 function toggleMesh() {
   showMesh = !showMesh;
   preview2d.meshShown = preview3d.meshShown = showMesh;
-  if (showMesh) scheduleMesh(0);
-  else {
-    meshSeq++; // drop a layout in flight
-    clearTimeout(meshTimer);
-    setMeshBusy(false);
-    setMesh(null);
-  }
+  setMesh(showMesh ? meshData : null);
 }
 
-/** Lay out the PCB for the current design and show its copper (the old one goes at once:
- *  it no longer matches the pattern). */
-function scheduleMesh(delay = MESH_DELAY) {
+/** Lay out the PCB for the current design and show its copper. Resolves with the layout, or
+ *  null (failed: the error dialog says why; cancelled). */
+function generateMesh() {
+  if (meshRun) return meshRun;
+  if (!lastValid) return Promise.resolve(null);
+  const config = lastValid.config;
   const seq = ++meshSeq;
-  clearTimeout(meshTimer);
-  setMesh(null);
-  meshTimer = setTimeout(async () => {
-    if (!lastValid) return;
-    setStatus("Laying out the mesh…");
-    setMeshBusy(true);
-    const request = api("POST", "/api/pcb", { config: lastValid.config }, { raw: true })
-      .catch((err) => ({ ok: false, data: { error: err.message } }));
+  showMesh = true;
+  preview2d.meshShown = preview3d.meshShown = true;
+  meshData = meshConfig = null;
+  clearLog();
+  logLine("Laying out the mesh…");
+  setStatus("Laying out the mesh…");
+  setMeshBusy(true);
+  const request = api("POST", "/api/pcb", { config }, { raw: true })
+    .catch((err) => ({ ok: false, data: { error: err.message } }));
+  meshRun = (async () => {
+    setMesh(null);
     const { ok, data } = await watchProgress(request, seq);
-    if (seq !== meshSeq) return;
+    meshRun = null;
     setMeshBusy(false);
+    if (seq !== meshSeq) return null;
     if (!ok) {
-      setStatus(`Mesh: ${data.error || "layout failed"}`, true);
-      return;
+      setMesh(null);
+      if (data.cancelled) {
+        logLine("Cancelled");
+        setStatus("Mesh layout cancelled");
+        return null;
+      }
+      const message = data.error || "the layout failed";
+      logLine(`Failed: ${message}`, true);
+      setStatus(`Mesh layout failed: ${message}`, true);
+      showError("Mesh layout failed", message);
+      return null;
     }
-    setMesh(data);
+    meshData = data;
+    meshConfig = JSON.stringify(config);
+    setMesh(showMesh ? data : null);
     const missed = data.meshes.front.unreached + data.meshes.back.unreached;
-    setStatus(missed ? `Mesh laid out; ${missed} cells out of reach` : "Mesh laid out", missed > 0);
-  }, delay);
+    const done = missed ? `Mesh laid out; ${missed} cells out of reach` : "Mesh laid out";
+    logLine(done);
+    setStatus(done, missed > 0);
+    // (the design changed meanwhile: out of date at once)
+    if (lastValid) checkMeshCurrent(lastValid.config);
+    return meshData;
+  })();
+  updateMeshNote();
+  return meshRun;
 }
 
-/** `request`'s reply; while it runs, the layout's progress (polled) on the bar and in the
- *  status line. */
+/** Stop the layout under way (its request then answers "cancelled"). */
+async function cancelMesh() {
+  logLine("Cancelling…");
+  await api("POST", "/api/pcb/cancel").catch(() => null);
+}
+
+/** `request`'s reply; while it runs, the layout's progress (polled) on the bar, in the
+ *  status line and the log (a line per phase, its step updated in place). */
 async function watchProgress(request, seq) {
   const bar = $("#mesh-progress");
   let running = true;
@@ -322,12 +422,36 @@ async function watchProgress(request, seq) {
       const e = reply?.progress;
       if (!e || !running || seq !== meshSeq) continue;
       bar.value = e.done;
-      setStatus(`Laying out the mesh… ${Math.round(100 * e.done)} % (${describeProgress(e)})`);
+      const text = describeProgress(e);
+      setStatus(`Laying out the mesh… ${Math.round(100 * e.done)} % (${text})`);
+      logLine(text, false, `${e.stage} ${e.phase}`);
     }
     return await request;
   } finally {
-    if (seq === meshSeq) bar.hidden = true;
+    bar.hidden = true;
   }
+}
+
+function clearLog() {
+  $("#mesh-log-list").replaceChildren();
+  $("#mesh-log").hidden = true;
+}
+
+/** A line in the mesh's log, and in its summary (`key`: one line per key, updated in
+ *  place: each layer's phase, its steps). */
+function logLine(text, error = false, key = null) {
+  const list = $("#mesh-log-list");
+  const t = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  let li = key ? [...list.children].find((l) => l.dataset.key === key) : null;
+  if (!li) {
+    li = list.appendChild(document.createElement("li"));
+    if (key) li.dataset.key = key;
+  }
+  li.textContent = `${t}  ${text}`;
+  li.classList.toggle("error", error);
+  $("#mesh-log-latest").textContent = text;
+  $("#mesh-log").hidden = false;
+  list.scrollTop = list.scrollHeight;
 }
 
 /** A progress event in a few words: "F.Cu: settle 12/40, skew 3.1/2.0/1.2 mm". */
@@ -339,6 +463,14 @@ function describeProgress(e) {
     text += `, skew ${e.apart.map((a) => a.toFixed(1)).join("/")} mm`;
   }
   return text;
+}
+
+/** A modal dialog with an error (OK closes it). */
+function showError(title, message) {
+  const dialog = $("#error-dialog");
+  $("#error-title").textContent = title;
+  $("#error-text").textContent = message;
+  if (!dialog.open) dialog.showModal();
 }
 
 function scheduleSave(config) {
@@ -449,14 +581,19 @@ async function downloadScad() {
 
 async function downloadPcb() {
   if (!lastValid) return;
-  setStatus("Laying out the PCB…");
   pcbBtn.classList.add("busy");
   pcbBtn.disabled = true;
   try {
+    // (the files are the generated mesh's: laid out first, if not yet for this design)
+    const config = lastValid.config;
+    if (!meshData || JSON.stringify(config) !== meshConfig) {
+      if (!(await generateMesh())) return;
+    }
+    setStatus("Writing the PCB files…");
     const res = await fetch("/api/pcb/files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ config: lastValid.config }),
+      body: JSON.stringify({ config }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -466,7 +603,7 @@ async function downloadPcb() {
     setStatus("Up to date");
   } catch (err) {
     setStatus(`PCB export failed: ${err.message}`, true);
-    showBanner(`PCB export failed: ${err.message}`);
+    showError("PCB export failed", err.message);
   } finally {
     pcbBtn.classList.remove("busy");
     pcbBtn.disabled = !lastValid;
@@ -478,6 +615,24 @@ async function resetToDefaults() {
   hideBanner();
   writeForm(config);
   scheduleRender(0);
+}
+
+/** The top bar's button: collapse the settings (the previews take the width), or show them. */
+function setupSidebar() {
+  const button = $("#btn-sidebar");
+  const layout = $(".layout");
+  const apply = (collapsed) => {
+    if (collapsed) layout.dataset.sidebar = "collapsed";
+    else delete layout.dataset.sidebar;
+    button.setAttribute("aria-expanded", String(!collapsed));
+    button.title = collapsed ? "Show the settings" : "Hide the settings";
+  };
+  apply(loadPref(SIDEBAR_KEY, false));
+  button.addEventListener("click", () => {
+    const collapsed = !layout.dataset.sidebar;
+    apply(collapsed);
+    savePref(SIDEBAR_KEY, collapsed);
+  });
 }
 
 function setupDragAndDrop() {
@@ -548,6 +703,8 @@ async function main() {
   scadBtn.addEventListener("click", downloadScad);
   pcbBtn.addEventListener("click", downloadPcb);
   document.addEventListener("pb-mesh-toggle", toggleMesh);
+  setupSidebar();
+  $("#stats > header").append(maximizeButton($("#stats")));
   $("#banner-close").addEventListener("click", hideBanner);
   setupDragAndDrop();
   await render();

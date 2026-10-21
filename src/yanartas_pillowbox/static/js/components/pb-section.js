@@ -5,6 +5,7 @@
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
 import { MAXIMIZE_STYLE, maximizeButton } from "../panels.js";
 import { attachPanZoom, unitsPerPixel } from "../panzoom.js";
+import { SCALEBAR_STYLE, scaleBar, updateScaleBar } from "../scalebar.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -37,6 +38,7 @@ template.innerHTML = `
           --payload-fill: color-mix(in srgb, var(--accent) 22%, transparent); }
   ${DIM_STYLE}
   ${MAXIMIZE_STYLE}
+  ${SCALEBAR_STYLE}
   .payload { fill: var(--payload-fill); stroke: var(--accent);
              stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
   .payload-clearance { fill: none; stroke: var(--accent); stroke-width: 1px; stroke-dasharray: 4 3;
@@ -91,6 +93,7 @@ export class PbSection extends HTMLElement {
   #view = null; // current viewBox
   #zoomed = false; // the user zoomed or panned: keep the view across updates
   #zoom; // zoom(factor): about the centre
+  #scale = scaleBar();
 
   constructor() {
     super();
@@ -121,6 +124,7 @@ export class PbSection extends HTMLElement {
         // Panning keeps the scale: only the viewBox moves. Zooming redraws the text.
         if (rescaled) this.#render();
         else this.#svg.setAttribute("viewBox", v.join(" "));
+        updateScaleBar(this.#scale, unitsPerPixel(this.#stage, v));
       },
       minMax: () => [this.#base[2] / 50, this.#base[2] * 10],
       fit: () => this.fit(),
@@ -183,7 +187,8 @@ export class PbSection extends HTMLElement {
     }
     this.#view = box;
     svg.setAttribute("viewBox", box.join(" "));
-    this.#stage.replaceChildren(svg);
+    this.#stage.replaceChildren(svg, this.#scale);
+    updateScaleBar(this.#scale, unitsPerPixel(this.#stage, box));
     this.#svg = svg;
     this.highlight(this.#highlight);
   }

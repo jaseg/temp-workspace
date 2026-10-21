@@ -285,7 +285,8 @@ def partition(
         parts = _partition(area, zones, ports, inward, width, rng)
         a = [p.area.area for p in parts]
         bad = (max(a) - min(a)) / max(a)
-        if any(p.port.difference(p.area).area > 1e-6 for p in parts):
+        # (each port in its partition: but the slivers snapping to the union's grid leaves)
+        if any(p.port.difference(p.area).area > 1e-6 * max(1.0, p.port.area) for p in parts):
             bad = math.inf
         if bad < worst:
             best, worst = parts, bad

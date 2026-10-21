@@ -2,6 +2,7 @@
 step run again alone from them, as it ran."""
 
 import numpy as np
+import pytest
 import shapely
 
 from yanartas_pillowbox import checkpoint, partition, sfc
@@ -57,3 +58,20 @@ def test_a_run_clears_the_last_runs_checkpoints(tmp_path, monkeypatch):
     checkpoint.resume(tmp_path / first[0])
     assert sorted(f.name for f in tmp_path.glob("*.json.gz")) == first
     assert (tmp_path / "keep.txt").exists()
+
+
+def test_a_cancelled_layout_stops():
+    """Cancelled, a layout stops at its next progress report (and the Rust core's loops at
+    their next step); the next one runs again."""
+    from yanartas_pillowbox import progress
+
+    p = 0.3
+    area = shapely.box(0, 0, 6, 4 * p)
+    lines = [np.column_stack([np.linspace(0, 6, 60), np.full(60, (j + 0.5) * p)]) for j in range(4)]
+    try:
+        progress.cancel()
+        with pytest.raises(progress.Cancelled):
+            sfc._settle(lines, p, area, [area], shapely.Polygon(), [0, 0, 1, 1], 4)
+    finally:
+        progress.begin()
+    assert len(sfc._settle(lines, p, area, [area], shapely.Polygon(), [0, 0, 1, 1], 4)) == 4

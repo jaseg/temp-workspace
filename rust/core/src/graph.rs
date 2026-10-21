@@ -208,6 +208,9 @@ pub fn curve(
     // afresh, the best kept)
     let mut best: Option<Built> = None;
     for _ in 0..prm.attempts {
+        if crate::cancelled() {
+            break;
+        }
         let mut g = Graph::new();
         for (si, s) in segments.iter().enumerate() {
             let cells = cells(&s.domain, d, &mut rng, &pins[si], prm.lloyd);
@@ -393,6 +396,9 @@ pub fn cells(domain: &Rings, d: f64, rng: &mut Rng, pins: &[P], lloyd: usize) ->
     let edges = Segs::new(ea, eb, d);
     let mut pieces = Vec::new();
     for it in 0..=lloyd {
+        if crate::cancelled() {
+            break;
+        }
         pieces = voronoi(&s, domain, frame, d, &edges);
         pieces.retain(|p: &Vec<Rings>| !p.is_empty());
         if it == lloyd {

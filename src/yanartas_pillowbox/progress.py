@@ -22,6 +22,33 @@ WEIGHT = {"graph": 0.25, "relax": 0.2, "lanes": 0.05, "settle": 0.35, "fill": 0.
 _ORDER = list(WEIGHT)
 
 _local = threading.local()
+_cancel = threading.Event()  # (the layout under way is to stop: on every thread)
+
+
+class Cancelled(Exception):
+    """The layout was cancelled (``cancel``): raised where it next reports its progress."""
+
+
+def cancel() -> None:
+    """Stop the layout under way: its next progress report (on any thread) raises
+    ``Cancelled``, and the Rust core's loops stop at their next step."""
+    _cancel.set()
+    _core_cancel(True)
+
+
+def begin() -> None:
+    """A layout begins: none cancelled."""
+    _cancel.clear()
+    _core_cancel(False)
+
+
+def _core_cancel(on: bool) -> None:
+    try:
+        import yanartas_mesh  # (natively; in the browser a cancel restarts the worker)
+    except ImportError:
+        return
+    if hasattr(yanartas_mesh, "cancel"):
+        yanartas_mesh.cancel(on)
 
 
 def _state() -> dict:
@@ -60,7 +87,10 @@ def current() -> str:
 
 
 def report(phase: str, step: int = 1, steps: int = 1, **figures: object) -> None:
-    """Phase ``phase`` has got to ``step`` of at most ``steps``."""
+    """Phase ``phase`` has got to ``step`` of at most ``steps``. Raises ``Cancelled`` once
+    the layout is cancelled."""
+    if _cancel.is_set():
+        raise Cancelled("the layout was cancelled")
     s = _state()
     if s["listener"] is None:
         return

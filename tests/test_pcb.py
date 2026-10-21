@@ -10,7 +10,7 @@ import pytest
 import shapely
 from shapely.geometry import LineString, Point, Polygon, box
 
-from yanartas_pillowbox import pcb
+from yanartas_pillowbox import pcb, progress
 from yanartas_pillowbox.cli import main
 from yanartas_pillowbox.config import Config
 
@@ -284,6 +284,13 @@ def test_api_routes(tmp_path):
     assert r.status_code == 200 and r.mimetype == "application/zip"
     names = zipfile.ZipFile(io.BytesIO(r.data)).namelist()
     assert "pillowbox.kicad_pcb" in names and "pillowbox-gerbers/pillowbox-F_Cu.gbr" in names
+    # (cancelling: the layout under way stops; none here, the next one runs as ever)
+    try:
+        assert client.post("/api/pcb/cancel").json == {"cancelled": True}
+    finally:
+        progress.begin()
+    r = client.post("/api/pcb", json={"config": {**small, "mesh_seed": 1}})
+    assert r.status_code == 200
 
 
 @pytest.mark.parametrize("offset", ["cell", "cell_trace"])
@@ -473,3 +480,16 @@ def test_space_filling_curve_full_size():
         assert m.algorithm == "sfc" and m.unreached == 0
     for sp in result.spacing().values():
         assert sp.under < 0.01 * sp.measured and sp.within > 0.6 * sp.measured
+
+
+def test_traces_neck_down_where_the_exits_do_not_fit_the_cable():
+    """With a space wider than the plug's pitch and more traces than fit the cable centred
+    on their pins, the exits sit side by side across a junction widened for them and the
+    traces neck down in the cable's first corner to the plug's pitch: the layout passes its
+    check, the cable's traces at that pitch, the design rules at the cable's space."""
+    cfg = D.with_values(mesh_trace_space=1.0, mesh_traces=10)
+    result = pcb.layout(cfg)
+    assert pcb.verify(result) == []
+    assert result.clearance == 1.0 and result.cable_clearance == pytest.approx(0.35)
+    rules = pcb.kicad_project(result, "x")["net_settings"]["classes"][0]
+    assert rules["clearance"] == pytest.approx(0.35)

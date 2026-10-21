@@ -16,7 +16,7 @@ from yanartas_pillowbox import crosssection
 
 # Bumped whenever the meaning of saved settings changes; documents of any other version are
 # rejected (no migrations).
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
@@ -236,11 +236,25 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
             ("up", "Up (towards the front end)"),
             ("down", "Down (towards the back end)"),
         ),
-        help="A flat cable of the flex PCB, leaving the middle of the front panel's free "
-        "straight edge (the glued edge) outward, turning up or down along it and meandering "
-        "in rows beside it. Every corner folds flat along its diagonal, so the cable becomes "
-        "one straight strip. Up: towards the top of the pattern (the box's front end); down: "
-        "towards the bottom.",
+        help="A flat cable of the flex PCB, leaving the front panel's free straight edge (the "
+        "glued edge) outward, turning up or down along it and meandering in rows beside it. "
+        "Every corner folds flat along its diagonal, so the cable becomes one straight strip. "
+        "Up: towards the top of the pattern (the box's front end); down: towards the bottom. "
+        "Where it leaves the edge: see Cable entry.",
+    ),
+    FieldSpec(
+        "fpc_entry_offset",
+        "Cable entry",
+        "float",
+        "FPC cable",
+        "mm",
+        0,
+        2000,
+        0.5,
+        help="Where the cable leaves the free edge: how far from the lowest it can go (cable "
+        "turning up; the highest, turning down). Folded into the box, the cable's first "
+        "corner lies on the back panel beside the edge, and must stay clear of the inner "
+        "flap at that end: 0 puts it as near as that allows.",
     ),
     FieldSpec(
         "fpc_cable_length",
@@ -502,6 +516,7 @@ class Config:
     fpc_cutout: str = "none"
     fpc_cutout_width: float = 15.0
     fpc_cable: str = "up"
+    fpc_entry_offset: float = 0.0  # (0: the lowest it can go, the cable turning up)
     fpc_cable_length: float = 55.0  # (one row, beside the default pattern's free edge)
     fpc_pins: float = 61.0  # (the default curve mesh's ends and the GND pins between them)
     fpc_pitch: float = 0.5
@@ -717,6 +732,7 @@ def validate(cfg: Config) -> dict[str, str]:
 
     fpc_fields = {
         "fpc_cable",
+        "fpc_entry_offset",
         "fpc_cable_length",
         "fpc_pins",
         "fpc_pitch",

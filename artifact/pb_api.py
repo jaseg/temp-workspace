@@ -76,6 +76,8 @@ def _route(method: str, path: str, content: str | None, stored: str | None) -> s
         return _reply(200, api.layout_progress())
     if method == "POST" and path == "/api/pcb":
         return _reply(200, api.pcb_preview(api.parse_config(data)))
+    if method == "POST" and path == "/api/pcb/cancel":  # (pyshim.js: while busy, restarts us)
+        return _reply(200, api.cancel_layout())
     if method == "POST" and path == "/api/pcb/files":
         return _reply(200, api.pcb_files(api.parse_config(data)), "application/zip")
     return _reply(404, {"error": f"no route {method} {path}"})
