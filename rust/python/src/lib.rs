@@ -5,7 +5,7 @@ use numpy::ndarray::Array2;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use yanartas_mesh_core::arcs::{fit, Piece};
+use yanartas_mesh_core::arcs::{fit_all, Piece};
 use yanartas_mesh_core::curve::{relax, CurveInput, CurveParams};
 use yanartas_mesh_core::graph::{curve, GraphInput, GraphParams, Segment};
 use yanartas_mesh_core::lanes::{lanes, LaneParams};
@@ -359,20 +359,30 @@ fn _cells<'py>(
     PyList::new(py, out.iter().map(|c| array(py, &c[0])))
 }
 
-/// Each polyline as lines and circular arcs within `tol` of it: per line an (m, 7) array,
-/// a row per piece: kind (0 line, 1 arc), start, middle (an arc's halfway point; a line's
-/// middle), end.
+/// Each polyline as lines and circular arcs within `tol` of it (further where it has room,
+/// up to `most`: `arcs::fit_all`, with the traces' `pitch` and the area's `edges`): per line
+/// an (m, 7) array, a row per piece: kind (0 line, 1 arc), start, middle (an arc's halfway
+/// point; a line's middle), end.
 #[pyfunction]
+#[pyo3(signature = (lines, tol, pitch = 0.0, most = 0.0, edges = None))]
 fn fit_arcs<'py>(
     py: Python<'py>,
     lines: Vec<PyReadonlyArray2<'py, f64>>,
     tol: f64,
+    pitch: f64,
+    most: f64,
+    edges: Option<Vec<PyReadonlyArray2<'py, f64>>>,
 ) -> PyResult<Bound<'py, PyList>> {
     let lines: Vec<Vec<P>> = lines.iter().map(points).collect::<PyResult<_>>()?;
+    let edges: Vec<Vec<P>> = edges
+        .unwrap_or_default()
+        .iter()
+        .map(points)
+        .collect::<PyResult<_>>()?;
     let out: Vec<Vec<[f64; 7]>> = py.allow_threads(|| {
-        lines
+        fit_all(&lines, &edges, tol, pitch, most)
             .iter()
-            .map(|l| fit(l, tol).iter().map(row).collect())
+            .map(|pieces| pieces.iter().map(row).collect())
             .collect()
     });
     PyList::new(

@@ -580,9 +580,17 @@ an exact isometry: the panels curve along it, not across it.
 - **Later.** The rest of the curve layout in Rust; an alignment field (the reference's
   needles) to lay the curve along the edges; a hard skew limit in settling
   (dropped: it cost coverage; steering and matching keep the skew within 10 mm instead):
-  reconsider it; a
-  switch to draw the traces as circular arcs (now
-  polylines, simplified within 2 µm).
+  reconsider it.
+- **Lines and arcs** (`mesh_shape = arcs`, `arcs::fit_all`): each settled trace redrawn
+  greedily, the longest piece from each vertex that a line or an arc through the run's two
+  ends follows. The arc is the one of those (one per sagitta) nearest the run at its worst,
+  searched between the sagittas of the circles through a few of its vertices: settling
+  leaves a wobble of a few micrometres, and one middle vertex alone misses it. The
+  tolerance is per vertex: `ARCS` scaled to the pitch everywhere, and where the trace has
+  room, up to `ARCS_ROOM` pitches: half of how much further than the pitch the nearest
+  copper beside it is (another trace, or its own more than 1.2 pitches along it, as round
+  a U-turn), and all of how much further than half a pitch the area's edge is. So the
+  traces keep as far apart as before, in far fewer pieces, mostly arcs.
 - **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board
   renderer fails on footprints, so `render_stack` draws the tracks, vias, graphics and
   footprint into the layer stack itself.

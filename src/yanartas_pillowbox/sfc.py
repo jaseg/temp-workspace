@@ -91,6 +91,7 @@ MARGIN = 0.02  # ... at a pitch this much above the least (but at the exit)
 SIMPLIFY = 0.002  # the traces simplified within this (mm; well within the margin)
 LOOP = 3.0  # loops the traces' offsets leave in tight bends: cut out up to this many spacings long
 ARCS = 0.002  # drawn in lines and arcs (``arcs``): within this of the traces (mm)
+ARCS_ROOM = 0.03  # ... and where they have room, up to this many pitches
 INSIDE = 0.9  # traces inside a bend keep within this share of its radius
 PUSH_MARGIN = 1.04  # runs closer than this many times their least spacing: pushed apart
 BEND_SLACK = 0.85  # bends this much tighter than the tightest: smoothed (U-turns sit at it)
@@ -651,8 +652,8 @@ def _browser_core() -> object | None:
         region = np.split(np.asarray(out.region.to_py(), int), ends)
         return list(zip(pts, region, strict=True)), int(out.cells), int(out.left)
 
-    def fit_arcs(lines, tol):  # noqa: ANN001, ANN202
-        out = mesh.fit_arcs(*flat(lines), tol)
+    def fit_arcs(lines, tol, pitch=0.0, most=0.0, edges=None):  # noqa: ANN001, ANN202
+        out = mesh.fit_arcs(*flat(lines), tol, pitch, most, *flat(edges or []))
         rows = np.asarray(out.rows.to_py(), float).reshape(-1, 7)
         return np.split(rows, np.cumsum(np.asarray(out.counts.to_py(), int))[:-1])
 
@@ -851,7 +852,8 @@ def generate(
     progress.report("match", 1, 1)
     with checkpoint.timed("output"):
         return _output(
-            flat, frame, arcs, pitch, exits, c, groups, pair, partitions, cells, left, corners
+            flat, frame, arcs, pitch, exits, c, groups, pair, partitions, cells, left, corners,
+            area,
         )  # fmt: skip
 
 
@@ -868,14 +870,23 @@ def _output(
     cells: int,
     left: int,
     corners: list[tuple[float, float]],
+    area: shapely.Geometry | None = None,
 ) -> Mesh:
-    """``generate``'s mesh from its settled traces: simplified (or fitted with arcs), back in
-    the board's frame, its nets in order."""
+    """``generate``'s mesh from its settled traces: simplified (or fitted with arcs: within
+    ``ARCS`` scaled to the pitch, and where a trace has room to the copper beside it and to
+    the ``area``'s edge, further, up to ``ARCS_ROOM`` pitches), back in the board's frame,
+    its nets in order."""
     out: list[np.ndarray] = []
     shapes: list[tuple[Piece, ...] | None] = []
     if arcs:
         tol = ARCS * pitch / 0.3
-        for rows in _core().fit_arcs([np.ascontiguousarray(xy, float) for xy in flat], tol):
+        edges = [
+            np.ascontiguousarray(np.asarray(ring.coords, float)[:-1])
+            for poly in ([] if area is None else _polygons(area))
+            for ring in (poly.exterior, *poly.interiors)
+        ]
+        lines = [np.ascontiguousarray(xy, float) for xy in flat]
+        for rows in _core().fit_arcs(lines, tol, pitch, ARCS_ROOM * pitch, edges):
             ends = frame.inv(np.asarray(rows, float)[:, 1:].reshape(-1, 2)).reshape(-1, 3, 2)
             pieces = tuple(
                 (

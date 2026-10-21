@@ -467,8 +467,8 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         ),
         help="Space-filling curve: how its traces are drawn. Straight segments: the "
         "polylines, simplified. Lines and arcs: each trace redrawn in straight lines and "
-        "circular arcs (KiCad track arcs) within a few micrometres of it, for far fewer, "
-        "smoother pieces.",
+        "circular arcs (KiCad track arcs) within a few micrometres of it (up to 3 % of the "
+        "pitch where it has room to the copper beside it), for far fewer, smoother pieces.",
     ),
     FieldSpec(
         "mesh_back_offset",

@@ -4,7 +4,7 @@
 
 use js_sys::{Array, Float64Array, Function, Object, Reflect, Uint32Array};
 use wasm_bindgen::prelude::*;
-use yanartas_mesh_core::arcs::{fit, Piece};
+use yanartas_mesh_core::arcs::{fit_all, Piece};
 use yanartas_mesh_core::curve::{relax, CurveInput, CurveParams};
 use yanartas_mesh_core::graph::{curve, GraphInput, GraphParams, Segment};
 use yanartas_mesh_core::lanes::{lanes, LaneParams};
@@ -360,15 +360,25 @@ pub fn curve_graph(
     Ok(o)
 }
 
-/// Each polyline (`lines`/`line_lens`) as lines and circular arcs within `tol` of it
-/// (the extension's `fit_arcs`): `{rows, counts}`, seven numbers a piece (kind, start,
-/// middle, end), each line's number of pieces.
+/// Each polyline (`lines`/`line_lens`) as lines and circular arcs within `tol` of it,
+/// further where it has room (the extension's `fit_arcs`, with the area's `edges`/
+/// `edge_lens`): `{rows, counts}`, seven numbers a piece (kind, start, middle, end), each
+/// line's number of pieces.
 #[wasm_bindgen]
-pub fn fit_arcs(lines: &[f64], line_lens: &[u32], tol: f64) -> Result<Object, JsValue> {
+pub fn fit_arcs(
+    lines: &[f64],
+    line_lens: &[u32],
+    tol: f64,
+    pitch: f64,
+    most: f64,
+    edges: &[f64],
+    edge_lens: &[u32],
+) -> Result<Object, JsValue> {
     let mut rows = Vec::new();
     let mut counts = Vec::new();
-    for line in runs(lines, line_lens) {
-        let pieces = fit(&line, tol);
+    let lines = runs(lines, line_lens);
+    let edges = runs(edges, edge_lens);
+    for pieces in fit_all(&lines, &edges, tol, pitch, most) {
         counts.push(pieces.len() as u32);
         for p in pieces {
             rows.extend(match p {

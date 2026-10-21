@@ -80,8 +80,10 @@ def test_seed_repeats_the_layout():
 
 
 def test_arcs_draw_the_same_traces():
-    """In lines and arcs, each trace keeps to the simplified one within a few micrometres,
-    in far fewer pieces, its ends as before; ``traces`` the arcs drawn as a polyline."""
+    """In lines and arcs, each trace keeps to the simplified one within a few micrometres
+    (further where it has room to the copper beside it, up to ``ARCS_ROOM`` pitches), in far
+    fewer pieces, its ends as before, the traces as far apart; ``traces`` the arcs drawn as
+    a polyline."""
     a = sfc.generate(AREA, (7, 0), mesh.UP, 2, PITCH, seed=3, zones=ZONES)
     b = sfc.generate(AREA, (7, 0), mesh.UP, 2, PITCH, seed=3, zones=ZONES, arcs=True)
     assert a.arcs is None and b.arcs is not None
@@ -92,8 +94,13 @@ def test_arcs_draw_the_same_traces():
         assert any(m is not None for _, m, _ in pieces) and len(pieces) < len(line)
         assert all(q[0] == p[2] for p, q in itertools.pairwise(pieces))
         far = shapely.hausdorff_distance(LineString(line), LineString(poly), densify=0.05)
-        assert far < 3 * tol + sfc.SIMPLIFY * PITCH / 0.3
+        assert far < sfc.ARCS_ROOM * PITCH + tol + sfc.SIMPLIFY * PITCH / 0.3
         assert poly == mesh.sample_arcs(pieces, tol)
+    least = [
+        min(LineString(x).distance(LineString(y)) for x, y in itertools.combinations(m.traces, 2))
+        for m in (a, b)
+    ]
+    assert least[1] > least[0] - 2 * tol
 
 
 def test_sample_arcs_keeps_to_the_circle():
@@ -254,3 +261,33 @@ def test_a_region_no_curve_reaches_merges_into_its_partitions_neighbour():
     assert sfc._merged([lid, tab, other], [0, 2, 1], found, 4.0) is None
     every = [(np.zeros((1, 2)), np.array([0, 1, 2]))]
     assert sfc._merged([lid, tab, other], [0, 0, 1], every, 4.0) is None
+
+
+def _wobbly_circle(r, n, wobble, seed, centre=(0.0, 0.0)):
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0, 1.5 * np.pi, n)  # (three quarters round: one arc's worth)
+    rr = r + wobble * rng.uniform(-1, 1, n)
+    return np.ascontiguousarray(np.c_[centre[0] + rr * np.cos(t), centre[1] + rr * np.sin(t)])
+
+
+def test_arcs_take_a_wobbly_bend_where_it_has_room():
+    """A settled bend wobbles by more than the fit's tolerance: with room to the copper
+    beside it, it is still taken in a few arcs (each within its room of it); at the pitch
+    from another trace, only within the tolerance."""
+    tol, pitch = 0.002, 0.3
+    alone = _wobbly_circle(5.0, 200, 0.004, 1)
+    rows = sfc._core().fit_arcs([alone], tol, pitch, sfc.ARCS_ROOM * pitch)[0]
+    assert sum(rows[:, 0]) >= 1 and len(rows) <= 6
+    # (without the room: many short pieces)
+    assert len(sfc._core().fit_arcs([alone], tol)[0]) > 4 * len(rows)
+    # Two of them a pitch apart: no room, the fit keeps within the tolerance.
+    inner = _wobbly_circle(5.0 - pitch, 200, 0.0, 2)
+    tight = sfc._core().fit_arcs([alone, inner], tol, pitch, sfc.ARCS_ROOM * pitch)[0]
+    pieces = tuple(((r[1], r[2]), (r[3], r[4]) if r[0] else None, (r[5], r[6])) for r in tight)
+    drawn = LineString(mesh.sample_arcs(pieces, tol / 4))
+    # (within the tolerance, and the drawn arcs' chords within a quarter of it)
+    assert max(drawn.distance(shapely.Point(p)) for p in alone) <= tol * 1.3
+    # Near the area's edge: as tight.
+    edge = _wobbly_circle(5.0 + pitch / 2, 200, 0.0, 3)
+    rows = sfc._core().fit_arcs([alone], tol, pitch, sfc.ARCS_ROOM * pitch, [edge])[0]
+    assert len(rows) > 4 * 6
