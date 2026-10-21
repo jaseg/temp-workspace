@@ -309,6 +309,12 @@ an exact isometry: the panels curve along it, not across it.
      comes apart at when shrunk by half a spacing (no curve would reach them) to the
      neighbour beside them most. Each partition is its cells, its strip and its port; a
      split that comes out uneven is tried afresh (6 times at most).
+  5. *Unreached pieces handed on* (`sfc._reassigned`): a partition's piece its curve
+     still does not reach (a piece of the back panel hanging off a sliver of the front
+     one too thin for a run in and back out: the cells' walls were wide enough, the
+     piece across them not) goes to the partition whose curve reaches the piece beside
+     it, across the longest border a curve can cross, and so on from there; the curves
+     are then found again. The partitions' areas come out less even, the box covered.
   The graph is built afresh (up to `ATTEMPTS` times, the best kept) when a cycle ends up
   joined to no exit's curve; across a border it joins as long as cycles there are apart.
   Seeds that the Lloyd steps bring near an exit's pinned seed are left out each step (a

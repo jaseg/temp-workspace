@@ -244,6 +244,38 @@ def _shared_borders(
     return [(i, j, [np.asarray(ln.coords, float) for ln in lines]) for _, i, j, lines in pairs]
 
 
+def _reassigned(
+    regions: list[Polygon],
+    owner: list[int],
+    found: list[tuple[np.ndarray, np.ndarray]],
+    spacing: float,
+) -> list[int] | None:
+    """The regions' owners with those no curve reached (and that could take one: their
+    domains not empty) given to a partition whose curve does reach a region beside them
+    (along a border a curve can cross, the longest), and so on from those; None if none
+    moves."""
+    reached = {int(r) for _, regs in found for r in np.asarray(regs).ravel()}
+    lost = {
+        i
+        for i, r in enumerate(regions)
+        if i not in reached and any(d.area >= spacing**2 for d in _polygons(r.buffer(-spacing / 2)))
+    }
+    if not lost:
+        return None
+    out = list(owner)
+    borders = _shared_borders(regions, spacing)  # (longest first)
+    changed = True
+    while lost and changed:
+        changed = False
+        for i, j, _ in borders:
+            for a, b in ((i, j), (j, i)):
+                if a in lost and b not in lost and out[a] != out[b]:
+                    out[a] = out[b]
+                    lost.discard(a)
+                    changed = True
+    return out if out != list(owner) else None
+
+
 def _lines(g: shapely.Geometry) -> list[LineString]:
     return [p for p in shapely.get_parts(g) if isinstance(p, LineString) and p.length > 0]
 
@@ -715,6 +747,22 @@ def generate(
         for (x0, _), ym in zip(exits, tops, strict=True)
     ]
     found, cells, left = _curve(regions, owner, spacing, openings, rng.getrandbits(64))
+    # (regions a partition's curve cannot reach, e.g. past a sliver of it too thin for a run
+    # in and back out: to the partition beside them whose curve does reach there, and the
+    # curves found again)
+    moved = _reassigned(regions, owner, found, spacing)
+    if moved is not None:
+        for i, k in enumerate(moved):
+            if k != owner[i]:
+                parts[owner[i]] = shapely.difference(parts[owner[i]], regions[i])
+                parts[k] = shapely.union_all([parts[k], regions[i]])
+                if partitions:
+                    back = shapely.transform(regions[i], frame.inv)
+                    partitions = list(partitions)
+                    partitions[owner[i]] = shapely.difference(partitions[owner[i]], back)
+                    partitions[k] = shapely.union_all([partitions[k], back])
+        owner = moved
+        found, cells, left = _curve(regions, owner, spacing, openings, rng.getrandbits(64))
     progress.report("graph", cells=cells)
     lines = []
     for k, ((x0, y0), ym, (pts, _)) in enumerate(zip(exits, tops, found, strict=True)):

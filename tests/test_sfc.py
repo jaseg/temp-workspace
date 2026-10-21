@@ -180,3 +180,19 @@ def test_without_filling_the_pocket_stays_a_hole(w, h, monkeypatch):
     out = sfc._settle(lines, PITCH, area, [area], shapely.Polygon(), [0, 0, 1, 1], 4)
     assert mesh.holes(out, area, 2 * PITCH / 3, PITCH).largest > 0.15
     assert mesh.density(out, area, PITCH / 2, PITCH / 2, **NARROW).thin > 0.1
+
+
+def test_regions_no_curve_reaches_go_to_the_partition_beside():
+    """A partition's piece its curve cannot reach (past a sliver of it too thin to cross)
+    goes to the partition whose curve reaches the region beside it, and so on from there."""
+    reached = shapely.box(0, 0, 40, 40)  # partition 0's, reached
+    lost = shapely.box(40, 0, 80, 40)  # partition 1's, its curve stopped short of it
+    behind = shapely.box(80, 0, 120, 40)  # partition 1's too, only past the lost one
+    other = shapely.box(0, 40, 120, 80)  # partition 1's, reached
+    regions = [reached, lost, behind, other]
+    found = [(np.zeros((1, 2)), np.array([0])), (np.zeros((1, 2)), np.array([3]))]
+    # (beside partition 1's own reached region too: its curve could not get in from there)
+    assert sfc._reassigned(regions, [0, 1, 1, 1], found, 4.0) == [0, 0, 0, 1]
+    # Nothing left out: nothing moves.
+    every = [(np.zeros((1, 2)), np.array([0, 1, 2, 3]))]
+    assert sfc._reassigned(regions, [0, 1, 1, 1], every, 4.0) is None
