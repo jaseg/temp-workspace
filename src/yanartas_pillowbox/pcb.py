@@ -509,6 +509,12 @@ def _route_cable(
             continue
         centre = sum(k_pin(j) for j in side_pins) / len(side_pins)
         m = len(ks)
+        # (centred on its pins, but kept off the stitching vias' lanes by the cable's edges,
+        # where the cable is wide enough)
+        clear = cable.width / 2 - 2 * space - VIA_SIZE - cfg.mesh_edge_clearance / 2 - w / 2
+        half = (m - 1) / 2 * pitch
+        if half <= clear:
+            centre = min(max(centre, -clear + half), clear - half)
         along_k[layer] = [centre + ((m - 1) / 2 - i) * pitch for i in range(m)]
         if max(abs(k) for k in along_k[layer]) + w / 2 + space > cable.width / 2:
             raise PcbError("the cable is too narrow for the mesh's traces at its pitch")
@@ -585,8 +591,11 @@ def _route_cable(
 
     # Stitching vias along both edges of the cable and between the two meshes' traces.
     edge = cable.width / 2 - space - VIA_SIZE / 2 - cfg.mesh_edge_clearance / 2
-    lanes = [edge, -edge]
     bundles = sorted(k for layer in along_k for k in along_k[layer])
+    # (an edge's lane only clear of the traces)
+    lanes = [
+        k for k in (edge, -edge) if all(abs(k - b) >= VIA_SIZE / 2 + space + w / 2 for b in bundles)
+    ]
     gaps = [
         (a + b) / 2 for a, b in itertools.pairwise(bundles) if b - a >= VIA_SIZE + 2 * space + w
     ]
