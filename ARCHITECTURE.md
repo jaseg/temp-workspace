@@ -488,7 +488,9 @@ an exact isometry: the panels curve along it, not across it.
   layers run side by side, so theirs add up to more than the wall-clock time). With
   `YANARTAS_CHECKPOINT=<dir>` each step's arguments and result are also written there,
   gzipped JSON (arrays exactly, as base64 of their bytes; geometries as WKB), numbered in
-  order: `checkpoint.resume(<…in.json.gz>)` runs that step alone again, as it ran.
+  order; a run (a layout, a mesh, a step called alone) first clears what the run before it
+  left there. `checkpoint.resume(<…in.json.gz>)` runs that step alone again, as it ran
+  (writing and clearing nothing).
   Settling is three calls of the Rust core for this (its `phases`: settling, the holes,
   smoothing and matching; `base` the traces as first laid, for their lengths), so a fix
   to filling holes is tried in seconds on a whole board's layer.

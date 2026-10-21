@@ -38,3 +38,22 @@ def test_a_step_runs_again_from_its_checkpoint(tmp_path, monkeypatch):
     again = checkpoint.resume(tmp_path / steps[-1])
     assert all(np.array_equal(a, b) for a, b in zip(again, out, strict=True))
     assert {name for _, name in checkpoint.times()} >= {"settle", "fill", "finish"}
+
+
+def test_a_run_clears_the_last_runs_checkpoints(tmp_path, monkeypatch):
+    """A run's checkpoints replace the last run's (the numbering from 000 again); a resume
+    neither writes nor clears any."""
+    monkeypatch.setenv("YANARTAS_CHECKPOINT", str(tmp_path))
+    (tmp_path / "keep.txt").write_text("not a checkpoint")
+    p = 0.3
+    area = shapely.box(0, 0, 6, 4 * p)
+    lines = [np.column_stack([np.linspace(0, 6, 60), np.full(60, (j + 0.5) * p)]) for j in range(4)]
+    sfc._settle(lines, p, area, [area], shapely.Polygon(), [0, 0, 1, 1], 4)
+    first = sorted(f.name for f in tmp_path.glob("*.json.gz"))
+    (tmp_path / "099-x-stale.in.json.gz").write_bytes(b"")
+    sfc._settle(lines, p, area, [area], shapely.Polygon(), [0, 0, 1, 1], 4)
+    again = sorted(f.name for f in tmp_path.glob("*.json.gz"))
+    assert again == first and first[0].startswith("000-")
+    checkpoint.resume(tmp_path / first[0])
+    assert sorted(f.name for f in tmp_path.glob("*.json.gz")) == first
+    assert (tmp_path / "keep.txt").exists()

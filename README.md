@@ -491,7 +491,7 @@ uv run --group dev ruff format . # format
 
 A PCB layout's steps are timed (`checkpoint.report()`). To work on one step without laying
 out the whole board again, set `YANARTAS_CHECKPOINT=<dir>`: every step's inputs and result
-are written there as gzipped JSON, and `checkpoint.resume("<dir>/<nnn>-<layer>-<step>.in.json.gz")`
+are written there as gzipped JSON (each run first clears the last run's), and `checkpoint.resume("<dir>/<nnn>-<layer>-<step>.in.json.gz")`
 runs that step again on its own. `scripts/crop_checkpoint.py` cuts a window out of a
 settling step's checkpoint for a small case of one spot.
 

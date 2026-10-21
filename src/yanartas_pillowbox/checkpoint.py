@@ -6,9 +6,13 @@ scripts/crop_checkpoint.py), without laying out the whole board again.
 A step is a function decorated with ``step(name)``. Its checkpoint is
 ``<dir>/<nnn>-<stage>-<name>.in.json.gz`` (its arguments) and ``….out.json.gz`` (what it
 returned), numbered in the order the steps began; ``<stage>`` is the layer being laid
-(``progress``'s stage). Values: numbers, strings, lists, tuples, dicts and dataclasses as JSON;
-numpy arrays exactly (their float64 bytes, base64); shapely geometries as WKB (hex); numpy
-random generators by their state."""
+(``progress``'s stage). A run is the outermost step (or ``run``-marked call: a layout, a
+mesh) and all within it, on any thread: as one begins, the files a run before it left in
+the directory go, and the numbering starts again.
+
+Values: numbers, strings, lists, tuples, dicts and dataclasses as JSON; numpy arrays
+exactly (their float64 bytes, base64); shapely geometries as WKB (hex); numpy random
+generators by their state."""
 
 from __future__ import annotations
 
@@ -38,6 +42,39 @@ _steps: dict[str, Callable[..., Any]] = {}
 _count = itertools.count()
 _lock = threading.Lock()
 _times: dict[tuple[str, str], list[float]] = {}  # ((stage, step) -> [seconds, calls])
+_depth = 0  # (steps and runs under way, on all threads)
+_quiet = 0  # (resumes under way: nothing written, nothing cleared)
+_FILES = "[0-9][0-9][0-9]-*.json.gz"
+
+
+@contextlib.contextmanager
+def _within() -> Iterator[None]:
+    """In a run: the outermost begins one (the last run's checkpoints cleared)."""
+    global _count, _depth
+    with _lock:
+        if _depth == 0:
+            _count = itertools.count()
+            where = _dir()
+            if where is not None and where.is_dir():
+                for f in where.glob(_FILES):
+                    f.unlink()
+        _depth += 1
+    try:
+        yield
+    finally:
+        with _lock:
+            _depth -= 1
+
+
+def run(f: F) -> F:
+    """``f``'s calls each a run (the steps within it one run's), unless within one."""
+
+    @functools.wraps(f)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        with _within():
+            return f(*args, **kwargs)
+
+    return wrapped  # type: ignore[return-value]
 
 
 def step(name: str) -> Callable[[F], F]:
@@ -47,7 +84,8 @@ def step(name: str) -> Callable[[F], F]:
         _steps[name] = f
 
         @functools.wraps(f)
-        def run(*args: Any, **kwargs: Any) -> Any:
+        @run
+        def stepped(*args: Any, **kwargs: Any) -> Any:
             stage = progress.current() or "-"
             where = _dir()
             path = None
@@ -65,7 +103,7 @@ def step(name: str) -> Callable[[F], F]:
                 save(Path(f"{path}.out.json.gz"), {"step": name, "seconds": spent, "out": out})
             return out
 
-        return run  # type: ignore[return-value]
+        return stepped  # type: ignore[return-value]
 
     return wrap
 
@@ -75,11 +113,12 @@ def timed_step(name: str) -> Callable[[F], F]:
 
     def wrap(f: F) -> F:
         @functools.wraps(f)
-        def run(*args: Any, **kwargs: Any) -> Any:
+        @run
+        def stepped(*args: Any, **kwargs: Any) -> Any:
             with timed(name):
                 return f(*args, **kwargs)
 
-        return run  # type: ignore[return-value]
+        return stepped  # type: ignore[return-value]
 
     return wrap
 
@@ -101,11 +140,19 @@ def timed(name: str) -> Iterator[None]:
 
 def resume(path: str | Path) -> Any:
     """Run the step whose inputs ``path`` holds again (as checkpointed: the steps' modules
-    imported), returning what it returns."""
+    imported), returning what it returns; nothing written or cleared meanwhile (the run's
+    checkpoints kept as they are)."""
+    global _quiet
     from . import partition, pcb, sfc  # noqa: F401  (the steps registered)
 
     d = load(path)
-    return _steps[d["step"]](*d["args"], **d["kwargs"])
+    with _lock:
+        _quiet += 1
+    try:
+        return _steps[d["step"]](*d["args"], **d["kwargs"])
+    finally:
+        with _lock:
+            _quiet -= 1
 
 
 def times() -> dict[tuple[str, str], tuple[float, int]]:
@@ -153,7 +200,7 @@ def load(path: str | Path) -> Any:
 
 def _dir() -> Path | None:
     d = os.environ.get("YANARTAS_CHECKPOINT")
-    return Path(d) if d else None
+    return Path(d) if d and not _quiet else None
 
 
 def _safe(s: str) -> str:

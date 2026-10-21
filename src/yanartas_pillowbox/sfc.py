@@ -402,6 +402,7 @@ def _lanes(
 
 
 # ----------------------------------------------------------------------------- settling
+@checkpoint.run
 def _settle(
     lines: list[np.ndarray],
     pitch: float,
@@ -638,6 +639,7 @@ def _params(traces: int = SCALE) -> dict[str, float]:
 
 
 # ----------------------------------------------------------------------------- generator
+@checkpoint.run
 def generate(
     mask: shapely.Geometry,
     exit_corner: Point | Sequence[Point],
