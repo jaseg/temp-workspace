@@ -41,7 +41,8 @@ fn params(obj: &JsValue) -> Result<Params, JsValue> {
     take!(
         steps: usize, rate: f64, reach: f64, pin: f64, cool: f64, step: f64, still: f64,
         band: f64, leap: f64, tune: f64, steer: f64, span: usize, steer_cool: f64, tip: f64,
-        reach_out: f64, fill: f64, fill_blur: f64, bend: usize, smooth: usize, finish: usize, match_steps: usize, match_band: f64, match_rate: f64
+        reach_out: f64, fill: f64, fill_blur: f64, bend: usize, smooth: usize, finish: usize, match_steps: usize, match_band: f64, match_rate: f64,
+        ribbon: f64, share: f64
     );
     Ok(p)
 }

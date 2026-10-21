@@ -116,6 +116,7 @@ SETTLE_TIP = 1.0  # ... U-turns tighter than this many pitches per trace's radiu
 SETTLE_REACH_OUT = 1.0  # ... leaning out along their axis by this share of the room
 SETTLE_FILL = 2.0  # ... down the slope of the traces' density (into holes) by this much
 SETTLE_FILL_BLUR = 0.5  # ... (the density blurred over this many pitches per trace)
+SETTLE_SHARE = 0  # ... a trace's own copper across, the room its pair's legs': theirs (0: off)
 SETTLE_BEND = 2  # ... the bends it grows (or straightens): this many vertices either way
 SETTLE_SMOOTH = 3  # ... jitter smoothed this many times a step
 SETTLE_FINISH = 10  # ... then all smoothed this many times (kept clear)
@@ -582,6 +583,8 @@ def _params(traces: int = SCALE) -> dict[str, float]:
         "match_steps": MATCH,
         "match_band": MATCH_BAND,
         "match_rate": MATCH_RATE,
+        "ribbon": 0.0,
+        "share": float(SETTLE_SHARE),
     }
 
 

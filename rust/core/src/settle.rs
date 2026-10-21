@@ -38,6 +38,8 @@ pub struct Params {
     pub match_steps: usize, // MATCH
     pub match_band: f64,    // MATCH_BAND
     pub match_rate: f64,    // MATCH_RATE
+    pub ribbon: f64,        // (traces abreast in a lane; 0: a group's)
+    pub share: f64,         // SETTLE_SHARE (0: off)
 }
 
 impl Default for Params {
@@ -66,6 +68,8 @@ impl Default for Params {
             match_steps: 20,
             match_band: 15.0,
             match_rate: 0.5,
+            ribbon: 0.0,
+            share: 0.0,
         }
     }
 }
@@ -149,14 +153,33 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
     let base = Traces::new(&input.lines, None).binned(bins);
     let mut gained = minus(&tr.binned(bins), &base);
     let sides = neighbour_sides(&tr, &group);
+    // (per trace and side, left then right: how many of its group's traces' legs belong
+    // between it and its own copper across, there in turn: the room theirs too)
+    let across: Vec<[f64; 2]> = (0..n)
+        .map(|t| {
+            let mut k = [0.0, 0.0];
+            for (u, on) in [(t.wrapping_sub(1), -1i64), (t + 1, 1)] {
+                if prm.share <= 0.0 || u >= n || group[u] != group[t] {
+                    continue;
+                }
+                let mut v = t as i64 + on;
+                while v >= 0 && (v as usize) < n && group[v as usize] == group[t] {
+                    k[if sides[t][u] > 0.0 { 0 } else { 1 }] += 2.0;
+                    v += on;
+                }
+            }
+            k
+        })
+        .collect();
     let mut hot: Option<HashSet<(i64, i64)>> = None;
-    // (the density's blur: about the size of the holes where a ribbon's bends meet)
-    // (a ribbon: one group's traces)
+    // (a group's traces, matched in length together, abreast: their U-turns' tips; the
+    // density's blur: about the size of the holes where a lane's bends meet)
     let ribbon = (0..n)
         .map(|t| group.iter().filter(|&&g| g == group[t]).count())
         .max()
         .unwrap_or(0) as f64;
-    let blur = prm.fill_blur * ribbon * pitch;
+    let lane = if prm.ribbon > 0.0 { prm.ribbon } else { ribbon };
+    let blur = prm.fill_blur * lane * pitch;
     let mut density = (prm.fill > 0.0).then(|| {
         let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
         for q in input.zones.iter().flatten().flatten() {
@@ -198,7 +221,18 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
         let pushes = pmap(look.len(), |k| {
             let i = look[k];
             let lean = -prm.reach_out * dot(tip[i], normal[i]);
-            centring(&tr, &arc, &normal, &verts, cx.edge, cx.edges, i, lean, &cx)
+            centring(
+                &tr,
+                &arc,
+                &normal,
+                &verts,
+                cx.edge,
+                cx.edges,
+                i,
+                lean,
+                across[tr.net[i]],
+                &cx,
+            )
         });
         let mut push = vec![0.0; tr.len()];
         for (k, &i) in look.iter().enumerate() {
@@ -264,9 +298,12 @@ pub fn settle(input: &Input, prm: &Params, progress: &mut dyn FnMut(&Status)) ->
                     l = 0.0;
                 }
                 l /= prm.tune * pitch;
-                grow = grow.max((-l).clamp(0.0, 1.0));
                 let toward = scale(normal[i], sides[t][u]);
                 let bump = dot(bend[i], toward) < 0.0; // (a bump towards the neighbour)
+                                                       // (behind: its bumps towards the one ahead grown, after it, not those away)
+                if bump || prm.share <= 0.0 {
+                    grow = grow.max((-l).clamp(0.0, 1.0));
+                }
                 let give = l.clamp(0.0, 1.0) * if bump { 1.0 } else { (l - 1.0).clamp(0.0, 1.0) };
                 m = add(m, scale(bend[i], steer * give));
             }
@@ -559,6 +596,7 @@ fn centring(
     edges: &Grid,
     i: usize,
     lean: f64,
+    across: [f64; 2],
     cx: &Ctx,
 ) -> f64 {
     let (q, n, t) = (tr.p[i], normal[i], tr.net[i]);
@@ -572,17 +610,25 @@ fn centring(
             if tr.net[j] == t && (arc[j] - arc[i]).abs() <= cx.own {
                 return;
             }
-            let across = dot(v, n);
-            if across >= 0.7 * dd {
-                side[0] = side[0].min(dd);
-            } else if -across >= 0.7 * dd {
-                side[1] = side[1].min(dd);
+            let own = |k: usize| {
+                if tr.net[j] != t || across[k] <= 0.0 {
+                    dd
+                } else {
+                    (dd - across[k] * cx.pitch).max(0.01 * cx.pitch)
+                }
+            };
+            let a = dot(v, n);
+            if a >= 0.7 * dd {
+                side[0] = side[0].min(own(0));
+            } else if -a >= 0.7 * dd {
+                side[1] = side[1].min(own(1));
             }
         });
     };
     look(cx.near, &mut side);
     if side[0] >= cx.far || side[1] >= cx.far {
-        look(cx.far, &mut side); // (further only where nothing that near)
+        // (further only where nothing that near; its own copper as far as it counts)
+        look(cx.far + across[0].max(across[1]) * cx.pitch, &mut side);
     }
     // the edge: the nearest point on either side (most vertices: none near, at once)
     let mut de = [cx.far, cx.far];

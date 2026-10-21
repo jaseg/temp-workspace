@@ -53,7 +53,9 @@ fn read_params(d: &Bound<'_, PyDict>) -> PyResult<Params> {
         finish,
         match_steps,
         match_band,
-        match_rate
+        match_rate,
+        ribbon,
+        share
     );
     Ok(p)
 }
