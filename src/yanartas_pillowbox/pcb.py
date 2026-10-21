@@ -142,6 +142,15 @@ class Layout:
             }
         return self._cache["density"]
 
+    def average_space(self) -> dict[str, float]:
+        """Each mesh's average copper-to-copper space (mm), by layer: the space traces side
+        by side would need to cover its area as its copper does (from the density). The set
+        space is the least: settled, the traces spread into the room left, so this is more."""
+        pitch = self.width + self.clearance
+        return {
+            layer: pitch / d.mean - self.width for layer, d in self.density().items() if d.mean > 0
+        }
+
     def skew(self) -> dict[str, list[tuple[str, str, float, float]]]:
         """Each mesh's neighbouring traces matched in length together (the curve's: net 1
         and 2, 3 and 4, ..., an odd ribbon's middle three, within each partition, see
@@ -878,6 +887,7 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
     lengths = result.net_lengths()
     longest = result.longest_trace()
     spacing, skew, density = result.spacing(), result.skew(), result.density()
+    average = result.average_space()
     layers: dict[str, list[list[float]]] = {"front": [], "back": []}
     for track in result.tracks:
         layers["front" if track.layer == FRONT else "back"].append(flat(track.points))
@@ -901,6 +911,7 @@ def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
                 "traces": len(m.traces),
                 "spacing": spacing[layer].to_dict(),
                 "density": density[layer].to_dict() if layer in density else None,
+                "average_space": round(average[layer], 4) if layer in average else None,
                 "skew": [
                     {"nets": [a, b], "total": round(total, 3), "local": round(local, 3)}
                     for a, b, total, local in skew[layer]

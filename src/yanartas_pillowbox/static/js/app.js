@@ -242,6 +242,10 @@ function renderMeshStats(pcb) {
       : []),
     ["Longest trace (front / back)", both((x) => m(x.longest))],
     ["Longest trace", `${m(pcb.longest_trace.length)} (${pcb.longest_trace.net})`],
+    ...(front.average_space != null && back.average_space != null
+      ? [[`Average space, set least ${pcb.space.toFixed(2)} mm (front / back)`,
+          both((x) => `${x.average_space.toFixed(3)} mm`)]]
+      : []),
     ["Space within −5…+20 % (front / back)", both(share)],
     ["Below nominal space (front / back)", both(below), front.spacing.under + back.spacing.under > 0],
     ["Gaps over twice the space, widest (front / back)", both(wide)],

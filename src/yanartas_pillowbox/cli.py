@@ -138,6 +138,7 @@ def cmd_pcb(args: argparse.Namespace) -> int:
         return 2
     bar.close()
     spacing, skew, density = layout.spacing(), layout.skew(), layout.density()
+    average = layout.average_space()
     for side, m in layout.meshes.items():
         if m.algorithm == "sfc":
             missed = f", {m.unreached} panels out of reach" if m.unreached else ""
@@ -169,6 +170,12 @@ def cmd_pcb(args: argparse.Namespace) -> int:
                 f"  coverage: {100 * d.mean:.0f} % of nominal density, spread "
                 f"{100 * d.spread:.1f} %, {100 * d.thin:.2f} % of the area under "
                 f"{100 * THIN:.0f} % (least {100 * d.least:.0f} %)",
+                file=sys.stderr,
+            )
+        if side in average:
+            print(
+                f"  average space: {average[side]:.3f} mm (the least: "
+                f"{layout.clearance:.3f} mm, as set)",
                 file=sys.stderr,
             )
         for a, b, total, local in skew[side]:

@@ -255,6 +255,10 @@ def test_preview_json(layout):
     assert data["offset"] == [10.0, 20.0] and len(data["bbox"]) == 4
     assert len(data["pads"]) == 4 * int(D.fpc_pins) and len(data["vias"]) == 2 * len(layout.vias)
     assert data["meshes"]["front"]["unreached"] == 0
+    # (the average space: no less than the set least, as the layout never undercuts it)
+    for side in ("front", "back"):
+        average = data["meshes"][side]["average_space"]
+        assert data["space"] * 0.98 < average < 2 * data["space"]
 
 
 def test_cli(tmp_path, capsys):

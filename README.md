@@ -175,7 +175,7 @@ All lengths are in millimetres.
 | `fpc_corner_radius` | 1 | Rounds the cable's corners and where it meets the front panel's edge (not the plug's). 0–10; smaller where there is no room, e.g. at most half the clearance at the slots between rows. |
 | `fpc_cable_gap` | 1 | Cut-to-cut clearance between the cable's rows, and between the cable and the rest of the pattern. 0.1–20. |
 | `mesh_trace_width` | 0.15 | PCB layout: width of the security mesh's traces, on both copper layers and along the cable. 0.05–2. |
-| `mesh_trace_space` | 0.15 | Copper-to-copper space between them (and the clearance of the rest of the layout). 0.05–2. |
+| `mesh_trace_space` | 0.15 | The least copper-to-copper space between them (and the clearance of the rest of the layout): never undercut, checked by the design rules. Settled, the traces spread into the room left over, so the average space is larger: about 20 % with the space-filling curve, 5 % with the KiMesh grid (reported as *Average space*). 0.05–2. |
 | `mesh_traces` | 4 | Mesh traces (loops, two ends each) per side of the foil: for the space-filling curve, per partition (so `mesh_partitions × mesh_traces` per side); for KiMesh, in all. The exit cell is twice as many trace pitches wide as a side has traces (KiMesh: every cell, 2.4 mm by default). Whole numbers 1–16; the plug needs a pin per end plus the GND pins. |
 | `mesh_partitions` | 3 | Space-filling curve only: each side's mesh area is split into this many partitions of equal area, each with `mesh_traces` traces of its own from the connector. Whole numbers 1–16. KiMesh ignores it. |
 | `mesh_edge_clearance` | 0.5 | How far the mesh keeps off the foil's cut edges and slits. 0–10. |

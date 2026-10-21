@@ -349,14 +349,17 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
     ),
     FieldSpec(
         "mesh_trace_space",
-        "Mesh trace space",
+        "Mesh trace space (minimum)",
         "float",
         "PCB mesh",
         "mm",
         0.05,
         2,
         0.01,
-        help="Copper-to-copper space between the mesh's traces.",
+        help="Least copper-to-copper space between the mesh's traces: the layout never goes "
+        "below it, and the design rules check it. Settled, the traces spread into the room "
+        "left over, so the average space comes out larger: about 20 % with the space-filling "
+        "curve, 5 % with the KiMesh grid (see Average space under the mesh's figures).",
     ),
     FieldSpec(
         "mesh_traces",
