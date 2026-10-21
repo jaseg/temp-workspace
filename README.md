@@ -6,7 +6,8 @@ UI with live 2D and 3D previews. The tool runs entirely offline: the UI is serve
 
 A pillow box is cut from one flat sheet. It has two shell panels and a glue tab. Each short
 end of each panel has a curved (circular-arc) fold. The lens-shaped flap outside that fold
-closes the end, and pressing the flaps in makes the shell bulge into a "pillow".
+closes the end, and pressing the flaps in makes the shell bulge into a "pillow". It can also
+be made of two identical pieces instead (see *Two pieces*).
 
 ## Installation & running
 
@@ -162,6 +163,7 @@ All lengths are in millimetres.
 
 | Key | Default | Meaning / constraints |
 |---|---|---|
+| `pieces` | `one` | `one`: the usual one-piece pattern. `two`: two identical pieces, each one panel with an outer flap at its top end, an inner flap at its bottom end, the FPC cable on its free edge and a glue tab on the other (see *Two pieces*). |
 | `width` | 107 | Interior width of the closed box's cross-section, from fold to fold (between the material's inner corners). 10–1000. This drives the panel size: see *circumference* below. |
 | `length` | 101 | Interior length along the middle of the box, between the inner end walls: the shortest distance between the curves. 10–2000. The back panel's straight edges (corner to corner) are `length + height + 3·thickness` long, the front panel's `2·end_wall_gap` longer. |
 | `end_wall_gap` | 10 | Clear gap, in the middle of the box, between each outer end wall and the inner end wall inside it, covered by a lid (see *End wall gap* below). 0–500. 0 stacks the two walls of each end on each other, with no lid. |
@@ -454,6 +456,35 @@ top of each other:
   that this is exactly `width` (`crosssection.solve_shell`).
 * **Lengths:** the back panel's straight edges are `length + height + 3·t` long, the front
   panel's `2·end_wall_gap` longer.
+
+#### Two pieces
+
+With `pieces = two` the box is made of two identical pieces (`geometry._build_piece`); the
+SVG and the PCB files hold one of them, to be made twice.
+
+* Each piece is one panel: at its top end the outer flap (with the lid, its glue tabs and
+  the overhangs, with an end wall gap), at its bottom end the inner flap; the free edge, with
+  the FPC cable, on the left, and the glue tab beyond the glue fold on the right.
+* The second piece is the first **turned over**: its print side (F.Cu) faces **into** the box,
+  so its folds go the other way round (mountain and valley swapped; the pattern is labelled
+  for the first). It closes the box from below, its outer flap at the other end: at each
+  end one piece's outer flap closes over the other's inner flap, and each glue tab is glued
+  onto the outside of the other piece's free edge. Both pieces' cables plug in.
+* **Cross-section** (`crosssection.solve_two_piece`): both panels have the same section, the
+  second the first turned half a turn about the box's axis. Both folds bow in by
+  `(height + t)/2`; both seams are glued edges, like the one-piece pattern's (the free edge
+  resting inside the other panel, its glue fold `t / sin α` beyond).
+* **Lengths:** each piece's straight edges are `length + height + 3·t + end_wall_gap` long
+  (the gap only at its outer flap). The other piece's ends stand `end_wall_gap + t` further on
+  (the folds bow in alike, so the outer wall's thickness comes from there): its free edge,
+  under this piece's glue tab, starts that far down, and the glue tab with it, tapered off the
+  other piece's inner flap fold; at the bottom it ends square at this piece's corner.
+* **Lids:** only at the outer flap, and the same on both sides (the overhang and lid glue tab
+  on the right as on the left). The lid's free edge follows the other piece's inner wall,
+  continued along its tangent past that piece's free edge.
+* **FPC cable:** it clears the other piece's inner flap at the top and this piece's own at
+  the bottom (*Cable entry*); with nothing beside the free edge at the bottom end, its rows
+  may run down to the piece's corner.
 
 ## Output SVG & line convention
 

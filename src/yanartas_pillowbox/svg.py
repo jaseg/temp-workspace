@@ -201,13 +201,27 @@ def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]
     * on the front panel, just inside each curved fold, which end of the box that is (front
       end: the top of the pattern, like the FPC cutout setting);
     * on every flap and lid, which way its print side faces once folded (they keep the
-      panels' orientation)."""
+      panels' orientation).
+
+    Two pieces: that one is made twice, one folded print side out, one in; which end is
+    which."""
     printed_out = cfg.print_side == "outside"
 
     def facing(outward: bool) -> str:
         return "outside" if outward == printed_out else "inside"
 
     out = []
+    if cfg.two_piece:
+        # (one piece's print side faces out, the other's in: its folds go the other way)
+        front = pattern.face("front-panel")
+        xf = (front.x0 + front.x1) / 2
+        top, bottom = front.y_range(xf)
+        mid = (top + bottom) / 2
+        out.append(("make two: one with this side", (xf, mid - LABEL_SIZE), LABEL_SIZE))
+        out.append(("outside, one inside", (xf, mid + LABEL_SIZE), LABEL_SIZE))
+        out.append(("outer flap end", (xf, top + 2 * LABEL_SIZE), LABEL_SIZE))
+        out.append(("inner flap end", (xf, bottom - 2 * LABEL_SIZE), LABEL_SIZE))
+        return out
     back, front = pattern.face("back-panel"), pattern.face("front-panel")
     xb, xf = (back.x0 + back.x1) / 2, (front.x0 + front.x1) / 2
     out.append((facing(True), (xb, sum(back.y_range(xb)) / 2), LABEL_SIZE))

@@ -119,6 +119,10 @@ def cmd_generate(args: argparse.Namespace) -> int:
     else:
         Path(args.output).write_text(svg, encoding="utf-8")
         print(f"wrote {args.output}", file=sys.stderr)
+    if cfg.two_piece:
+        print(
+            "two pieces: cut this pattern twice (fold one print side out, one in)", file=sys.stderr
+        )
     return 0
 
 
@@ -184,6 +188,8 @@ def cmd_pcb(args: argparse.Namespace) -> int:
     print(f"longest trace: {net}, {length / 1000:.2f} m", file=sys.stderr)
     for path in pcb.export(layout, args.output, args.name):
         print(f"wrote {path}", file=sys.stderr)
+    if cfg.two_piece:
+        print("two pieces: make two of this board (one F.Cu outside, one inside)", file=sys.stderr)
     return 0
 
 

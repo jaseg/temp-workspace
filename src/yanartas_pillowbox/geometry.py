@@ -531,13 +531,14 @@ def min_lid_width(cfg: Config) -> float | None:
     everything else kept: flatter boxes widen their ends further. None if no width up to the
     limit allows it."""
     from yanartas_pillowbox.config import SPECS_BY_NAME  # (config imports this module lazily)
-    from yanartas_pillowbox.crosssection import solve_shell
+    from yanartas_pillowbox.crosssection import solve_shell, solve_two_piece
 
     w_max = SPECS_BY_NAME["width"].maximum
+    solve = solve_two_piece if cfg.two_piece else solve_shell
 
     def ok(w: float) -> bool:
         try:
-            shell = solve_shell(w, cfg.height, cfg.length, cfg.thickness)
+            shell = solve(w, cfg.height, cfg.length, cfg.thickness)
         except ValueError:  # too narrow to close at this height
             return False
         return max_lid_offset(shell) >= cfg.lid_offset
@@ -569,7 +570,8 @@ def lid_layout(cfg: Config) -> LidLayout | None:
     d = math.sqrt(max(0.0, r * r - (r - s + level / 2) ** 2))
     if d / math.sqrt(max(1e-300, r * r - d * d)) > MAX_SPREAD_SLOPE * (1 + 1e-12):
         raise ValueError("lid offset too large: the end section would need to turn past 45 degrees")
-    spread = max(0.0, d - sec.width / 2)
+    spread = d - sec.width / 2
+    spread = spread if spread > 1e-9 * sec.width else 0.0  # (rounding: none)
     k = max(2, math.ceil(4 * spread))  # samples on each continuation
     xs_flat = (
         [
@@ -580,13 +582,29 @@ def lid_layout(cfg: Config) -> LidLayout | None:
         if spread > 0
         else us
     )
-    reach = cfg.end_wall_gap - t / 2 + cfg.lid_overlap
+    reach = cfg.inner_offset - t / 2 + cfg.lid_overlap
     g_x, p_x = shell.glue_point[0], shell.fold_point[0]
 
     def crease_depth(x: float) -> float:
         """Depth of the back panel's crease at flat x; over the overhangs, beyond the panel's
         edges, it runs on along the front panel's continued fold arc (so the lid's free edge
-        stays one smooth curve)."""
+        stays one smooth curve). Two pieces: the other piece's crease, its fold arc
+        continued past its free edge (which stops short of this one's glue fold)."""
+        if cfg.two_piece:
+            target = shell.front_x + sec.x_ext(x)  # (this piece's X there)
+
+            def other(v: float) -> tuple[float, float]:
+                """The other's (X, depth) at its v (beyond its edges: along their tangent)."""
+                end = min(sec.width, max(0.0, v))
+                k = sec.slope(end)
+                c = math.sqrt(1 - k * k)
+                return (shell.back_x - sec.x(end) - c * (v - end), sec.z(end) + k * (v - end))
+
+            lo, hi = -sec.width, 2 * sec.width
+            for _ in range(100):  # (the other's X falls with its v)
+                mid = (lo + hi) / 2
+                lo, hi = (lo, mid) if other(mid)[0] < target else (mid, hi)
+            return other((lo + hi) / 2)[1]
         if x < 0:
             return crease_depth(0.0) + sec.z_ext(x)
         if x > sec.width:
@@ -602,13 +620,15 @@ def lid_layout(cfg: Config) -> LidLayout | None:
     return LidLayout(level, spread, depth, t == 0 and spread == 0)
 
 
-def glue_tab_taper(cfg: Config) -> float:
+def glue_tab_taper(cfg: Config, gap: float | None = None) -> float:
     """How far each end of the glue tab is cut back along its glue fold. Glued on the outside
     of the front panel's free edge, from the back panel's ends on (the end wall gap past the
     front panel's), the tab must stay off the front panel's curved fold: its end runs from
     the glue fold at up to 45 degrees (the tab's width), only as steep as needed; where the
-    gap leaves room, it is square. At most short of half the straight edge."""
-    sec, g, e = cfg.shell.front, cfg.glue_tab_width, cfg.end_wall_gap
+    gap leaves room, it is square. At most short of half the straight edge. ``gap``: how far
+    the tab's end stands in from the other panel's ends (default: the end wall gap)."""
+    sec, g = cfg.shell.front, cfg.glue_tab_width
+    e = cfg.end_wall_gap if gap is None else gap
     r = circle_radius(sec.width, sec.sagitta)
 
     def fold_y(u: float) -> float:  # the front panel's fold arc, u from its free edge
@@ -661,10 +681,13 @@ def _split_at_x(
 
 
 def overall_length(cfg: Config) -> float:
-    """The box's overall length (mid-surface): the front panel's, plus where the widened end
-    sections' outer walls reach past its ends."""
+    """The box's overall length (mid-surface): the front panel's (two pieces: from one
+    piece's outer end to the other's), plus where the widened end sections' outer walls
+    reach past its ends."""
     lid = lid_layout(cfg)
-    return cfg.front_length + (0.0 if lid is None else 2 * lid.drop)
+    # (two pieces: the other one's outer end stands ``inner_offset`` further on)
+    length = cfg.front_length + (cfg.inner_offset if cfg.two_piece else 0.0)
+    return length + (0.0 if lid is None else 2 * lid.drop)
 
 
 def _mirror_face(face: Face, length: float, name: str) -> Face:
@@ -687,7 +710,10 @@ def build_pattern(cfg: Config) -> Pattern:
     the back panel and the glue tab are ``2 e`` shorter (``e``, the end wall gap): they run
     from ``y = e`` to ``y = e + L`` (``cfg.edge_length``). Each flap's wall stands at its own
     panel's crease, so the inner walls stand ``e`` inside the outer walls. With a gap, each
-    outer flap carries a lid over it (``LidLayout``). The bottom end mirrors the top."""
+    outer flap carries a lid over it (``LidLayout``). The bottom end mirrors the top.
+    Two pieces: one of them (``_build_piece``)."""
+    if cfg.two_piece:
+        return _build_piece(cfg)
     shell = cfg.shell
     wf, wb, length = shell.front.width, shell.back.width, cfg.front_length
     e, edge = cfg.end_wall_gap, cfg.edge_length
@@ -978,6 +1004,251 @@ def build_pattern(cfg: Config) -> Pattern:
     return Pattern(outline, folds, faces, bbox, info, slits, scraps, cable)
 
 
+def _lid_end(
+    cfg: Config, lid: LidLayout, f_ft: Arc, w: float, e: float
+) -> tuple[tuple[Segment, ...], tuple[Face, ...], tuple[Fold, ...], tuple[Segment, ...]]:
+    """A piece's top end with a lid (two pieces, see ``_build_piece``): the outline from
+    the free edge's top (``(0, e)``) round to the panel's other side (``(w, e)``), its faces
+    and folds, and the panel's sides up there (seams with the overhangs, or cuts). Like the
+    one-piece pattern's top end, but the same on both sides: the overhang and the lid's
+    glue tab on the right as on the left (beside the panel there, only its glue tab, further
+    down)."""
+    sf, g = cfg.shell.front.sagitta, cfg.glue_tab_width
+    dd, sp = lid.drop, lid.spread
+    up, down = (0.0, -1.0), (0.0, 1.0)
+    crease = arc_from_chord((-sp, -dd), (w + sp, -dd), sf + dd, up)
+    lid_edge = lid.edge(sf)
+    lid_l, lid_r = Line((-sp, -dd), lid_edge[0].start), Line(lid_edge[-1].end, (w + sp, -dd))
+    x_l, y_l = -sp - g, lid_l.end[1]
+    tab_l = _lines((lid_l.start, (x_l, -dd)), ((x_l, -dd), (x_l, y_l)), ((x_l, y_l), lid_l.end))
+    x_r, y_r = w + sp + g, lid_r.start[1]
+    tab_r = _lines((lid_r.start, (x_r, y_r)), ((x_r, y_r), (x_r, -dd)), ((x_r, -dd), lid_r.end))
+    faces: list[Face] = [
+        Face(
+            "lid-tab-top-left",
+            "tab",
+            (*tab_l, lid_l.reversed()),
+            x_l,
+            -sp,
+            tab_l[2:],
+            (tab_l[0].reversed(),),
+        ),
+        Face(
+            "lid-tab-top-right",
+            "tab",
+            (*tab_r, lid_r.reversed()),
+            w + sp,
+            x_r,
+            tab_r[:1],
+            (tab_r[2].reversed(),),
+        ),
+    ]
+    folds: list[Fold] = []
+    if sp == 0:  # zero thickness, no offset: the lid's fold runs through the corners
+        lead = _lines(((0.0, e), (0.0, 0.0)))
+        tail = _lines(((w, 0.0), (w, e)))
+        arcs: tuple[Segment, ...] = (f_ft,)
+        sides = (*lead, *tail)
+    else:
+        full = arc_from_chord((-sp, -dd), (w + sp, -dd), sf + dd, down)
+        t0 = full.param_of_angle(_angle(full.center, (0.0, 0.0)))
+        t1 = full.param_of_angle(_angle(full.center, (w, 0.0)))
+        assert t0 is not None and t1 is not None
+        f_left = replace(full.sub(0.0, t0), start=full.start, end=(0.0, 0.0))
+        f_right = replace(full.sub(t1, 1.0), start=(w, 0.0), end=full.end)
+        bl, left = Line((0.0, e), (-sp, e)), Line((-sp, e), (-sp, -dd))
+        right, br = Line((w + sp, -dd), (w + sp, e)), Line((w + sp, e), (w, e))
+        seam_l, seam_r = Line((0.0, 0.0), (0.0, e)), Line((w, e), (w, 0.0))
+        lead, tail = (bl, left), (right, br)
+        faces += [
+            Face(
+                "front-top-left",
+                "panel",
+                (f_left, seam_l, bl, left),
+                -sp,
+                0.0,
+                (f_left,),
+                (bl.reversed(),),
+            ),
+            Face(
+                "front-top-right",
+                "panel",
+                (f_right, right, br, seam_r),
+                w,
+                w + sp,
+                (f_right,),
+                (br.reversed(),),
+            ),
+        ]
+        arcs = (f_left, f_ft, f_right)
+        folds += [
+            Fold("front-top-left", FoldCategory.CURVED, f_left),
+            Fold("front-top-right", FoldCategory.CURVED, f_right),
+        ]
+        sides = (seam_l, seam_r)
+    chain = (*lead, *tab_l, *lid_edge, *tab_r, *tail)
+    faces += [
+        Face(
+            "front-top-flap",
+            "flap",
+            (crease, *(seg.reversed() for seg in reversed(arcs))),
+            -sp,
+            w + sp,
+            (crease,),
+            arcs,
+        ),
+        Face(
+            "front-top-lid",
+            "lid",
+            (lid_l, *lid_edge, lid_r, crease.reversed()),
+            -sp,
+            w + sp,
+            lid_edge,
+            (crease,),
+        ),
+    ]
+    folds += [
+        Fold("lid-top", FoldCategory.LID, crease),
+        Fold("lid-tab-top-left", FoldCategory.GLUE, lid_l),
+        Fold("lid-tab-top-right", FoldCategory.GLUE, lid_r),
+    ]
+    return chain, tuple(faces), tuple(folds), sides
+
+
+def _build_piece(cfg: Config) -> Pattern:
+    """One of the two identical pieces (``cfg.two_piece``; the shell's
+    ``crosssection.solve_two_piece``): a panel ``w`` wide, its straight edges ``Lp``
+    (``cfg.front_length``) long from ``y = 0`` to ``Lp``; at the top the outer flap (with
+    the lid and its glue tabs, and the overhangs, with an end wall gap), at the bottom the
+    inner flap; the free edge (with the FPC cable) at ``x = 0``, the glue tab beyond the
+    glue fold at ``x = w``.
+
+    The other piece is this one turned over (its print side inward), closing the box from
+    below with its outer flap at the other end: its ends stand ``d`` (``cfg.inner_offset``,
+    the end wall gap and a thickness) further on than this one's, so this one's glue tab,
+    glued onto its free edge, runs from ``y = d`` (tapered off its inner flap's fold there)
+    to ``Lp`` (off its outer flap's fold, ``d`` further on)."""
+    shell = cfg.shell
+    w, s, lp = shell.front.width, shell.front.sagitta, cfg.front_length
+    e, d, g = cfg.end_wall_gap, cfg.inner_offset, cfg.glue_tab_width
+    lid = lid_layout(cfg)
+    up, down = (0.0, -1.0), (0.0, 1.0)
+    f_ft = arc_from_chord((0.0, 0.0), (w, 0.0), s, down)
+    f_bot = arc_from_chord((0.0, lp), (w, lp), s, up)
+
+    # The top end: the outer flap (and the lid).
+    if lid is None:
+        c_left, c_right = shell.front_cuts[0][1], shell.front_cuts[-1][1]
+        cut_ft = _cut_chain(0.0, 0.0, shell.front_cuts, up=True)
+        steps = (*_lines(((0.0, 0.0), (0.0, -c_left))), *cut_ft, *_lines(((w, -c_right), (w, 0.0))))
+        top_chain = steps
+        top_faces: tuple[Face, ...] = (
+            Face("front-top-flap", "flap", (*steps, f_ft.reversed()), 0.0, w, cut_ft, (f_ft,)),
+        )
+        top_folds: tuple[Fold, ...] = ()
+        left_t: tuple[Segment, ...] = ()
+        right_t = _lines(((w, 0.0), (w, e)))
+    else:
+        top_chain, top_faces, top_folds, sides = _lid_end(cfg, lid, f_ft, w, e)
+        if lid.spread > 0:
+            left_t, right_t = (sides[0],), (sides[1].reversed(),)
+        else:
+            left_t, right_t = (sides[0].reversed(),), (sides[1],)
+    # Down the panel's side to the glue tab: a cut over the gap, past the overhang.
+    gap_cut = _lines(((w, e), (w, d)))
+
+    # The glue tab, over the other piece's free edge from its inner end (d) to this one's.
+    t_top, t_bot = glue_tab_taper(cfg, 0.0), glue_tab_taper(cfg, d)
+    tab = (
+        Line((w, d), (w + g, d + t_top)),
+        Line((w + g, d + t_top), (w + g, lp - t_bot)),
+        Line((w + g, lp - t_bot), (w, lp)),
+    )
+    glue = Line((w, d), (w, lp))
+
+    # The bottom end: the inner flap (an FPC cutout cuts its top off).
+    level = cfg.fpc_cutout_width if cfg.fpc_cutout != "none" else 0.0
+    cut_b = _cut_chain(0.0, lp, flatten_cut(shell.back_cuts, level), up=False)
+    step_b = _lines(((0.0, cut_b[0].start[1]), (0.0, lp)))
+
+    # The free edge, up from the bottom corner to the top end section; the cable leaves it.
+    cable_layout = fpc.layout(cfg)
+    free_edge: tuple[Segment, ...] = (Line((0.0, lp), (0.0, e)),)
+    edge_cut = free_edge
+    if cable_layout is not None:
+        edge_cut = fillet(
+            ((0.0, lp), *cable_layout.outline, (0.0, e)),
+            cfg.fpc_corner_radius,
+            cable_layout.plug_corners,
+        )
+        j0, j1 = cable_layout.junction
+        first, last = edge_cut[0], edge_cut[-1]
+        assert isinstance(first, Line) and isinstance(last, Line)
+        free_edge = (first, *_lines((first.end, j0), (j0, j1), (j1, last.start)), last)
+
+    def rev(chain: Sequence[Segment]) -> tuple[Segment, ...]:
+        return tuple(seg.reversed() for seg in reversed(chain))
+
+    outline = Outline((*top_chain, *gap_cut, *tab, *rev(cut_b), *step_b, *edge_cut))
+    folds = (
+        Fold("front-top", FoldCategory.CURVED, f_ft),
+        Fold("back-bottom", FoldCategory.CURVED, f_bot),
+        Fold("glue-tab", FoldCategory.GLUE, glue),
+        *top_folds,
+    )
+    faces = (
+        Face(
+            "front-panel",
+            "panel",
+            (f_ft, *right_t, *gap_cut, glue, f_bot.reversed(), *free_edge, *rev(left_t)),
+            0.0,
+            w,
+            (f_ft,),
+            (f_bot,),
+        ),
+        Face("glue-tab", "tab", (*tab, glue.reversed()), w, w + g, tab[:1], tab[2:]),
+        *top_faces,
+        Face("back-bottom-flap", "flap", (f_bot, *rev(cut_b), *step_b), 0.0, w, (f_bot,), cut_b),
+    )
+    bbox = union_bbox([outline.bbox(), *(f.segment.bbox() for f in folds)])
+    x0, z0, x1, z1 = shell_bbox(shell)
+    info = {
+        "pattern_width": bbox[2] - bbox[0],
+        "pattern_height": bbox[3] - bbox[1],
+        "front_fold_sagitta": s,
+        "back_fold_sagitta": s,
+        "front_cut_sagitta": max(c for _, c in shell.front_cuts) if lid is None else s - lid.level,
+        "back_cut_sagitta": max(c for _, c in shell.back_cuts),
+        "front_fold_radius": circle_radius(w, s),
+        "back_fold_radius": circle_radius(w, s),
+        "box_height": cfg.height,
+        "edge_length": lp,
+        "front_edge_length": lp,
+        "front_panel_width": w,
+        "back_panel_width": w,
+        "circumference": 2 * w,
+        "outer_width": x1 - x0,
+        "outer_height": z1 - z0,
+        "outer_length": overall_length(cfg),
+        "glue_tab_taper": t_top,
+        "glue_tab_taper_end": t_bot,
+        "pieces": 2,
+    }
+    if lid is not None:
+        front = shell.front
+        info["end_width_increase"] = (
+            front.x_ext(w + lid.spread) - front.x_ext(-lid.spread) - (x1 - x0 - shell.thickness)
+        )
+        info["end_height_increase"] = -lid.level - shell.thickness
+    folds = tuple(replace(f, direction=fold_direction(cfg, f.segment, faces)) for f in folds)
+    cable = None
+    if cable_layout is not None:
+        cable = _place_cable(cfg, cable_layout, outline.segments)
+        info["fpc_cable_width"] = cable.width
+        info["fpc_plug_width"] = cable.plug_width
+    return Pattern(outline, folds, faces, bbox, info, (), (), cable)
+
+
 @dataclass(frozen=True)
 class _Tab:
     """A lid's glue tab over the inner flap (see ``_lid_tab_right``)."""
@@ -1196,13 +1467,27 @@ class FoldedBox:
         lid = lid_layout(cfg)
         self.lid_level = 0.0 if lid is None else lid.level
         self.spread = 0.0 if lid is None else lid.spread
+        self.two_piece = cfg.two_piece
+        # The box's middle, in pattern y: two pieces, the other one's ends stand
+        # ``inner_offset`` further on.
+        self.cy = (self.length + (cfg.inner_offset if cfg.two_piece else 0.0)) / 2
 
     def map(self, face: str, p: Point) -> Point3:
+        """Where flat point p of the face lies in the closed box. Two pieces: of the piece
+        on top (the other is ``other``)."""
         shell, length, e, k = self.shell, self.length, self.gap, self.lid_level
         front, back, zs = shell.front, shell.back, shell.z_shift
         x, y = p
         if face.startswith("lid-tab-"):
             return self._lid_tab(face, p)
+        if self.two_piece and face in ("back-bottom-flap", "glue-tab"):
+            if face == "glue-tab":  # (the other's, turned: on the other one's free edge)
+                tx, tz = shell.tab_point(x - front.width)
+                pos = (-tx, y, -tz)
+            else:  # reflected across y + Z = Lp (the inner flap, its fold bowing up)
+                fx, fz = shell.front_x + front.x(x), front.z(x)
+                pos = (fx, length - fz, zs + length - y)
+            return (pos[0], self.cy - pos[1], pos[2])
         # Crease planes (unshifted Z): front y = Z, back y - e = -Z (and mirrored about the
         # middle, y = L / 2).
         if face.startswith("front-"):
@@ -1234,7 +1519,13 @@ class FoldedBox:
             pos = (tx, y, tz)
         else:
             raise KeyError(face)
-        return (pos[0], length / 2 - pos[1], pos[2])
+        return (pos[0], self.cy - pos[1], pos[2])
+
+    @staticmethod
+    def other(q: Point3) -> Point3:
+        """Two pieces: the other piece's point for this one's (turned over, about the box's
+        middle: X, Y and Z all reversed)."""
+        return (-q[0], -q[1], -q[2])
 
     def _lid_tab(self, face: str, p: Point) -> Point3:
         """A lid's glue tab, folded round the box's side at the lid's straight side: a flat
@@ -1360,7 +1651,7 @@ class FoldedCable:
         self.creases = tuple((f.segment.start, f.segment.end) for f in cable.corners)
         (self.x0, ya), (_, yb) = cable.junction
         self.yc = (ya + yb) / 2
-        self.y0 = cfg.front_length / 2 - self.yc  # (the box's Y at the junction's middle)
+        self.y0 = box.cy - self.yc  # (the box's Y at the junction's middle)
         self.t = t
 
         def inside(panel: str, k: float, forward: bool = True) -> _Run:
@@ -1702,6 +1993,31 @@ def build_model3d(
     cable = None
     if pattern.cable is not None:
         cable = FoldedCable(cfg, pattern.cable).model()
+    cables = [cable] if cable is not None else []
+    if cfg.two_piece:
+        # The other piece: this one turned over, closing the box from below (``other``).
+        def turned(v: list[float]) -> list[float]:
+            return [-c for c in v]
+
+        def turned_lines(ls: list[list[list[float]]]) -> list[list[list[float]]]:
+            return [[turned(q) for q in line] for line in ls]
+
+        for part in parts:
+            part["piece"] = 1
+        parts += [{**part, "positions": turned(part["positions"]), "piece": 2} for part in parts]
+        lines += [{**line, "points": turned_lines([line["points"]])[0]} for line in lines]
+        cuts += turned_lines(cuts)
+        if cable is not None:
+            cables.append(
+                {
+                    **cable,
+                    "positions": turned(cable["positions"]),
+                    "cuts": turned_lines(cable["cuts"]),
+                    "lines": [
+                        {**ln, "points": turned_lines([ln["points"]])[0]} for ln in cable["lines"]
+                    ],
+                }
+            )
 
     x0, z0, x1, z1 = shell_bbox(box.shell, with_material=False)
     return {
@@ -1709,8 +2025,10 @@ def build_model3d(
         "units": "mm",
         "parts": parts,
         # The FPC cable, folded: {positions, indices, cuts, lines} (its own cut edges and fold
-        # lines, like the box's); None without one.
+        # lines, like the box's); None without one. ``cables``: every piece's (two pieces:
+        # both).
         "cable": cable,
+        "cables": cables,
         "lines": lines,
         "bounds": {  # of the mid-surface model (wider and taller at the ends with lids)
             "width": max(x1 - x0, _span(parts, 0)),
@@ -1830,7 +2148,10 @@ def _section_cable(cfg: Config) -> list[list[list[float]]] | None:
         layout.path,
         corners,
     )
-    return FoldedCable(cfg, cable).section_lines()
+    lines = FoldedCable(cfg, cable).section_lines()
+    if cfg.two_piece:  # (the other piece's, turned)
+        lines += [[[-x, -z] for x, z in line] for line in lines]
+    return lines
 
 
 def shell_bbox(shell: Shell, with_material: bool = True) -> BBox:
@@ -1870,7 +2191,7 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
     """
     box = FoldedBox(cfg)
     shell = box.shell
-    wf, wb, mid = shell.front.width, shell.back.width, cfg.front_length / 2
+    wf, wb, mid = shell.front.width, shell.back.width, box.cy
 
     def trace(face: str, x0: float, x1: float) -> list[list[float]]:
         def at(f: float) -> tuple[float, float]:
@@ -1880,8 +2201,16 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
         return _trace(at, samples)
 
     front = trace("front-panel", 0.0, wf)  # glued edge (-X) -> straight fold (+X)
-    back = trace("back-panel", wf, wf + wb)  # straight fold (+X) -> glue fold (-X)
-    glue_tab = trace("glue-tab", wf + wb, wf + wb + cfg.glue_tab_width)  # glue fold -> free edge
+    if cfg.two_piece:  # (the other piece: this one turned over; and its glue tab)
+        back = [[-x, -z] for x, z in front]  # (its free edge (+X) -> its glue fold (-X))
+        mine = trace("glue-tab", wf, wf + cfg.glue_tab_width)
+        glue_tab = [[-x, -z] for x, z in mine]
+        tabs = [glue_tab, mine]
+    else:
+        back = trace("back-panel", wf, wf + wb)  # straight fold (+X) -> glue fold (-X)
+        # glue fold -> free edge
+        glue_tab = trace("glue-tab", wf + wb, wf + wb + cfg.glue_tab_width)
+        tabs = [glue_tab]
     h = shell.thickness / 2
     fa, ba = shell.front_point(wf / 2), shell.back_point(wb / 2)
     inner = {
@@ -1897,7 +2226,8 @@ def build_cross_section(cfg: Config, samples: int = 96) -> dict[str, Any]:
         "interior": _interior(shell, samples),
         "inner": {k: [round(c, 6) for c in v] for k, v in inner.items()},
         "glue_tab": glue_tab,
-        "material": [_band(c, shell.thickness) for c in (front, back, glue_tab)],
+        "glue_tabs": tabs,  # (two pieces: both)
+        "material": [_band(c, shell.thickness) for c in (front, back, *tabs)],
         "width": cfg.width,  # interior
         "height": cfg.height,
         "thickness": shell.thickness,

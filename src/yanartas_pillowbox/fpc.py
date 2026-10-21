@@ -258,7 +258,8 @@ def entry_range(cfg: Config) -> tuple[float, float]:
     cable's width at every depth on one side) lie on the inside of the back panel, up to
     the square's far side deep. There the inner flaps' walls stand ``e + z(u)`` in from the
     back panel's ends (their fold's sagitta at that depth: more, deeper in), half a
-    thickness thick; the cable keeps the clearance from them."""
+    thickness thick; the cable keeps the clearance from them. Two pieces: the other
+    piece's inner flap at the top, this one's at the bottom."""
     t, e, lf, gap = cfg.thickness, cfg.end_wall_gap, cfg.front_length, cfg.fpc_cable_gap
     w, wj = cable_width(cfg), junction_width(cfg)
     shell = cfg.shell
@@ -271,6 +272,11 @@ def entry_range(cfg: Config) -> tuple[float, float]:
     deep = gap + cfg.fpc_cable_inset + t + w  # (the stub and the square, from the junction)
     z = back.z(lo - deep - t)  # (a thickness deeper: on the safe side)
     margin = wj / 2 + t / 2 + gap  # (the junction's middle: half of it each way)
+    if cfg.two_piece:
+        # At the top, the other piece's inner flap (its ends ``inner_offset`` on); at the
+        # bottom this one's own, its fold's sagitta there from its free edge on.
+        zb = shell.front.z(deep + t)
+        return (cfg.inner_offset + z + margin, lf - zb - margin)
     return (e + z + margin, lf - e - z - margin)
 
 
@@ -305,7 +311,8 @@ def layout(cfg: Config) -> CableLayout | None:
     # The rows clear the end sections beside the edge (beyond the back panel's ends: the
     # overhangs, the lids' glue tabs, the outer flaps' corners) by the clearance: the frame's
     # x runs along the edge from the junction, the way the cable turns.
-    top, bottom = e + gap, lf - e - gap  # (pattern y)
+    # (two pieces: nothing beside the edge at the bottom end, its inner flap's)
+    top, bottom = e + gap, lf - (0.0 if cfg.two_piece else e) - gap  # (pattern y)
     x_left, x_right = (yj - bottom, yj - top) if k < 0 else (top - yj, bottom - yj)
     # The stub clears the edge by the clearance (and the plug's ears), and is a thickness
     # longer: the first row, folded back over it, folds onto the front panel a thickness

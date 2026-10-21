@@ -75,7 +75,10 @@ def _plan_curves(cfg: Config) -> dict[str, list[Point]]:
     """Plan curves at the top end (+Y): the inner wall's two surfaces and the outer wall's
     inner surface (across the widened end section)."""
     shell, t = cfg.shell, cfg.thickness
-    half, front, back = shell.edge_length / 2, shell.front, shell.back
+    front, back = shell.front, shell.back
+    # (the inner wall's ends from the box's middle; two pieces: their folds bow in alike,
+    # the walls' thicknesses come from the ends' offsets)
+    half = (cfg.edge_length - (t if cfg.two_piece else 0.0)) / 2
     ext = 2 * (shell.inner_fold[0] - shell.inner_glue[0])  # far past the interior's corners
     sp = _spread(cfg)
 
@@ -83,7 +86,7 @@ def _plan_curves(cfg: Config) -> dict[str, list[Point]]:
         return (shell.back_point(u)[0], half - back.z(u))
 
     def outer(v: float) -> Point:  # the front panel runs on by the gap, and wider
-        return (_front_point(cfg, v - sp)[0], half + cfg.end_wall_gap - front.z_ext(v - sp))
+        return (_front_point(cfg, v - sp)[0], half + cfg.inner_offset - front.z_ext(v - sp))
 
     return {
         "inner_in": _offset_curve(inner, back.width, t / 2, ext),
@@ -95,9 +98,10 @@ def _plan_curves(cfg: Config) -> dict[str, list[Point]]:
 
 def main_plan(cfg: Config) -> list[Point]:
     """Plan outline of the main space, between the inner end walls; the bottom end mirrors
-    the top."""
+    the top (two pieces: turned, the other piece's inner wall)."""
     top = _plan_curves(cfg)["inner_in"]
-    return [*top, *((x, -y) for x, y in reversed(top))]
+    k = -1.0 if cfg.two_piece else 1.0
+    return [*top, *((k * x, -y) for x, y in reversed(top))]
 
 
 def _front_inner(cfg: Config, x: float) -> float:
@@ -220,7 +224,10 @@ def render_scad(cfg: Config) -> str:
             "",
             "module end_spaces() {",
             "  end_space();",
-            "  mirror([0, 1, 0]) end_space();",
+            # (two pieces: the other end's is the other piece's, the box turned over)
+            "  rotate([0, 180, 0]) mirror([0, 1, 0]) end_space();"
+            if cfg.two_piece
+            else "  mirror([0, 1, 0]) end_space();",
             "}",
             "",
             "module end_section() {",

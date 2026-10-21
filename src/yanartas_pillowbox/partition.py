@@ -22,6 +22,7 @@ fold, so two partitions' curves run a spacing apart, as two runs of one curve do
 from __future__ import annotations
 
 import heapq
+import itertools
 import math
 from dataclasses import dataclass
 
@@ -297,21 +298,53 @@ def partition(
     return best
 
 
-def strips(ports: list[Polygon], inward: tuple[float, float], width: float) -> list[Polygon]:
+def strips(
+    ports: list[Polygon],
+    inward: tuple[float, float],
+    width: float,
+    zones: list[Polygon] | None = None,
+) -> list[Polygon]:
     """Each port's strip: from the port's inner side straight on in, as wide; the middle
-    ones longest, no two side by side as long."""
+    ones longest, no two side by side as long. With ``zones``, in the first order (rising
+    to the longest and falling off again; the outer ports' shortest first on the first
+    port's side) that leaves the square in front of every strip's end (where its curve
+    opens) within one zone: off a fold that closes in on the ports, a strip running along it
+    would end too near it for its curve to open (its domain keeps half a spacing off)."""
     inv = np.asarray(inward, float) / math.hypot(*inward)
     count = len(ports)
-    rank = sorted(range(count), key=lambda k: (min(k, count - 1 - k), k))
-    out = []
-    for k, port in enumerate(ports):
-        depth = width * (STRIP + STAGGER * rank.index(k))
-        d = shapely.get_coordinates(port) @ inv
-        step = float(d.max() - d.min())
-        ahead = shapely.affinity.translate(port, *(inv * step))
-        far = shapely.affinity.translate(port, *(inv * (step + depth - width)))
-        out.append(shapely.union_all([ahead, far]).convex_hull)
-    return out
+    first = sorted(range(count), key=lambda k: (min(k, count - 1 - k), k))
+    orders = [first]
+    if zones is not None and count <= 6:
+        for perm in itertools.permutations(range(count)):
+            depth = [perm.index(k) for k in range(count)]  # (each port's rank)
+            top = depth.index(max(depth))
+            rises = all(a < b for a, b in itertools.pairwise(depth[: top + 1]))
+            falls = all(a > b for a, b in itertools.pairwise(depth[top:]))
+            if rises and falls and list(perm) != first:
+                orders.append(list(perm))
+
+    def laid(rank: list[int]) -> list[tuple[Polygon, Polygon]]:
+        out = []
+        for k, port in enumerate(ports):
+            depth = width * (STRIP + STAGGER * rank.index(k))
+            d = shapely.get_coordinates(port) @ inv
+            step = float(d.max() - d.min())
+            ahead = shapely.affinity.translate(port, *(inv * step))
+            far = shapely.affinity.translate(port, *(inv * (step + depth - width)))
+            end = shapely.affinity.translate(port, *(inv * (step + depth)))
+            out.append((shapely.union_all([ahead, far]).convex_hull, end))
+        return out
+
+    if zones is None:
+        return [lane for lane, _ in laid(first)]
+    grown = [z.buffer(1e-6) for z in zones]
+    for rank in orders:
+        lanes = laid(rank)
+        if all(any(z.contains(end) for z in grown) for _, end in lanes):
+            return [lane for lane, _ in lanes]
+    raise MeshError(
+        "no room for the mesh's exits beside a fold (move the cable's entry: see Cable entry)"
+    )
 
 
 def _partition(
@@ -324,7 +357,7 @@ def _partition(
 ) -> list[Partition]:
     count = len(ports)
     inv = np.asarray(inward, float) / math.hypot(*inward)
-    lanes = strips(ports, inward, width)
+    lanes = strips(ports, inward, width, zones)
     # (a cell pinned in front of each strip's end, its own: where its curve opens)
     ends = []
     for s in lanes:

@@ -140,7 +140,7 @@ export class PbSection extends HTMLElement {
   }
 
   /** section: {front, back: [[x, z]...] (mid-surfaces), interior: [[x, z]...] (closed),
-   *  glue_tab: [[x, z]...], material: [outline...], cable: [[[x, z]...]...] | null (the FPC
+   *  glue_tab: [[x, z]...], glue_tabs: [[[x, z]...]...] (two pieces: both), material: [outline...], cable: [[[x, z]...]...] | null (the FPC
    *  cable's mid-surface, through its middle), width, height (interior), bbox};
    *  dims: parameter dimensions in the same (X, Z) frame. */
   update(section, dims = [], payload = null) {
@@ -212,9 +212,12 @@ export class PbSection extends HTMLElement {
     // The interior: the panels' inner surfaces.
     const interior = section.interior.map(p);
     svg.append(el("path", { class: "interior", d: `M ${interior.map((q) => q.join(",")).join(" L ")} Z` }));
-    // The glue tab, wrapped around the front panel's free edge onto its outside.
-    const tab = section.glue_tab.map(p);
-    svg.append(el("path", { class: "glue-tab", d: `M ${tab.map((q) => q.join(",")).join(" L ")}` }));
+    // The glue tab, wrapped around the front panel's free edge onto its outside (two
+    // pieces: each one's, round the other's free edge).
+    for (const line of section.glue_tabs ?? [section.glue_tab]) {
+      const tab = line.map(p);
+      svg.append(el("path", { class: "glue-tab", d: `M ${tab.map((q) => q.join(",")).join(" L ")}` }));
+    }
     // The FPC cable, folded in at the glued edge: the stub on the back panel, the rest folded
     // back over it and on along the front panel.
     for (const line of section.cable ?? []) {
@@ -258,6 +261,7 @@ function turnSection(section) {
     back: section.back.map(turn),
     interior: section.interior.map(turn),
     glue_tab: section.glue_tab.map(turn),
+    glue_tabs: section.glue_tabs && section.glue_tabs.map((line) => line.map(turn)),
     cable: section.cable && section.cable.map((line) => line.map(turn)),
     material: section.material.map((band) => band.map(turn)),
     inner: Object.fromEntries(Object.entries(section.inner).map(([k, v]) => [k, turn(v)])),

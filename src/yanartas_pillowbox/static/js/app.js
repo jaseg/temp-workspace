@@ -494,8 +494,16 @@ function pair(a, b) {
 }
 
 function renderDerived(info, payload) {
-  const rows = [
-    ["Outside (w × h × l)", `${[info.outer_width, info.outer_height, info.outer_length].map((v) => v.toFixed(2)).join(" × ")} mm`],
+  const outside = ["Outside (w × h × l)", `${[info.outer_width, info.outer_height, info.outer_length].map((v) => v.toFixed(2)).join(" × ")} mm`];
+  // (two pieces: both panels alike, each piece made twice)
+  const panels = info.pieces === 2 ? [
+    ["Pieces", "2 identical (one print side out, one in)"],
+    ["Straight edge", info.front_edge_length],
+    ["Panel width", info.front_panel_width],
+    ["Fold sagitta / radius", pair(info.front_fold_sagitta, info.front_fold_radius)],
+    ["Outer / inner flap cut sagitta", pair(info.front_cut_sagitta, info.back_cut_sagitta)],
+    ["Glue-tab taper (top / bottom)", pair(info.glue_tab_taper, info.glue_tab_taper_end)],
+  ] : [
     ["Front / back straight edge", pair(info.front_edge_length, info.edge_length)],
     ["Circumference", info.circumference],
     ["Front / back panel width", pair(info.front_panel_width, info.back_panel_width)],
@@ -503,6 +511,10 @@ function renderDerived(info, payload) {
     ["Front / back fold radius", pair(info.front_fold_radius, info.back_fold_radius)],
     ["Outer / inner flap cut sagitta", pair(info.front_cut_sagitta, info.back_cut_sagitta)],
     ["Glue-tab taper", info.glue_tab_taper],
+  ];
+  const rows = [
+    outside,
+    ...panels,
     ...(info.end_width_increase == null ? [] : [
       ["Ends wider / taller by", pair(info.end_width_increase, info.end_height_increase)],
     ]),

@@ -227,6 +227,11 @@ class Shell:
     The glue tab lies on the outside of the front panel: its mid-surface is the front's,
     offset by ``t`` along the outward normal. It leaves G along the tangent at E for
     ``tab_lead`` (G lies ``t / sin(alpha)`` beyond E), then follows the offset curve.
+
+    ``two_piece`` (see ``solve_two_piece``): two identical panels, each with a glue tab, the
+    second the first turned about the box's axis: ``back_point(u) = -front_point(u)``, both
+    ``u`` from the panel's free edge, both chords on ``Z = 0`` (``z_shift`` 0). Both seams are
+    glued edges; P is then the front panel's glue fold, G the back one's.
     """
 
     width: float
@@ -239,10 +244,11 @@ class Shell:
     back_x: float
     inner_fold: tuple[float, float]  # interior corner at the straight fold
     inner_glue: tuple[float, float]  # interior corner at the glued edge
+    two_piece: bool = False
 
     @property
     def z_shift(self) -> float:
-        return self.thickness / 2
+        return 0.0 if self.two_piece else self.thickness / 2
 
     @property
     def edge_length(self) -> float:
@@ -441,12 +447,52 @@ def solve_shell(width: float, height: float, length: float, thickness: float) ->
     )
 
 
-def max_height(width: float, thickness: float) -> float:
+@lru_cache(maxsize=512)
+def solve_two_piece(width: float, height: float, length: float, thickness: float) -> Shell:
+    """The shell of two identical panels (``Shell.two_piece``): each panel's free edge rests
+    inside the other's glue fold, which lies ``t / sin(alpha)`` beyond it (the other's glue
+    tab on its outside), at both seams alike. Both folds bow in by ``(height + t) / 2``,
+    putting the panels' inner surfaces at ``Z = +-height/2`` on the centreline. Raises
+    ValueError if an arc is too steep to close."""
+    t = thickness
+    s = (height + t) / 2
+    d = width
+    for _ in range(100):
+        w = panel_width(d, s)
+        k = edge_slope(w, s)
+        c = math.sqrt(1 - k * k)
+        delta = t / k
+        # The interior corner at the left seam, relative to the back panel's glue fold G:
+        # the front's inner surface 3t/2 from G's line (as at the one-piece glued edge).
+        vg = _mitre((c, k), -1.5 * t, (c, -k), t / 2)
+        err = width - (d + delta - 2 * vg[0])
+        if abs(err) <= 1e-12 * width:
+            break
+        d += err
+    sec = CrossSection(w, s)
+    gx = -delta / 2 - d / 2  # (G: the back panel's glue fold, at the left seam)
+    return Shell(
+        width,
+        height,
+        length,
+        t,
+        sec,
+        sec,
+        front_x=delta / 2,
+        back_x=-delta / 2,
+        inner_fold=(-(gx + vg[0]), -vg[1]),
+        inner_glue=(gx + vg[0], vg[1]),
+        two_piece=True,
+    )
+
+
+def max_height(width: float, thickness: float, two_piece: bool = False) -> float:
     """Largest interior height a shell of this interior width can have (to 1 um)."""
+    solve = solve_two_piece if two_piece else solve_shell
 
     def ok(h: float) -> bool:
         try:
-            solve_shell(width, h, 1.0, thickness)
+            solve(width, h, 1.0, thickness)
         except ValueError:
             return False
         return True

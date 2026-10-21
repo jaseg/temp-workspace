@@ -16,7 +16,7 @@ from yanartas_pillowbox import crosssection
 
 # Bumped whenever the meaning of saved settings changes; documents of any other version are
 # rejected (no migrations).
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
@@ -75,6 +75,21 @@ class FieldSpec:
 
 
 FIELD_SPECS: tuple[FieldSpec, ...] = (
+    FieldSpec(
+        "pieces",
+        "Pieces",
+        "choice",
+        "Shell",
+        choices=(("one", "One piece"), ("two", "Two identical pieces")),
+        help="One piece: the front and back panels in one, joined by a straight fold, with "
+        "outer flaps on the front panel and inner flaps on the back one. Two identical "
+        "pieces: each one panel with an outer flap at its top end and an inner flap at its "
+        "bottom end, the FPC cable on its free edge and a glue tab on the other. The second "
+        "piece, turned over (its print side inward: its folds go the other way), closes the "
+        "box from below: each glue tab onto the other piece's free edge, each outer flap over "
+        "the other's inner flap. The end wall gap is at each outer flap only; plug in both "
+        "pieces' cables.",
+    ),
     FieldSpec(
         "width",
         "Box width",
@@ -212,7 +227,8 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         ),
         help="Cuts the top of the inner flaps' curved edge off level, leaving a slot between "
         "flap and box for a flat cable. Front end: the flap at the top of the pattern; back "
-        "end: the one at the bottom.",
+        "end: the one at the bottom. Two pieces: any of them cuts the piece's inner flap "
+        "(both pieces').",
     ),
     FieldSpec(
         "fpc_cutout_width",
@@ -504,6 +520,7 @@ class Config:
     width: float = 107.0
     length: float = 101.0
     height: float = 48.5
+    pieces: str = "one"
     end_wall_gap: float = 10.0
     lid_overlap: float = 5.0
     lid_offset: float = 2.0
@@ -539,9 +556,14 @@ class Config:
 
     # ----------------------------------------------------------------- derived values
     @property
+    def two_piece(self) -> bool:
+        return self.pieces == "two"
+
+    @property
     def shell(self) -> crosssection.Shell:
         """Mid-surface geometry of the closed shell around the interior (cached)."""
-        return crosssection.solve_shell(self.width, self.height, self.length, self.thickness)
+        solve = crosssection.solve_two_piece if self.two_piece else crosssection.solve_shell
+        return solve(self.width, self.height, self.length, self.thickness)
 
     @property
     def edge_length(self) -> float:
@@ -551,8 +573,16 @@ class Config:
     @property
     def front_length(self) -> float:
         """Length of the front panel's straight edges, corner to corner: the box overall. The
-        front panel runs on by the end wall gap at each end."""
-        return self.edge_length + 2 * self.end_wall_gap
+        front panel runs on by the end wall gap at each end. Two pieces: each piece's
+        panel's, one end wall gap longer (at its outer flap)."""
+        return self.edge_length + (1 if self.two_piece else 2) * self.end_wall_gap
+
+    @property
+    def inner_offset(self) -> float:
+        """How far the inner flap's panel's ends stand in from the outer flap's at each end
+        (corner line to corner line): the end wall gap; two pieces, a thickness more (their
+        folds bow in alike, so the outer wall's thickness comes from the panel's length)."""
+        return self.end_wall_gap + (self.thickness if self.two_piece else 0.0)
 
     @property
     def mesh_nets(self) -> int:
@@ -672,7 +702,7 @@ def validate(cfg: Config) -> dict[str, str]:
         try:
             _ = cfg.shell
         except ValueError:
-            max_height = crosssection.max_height(cfg.width, cfg.thickness)
+            max_height = crosssection.max_height(cfg.width, cfg.thickness, cfg.two_piece)
             add(
                 "height",
                 f"must be at most {_fmt(max_height - 0.005)} mm for a {_fmt(cfg.width)} mm "

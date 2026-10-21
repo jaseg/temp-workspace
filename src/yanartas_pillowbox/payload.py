@@ -122,7 +122,8 @@ def section_clearance(shell: Shell, width: float, height: float) -> float:
 def wall_clearance(shell: Shell, width: float, depth: float) -> float:
     """Distance in plan from the payload (width x depth, centred) to the inner end walls'
     inner surfaces (the same at both ends)."""
-    half = shell.edge_length / 2
+    # (two pieces: the folds bow in alike, the inner wall's thickness from the ends' offset)
+    half = (shell.edge_length - (shell.thickness if shell.two_piece else 0.0)) / 2
 
     def wall(u: float) -> tuple[float, float]:
         return (shell.back_point(u)[0], half - shell.back.z(u))

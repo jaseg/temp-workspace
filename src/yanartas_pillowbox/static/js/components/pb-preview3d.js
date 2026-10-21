@@ -196,7 +196,10 @@ export class PbPreview3d extends HTMLElement {
     const b0 = model.bounds;
     const k = Math.max(1, Math.hypot(b0.width, b0.length, b0.height) / 150);
     // The FPC cable, folded into the box: drawn through the paper, like the inner flaps.
-    if (model.cable) group.add(this.#cableMesh(model.cable, k));
+    // (two pieces: both pieces' cables)
+    for (const cable of model.cables ?? (model.cable ? [model.cable] : [])) {
+      group.add(this.#cableMesh(cable, k));
+    }
     const lineMat = new THREE.LineBasicMaterial({ color: 0x111111 });
     for (const line of model.lines) {
       const dash = (DASH_MM[line.direction] ?? [1, 0]).map((v) => v * k);

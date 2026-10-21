@@ -111,6 +111,7 @@ outputs.
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
 | `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its strip (a port wide, no two neighbours as long); cells never across a fold, pinned seeds kept; the seed repeats the split, another differs; the mesh over partitions laid out at once (each partition's traces out through its port at the pitch, in it, apart, matched in length, `even`). |
 | `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (a layer's partitions, of equal area, laid out at once, their traces the layer's). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
+| `test_two_piece.py` | Two identical pieces: the shell (the second panel the first turned, the interior as asked), the config's lengths, one closed outline without crossings, folds on it and off it, the faces a piece has, every fold a mountain fold, the walls a gap and a thickness apart at both ends, each glue tab a thickness outside the other piece, both pieces (and cables) in the model and the section, the cable clear of both inner flaps, the dimensions, payload, OpenSCAD and labels, a KiMesh layout over a piece; strips ordered to keep their ends off a fold. |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded; the build ships every package module a shipped one imports. |
 
@@ -231,6 +232,44 @@ planes by `e` accordingly; everything stays an exact isometric folding.
 - **Interior.** The interior, payload clearance and fit are unchanged: they are bounded by
   the inner walls, centred on the box.
 
+### 4.4a Two pieces (`pieces = "two"`)
+
+The box made of two identical pieces, the second turned over (point inversion about the
+box's middle: X, Y and Z reversed; its print side inward), each one panel with an outer flap
+at its top end and an inner flap at its bottom end, the FPC cable on its free edge and a glue
+tab beyond its glue fold (`geometry._build_piece`).
+
+- **Shell.** `crosssection.solve_two_piece`: one `CrossSection` for both panels (fold
+  sagitta `(height + t)/2`), `back_point(u) = -front_point(u)` (both `u` from the free
+  edge), both chords on `Z = 0` (`Shell.z_shift` 0). Each seam is the one-piece glued edge:
+  the free edge rests inside the other panel, whose glue fold lies `t / sin α` beyond; the
+  interior corner from the same mitre. The width is solved for the interior as before.
+- **Lengths.** `Config.front_length` is the piece's straight edge,
+  `edge_length + end_wall_gap`; `Config.inner_offset` (`end_wall_gap + t`; one piece: the gap)
+  is how far the inner flap's panel's ends stand in from the outer flap's at an end. With
+  both folds bowing in alike, the outer wall's extra thickness comes from there.
+  `FoldedBox.cy` is the box's middle in pattern y (`(front_length + inner_offset) / 2`).
+- **Flaps.** The outer flap's cut is `Shell.front_cuts` (to the other panel's outer surface),
+  the inner flap's `Shell.back_cuts` (to its inner surface; the same in the piece's own `u`,
+  by symmetry), with a short cut step where it does not start on the chord. The lid end
+  (`_lid_end`) is the one-piece one made the same on both sides; `lid_layout`'s depth follows
+  the other piece's inner wall, continued along its tangent past its free edge (which stops
+  short of this one's glue fold).
+- **Glue tab.** From `inner_offset` (where the other piece's free edge begins) to the
+  piece's inner end, tapered off the other's inner flap fold at the top
+  (`glue_tab_taper(cfg, 0)`), off its outer flap fold `inner_offset` on at the bottom.
+- **3D model.** `FoldedBox.map` maps the piece on top; `build_model3d` adds the other piece's
+  parts, lines, cut edges and cable turned (`FoldedBox.other`), tagged `piece` 1 and 2
+  (`cables` holds both cables). Turned over, the second piece's triangles keep their
+  winding, so the viewer shows its B.Cu outside, as made. The section adds the other glue
+  tab (`glue_tabs`) and cable.
+- **FPC.** `fpc.entry_range` takes the other piece's inner flap at the top and this one's at
+  the bottom; the rows may run down to the piece's corner. Near that corner the inner flap's
+  fold closes in on the junction; `partition.strips` orders the exits' strips to keep their
+  ends off it.
+- **Elsewhere.** Dimensions (`_piece_dimensions`), payload wall clearance and the OpenSCAD
+  interior (the other end turned) use `inner_offset`/`cy`; the SVG labels say to make two.
+
 ### 4.5 FPC cutout and cable
 
 `level_cut` finds, by bisection on the level, the horizontal cut that removes exactly
@@ -283,7 +322,10 @@ an exact isometry: the panels curve along it, not across it.
   1. *Strips:* from each port, straight on in, a strip as wide (a pair of trace lanes),
      side by side with the next port's (nothing between them); the middle ones longest, no
      two neighbours as long (1 port, then 1.5 ports longer a step), so each strip's end
-     and a stretch of its side face the open area. The stem's rails run along it (its
+     and a stretch of its side face the open area. Where a fold closes in on the ports, the
+     first order (rising to the longest and falling off) that leaves the square in front of
+     every strip's end within one panel: else a strip run up beside the fold ends too near
+     it for its curve to open there. The stem's rails run along it (its
      traces at the pitch, held as laid in settling) and the curve opens at its end. (A
      strip made curve area instead, a corridor a spacing wide, left the stem a small cycle
      of its own that no merge joins.) Beside a longer strip, a curve's opening has no room
