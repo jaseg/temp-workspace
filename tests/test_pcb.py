@@ -554,13 +554,17 @@ def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
 @pytest.mark.slow
 def test_space_filling_curve_full_size():
     """The default box with the curve layout: checked (open, shorts) by the layout itself,
-    every panel reached, the space mostly within the nominal one -5 / +20 %."""
+    every panel reached; the set space the least (all but a sliver at least it), the traces
+    spread into the room left: on average about a fifth more, most of them within -5 / +20 %
+    of the set space."""
     result = pcb.layout(D.with_values(mesh_algorithm="sfc"))
     assert pcb.verify(result) == []
     for m in result.meshes.values():
         assert m.algorithm == "sfc" and m.unreached == 0
     for sp in result.spacing().values():
-        assert sp.under < 0.01 * sp.measured and sp.within > 0.6 * sp.measured
+        assert sp.under < 0.01 * sp.measured and sp.within > 0.5 * sp.measured
+    for average in result.average_space().values():
+        assert result.clearance <= average <= 1.3 * result.clearance
 
 
 @pytest.mark.slow
