@@ -109,8 +109,8 @@ pub fn chacha20_block(key: &[u32; 8], tail: [u32; 4]) -> [u32; 16] {
 impl Rng {
     pub fn new(key: &[u8; 32]) -> Rng {
         let mut k = [0u32; 8];
-        for (w, c) in k.iter_mut().zip(key.chunks_exact(4)) {
-            *w = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+        for (w, c) in k.iter_mut().zip(key.as_chunks::<4>().0) {
+            *w = u32::from_le_bytes(*c);
         }
         Rng {
             key: k,

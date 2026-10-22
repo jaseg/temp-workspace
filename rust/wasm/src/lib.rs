@@ -366,6 +366,7 @@ pub fn curve_graph(
 /// simplified within `tol`, turning at most `max_turn` a vertex (the extension's
 /// `smooth_traces`): `{points, lens}`.
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
 pub fn smooth_traces(
     lines: &[f64],
     line_lens: &[u32],
@@ -397,6 +398,7 @@ pub fn smooth_traces(
 /// `edge_lens`): `{rows, counts}`, seven numbers a piece (kind, start, middle, end), each
 /// line's number of pieces.
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
 pub fn fit_arcs(
     lines: &[f64],
     line_lens: &[u32],

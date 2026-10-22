@@ -372,6 +372,7 @@ fn _cells<'py>(
 /// point; a line's middle), end.
 #[pyfunction]
 #[pyo3(signature = (lines, tol, pitch = 0.0, most = 0.0, edges = None, max_turn = 0.0, give = 0.0))]
+#[allow(clippy::too_many_arguments)]
 fn fit_arcs<'py>(
     py: Python<'py>,
     lines: Vec<PyReadonlyArray2<'py, f64>>,
