@@ -11,7 +11,7 @@ be made of two identical pieces instead (see *Two pieces*).
 
 ## Installation & running
 
-Requires Python ≥ 3.11. With [uv](https://docs.astral.sh/uv/):
+Requires Python ≥ 3.12 (gerbonara 1.6, for the PCB exports, needs it). With [uv](https://docs.astral.sh/uv/):
 
 ```sh
 uvx yanartas-pillowbox                 # from PyPI, once published

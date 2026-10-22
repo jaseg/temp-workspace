@@ -7,13 +7,13 @@ name = "yanartas-pillowbox"
 version = "0.1.0"
 description = "Generate laser-ready SVG folding patterns for pillow boxes, configured through a local web UI."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 authors = [{ name = "jaseg" }]
 dependencies = [
     "flask>=3.0",
-    "gerbonara>=1.5.0",
+    "gerbonara>=1.6.3",
     "shapely>=2.2.0",
     "yanartas-mesh",  # (the mesh settling's Rust core: rust/python, built with maturin)
 ]
