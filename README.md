@@ -372,7 +372,9 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   sides. The board is made without its tracks and they are written into its file as text,
   each copper layer's in a process of its own (gerbonara takes minutes over a mesh's
   millions of segments; in the browser, one after the other); the Gerbers and SVGs draw them
-  straight from the layout (a lines-and-arcs track's arcs through their true centres).
+  straight from the layout (a lines-and-arcs track's arcs through their true centres). An
+  arc of a radius over 100 mm goes out as straight lines along it, within 5 % of the track
+  width of it: KiCad releases draw arcs of huge radius in the wrong place.
 
 ### Geometry model
 

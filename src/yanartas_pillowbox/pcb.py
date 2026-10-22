@@ -59,6 +59,10 @@ Point = tuple[float, float]
 VIA_SIZE, VIA_DRILL = 0.45, 0.2
 SLIT_WIDTH = 0.1  # the slits' cut, as a slot (a closed board edge)
 TOLERANCE = 0.005  # arcs as polylines (chord error)
+# arcs of a larger radius than this (mm) exported as lines, within this share of the
+# track's width of them (KiCad releases draw arcs of huge radius in the wrong place)
+LARGE_ARC = 100.0
+SHALLOW_ARC = 0.05
 FOLD_CLEARANCE = 1.0  # vias keep this far from the cable's folds
 STITCH_PITCH = 6.0  # GND stitching vias along the cable
 GND_VIA_EVERY = 4  # in a run of GND contacts, a via behind every this many (joined along)
@@ -216,6 +220,43 @@ def sample(segments: Iterable[Segment], tol: float = TOLERANCE) -> list[Point]:
     if len(out) > 1 and math.dist(out[0], out[-1]) < 1e-9:
         out.pop()
     return out
+
+
+def _flattened(pieces: Sequence[meshgen.Piece], tol: float) -> tuple[meshgen.Piece, ...]:
+    """The pieces, each arc of a radius over ``LARGE_ARC`` as lines along it, as few as keep
+    within ``tol`` of it."""
+    out: list[meshgen.Piece] = []
+    for a, m, b in pieces:
+        if m is None:
+            out.append((a, m, b))
+            continue
+        (ax, ay), (mx, my), (bx, by) = a, m, b
+        d = 2 * (ax * (my - by) + mx * (by - ay) + bx * (ay - my))
+        if abs(d) < 1e-15:  # (straight)
+            out.append((a, None, b))
+            continue
+        sa, sm, sb = ax * ax + ay * ay, mx * mx + my * my, bx * bx + by * by
+        cx = (sa * (my - by) + sm * (by - ay) + sb * (ay - my)) / d
+        cy = (sa * (bx - mx) + sm * (ax - bx) + sb * (mx - ax)) / d
+        r = math.dist((cx, cy), a)
+        if r <= LARGE_ARC:
+            out.append((a, m, b))
+            continue
+        # (n chords: each 1/n² as far off as the whole one; the arc's own sagitta at m)
+        t0 = math.atan2(ay - cy, ax - cx)
+        tm = (math.atan2(my - cy, mx - cx) - t0 + math.pi) % math.tau - math.pi
+        sag = r * (1 - math.cos(tm))
+        n = max(1, math.ceil(math.sqrt(sag / tol))) if tol > 0 else 1
+        pts = (
+            [a]
+            + [
+                (cx + r * math.cos(t0 + 2 * tm * k / n), cy + r * math.sin(t0 + 2 * tm * k / n))
+                for k in range(1, n)
+            ]
+            + [b]
+        )
+        out += [(p, None, q) for p, q in itertools.pairwise(pts)]
+    return tuple(out)
 
 
 def _unit(a: Point, b: Point) -> Point:
@@ -485,7 +526,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         result.meshes[layer] = m
         side = "F" if layer == FRONT else "B"
         for net, trace in enumerate(m.traces):
-            arcs = m.arcs[net] if m.arcs else None
+            arcs = _flattened(m.arcs[net], SHALLOW_ARC * w) if m.arcs else None
             result.tracks.append(Track(trace, layer, f"MESH_{side}{net + 1}", w, arcs))
         # The loops' ends, across the cable from pin 1's side: they run on into the cable.
         tracks[layer] = sorted(

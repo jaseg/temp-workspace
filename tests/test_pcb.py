@@ -586,6 +586,42 @@ def test_space_filling_curve_covers_every_face(changes):
     result = pcb.layout(D.with_values(**changes))
     assert pcb.verify(result) == []
     assert [m.unreached for m in result.meshes.values()] == [0, 0]
+    # (lines and arcs: no arc of so large a radius it goes out as lines)
+    for t in result.tracks:
+        for a, m, b in t.arcs or ():
+            assert m is None or _radius(a, m, b) <= pcb.LARGE_ARC
+
+
+def _radius(a, m, b):
+    (ax, ay), (mx, my), (bx, by) = a, m, b
+    d = 2 * (ax * (my - by) + mx * (by - ay) + bx * (ay - my))
+    sa, sm, sb = ax * ax + ay * ay, mx * mx + my * my, bx * bx + by * by
+    cx = (sa * (my - by) + sm * (by - ay) + sb * (ay - my)) / d
+    cy = (sa * (bx - mx) + sm * (ax - bx) + sb * (mx - ax)) / d
+    return math.dist((cx, cy), a)
+
+
+def test_large_arcs_go_out_as_lines():
+    """An arc of a radius over ``LARGE_ARC`` goes out as lines along it, within
+    ``SHALLOW_ARC`` of the track's width of it (KiCad releases draw arcs of huge radius in
+    the wrong place); smaller ones stay arcs, lines stay lines."""
+    w = 0.1
+    tol = pcb.SHALLOW_ARC * w
+    r = 1073.7  # (as one KiCad drew elsewhere: 9.2 mm long, 10 µm off its chord)
+    half = 4.6 / r
+    a, m, b = ((r * math.sin(s), r * math.cos(s)) for s in (-half, 0.0, half))
+    deep = ((-1.0, 0.0), (0.0, 1.0), (1.0, 0.0))
+    line = ((0.0, 0.0), None, (1.0, 1.0))
+    out = pcb._flattened([(a, m, b), deep, line], tol)
+    assert out[-2:] == (deep, line)
+    pieces = out[:-2]
+    assert len(pieces) == 2 and all(p[1] is None for p in pieces)
+    assert pieces[0][0] == a and pieces[-1][2] == b
+    for p, _, q in pieces:  # (on the arc, its chords within the tolerance of it)
+        for v in (p, q):
+            assert math.hypot(*v) == pytest.approx(r)
+        mid = ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
+        assert r - math.hypot(*mid) <= tol
 
 
 def test_traces_neck_down_where_the_exits_do_not_fit_the_cable():
