@@ -430,6 +430,29 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         help="Distance the mesh keeps from the foil's cut edges and slits.",
     ),
     FieldSpec(
+        "stiffener_flap_offset",
+        "Flap stiffener offset",
+        "float",
+        "PCB stiffeners",
+        "mm",
+        0,
+        10,
+        0.1,
+        help="How far the flaps' stiffeners (User.1 in the KiCad board, and the SVG's stiffener "
+        "layer) stay inside the flaps' outlines.",
+    ),
+    FieldSpec(
+        "stiffener_tab_offset",
+        "Glue-tab stiffener offset",
+        "float",
+        "PCB stiffeners",
+        "mm",
+        0,
+        10,
+        0.1,
+        help="How far the glue tab's stiffener stays inside the glue tab's outline.",
+    ),
+    FieldSpec(
         "mesh_seed",
         "Mesh seed",
         "text",
@@ -547,6 +570,8 @@ class Config:
     mesh_partitions: float = 3.0
     mesh_edge_clearance: float = 0.5
     mesh_seed: str = "0"
+    stiffener_flap_offset: float = 0.5
+    stiffener_tab_offset: float = 0.5
     mesh_algorithm: str = "kimesh"
     mesh_shape: str = "lines"
     mesh_back_offset: str = "cell"

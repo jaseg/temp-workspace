@@ -286,8 +286,8 @@ def test_kicad_page_holds_the_design_centred(layout, tmp_path):
 
 
 def test_stiffeners_on_user_1(layout):
-    """The glue tab and the lens-shaped flaps, as filled polygons on User.1: their faces'
-    areas."""
+    """The glue tab and the lens-shaped flaps, as filled polygons on User.1: their faces,
+    each shrunk by its stiffener offset (its edges moved in, the corners mitred)."""
     from shapely.geometry import Polygon as SPolygon
 
     from yanartas_pillowbox.geometry import build_pattern
@@ -299,8 +299,16 @@ def test_stiffeners_on_user_1(layout):
     polys = [p for p in board.polygons if p.layer == "User.1"]
     assert len(polys) == len(faces) and all(p.fill for p in polys)
     areas = sorted(SPolygon([(q.x, q.y) for q in p.pts]).area for p in polys)
-    expect = sorted(SPolygon(pcb.sample(f.boundary)).area for f in faces)
-    assert areas == pytest.approx(expect, rel=1e-6)
+    d = {"glue-tab": D.stiffener_tab_offset}
+    expect = sorted(
+        SPolygon(pcb.sample(f.boundary))
+        .buffer(-d.get(f.name, D.stiffener_flap_offset), join_style="mitre", mitre_limit=100)
+        .area
+        for f in faces
+    )
+    assert areas == pytest.approx(expect, rel=1e-3)
+    whole = sorted(SPolygon(pcb.sample(f.boundary)).area for f in faces)
+    assert all(a < w for a, w in zip(areas, whole, strict=True))
 
 
 def test_spare_pins_are_grounded(layout):

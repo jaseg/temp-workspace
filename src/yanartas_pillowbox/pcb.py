@@ -42,7 +42,7 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString, Polygon
 
-from yanartas_pillowbox import checkpoint, kimesh, partition, progress, rand, sfc
+from yanartas_pillowbox import checkpoint, geometry, kimesh, partition, progress, rand, sfc
 from yanartas_pillowbox import mesh as meshgen
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.geometry import (
@@ -205,21 +205,8 @@ def pinout(pins: int, traces: int, group: int | None = None) -> list[str | None]
 
 # ----------------------------------------------------------------------------- geometry
 def sample(segments: Iterable[Segment], tol: float = TOLERANCE) -> list[Point]:
-    """The chain of segments as a polyline (arcs within ``tol``), without the closing
-    repeat of its first point."""
-    out: list[Point] = []
-    for seg in segments:
-        if isinstance(seg, Arc):
-            step = 2 * math.acos(max(-1.0, 1 - tol / seg.radius))
-            n = max(1, math.ceil(abs(seg.sweep) / step))
-        else:
-            n = 1
-        pts = [seg.point_at(i / n) for i in range(n + 1)]
-        pts[0], pts[-1] = seg.start, seg.end
-        out.extend(pts if not out else pts[1:])
-    if len(out) > 1 and math.dist(out[0], out[-1]) < 1e-9:
-        out.pop()
-    return out
+    """The chain of segments as a polyline (arcs within ``tol``): ``geometry.sample``."""
+    return geometry.sample(list(segments), tol)
 
 
 def _flattened(pieces: Sequence[meshgen.Piece], tol: float) -> tuple[meshgen.Piece, ...]:
@@ -326,13 +313,13 @@ def _dedupe(pts: list[Point]) -> list[Point]:
     return out
 
 
-def stiffeners(pattern: Pattern) -> list[Polygon]:
+def stiffeners(
+    pattern: Pattern, flap_offset: float = 0.0, tab_offset: float = 0.0
+) -> list[Polygon]:
     """The glue tab and the lens-shaped flaps (outer and inner), as polygons: where
-    stiffeners may go."""
+    stiffeners may go, each shrunk by its offset (``geometry.stiffener_outlines``)."""
     return [
-        Polygon(sample(f.boundary))
-        for f in pattern.faces
-        if f.name == "glue-tab" or f.kind == "flap"
+        Polygon(p) for p in geometry.stiffener_outlines(pattern, flap_offset, tab_offset).values()
     ]
 
 
@@ -431,7 +418,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     }
 
     result = Layout(board, (*(f.segment for f in pattern.folds), *(f.segment for f in cable.folds)))
-    result.stiffeners = stiffeners(pattern)
+    result.stiffeners = stiffeners(pattern, cfg.stiffener_flap_offset, cfg.stiffener_tab_offset)
     result.area = mask
     result.clearance, result.width = space, w
     cell = 2 * n * pitch

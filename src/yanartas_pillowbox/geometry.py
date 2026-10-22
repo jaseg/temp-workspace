@@ -204,6 +204,95 @@ class Arc:
 Segment = Line | Arc
 
 
+def sample(segments: Sequence[Segment], tol: float = 0.005) -> list[Point]:
+    """The chain of segments as a polyline (arcs within ``tol``), without the closing
+    repeat of its first point."""
+    out: list[Point] = []
+    for seg in segments:
+        if isinstance(seg, Arc):
+            step = 2 * math.acos(max(-1.0, 1 - tol / seg.radius))
+            n = max(1, math.ceil(abs(seg.sweep) / step))
+        else:
+            n = 1
+        pts = [seg.point_at(i / n) for i in range(n + 1)]
+        pts[0], pts[-1] = seg.start, seg.end
+        out.extend(pts if not out else pts[1:])
+    if len(out) > 1 and math.dist(out[0], out[-1]) < 1e-9:
+        out.pop()
+    return out
+
+
+def stiffener_outlines(
+    pattern: Pattern, flap_offset: float = 0.0, tab_offset: float = 0.0
+) -> dict[str, list[Point]]:
+    """Where stiffeners may go, by face: the glue tab and the lens-shaped flaps (outer and
+    inner), each shrunk by its offset (``inset``; none left: left out)."""
+    out = {}
+    for f in pattern.faces:
+        if f.name == "glue-tab" or f.kind == "flap":
+            d = tab_offset if f.name == "glue-tab" else flap_offset
+            pts = inset(sample(list(f.boundary)), d)
+            if pts:
+                out[f.name] = pts
+    return out
+
+
+def inset(points: Sequence[Point], d: float) -> list[Point]:
+    """The closed polygon ``points`` shrunk by ``d``: each edge moved ``d`` inward, parallel,
+    the corners mitred (sharp ones stay sharp). Where that reverses an edge (past a sharp
+    tip, or across a narrow neck of finely sampled curve), the edge is gone: its neighbours
+    meet instead, until none is reversed. Nothing left (or turned inside out): empty."""
+    pts: list[Point] = []
+    for p in points:
+        if not pts or math.dist(p, pts[-1]) > 1e-9:
+            pts.append(p)
+    while len(pts) > 1 and math.dist(pts[0], pts[-1]) <= 1e-9:
+        pts.pop()
+    if d <= 0 or len(pts) < 3:
+        return pts if d <= 0 else []
+
+    def area(q: Sequence[Point]) -> float:
+        return sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(q, [*q[1:], q[0]], strict=True)) / 2
+
+    whole = area(pts)
+    side = 1.0 if whole > 0 else -1.0  # (the inward normal: to the left of a positive loop)
+    # Each edge's line moved in: a point on it and its direction.
+    lines = []
+    for i, (x0, y0) in enumerate(pts):
+        x1, y1 = pts[(i + 1) % len(pts)]
+        length = math.hypot(x1 - x0, y1 - y0)
+        ux, uy = (x1 - x0) / length, (y1 - y0) / length
+        lines.append(((x0 - side * uy * d, y0 + side * ux * d), (ux, uy)))
+
+    def meet(a: tuple, b: tuple) -> Point:
+        (p, u), (q, v) = a, b
+        cross = u[0] * v[1] - u[1] * v[0]
+        if abs(cross) < 1e-12:  # (parallel: straight on)
+            return q
+        t = ((q[0] - p[0]) * v[1] - (q[1] - p[1]) * v[0]) / cross
+        return (p[0] + t * u[0], p[1] + t * u[1])
+
+    while len(lines) >= 3:
+        n = len(lines)
+        corners = [meet(lines[i - 1], lines[i]) for i in range(n)]  # (corner i starts edge i)
+        reversed_ = [
+            i
+            for i in range(n)
+            if (corners[(i + 1) % n][0] - corners[i][0]) * lines[i][1][0]
+            + (corners[(i + 1) % n][1] - corners[i][1]) * lines[i][1][1]
+            < 0
+        ]
+        if not reversed_:
+            break
+        drop = set(reversed_[::2]) if len(reversed_) > 1 else set(reversed_)
+        lines = [ln for i, ln in enumerate(lines) if i not in drop]
+    else:
+        return []
+    out = [meet(lines[i - 1], lines[i]) for i in range(len(lines))]
+    left = area(out)
+    return out if left * whole > 0 and abs(left) < abs(whole) else []
+
+
 def arc_through(center: Point, radius: float, start: Point, end: Point, via: Point) -> Arc:
     """Arc on the given circle from ``start`` to ``end`` that passes the direction of ``via``."""
     a0, a1, av = _angle(center, start), _angle(center, end), _angle(center, via)

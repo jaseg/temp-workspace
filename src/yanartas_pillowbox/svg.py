@@ -28,6 +28,7 @@ from yanartas_pillowbox.geometry import (
     Point,
     Segment,
     build_pattern,
+    stiffener_outlines,
 )
 
 MARGIN = 10.0  # mm on every side
@@ -198,17 +199,15 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
             "display": "none",
         },
     )
-    for face in pattern.faces:
-        if face.name == "glue-tab" or face.kind == "flap":
-            ET.SubElement(
-                g,
-                f"{{{SVG_NS}}}path",
-                {
-                    "id": f"stiffener-{face.name}",
-                    "d": path_data(list(face.boundary), offset, close=True),
-                    **stroke_attrs(None),
-                },
-            )
+    # (each shrunk by its offset: a polygon then, the arcs sampled finely)
+    outlines = stiffener_outlines(pattern, cfg.stiffener_flap_offset, cfg.stiffener_tab_offset)
+    for name, pts in outlines.items():
+        d = "M " + " L ".join(f"{fmt(x + offset[0])} {fmt(y + offset[1])}" for x, y in pts) + " Z"
+        ET.SubElement(
+            g,
+            f"{{{SVG_NS}}}path",
+            {"id": f"stiffener-{name}", "d": d, **stroke_attrs(None)},
+        )
 
     _labels(root, cfg, pattern, offset)
 

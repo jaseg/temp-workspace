@@ -15,7 +15,9 @@ from yanartas_pillowbox.geometry import (
     arc_from_chord,
     build_pattern,
     fold_direction,
+    inset,
     lid_layout,
+    stiffener_outlines,
 )
 
 CONFIGS = {
@@ -422,3 +424,41 @@ def test_lid_glue_tabs(tab):
         assert any(abs(gap) < 1e-9 for gap in gaps) and len(pat.scraps) == 2
         assert right.y_range(right.x0 + 1e-6)[1] == pytest.approx(-dd)
     assert not [f for f in build_pattern(cfg.with_values(end_wall_gap=0)).faces if "lid" in f.name]
+
+
+def test_inset_moves_every_edge_in_and_keeps_corners_sharp():
+    """A polygon shrunk: each edge moved in by the offset, parallel, the corners mitred;
+    either way round; nothing left (or turned inside out): empty; no offset: as it was."""
+    square = [(0, 0), (10, 0), (10, 10), (0, 10)]
+    assert inset(square, 1) == pytest.approx([(1, 1), (9, 1), (9, 9), (1, 9)])
+    assert inset(square[::-1], 1) == pytest.approx([(1, 9), (9, 9), (9, 1), (1, 1)])
+    # (a sharp corner stays sharp: its tip moves in along its bisector, 1 / sin(half its angle))
+    tri = [(0, 0), (10, 0), (0, 2)]
+    out = inset(tri, 0.1)
+    for (x, y), (a, b) in zip(out, tri, strict=True):
+        assert (x, y) != pytest.approx((a, b))
+    assert inset(square, 5) == [] and inset(square, 6) == []
+    assert inset([*square, (0, 0)], 0) == square  # (the closing point dropped)
+
+
+@pytest.mark.parametrize("pieces", ["one", "two"])
+def test_stiffeners_are_the_faces_shrunk(pieces):
+    """The glue tab and the flaps, each shrunk by its own offset; none: the faces as drawn."""
+    from shapely.geometry import Polygon
+
+    from yanartas_pillowbox.geometry import sample
+
+    cfg = Config.defaults().with_values(pieces=pieces, lid_offset=1.5)
+    pattern = build_pattern(cfg)
+    faces = {f.name: Polygon(sample(list(f.boundary))) for f in pattern.faces}
+    plain = stiffener_outlines(pattern)
+    assert set(plain) == {f.name for f in pattern.faces if f.name == "glue-tab" or f.kind == "flap"}
+    for name, pts in plain.items():
+        assert Polygon(pts).area == pytest.approx(faces[name].area)
+    shrunk = stiffener_outlines(pattern, 0.5, 1.0)
+    for name, pts in shrunk.items():
+        d = 1.0 if name == "glue-tab" else 0.5
+        p = Polygon(pts)
+        mitred = faces[name].buffer(-d, join_style="mitre", mitre_limit=100)
+        assert mitred.buffer(1e-3).contains(p) and faces[name].contains(p)
+        assert p.area == pytest.approx(mitred.area, rel=1e-3)
