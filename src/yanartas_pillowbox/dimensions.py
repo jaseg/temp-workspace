@@ -258,16 +258,17 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
             w,
             at=y1 + dy + gap,
         ),
-        # (length and height off the sheet to the right, beyond the taper; their extension
-        # lines from the drawn lines at the middle: the other piece's inner wall, this one's
-        # fold, its cut edge; t/2 outside the surfaces measured between)
+        # (length and height off the sheet to the right, in line with the taper: one after
+        # the other along the piece; their extension lines from the drawn lines at the
+        # middle: the other piece's inner wall, this one's fold, its cut edge; t/2 outside
+        # the surfaces measured between)
         Dimension(
             "length",
             f"length {fmt(cfg.length)}",
             "vertical",
             (p(xm, ya), p(xm, yb)),
             yb - ya,
-            at=x1 + dx + gap * (1 + 2 * SIDE_STEP),
+            at=x1 + dx + gap,
             extensions=(
                 (p(xm, ya - t / 2), p(xm, ya)),
                 (p(xm, yb + t / 2), p(xm, yb)),
@@ -279,7 +280,7 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
             "vertical",
             (p(xm, y_fold), p(xm, y_cut)),
             y_cut - y_fold,
-            at=x1 + dx + gap * (1 + SIDE_STEP),
+            at=x1 + dx + gap,
             extensions=(
                 (p(xm, y_fold - t / 2), p(xm, y_fold)),
                 (p(xm, y_cut), p(xm, y_cut)),
@@ -304,7 +305,7 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
                 (p(w, d), p(w + g, d + taper)),
                 taper,
                 at=x1 + dx + gap,
-                label_first=True,  # (above it: clear of the length's and height's)
+                label_first=True,  # (above it, off the sheet: clear of the length's)
             )
         )
     if e > 0:
