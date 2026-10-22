@@ -47,10 +47,15 @@ export function drawDims2d(dims, { fs, flipY = false }) {
       const at = horiz && flipY ? -d.at : d.at;
       const q1 = horiz ? [p1[0], at] : [at, p1[1]];
       const q2 = horiz ? [p2[0], at] : [at, p2[1]];
-      for (const [p, q] of [[p1, q1], [p2, q2]]) {
-        const dir = Math.sign(horiz ? q[1] - p[1] : q[0] - p[0]) || 1;
+      // (an extension line from where given, e.g. the drawn line the measured point lies
+      // off by the material allowance; else from the point)
+      const from = (d.extensions ?? []).map(([e]) => T(e));
+      for (const [i, [p, q]] of [[p1, q1], [p2, q2]].entries()) {
+        const e = from[i] ?? p;
+        const dir = Math.sign(horiz ? q[1] - e[1] : q[0] - e[0]) || 1;
         const over = horiz ? [q[0], q[1] + dir * fs * 0.4] : [q[0] + dir * fs * 0.4, q[1]];
-        if (Math.hypot(q[0] - p[0], q[1] - p[1]) > 1e-6) g.append(line(p, over, "ext"));
+        if (Math.hypot(q[0] - e[0], q[1] - e[1]) > 1e-6) g.append(line(e, over, "ext"));
+        if (from[i]) track(e);
       }
       g.append(line(q1, q2), ...arrows(q1, q2, a));
       const mid = [(q1[0] + q2[0]) / 2, (q1[1] + q2[1]) / 2];

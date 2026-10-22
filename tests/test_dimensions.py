@@ -318,3 +318,25 @@ def test_inner_end_walls_are_drawn_on_the_front_panel(pieces):
             y_fold = fold.y_range(x)[1 if end == "top" else 0]
             ys = LineString(pts).intersection(LineString([(x, -1e3), (x, 1e3)]))
             assert math.isclose(abs(ys.y - y_fold), e, abs_tol=t + 0.5), (end, x)
+
+
+@pytest.mark.parametrize("pieces", ["one", "two"])
+def test_gap_extension_lines_reach_the_fold_and_the_inner_wall(pieces):
+    """The end wall gap's extension lines start on the drawn lines it lies between: the
+    outer flap's fold and the inner wall's arc (``landing_outlines``), at their apexes."""
+    from shapely.geometry import LineString
+    from shapely.geometry import Point as SPoint
+
+    cfg = Config.defaults().with_values(pieces=pieces, lid_offset=1.5)
+    pattern = build_pattern(cfg)
+    offset = sheet_offset(pattern)
+    gap = next(d for d in dm.pattern_dimensions(cfg, pattern, offset) if d.param == "end_wall_gap")
+    (fold, _), (wall, _) = gap.extensions
+    end = "top" if pieces == "two" else "bottom"
+    arc = next(o for o in dm.landing_outlines(cfg, pattern, offset) if end in o["label"])
+    assert LineString(arc["points"]).distance(SPoint(wall)) < 1e-3
+    w = cfg.shell.front.width
+    y = pattern.face(f"front-{end}-flap").y_range(w / 2)[1 if end == "top" else 0]
+    assert fold == pytest.approx((w / 2 + offset[0], y + offset[1]), abs=1e-6)
+    # (the apexes: the middle, where both lie furthest in)
+    assert fold[0] == wall[0] == pytest.approx(w / 2 + offset[0])

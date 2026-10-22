@@ -174,6 +174,11 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 (p(wf / 2, yg[0]), p(wf / 2, yg[1])),
                 yg[0] - yg[1],
                 at=wf * 0.3 + dx,  # beside the midline, clear of the exported labels
+                # (from the drawn fold's and inner wall's apexes, t/2 outside the surfaces)
+                extensions=(
+                    (p(wf / 2, yg[0] + t / 2), p(wf * 0.3, yg[0])),
+                    (p(wf / 2, yg[1] - t / 2), p(wf * 0.3, yg[1])),
+                ),
             )
         )
     lid = lid_layout(cfg)
@@ -272,6 +277,11 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
                 (p(w * 0.3, s + t / 2), p(w * 0.3, d + s - t / 2)),
                 d - t,
                 at=w * 0.3 + dx,
+                # (from the drawn fold's and inner wall's apexes, t/2 outside the surfaces)
+                extensions=(
+                    (p(w / 2, s), p(w * 0.3, s + t / 2)),
+                    (p(w / 2, d + s), p(w * 0.3, d + s - t / 2)),
+                ),
             )
         )
     lid = lid_layout(cfg)
