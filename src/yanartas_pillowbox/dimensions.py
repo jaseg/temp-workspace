@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -194,6 +195,15 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 (p(wf / 2, y_edge), p(wf / 2, y_edge + cfg.lid_overlap)),
                 cfg.lid_overlap,
                 at=wf * 0.3 + dx,
+                # (from the lid's edge and the drawn inner wall under it, t/2 outside its
+                # outer surface)
+                extensions=(
+                    (p(wf / 2, y_edge), p(wf * 0.3, y_edge)),
+                    (
+                        p(wf / 2, y_edge + cfg.lid_overlap - t / 2),
+                        p(wf * 0.3, y_edge + cfg.lid_overlap),
+                    ),
+                ),
             )
         )
     return dims
@@ -295,6 +305,12 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
                 (p(xm, y_edge), p(xm, y_edge + cfg.lid_overlap)),
                 cfg.lid_overlap,
                 at=w * 0.3 + dx,
+                # (from the lid's edge and the drawn inner wall under it, t/2 outside its
+                # outer surface)
+                extensions=(
+                    (p(xm, y_edge), p(w * 0.3, y_edge)),
+                    (p(xm, y_edge + cfg.lid_overlap - t / 2), p(w * 0.3, y_edge + cfg.lid_overlap)),
+                ),
             )
         )
     return dims
@@ -335,55 +351,90 @@ def landing_outlines(cfg: Config, pattern: Pattern, offset: Point) -> list[dict[
             ("back-top-flap", "lower", "top", False),
             ("back-bottom-flap", "upper", "bottom", False),
         ]
+    k, length = box.lid_level, box.length
     out = []
     for inner, edge, end, other in ends:
-        # (on the front panel and the overhangs beside it: by the glued edge the inner wall
-        # reaches a little past the front panel's free edge, off the sheet there)
-        body = [pattern.face(n) for n in ("front-panel", f"front-{end}-left", f"front-{end}-right")]
+        # Where it stands along the box (Y, unflipped; the same at a given X all down the
+        # wall), carried onto the front panel (its flat y that distance along the box) and
+        # onto the lid closing over it (folded back at the lid's level: the overlap's end).
+        # (On the front panel, the overhangs beside it too: by the glued edge the inner wall
+        # reaches a little past the front panel's free edge, off the sheet there.)
+        panel = ["front-panel", f"front-{end}-left", f"front-{end}-right"]
+        targets = [(panel, lambda y: y, f"inner end wall, folded, at the {end} end")]
+        if lid is not None and any(f.name == f"front-{end}-lid" for f in pattern.faces):
+            fold = (lambda y: k - y) if end == "top" else (lambda y: 2 * length - k - y)
+            targets.append(([f"front-{end}-lid"], fold, f"inner end wall, under the {end} lid"))
+        for names, flat_y, label in targets:
+            body = [pattern.face(n) for n in names]
+            pts = _clipped(
+                getattr(pattern.face(inner), edge),
+                lambda p, inner=inner, other=other, flat_y=flat_y: _carried(
+                    box, inner, other, p, flat_x, flat_y
+                ),
+                lambda q, body=body: any(
+                    f.x0 <= q[0] <= f.x1 and _within(f.y_range(q[0]), q[1]) for f in body
+                ),
+            )
+            out.append(
+                {
+                    "param": None,
+                    "kind": "outline",
+                    "label": label,
+                    "value": 0.0,
+                    "points": [_r((x + dx, y + dy)) for x, y in pts],
+                }
+            )
+    return out
 
-        def on(q: Point) -> bool:
-            return any(f.x0 <= q[0] <= f.x1 and _within(f.y_range(q[0]), q[1]) for f in body)  # noqa: B023
 
-        def at(seg: Any, u: float) -> Point:
-            q = box.map(inner, seg.point_at(u))  # noqa: B023
-            if other:  # noqa: B023
-                q = box.other(q)
-            # (the front panel's flat y is its distance along the box: Y = cy - y)
-            return (flat_x(q[0]), box.cy - q[1])
+def _carried(
+    box: FoldedBox,
+    face: str,
+    other: bool,
+    p: Point,
+    flat_x: Callable[[float], float],
+    flat_y: Callable[[float], float],
+) -> Point:
+    """Flat point p of an inner flap, folded (two pieces: the other piece's), in the flat
+    coordinates ``flat_x`` of its X and ``flat_y`` of its distance along the box."""
+    q = box.map(face, p)
+    if other:
+        q = box.other(q)
+    return (flat_x(q[0]), flat_y(box.cy - q[1]))
 
-        runs: list[list[Point]] = [[]]
-        for seg in getattr(pattern.face(inner), edge):
-            n = max(2, math.ceil(seg.length / 0.5))
-            for i in range(n + 1):
-                q = at(seg, i / n)
-                pts = runs[-1]
-                if on(q):
-                    if not pts and i > 0:  # (from where it comes onto the panel)
-                        lo, hi = (i - 1) / n, i / n
-                        for _ in range(40):
-                            mid = (lo + hi) / 2
-                            lo, hi = (lo, mid) if on(at(seg, mid)) else (mid, hi)
-                        pts.append(at(seg, hi))
-                    pts.append(q)
-                elif pts and i > 0 and on(at(seg, (i - 1) / n)):  # (to where it leaves it)
+
+def _clipped(
+    segments: Sequence[Any], at: Callable[[Point], Point], on: Callable[[Point], bool]
+) -> list[Point]:
+    """The chain of segments carried by ``at``, sampled every half millimetre or so: its
+    longest run that ``on`` holds along (from and to where it comes on and goes off)."""
+    runs: list[list[Point]] = [[]]
+    for seg in segments:
+        n = max(2, math.ceil(seg.length / 0.5))
+
+        def q(u: float, seg: Any = seg) -> Point:
+            return at(seg.point_at(u))
+
+        for i in range(n + 1):
+            p = q(i / n)
+            pts = runs[-1]
+            if on(p):
+                if not pts and i > 0:  # (from where it comes on)
                     lo, hi = (i - 1) / n, i / n
                     for _ in range(40):
                         mid = (lo + hi) / 2
-                        lo, hi = (mid, hi) if on(at(seg, mid)) else (lo, mid)
-                    pts.append(at(seg, lo))
-                    runs.append([])
-        pts = max(runs, key=len)
-        pts = [(x + dx, y + dy) for k, (x, y) in enumerate(pts) if k == 0 or (x, y) != pts[k - 1]]
-        out.append(
-            {
-                "param": None,
-                "kind": "outline",
-                "label": f"inner end wall, folded, at the {end} end",
-                "value": 0.0,
-                "points": [_r(p) for p in pts],
-            }
-        )
-    return out
+                        lo, hi = (lo, mid) if on(q(mid)) else (mid, hi)
+                    pts.append(q(hi))
+                pts.append(p)
+            elif pts and i > 0 and on(q((i - 1) / n)):  # (to where it goes off)
+                lo, hi = (i - 1) / n, i / n
+                for _ in range(40):
+                    mid = (lo + hi) / 2
+                    lo, hi = (mid, hi) if on(q(mid)) else (lo, mid)
+                pts.append(q(lo))
+                runs.append([])
+    pts = max(runs, key=len)
+    return [p for k, p in enumerate(pts) if k == 0 or p != pts[k - 1]]
 
 
 def _within(span: tuple[float, float], v: float, tol: float = 1e-6) -> bool:

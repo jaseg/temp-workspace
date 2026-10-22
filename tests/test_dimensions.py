@@ -299,7 +299,7 @@ def test_inner_end_walls_are_drawn_on_the_front_panel(pieces):
     cfg = Config.defaults().with_values(pieces=pieces, lid_offset=1.5)
     pattern = build_pattern(cfg)
     dx, dy = sheet_offset(pattern)
-    outlines = dm.landing_outlines(cfg, pattern, (dx, dy))
+    outlines = [o for o in dm.landing_outlines(cfg, pattern, (dx, dy)) if "folded" in o["label"]]
     assert len(outlines) == (1 if pieces == "two" else 2)
     names = ("front-panel", "front-top-left", "front-top-right", "front-bottom-left",
              "front-bottom-right")  # fmt: skip
@@ -333,10 +333,47 @@ def test_gap_extension_lines_reach_the_fold_and_the_inner_wall(pieces):
     gap = next(d for d in dm.pattern_dimensions(cfg, pattern, offset) if d.param == "end_wall_gap")
     (fold, _), (wall, _) = gap.extensions
     end = "top" if pieces == "two" else "bottom"
-    arc = next(o for o in dm.landing_outlines(cfg, pattern, offset) if end in o["label"])
+    arc = next(
+        o
+        for o in dm.landing_outlines(cfg, pattern, offset)
+        if o["label"] == f"inner end wall, folded, at the {end} end"
+    )
     assert LineString(arc["points"]).distance(SPoint(wall)) < 1e-3
     w = cfg.shell.front.width
     y = pattern.face(f"front-{end}-flap").y_range(w / 2)[1 if end == "top" else 0]
     assert fold == pytest.approx((w / 2 + offset[0], y + offset[1]), abs=1e-6)
     # (the apexes: the middle, where both lie furthest in)
     assert fold[0] == wall[0] == pytest.approx(w / 2 + offset[0])
+
+
+@pytest.mark.parametrize("pieces", ["one", "two"])
+def test_inner_end_walls_are_drawn_under_the_lids(pieces):
+    """Where each inner end wall stands under the lid closing over it: one open arc per lid,
+    on the lid, the overlap in from its free edge at the middle (to the wall's outer surface,
+    t/2 off it); the overlap's extension lines start on the lid's edge and on that arc."""
+    from shapely.geometry import LineString
+    from shapely.geometry import Point as SPoint
+
+    cfg = Config.defaults().with_values(pieces=pieces, lid_offset=1.5)
+    pattern = build_pattern(cfg)
+    dx, dy = offset = sheet_offset(pattern)
+    lids = [f for f in pattern.faces if f.name in ("front-top-lid", "front-bottom-lid")]
+    arcs = [o for o in dm.landing_outlines(cfg, pattern, offset) if "lid" in o["label"]]
+    assert len(arcs) == len(lids) == (1 if pieces == "two" else 2)
+    w, t, lap = cfg.shell.front.width, cfg.thickness, cfg.lid_overlap
+    for o in arcs:
+        end = "top" if "top" in o["label"] else "bottom"
+        lid = pattern.face(f"front-{end}-lid")
+        pts = [(x - dx, y - dy) for x, y in o["points"]]
+        assert pts[0] != pts[-1]
+        for x, y in pts:
+            lo, hi = lid.y_range(min(max(x, lid.x0), lid.x1))
+            assert lid.x0 - 1e-6 <= x <= lid.x1 + 1e-6 and lo - 1e-6 <= y <= hi + 1e-6
+        edge = lid.y_range(w / 2)[0 if end == "top" else 1]
+        cut = LineString(pts).intersection(LineString([(w / 2, -1e3), (w / 2, 1e3)]))
+        assert abs(cut.y - edge) == pytest.approx(lap - t / 2, abs=1e-3)
+    gap = next(d for d in dm.pattern_dimensions(cfg, pattern, offset) if d.param == "lid_overlap")
+    (start, _), (wall, _) = gap.extensions
+    top = next(o for o in arcs if "top" in o["label"])
+    assert LineString(top["points"]).distance(SPoint(wall)) < 1e-3
+    assert start[1] - dy == pytest.approx(pattern.face("front-top-lid").y_range(start[0] - dx)[0])
