@@ -7,6 +7,11 @@
 import { DIM_STYLE, drawDims2d, highlightDims, labelPx } from "../dims2d.js";
 import { LINE_STYLES, lineSwatch } from "../lines.js";
 import { COPPER, rasterize } from "../meshtex.js";
+
+// The two copper layers multiplied where they cross: a dark colour of their own there, so
+// one layer's trace over the other's stands out from either alone (the stage is light in
+// both themes, so it never reads as a break).
+const MESH_STYLE = { alpha: { back: 0.85, front: 0.85 }, blend: "multiply" };
 import { MAXIMIZE_STYLE, maximizeButton } from "../panels.js";
 import { attachPanZoom, unitsPerPixel } from "../panzoom.js";
 import { SCALEBAR_STYLE, scaleBar, updateScaleBar } from "../scalebar.js";
@@ -208,7 +213,7 @@ export class PbPreview2d extends HTMLElement {
       this.#drawLegend();
       return;
     }
-    const { canvas, bbox } = rasterize(pcb, ["back", "front"], { alpha: { back: 0.55, front: 0.8 } });
+    const { canvas, bbox } = rasterize(pcb, ["back", "front"], MESH_STYLE);
     const [x0, y0, x1, y1] = bbox;
     const [dx, dy] = pcb.offset;
     const mesh = { url: null, x: x0 + dx, y: y0 + dy, w: x1 - x0, h: y1 - y0 };
@@ -258,7 +263,7 @@ export class PbPreview2d extends HTMLElement {
     // Opaque, on the stage's colour: the blurrier whole bitmap must not show through.
     const background = getComputedStyle(this.#stage).backgroundColor;
     const { canvas } = rasterize(pcb, ["back", "front"], {
-      maxSize: Math.ceil(px), region, background, alpha: { back: 0.55, front: 0.8 } });
+      maxSize: Math.ceil(px), region, background, ...MESH_STYLE });
     const detail = { url: null, x: vx, y: vy, w: vw, h: vh };
     canvas.toBlob((blob) => {
       if (this.#mesh !== mesh || this.#meshData !== pcb) return;
