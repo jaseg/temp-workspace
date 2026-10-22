@@ -28,6 +28,8 @@ from yanartas_pillowbox.crosssection import curve_samples
 from yanartas_pillowbox.geometry import FoldedBox, Pattern, Point, Point3, lid_layout
 from yanartas_pillowbox.svg import MARGIN
 
+SIDE_STEP = 0.6  # dimensions side by side off the sheet: this many sheet gaps apart
+
 Coords = tuple[float, ...]
 
 
@@ -43,6 +45,9 @@ class Dimension:
     line: tuple[Coords, ...] = ()
     extensions: tuple[tuple[Coords, Coords], ...] = ()
     label_at: Coords | None = None
+    # (2D, too short for its label between its ends: the label beyond its first point, not
+    # its second)
+    label_first: bool = False
 
     def to_json(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -62,6 +67,8 @@ class Dimension:
             out["extensions"] = [[_r(a), _r(b)] for a, b in self.extensions]
         if self.label_at is not None:
             out["labelAt"] = _r(self.label_at)
+        if self.label_first:
+            out["labelFirst"] = True
         return out
 
 
@@ -129,13 +136,19 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
             wf + wb,
             at=y1 + dy + gap,
         ),
+        # (length and height off the sheet to the right, beyond the taper; their extension
+        # lines from the drawn folds, t/2 outside the surfaces measured between)
         Dimension(
             "length",
             f"length {fmt(cfg.length)}",
             "vertical",
             (p(xh, ya), p(xh, yb)),
             yb - ya,
-            at=wf + wb * 0.3 + dx,  # beside the midline, clear of the exported labels
+            at=x1 + dx + gap * (1 + 2 * SIDE_STEP),
+            extensions=(
+                (p(xh, ya - t / 2), p(xh, ya)),
+                (p(xh, yb + t / 2), p(xh, yb)),
+            ),
         ),
         Dimension(
             "height",
@@ -143,7 +156,11 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
             "vertical",
             (p(xh, y_fold), p(xh, y_cut)),
             abs(y_fold - y_cut),
-            at=wf + wb * 0.8 + dx,  # beside the middle, clear of the exported labels
+            at=x1 + dx + gap * (1 + SIDE_STEP),
+            extensions=(
+                (p(xh, y_fold + (-t / 2 if cut == {"front"} else t / 2)), p(xh, y_fold)),
+                (p(xh, y_cut), p(xh, y_cut)),
+            ),
         ),
         # Glue tab: width and taper both dimensioned at the tab's bottom end.
         Dimension(
@@ -164,6 +181,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 (p(wf + wb, e + edge), p(wf + wb + g, e + edge - taper)),
                 taper,
                 at=x1 + dx + gap,
+                label_first=True,  # (below it: clear of the length's and height's)
             )
         )
     if e > 0:
@@ -194,6 +212,7 @@ def pattern_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dim
                 "vertical",
                 (p(wf / 2, y_edge), p(wf / 2, y_edge + cfg.lid_overlap)),
                 cfg.lid_overlap,
+                label_first=True,  # (above the lid's edge: off the sheet)
                 at=wf * 0.3 + dx,
                 # (from the lid's edge and the drawn inner wall under it, t/2 outside its
                 # outer surface)
@@ -239,13 +258,20 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
             w,
             at=y1 + dy + gap,
         ),
+        # (length and height off the sheet to the right, beyond the taper; their extension
+        # lines from the drawn lines at the middle: the other piece's inner wall, this one's
+        # fold, its cut edge; t/2 outside the surfaces measured between)
         Dimension(
             "length",
             f"length {fmt(cfg.length)}",
             "vertical",
-            (p(w * 0.7, ya), p(w * 0.7, yb)),
+            (p(xm, ya), p(xm, yb)),
             yb - ya,
-            at=w * 0.7 + dx,
+            at=x1 + dx + gap * (1 + 2 * SIDE_STEP),
+            extensions=(
+                (p(xm, ya - t / 2), p(xm, ya)),
+                (p(xm, yb + t / 2), p(xm, yb)),
+            ),
         ),
         Dimension(
             "height",
@@ -253,7 +279,11 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
             "vertical",
             (p(xm, y_fold), p(xm, y_cut)),
             y_cut - y_fold,
-            at=w * 0.8 + dx,
+            at=x1 + dx + gap * (1 + SIDE_STEP),
+            extensions=(
+                (p(xm, y_fold - t / 2), p(xm, y_fold)),
+                (p(xm, y_cut), p(xm, y_cut)),
+            ),
         ),
         # Glue tab: width and taper both at the tab's top end.
         Dimension(
@@ -274,6 +304,7 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
                 (p(w, d), p(w + g, d + taper)),
                 taper,
                 at=x1 + dx + gap,
+                label_first=True,  # (above it: clear of the length's and height's)
             )
         )
     if e > 0:
@@ -304,6 +335,7 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
                 "vertical",
                 (p(xm, y_edge), p(xm, y_edge + cfg.lid_overlap)),
                 cfg.lid_overlap,
+                label_first=True,  # (above the lid's edge: off the sheet)
                 at=w * 0.3 + dx,
                 # (from the lid's edge and the drawn inner wall under it, t/2 outside its
                 # outer surface)

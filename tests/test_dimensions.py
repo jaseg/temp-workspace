@@ -121,12 +121,16 @@ def test_length_dimension_runs_along_the_inner_flaps(cfg):
     dx, dy = sheet_offset(pattern)
     length = next(d for d in dm.pattern_dimensions(cfg, pattern, (dx, dy)) if d.param == "length")
     inset = cfg.thickness / 2
-    for p, fold, k in zip(length.points, ("back-top", "back-bottom"), (1, -1), strict=True):
+    ends = zip(length.points, length.extensions, ("back-top", "back-bottom"), (1, -1), strict=True)
+    for p, (start, _), fold, k in ends:
         apex = pattern.fold(fold).segment.point_at(0.5)
         assert p == pytest.approx((apex[0] + dx, apex[1] + dy + k * inset))
-    # (drawn beside the midline, clear of the exported labels)
-    shell = cfg.shell
-    assert length.at == pytest.approx(shell.front.width + shell.back.width * 0.3 + dx)
+        # (its extension lines from the drawn folds)
+        assert start == pytest.approx((apex[0] + dx, apex[1] + dy))
+    # (drawn off the sheet to the right, beyond the taper)
+    x1 = pattern.bbox[2] + dx
+    others = [d.at for d in dm.pattern_dimensions(cfg, pattern, (dx, dy)) if d.kind == "vertical"]
+    assert length.at > x1 and length.at == max(others)
 
 
 def test_gap_dimension_on_the_front_panel(cfg):

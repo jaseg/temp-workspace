@@ -64,13 +64,15 @@ export function drawDims2d(dims, { fs, flipY = false }) {
         g.append(line(q1, q2), ...arrows(q1, q2, a));
       } else {
         // Too short for its arrows and label between the extension lines: the arrows outside,
-        // pointing in on leaders, and the label beyond the second one's leader.
+        // pointing in on leaders, and the label beyond the second one's leader (labelFirst:
+        // the first one's).
         const u = span > 1e-9 ? unit(q1, q2) : (horiz ? [1, 0] : [0, 1]);
         const o1 = [q1[0] - u[0] * 2 * a, q1[1] - u[1] * 2 * a];
         const o2 = [q2[0] + u[0] * 2 * a, q2[1] + u[1] * 2 * a];
         g.append(line(o1, o2), arrowTip(q1, u, a), arrowTip(q2, [-u[0], -u[1]], a));
         const k = 2 * a + half + fs * 0.4;
-        mid = [q2[0] + u[0] * k, q2[1] + u[1] * k];
+        const [e, sign] = d.labelFirst ? [q1, -1] : [q2, 1];
+        mid = [e[0] + sign * u[0] * k, e[1] + sign * u[1] * k];
         track(o1, o2);
       }
       g.append(label(mid, d.label, fs, horiz ? 0 : -90));
