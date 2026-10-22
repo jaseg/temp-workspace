@@ -286,13 +286,13 @@ def test_render_returns_dimensions(tmp_path):
 
 
 @pytest.mark.parametrize("pieces", ["one", "two"])
-def test_inner_flaps_landing_outlines_lie_on_the_outer_flaps(pieces):
-    """Where each inner flap lands, folded, on the outer flap over it: a closed outline, in
-    the dimensions layer, within that flap (its fold along the other panel, its cut edge
-    inside the box); one per outer flap."""
+def test_inner_end_walls_are_drawn_on_the_front_panel(pieces):
+    """Where each inner end wall stands, folded, seen on the front panel: one open arc per
+    end (its flap's cut edge), in the dimensions layer, inside the front panel (and the
+    overhangs beside it), the end wall gap in from the outer flap's fold all along."""
     import shapely
+    from shapely.geometry import LineString, Polygon
     from shapely.geometry import Point as SPoint
-    from shapely.geometry import Polygon
 
     from yanartas_pillowbox.pcb import sample
 
@@ -301,12 +301,20 @@ def test_inner_flaps_landing_outlines_lie_on_the_outer_flaps(pieces):
     dx, dy = sheet_offset(pattern)
     outlines = dm.landing_outlines(cfg, pattern, (dx, dy))
     assert len(outlines) == (1 if pieces == "two" else 2)
+    names = ("front-panel", "front-top-left", "front-top-right", "front-bottom-left",
+             "front-bottom-right")  # fmt: skip
+    body = shapely.union_all(
+        [Polygon(sample(f.boundary)) for f in pattern.faces if f.name in names]
+    ).buffer(0.05)
+    w, e, t = cfg.shell.front.width, cfg.end_wall_gap, cfg.thickness
     for o in outlines:
         assert o["kind"] == "outline" and o["param"] is None
-        assert o["points"][0] == o["points"][-1]
+        pts = [(x - dx, y - dy) for x, y in o["points"]]
+        assert pts[0] != pts[-1]  # (one arc, not a closed outline)
+        assert all(body.contains(SPoint(p)) for p in pts)
         end = "top" if "top" in o["label"] else "bottom"
-        # (the flap, and the overhangs beside it: by the glued edge the other panel runs on
-        # a little past this one's free edge)
-        faces = [f for f in pattern.faces if f.name.startswith(f"front-{end}-")]
-        flap = shapely.union_all([Polygon(sample(f.boundary)) for f in faces]).buffer(0.05)
-        assert all(flap.contains(SPoint(x - dx, y - dy)) for x, y in o["points"])
+        fold = pattern.face(f"front-{end}-flap")
+        for x in (0.1 * w, 0.5 * w, 0.9 * w):
+            y_fold = fold.y_range(x)[1 if end == "top" else 0]
+            ys = LineString(pts).intersection(LineString([(x, -1e3), (x, 1e3)]))
+            assert math.isclose(abs(ys.y - y_fold), e, abs_tol=t + 0.5), (end, x)

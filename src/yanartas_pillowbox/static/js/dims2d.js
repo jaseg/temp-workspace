@@ -60,7 +60,7 @@ export function drawDims2d(dims, { fs, flipY = false }) {
       track(horiz ? [mid[0] - half, mid[1] - fs] : [mid[0] - fs, mid[1] - half],
             horiz ? [mid[0] + half, mid[1] + fs] : [mid[0] + fs, mid[1] + half]);
     } else if (d.kind === "outline") {
-      // A guide (where an inner flap lands, folded): dashed, like the extension lines.
+      // A guide (where an inner end wall stands, folded): dashed, like the extension lines.
       const pts = d.points.map(T);
       g.append(el("path", { class: "ln ext", d: `M ${pts.map((q) => q.join(",")).join(" L ")}` }));
       track(...pts);

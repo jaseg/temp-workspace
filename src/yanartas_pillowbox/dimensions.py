@@ -291,21 +291,22 @@ def _piece_dimensions(cfg: Config, pattern: Pattern, offset: Point) -> list[Dime
 
 
 def landing_outlines(cfg: Config, pattern: Pattern, offset: Point) -> list[dict[str, Any]]:
-    """Where each inner flap lands on the outer flap closing over it, once folded: its
-    outline (fold and cut edge) carried along the box onto the outer flap's wall and drawn
-    in that flap's flat coordinates (+ ``offset``), as ``outline`` entries for the
-    dimensions layer. Two pieces: the other piece's inner flap, under this one's outer
-    flap."""
+    """Where each inner end wall stands, once folded, seen on the front panel: its flap's
+    cut edge, which rests against the front panel's inside, carried onto the front panel's
+    flat coordinates (+ ``offset``) at the same place along the box. One arc per end, the
+    end wall gap inside the outer flap's fold, as ``outline`` entries (open, dashed) for the
+    dimensions layer. Two pieces: the other piece's inner flap, at this one's outer flap
+    end."""
     box = FoldedBox(cfg)
     shell = box.shell
-    sec, zs = shell.front, shell.z_shift
+    sec = shell.front
     dx, dy = offset
     lid = lid_layout(cfg)
     sp = 0.0 if lid is None else lid.spread
 
     def flat_x(x3: float) -> float:
-        """The outer flap's flat x where its wall stands at X = x3 (the front panel's
-        section, continued over the overhangs)."""
+        """The front panel's flat x where it stands at X = x3 (its section continued over
+        the overhangs)."""
         lo, hi = -sp - sec.width, sec.width * 2 + sp
         for _ in range(80):
             mid = (lo + hi) / 2
@@ -316,37 +317,67 @@ def landing_outlines(cfg: Config, pattern: Pattern, offset: Point) -> list[dict[
             lo, hi = (lo, mid) if beyond else (mid, hi)
         return (lo + hi) / 2
 
-    # (inner flap face, outer flap face, its flat y from the folded Z, whose box)
+    # (inner flap face, its cut edge (away from its fold on the back panel), the end, whose)
     if cfg.two_piece:
-        ends = [("back-bottom-flap", "front-top-flap", lambda z: z - zs, True)]
+        ends = [("back-bottom-flap", "upper", "top", True)]
     else:
-        length = cfg.front_length
         ends = [
-            ("back-top-flap", "front-top-flap", lambda z: z - zs, False),
-            ("back-bottom-flap", "front-bottom-flap", lambda z: length + zs - z, False),
+            ("back-top-flap", "lower", "top", False),
+            ("back-bottom-flap", "upper", "bottom", False),
         ]
     out = []
-    for inner, outer, y_of, other in ends:
-        face = pattern.face(inner)
-        pts = []
-        for seg in face.boundary:
+    for inner, edge, end, other in ends:
+        # (on the front panel and the overhangs beside it: by the glued edge the inner wall
+        # reaches a little past the front panel's free edge, off the sheet there)
+        body = [pattern.face(n) for n in ("front-panel", f"front-{end}-left", f"front-{end}-right")]
+
+        def on(q: Point) -> bool:
+            return any(f.x0 <= q[0] <= f.x1 and _within(f.y_range(q[0]), q[1]) for f in body)  # noqa: B023
+
+        def at(seg: Any, u: float) -> Point:
+            q = box.map(inner, seg.point_at(u))  # noqa: B023
+            if other:  # noqa: B023
+                q = box.other(q)
+            # (the front panel's flat y is its distance along the box: Y = cy - y)
+            return (flat_x(q[0]), box.cy - q[1])
+
+        runs: list[list[Point]] = [[]]
+        for seg in getattr(pattern.face(inner), edge):
             n = max(2, math.ceil(seg.length / 0.5))
-            for i in range(n):
-                q = box.map(inner, seg.point_at(i / n))
-                if other:
-                    q = box.other(q)
-                pts.append((flat_x(q[0]) + dx, y_of(q[2]) + dy))
-        pts.append(pts[0])
+            for i in range(n + 1):
+                q = at(seg, i / n)
+                pts = runs[-1]
+                if on(q):
+                    if not pts and i > 0:  # (from where it comes onto the panel)
+                        lo, hi = (i - 1) / n, i / n
+                        for _ in range(40):
+                            mid = (lo + hi) / 2
+                            lo, hi = (lo, mid) if on(at(seg, mid)) else (mid, hi)
+                        pts.append(at(seg, hi))
+                    pts.append(q)
+                elif pts and i > 0 and on(at(seg, (i - 1) / n)):  # (to where it leaves it)
+                    lo, hi = (i - 1) / n, i / n
+                    for _ in range(40):
+                        mid = (lo + hi) / 2
+                        lo, hi = (mid, hi) if on(at(seg, mid)) else (lo, mid)
+                    pts.append(at(seg, lo))
+                    runs.append([])
+        pts = max(runs, key=len)
+        pts = [(x + dx, y + dy) for k, (x, y) in enumerate(pts) if k == 0 or (x, y) != pts[k - 1]]
         out.append(
             {
                 "param": None,
                 "kind": "outline",
-                "label": f"inner flap, folded, on the {outer.split('-')[1]} outer flap",
+                "label": f"inner end wall, folded, at the {end} end",
                 "value": 0.0,
                 "points": [_r(p) for p in pts],
             }
         )
     return out
+
+
+def _within(span: tuple[float, float], v: float, tol: float = 1e-6) -> bool:
+    return span[0] - tol <= v <= span[1] + tol
 
 
 # ------------------------------------------------------------------------- cross-section

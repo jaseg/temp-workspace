@@ -57,7 +57,7 @@ def render(cfg: Config) -> dict[str, Any]:
         "info": pattern.info,
         "payload": payload.summary(cfg),
         "dimensions": {
-            # (and where the inner flaps land on the outer flaps: dashed outlines)
+            # (and where the inner end walls stand, seen on the front panel: dashed arcs)
             "pattern": [
                 *dims.to_json(dims.pattern_dimensions(cfg, pattern, sheet_offset(pattern))),
                 *dims.landing_outlines(cfg, pattern, sheet_offset(pattern)),
