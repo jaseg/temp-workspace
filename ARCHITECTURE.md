@@ -590,7 +590,9 @@ an exact isometry: the panels curve along it, not across it.
   have less room (to another trace, half of how much further than the pitch; to the
   area's edge or a zone's border, e.g. a fold, how much further than half a pitch) than
   the less of its two ends and zero, and so does the other trace's segment it would crowd
-  (repeated until nothing changes, at most 6 times). `TURN_GIVE` allows a share of the
+  (repeated until nothing changes, at most 6 times). Towards the trace's own copper (round
+  a hairpin's tip, the other leg) it may come nearer by the polyline's own error there:
+  the trace only comes nearer itself. `TURN_GIVE` allows a share of the
   pitch more (0: no clearance lost; about 5 % of the vertices keep their sharper turn).
   Straight segments (`smooth_traces`) are that curve simplified greedily: the longest
   chord within `SIMPLIFY` of it whose dense steps each stay within `MAX_TURN / 4` of the
@@ -602,8 +604,10 @@ an exact isometry: the panels curve along it, not across it.
   vertex: the error the polyline itself makes there (its chords' sagitta, `L·θ/8`, plus
   10 % for rounding), at least `ARCS` scaled to the pitch; and where the trace has room,
   up to `ARCS_ROOM` pitches: half of how much further than the pitch the nearest copper
-  beside it is (another trace, or its own more than 1.2 pitches along it, as round a
-  U-turn), and all of how much further than half a pitch the area's edge is. So the
+  beside it is (another trace, or its own more than 1.8 pitches along it, as round a
+  U-turn: half a turn a pitch across is π/2 pitches long, so nearer along, round a
+  hairpin's tip, it is the same bend, which may then be drawn in arcs; and its own within
+  4 pitches along, the hairpin's other leg, a quarter pitch nearer still), and all of how much further than half a pitch the area's edge is. So the
   traces keep as far apart as before, in far fewer pieces, about 90 % of their length
   arcs.
 - **Export.** One gerbonara KiCad `Board` is the source of all files; gerbonara's own board

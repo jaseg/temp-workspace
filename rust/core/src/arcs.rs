@@ -186,6 +186,16 @@ pub fn own_error(p: &[P]) -> Vec<f64> {
         .collect()
 }
 
+/// How far along a trace its own copper is not counted as beside it (`rooms`), in
+/// pitches: past half a U-turn a pitch across (π/2), with some to spare.
+const OWN_REACH: f64 = 1.8;
+
+/// How far along a trace its own copper is the other leg of the same hairpin (`rooms`), in
+/// pitches; and how much nearer than the pitch that may come (a share of it): round the
+/// tip, the trace only comes nearer itself.
+const HAIRPIN_REACH: f64 = 4.0;
+const HAIRPIN_GIVE: f64 = 0.25;
+
 /// The polyline's own error (`own_error`) taken this much larger: rounding.
 const OWN_SLACK: f64 = 1.1;
 
@@ -281,8 +291,9 @@ pub fn fit_all(
 
 /// How far each vertex of `lines` may move (towards the copper beside it, the worst case)
 /// and its traces keep the `pitch` apart: half of how much further than the pitch the
-/// nearest other trace is (or its own, more than a pitch and a fifth along it, as round a
-/// U-turn: either may move), all of how much further than half a pitch the area's edge
+/// nearest other trace is (or its own, more than `OWN_REACH` pitches along it, as round a
+/// U-turn: either may move; within `HAIRPIN_REACH`, `HAIRPIN_GIVE` more), all of how much
+/// further than half a pitch the area's edge
 /// (`edges`, closed rings) is; copper only looked for within `reach` (none: `reach`).
 /// Negative where the traces are already nearer than that.
 pub fn rooms(lines: &[Vec<P>], edges: &[Vec<P>], pitch: f64, reach: f64) -> Vec<Vec<f64>> {
@@ -343,7 +354,10 @@ fn rooms_by(
         }
     }
     let segs = Segs::new(a, b, reach);
-    let own = 1.2 * pitch;
+    // (its own copper only past half a U-turn a pitch across, π/2 pitches long: nearer
+    // along, round a hairpin's tip, it is the same bend, not copper beside it)
+    let own = OWN_REACH * pitch;
+    let hairpin = HAIRPIN_REACH * pitch;
     lines
         .iter()
         .enumerate()
@@ -368,6 +382,11 @@ fn rooms_by(
                             None => d - pitch / 2.0,
                             // (the trace itself, here: its own curve, not copper beside it)
                             Some((oi, _)) if oi == li && s0 - own < s && s < s1 + own => return,
+                            // (the other leg of the same hairpin: nearer it, the trace only
+                            // comes nearer itself, so a little give)
+                            Some((oi, _)) if oi == li && s0 - hairpin < s && s < s1 + hairpin => {
+                                (d - pitch) / 2.0 + HAIRPIN_GIVE * pitch
+                            }
                             Some(_) => (d - pitch) / 2.0,
                         };
                         if r < room {
@@ -449,7 +468,8 @@ fn refine_where(p: &[P], max_turn: f64, allow: &[bool]) -> (Vec<P>, Vec<usize>) 
 
 /// Each of `lines` as `refine` makes it, but a segment whose curve would come nearer the
 /// copper beside it than the `pitch` (`rooms`: the curves', the area's `edges`), and nearer
-/// than its chord did, by more than `give` (a share of the pitch), kept straight.
+/// than its chord did, by more than `give` (a share of the pitch; to its own copper, also
+/// the polyline's own error there, `own_error`), kept straight.
 pub fn refine_all(
     lines: &[Vec<P>],
     edges: &[Vec<P>],
@@ -467,6 +487,9 @@ pub fn refine_all(
         .iter()
         .map(|&c| rooms_to(lines, edges, pitch, reach, c))
         .collect();
+    // (the polyline itself is off the curve it stands for by its own error: the curve may
+    // come as much nearer the trace's own copper; a trace's room counts half its move)
+    let inherent: Vec<Vec<f64>> = lines.iter().map(|l| own_error(l)).collect();
     let mut allow: Vec<Vec<bool>> = lines
         .iter()
         .map(|l| vec![true; l.len().saturating_sub(1)])
@@ -485,9 +508,16 @@ pub fn refine_all(
             for (li, (_, seg)) in out.iter().enumerate() {
                 for (q, &k) in seg.iter().enumerate() {
                     let k = k.min(lines[li].len().saturating_sub(2));
-                    let floor =
-                        before[c][li][k].min(before[c][li][k + 1]).min(0.0) - give * pitch / 2.0;
                     let (room, nearest) = after[li][q];
+                    // (nearer its own copper only: the polyline's own error, as round a tip)
+                    let slack = match nearest {
+                        Some((ol, _)) if ol == li => 0.5 * inherent[li][k].max(inherent[li][k + 1]),
+                        _ => 0.0,
+                    };
+                    let floor = before[c][li][k].min(before[c][li][k + 1]).min(0.0)
+                        - give * pitch / 2.0
+                        - slack;
+
                     if room >= floor - 1e-9 {
                         continue;
                     }

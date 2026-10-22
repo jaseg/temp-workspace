@@ -296,6 +296,43 @@ def test_arcs_take_a_wobbly_bend_where_it_has_room():
     assert len(rows) > 4 * 6
 
 
+def _serpentine(pitch, legs, length, step, seed):
+    """A trace up and down in legs a pitch apart, each turn a half circle (the legs' pitch
+    across), its vertices about ``step`` apart along it and a little off it (settled)."""
+    rng = np.random.default_rng(seed)
+    pts = []
+    for k in range(legs):
+        x, up = k * pitch, k % 2 == 0
+        ys = np.linspace(0, length, max(2, round(length / step)) + 1)
+        pts += [(x, y if up else length - y) for y in ys[:-1]]
+        if k + 1 < legs:  # (the turn over to the next leg)
+            cx, cy, r = x + pitch / 2, length if up else 0.0, pitch / 2
+            n = max(2, round(math.pi * r / step))
+            for i in range(n):
+                a = math.pi * (1 - i / n)
+                pts.append((cx + r * math.cos(a), cy + (r if up else -r) * math.sin(a)))
+    pts.append((pitch * (legs - 1), length if legs % 2 else 0.0))
+    xy = np.asarray(pts, float)
+    return np.ascontiguousarray(xy + rng.normal(0.0, 0.002 * pitch, xy.shape))
+
+
+def test_arcs_take_hairpin_tips():
+    """A hairpin's tip is taken in arcs, as the legs beside it: the trace's own copper just
+    round the bend is the tip itself, not copper beside it (half a turn a pitch across is
+    over one and a half pitches long), so it does not hold the tip to its corners."""
+    pitch = 0.3
+    line = _serpentine(pitch, 6, 3.0, 0.36 * pitch, 1)
+    tol = sfc.ARCS * pitch / 0.3
+    rows = sfc._core().fit_arcs(
+        [line], tol, pitch, sfc.ARCS_ROOM * pitch, [], sfc.MAX_TURN, sfc.TURN_GIVE
+    )[0]
+    mid = (rows[:, 2] + rows[:, 6]) / 2  # (the pieces round the tips: past the legs' ends)
+    tip = rows[(mid > 3.0) | (mid < 0.0)]
+    straight = sum(math.dist(r[1:3], r[5:7]) for r in tip if r[0] == 0)
+    total = sum(math.dist(r[1:3], r[5:7]) for r in tip)
+    assert total > 0 and straight < 0.1 * total, (straight, total)
+
+
 def _turns(traces):
     out = []
     for t in traces:
