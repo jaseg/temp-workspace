@@ -94,6 +94,15 @@ def test_pcb_files_travel_base64(client):
     assert names == zipfile.ZipFile(io.BytesIO(expected.data)).namelist()
 
 
+def test_debug_svg_route(client):
+    """The mesh debug SVG: text, as the server's."""
+    content = json.dumps({"config": {"mesh_traces": 2}})
+    reply = json.loads(pb_api.serve("POST", "/api/pcb/debug.svg", content, None))
+    assert reply["status"] == 200 and reply["type"] == "image/svg+xml"
+    expected = client.post("/api/pcb/debug.svg", data=content, content_type="application/json")
+    assert reply["content"] == expected.data.decode()
+
+
 def test_the_build_ships_every_module_the_api_imports():
     """Each of the package's modules a shipped one imports is shipped too (else the browser
     fails at its first use, as the PCB layout's partitions once did)."""

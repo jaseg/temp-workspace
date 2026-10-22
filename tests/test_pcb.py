@@ -359,6 +359,8 @@ def test_api_routes(tmp_path):
     assert r.status_code == 200 and r.mimetype == "application/zip"
     names = zipfile.ZipFile(io.BytesIO(r.data)).namelist()
     assert "pillowbox.kicad_pcb" in names and "pillowbox-gerbers/pillowbox-F_Cu.gbr" in names
+    r = client.post("/api/pcb/debug.svg", json={"config": small})
+    assert r.status_code == 200 and r.mimetype == "image/svg+xml" and b"F.Cu" in r.data
     # (cancelling: the layout under way stops; none here, the next one runs as ever)
     try:
         assert client.post("/api/pcb/cancel").json == {"cancelled": True}
@@ -657,3 +659,33 @@ def test_traces_neck_down_where_the_exits_do_not_fit_the_cable():
     assert result.clearance == 1.0 and result.cable_clearance == pytest.approx(0.35)
     rules = pcb.kicad_project(result, "x")["net_settings"]["classes"][0]
     assert rules["clearance"] == pytest.approx(0.35)
+
+
+def test_debug_svg_colours_traces_by_partition(layout):
+    """The meshes for debugging: both layers' traces, each its own colour, each partition's
+    a family of one hue (the partitions' hues apart), the partitions outlined."""
+    import re
+    import xml.etree.ElementTree as ET
+
+    root = ET.fromstring(pcb.debug_svg(layout))
+    ns = "{http://www.w3.org/2000/svg}"
+    for layer in ("F.Cu", "B.Cu"):
+        m = layout.meshes[layer]
+        (g,) = [g for g in root.iter(f"{ns}g") if g.get("id") == layer.replace(".", "-")]
+        traces = [p for p in g.iter(f"{ns}path") if p.find(f"{ns}title") is not None]
+        assert len(traces) == len(m.traces)
+        colours = [p.get("stroke") for p in traces]
+        assert len(set(colours)) == len(colours)  # (each its own)
+        hues = [float(re.match(r"hsl\(([-\d.]+),", c).group(1)) for c in colours]
+        sizes = m.groups or (len(m.traces),)
+        at = 0
+        centres = []
+        for size in sizes:  # (a family: hues within 24 degrees of each other)
+            mine = hues[at : at + size]
+            assert max(mine) - min(mine) <= 24
+            centres.append(sum(mine) / size)
+            at += size
+        apart = [abs(a - b) for a, b in itertools.combinations(centres, 2)]
+        assert min(apart, default=360) > 60
+        dashed = [p for p in g.iter(f"{ns}path") if p.get("stroke") == "#555"]
+        assert len(dashed) >= len(m.parts)

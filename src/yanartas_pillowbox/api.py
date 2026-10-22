@@ -150,6 +150,13 @@ def pcb_files(cfg: Config) -> bytes:
     return _last["zip"]
 
 
+def pcb_debug_svg(cfg: Config) -> str:
+    """The PCB layout's meshes for debugging (``pcb.debug_svg``): each trace its own colour,
+    each partition a colour family."""
+    pcb, layout = _pcb_layout(cfg)
+    return pcb.debug_svg(layout)
+
+
 def payload_action(request: Any) -> dict[str, Any]:
     """``{config, action: "fit" | "maximize", field?}`` -> ``{config}`` (not saved)."""
     cfg = parse_config(request)

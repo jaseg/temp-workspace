@@ -122,6 +122,12 @@ def create_app(settings_path: Path) -> Flask:
         """``{config}`` -> zip of the PCB layout's KiCad, Gerber and SVG files."""
         return Response(api.pcb_files(api.parse_config(data)), mimetype="application/zip")
 
+    @app.post("/api/pcb/debug.svg")
+    @_json_route
+    def pcb_debug_svg(data: Any) -> Any:
+        """``{config}`` -> the PCB layout's meshes as an SVG: traces coloured by partition."""
+        return Response(api.pcb_debug_svg(api.parse_config(data)), mimetype="image/svg+xml")
+
     @app.post("/api/payload")
     @_json_route
     def payload_action(data: Any) -> Any:

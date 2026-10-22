@@ -1128,6 +1128,78 @@ def export(result: Layout, directory: str | Path, name: str = "pillowbox") -> li
     return [pcb_file, pro_file, gerbers, *svgs]
 
 
+def debug_svg(result: Layout) -> str:
+    """The meshes for debugging, as an SVG: F.Cu and B.Cu side by side over the foil's
+    outline and folds, each mesh trace a colour of its own, each partition's traces a colour
+    family (hue) of their own, the partitions outlined dashed."""
+    x0, y0, x1, y1 = result.board.bounds
+    w, h, gap = x1 - x0, y1 - y0, 10.0
+
+    def path(points: Iterable[Point], dx: float, closed: bool = False) -> str:
+        pts = [f"{x - x0 + dx:.3f},{y - y0:.3f}" for x, y in points]
+        return "M" + " L".join(pts) + (" Z" if closed else "")
+
+    def colours(sizes: Sequence[int]) -> list[str]:
+        out = []
+        for k, size in enumerate(sizes):
+            hue = 360 * k / len(sizes)
+            for i in range(size):  # (darker to lighter, the hue turned a little within)
+                t = i / max(size - 1, 1)
+                out.append(f"hsl({hue + 24 * (t - 0.5):.0f},{80 - 20 * t:.0f}%,{30 + 30 * t:.0f}%)")
+        return out
+
+    def outline(dx: float) -> list[str]:
+        rings = [result.board.exterior, *result.board.interiors]
+        out = [
+            f'<path d="{path(r.coords, dx, True)}" fill="{"#fafaf7" if i == 0 else "#fff"}" '
+            'stroke="#888" stroke-width="0.15"/>'
+            for i, r in enumerate(rings)
+        ]
+        out += [
+            f'<path d="{path(sample([seg]), dx)}" fill="none" stroke="#bbb" stroke-width="0.12" '
+            'stroke-dasharray="1 0.6"/>'
+            for seg in result.folds
+        ]
+        return out
+
+    body = []
+    for k, layer in enumerate((FRONT, BACK)):
+        dx = k * (w + gap)
+        name = layer.replace(".", "-")
+        body.append(f'<g id="{name}" inkscape:groupmode="layer" inkscape:label="{layer}">')
+        body += outline(dx)
+        m = result.meshes.get(layer)
+        if m is not None:
+            for part in m.parts:
+                for g in getattr(part, "geoms", [part]):
+                    body.append(
+                        f'<path d="{path(g.exterior.coords, dx, True)}" fill="none" stroke="#555" '
+                        'stroke-width="0.1" stroke-dasharray="0.8 0.5"/>'
+                    )
+            cols = colours(m.groups or (len(m.traces),))
+            for i, t in enumerate(m.traces):
+                body.append(
+                    f'<path d="{path(t, dx)}" fill="none" stroke="{cols[i % len(cols)]}" '
+                    f'stroke-width="{result.width:.3f}" stroke-linejoin="round" '
+                    f'stroke-linecap="round"><title>{layer} trace {i + 1}</title></path>'
+                )
+        body.append(
+            f'<text x="{dx + 2:.1f}" y="{h + 6:.1f}" font-family="sans-serif" '
+            f'font-size="5">{layer}</text>'
+        )
+        body.append("</g>")
+    W, H = 2 * w + gap, h + 10
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<svg xmlns="http://www.w3.org/2000/svg" '
+        'xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" '
+        f'width="{W:.3f}mm" height="{H:.3f}mm" viewBox="-2 -2 {W + 4:.3f} {H + 4:.3f}">\n'
+        f'<rect x="-2" y="-2" width="{W + 4:.3f}" height="{H + 4:.3f}" fill="#fff"/>\n'
+        + "\n".join(body)
+        + "\n</svg>\n"
+    )
+
+
 def preview_json(result: Layout, offset: Point = (0.0, 0.0)) -> dict:
     """The layout for the UI's previews, compact: each copper layer's tracks as flat
     [x, y, x, y, ...] lists (mm, pattern coordinates, rounded to µm), the vias, the plug's

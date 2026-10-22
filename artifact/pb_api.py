@@ -80,6 +80,8 @@ def _route(method: str, path: str, content: str | None, stored: str | None) -> s
         return _reply(200, api.cancel_layout())
     if method == "POST" and path == "/api/pcb/files":
         return _reply(200, api.pcb_files(api.parse_config(data)), "application/zip")
+    if method == "POST" and path == "/api/pcb/debug.svg":
+        return _reply(200, api.pcb_debug_svg(api.parse_config(data)), "image/svg+xml")
     return _reply(404, {"error": f"no route {method} {path}"})
 
 

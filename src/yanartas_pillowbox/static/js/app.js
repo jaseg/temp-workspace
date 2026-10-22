@@ -20,6 +20,7 @@ const statusEl = $("#status");
 const downloadBtn = $("#btn-download");
 const scadBtn = $("#btn-scad");
 const pcbBtn = $("#btn-pcb");
+const debugBtn = $("#btn-debug-svg");
 const PROGRESS_POLL = 500; // ms between looks at a running layout's progress
 const GROUPS_KEY = "pb-groups"; // which settings groups are open (per viewer)
 const SIDEBAR_KEY = "pb-sidebar"; // whether the settings are collapsed (per viewer)
@@ -239,7 +240,7 @@ async function render() {
     if (!Object.keys(errors).length) showBanner(result.data.error || "Render failed");
     const n = Object.keys(errors).length;
     setStatus(`${n || "An"} invalid value${n === 1 ? "" : "s"} — previews show the last valid design`, true);
-    downloadBtn.disabled = scadBtn.disabled = pcbBtn.disabled = true;
+    downloadBtn.disabled = scadBtn.disabled = pcbBtn.disabled = debugBtn.disabled = true;
     return;
   }
   showErrors({});
@@ -249,7 +250,7 @@ async function render() {
   preview3d.update(model, dimensions.model, payload);
   sectionView.update(section, dimensions.section, payload);
   renderDerived(info, payload);
-  downloadBtn.disabled = scadBtn.disabled = pcbBtn.disabled = false;
+  downloadBtn.disabled = scadBtn.disabled = pcbBtn.disabled = debugBtn.disabled = false;
   setStatus("Up to date");
   scheduleSave(lastValid.config);
   checkMeshCurrent(lastValid.config);
@@ -614,18 +615,19 @@ async function downloadScad() {
   }
 }
 
-async function downloadPcb() {
+/** A file made from the generated mesh (laid out first, if not yet for this design):
+ *  `path`'s reply, saved as `suffix`; `what` names it in the status and errors. */
+async function downloadFromMesh(button, path, suffix, what) {
   if (!lastValid) return;
-  pcbBtn.classList.add("busy");
-  pcbBtn.disabled = true;
+  button.classList.add("busy");
+  button.disabled = true;
   try {
-    // (the files are the generated mesh's: laid out first, if not yet for this design)
     const config = lastValid.config;
     if (!meshData || JSON.stringify(config) !== meshConfig) {
       if (!(await generateMesh())) return;
     }
-    setStatus("Writing the PCB files…");
-    const res = await fetch("/api/pcb/files", {
+    setStatus(`Writing the ${what}…`);
+    const res = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ config }),
@@ -634,15 +636,23 @@ async function downloadPcb() {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || `export failed (${res.status})`);
     }
-    saveBlob(await res.blob(), fileName("-pcb.zip"));
+    saveBlob(await res.blob(), fileName(suffix));
     setStatus("Up to date");
   } catch (err) {
-    setStatus(`PCB export failed: ${err.message}`, true);
-    showError("PCB export failed", err.message);
+    setStatus(`Export of the ${what} failed: ${err.message}`, true);
+    showError(`Export of the ${what} failed`, err.message);
   } finally {
-    pcbBtn.classList.remove("busy");
-    pcbBtn.disabled = !lastValid;
+    button.classList.remove("busy");
+    button.disabled = !lastValid;
   }
+}
+
+function downloadPcb() {
+  return downloadFromMesh(pcbBtn, "/api/pcb/files", "-pcb.zip", "PCB files");
+}
+
+function downloadDebugSvg() {
+  return downloadFromMesh(debugBtn, "/api/pcb/debug.svg", "-mesh-debug.svg", "mesh debug SVG");
 }
 
 async function resetToDefaults() {
@@ -744,6 +754,7 @@ async function main() {
   downloadBtn.addEventListener("click", download);
   scadBtn.addEventListener("click", downloadScad);
   pcbBtn.addEventListener("click", downloadPcb);
+  debugBtn.addEventListener("click", downloadDebugSvg);
   document.addEventListener("pb-mesh-toggle", toggleMesh);
   setupSidebar();
   $("#stats > header").append(maximizeButton($("#stats")));

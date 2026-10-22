@@ -97,7 +97,10 @@ the defaults. It never crashes because of the file.
   drawn into a bitmap once (in 3D, a texture on each side of the paper), never as SVG
   paths; zoomed in, the 2D view draws the visible part again at screen resolution.
   *Download PCB* saves the KiCad, Gerber and SVG files of the generated mesh as a zip
-  (generating it first if there is none for the design).
+  (generating it first if there is none for the design). *Debug SVG* saves the mesh for
+  debugging: both copper layers side by side over the foil's outline, each trace a colour
+  of its own, each partition's traces a colour family (hue) of their own, the partitions
+  outlined dashed.
 * **Shell cross-section:** a 2D section through the closed shell, perpendicular to its length.
   The shell has this same section everywhere between the curved folds. It shows the closed
   width and height, and marks the two straight folds where they are seen end-on. Like the
