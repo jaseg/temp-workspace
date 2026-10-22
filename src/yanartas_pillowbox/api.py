@@ -3,6 +3,7 @@ in-browser build (``artifact/pb_api.py``) answer every request through these fun
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -69,20 +70,31 @@ def render(cfg: Config) -> dict[str, Any]:
 
 
 _progress: dict[str, Any] | None = None  # the PCB layout's latest progress event
-forward: Callable[[dict[str, Any]], None] | None = None  # (also given each, when set)
+# ... and its phases so far, in the order they began: each the phase's latest event and
+# ``at``, when it began (its stages', e.g. the two copper layers', interleaved)
+_log: list[dict[str, Any]] = []
+# (given ``layout_progress()`` after each event, when set: the browser's worker posts it)
+forward: Callable[[dict[str, Any]], None] | None = None
 
 
 def _track(event: dict[str, Any]) -> None:
     global _progress
     _progress = event
+    last = next((e for e in reversed(_log) if e["stage"] == event["stage"]), None)
+    if last is None or last["phase"] != event["phase"]:
+        last = {"at": round(time.time(), 3)}
+        _log.append(last)
+    last.update(event)
     if forward is not None:
-        forward(event)
+        forward(layout_progress())
 
 
 def layout_progress() -> dict[str, Any]:
-    """``{progress}``: how far the PCB layout in progress (or the last) has got (``progress``'s
-    event; null before any)."""
-    return {"progress": _progress}
+    """``{progress, log}``: how far the PCB layout in progress (or the last) has got:
+    ``progress``'s latest event (null before any; ``done`` the whole layout's share) and
+    its log, a phase of a stage after another as they began (``at``, seconds since the
+    epoch), each with its latest event's figures."""
+    return {"progress": _progress, "log": _log}
 
 
 _last: dict[str, Any] = {}  # the last PCB layout (and its files): {config, layout, zip}
@@ -102,6 +114,7 @@ def _pcb_layout(cfg: Config) -> tuple[Any, Any]:
         return pcb, _last["layout"]
     global _progress
     _progress = None
+    _log.clear()
     progress.begin()
     try:
         with progress.listening(_track):

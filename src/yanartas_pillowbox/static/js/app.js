@@ -426,26 +426,34 @@ async function cancelMesh() {
 }
 
 /** `request`'s reply; while it runs, the layout's progress (polled) on the bar, in the
- *  status line and the log (a line per phase, its step updated in place). */
+ *  status line (each stage's, e.g. both copper layers', latest phase) and the log (a line
+ *  per phase of a stage, at the time it began, its step updated in place). */
 async function watchProgress(request, seq) {
   const bar = $("#mesh-progress");
   let running = true;
   request.finally(() => { running = false; });
   bar.value = 0;
   bar.hidden = false;
+  const first = $("#mesh-log-list").children.length; // (the log's lines before this layout's)
+  const look = async () => {
+    const reply = await api("GET", "/api/progress").catch(() => null);
+    if (!reply?.progress || seq !== meshSeq) return;
+    const log = reply.log ?? [];
+    log.forEach((e, i) => logLine(describeProgress(e), false, `progress ${first} ${i}`, e.at));
+    const latest = new Map(log.map((e) => [e.stage, e])); // (each stage's last phase)
+    const text = [...latest.values()].map(describeProgress).join(" · ");
+    bar.value = reply.progress.done;
+    if (running) setStatus(`Laying out the mesh… ${Math.round(100 * reply.progress.done)} % (${text})`);
+  };
   try {
     while (running && seq === meshSeq) {
       await Promise.race([request, new Promise((r) => setTimeout(r, PROGRESS_POLL))]);
       if (!running || seq !== meshSeq) break;
-      const reply = await api("GET", "/api/progress").catch(() => null);
-      const e = reply?.progress;
-      if (!e || !running || seq !== meshSeq) continue;
-      bar.value = e.done;
-      const text = describeProgress(e);
-      setStatus(`Laying out the mesh… ${Math.round(100 * e.done)} % (${text})`);
-      logLine(text, false, `${e.stage} ${e.phase}`);
+      await look();
     }
-    return await request;
+    const out = await request;
+    await look(); // (the last phases' last steps, as the layout left them)
+    return out;
   } finally {
     bar.hidden = true;
   }
@@ -457,10 +465,11 @@ function clearLog() {
 }
 
 /** A line in the mesh's log, and in its summary (`key`: one line per key, updated in
- *  place: each layer's phase, its steps). */
-function logLine(text, error = false, key = null) {
+ *  place: each layer's phase, its steps; `at`: its time, seconds since the epoch, else now). */
+function logLine(text, error = false, key = null, at = null) {
   const list = $("#mesh-log-list");
-  const t = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const when = at === null ? new Date() : new Date(at * 1000);
+  const t = when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   let li = key ? [...list.children].find((l) => l.dataset.key === key) : null;
   if (!li) {
     li = list.appendChild(document.createElement("li"));
@@ -701,9 +710,9 @@ async function main() {
   form.addEventListener("pb-action", (e) => {
     if (e.detail.action === "maximize") payloadAction({ action: "maximize", field: e.detail.name });
     if (e.detail.action === "randomize") {
-      // (eight random base-36 characters: a new seed, as if typed in)
-      const digits = crypto.getRandomValues(new Uint8Array(8));
-      params.get(e.detail.name).value = Array.from(digits, (d) => (d % 36).toString(36)).join("");
+      // (128 bits from the browser's secure source, in hex: a new seed, as if typed in)
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      params.get(e.detail.name).value = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
       setStatus("Updating…");
       scheduleRender(0);
     }

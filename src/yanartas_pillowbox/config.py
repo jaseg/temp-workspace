@@ -8,7 +8,6 @@ validated ``Config`` or raises ``ConfigError`` carrying one message per offendin
 
 from __future__ import annotations
 
-import hashlib
 import math
 from dataclasses import dataclass, fields, replace
 from typing import Any, Literal
@@ -556,9 +555,11 @@ class Config:
 
     # ----------------------------------------------------------------- derived values
     @property
-    def seed(self) -> int:
-        """``mesh_seed`` as the layout's random seed: its text's SHA-256 hash."""
-        return int.from_bytes(hashlib.sha256(self.mesh_seed.encode()).digest()[:8]) >> 1
+    def seed(self) -> bytes:
+        """``mesh_seed`` distilled into the layout's 256-bit random key (``rand.key_of``)."""
+        from yanartas_pillowbox import rand
+
+        return rand.key_of(self.mesh_seed)
 
     @property
     def two_piece(self) -> bool:

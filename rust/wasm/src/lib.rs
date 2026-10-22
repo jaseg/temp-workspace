@@ -263,7 +263,8 @@ pub fn offset_lanes(
 /// The curve's graph walked into a curve (`sfc._curve`; the extension's `curve_graph`):
 /// `seg_region` each segment's region, its domain's rings flat (`rings`, `ring_lens`,
 /// `seg_rings`); the borders: `pairs` (region, region) flat, `pair_lines` each pair's
-/// number of lines, the lines flat (`lines`, `line_lens`); the seed in two halves. Returns
+/// number of lines, the lines flat (`lines`, `line_lens`); the random key (32 bytes, for
+/// ChaCha20: `graph::Rng`). Returns
 /// `{points, lens, region, cells, left}`: the curves' points and regions flat, each
 /// curve's number of points (one curve per opening, `openings` four numbers each).
 #[wasm_bindgen]
@@ -279,8 +280,7 @@ pub fn curve_graph(
     line_lens: &[u32],
     openings: &[f64],
     spacing: f64,
-    seed_hi: u32,
-    seed_lo: u32,
+    key: &[u8],
     params_obj: JsValue,
     progress: Option<Function>,
 ) -> Result<Object, JsValue> {
@@ -312,7 +312,9 @@ pub fn curve_graph(
             .map(|o| [[o[0], o[1]], [o[2], o[3]]])
             .collect(),
         spacing,
-        seed: ((seed_hi as u64) << 32) | seed_lo as u64,
+        key: key
+            .try_into()
+            .map_err(|_| JsValue::from_str("a random key is 32 bytes"))?,
     };
     let mut p = GraphParams::default();
     if let Some(v) = number(&params_obj, "seed_spacing")? {

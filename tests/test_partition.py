@@ -9,6 +9,7 @@ import pytest
 import shapely
 
 from yanartas_pillowbox import mesh, partition, sfc
+from yanartas_pillowbox.rand import Rand
 
 PITCH = 0.3
 AREA = shapely.box(0, 0, 60, 40)
@@ -57,7 +58,7 @@ def test_seed_repeats_the_partitions_and_another_differs():
 
 def test_cells_keep_to_the_zones_and_their_pins():
     pins = [(5.0, 5.0), (40.0, 30.0)]
-    polys, zone, at = partition.cells(AREA, ZONES, 2.0, np.random.default_rng(0), pins)
+    polys, zone, at = partition.cells(AREA, ZONES, 2.0, Rand.of(0, "test"), pins)
     assert sum(p.area for p in polys) == pytest.approx(AREA.area)
     for p, z in zip(polys, zone, strict=True):  # (no cell across the fold)
         assert ZONES[z].buffer(1e-6).contains(p)

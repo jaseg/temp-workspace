@@ -43,13 +43,13 @@ pub struct Segment {
 /// What the graph is built from: the segments, the borders between regions (each pair of
 /// regions with the lines of their shared border, longest first; the pairs longest first:
 /// only those a curve may cross), the exits' openings (each a stem's two ends), the
-/// spacing and the random seed.
+/// spacing and the random key (`Rng`).
 pub struct GraphInput {
     pub segments: Vec<Segment>,
     pub borders: Vec<(usize, usize, Vec<Vec<P>>)>,
     pub openings: Vec<[P; 2]>,
     pub spacing: f64,
-    pub seed: u64,
+    pub key: [u8; 32],
 }
 
 /// The curves, one per exit: each its vertices from its stem's end at `opening[0]` round
@@ -61,30 +61,100 @@ pub struct Curves {
     pub left: usize,
 }
 
-/// A small, seeded random source (SplitMix64).
-pub struct Rng(u64);
+/// A deterministic, cryptographically secure random source: the ChaCha20 stream (RFC 8439's
+/// block function, a 64-bit block counter, nonce zero) under a 256-bit key, the layout's
+/// key for this consumer (derived from the seed on the Python side, under a label of its
+/// own: no other stream shares it).
+pub struct Rng {
+    key: [u32; 8],
+    counter: u64,
+    block: [u32; 16],
+    used: usize,
+}
+
+/// One ChaCha20 block: the state (constants, key, counter and nonce words) after twenty
+/// rounds, plus itself.
+pub fn chacha20_block(key: &[u32; 8], tail: [u32; 4]) -> [u32; 16] {
+    let mut init = [0u32; 16];
+    init[..4].copy_from_slice(&[0x6170_7865, 0x3320_646e, 0x7962_2d32, 0x6b20_6574]);
+    init[4..12].copy_from_slice(key);
+    init[12..].copy_from_slice(&tail);
+    let mut s = init;
+    let q = |s: &mut [u32; 16], a: usize, b: usize, c: usize, d: usize| {
+        s[a] = s[a].wrapping_add(s[b]);
+        s[d] = (s[d] ^ s[a]).rotate_left(16);
+        s[c] = s[c].wrapping_add(s[d]);
+        s[b] = (s[b] ^ s[c]).rotate_left(12);
+        s[a] = s[a].wrapping_add(s[b]);
+        s[d] = (s[d] ^ s[a]).rotate_left(8);
+        s[c] = s[c].wrapping_add(s[d]);
+        s[b] = (s[b] ^ s[c]).rotate_left(7);
+    };
+    for _ in 0..10 {
+        q(&mut s, 0, 4, 8, 12);
+        q(&mut s, 1, 5, 9, 13);
+        q(&mut s, 2, 6, 10, 14);
+        q(&mut s, 3, 7, 11, 15);
+        q(&mut s, 0, 5, 10, 15);
+        q(&mut s, 1, 6, 11, 12);
+        q(&mut s, 2, 7, 8, 13);
+        q(&mut s, 3, 4, 9, 14);
+    }
+    for (o, i) in s.iter_mut().zip(init) {
+        *o = o.wrapping_add(i);
+    }
+    s
+}
 
 impl Rng {
-    pub fn new(seed: u64) -> Rng {
-        Rng(seed)
+    pub fn new(key: &[u8; 32]) -> Rng {
+        let mut k = [0u32; 8];
+        for (w, c) in k.iter_mut().zip(key.chunks_exact(4)) {
+            *w = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+        }
+        Rng {
+            key: k,
+            counter: 0,
+            block: [0; 16],
+            used: 16,
+        }
+    }
+
+    fn next_u32(&mut self) -> u32 {
+        if self.used == 16 {
+            let c = self.counter;
+            self.block = chacha20_block(&self.key, [c as u32, (c >> 32) as u32, 0, 0]);
+            self.counter += 1;
+            self.used = 0;
+        }
+        self.used += 1;
+        self.block[self.used - 1]
     }
 
     pub fn next_u64(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
+        let lo = self.next_u32() as u64;
+        (self.next_u32() as u64) << 32 | lo
     }
 
-    /// In [0, 1).
+    /// In [0, 1) (53 bits).
     pub fn random(&mut self) -> f64 {
         (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
     }
 
+    /// In 0 .. n - 1, without bias (the uneven top of the 64-bit range rejected).
+    pub fn below(&mut self, n: u64) -> u64 {
+        let zone = u64::MAX - (u64::MAX % n + 1) % n;
+        loop {
+            let w = self.next_u64();
+            if w <= zone {
+                return w % n;
+            }
+        }
+    }
+
     pub fn shuffle<T>(&mut self, v: &mut [T]) {
         for i in (1..v.len()).rev() {
-            let j = (self.next_u64() % (i as u64 + 1)) as usize;
+            let j = self.below(i as u64 + 1) as usize;
             v.swap(i, j);
         }
     }
@@ -203,7 +273,7 @@ pub fn curve(
             pins[seg].push(pin);
         }
     }
-    let mut rng = Rng::new(input.seed);
+    let mut rng = Rng::new(&input.key);
     // (a build with a cycle no exit's curve took in, as one cut off in a narrow spot: tried
     // afresh, the best kept)
     let mut best: Option<Built> = None;

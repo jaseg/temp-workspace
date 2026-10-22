@@ -27,7 +27,7 @@ const tick = setInterval(() => {
   if (el) el.textContent = `Starting the geometry engine (Python in your browser)… ${s} s`;
 }, 500);
 
-let progress = null; // (the PCB layout's latest progress event, from the worker)
+let progress = null; // (the PCB layout's progress, {progress, log}, as the worker last posted it)
 
 function onMessage({ data }) {
   if (data.progress) {
@@ -113,7 +113,7 @@ window.fetch = async (input, init = {}) => {
   }
   const method = (init.method || "GET").toUpperCase();
   if (method === "GET" && url.pathname === "/api/progress") { // (the worker is busy laying out)
-    return new Response(JSON.stringify({ progress }), {
+    return new Response(JSON.stringify(progress ?? { progress: null, log: [] }), {
       status: 200, headers: { "Content-Type": "application/json" },
     });
   }

@@ -253,12 +253,12 @@ def test_mesh_nets_per_side():
 
 
 def test_mesh_seed_is_any_text():
-    """The mesh seed takes any text, the layout's seed its SHA-256 hash: the same every
+    """The mesh seed takes any text, distilled into the layout's 256-bit key: the same every
     time, another for other text."""
     cfg = Config.defaults()
     a = cfg.with_values(mesh_seed="hello, box")
     assert a.seed == cfg.with_values(mesh_seed="hello, box").seed
     assert a.seed != cfg.with_values(mesh_seed="hello, box!").seed != cfg.seed
-    assert 0 <= a.seed < 2**63 and cfg.with_values(mesh_seed="").seed >= 0
+    assert len(a.seed) == 32 and len(cfg.with_values(mesh_seed="").seed) == 32
     assert parse_cli_value("mesh_seed", "my box") == "my box"
     assert errors_for(mesh_seed=1) == {"mesh_seed": "must be text"}

@@ -20,11 +20,11 @@ from yanartas_pillowbox.svg import SvgImportError, extract_config
 
 JSON = "application/json"
 
-try:  # (in the web worker: each progress event posted to the page, which shows the bar)
+try:  # (in the web worker: the progress after each event posted to the page, which shows it)
     import js  # type: ignore[import-not-found]
 
-    def _post(event: dict[str, Any]) -> None:
-        js.postMessage(js.JSON.parse(json.dumps({"progress": event})))
+    def _post(state: dict[str, Any]) -> None:
+        js.postMessage(js.JSON.parse(json.dumps({"progress": state})))
 
     api.forward = _post
 except ImportError:  # (natively, under the tests)

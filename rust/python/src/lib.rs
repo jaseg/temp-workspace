@@ -276,11 +276,12 @@ fn offset_lanes<'py>(
 
 /// The curves' graph walked into curves (`sfc._curve`): `segments` each (region, its
 /// domain's rings), `borders` each (region, region, the lines of their shared border; the
-/// longest first), `openings` each a stem's ends, `seed` the random seed. Returns per
+/// longest first), `openings` each a stem's ends, `key` the random key (32 bytes, for
+/// ChaCha20: `graph::Rng`). Returns per
 /// opening its curve's points and each one's region, the number of cells and of regions
 /// left out.
 #[pyfunction]
-#[pyo3(signature = (segments, borders, openings, spacing, seed, params, progress=None))]
+#[pyo3(signature = (segments, borders, openings, spacing, key, params, progress=None))]
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn curve_graph<'py>(
     py: Python<'py>,
@@ -288,7 +289,7 @@ fn curve_graph<'py>(
     borders: Vec<(usize, usize, Vec<PyReadonlyArray2<'py, f64>>)>,
     openings: Vec<((f64, f64), (f64, f64))>,
     spacing: f64,
-    seed: u64,
+    key: &[u8],
     params: &Bound<'py, PyDict>,
     progress: Option<PyObject>,
 ) -> PyResult<(Vec<(Bound<'py, PyArray2<f64>>, Vec<usize>)>, usize, usize)> {
@@ -311,7 +312,7 @@ fn curve_graph<'py>(
             .map(|(a, b)| [[a.0, a.1], [b.0, b.1]])
             .collect(),
         spacing,
-        seed,
+        key: key32(key)?,
     };
     let mut prm = GraphParams::default();
     read!(params, prm, seed_spacing, lloyd, attempts);
@@ -342,18 +343,24 @@ fn curve_graph<'py>(
     Ok((curves, c.cells, c.left))
 }
 
+/// A random key: exactly 32 bytes.
+fn key32(key: &[u8]) -> PyResult<[u8; 32]> {
+    key.try_into()
+        .map_err(|_| pyo3::exceptions::PyValueError::new_err("a random key is 32 bytes"))
+}
+
 /// (testing) The tessellation of one domain: its cells' outlines.
 #[pyfunction]
 fn _cells<'py>(
     py: Python<'py>,
     domain: Vec<PyReadonlyArray2<'py, f64>>,
     d: f64,
-    seed: u64,
+    key: &[u8],
     pin: Option<(f64, f64)>,
     lloyd: usize,
 ) -> PyResult<Bound<'py, PyList>> {
     let domain: Vec<Vec<P>> = domain.iter().map(points).collect::<PyResult<_>>()?;
-    let mut rng = yanartas_mesh_core::graph::Rng::new(seed);
+    let mut rng = yanartas_mesh_core::graph::Rng::new(&key32(key)?);
     let pins: Vec<P> = pin.map(|p| [p.0, p.1]).into_iter().collect();
     let out = yanartas_mesh_core::graph::cells(&domain, d, &mut rng, &pins, lloyd);
     PyList::new(py, out.iter().map(|c| array(py, &c[0])))

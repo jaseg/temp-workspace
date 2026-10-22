@@ -46,8 +46,8 @@ Laplacian smoothing) instead of an L-BFGS solve.
 
 from __future__ import annotations
 
+import itertools
 import math
-import random
 import sys
 from collections.abc import Sequence
 from typing import Any
@@ -70,6 +70,7 @@ from yanartas_pillowbox.mesh import (
     resample,
     sample_arcs,
 )
+from yanartas_pillowbox.rand import Rand
 
 try:  # (the settling's Rust core, on all cores: rust/python; the browser has its wasm)
     import yanartas_mesh as _native
@@ -194,7 +195,7 @@ def _curve(
     owner: list[int],
     spacing: float,
     openings: list[tuple[Point, Point]],
-    seed: int,
+    key: bytes,
 ) -> tuple[list[tuple[np.ndarray, np.ndarray]], int, int]:
     """The closed curves through the regions, one per opening, by the Rust core
     (``graph::curve``; see ARCHITECTURE.md, 2. to 5.): each its vertices from its stem's end
@@ -218,7 +219,7 @@ def _curve(
             borders,
             [(tuple(map(float, a)), tuple(map(float, b))) for a, b in openings],
             spacing,
-            seed,
+            key,
             {"seed_spacing": SEED_SPACING, "lloyd": LLOYD, "attempts": ATTEMPTS},
             lambda step, steps: progress.report("graph", step, steps),
         )
@@ -326,7 +327,7 @@ def _relax(
     spacing: float,
     least: float,
     pitch: float,
-    rng: np.random.Generator,
+    rng: Rand,
     hold: int = 0,
 ) -> tuple[np.ndarray, int]:
     """The curve, relaxed by the Rust core (``curve::relax``; see ARCHITECTURE.md, 6. and 7.):
@@ -635,7 +636,7 @@ def _browser_core() -> object | None:
         )  # fmt: skip
         return unflat(out.points, out.lens)
 
-    def curve_graph(segments, borders, openings, spacing, seed, params, report):  # noqa: ANN001, ANN202
+    def curve_graph(segments, borders, openings, spacing, key, params, report):  # noqa: ANN001, ANN202
         rings = [r for _, rs in segments for r in rs]
         lines = [ln for _, _, ls in borders for ln in ls]
         try:
@@ -644,7 +645,7 @@ def _browser_core() -> object | None:
                 u32([len(rs) for _, rs in segments]),
                 u32([v for i, j, _ in borders for v in (i, j)]),
                 u32([len(ls) for _, _, ls in borders]), *flat(lines),
-                f64(np.array(openings)), spacing, seed >> 32, seed & 0xFFFFFFFF, obj(params),
+                f64(np.array(openings)), spacing, to_js(np.frombuffer(key, np.uint8)), obj(params),
                 report=report,
             )  # fmt: skip
         except Exception as e:  # (pyodide's JsException: what the core refused)
@@ -770,8 +771,10 @@ def generate(
                 x = xb - m if xb > xa else xb + c
                 area = shapely.difference(area, shapely.box(x, ya + spacing, x + m, yb))
     area = shapely.union_all(_polygons(area))  # (no slivers of lines or points left)
-    rng = random.Random(seed)
-    nrng = np.random.default_rng(rng.getrandbits(64))
+    rng = Rand.of(seed, "sfc")
+    nrng = rng.child("relax")
+    # (each try at the curve's graph, a key of its own for the Rust core's ChaCha20)
+    graph_keys = (rng.key_for(f"graph/{k}") for k in itertools.count())
     zs = [frame.geom(z) for z in zones]
     parts = [
         shapely.union_all(_polygons(area.intersection(frame.geom(g)))) for g in partitions
@@ -787,7 +790,7 @@ def generate(
         ((x0 + c / 4, ym + spacing / 2), (x0 + 3 * c / 4, ym + spacing / 2))
         for (x0, _), ym in zip(exits, tops, strict=True)
     ]
-    found, cells, left = _curve(regions, owner, spacing, openings, rng.getrandbits(64))
+    found, cells, left = _curve(regions, owner, spacing, openings, next(graph_keys))
     # (regions a partition's curve cannot reach, e.g. past a sliver of it too thin for a run
     # in and back out: to the partition beside them whose curve does reach there, and the
     # curves found again)
@@ -803,14 +806,14 @@ def generate(
                     partitions[owner[i]] = shapely.difference(partitions[owner[i]], back)
                     partitions[k] = shapely.union_all([partitions[k], back])
         owner = moved
-        found, cells, left = _curve(regions, owner, spacing, openings, rng.getrandbits(64))
+        found, cells, left = _curve(regions, owner, spacing, openings, next(graph_keys))
     # (and a small one that still none reaches, e.g. a lid's glue tab whose one cell finds no
     # run of the narrow lid beside it to join across their border: one region with that
     # neighbour, its curve crossing the fold between them inside it)
     merged = _merged(regions, owner, found, spacing)
     if merged is not None:
         regions, owner = merged
-        found, cells, left = _curve(regions, owner, spacing, openings, rng.getrandbits(64))
+        found, cells, left = _curve(regions, owner, spacing, openings, next(graph_keys))
     progress.report("graph", cells=cells)
     lines = []
     for k, ((x0, y0), ym, (pts, _)) in enumerate(zip(exits, tops, found, strict=True)):

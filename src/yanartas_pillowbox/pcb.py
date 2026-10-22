@@ -42,7 +42,7 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString, Polygon
 
-from yanartas_pillowbox import checkpoint, kimesh, partition, progress, sfc
+from yanartas_pillowbox import checkpoint, kimesh, partition, progress, rand, sfc
 from yanartas_pillowbox import mesh as meshgen
 from yanartas_pillowbox.config import Config
 from yanartas_pillowbox.geometry import (
@@ -487,8 +487,8 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
 
     side = meshgen.LEFT  # (the cable leaves the edge towards -x)
     jobs: list[tuple[str, Callable[[], meshgen.Mesh]]] = []
-    for i, (layer, corner) in enumerate(corners.items()):
-        seed = cfg.seed * 2 + i
+    for layer, corner in corners.items():
+        seed = rand.derive(cfg.seed, f"layer/{layer}")  # (each layer a key of its own)
         if cfg.mesh_algorithm != "sfc":
             jobs.append((layer, functools.partial(
                 kimesh.generate, copy(mask), corner, side, n, pitch, seed=seed

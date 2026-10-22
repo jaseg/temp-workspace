@@ -14,7 +14,6 @@ Unit-cell coordinates: x right, y down (as the pattern); side bits as in ``mesh`
 from __future__ import annotations
 
 import math
-import random
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 
@@ -32,6 +31,7 @@ from yanartas_pillowbox.mesh import (
     Point,
     straighten,
 )
+from yanartas_pillowbox.rand import Rand
 
 __all__ = ["DOWN", "LEFT", "RIGHT", "UP", "Mesh", "MeshError", "generate", "tile"]
 
@@ -178,7 +178,7 @@ def generate(
     if (0, 0) not in valid:
         raise MeshError("no room for the mesh's exit cell")
 
-    rnd = random.Random(seed)
+    rnd = Rand.of(seed, "kimesh")
 
     def neighbours(x: int, y: int, straight: int) -> list[tuple[int, int, int]]:
         out = [(x + dx, y + dy, side) for side, (dx, dy) in STEP.items()]

@@ -33,6 +33,7 @@ from shapely.geometry import Polygon
 
 from yanartas_pillowbox import checkpoint
 from yanartas_pillowbox.mesh import MeshError
+from yanartas_pillowbox.rand import Rand
 
 LLOYD = 3  # Lloyd iterations of the cells
 CELL = 2.5  # the cells this many ports across
@@ -70,7 +71,7 @@ def cells(
     area: shapely.Geometry,
     zones: list[Polygon],
     size: float,
-    rng: np.random.Generator,
+    rng: Rand,
     pins: list[tuple[float, float]] = (),
 ) -> tuple[list[Polygon], list[int], list[int]]:
     """The area as Voronoi cells about ``size`` across, each zone's on its own (Lloyd's
@@ -280,7 +281,7 @@ def partition(
     ``inward`` the way from the junction into the area), of equal area, each holding its
     port, ``width`` wide (a pair of trace lanes: the ports' width), and its strip. A split
     that comes out uneven is tried again afresh."""
-    rng = np.random.default_rng(seed)
+    rng = Rand.of(seed, "partition")
     best, worst = None, math.inf
     for _ in range(ATTEMPTS):
         parts = _partition(area, zones, ports, inward, width, rng)
@@ -353,7 +354,7 @@ def _partition(
     ports: list[Polygon],
     inward: tuple[float, float],
     width: float,
-    rng: np.random.Generator,
+    rng: Rand,
 ) -> list[Partition]:
     count = len(ports)
     inv = np.asarray(inward, float) / math.hypot(*inward)
@@ -463,7 +464,7 @@ def _pinched(
     return owner
 
 
-def _field(cen: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+def _field(cen: np.ndarray, rng: Rand) -> np.ndarray:
     """A smooth random cost over the cells (a few plane waves, about as long as the area
     is wide): the partitions' borders bent one way on one layer, another on the other."""
     span = float(np.ptp(cen, axis=0).max()) or 1.0

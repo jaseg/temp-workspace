@@ -60,11 +60,12 @@ def test_layout(n, side, corner, even):
         assert line.is_simple and AREA.buffer(1e-9).contains(line)
         # (the copper inside, but where the traces leave)
         assert AREA.buffer(-PITCH / 4).contains(line.difference(edge.buffer(PITCH)))
-        # the curve joins the two zones once: each trace in the one it does not leave from
-        # in one piece (counted a little inside it: a trace may run along their border,
-        # touching it, and drawn smooth, graze it by a few µm)
-        parts = [len(shapely.get_parts(line.intersection(z.buffer(-0.01)))) for z in ZONES]
-        assert min(parts) == 1
+    # The curve joins the two zones once: every trace crosses their border, and all the
+    # crossings lie in one stretch of it, the ribbon's width (its lanes may turn back across
+    # the border there, the innermost round a tip at it).
+    crossings = sorted(p.y for line in lines for p in shapely.get_parts(line.intersection(FOLD)))
+    assert all(len(shapely.get_parts(line.intersection(FOLD))) >= 2 for line in lines)
+    assert crossings[-1] - crossings[0] < 2 * c
     for a, b in itertools.combinations(lines, 2):  # no two traces nearer than the pitch
         assert a.distance(b) > 0.99 * PITCH
     # the space between the traces: rarely below the nominal one, much of it within -5 /
@@ -141,7 +142,7 @@ def test_cells_tile_their_domain():
 
     domain = shapely.box(0, 0, 12, 8).difference(shapely.box(5, 3, 7, 5))
     rings = [np.asarray(r.coords)[:-1] for r in (domain.exterior, *domain.interiors)]
-    cells = [Polygon(c) for c in yanartas_mesh._cells(rings, 1.5, 3, None, 6)]
+    cells = [Polygon(c) for c in yanartas_mesh._cells(rings, 1.5, bytes(32), None, 6)]
     union = shapely.union_all(cells)
     assert all(c.is_valid for c in cells)
     assert math.isclose(sum(c.area for c in cells), domain.area, rel_tol=1e-9)

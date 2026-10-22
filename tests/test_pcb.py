@@ -535,6 +535,8 @@ def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     from yanartas_pillowbox.server import create_app
 
     def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, partitions=(), stems=()):
+        progress.report("relax", 1, 2)
+        progress.report("relax", 2, 2)
         progress.report("settle", 20, 40, vertices=1000)
         return _ports_only(mask, corner, side, n, pitch, partitions=partitions)
 
@@ -542,13 +544,21 @@ def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     client = create_app(tmp_path / "s.json").test_client()
     config = D.with_values(mesh_traces=2, mesh_algorithm="sfc").to_dict()
     assert client.post("/api/pcb", json={"config": config}).status_code == 200
-    e = client.get("/api/progress").json["progress"]  # (the sides run at once: either)
+    reply = client.get("/api/progress").json
+    e = reply["progress"]  # (the sides run at once: either)
     assert e["stage"].split()[0] in ("F.Cu", "B.Cu") and (e["phase"], e["step"], e["steps"]) == (
         "settle",
         20,
         40,
     )
     assert e["vertices"] == 1000 and 0.2 < e["done"] < 1
+    # The log: every phase of each side, in the order they began (with when), each at its
+    # last step; however the two sides' events interleaved.
+    log = reply["log"]
+    for side in ("F.Cu", "B.Cu"):
+        mine = [x for x in log if x["stage"] == side]
+        assert [(x["phase"], x["step"]) for x in mine] == [("relax", 2), ("settle", 20)]
+    assert [x["at"] for x in log] == sorted(x["at"] for x in log)
 
 
 @pytest.mark.slow
