@@ -57,11 +57,24 @@ export function drawDims2d(dims, { fs, flipY = false }) {
         if (Math.hypot(q[0] - e[0], q[1] - e[1]) > 1e-6) g.append(line(e, over, "ext"));
         if (from[i]) track(e);
       }
-      g.append(line(q1, q2), ...arrows(q1, q2, a));
-      const mid = [(q1[0] + q2[0]) / 2, (q1[1] + q2[1]) / 2];
+      const half = d.label.length * fs * 0.3;
+      const span = Math.hypot(q2[0] - q1[0], q2[1] - q1[1]);
+      let mid = [(q1[0] + q2[0]) / 2, (q1[1] + q2[1]) / 2];
+      if (span >= 2 * a + 2 * half + fs * 0.6) {
+        g.append(line(q1, q2), ...arrows(q1, q2, a));
+      } else {
+        // Too short for its arrows and label between the extension lines: the arrows outside,
+        // pointing in on leaders, and the label beyond the second one's leader.
+        const u = span > 1e-9 ? unit(q1, q2) : (horiz ? [1, 0] : [0, 1]);
+        const o1 = [q1[0] - u[0] * 2 * a, q1[1] - u[1] * 2 * a];
+        const o2 = [q2[0] + u[0] * 2 * a, q2[1] + u[1] * 2 * a];
+        g.append(line(o1, o2), arrowTip(q1, u, a), arrowTip(q2, [-u[0], -u[1]], a));
+        const k = 2 * a + half + fs * 0.4;
+        mid = [q2[0] + u[0] * k, q2[1] + u[1] * k];
+        track(o1, o2);
+      }
       g.append(label(mid, d.label, fs, horiz ? 0 : -90));
       track(p1, p2, q1, q2);
-      const half = d.label.length * fs * 0.3;
       track(horiz ? [mid[0] - half, mid[1] - fs] : [mid[0] - fs, mid[1] - half],
             horiz ? [mid[0] + half, mid[1] + fs] : [mid[0] + fs, mid[1] + half]);
     } else if (d.kind === "outline") {
