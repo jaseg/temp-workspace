@@ -8,6 +8,7 @@ validated ``Config`` or raises ``ConfigError`` carrying one message per offendin
 
 from __future__ import annotations
 
+import hashlib
 import math
 from dataclasses import dataclass, fields, replace
 from typing import Any, Literal
@@ -16,11 +17,11 @@ from yanartas_pillowbox import crosssection
 
 # Bumped whenever the meaning of saved settings changes; documents of any other version are
 # rejected (no migrations).
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 STROKE_WIDTH = 0.1  # mm, written to every line of the SVG
 
-FieldKind = Literal["float", "choice"]
+FieldKind = Literal["float", "choice", "text"]
 
 
 class ConfigError(ValueError):
@@ -432,13 +433,10 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
     FieldSpec(
         "mesh_seed",
         "Mesh seed",
-        "float",
+        "text",
         "PCB mesh",
-        "",
-        0,
-        1e9,
-        1,
-        help="Seed of the mesh's random walk: the same seed gives the same mesh.",
+        help="Seed of the mesh's random walk, any text: the same seed gives the same mesh.",
+        action=("randomize", "\u2684", "Randomize: a new random seed"),
     ),
     FieldSpec(
         "mesh_algorithm",
@@ -549,7 +547,7 @@ class Config:
     mesh_traces: float = 4.0
     mesh_partitions: float = 3.0
     mesh_edge_clearance: float = 0.5
-    mesh_seed: float = 0.0
+    mesh_seed: str = "0"
     mesh_algorithm: str = "kimesh"
     mesh_shape: str = "lines"
     mesh_back_offset: str = "cell"
@@ -557,6 +555,11 @@ class Config:
     print_side: str = "outside"
 
     # ----------------------------------------------------------------- derived values
+    @property
+    def seed(self) -> int:
+        """``mesh_seed`` as the layout's random seed: its text's SHA-256 hash."""
+        return int.from_bytes(hashlib.sha256(self.mesh_seed.encode()).digest()[:8]) >> 1
+
     @property
     def two_piece(self) -> bool:
         return self.pieces == "two"
@@ -655,6 +658,10 @@ def check_version(data: dict[str, Any], *, required: bool) -> None:
 
 
 def _coerce(spec: FieldSpec, value: Any) -> Any:
+    if spec.kind == "text":
+        if not isinstance(value, str):
+            raise ValueError("must be text")
+        return value
     if spec.kind == "float":
         if isinstance(value, bool) or not isinstance(value, int | float):
             raise ValueError("must be a number")
@@ -776,7 +783,7 @@ def validate(cfg: Config) -> dict[str, str]:
     }
     if cfg.fpc_cable != "none" and "fpc_pins" not in errors and cfg.fpc_pins != int(cfg.fpc_pins):
         add("fpc_pins", "must be a whole number")
-    for name in ("mesh_traces", "mesh_partitions", "mesh_seed"):
+    for name in ("mesh_traces", "mesh_partitions"):
         if name not in errors and getattr(cfg, name) != int(getattr(cfg, name)):
             add(name, "must be a whole number")
     if shell is not None and cfg.fpc_cable != "none" and not errors.keys() & fpc_fields:

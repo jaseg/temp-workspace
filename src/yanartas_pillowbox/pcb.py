@@ -488,7 +488,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     side = meshgen.LEFT  # (the cable leaves the edge towards -x)
     jobs: list[tuple[str, Callable[[], meshgen.Mesh]]] = []
     for i, (layer, corner) in enumerate(corners.items()):
-        seed = int(cfg.mesh_seed) * 2 + i
+        seed = cfg.seed * 2 + i
         if cfg.mesh_algorithm != "sfc":
             jobs.append((layer, functools.partial(
                 kimesh.generate, copy(mask), corner, side, n, pitch, seed=seed

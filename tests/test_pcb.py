@@ -356,7 +356,7 @@ def test_api_routes(tmp_path):
         assert client.post("/api/pcb/cancel").json == {"cancelled": True}
     finally:
         progress.begin()
-    r = client.post("/api/pcb", json={"config": {**small, "mesh_seed": 1}})
+    r = client.post("/api/pcb", json={"config": {**small, "mesh_seed": "1"}})
     assert r.status_code == 200
 
 

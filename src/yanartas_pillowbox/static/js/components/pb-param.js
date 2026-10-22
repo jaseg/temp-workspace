@@ -1,4 +1,4 @@
-// <pb-param>: one labelled configuration input (number or select) with unit, optional
+// <pb-param>: one labelled configuration input (number, text or select) with unit, optional
 // action button, help text and an inline validation message. Built from a field spec served
 // by /api/defaults. Emits a bubbling "pb-change" event whenever the user edits the value.
 
@@ -72,6 +72,12 @@ export class PbParam extends HTMLElement {
       input.step = spec.step ?? "any";
       if (spec.min !== undefined) input.min = spec.min;
       if (spec.max !== undefined) input.max = spec.max;
+      input.addEventListener("input", emit);
+      control.append(input);
+      this.#input = input;
+    } else if (spec.kind === "text") {
+      const input = el("input");
+      Object.assign(input, { type: "text", id, spellcheck: false, autocomplete: "off" });
       input.addEventListener("input", emit);
       control.append(input);
       this.#input = input;

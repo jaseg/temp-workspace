@@ -700,6 +700,13 @@ async function main() {
   form.addEventListener("submit", (e) => e.preventDefault());
   form.addEventListener("pb-action", (e) => {
     if (e.detail.action === "maximize") payloadAction({ action: "maximize", field: e.detail.name });
+    if (e.detail.action === "randomize") {
+      // (eight random base-36 characters: a new seed, as if typed in)
+      const digits = crypto.getRandomValues(new Uint8Array(8));
+      params.get(e.detail.name).value = Array.from(digits, (d) => (d % 36).toString(36)).join("");
+      setStatus("Updating…");
+      scheduleRender(0);
+    }
   });
 
   // Link parameters and dimensions: focusing or hovering a field highlights its dimensions

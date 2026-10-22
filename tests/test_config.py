@@ -250,3 +250,15 @@ def test_mesh_nets_per_side():
     assert d.mesh_nets == 4
     assert d.with_values(mesh_algorithm="sfc").mesh_nets == 12
     assert d.with_values(mesh_algorithm="sfc", mesh_partitions=1, mesh_traces=5).mesh_nets == 5
+
+
+def test_mesh_seed_is_any_text():
+    """The mesh seed takes any text, the layout's seed its SHA-256 hash: the same every
+    time, another for other text."""
+    cfg = Config.defaults()
+    a = cfg.with_values(mesh_seed="hello, box")
+    assert a.seed == cfg.with_values(mesh_seed="hello, box").seed
+    assert a.seed != cfg.with_values(mesh_seed="hello, box!").seed != cfg.seed
+    assert 0 <= a.seed < 2**63 and cfg.with_values(mesh_seed="").seed >= 0
+    assert parse_cli_value("mesh_seed", "my box") == "my box"
+    assert errors_for(mesh_seed=1) == {"mesh_seed": "must be text"}

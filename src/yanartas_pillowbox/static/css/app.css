@@ -210,6 +210,7 @@ pb-param .row { display: grid; grid-template-columns: 1fr minmax(0, 150px); alig
 pb-param label { font-size: var(--label-font-size); }
 pb-param .control { display: flex; align-items: center; gap: 6px; min-width: 0; }
 pb-param .control input[type="number"],
+pb-param .control input[type="text"],
 pb-param .control select {
   width: 100%;
   min-width: 0;
@@ -219,6 +220,7 @@ pb-param .control select {
   padding: 4px 6px;
 }
 pb-param .control input[type="number"] { text-align: right; font-family: var(--mono); }
+pb-param .control input[type="text"] { font-family: var(--mono); }
 pb-param .unit { color: var(--text-muted); font-size: 12px; min-width: 22px; }
 pb-param .row.has-action { grid-template-columns: 1fr minmax(0, 196px); }
 pb-param.wide .row { grid-template-columns: auto minmax(0, 1fr); }
