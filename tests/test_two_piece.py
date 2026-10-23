@@ -226,9 +226,19 @@ def test_payload_clearance_and_interior_model():
     assert "rotate([0, 180, 0]) mirror([0, 1, 0]) end_space();" in text
 
 
-def test_svg_labels_say_to_make_two():
-    text = render_svg(TWO)
-    assert "make two" in text and "outer flap end" in text and "inner flap end" in text
+def test_svg_labels_name_the_panel_and_walls():
+    """The body panel, and the walls each end's flap makes, in the middle of that flap."""
+    from yanartas_pillowbox.svg import face_labels
+
+    pattern = build_pattern(TWO)
+    labels = {text: at for text, at, _ in face_labels(TWO, pattern)}
+    assert set(labels) == {"body panel", "outer wall", "inner wall"}
+    for text, name in (("outer wall", "front-top-flap"), ("inner wall", "back-bottom-flap")):
+        face = pattern.face(name)
+        x, y = labels[text]
+        assert x == pytest.approx((face.x0 + face.x1) / 2)
+        assert y == pytest.approx(sum(face.y_range(x)) / 2)
+    assert "body panel" in render_svg(TWO)
 
 
 def test_lid_offset_hint_uses_the_two_piece_shell():

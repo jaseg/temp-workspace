@@ -383,7 +383,7 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   its bends too (kept 1 mm off its folds, the corners' creases among them, each moved along
   its lane from where it falls as far as that takes), join the two layers.
 * **Output:** through [gerbonara](https://gitlab.com/gerbolyze/gerbonara): the KiCad board
-  (outline on Edge.Cuts, with the slits as 0.1 mm slots; fold lines on Dwgs.User; plug
+  (outline on Edge.Cuts, with the slits as 0.1 mm slots; fold lines on Dwgs.User and on both silkscreens, F.SilkS and B.SilkS; plug
   contacts as footprint J1), a KiCad project carrying the design rules (net class Default:
   the trace width and space, the vias), Gerber and drill files, and SVG renderings of both
   sides. The board is made without its tracks and they are written into its file as text,

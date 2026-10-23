@@ -79,6 +79,7 @@ TOLERANCE = 0.005  # arcs as polylines (chord error)
 LARGE_ARC = 100.0
 SHALLOW_ARC = 0.05
 FOLD_CLEARANCE = 1.0  # vias keep this far from the cable's folds
+FOLD_LAYERS = ("Dwgs.User", "F.SilkS", "B.SilkS")  # the fold lines, on each
 STITCH_PITCH = 6.0  # GND stitching vias along the cable
 # ... each where it falls, or (on a fold) this far along the lane from there, the nearest first
 STITCH_SHIFTS = tuple(sorted((0.25 * k for k in range(-11, 12)), key=abs))
@@ -789,7 +790,8 @@ def verify(result: Layout) -> list[str]:
 
 def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> Any:
     """The layout as a gerbonara KiCad board: the foil's outline on Edge.Cuts, the folds on
-    Dwgs.User, the glue tab and the flaps as filled polygons on User.1 (for stiffeners), the
+    Dwgs.User and on both silkscreens (to fold along, either side up), the glue tab and the
+    flaps as filled polygons on User.1 (for stiffeners), the
     tracks (``tracks``: else left out, for ``kicad_text``), vias and the plug's contacts
     (footprint J1), and the cable's GND zone on both copper layers (left unfilled: KiCad
     fills it); on a page that holds it all with a margin, centred (``page``)."""
@@ -830,22 +832,21 @@ def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> An
             )
         )
     for seg in result.folds:
-        if isinstance(seg, Arc):
-            board.add(
-                kgr.Arc(
-                    start=xy(seg.start),
-                    mid=xy(seg.point_at(0.5)),
-                    end=xy(seg.end),
-                    layer="Dwgs.User",
-                    stroke=stroke(0.1),
+        for layer in FOLD_LAYERS:
+            if isinstance(seg, Arc):
+                board.add(
+                    kgr.Arc(
+                        start=xy(seg.start),
+                        mid=xy(seg.point_at(0.5)),
+                        end=xy(seg.end),
+                        layer=layer,
+                        stroke=stroke(0.1),
+                    )
                 )
-            )
-        else:
-            board.add(
-                kgr.Line(
-                    start=xy(seg.start), end=xy(seg.end), layer="Dwgs.User", stroke=stroke(0.1)
+            else:
+                board.add(
+                    kgr.Line(start=xy(seg.start), end=xy(seg.end), layer=layer, stroke=stroke(0.1))
                 )
-            )
 
     for track in result.tracks if tracks else ():
         net = board.net_id(track.net)

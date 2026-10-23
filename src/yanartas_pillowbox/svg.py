@@ -226,8 +226,8 @@ def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]
     * on every flap and lid, which way its print side faces once folded (they keep the
       panels' orientation).
 
-    Two pieces: that one is made twice, one folded print side out, one in; which end is
-    which."""
+    Two pieces: the body panel, and in the middle of each end's flap the wall it makes
+    (outer, inner)."""
     printed_out = cfg.print_side == "outside"
 
     def facing(outward: bool) -> str:
@@ -235,15 +235,16 @@ def face_labels(cfg: Config, pattern: Pattern) -> list[tuple[str, Point, float]]
 
     out = []
     if cfg.two_piece:
-        # (one piece's print side faces out, the other's in: its folds go the other way)
-        front = pattern.face("front-panel")
-        xf = (front.x0 + front.x1) / 2
-        top, bottom = front.y_range(xf)
-        mid = (top + bottom) / 2
-        out.append(("make two: one with this side", (xf, mid - LABEL_SIZE), LABEL_SIZE))
-        out.append(("outside, one inside", (xf, mid + LABEL_SIZE), LABEL_SIZE))
-        out.append(("outer flap end", (xf, top + 2 * LABEL_SIZE), LABEL_SIZE))
-        out.append(("inner flap end", (xf, bottom - 2 * LABEL_SIZE), LABEL_SIZE))
+        # (the body panel; each end's flap, in its middle: the wall it makes)
+        for name, text in (
+            ("front-panel", "body panel"),
+            ("front-top-flap", "outer wall"),
+            ("back-bottom-flap", "inner wall"),
+        ):
+            face = pattern.face(name)
+            xm = (face.x0 + face.x1) / 2
+            lo, hi = face.y_range(xm)
+            out.append((text, (xm, (lo + hi) / 2), min(LABEL_SIZE, (hi - lo) / 3)))
         return out
     back, front = pattern.face("back-panel"), pattern.face("front-panel")
     xb, xf = (back.x0 + back.x1) / 2, (front.x0 + front.x1) / 2

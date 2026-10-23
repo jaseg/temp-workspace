@@ -271,7 +271,7 @@ tab beyond its glue fold (`geometry._build_piece`).
   fold closes in on the junction; `partition.strips` orders the exits' strips to keep their
   ends off it.
 - **Elsewhere.** Dimensions (`_piece_dimensions`), payload wall clearance and the OpenSCAD
-  interior (the other end turned) use `inner_offset`/`cy`; the SVG labels say to make two.
+  interior (the other end turned) use `inner_offset`/`cy`; the SVG labels name the body panel and, in the middle of each end's flap, the wall it makes (outer, inner).
 
 ### 4.5 FPC cutout and cable
 

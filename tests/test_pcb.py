@@ -228,6 +228,13 @@ def test_export(layout, tmp_path):
     assert len(fp.pads) == int(D.fpc_pins)
     assert [z.net_name for z in board.zones] == ["GND"]
     assert {line.layer for line in board.lines} >= {"Edge.Cuts", "Dwgs.User"}
+    # (the folds on both silkscreens too, as on Dwgs.User)
+    folds = [
+        sorted((round(g.start.x, 3), round(g.start.y, 3), round(g.end.x, 3), round(g.end.y, 3))
+               for g in (*board.lines, *board.arcs) if g.layer == layer)
+        for layer in ("Dwgs.User", "F.SilkS", "B.SilkS")
+    ]  # fmt: skip
+    assert folds[0] and folds[0] == folds[1] == folds[2]
     gerbers = {p.name for p in (tmp_path / f"{name}-gerbers").iterdir()}
     assert {
         f"{name}-F_Cu.gbr",
