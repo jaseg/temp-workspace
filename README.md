@@ -555,11 +555,11 @@ layers keep the line types apart.
 * **Fold lines:** separate open paths, dashed by fold direction. They end exactly on the
   outline and never run along it.
 * **Glue guides** (two pieces only): six short marks, neither cut nor folded, for gluing
-  the other piece's tab on at the right height. Three are on the glue tab's outer part (5
-  mm long): in its middle and near its ends, just past the mitres. Three are on the free
+  the other piece's tab on at the right height. Three run across the glue tab and 5 mm on
+  into the panel: in its middle and near its ends, past the mitres. Three are on the free
   edge, where the other piece's tab brings those three once the two pieces are put
   together. They run from the edge across the panel as far as the tab reaches plus 5 mm,
-  so they show past the glued-on tab, and they keep 1 mm off the curved folds. Line each
+  so they show past the glued-on tab, and all six keep 1 mm off the curved folds. Line each
   mark on the tab up with its mark on the panel.
 * **Styling:** `fill="none"`, `stroke` and `stroke-width` are plain attributes on every
   element, with a fixed 0.1 mm stroke width. There are no CSS classes and no `<style>`.

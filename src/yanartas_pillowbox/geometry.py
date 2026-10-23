@@ -614,7 +614,7 @@ class LidLayout:
         return tuple(Line(a, b) for a, b in itertools.pairwise(pts) if _dist(a, b) > 1e-12)
 
 
-GUIDE = 5.0  # the glue guides this long on the tab, and past it on the free edge's side
+GUIDE = 5.0  # the glue guides reach this far past the glue tab, into the panel
 MAX_SPREAD_SLOPE = 0.98  # the continued fold arc must turn less than 45 degrees, with margin
 
 
@@ -1367,17 +1367,23 @@ def glue_guides(
     """Two pieces: marks to line the other piece's glue tab up along this one's free edge
     by. On the free edge: from the edge across the panel as far as the other piece's tab
     reaches and ``GUIDE`` further (so they show past it once it is glued), in the middle
-    and near the tab's ends: past their mitres, and as far in as keeps them a millimetre off
-    the curved folds (``w`` wide, bowing in by ``s``). On the glue tab, across its outer
-    part (``GUIDE`` long), the same marks where the tab brings them (turned over: at
-    ``y = d + Lp`` less theirs)."""
+    and near the tab's ends: past their mitres, and as far in as keeps every mark a
+    millimetre off the curved folds (``w`` wide, bowing in by ``s``). On the glue tab, the
+    same marks where the tab brings them (turned over: at ``y = d + Lp`` less theirs),
+    across it and ``GUIDE`` on into the panel."""
     r = circle_radius(w, s)
+
+    def fold(u: float) -> float:  # (how far the folds bow in, u from the panel's side)
+        u = min(u, w / 2) - w / 2
+        return math.sqrt(r * r - u * u) - (r - s)
+
     far = min(g + GUIDE, w / 2)
-    u = far - w / 2
-    clear = math.sqrt(r * r - u * u) - (r - s) + 1.0  # (the fold at the marks' far end)
-    edge = (max(d + t_bot, clear), (d + lp) / 2, min(lp - t_top, lp - clear))
+    clear, inner = fold(far) + 1.0, fold(GUIDE) + 1.0  # (the free edge's; the tab's)
+    lo = max(d + t_bot, clear, d + inner)
+    hi = min(lp - t_top, lp - clear, lp + d - inner)
+    edge = (lo, (d + lp) / 2, hi)
     return (
-        *(Line((w + g - GUIDE, d + lp - y), (w + g, d + lp - y)) for y in edge),
+        *(Line((w - GUIDE, d + lp - y), (w + g, d + lp - y)) for y in edge),
         *(Line((0.0, y), (far, y)) for y in edge),
     )
 

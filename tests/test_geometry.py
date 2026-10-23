@@ -471,7 +471,8 @@ def test_stiffeners_are_the_faces_shrunk(pieces):
 
 
 def test_glue_guides_line_the_other_piece_s_tab_up():
-    """Two pieces: three marks on the glue tab's outer part and three on the free edge, each
+    """Two pieces: three marks across the glue tab (and on into the panel) and three on the
+    free edge, each
     on the free edge where the other piece's tab (turned over: y to d + Lp - y) brings one of
     the tab's; those on the free edge on the panel, reaching past the tab's width, those on
     the tab within it. One piece: none."""
@@ -488,9 +489,11 @@ def test_glue_guides_line_the_other_piece_s_tab_up():
     for t, e in zip(tab, edge, strict=True):
         assert t.start[1] == t.end[1] == pytest.approx(d + lp - e.start[1])
     faces = {f.name: SPolygon(sample(list(f.boundary))).buffer(1e-6) for f in pattern.faces}
-    for t in tab:
-        assert faces["glue-tab"].contains(LineString([t.start, t.end]))
-        assert math.dist(t.start, t.end) == pytest.approx(GUIDE)
+    w, g = cfg.shell.front.width, cfg.glue_tab_width
+    for t in tab:  # (across the tab, and GUIDE on into the panel)
+        assert (t.start[0], t.end[0]) == pytest.approx((w - GUIDE, w + g))
+        line = LineString([t.start, t.end])
+        assert faces["glue-tab"].union(faces["front-panel"]).contains(line)
     for e in edge:
         assert e.start[0] == 0 and e.end[0] == pytest.approx(cfg.glue_tab_width + GUIDE)
         assert faces["front-panel"].contains(LineString([e.start, e.end]))
