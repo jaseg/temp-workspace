@@ -327,7 +327,9 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         50,
         0.25,
         help="Length of the plug at the cable's end: the part that goes into the connector "
-        "(the contacts and the stiffener behind them).",
+        "(the contacts and the stiffener behind them, on the stiffener layer). ZIF connectors "
+        "for 0.5 mm FPC (e.g. Hirose FH12) want the contacts exposed 3.5 mm or more and the end "
+        "stiffened 4.5 mm or more, to 0.3 mm thick.",
     ),
     FieldSpec(
         "fpc_cable_inset",
@@ -560,7 +562,7 @@ class Config:
     fpc_pins: float = 61.0  # (the default curve mesh's ends and GND pins take 55)
     fpc_pitch: float = 0.5
     fpc_edge_margin: float = 0.5
-    fpc_plug_length: float = 4.0
+    fpc_plug_length: float = 4.5
     fpc_cable_inset: float = 0.0
     fpc_corner_radius: float = 1.0
     fpc_cable_gap: float = 1.0

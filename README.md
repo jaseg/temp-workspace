@@ -186,8 +186,8 @@ All lengths are in millimetres.
 | `fpc_pins` | 61 | Contacts of the FPC connector, 2–200. The default holds the default space-filling-curve mesh: 3 partitions × 4 traces × 2 ends × 2 sides, and a GND pin after every four ends (plus pin 1). The PCB layout refuses a plug with too few pins. |
 | `fpc_pitch` | 0.5 | Contact pitch, 0.1–2.54. |
 | `fpc_edge_margin` | 0.5 | From the outermost contacts' centres to the plug's edges: the plug is `(pins − 1)·pitch + 2·margin` wide (31 mm by default, the usual `(pins + 1)·pitch`). At most the front panel's straight edge beside the back panel, less 1 mm. |
-| `fpc_plug_length` | 4 | Length of the plug at the cable's end, 1–50. |
-| `fpc_cable_inset` | 0 | How much narrower than the plug the rest of the cable is on each side; the plug's ears then stick out. 0–10. |
+| `fpc_plug_length` | 4.5 | Length of the plug at the cable's end, 1–50: the part that goes into the connector, stiffened (4.5 mm or more for Hirose FH12 and the like). |
+| `fpc_cable_inset` | 0 | How much narrower than the plug the rest of the cable is on each side; the plug's ears then stick out, on past the vias and the traces' fan-out behind the contacts, narrowing at 45°. 0–10. |
 | `fpc_corner_radius` | 1 | Rounds the cable's corners and where it meets the front panel's edge (not the plug's). 0–10; smaller where there is no room, e.g. at most half the clearance at the slots between rows. |
 | `fpc_cable_gap` | 1 | Cut-to-cut clearance between the cable's rows, and between the cable and the rest of the pattern. 0.1–20. |
 | `mesh_trace_width` | 0.15 | PCB layout: width of the security mesh's traces, on both copper layers and along the cable. 0.05–2. |
@@ -243,8 +243,10 @@ free straight edge (the glued edge, at the pattern's left), outward, by default 
 can (turning up; as high, turning down; `fpc_entry_offset` moves it from there): folded
 into the box, its stub and first corner lie on the inside of the back panel beside the edge,
 and keep the clearance (`fpc_cable_gap`) from the inner flap's wall at that end, past half
-its thickness (the wall stands further in, deeper into the box, by its fold's sagitta there;
-the rest of the cable, along the front panel, is not checked). Where it leaves the edge the
+its thickness; and so does the rest of it, which runs on across the front panel's inside at
+the same place along the box, where the wall stands further in (by its fold's sagitta: most
+at the panel's middle). The plug's ears count too, where they stick out further than the
+junction. Where it leaves the edge the
 cable is as wide as the meshes' exits need (`fpc.exit_width`: each layer's exit cell, the
 back one offset by half a cell, off the junction's fillets), if that is wider than the cable:
 the stub widens on the side away from its first turn, up to the first corner's far side, a
@@ -345,7 +347,11 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   edge (its traces running straight on across the gap); their traces run on into the cable and along
   it at the mesh's pitch, each layer's on its own side (F.Cu's on pin 1's side). Before the
   plug they fan out with 45° jogs to their contacts' places; the B.Cu traces change to the
-  contact side (F.Cu) through two staggered rows of vias (0.45 mm, 0.2 mm drill).
+  contact side (F.Cu) through two staggered rows of vias (0.45 mm, 0.2 mm drill). An inset
+  cable (`fpc_cable_inset`) stays as wide as the plug past those vias and the fan-out, and
+  narrows to its own width at 45° just where the fan-out starts (`plug.py`), so no trace
+  leaves it; its traces then always neck down to their places along the cable in its first
+  corner (below).
   Where the exit cells do not fit the cable centred on their pins (a wide trace space, many
   traces), they sit side by side across the junction, widened to hold them (see *FPC
   cable*), and the traces neck down in the cable's first corner: up the stub at the mesh's
@@ -361,17 +367,21 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   ends (KiMesh: a side's), nested: its loops' two ends mirrored about its middle
   (`p1t1s p1t2s p1t3s p1t3r p1t2r p1t1r GND p2t1s …`). The default KiMesh layout (N = 4)
   uses pins 1–19 for its ends; the default curve layout (N = 12, three partitions of four)
-  pins 1–55. Contacts are 0.6 pitch wide and stop 0.2 mm short of the tip.
-* **Stiffeners:** the glue tab and the lens-shaped flaps (outer and inner) are copied as
-  filled polygons onto KiCad's User.1 layer, and into the pattern SVG as a hidden layer
-  "User.1 (stiffeners)", for stiffeners later.
+  pins 1–55. Contacts are 0.7 pitch wide (0.35 mm at 0.5 mm, as for Hirose's FH12 and the
+  like) and stop 0.2 mm short of the tip; such connectors want them exposed 3.5 mm or more,
+  and the plug's end stiffened 4.5 mm or more to 0.3 mm thick (`fpc_plug_length`).
+* **Stiffeners:** the glue tab, the lens-shaped flaps (outer and inner) and the cable's plug
+  (as wide as the plug, `fpc_plug_length` back from its tip) are copied as filled polygons
+  onto KiCad's User.1 layer, and into the pattern SVG as a hidden layer "User.1
+  (stiffeners)", for stiffeners later.
 * **KiCad page:** a custom page as big as the design plus 25 mm a side and 50 mm above and
   below (room for the title block), at least A5; the design in its middle (the Gerbers and
   SVGs use the same coordinates).
 * **Ground:** the cable is a GND zone on both layers. It is a KiCad zone, filled in KiCad;
   the Gerber and SVG output leaves it out (fill and re-export in KiCad for fabrication).
-  Vias behind the GND contacts and stitching vias along the cable (kept 1 mm off its folds
-  and off the folded-flat corners) join the two layers.
+  Vias behind the GND contacts and stitching vias along both edges of the cable, through
+  its bends too (kept 1 mm off its folds, the corners' creases among them, each moved along
+  its lane from where it falls as far as that takes), join the two layers.
 * **Output:** through [gerbonara](https://gitlab.com/gerbolyze/gerbonara): the KiCad board
   (outline on Edge.Cuts, with the slits as 0.1 mm slots; fold lines on Dwgs.User; plug
   contacts as footprint J1), a KiCad project carrying the design rules (net class Default:

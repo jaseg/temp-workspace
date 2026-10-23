@@ -18,6 +18,7 @@ from yanartas_pillowbox.geometry import (
     build_model3d,
     build_pattern,
 )
+from yanartas_pillowbox.plug import plug_end
 
 D = Config.defaults()
 CONFIGS = {
@@ -168,9 +169,10 @@ def test_cable_keeps_its_clearance(cfg):
 
 
 def test_plug_end_is_square_and_sized(cfg):
-    """The plug: the last plug length, as wide as the contacts' span plus the edge margins,
-    its corners (and the steps to its ears) left sharp; every other corner of the cable
-    rounded by at most the corner radius."""
+    """The plug: the last plug length, as wide as the contacts' span plus the edge margins
+    (inset: on past the vias and the fan-out behind it, its ears narrowing at 45 degrees),
+    its corners (and the ears') left sharp; every other corner of the cable rounded by at
+    most the corner radius."""
     pattern = build_pattern(cfg)
     cable = pattern.cable
     assert cable.plug_width == pytest.approx(
@@ -179,11 +181,16 @@ def test_plug_end_is_square_and_sized(cfg):
     tip, before = cable.path[-1], cable.path[-2]
     d = _unit(before, tip)
     n = (-d[1], d[0])
-    hp, plug = cable.plug_width / 2, cable.plug_length
+    hp, h, plug = cable.plug_width / 2, cable.width / 2, cable.plug_length
     corners = [(tip[0] + k * hp * n[0], tip[1] + k * hp * n[1]) for k in (-1, 1)]
     if cable.plug_width > cable.width:
-        base = (tip[0] - plug * d[0], tip[1] - plug * d[1])
+        # (as wide as the plug on past its vias and fan-out, then narrowing at 45 degrees)
+        end = plug_end(cfg)
+        assert end.full >= plug and end.fan_start - end.full == pytest.approx(hp - h)
+        base = (tip[0] - end.full * d[0], tip[1] - end.full * d[1])
         corners += [(base[0] + k * hp * n[0], base[1] + k * hp * n[1]) for k in (-1, 1)]
+        narrow = (tip[0] - end.fan_start * d[0], tip[1] - end.fan_start * d[1])
+        corners += [(narrow[0] + k * h * n[0], narrow[1] + k * h * n[1]) for k in (-1, 1)]
     ends = [q for s in pattern.outline.segments if isinstance(s, Line) for q in (s.start, s.end)]
     for c in corners:  # two straight cuts meet there
         assert sum(math.dist(c, q) < 1e-9 for q in ends) == 2, c
@@ -409,17 +416,34 @@ def _first_corner(cfg):
 
 def test_first_corner_clears_the_inner_flaps(cfg):
     """Folded into the box, the cable's stub and its first corner (the triangle) stay clear
-    of the inner flaps' walls: by the clearance, past half the flap's thickness; and at the
-    default entry as near the end it turns away from as that allows (the rest of the
-    cable, along the front panel, is not checked)."""
+    of the inner flaps' walls: by the clearance, past half the flap's thickness; so does its
+    run on across the front panel's inside, at the junction's place along the box (where
+    the walls stand in further, towards the panel's middle). At the default entry it lies
+    as near the end it turns away from as that allows (a thickness more, at most; and the
+    plug's ears' more, if they stick out further than the junction)."""
     t, gap = cfg.thickness, cfg.fpc_cable_gap
+    shell = cfg.shell
     least = math.inf
-    for x, y, _ in _first_corner(cfg):
+
+    def check(x, y):
+        nonlocal least
         top, bottom = _flap_walls(cfg, x)
         assert bottom + t / 2 + 0.9 * gap < y < top - t / 2 - 0.9 * gap, (x, y, top, bottom)
         least = min(least, (y - bottom) if cfg.fpc_cable == "up" else (top - y))
-    if cfg.fpc_entry_offset == 0:  # (no nearer than needed: a thickness more, at most)
-        assert least - t / 2 - gap < 2 * t + 0.05, least
+
+    corner = _first_corner(cfg)
+    for x, y, _ in corner:
+        check(x, y)
+    ys = [y for _, y, _ in corner]
+    run = min(cfg.fpc_cable_length, shell.front.width)
+    for i in range(41):
+        x = shell.front_point(run * i / 40)[0]
+        for y in (min(ys), max(ys)):
+            check(x, y)
+    if cfg.fpc_entry_offset == 0:  # (no nearer than needed)
+        w, wj, wp = fpc.cable_width(cfg), fpc.junction_width(cfg), fpc.plug_width(cfg)
+        ears = max(0.0, (wj - w) / 2 + wp / 2 - wj / 2)
+        assert least - t / 2 - gap < 2 * t + 0.05 + ears, least
 
 
 def test_cable_in_the_3d_model(cfg):
@@ -434,6 +458,20 @@ def test_cable_in_the_3d_model(cfg):
     ]
     # One cut line along both sides and the plug's end, plus the stub's two sides.
     assert len(cable["cuts"]) == 3
+
+
+def test_cable_folds_lie_on_the_strip_in_the_3d_model(cfg):
+    """Straightened, each corner's crease runs across the strip from side to side, about
+    the cable's own centreline (not the junction's middle: wider for the meshes' exits, as
+    with an inset cable), its ends past the fillets at most."""
+    pattern = build_pattern(cfg)
+    folded = FoldedCable(cfg, pattern.cable)
+    cable = pattern.cable
+    centre, h = cable.path[0][1] - folded.yc, cable.width / 2
+    for k, fold in enumerate(cable.corners[1:], start=1):
+        for q in (fold.segment.start, fold.segment.end):
+            v, _ = folded.straight(q, k)
+            assert abs(abs(v - centre) - h) <= cfg.fpc_corner_radius + 1e-6, (fold.name, v)
 
 
 def test_cable_is_isometric_in_the_3d_model(cfg):

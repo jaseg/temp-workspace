@@ -287,7 +287,8 @@ def test_kicad_page_holds_the_design_centred(layout, tmp_path):
 
 def test_stiffeners_on_user_1(layout):
     """The glue tab and the lens-shaped flaps, as filled polygons on User.1: their faces,
-    each shrunk by its stiffener offset (its edges moved in, the corners mitred)."""
+    each shrunk by its stiffener offset (its edges moved in, the corners mitred); and the
+    cable's plug, as wide as the plug and as long."""
     from shapely.geometry import Polygon as SPolygon
 
     from yanartas_pillowbox.geometry import build_pattern
@@ -297,8 +298,10 @@ def test_stiffeners_on_user_1(layout):
     assert len(faces) == 5  # (the glue tab, two outer and two inner flaps)
     board = pcb.to_kicad(layout, tracks=False)
     polys = [p for p in board.polygons if p.layer == "User.1"]
-    assert len(polys) == len(faces) and all(p.fill for p in polys)
+    assert len(polys) == len(faces) + 1 and all(p.fill for p in polys)
     areas = sorted(SPolygon([(q.x, q.y) for q in p.pts]).area for p in polys)
+    plug = pattern.cable.plug_width * D.fpc_plug_length
+    areas.remove(min(areas, key=lambda a: abs(a - plug)))
     d = {"glue-tab": D.stiffener_tab_offset}
     expect = sorted(
         SPolygon(pcb.sample(f.boundary))

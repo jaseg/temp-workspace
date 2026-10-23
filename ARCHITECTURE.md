@@ -40,6 +40,7 @@ config ──► crosssection ──► geometry ──► svg ──► (downlo
 | `progress.py` | How far a long layout has got: the layouts report phases and steps, the CLI and the web UI show them. |
 | `checkpoint.py` | The layout's steps timed, and (with `YANARTAS_CHECKPOINT` set) their inputs and results written as gzipped JSON, any one step then run again alone (`resume`). |
 | `pcb.py` | The flex-PCB layout (mask, both meshes, the cable's traces, fan-out, vias and plug contacts, GND zone) and its export through gerbonara (KiCad board and project, Gerber, SVG). Imported on demand: its dependencies are heavy (the in-browser build loads them on the first PCB request). |
+| `plug.py` | The cable's plug end, shared by `fpc` and `pcb`: the pinout, the vias' rows behind the contacts and the traces' fan-out (`plug_end`), how far back the cable stays as wide as the plug. |
 | `fpc.py` | The FPC cable's layout: it leaves the front panel's free edge (x = 0) where set (`entry_range`: by default as near the end it turns away from as the inner flap allows), as wide as the meshes' exits need (`junction_width`), and turns up or down along it; the meander (laid out in a frame of its own, turned into the pattern's), its outline and plug, the corners' flat folds, and `unfold` (where a point lies once the corners are folded). |
 | `geometry.py` | The flat pattern (`build_pattern`: outline, typed folds, faces), the folding map (`FoldedBox`), the 3D mesh (`build_model3d`) and the cross-section view data. |
 | `svg.py` | Serializes a `Pattern` to SVG (layers, dash styles, labels, embedded config) and reads the config back (`extract_config`). |
@@ -284,8 +285,16 @@ The FPC cable is independent of it: it leaves the front panel's free straight ed
 it can go: folded in, its stub and first corner square lie on the back panel's inside up to
 the square's far side deep, where the inner flap's wall stands `e + z(u)` in from the back
 panel's end (`z` the back fold's sagitta at that depth, from where the front panel's edge
-rests); the cable keeps the clearance from it past half its thickness (`entry_range`; its
-rows, along the front panel, are not checked). Its junction is as wide as the meshes' exits
+rests); the cable keeps the clearance from it past half its thickness (`entry_range`). Past
+the wall fold the cable runs on across the front panel's inside (round onto the back panel,
+if that long) at the junction's place along the box, where the walls stand in further: at
+every X it reaches, the wall over it (the panel's fold there, by X), most towards the
+panels' middle, so the cable keeps the clearance from the deepest; the plug's ears count
+where they stick out further than the junction. The plug end (`plug.py`, shared with
+`pcb`): the pinout, the GND and via rows behind the contacts and the traces' fan-out, from
+the configuration alone (an inset cable's traces always neck down in its first corner), so
+that the outline keeps the plug's width past them and narrows at 45 degrees just where the
+fan-out starts (`CableLayout.plug_full`, `plug_end`; the 3D model's strip likewise). Its junction is as wide as the meshes' exits
 need (`exit_width`), if wider than the cable: the stub widens on the side away from the first
 turn up to the first corner's far side (a rectangle there), whose crease is still the
 cable's square's diagonal, so the rows fold back as before. `fpc.meander` lays it out in a frame of its own (the junction level, the stub up, the

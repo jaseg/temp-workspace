@@ -226,7 +226,9 @@ def stiffener_outlines(
     pattern: Pattern, flap_offset: float = 0.0, tab_offset: float = 0.0
 ) -> dict[str, list[Point]]:
     """Where stiffeners may go, by face: the glue tab and the lens-shaped flaps (outer and
-    inner), each shrunk by its offset (``inset``; none left: left out)."""
+    inner), each shrunk by its offset (``inset``; none left: left out); and the cable's plug
+    (``plug``: its whole width, from its tip back by its length, flush with its edges, as a
+    ZIF connector wants the FPC's end stiffened)."""
     out = {}
     for f in pattern.faces:
         if f.name == "glue-tab" or f.kind == "flap":
@@ -234,6 +236,18 @@ def stiffener_outlines(
             pts = inset(sample(list(f.boundary)), d)
             if pts:
                 out[f.name] = pts
+    cable = pattern.cable
+    if cable is not None:
+        (bx, by), (tx, ty) = cable.path[-2], cable.path[-1]
+        k = math.hypot(tx - bx, ty - by)
+        ux, uy = (tx - bx) / k, (ty - by) / k
+        h, back = cable.plug_width / 2, cable.plug_length
+        out["plug"] = [
+            (tx - uy * h, ty + ux * h),
+            (tx + uy * h, ty - ux * h),
+            (tx - back * ux + uy * h, ty - back * uy - ux * h),
+            (tx - back * ux - uy * h, ty - back * uy + ux * h),
+        ]
     return out
 
 
@@ -415,6 +429,10 @@ class Cable:
     # corner (flat), the wall fold (onto the front panel) and the other corners (flat);
     # directions set by build_pattern.
     folds: tuple[Fold, ...]
+    # (as ``fpc.CableLayout``: as wide as the plug this far back from the tip, narrowing to
+    # the cable's width by ``plug_end``; none given: the plug's length, a step)
+    plug_full: float = 0.0
+    plug_end: float = 0.0
 
     @property
     def corners(self) -> tuple[Fold, ...]:
@@ -1428,6 +1446,8 @@ def _place_cable(cfg: Config, layout: fpc.CableLayout, cut: Sequence[Segment]) -
         layout.junction,
         layout.path,
         folds,
+        layout.plug_full,
+        layout.plug_end,
     )
     return replace(cable, folds=FoldedCable(cfg, cable).fold_directions())
 
@@ -1875,12 +1895,22 @@ class FoldedCable:
 
         # (the junction's side of the crease: the stub's)
         side = math.copysign(1.0, crease_v(0.0) - 0.0) if crease_v(0.0) else 1.0
+        # Across the strip from the junction's middle: the stub as wide as the junction (the
+        # meshes' exits may want it wider than the cable: on the side away from the first
+        # turn, up to the corner's far side); the rest the cable's width about its centreline.
+        (_, ya), (_, yb) = cable.junction
+        jlo, jhi = min(ya, yb) - self.yc, max(ya, yb) - self.yc
+        vo = cable.path[0][1] - self.yc
 
         def span(d: float) -> tuple[float, float]:
             if d <= stub - cable.width:
-                return (-h, h)
-            vc = max(-h, min(h, crease_v(d)))
-            return (-h, vc) if side > 0 else (vc, h)
+                return (jlo, jhi)
+            vc = max(jlo, min(jhi, crease_v(d)))
+            return (jlo, vc) if side > 0 else (vc, jhi)
+
+        def own(lo: float, hi: float) -> tuple[float, float]:
+            """Within the cable's own width."""
+            return (max(lo, vo - h), min(hi, vo + h))
 
         ds = [
             *((stub - cable.width) * i / 4 for i in range(4)),
@@ -1893,20 +1923,26 @@ class FoldedCable:
         ]
 
         length = self.cfg.fpc_cable_length
-        plug = length - cable.plug_length
-        rs = {-stub, -stub + cable.width, -self.t, plug, length}
+        # (as wide as the plug from ``plug`` on, narrowing to the cable's width back to
+        # ``ears``: a step there if they meet)
+        full = cable.plug_full or cable.plug_length
+        plug, ears = length - full, length - max(cable.plug_end, full)
+        rs = {-stub, -stub + cable.width, -self.t, ears, plug, length}
         n = max(4, math.ceil(length + stub))  # (every millimetre: the panels curve along it)
         rs |= {-stub + (length + stub) * i / n for i in range(n + 1)}
         rows: list[tuple[float, float, float]] = []  # (r, v from, v to)
         for r in sorted(x for x in rs if -stub <= x <= length):
-            if r <= -(stub - cable.width):
-                lo, hi = span(-r)
-            elif r < plug:
-                lo, hi = -h, h
+            if r <= -(stub - cable.width):  # (folded back over the corner's triangle)
+                lo, hi = own(*span(-r))
+            elif r < ears:
+                lo, hi = vo - h, vo + h
+            elif r < plug:  # (the ears narrowing: from the plug's width to the cable's)
+                k = h + (hp - h) * (r - ears) / (plug - ears)
+                lo, hi = vo - k, vo + k
             else:
-                lo, hi = -hp, hp
-            if r == plug:
-                rows.append((r, -h, h))
+                lo, hi = vo - hp, vo + hp
+            if r == plug and ears == plug:
+                rows.append((r, vo - h, vo + h))
             rows.append((r, lo, hi))
         rest_rows = [
             (self.point(lo, *self.section(r)), self.point(hi, *self.section(r)))
@@ -1956,7 +1992,7 @@ class FoldedCable:
         for fold in cable.folds:
             ends = (fold.segment.start, fold.segment.end)
             if fold.name == "cable-junction":
-                pts = [self.point(v, *self.stub_at(0.0)) for v in (-h, h)]
+                pts = [self.point(v, *self.stub_at(0.0)) for v in (jlo, jhi)]
             elif fold.name == "cable-corner-1":
                 pts = [self.map(0, q) for q in ends]
             elif fold.name == "cable-wall":
@@ -2236,6 +2272,8 @@ def _section_cable(cfg: Config) -> list[list[list[float]]] | None:
         layout.junction,
         layout.path,
         corners,
+        layout.plug_full,
+        layout.plug_end,
     )
     lines = FoldedCable(cfg, cable).section_lines()
     if cfg.two_piece:  # (the other piece's, turned)

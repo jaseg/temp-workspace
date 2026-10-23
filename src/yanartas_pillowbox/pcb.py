@@ -53,10 +53,24 @@ from yanartas_pillowbox.geometry import (
     _segment_key,
     build_pattern,
 )
+from yanartas_pillowbox.plug import (  # noqa: F401 (re-exported)
+    BACK,
+    CONTACT,
+    FRONT,
+    VIA_DRILL,
+    VIA_SIZE,
+    PcbError,
+    config_pinout,
+    fan,
+    pinout,
+    plug_end,
+)
+from yanartas_pillowbox.plug import dedupe as _dedupe
+from yanartas_pillowbox.plug import k_pin as plug_k_pin
+from yanartas_pillowbox.plug import sides as plug_sides
 
 Point = tuple[float, float]
 
-VIA_SIZE, VIA_DRILL = 0.45, 0.2
 RETRIES = 8  # a layer's curve mesh tried again afresh this often, if it leaves regions out
 SLIT_WIDTH = 0.1  # the slits' cut, as a slot (a closed board edge)
 TOLERANCE = 0.005  # arcs as polylines (chord error)
@@ -66,15 +80,11 @@ LARGE_ARC = 100.0
 SHALLOW_ARC = 0.05
 FOLD_CLEARANCE = 1.0  # vias keep this far from the cable's folds
 STITCH_PITCH = 6.0  # GND stitching vias along the cable
+# ... each where it falls, or (on a fold) this far along the lane from there, the nearest first
+STITCH_SHIFTS = tuple(sorted((0.25 * k for k in range(-11, 12)), key=abs))
 GND_VIA_EVERY = 4  # in a run of GND contacts, a via behind every this many (joined along)
 PAGE_MARGIN = (25.0, 50.0)  # KiCad page: around the design (x, y; the title block below)
 PAGE_MIN = (210.0, 148.0)  # ... and at least this big (A5 landscape)
-
-FRONT, BACK = "F.Cu", "B.Cu"
-
-
-class PcbError(ValueError):
-    """The layout cannot be made for this configuration."""
 
 
 @dataclass
@@ -187,23 +197,6 @@ class Layout:
         return self._cache["skew"]
 
 
-def pinout(pins: int, traces: int, group: int | None = None) -> list[str | None]:
-    """Each pin's signal, from pin 1: "GND" or "M<i>" (mesh end i, from 1); the pins the
-    mesh leaves over GND too; ``traces``: the mesh's nets on each side; ``group``: the
-    traces between two GND pins (one partition's, its ends nested: 1s 2s … 2r 1r; default:
-    a side's)."""
-    ends = 4 * traces  # two ends per loop, two sides
-    size = 2 * (group or traces)
-    out: list[str | None] = ["GND"]
-    for i in range(ends):
-        out.append(f"M{i + 1}")
-        if (i + 1) % size == 0:
-            out.append("GND")
-    if len(out) > pins:
-        raise PcbError(f"the plug needs at least {len(out)} pins for the mesh's ends")
-    return out + ["GND"] * (pins - len(out))
-
-
 # ----------------------------------------------------------------------------- geometry
 def sample(segments: Iterable[Segment], tol: float = TOLERANCE) -> list[Point]:
     """The chain of segments as a polyline (arcs within ``tol``): ``geometry.sample``."""
@@ -271,49 +264,6 @@ def offset_path(path: Sequence[Point], k: float) -> list[Point]:
 
 
 # ----------------------------------------------------------------------------- fan-out
-def fan(starts: Sequence[float], ends: Sequence[float], pitch: float) -> list[list[Point]]:
-    """Traces moving sideways from offsets ``starts`` to ``ends`` (both in the same order),
-    each by one 45 degree jog, staggered so that neighbours stay ``pitch`` apart (centre to
-    centre). In local coordinates (u along, from 0, v across): each trace's points from
-    ``(0, start)`` to ``(length, end)``, all ending at the same ``length``."""
-    n = len(starts)
-    delay = [0.0] * n
-
-    def trace(i: int, length: float | None = None) -> list[Point]:
-        a, b, u = starts[i], ends[i], delay[i]
-        pts = [(0.0, a), (u, a), (u + abs(b - a), b)]
-        if length is not None:
-            pts.append((length, b))
-        return pts
-
-    for _ in range(64 * n):
-        moved = False
-        for i in range(n - 1):
-            ta, tb = LineString(trace(i, 1e3)), LineString(trace(i + 1, 1e3))
-            if ta.distance(tb) >= pitch - 1e-9:
-                continue
-            # Whoever moves towards the other waits for the other to get out of the way.
-            gap_start, gap_end = abs(starts[i] - starts[i + 1]), abs(ends[i] - ends[i + 1])
-            towards_a = (ends[i + 1] - starts[i + 1]) * (starts[i] - starts[i + 1]) > 0
-            j = i + 1 if towards_a or gap_end < gap_start else i
-            delay[j] += 0.02
-            moved = True
-        if not moved:
-            break
-    else:  # pragma: no cover - the fan always settles for ordered offsets
-        raise PcbError("could not fan the traces out")
-    length = max(delay[i] + abs(ends[i] - starts[i]) for i in range(n)) + pitch
-    return [_dedupe(trace(i, length)) for i in range(n)]
-
-
-def _dedupe(pts: list[Point]) -> list[Point]:
-    out: list[Point] = []
-    for p in pts:
-        if not out or math.dist(out[-1], p) > 1e-9:
-            out.append(p)
-    return out
-
-
 def stiffeners(
     pattern: Pattern, flap_offset: float = 0.0, tab_offset: float = 0.0
 ) -> list[Polygon]:
@@ -373,9 +323,7 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     n = cfg.mesh_nets
     w, space = cfg.mesh_trace_width, cfg.mesh_trace_space
     pitch = w + space
-    # (a GND pin after each partition's ends: the curve's; KiMesh, a side's)
-    each = int(cfg.mesh_traces) if cfg.mesh_algorithm == "sfc" else n
-    pins = pinout(int(cfg.fpc_pins), n, each)
+    pins = config_pinout(cfg)  # (a GND pin after each partition's ends)
     ec = cfg.mesh_edge_clearance
 
     # The foil: the outline, less the slits (as narrow slots) and the scraps.
@@ -404,19 +352,11 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     mask = board.buffer(-ec).difference(cable_poly).difference(beyond)
 
     # Pins: across the plug, pin 1 on the cable's left (walking from the edge to the tip).
-    pin_pitch = cfg.fpc_pitch
-    npins = int(cfg.fpc_pins)
-
     def k_pin(j: int) -> float:
-        return ((npins + 1) / 2 - j) * pin_pitch
+        return plug_k_pin(cfg, j)
 
     left0 = _left(out_dir)  # (along the junction, towards pin 1's side)
-    mesh_pins = {s: j + 1 for j, s in enumerate(pins) if s and s.startswith("M")}
-    per_side = 2 * n
-    sides = {
-        FRONT: [mesh_pins[f"M{i + 1}"] for i in range(per_side)],
-        BACK: [mesh_pins[f"M{per_side + i + 1}"] for i in range(per_side)],
-    }
+    sides = plug_sides(cfg)
 
     result = Layout(board, (*(f.segment for f in pattern.folds), *(f.segment for f in cable.folds)))
     result.stiffeners = stiffeners(pattern, cfg.stiffener_flap_offset, cfg.stiffener_tab_offset)
@@ -582,29 +522,14 @@ def _route_cable(
     where its place up the stub meets its place along the row (the turns nested, none
     crossing)."""
     path = list(cable.path)
-    wide = neck
+    # (an inset cable: always necked down, so that the fan-out follows from the
+    # configuration, as the cable's outline was made for it: ``plug``)
+    wide = neck or cfg.fpc_cable_inset > 0
     w = result.width
-    pitch = min(w + result.clearance, cfg.fpc_pitch) if wide else w + result.clearance
-    space = pitch - w
+    given = None if wide else {layer: [k for k, _, _ in ends[layer]] for layer in sides}
+    end = plug_end(cfg, given)
+    space, along_k = end.space, end.along
     result.cable_clearance = space
-    # (each end's place along the cable: as at the junction, or necked down)
-    along_k: dict[str, list[float]] = {}
-    for layer, side_pins in sides.items():
-        ks = [k for k, _, _ in ends[layer]]
-        if not wide:
-            along_k[layer] = ks
-            continue
-        centre = sum(k_pin(j) for j in side_pins) / len(side_pins)
-        m = len(ks)
-        # (centred on its pins, but kept off the stitching vias' lanes by the cable's edges,
-        # where the cable is wide enough)
-        clear = cable.width / 2 - 2 * space - VIA_SIZE - cfg.mesh_edge_clearance / 2 - w / 2
-        half = (m - 1) / 2 * pitch
-        if half <= clear:
-            centre = min(max(centre, -clear + half), clear - half)
-        along_k[layer] = [centre + ((m - 1) / 2 - i) * pitch for i in range(m)]
-        if max(abs(k) for k in along_k[layer]) + w / 2 + space > cable.width / 2:
-            raise PcbError("the cable is too narrow for the mesh's traces at its pitch")
     d0, d1 = _unit(path[0], path[1]), _unit(path[1], path[2])
     a0, a1 = _left(d0), _left(d1)
 
@@ -627,14 +552,8 @@ def _route_cable(
         return (tip[0] - s * u[0] + k * nl[0], tip[1] - s * u[1] + k * nl[1])
 
     # Rows before the plug: GND vias behind the GND contacts, then the back mesh's vias in
-    # two staggered rows, then the fan-out.
-    row_gnd = plug + 0.2 + VIA_SIZE / 2
-    rows = (row_gnd + VIA_SIZE + space, row_gnd + 2 * (VIA_SIZE + space))
-    fans = {
-        layer: fan(along_k[layer], [k_pin(j) for j in side_pins], pitch)
-        for layer, side_pins in sides.items()
-    }
-    fan_start = rows[1] + VIA_SIZE / 2 + space + max(f[0][-1][0] for f in fans.values())
+    # two staggered rows, then the fan-out (``plug.plug_end``).
+    row_gnd, rows, fans, fan_start = end.row_gnd, end.rows, end.fans, end.fan_start
     straight = math.dist(before, tip) - (cable.width / 2 if len(path) > 3 else 0.0)
     if fan_start > straight:
         raise PcbError(
@@ -687,11 +606,17 @@ def _route_cable(
     edge = cable.width / 2 - space - VIA_SIZE / 2 - cfg.mesh_edge_clearance / 2
     bundles = sorted(k for layer in along_k for k in along_k[layer])
     # (an edge's lane only clear of the traces)
+    # (the bundles kept the lanes' clearance exactly, so a hair's leeway: else rounding
+    # drops a lane along the whole cable)
     lanes = [
-        k for k in (edge, -edge) if all(abs(k - b) >= VIA_SIZE / 2 + space + w / 2 for b in bundles)
+        k
+        for k in (edge, -edge)
+        if all(abs(k - b) >= VIA_SIZE / 2 + space + w / 2 - 1e-9 for b in bundles)
     ]
     gaps = [
-        (a + b) / 2 for a, b in itertools.pairwise(bundles) if b - a >= VIA_SIZE + 2 * space + w
+        (a + b) / 2
+        for a, b in itertools.pairwise(bundles)
+        if b - a >= VIA_SIZE + 2 * space + w - 1e-9
     ]
     lanes += gaps
     keep_out = shapely.union_all(
@@ -704,17 +629,18 @@ def _route_cable(
         length = line.length - fan_start - VIA_SIZE
         s = max(STITCH_PITCH / 2, first)
         while s < length:
-            q = line.interpolate(s)
-            p = (q.x, q.y)
-            if clear_of_folds(p) and not keep_out.contains(q) and _clear_of_turns(p, cable):
-                result.vias.append(Via(p, "GND"))
+            # (at its place along the lane, or as near it as is clear of the folds, the
+            # corners' creases among them, and of the other vias: through the turns too)
+            for ds in STITCH_SHIFTS:
+                if not first <= s + ds < length:
+                    continue
+                q = line.interpolate(s + ds)
+                p = (q.x, q.y)
+                if clear_of_folds(p) and not keep_out.contains(q):
+                    result.vias.append(Via(p, "GND"))
+                    keep_out = keep_out.union(q.buffer(VIA_SIZE + space))
+                    break
             s += STITCH_PITCH
-
-
-def _clear_of_turns(p: Point, cable: Cable) -> bool:
-    """Off the cable's corner squares (folded flat, they stack the cable's layers)."""
-    h = cable.width / 2 + FOLD_CLEARANCE
-    return all(max(abs(p[0] - c[0]), abs(p[1] - c[1])) > h for c in cable.path[1:-1])
 
 
 def _pad(
@@ -725,9 +651,10 @@ def _pad(
     u: Point,
     net: str | None,
 ) -> Pad:
-    """Contact j: from 0.2 mm short of the tip to the end of the plug."""
+    """Contact j: from 0.2 mm short of the tip to the end of the plug, ``CONTACT`` of the
+    pin pitch wide."""
     centre = at((plug + 0.2) / 2, k_pin(j))
-    length, width = plug - 0.2, 0.6 * (k_pin(1) - k_pin(2))
+    length, width = plug - 0.2, CONTACT * (k_pin(1) - k_pin(2))
     size = (length, width) if abs(u[0]) > abs(u[1]) else (width, length)
     return Pad(j, centre, size, net)
 

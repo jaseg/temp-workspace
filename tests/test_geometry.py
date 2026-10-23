@@ -443,8 +443,9 @@ def test_inset_moves_every_edge_in_and_keeps_corners_sharp():
 
 @pytest.mark.parametrize("pieces", ["one", "two"])
 def test_stiffeners_are_the_faces_shrunk(pieces):
-    """The glue tab and the flaps, each shrunk by its own offset; none: the faces as drawn."""
-    from shapely.geometry import Polygon
+    """The glue tab and the flaps, each shrunk by its own offset; none: the faces as drawn.
+    And the cable's plug: as wide as the plug, its length back from the tip, never shrunk."""
+    from shapely.geometry import Point, Polygon
 
     from yanartas_pillowbox.geometry import sample
 
@@ -452,10 +453,15 @@ def test_stiffeners_are_the_faces_shrunk(pieces):
     pattern = build_pattern(cfg)
     faces = {f.name: Polygon(sample(list(f.boundary))) for f in pattern.faces}
     plain = stiffener_outlines(pattern)
+    plug = plain.pop("plug")
     assert set(plain) == {f.name for f in pattern.faces if f.name == "glue-tab" or f.kind == "flap"}
     for name, pts in plain.items():
         assert Polygon(pts).area == pytest.approx(faces[name].area)
+    cable = pattern.cable
+    assert Polygon(plug).area == pytest.approx(cable.plug_width * cfg.fpc_plug_length)
+    assert Polygon(plug).buffer(1e-6).contains(Point(cable.path[-1]))  # (flush with the tip)
     shrunk = stiffener_outlines(pattern, 0.5, 1.0)
+    assert shrunk.pop("plug") == plug
     for name, pts in shrunk.items():
         d = 1.0 if name == "glue-tab" else 0.5
         p = Polygon(pts)
