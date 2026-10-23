@@ -310,7 +310,9 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   pair of trace lanes wide runs straight in (its traces at the pitch, side by side with the
   next port's, the middle ones longest) to where its partition's curve opens; the
   partitions grow over Voronoi cells from the strips' ends, their borders keeping to the
-  folds where they can and differing between the two sides. All are laid out in one pass:
+  folds where they can and differing between the two sides, necks narrower than a curve's
+  run in and back out widened. A side whose curves still leave a region bare is laid out
+  afresh with its seed salted (`mesh_seed` and "-1", "-2", ...). All are laid out in one pass:
   a partition's border is kept like a fold (each curve half a spacing off it, so
   neighbouring partitions' traces run a pitch apart, nothing between them) and all traces
   settle together, lengths matched within each partition; then each hole left more than a

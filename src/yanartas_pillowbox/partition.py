@@ -49,8 +49,17 @@ SMOOTH = 4  # passes giving cells to the partition that holds most of their bord
 ACROSS = 0.25  # ... a neighbour across a fold counting this much
 BALANCE = 0.01  # partitions' areas within this share of each other
 HOPS = 6  # a partition kept of a piece: looked for this many cells round a cell it gives up
-ATTEMPTS = 6  # tries at an even split
+ATTEMPTS = 6  # tries at an even split, with no neck
 UNEVEN = 0.03  # ... even: the partitions' areas within this share of each other
+LOPSIDED = UNEVEN  # ... but rather one with a neck than one less even than that
+NECK = 2.0  # a partition no narrower than this many ports where it can be wider
+PART = 3  # ... where it is wider: this many cells, or more
+WALL = (0.25, 0.5, 0.75)  # ... tested at these points along each wall between cells
+WIDEN = 20  # ... widened at most this many times a partition and zone a round
+
+
+class Uneven(MeshError):
+    """No try split the area evenly."""
 
 
 @dataclass(frozen=True)
@@ -127,20 +136,27 @@ def _voronoi(pts: np.ndarray, box: Polygon) -> np.ndarray:
     return out
 
 
-def _graph(polys: list[Polygon], zone: list[int], wall: float) -> list[list[tuple[int, float]]]:
-    """Each cell's neighbours (sharing a border at least ``wall`` long), with the cost of
-    the step to it."""
+def _walls(polys: list[Polygon]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The walls between cells: each pair's cells (``a < b``) and their shared border."""
     tree = shapely.STRtree(polys)
     a, b = tree.query(polys, predicate="intersects")
     keep = a < b
     a, b = a[keep], b[keep]
     arr = np.asarray(polys, dtype=object)
-    shared = shapely.length(
-        shapely.intersection(shapely.boundary(arr[a]), shapely.buffer(arr[b], 1e-6))
-    )
-    cen = shapely.get_coordinates(shapely.centroid(arr))
-    nbrs: list[list[tuple[int, float]]] = [[] for _ in polys]
-    for i, j, s in zip(a, b, shared, strict=True):
+    return a, b, shapely.intersection(shapely.boundary(arr[a]), shapely.buffer(arr[b], 1e-6))
+
+
+def _graph(
+    walls: tuple[np.ndarray, np.ndarray, np.ndarray],
+    cen: np.ndarray,
+    zone: list[int],
+    wall: float,
+) -> list[list[tuple[int, float]]]:
+    """Each cell's neighbours (sharing a border at least ``wall`` long), with the cost of
+    the step to it."""
+    a, b, shared = walls
+    nbrs: list[list[tuple[int, float]]] = [[] for _ in cen]
+    for i, j, s in zip(a, b, shapely.length(shared), strict=True):
         if s >= wall:
             step = float(np.hypot(*(cen[i] - cen[j]))) * (FOLD if zone[i] != zone[j] else 1.0)
             nbrs[i].append((int(j), step))
@@ -286,21 +302,23 @@ def partition(
     port, ``width`` wide (a pair of trace lanes: the ports' width), and its strip. A split
     that comes out uneven is tried again afresh."""
     rng = Rand.of(seed, "partition")
-    best, worst = None, math.inf
+    cut = _Cells(area, zones, ports, inward, width, rng)
+    tried = []
     for _ in range(ATTEMPTS):
-        parts = _partition(area, zones, ports, inward, width, rng)
-        a = [p.area.area for p in parts]
-        bad = (max(a) - min(a)) / max(a)
-        # (each port in its partition: but the slivers snapping to the union's grid leaves)
-        if any(p.port.difference(p.area).area > 1e-6 * max(1.0, p.port.area) for p in parts):
-            bad = math.inf
-        if bad < worst:
-            best, worst = parts, bad
-        if bad < UNEVEN:
+        owner, necks = cut.attempt(rng)
+        have = np.bincount(owner, cut.area, len(ports)) + cut.held
+        off = float((have.max() - have.min()) / have.max())
+        tried.append(((off > LOPSIDED, necks, off), len(tried), owner))
+        if not necks and off < UNEVEN:
             break
-    if best is None or worst > 0.5:
-        raise MeshError("could not split the mesh's area into partitions")
-    return best
+    for (_, _, off), _, owner in sorted(tried, key=lambda t: t[:2]):
+        if off > 0.5:
+            break
+        parts = cut.finished(owner)
+        # (each port in its partition: but the slivers snapping to the union's grid leaves)
+        if all(p.port.difference(p.area).area <= 1e-6 * max(1.0, p.port.area) for p in parts):
+            return parts
+    raise Uneven("could not split the mesh's area into partitions")
 
 
 def strips(
@@ -352,214 +370,364 @@ def strips(
     )
 
 
-def _partition(
-    area: shapely.Geometry,
-    zones: list[Polygon],
-    ports: list[Polygon],
-    inward: tuple[float, float],
-    width: float,
-    rng: Rand,
-) -> list[Partition]:
-    count = len(ports)
-    inv = np.asarray(inward, float) / math.hypot(*inward)
-    lanes = strips(ports, inward, width, zones)
-    # (a cell pinned in front of each strip's end, its own: where its curve opens)
-    ends = []
-    for s in lanes:
-        d = shapely.get_coordinates(s) @ inv
-        mid = np.asarray(s.centroid.coords[0]) + inv * (
-            float(d.max()) - float(s.centroid.coords[0] @ inv)
-        )
-        ends.append(tuple(mid + inv * CELL * width / 2))
-    rest = shapely.difference(area, shapely.union_all([*ports, *lanes]))
-    polys, zone, front = cells(rest, zones, CELL * width, rng, ends)
-    if len(polys) < 2 * count or min(front) < 0 or len(set(front)) < count:
-        raise MeshError("no room for the mesh's partitions")
-    # (and the strip's end all its own: a box over it, out of the cells beside)
-    side = np.array([-inv[1], inv[0]]) * width / 2
-    for k, end in enumerate(ends):
-        e = np.asarray(end) - inv * CELL * width / 2  # (the strip's end's middle)
-        f = e + inv * 0.75 * width
-        cut = shapely.intersection(Polygon([e - side, e + side, f + side, f - side]), rest)
-        for i in range(len(polys)):
-            if i != front[k] and polys[i].intersects(cut):
-                polys[i] = max(
-                    _parts(polys[i].difference(cut)) or [Polygon()], key=lambda q: q.area
-                )
-        polys[front[k]] = _one(shapely.union_all([polys[front[k]], cut]), polys[front[k]])
-    gone = {i for i, q in enumerate(polys) if q.is_empty or q.area < 1e-9}
-    if gone:
-        keep = [i for i in range(len(polys)) if i not in gone]
-        remap = {old: new for new, old in enumerate(keep)}
-        polys = [polys[i] for i in keep]
-        zone = [zone[i] for i in keep]
-        front = [remap[i] for i in front]
-    nbrs = _graph(polys, zone, 0.99 * width)
-    arr = np.asarray(polys, dtype=object)
-    cen = shapely.get_coordinates(shapely.centroid(arr))
-    cell_area = shapely.area(arr)
-    noise = 1.0 + NOISE * rng.random(len(polys))
-    field = _field(cen, rng)
-    cost = [
-        [(j, step * noise[j] * (field[i] + field[j]) / 2) for j, step in v]
-        for i, v in enumerate(nbrs)
-    ]
-    held = [p.area + s.area for p, s in zip(ports, lanes, strict=True)]
-    total = float(cell_area.sum() + sum(held))
-    want = total / count - np.array(held)
-    owner = _weighted(cost, cell_area, [[i] for i in front], want)
-    # (cells no path through a wide enough wall reaches: to the partition beside)
-    loose = _graph(polys, zone, 1e-3)
-    for _ in range(len(polys)):
-        lost = np.nonzero(owner < 0)[0]
-        if not len(lost):
-            break
-        for i in lost:
-            near = [owner[j] for j, _ in loose[i] if owner[j] >= 0]
-            if near:
-                owner[i] = max(set(near), key=near.count)
-    owner[owner < 0] = 0
-    owner = _refine(owner, nbrs, zone, cell_area, want, front)
-    # (necks widened, then the areas evened out again without narrowing any: no cell passed
-    # on whose partition would come apart without it, eroded as for a neck, round it)
-    necks = _Necks(loose, zone, front)
-    owner = _widened(owner, necks, set(front))
-    owner = _refine(owner, nbrs, zone, cell_area, want, front, necks.spares)
-    owner = _pinched(owner, arr, zone, loose, front, width)
-    out = []
-    for k in range(count):
-        g = shapely.union_all([*arr[owner == k], ports[k], lanes[k]], grid_size=1e-6)
-        d = shapely.get_coordinates(lanes[k]) @ inv
-        e = shapely.get_coordinates(ports[k]) @ inv
-        out.append(Partition(_one(g, ports[k]), ports[k], float(d.max() - e.min())))
-    return out
+class _Cells:
+    """A layer's area in cells, with its strips and their ends' cells, the cells' graphs
+    and necks: set up once for all attempts at a split."""
+
+    def __init__(
+        self,
+        area: shapely.Geometry,
+        zones: list[Polygon],
+        ports: list[Polygon],
+        inward: tuple[float, float],
+        width: float,
+        rng: Rand,
+    ) -> None:
+        count = len(ports)
+        self.inv = inv = np.asarray(inward, float) / math.hypot(*inward)
+        self.ports, self.width = ports, width
+        self.lanes = lanes = strips(ports, inward, width, zones)
+        # (a cell pinned in front of each strip's end, its own: where its curve opens)
+        ends = []
+        for s in lanes:
+            d = shapely.get_coordinates(s) @ inv
+            mid = np.asarray(s.centroid.coords[0]) + inv * (
+                float(d.max()) - float(s.centroid.coords[0] @ inv)
+            )
+            ends.append(tuple(mid + inv * CELL * width / 2))
+        rest = shapely.difference(area, shapely.union_all([*ports, *lanes]))
+        polys, zone, front = cells(rest, zones, CELL * width, rng, ends)
+        if len(polys) < 2 * count or min(front) < 0 or len(set(front)) < count:
+            raise MeshError("no room for the mesh's partitions")
+        # (and the strip's end all its own: a box over it, out of the cells beside)
+        side = np.array([-inv[1], inv[0]]) * width / 2
+        for k, end in enumerate(ends):
+            e = np.asarray(end) - inv * CELL * width / 2  # (the strip's end's middle)
+            f = e + inv * 0.75 * width
+            cut = shapely.intersection(Polygon([e - side, e + side, f + side, f - side]), rest)
+            for i in range(len(polys)):
+                if i != front[k] and polys[i].intersects(cut):
+                    polys[i] = max(
+                        _parts(polys[i].difference(cut)) or [Polygon()], key=lambda q: q.area
+                    )
+            polys[front[k]] = _one(shapely.union_all([polys[front[k]], cut]), polys[front[k]])
+        gone = {i for i, q in enumerate(polys) if q.is_empty or q.area < 1e-9}
+        if gone:
+            keep = [i for i in range(len(polys)) if i not in gone]
+            remap = {old: new for new, old in enumerate(keep)}
+            polys = [polys[i] for i in keep]
+            zone = [zone[i] for i in keep]
+            front = [remap[i] for i in front]
+        self.zone, self.front = zone, front
+        self.arr = arr = np.asarray(polys, dtype=object)
+        self.cen = shapely.get_coordinates(shapely.centroid(arr))
+        walls = _walls(polys)
+        self.nbrs = _graph(walls, self.cen, zone, 0.99 * width)
+        # (cells no path through a wide enough wall reaches: given to the partition beside)
+        self.loose = _graph(walls, self.cen, zone, 1e-3)
+        self.area = shapely.area(arr)
+        self.held = np.array([p.area + s.area for p, s in zip(ports, lanes, strict=True)])
+        total = float(self.area.sum() + self.held.sum())
+        self.want = total / count - self.held
+        self.necks = _Necks(arr, zone, walls, self.loose, front, width)
+
+    def attempt(self, rng: Rand) -> tuple[np.ndarray, int]:
+        """A split (each cell's partition) and how many necks it has left."""
+        nbrs, loose, zone, front = self.nbrs, self.loose, self.zone, self.front
+        noise = 1.0 + NOISE * rng.random(len(self.arr))
+        field = _field(self.cen, rng)
+        cost = [
+            [(j, step * noise[j] * (field[i] + field[j]) / 2) for j, step in v]
+            for i, v in enumerate(nbrs)
+        ]
+        owner = _weighted(cost, self.area, [[i] for i in front], self.want)
+        for _ in range(len(owner)):
+            lost = np.nonzero(owner < 0)[0]
+            if not len(lost):
+                break
+            for i in lost:
+                near = [owner[j] for j, _ in loose[i] if owner[j] >= 0]
+                if near:
+                    owner[i] = max(set(near), key=near.count)
+        owner[owner < 0] = 0
+        owner = _refine(owner, nbrs, zone, self.area, self.want, front)
+        # (necks widened, then the areas evened out again without narrowing any)
+        owner = _widened(owner, self.necks, nbrs, set(front))
+        owner = _refine(owner, nbrs, zone, self.area, self.want, front, self.necks.spares)
+        return owner, self.necks.left(owner)
+
+    def finished(self, owner: np.ndarray) -> list[Partition]:
+        """The partitions of a split, what lies past a passage too narrow for any curve
+        given to the neighbours."""
+        owner = _pinched(owner, self.arr, self.zone, self.loose, self.front, self.width)
+        out = []
+        for k, (port, lane) in enumerate(zip(self.ports, self.lanes, strict=True)):
+            g = shapely.union_all([*self.arr[owner == k], port, lane], grid_size=1e-6)
+            d = shapely.get_coordinates(lane) @ self.inv
+            e = shapely.get_coordinates(port) @ self.inv
+            out.append(Partition(_one(g, port), port, float(d.max() - e.min())))
+        return out
+
+
+def _components(n: int, a: np.ndarray, b: np.ndarray, node: np.ndarray) -> np.ndarray:
+    """Each node's component through the edges ``a``-``b`` (named by its least node; -1:
+    not a node): least names passed along the edges, then followed to their own."""
+    lab = np.where(node, np.arange(n), -1)
+    while True:
+        m = np.minimum(lab[a], lab[b])
+        new = lab.copy()
+        np.minimum.at(new, a, m)
+        np.minimum.at(new, b, m)
+        on = new >= 0
+        while True:  # (each name to its own name's: halving the chains)
+            jump = np.where(on, new[np.where(on, new, 0)], -1)
+            if (jump == new).all():
+                break
+            new = jump
+        if (new == lab).all():
+            return lab
+        lab = new
 
 
 class _Necks:
-    """Necks on the cell graph: a cell is *interior* to its partition when every neighbour
-    of it (through any wall; in its zone, zone by zone) is of the same partition, and a
-    partition's *wide parts* are its interior cells' groups (joined through walls), so that
-    two wide parts are joined only through a neck under three cells wide, where a curve
-    runs in and back out with no room to turn: its graph's cycles there join the rest at a
-    few cells only, if at all, and leave the part beyond bare. Its exit's cell, with no wide
-    part within two steps of it, counts as a part of its own (a neck cuts it off from the
-    rest)."""
+    """Necks, as where a partition eroded by ``NECK`` ports comes apart, tested at points
+    (each cell's centre, and three along each wall between two cells): a point is *clear*
+    when no border lies within ``NECK`` ports' half of it, the area's outline or a wall
+    between two partitions (zone by zone: or two zones). The walls near each point are
+    found once, so whether it is clear is a look at their two cells' partitions. A
+    partition's *wide parts* are its cells with clear centres joined through walls with a
+    clear point, those of ``PART`` cells or more: two of them are joined only through a
+    neck, narrower than a run in and back out, where its curve's graph's cycles join the
+    rest at a few cells only, if at all, and leave the part beyond bare. Its exit's cell,
+    with no wide part within two steps of it, counts as a part of its own (a neck cuts it
+    off from the rest)."""
 
     def __init__(
-        self, loose: list[list[tuple[int, float]]], zone: list[int], front: list[int]
+        self,
+        arr: np.ndarray,
+        zone: list[int],
+        walls: tuple[np.ndarray, np.ndarray, np.ndarray],
+        loose: list[list[tuple[int, float]]],
+        front: list[int],
+        width: float,
     ) -> None:
+        n = len(arr)
+        self.n = n
         self.loose = loose
         self.nb = [[j for j, _ in v] for v in loose]
         self.zn = np.asarray(zone)
         self.front = front
-        self.src = np.repeat(np.arange(len(loose)), [len(v) for v in loose])
-        self.dst = np.array([j for v in loose for j, _ in v], int)
-        self.same = self.zn[self.src] == self.zn[self.dst]
+        a, b, walls = walls
+        keep = shapely.length(walls) >= 1e-3  # (as the loose graph's)
+        a, b, walls = a[keep], b[keep], walls[keep]
+        self.a, self.b, self.m = a, b, len(a)
+        self.wall = {(int(i), int(j)): w for w, (i, j) in enumerate(zip(a, b, strict=True))}
+        cen = shapely.centroid(arr)
+        off = ~shapely.covers(arr, cen)
+        cen[off] = shapely.point_on_surface(arr[off])
+        probes = np.concatenate(
+            [cen, *(shapely.line_interpolate_point(walls, f, normalized=True) for f in WALL)]
+        )
+        self.probes = probes
+        reach = NECK * width / 2
+        outline = shapely.boundary(shapely.union_all(arr, grid_size=1e-6))
+        shapely.prepare(outline)
+        self.always = shapely.dwithin(outline, probes, reach)
+        p, w = shapely.STRtree(walls).query(probes, predicate="dwithin", distance=reach)
+        order = np.argsort(p, kind="stable")
+        self.pp, self.pa, self.pb = p[order], a[w[order]], b[w[order]]
+        self.at = np.searchsorted(self.pp, np.arange(len(probes) + 1))
+        self.local: dict[int, tuple] = {}
+        self.natives: dict[bool, np.ndarray] = {}
+        self.last: tuple = (None, None)
+
+    def clear(self, owner: np.ndarray, zonal: bool) -> np.ndarray:
+        """Whether each point is clear."""
+        bad = owner[self.pa] != owner[self.pb]
+        if zonal:
+            bad |= self.zn[self.pa] != self.zn[self.pb]
+        out = ~self.always
+        out[self.pp[bad]] = False
+        return out
+
+    def _wall_clear(self, ok: np.ndarray) -> np.ndarray:
+        n, m = self.n, self.m
+        return ok[n:].reshape(len(WALL), m).any(0)
+
+    def _labels(self, owner: np.ndarray, zonal: bool) -> np.ndarray:
+        """Each cell's group (-1: no clear centre): cells of a partition with clear centres
+        joined through walls with a clear point (``zonal``: walls between zones as borders),
+        named by a cell of theirs."""
+        key = (owner.tobytes(), zonal)
+        if self.last[0] == key:
+            return self.last[1]
+        ok = self.clear(owner, zonal)
+        node = ok[: self.n]
+        edge = self._wall_clear(ok) & node[self.a] & node[self.b]
+        lab = _components(self.n, self.a[edge], self.b[edge], node)
+        self.last = (key, lab)
+        return lab
+
+    def _native(self, zonal: bool) -> np.ndarray:
+        """Each cell's group as if the area were one partition (-1: no clear centre): where
+        the area itself is narrow, by its outline or between folds."""
+        if zonal not in self.natives:
+            self.natives[zonal] = self._labels(np.zeros(self.n, int), zonal)
+        return self.natives[zonal]
 
     def parts(self, owner: np.ndarray, k: int, z: int | None) -> list[list[int]]:
-        """Partition ``k``'s wide parts (in zone ``z``; None: all), the largest first."""
-        n = len(owner)
-        edges = np.ones(len(self.src), bool) if z is None else self.same
-        out_edge = edges & (owner[self.dst] != k)
-        interior = (owner == k) & (np.bincount(self.src[out_edge], minlength=n) == 0)
+        """Partition ``k``'s wide parts (in zone ``z``; None: all) that a neck parts where
+        the area itself is wide, the largest first: of the area's wide stretch where the
+        second largest is largest."""
+        native = self._native(z is not None)
+        lab = self._labels(owner, z is not None)
+        mine = (owner == k) & (lab >= 0)
         if z is not None:
-            interior &= self.zn == z
-        cells = set(np.nonzero(interior)[0].tolist())
-        groups = []
-        while cells:
-            start = cells.pop()
-            group, todo = [start], [start]
-            while todo:
-                i = todo.pop()
-                for j in self.nb[i]:
-                    if j in cells:
-                        cells.discard(j)
-                        group.append(j)
-                        todo.append(j)
-            if len(group) > 1:  # (a lone interior cell: no room to turn either)
-                groups.append(group)
-        groups.sort(key=len, reverse=True)
+            mine &= self.zn == z
+        cells = np.nonzero(mine)[0]
+        names, which = np.unique(lab[cells], return_inverse=True)
+        by: dict[int, list[list[int]]] = {}
+        for g in range(len(names)):
+            group = cells[which == g].tolist()
+            if len(group) >= PART:
+                by.setdefault(int(native[group[0]]), []).append(group)
+        for gs in by.values():
+            gs.sort(key=len, reverse=True)
+        groups = max(by.values(), key=lambda gs: len(gs[1]) if len(gs) > 1 else 0, default=[])
         f = self.front[k] if k < len(self.front) else None
-        if f is not None and groups and (z is None or self.zn[f] == z) and owner[f] == k:
+        if f is not None and by and (z is None or self.zn[f] == z) and owner[f] == k:
             # (within two steps: the cells beside the exit's touch the strips' ends beside)
             near = {f, *self.nb[f]}
             near |= {j for c in list(near) for j in self.nb[c]}
-            if not any(near.intersection(g) for g in groups):
-                groups.insert(1, [f])
+            if not any(near.intersection(g) for gs in by.values() for g in gs):
+                main = max((g for gs in by.values() for g in gs), key=len)
+                groups = [main, [f]]
         return groups
 
-    def count(self, owner: np.ndarray, k: int, z: int | None) -> int:
-        return len(self.parts(owner, k, z))
+    def left(self, owner: np.ndarray) -> int:
+        """How many partitions, as a whole or in a zone, have necks."""
+        return sum(
+            len(self.parts(owner, k, z)) > 1
+            for k in range(int(owner.max()) + 1)
+            for z in [None, *sorted(set(self.zn[owner == k].tolist()))]
+        )
+
+    def narrow(self, owner: np.ndarray, cells: list[int], z: int | None) -> list[int]:
+        """The cells whose walls with ``cells`` (and those between them) keep a point
+        there from being clear: of other partitions, nearest first."""
+        k = int(owner[cells[0]])
+        pts = list(cells)
+        for i, j in itertools.pairwise(cells):
+            w = self.wall.get((min(i, j), max(i, j)))
+            if w is not None:
+                pts += [self.n + s * self.m + w for s in range(len(WALL))]
+        out: dict[int, None] = {}
+        for p in pts:
+            for e in range(self.at[p], self.at[p + 1]):
+                x, y = int(self.pa[e]), int(self.pb[e])
+                if owner[x] == owner[y] or self.zn[x] != self.zn[y]:
+                    continue  # (no border there, or a fold's: as it is)
+                for c in (x, y):
+                    if owner[c] != k and (z is None or self.zn[c] == z):
+                        out[c] = None
+        return list(out)
 
     def spares(self, owner: np.ndarray, i: int) -> bool:
         """Whether cell ``i`` can leave its partition without narrowing it: round it (three
-        steps through walls, in its zone), its partition's wide parts come apart into no more
-        groups without it than with it."""
-        m, z = int(owner[i]), int(self.zn[i])
-        ring, seen = [i], {i}
-        for _ in range(3):
-            ring = [j for c in ring for j in self.nb[c] if j not in seen and self.zn[j] == z]
-            seen.update(ring)
-        window = [c for c in seen if owner[c] == m]
-        near = {c: [j for j in self.nb[c] if j in seen and self.zn[j] == z] for c in window}
+        steps through walls, in its zone), its partition's cells with clear centres, joined
+        through walls with a clear point, come apart into no more groups without it than
+        with it."""
+        if i not in self.local:
+            z = self.zn[i]
+            ring, seen = [i], {i}
+            for _ in range(3):
+                ring = [j for c in ring for j in self.nb[c] if j not in seen and self.zn[j] == z]
+                seen.update(ring)
+            cells = np.array(sorted(seen))
+            ws = np.array(
+                [w for c in cells for j in self.nb[c] if c < j and j in seen
+                 for w in [self.wall[(c, j)]]],
+                int,
+            )  # fmt: skip
+            pts = np.concatenate([cells, *(self.n + s * self.m + ws for s in range(len(WALL)))])
+            ent = np.concatenate([np.arange(self.at[p], self.at[p + 1]) for p in pts])
+            slot = np.repeat(np.arange(len(pts)), self.at[pts + 1] - self.at[pts])
+            pa, pb = self.pa[ent], self.pb[ent]
+            cross = self.zn[pa] != self.zn[pb]
+            self.local[i] = (cells, ws, len(pts), slot, pa, pb, cross, ~self.always[pts])
+        cells, ws, npts, slot, pa, pb, cross, free = self.local[i]
+        m = owner[i]
+        oa, ob = owner[pa], owner[pb]
 
-        def groups(without: int | None) -> int:
-            mine = {c for c in window if c != without}
-            # (interior: every neighbour seen, in the zone, its own; beyond the window: as if)
-            inner = {
-                c
-                for c in mine
-                if all(owner[j] == m and j != without for j in self.nb[c] if j in near[c])
-            }
-            n, left = 0, set(inner)
-            while left:
-                todo = [left.pop()]
+        def groups(without: bool) -> int:
+            if without:
+                xa, xb = np.where(pa == i, -1, oa), np.where(pb == i, -1, ob)
+            else:
+                xa, xb = oa, ob
+            bad = (xa != xb) | cross
+            ok = free & (np.bincount(slot[bad], minlength=npts) == 0)
+            mine = owner[cells] == m
+            if without:
+                mine &= cells != i
+            node = set(cells[ok[: len(cells)] & mine].tolist())
+            wok = ok[len(cells) :].reshape(len(WALL), len(ws)).any(0)
+            adj: dict[int, list[int]] = {}
+            for w in ws[wok].tolist():
+                x, y = int(self.a[w]), int(self.b[w])
+                if x in node and y in node:
+                    adj.setdefault(x, []).append(y)
+                    adj.setdefault(y, []).append(x)
+            n = 0
+            while node:
+                todo = [node.pop()]
                 n += 1
                 while todo:
                     c = todo.pop()
-                    for j in self.nb[c]:
-                        if j in left:
-                            left.discard(j)
+                    for j in adj.get(c, ()):
+                        if j in node:
+                            node.discard(j)
                             todo.append(j)
             return n
 
-        return groups(i) <= groups(None)
+        return groups(True) <= groups(False)
 
 
-def _widened(owner: np.ndarray, necks: _Necks, fixed: set[int]) -> np.ndarray:
+def _widened(
+    owner: np.ndarray,
+    necks: _Necks,
+    nbrs: list[list[tuple[int, float]]],
+    fixed: set[int],
+) -> np.ndarray:
     """Each partition's necks widened where the cells beside allow, as a whole and zone by
     zone (a curve's regions are a partition's pieces in each zone, each laid out on its own,
     joined to the others across the folds): where its wide parts (``_Necks``) are several,
     it takes the cells on the cheapest way from its largest to the next (its own cells free,
-    a neighbour's at a cost) and those beside them, each a neighbour can spare (not one it
-    needs to hold together itself or to stay wide, nor a strip's end's), a corridor three
-    cells wide, until its wide parts are one or none can be spared."""
+    a neighbour's at a cost) and those of the neighbours' that keep the way narrow, each a
+    neighbour can spare (not one it needs to hold together itself or to stay wide, nor a
+    strip's end's), until its wide parts are one or none can be spared. (Of a piece through
+    walls a port long, ``nbrs``, as ``_refine`` keeps partitions: a piece joined to the rest
+    by a shorter wall only, it hands on whole.)"""
     owner = owner.copy()
     nb, zn = necks.nb, necks.zn
     for _ in range(3):
         moved = False
         for k in range(int(owner.max()) + 1):
             for z in [None, *sorted(set(zn[owner == k].tolist()))]:
-                for _ in range(4):
+                for _ in range(WIDEN):
                     parts = necks.parts(owner, k, z)
                     if len(parts) < 2:
                         break
                     path = _cheapest(owner, nb, zn, k, z, parts[0], set(parts[1]), fixed)
                     if path is None:
                         break
-                    want = [c for c in path if owner[c] != k]
-                    want += [
-                        j
-                        for c in path
-                        for j in nb[c]
-                        if owner[j] != k and (z is None or zn[j] == z)
-                    ]
                     took = False
+                    want = [c for c in path if owner[c] != k]
+                    want += necks.narrow(owner, [c for c in path if owner[c] == k], z)
                     for j in dict.fromkeys(want):
-                        if owner[j] == k or j in fixed:
-                            continue
-                        if _connected(owner, necks.loose, int(owner[j]), j) and necks.spares(
-                            owner, j
+                        if (
+                            j not in fixed
+                            and _connected(owner, nbrs, int(owner[j]), j)
+                            and necks.spares(owner, j)
                         ):
                             owner[j] = k
                             took = moved = True
@@ -668,6 +836,7 @@ def _weighted(
     partition the tree of its source's paths, so of a piece; the weights set so that each
     gets about ``want`` of the area (cells no path reaches: -1)."""
     count = len(sources)
+    held = {i for cs in sources for i in cs}  # (each source its own partition's)
     w = np.zeros(count)
     best, best_err = None, math.inf
     step = None
@@ -687,7 +856,7 @@ def _weighted(
             if d > dist[i] or owner[i] != k:
                 continue
             for j, c in cost[i]:
-                if d + c < dist[j]:
+                if d + c < dist[j] and j not in held:
                     dist[j] = d + c
                     owner[j] = k
                     heapq.heappush(heap, (d + c, j, k))

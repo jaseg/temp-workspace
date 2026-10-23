@@ -218,6 +218,15 @@ def _split(region: Polygon, spacing: float) -> list[Polygon]:
     return [g for o in out for g in _polygons(o)]
 
 
+class Unreached(MeshError):
+    """The curves leave a region out (``generate``'s ``strict``)."""
+
+
+class Unbuilt(Unreached):
+    """No graph of the curves found (each try a cycle joined to no exit's curve): all left
+    out."""
+
+
 # ----------------------------------------------------------------------------- curve
 @checkpoint.step("graph")
 def _curve(
@@ -254,7 +263,7 @@ def _curve(
             lambda step, steps: progress.report("graph", step, steps),
         )
     except ValueError as e:
-        raise MeshError(str(e)) from e
+        raise Unbuilt(str(e)) from e
     return [(np.asarray(p), np.asarray(r)) for p, r in found], int(cells), [int(r) for r in lost]
 
 
@@ -764,6 +773,7 @@ def generate(
     arcs: bool = False,
     partitions: Sequence[shapely.Geometry] = (),
     stems: Sequence[float] = (),
+    strict: bool = False,
 ) -> Mesh:
     """The mesh over ``mask``: ``traces`` nets at ``pitch`` (trace plus space) round a closed
     space-filling curve, out through the exit cell (as ``kimesh.generate``: its corner with
@@ -775,7 +785,9 @@ def generate(
     partitions' borders kept as the zones' (no curve crosses one), the traces settled
     together, matched in length within their partition (``Mesh.groups``). ``stems``: how
     far in from each exit's open side its curve opens (its stem's rails straight on in
-    through the exit cell and on, at the pitch; at least a spacing)."""
+    through the exit cell and on, at the pitch; at least a spacing). ``strict``: a curve's
+    graph that leaves a region out raises ``Unreached`` at once (before the costly rest),
+    so that the caller can try again afresh."""
     if traces < 1:
         raise MeshError("need at least one trace")
     n = traces
@@ -856,6 +868,8 @@ def generate(
     # (any not wholly reached: also those the core reached in part only, a cycle of theirs
     # no curve took in; counted, so that the layout says so)
     left = len(_lost(regions, found, spacing, lost))
+    if strict and left:
+        raise Unreached(f"the mesh's curves leave {left} regions out")
     progress.report("graph", cells=cells)
     lines = []
     for k, ((x0, y0), ym, (pts, _)) in enumerate(zip(exits, tops, found, strict=True)):

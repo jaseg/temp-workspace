@@ -111,8 +111,8 @@ outputs.
 | `test_sfc.py` | The space-filling-curve layout on small areas: ends at the exit at the pitch, traces simple, in the area and apart, each zone border crossed twice, spacing rarely below the nominal and few islands (settled), density, coverage and uniformity (`even`), repeatable seeds; a pocket off a lane filled by the pair beside it (both its traces, `even` there too), and left bare without filling holes (the checks see it). |
 | `test_kimesh.py` | The KiMesh generator: each net one path whose ends leave the exit side at the pitch, every cell reached and inside the mask, nets apart, tiles opening on their key's sides, repeatable seeds. |
 | `test_rand.py` | The keyed streams: the same seed the same stream, another another; text and a number apart; each label's key distinct (lengths framed); draws in range and unbiased; a checkpoint keeps a stream's place. |
-| `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its strip (a port wide, no two neighbours as long); cells never across a fold, pinned seeds kept; the seed repeats the split, another differs; the mesh over partitions laid out at once (each partition's traces out through its port at the pitch, in it, apart, matched in length, `even`). |
-| `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (a layer's partitions, of equal area, laid out at once, their traces the layer's). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
+| `test_partition.py` | Partitions of a mesh's area: of equal area, together the whole of it, disjoint, each of a piece and holding its port and its strip (a port wide, no two neighbours as long); cells never across a fold, pinned seeds kept; the seed repeats the split, another differs; necks found (where the area itself is wide) and widened, no partition torn further; the mesh over partitions laid out at once (each partition's traces out through its port at the pitch, in it, apart, matched in length, `even`). |
+| `test_pcb.py` | The PCB layout: the pinout, both meshes, their exit cells at the junction, contacts carrying it, every mesh net one chain from contact to contact, a DRC of the copper, edge and fold clearances, multi-row cables, errors, the exports (re-read with gerbonara), the CLI and the API routes; the electrical check (`verify`, also against an open and a short put in) and the fail-safe, the metrics, the curve layout's wiring (a layer's partitions, of equal area, laid out at once, their traces the layer's; a layer whose curves leave a region out tried again with its seed salted, strict but the last). A full-size curve layout is marked `slow` (left out by default: `pytest -m slow`). |
 | `test_two_piece.py` | Two identical pieces: the shell (the second panel the first turned, the interior as asked), the config's lengths, one closed outline without crossings, folds on it and off it, the faces a piece has, every fold a mountain fold, the walls a gap and a thickness apart at both ends, each glue tab a thickness outside the other piece, both pieces (and cables) in the model and the section, the cable clear of both inner flaps, the dimensions, payload, OpenSCAD and labels, a KiMesh layout over a piece; strips ordered to keep their ends off a fold. |
 | `test_server.py`, `test_cli.py` | API contracts, settings fallback, CLI flags. |
 | `test_artifact_api.py` | The in-browser API answers every route like the Flask server; the PCB files' zip travels base64-encoded; the build ships every package module a shipped one imports. |
@@ -349,11 +349,30 @@ an exact isometry: the panels curve along it, not across it.
      neighbour across a fold counting a quarter: borders keep to folds), areas evened out
      between neighbours, the most uneven pair first (a cell at a time, to within about
      1 %), no partition ever torn (a cell is given up only if its neighbours in the
-     partition stay joined); then cells past a passage that a partition's piece of a panel
-     comes apart at when shrunk by half a spacing (no curve would reach them) to the
-     neighbour beside them most. Each partition is its cells, its strip and its port; a
-     split that comes out uneven is tried afresh (6 times at most).
-  5. *Unreached pieces handed on* (`sfc._reassigned`): a partition's piece its curve
+     partition stay joined). (The weights of step 3 rarely even the areas out by
+     themselves: the strips' ends lie together, so a small change of weight hands a whole
+     lobe of the area, behind a cell or two near the ends, from one partition to another;
+     the evening out here does most of it.)
+  5. *Necks widened* (`_Necks`, `_widened`): a partition (as a whole, and its piece of each
+     panel) narrower than 2 ports somewhere between two wide parts of it (each 3 cells or
+     more), where the area itself is wide, is a *neck*: its curve runs in there and back
+     out with no room to turn, the graph's cycles beyond join the rest at a few cells if
+     at all, and leave the part beyond bare. Tested as an erosion by a port, at points (each
+     cell's centre and three along each wall): a point is clear when no border (the
+     outline, or a wall between two partitions; for a panel's piece, or two panels) lies
+     within a port of it. The walls near each point are found once, so a test is a look at
+     their cells' partitions. Where a partition's wide parts are several, it takes the
+     cells on the cheapest way between its two largest (its own free) and the neighbours'
+     cells across the borders that keep that way narrow, each one only if its partition
+     can spare it (stays of a piece, and round the cell, within 3 steps, comes apart into
+     no more wide groups); then the areas are evened out again under the same guard.
+     Finally cells past a passage that a partition's piece of a panel comes apart at when
+     shrunk by half a spacing (no curve would reach them) go to the neighbour beside them
+     most. Each partition is its cells, its strip and its port. The cells, walls and
+     points are set up once (`_Cells`), and steps 3 to 5 tried up to 6 times, the first
+     split with no neck and even (within 3 %) kept, else the best (no neck first, unless
+     less even than that).
+  6. *Unreached pieces handed on* (`sfc._reassigned`): a partition's piece its curve
      still does not reach (a piece of the back panel hanging off a sliver of the front
      one too thin for a run in and back out: the cells' walls were wide enough, the
      piece across them not) goes to the partition whose curve reaches the piece beside
@@ -363,6 +382,15 @@ an exact isometry: the panels curve along it, not across it.
      band whose run keeps to the far end of their border) is merged into the reached
      region of its own partition beside it (`sfc._merged`), and the curves found again:
      its curve then crosses the fold between them inside the merged region.
+  7. *Tried again, salted* (`pcb._partitioned`): a layer whose curves still leave a region
+     out (any region the core reached only in part counts) is split and laid out afresh,
+     right after the curves' graph (before relaxation, the costly rest), its seed salted:
+     `mesh_seed` and "-1", "-2", ... (`RETRIES`, 8; each layer on its own); so is one no
+     split of which came out even (`partition.Uneven`), or whose curves' graph the core
+     could not build (`sfc.Unbuilt`). The last try is kept as it is, its unreached regions
+     counted (`Mesh.unreached`). In a survey of 400 seeds of a five-partition, two-piece
+     layout (800 layers, at double pitch), 5 layers took a second try, none more, and none
+     was left with a region out.
   The graph is built afresh (up to `ATTEMPTS` times, the best kept) when a cycle ends up
   joined to no exit's curve; across a border it joins as long as cycles there are apart.
   A join keeps off the border's ends (by `min(2 spacings, length / 6)`): a cycle edge along

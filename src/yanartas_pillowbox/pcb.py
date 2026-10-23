@@ -57,6 +57,7 @@ from yanartas_pillowbox.geometry import (
 Point = tuple[float, float]
 
 VIA_SIZE, VIA_DRILL = 0.45, 0.2
+RETRIES = 8  # a layer's curve mesh tried again afresh this often, if it leaves regions out
 SLIT_WIDTH = 0.1  # the slits' cut, as a slot (a closed board edge)
 TOLERANCE = 0.005  # arcs as polylines (chord error)
 # arcs of a larger radius than this (mm) exported as lines, within this share of the
@@ -492,15 +493,10 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
         ]
         area = mask.difference(shapely.box(xj - 1, cy, cx, cy + count * port))  # (the leads)
         zones = mesh_zones(pattern)
-        try:
-            parts = partition.partition(area, zones, ports, (1.0, 0.0), port, seed)
-        except meshgen.MeshError as e:
-            raise PcbError(str(e)) from e
         jobs.append((layer, functools.partial(
-            sfc.generate, copy(area), [(cx, cy + k * port) for k in range(count)], side,
-            each, pitch, seed=seed, zones=[copy(z) for z in zones],
-            arcs=cfg.mesh_shape == "arcs", partitions=[copy(p.area) for p in parts],
-            stems=[p.reach for p in parts],
+            _partitioned, cfg, layer, copy(area), [copy(z) for z in zones],
+            [copy(q) for q in ports], port,
+            [(cx, cy + k * port) for k in range(count)], side, each, pitch,
         )))  # fmt: skip
 
     # The two sides are independent: laid out at once.
@@ -531,6 +527,41 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     if problems:
         raise PcbError("the layout failed its check: " + "; ".join(problems[:5]))
     return result
+
+
+def _partitioned(
+    cfg: Config,
+    layer: str,
+    area: shapely.Geometry,
+    zones: list[shapely.Geometry],
+    ports: list[shapely.Geometry],
+    port: float,
+    exits: list[Point],
+    side: int,
+    each: int,
+    pitch: float,
+) -> meshgen.Mesh:
+    """A layer's curve mesh: its area split into partitions, a curve in each. A split its
+    curves leave a region of bare (or none found) is tried again afresh, with the seed
+    salted (``mesh_seed`` and "-1", "-2", ...: each layer on its own), up to ``RETRIES``
+    times; the last try's is kept as it is (its unreached regions counted)."""
+    for salt in range(RETRIES + 1):
+        key = cfg.seed if not salt else rand.key_of(f"{cfg.mesh_seed}-{salt}")
+        seed = rand.derive(key, f"layer/{layer}")
+        last = salt == RETRIES
+        if salt:
+            progress.report("graph", 0, 1, retry=salt)
+        try:
+            parts = partition.partition(area, zones, ports, (1.0, 0.0), port, seed)
+            return sfc.generate(
+                area, exits, side, each, pitch, seed=seed, zones=zones,
+                arcs=cfg.mesh_shape == "arcs", partitions=[p.area for p in parts],
+                stems=[p.reach for p in parts], strict=not last,
+            )  # fmt: skip
+        except (partition.Uneven, sfc.Unreached):
+            if last:
+                raise
+    raise AssertionError  # (unreachable: the last try returns or raises)
 
 
 def _route_cable(

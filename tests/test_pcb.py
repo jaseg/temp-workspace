@@ -475,7 +475,19 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
 
     seen = []
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, partitions=(), stems=()):
+    def fake(
+        mask,
+        corner,
+        side,
+        n,
+        pitch,
+        seed=0,
+        zones=(),
+        arcs=False,
+        partitions=(),
+        stems=(),
+        strict=False,
+    ):
         seen.append((len(zones), n, [p.area for p in partitions], len(corner), len(stems)))
         return _ports_only(mask, corner, side, n, pitch, partitions=partitions)
 
@@ -544,7 +556,19 @@ def test_layout_progress_reaches_the_api(monkeypatch, tmp_path):
     from yanartas_pillowbox import progress, sfc
     from yanartas_pillowbox.server import create_app
 
-    def fake(mask, corner, side, n, pitch, seed=0, zones=(), arcs=False, partitions=(), stems=()):
+    def fake(
+        mask,
+        corner,
+        side,
+        n,
+        pitch,
+        seed=0,
+        zones=(),
+        arcs=False,
+        partitions=(),
+        stems=(),
+        strict=False,
+    ):
         progress.report("relax", 1, 2)
         progress.report("relax", 2, 2)
         progress.report("settle", 20, 40, vertices=1000)
@@ -689,3 +713,31 @@ def test_debug_svg_colours_traces_by_partition(layout):
         assert min(apart, default=360) > 60
         dashed = [p for p in g.iter(f"{ns}path") if p.get("stroke") == "#555"]
         assert len(dashed) >= len(m.parts)
+
+
+def test_a_layer_whose_curves_leave_a_region_out_is_tried_again_salted(monkeypatch):
+    """A layer's split whose curves leave regions out is laid out again afresh, the seed
+    salted ("-1", ...), each try strict but the last (whose result is kept as it is)."""
+    from yanartas_pillowbox import partition, rand, sfc
+
+    seeds, strict = [], []
+
+    def split(area, zones, ports, inward, width, seed):
+        seeds.append(seed)
+        return [partition.Partition(box(0, 0, 1, 1), box(0, 0, 1, 1), 1.0)]
+
+    def generate(*args, strict: bool, **kwargs):
+        strict_.append(strict)
+        if strict:
+            raise sfc.Unreached("a region left out")
+        return "mesh"
+
+    strict_ = strict
+    monkeypatch.setattr(pcb.partition, "partition", split)
+    monkeypatch.setattr(pcb.sfc, "generate", generate)
+    cfg = Config().with_values(mesh_seed="abc")
+    got = pcb._partitioned(cfg, "F.Cu", box(0, 0, 9, 9), [], [], 1.0, [], 0, 1, 0.3)
+    assert got == "mesh"
+    assert strict == [True] * pcb.RETRIES + [False]
+    keys = [rand.key_of("abc")] + [rand.key_of(f"abc-{k}") for k in range(1, pcb.RETRIES + 1)]
+    assert seeds == [rand.derive(key, "layer/F.Cu") for key in keys]
