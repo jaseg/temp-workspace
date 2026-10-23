@@ -81,6 +81,8 @@ LARGE_ARC = 100.0
 SHALLOW_ARC = 0.05
 FOLD_CLEARANCE = 1.0  # vias keep this far from the cable's folds
 FOLD_LAYERS = ("Dwgs.User", "F.SilkS", "B.SilkS")  # the fold lines, on each
+GUIDE_LAYERS = ("F.SilkS", "B.SilkS")  # the glue guides, on each
+GUIDE_WIDTH = 0.15  # ... this wide
 STITCH_PITCH = 6.0  # GND stitching vias along the cable
 # ... each where it falls, or (on a fold) this far along the lane from there, the nearest first
 STITCH_SHIFTS = tuple(sorted((0.25 * k for k in range(-11, 12)), key=abs))
@@ -138,6 +140,8 @@ class Layout:
     cable_clearance: float = 0.15  # (the traces' along the cable: necked down, maybe less)
     # the glue tab and the lens-shaped flaps: copies for stiffeners (User.1 in KiCad)
     stiffeners: list[Polygon] = field(default_factory=list)
+    # two pieces: the glue guides (``geometry.glue_guides``), on both silkscreens
+    guides: tuple[Segment, ...] = ()
     _cache: dict = field(default_factory=dict, repr=False)
 
     def net_lengths(self) -> dict[str, float]:
@@ -275,13 +279,12 @@ def offset_path(path: Sequence[Point], k: float) -> list[Point]:
 
 # ----------------------------------------------------------------------------- fan-out
 def stiffeners(
-    pattern: Pattern, flap_offset: float = 0.0, tab_offset: float = 0.0
+    pattern: Pattern, flap_offset: float = 0.0, tab_offset: float = 0.0, tab: bool = True
 ) -> list[Polygon]:
-    """The glue tab and the lens-shaped flaps (outer and inner), as polygons: where
+    """The glue tab (``tab``) and the lens-shaped flaps (outer and inner), as polygons: where
     stiffeners may go, each shrunk by its offset (``geometry.stiffener_outlines``)."""
-    return [
-        Polygon(p) for p in geometry.stiffener_outlines(pattern, flap_offset, tab_offset).values()
-    ]
+    outlines = geometry.stiffener_outlines(pattern, flap_offset, tab_offset, tab)
+    return [Polygon(p) for p in outlines.values()]
 
 
 @dataclass(frozen=True)
@@ -412,7 +415,10 @@ def layout(cfg: Config, pattern: Pattern | None = None) -> Layout:
     sides = plug_sides(cfg)
 
     result = Layout(board, (*(f.segment for f in pattern.folds), *(f.segment for f in cable.folds)))
-    result.stiffeners = stiffeners(pattern, cfg.stiffener_flap_offset, cfg.stiffener_tab_offset)
+    result.stiffeners = stiffeners(
+        pattern, cfg.stiffener_flap_offset, cfg.stiffener_tab_offset, cfg.stiffener_glue_tab == "on"
+    )
+    result.guides = pattern.guides
     result.area = mask
     result.clearance, result.width = space, w
     cell = 2 * n * pitch
@@ -909,6 +915,14 @@ def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> An
                     kgr.Line(start=xy(seg.start), end=xy(seg.end), layer=layer, stroke=stroke(0.1))
                 )
 
+    for seg in result.guides:
+        for layer in GUIDE_LAYERS:
+            board.add(
+                kgr.Line(
+                    start=xy(seg.start), end=xy(seg.end), layer=layer, stroke=stroke(GUIDE_WIDTH)
+                )
+            )
+
     for track in result.tracks if tracks else ():
         net = board.net_id(track.net)
         if track.arcs:
@@ -1179,6 +1193,10 @@ def debug_svg(result: Layout) -> str:
             f'<path d="{path(sample([seg]), dx)}" fill="none" stroke="#bbb" stroke-width="0.12" '
             'stroke-dasharray="1 0.6"/>'
             for seg in result.folds
+        ]
+        out += [
+            f'<path d="{path(sample([seg]), dx)}" fill="none" stroke="#444" stroke-width="0.15"/>'
+            for seg in result.guides
         ]
         return out
 

@@ -223,15 +223,15 @@ def sample(segments: Sequence[Segment], tol: float = 0.005) -> list[Point]:
 
 
 def stiffener_outlines(
-    pattern: Pattern, flap_offset: float = 0.0, tab_offset: float = 0.0
+    pattern: Pattern, flap_offset: float = 0.0, tab_offset: float = 0.0, tab: bool = True
 ) -> dict[str, list[Point]]:
-    """Where stiffeners may go, by face: the glue tab and the lens-shaped flaps (outer and
-    inner), each shrunk by its offset (``inset``; none left: left out); and the cable's plug
-    (``plug``: its whole width, from its tip back by its length, flush with its edges, as a
-    ZIF connector wants the FPC's end stiffened)."""
+    """Where stiffeners may go, by face: the glue tab (``tab``) and the lens-shaped flaps
+    (outer and inner), each shrunk by its offset (``inset``; none left: left out); and the
+    cable's plug (``plug``: its whole width, from its tip back by its length, flush with its
+    edges, as a ZIF connector wants the FPC's end stiffened)."""
     out = {}
     for f in pattern.faces:
-        if f.name == "glue-tab" or f.kind == "flap":
+        if (f.name == "glue-tab" and tab) or f.kind == "flap":
             d = tab_offset if f.name == "glue-tab" else flap_offset
             pts = inset(sample(list(f.boundary)), d)
             if pts:
@@ -406,6 +406,8 @@ class Pattern:
     # Closed loops of slit segments, inside the outline, whose inside is cut out as scrap.
     scraps: tuple[tuple[Segment, ...], ...] = ()
     cable: Cable | None = None  # the FPC cable (its cut is part of the outline)
+    # Two pieces: short lines to line the glue tabs up by (``glue_guides``), not cut or folded.
+    guides: tuple[Line, ...] = ()
 
     def fold(self, name: str) -> Fold:
         return next(f for f in self.folds if f.name == name)
@@ -612,6 +614,7 @@ class LidLayout:
         return tuple(Line(a, b) for a, b in itertools.pairwise(pts) if _dist(a, b) > 1e-12)
 
 
+GUIDE = 5.0  # the glue guides this long on the tab, and past it on the free edge's side
 MAX_SPREAD_SLOPE = 0.98  # the continued fold arc must turn less than 45 degrees, with margin
 
 
@@ -1353,7 +1356,30 @@ def _build_piece(cfg: Config) -> Pattern:
         cable = _place_cable(cfg, cable_layout, outline.segments)
         info["fpc_cable_width"] = cable.width
         info["fpc_plug_width"] = cable.plug_width
-    return Pattern(outline, folds, faces, bbox, info, (), (), cable)
+    return Pattern(
+        outline, folds, faces, bbox, info, (), (), cable, glue_guides(w, s, d, lp, g, t_top, t_bot)
+    )
+
+
+def glue_guides(
+    w: float, s: float, d: float, lp: float, g: float, t_top: float, t_bot: float
+) -> tuple[Line, ...]:
+    """Two pieces: marks to line the other piece's glue tab up along this one's free edge
+    by. On the free edge: from the edge across the panel as far as the other piece's tab
+    reaches and ``GUIDE`` further (so they show past it once it is glued), in the middle
+    and near the tab's ends: past their mitres, and as far in as keeps them a millimetre off
+    the curved folds (``w`` wide, bowing in by ``s``). On the glue tab, across its outer
+    part (``GUIDE`` long), the same marks where the tab brings them (turned over: at
+    ``y = d + Lp`` less theirs)."""
+    r = circle_radius(w, s)
+    far = min(g + GUIDE, w / 2)
+    u = far - w / 2
+    clear = math.sqrt(r * r - u * u) - (r - s) + 1.0  # (the fold at the marks' far end)
+    edge = (max(d + t_bot, clear), (d + lp) / 2, min(lp - t_top, lp - clear))
+    return (
+        *(Line((w + g - GUIDE, d + lp - y), (w + g, d + lp - y)) for y in edge),
+        *(Line((0.0, y), (far, y)) for y in edge),
+    )
 
 
 @dataclass(frozen=True)

@@ -301,15 +301,29 @@ def test_face_labels(gap):
                 assert x == pytest.approx((faces[name].x0 + faces[name].x1) / 2)
 
 
-def test_stiffeners_layer(cfg):
-    """The glue tab, the lens-shaped flaps and the cable's plug again, closed outlines in a
-    hidden layer of their own (User.1, for stiffeners): not to be cut."""
+@pytest.mark.parametrize("tab", ["off", "on"])
+def test_stiffeners_layer(cfg, tab):
+    """The lens-shaped flaps, the cable's plug and (if on) the glue tab again, closed outlines
+    in a hidden layer of their own (User.1, for stiffeners): not to be cut."""
+    cfg = cfg.with_values(stiffener_glue_tab=tab)
     pattern = build_pattern(cfg)
     root = svg_elements(render_svg(cfg, pattern))
     (g,) = [g for g in root.findall(q("g")) if g.get("id") == "user-1"]
     assert g.get(f"{{{INKSCAPE_NS}}}groupmode") == "layer" and g.get("display") == "none"
-    faces = {f.name for f in pattern.faces if f.name == "glue-tab" or f.kind == "flap"}
+    faces = {f.name for f in pattern.faces if f.kind == "flap"}
+    faces |= {"glue-tab"} if tab == "on" else set()
     plug = {"plug"} if pattern.cable is not None else set()
     assert {el.get("id") for el in g} == {f"stiffener-{n}" for n in faces | plug}
     for el in g:
         assert el.get("d").rstrip().endswith("Z") and el.get("fill") == "none"
+
+
+def test_glue_guides_layer():
+    """Two pieces: the glue guides, six dotted lines in a layer of their own; one piece: none."""
+    two = Config().with_values(pieces="two", lid_offset=1.5)
+    root = svg_elements(render_svg(two))
+    (g,) = [g for g in root.findall(q("g")) if g.get("id") == "glue-guides"]
+    assert g.get(f"{{{INKSCAPE_NS}}}label") == "Glue guides"
+    assert len(g) == 6 and all(el.get("stroke-dasharray") for el in g)
+    root = svg_elements(render_svg(Config()))
+    assert not [g for g in root.findall(q("g")) if g.get("id") == "glue-guides"]

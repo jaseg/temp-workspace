@@ -5,6 +5,7 @@ export const LINE_STYLES = {
   cut: { label: "Cut", dash: null },
   mountain: { label: "Mountain fold", dash: [9, 4.5, 1.5, 4.5] }, // dash-dot
   valley: { label: "Valley fold", dash: [9, 6] }, // dashed
+  guides: { label: "Glue guide", dash: [1.5, 3] }, // dotted (two pieces)
 };
 
 /** Small inline SVG showing a line style, for legends. */

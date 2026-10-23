@@ -52,6 +52,7 @@ template.innerHTML = `
   .stage svg path { vector-effect: non-scaling-stroke; stroke-width: 1.4px; }
   .stage svg #fold-mountain path { stroke-dasharray: ${LINE_STYLES.mountain.dash.join(" ")}; }
   .stage svg #fold-valley path { stroke-dasharray: ${LINE_STYLES.valley.dash.join(" ")}; }
+  .stage svg #glue-guides path { stroke-dasharray: ${LINE_STYLES.guides.dash.join(" ")}; }
   .stage svg .sheet { fill: none; stroke: var(--sheet-stroke); stroke-dasharray: 4 3;
                       stroke-width: 1px; vector-effect: non-scaling-stroke; }
   ${DIM_STYLE}
@@ -292,7 +293,8 @@ export class PbPreview2d extends HTMLElement {
   /** Legend: the line types present in this pattern (and the copper layers, if shown). */
   #drawLegend() {
     if (!this.#svg) return;
-    const present = ["cut", ...["mountain", "valley"].filter((t) => this.#svg.querySelector(`#fold-${t}`))];
+    const ids = { mountain: "fold-mountain", valley: "fold-valley", guides: "glue-guides" };
+    const present = ["cut", ...Object.keys(ids).filter((t) => this.#svg.querySelector(`#${ids[t]}`))];
     const items = present.map((t) => {
       const item = document.createElement("span");
       item.append(lineSwatch(LINE_STYLES[t].dash), LINE_STYLES[t].label);

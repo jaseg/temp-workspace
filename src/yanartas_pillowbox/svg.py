@@ -52,6 +52,7 @@ LAYERS: dict[str, tuple[str, str, str | None]] = {
     "cut": ("cut", "Cut", None),
     FoldDirection.MOUNTAIN: ("fold-mountain", "Fold - mountain", "3 1.5 0.5 1.5"),
     FoldDirection.VALLEY: ("fold-valley", "Fold - valley", "3 2"),
+    "guides": ("glue-guides", "Glue guides", "0.5 0.5"),
 }
 
 
@@ -187,6 +188,20 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
                 },
             )
 
+    # Two pieces: the glue guides (dotted: neither cut nor folded).
+    if pattern.guides:
+        g, dash = _layer(root, "guides")
+        for i, guide in enumerate(pattern.guides):
+            ET.SubElement(
+                g,
+                f"{{{SVG_NS}}}path",
+                {
+                    "id": f"glue-guide-{i + 1}",
+                    "d": path_data([guide], offset, close=False),
+                    **stroke_attrs(dash),
+                },
+            )
+
     # The glue tab and the lens-shaped flaps again, for stiffeners (KiCad's User.1): a layer
     # of its own, hidden (not to be cut).
     g = ET.SubElement(
@@ -200,7 +215,12 @@ def render_svg(cfg: Config, pattern: Pattern | None = None) -> str:
         },
     )
     # (each shrunk by its offset: a polygon then, the arcs sampled finely)
-    outlines = stiffener_outlines(pattern, cfg.stiffener_flap_offset, cfg.stiffener_tab_offset)
+    outlines = stiffener_outlines(
+        pattern,
+        cfg.stiffener_flap_offset,
+        cfg.stiffener_tab_offset,
+        cfg.stiffener_glue_tab == "on",
+    )
     for name, pts in outlines.items():
         d = "M " + " L ".join(f"{fmt(x + offset[0])} {fmt(y + offset[1])}" for x, y in pts) + " Z"
         ET.SubElement(

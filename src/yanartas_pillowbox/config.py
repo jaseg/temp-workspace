@@ -472,6 +472,15 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "layer) stay inside the flaps' outlines.",
     ),
     FieldSpec(
+        "stiffener_glue_tab",
+        "Glue-tab stiffener",
+        "choice",
+        "PCB stiffeners",
+        choices=(("off", "Off"), ("on", "On")),
+        help="Whether the glue tab gets a stiffener (User.1, and the SVG's stiffener layer) "
+        "as the flaps do.",
+    ),
+    FieldSpec(
         "stiffener_tab_offset",
         "Glue-tab stiffener offset",
         "float",
@@ -480,7 +489,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         0,
         10,
         0.1,
-        help="How far the glue tab's stiffener stays inside the glue tab's outline.",
+        help="How far the glue tab's stiffener (if on) stays inside the glue tab's outline.",
     ),
     FieldSpec(
         "mesh_seed",
@@ -631,6 +640,7 @@ class Config:
     mesh_seed: str = "0"
     stiffener_flap_offset: float = 0.5
     stiffener_tab_offset: float = 0.5
+    stiffener_glue_tab: str = "off"
     mesh_algorithm: str = "kimesh"
     mesh_shape: str = "lines"
     mesh_partition_folds: str = "follow"

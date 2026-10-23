@@ -199,7 +199,8 @@ All lengths are in millimetres.
 | `mesh_edge_clearance` | 0.5 | How far the mesh keeps off the foil's cut edges and slits. 0–10. |
 | `mesh_seed` | 0 | Seed of the mesh's layout: the same seed gives the same mesh. Any text, distilled into a 256-bit key; the layout's randomness is drawn from it by cryptographically secure generators (SHAKE-256, ChaCha20 in the Rust core), each part of the layout a stream of its own. The die button puts in a fresh 128-bit seed. |
 | `stiffener_flap_offset` | 0.5 | How far the flaps' stiffener outlines (KiCad's User.1, the SVG's stiffener layer) stay inside the flaps (mm): each edge moved in, the corners mitred. 0–10. |
-| `stiffener_tab_offset` | 0.5 | The same for the glue tab's stiffener (mm). 0–10. |
+| `stiffener_glue_tab` | `off` | `on` gives the glue tab a stiffener too (User.1 and the SVG's stiffener layer), as the flaps have; `off` leaves it bare. |
+| `stiffener_tab_offset` | 0.5 | The same for the glue tab's stiffener, if on (mm). 0–10. |
 | `mesh_algorithm` | `kimesh` | How the mesh is laid out: `kimesh` (tiles on a square grid, fast) or `sfc` (a closed space-filling curve after Bedel et al. 2022: follows edges and folds, crosses each fold as seldom as can be, takes a minute or more per layer). See *PCB layout*. |
 | `mesh_shape` | `lines` | Space-filling curve only: how its traces are drawn: `lines` each trace redrawn as the smooth curve through its vertices, in straight segments no two of which turn more than 10° (but where that would bring copper closer); `arcs` that curve redrawn in straight lines and circular arcs (KiCad track arcs) within the polyline's own error of it, further (up to 3 % of the pitch) where it has room to the copper beside it, so mostly arcs. |
 | `mesh_partition_folds` | `follow` | Space-filling curve only: the Voronoi map the partitions are cut from. `follow`: each panel's cells on their own, crossing a fold costs more and the partitions' borders keep to the folds where they can; `ignore`: the whole area one zone, cells and borders across the folds as anywhere else. |
@@ -390,7 +391,7 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   its bends too (kept 1 mm off its folds, the corners' creases among them, each moved along
   its lane from where it falls as far as that takes), join the two layers.
 * **Output:** through [gerbonara](https://gitlab.com/gerbolyze/gerbonara): the KiCad board
-  (outline on Edge.Cuts, with the slits as 0.1 mm slots; fold lines on Dwgs.User and on both silkscreens, F.SilkS and B.SilkS; plug
+  (outline on Edge.Cuts, with the slits as 0.1 mm slots; fold lines on Dwgs.User and on both silkscreens, F.SilkS and B.SilkS; two pieces, the glue guides on both silkscreens too, 0.15 mm wide; plug
   contacts as footprint J1), a KiCad project carrying the design rules (net class Default:
   the trace width and space, the vias), Gerber and drill files, and SVG renderings of both
   sides. The board is made without its tracks and they are written into its file as text,
@@ -533,6 +534,7 @@ own mirror image. Only the fold indicators flip.
 | `cut` | Cut | solid | — |
 | `fold-mountain` | Fold - mountain | dash-dot | `3 1.5 0.5 1.5` |
 | `fold-valley` | Fold - valley | dashed | `3 2` |
+| `glue-guides` | Glue guides | dotted | `0.5 0.5` |
 
 The dashes follow the origami convention. Each fold's direction is computed from the folded
 3D model, not set manually. Seen from the outside, every fold of a pillow box is a mountain
@@ -552,6 +554,13 @@ layers keep the line types apart.
   and no stray subpaths.
 * **Fold lines:** separate open paths, dashed by fold direction. They end exactly on the
   outline and never run along it.
+* **Glue guides** (two pieces only): six short marks, neither cut nor folded, for gluing
+  the other piece's tab on at the right height. Three are on the glue tab's outer part (5
+  mm long): in its middle and near its ends, just past the mitres. Three are on the free
+  edge, where the other piece's tab brings those three once the two pieces are put
+  together. They run from the edge across the panel as far as the tab reaches plus 5 mm,
+  so they show past the glued-on tab, and they keep 1 mm off the curved folds. Line each
+  mark on the tab up with its mark on the panel.
 * **Styling:** `fill="none"`, `stroke` and `stroke-width` are plain attributes on every
   element, with a fixed 0.1 mm stroke width. There are no CSS classes and no `<style>`.
 * **Metadata:** the complete config is stored as JSON in

@@ -324,16 +324,20 @@ def test_sheet_is_the_smallest_a_size_that_holds_the_design(outline, want, centr
 
 
 def test_stiffeners_on_user_1(layout):
-    """The glue tab and the lens-shaped flaps, as filled polygons on User.1: their faces,
-    each shrunk by its stiffener offset (its edges moved in, the corners mitred); and the
-    cable's plug, as wide as the plug and as long."""
+    """The lens-shaped flaps (and, if on, the glue tab), as filled polygons on User.1: their
+    faces, each shrunk by its stiffener offset (its edges moved in, the corners mitred); and
+    the cable's plug, as wide as the plug and as long."""
     from shapely.geometry import Polygon as SPolygon
 
     from yanartas_pillowbox.geometry import build_pattern
 
     pattern = build_pattern(D)
-    faces = [f for f in pattern.faces if f.name == "glue-tab" or f.kind == "flap"]
-    assert len(faces) == 5  # (the glue tab, two outer and two inner flaps)
+    faces = [f for f in pattern.faces if f.kind == "flap"]
+    assert len(faces) == 4  # (two outer and two inner flaps; the glue tab's is off)
+    tab = pattern.face("glue-tab")
+    on = pcb.stiffeners(pattern, D.stiffener_flap_offset, D.stiffener_tab_offset, tab=True)
+    assert len(on) == len(faces) + 2  # (and the glue tab, and the plug)
+    assert any(p.within(SPolygon(pcb.sample(tab.boundary))) for p in on)
     board = pcb.to_kicad(layout, tracks=False)
     polys = [p for p in board.polygons if p.layer == "User.1"]
     assert len(polys) == len(faces) + 1 and all(p.fill for p in polys)
@@ -811,3 +815,15 @@ def test_a_layer_whose_curves_leave_a_region_out_is_tried_again_salted(monkeypat
     assert strict == [True] * pcb.RETRIES + [False]
     keys = [rand.key_of("abc")] + [rand.key_of(f"abc-{k}") for k in range(1, pcb.RETRIES + 1)]
     assert seeds == [rand.derive(key, "layer/F.Cu") for key in keys]
+
+
+def test_glue_guides_on_both_silkscreens():
+    """Two pieces: the glue guides, on F.SilkS and B.SilkS."""
+    cfg = D.with_values(pieces="two", lid_offset=1.5)
+    layout = pcb.layout(cfg)
+    assert len(layout.guides) == 6
+    board = pcb.to_kicad(layout, tracks=False)
+    for silk in pcb.GUIDE_LAYERS:
+        lines = [ln for ln in board.lines if ln.layer == silk]
+        guides = [ln for ln in lines if ln.stroke.width == pcb.GUIDE_WIDTH]
+        assert len(guides) == 6
