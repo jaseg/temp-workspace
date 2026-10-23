@@ -50,7 +50,7 @@ markers = ["slow: full-size layouts that take minutes (run with -m slow)"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["src/yanartas_pillowbox/static"]
+extend-exclude = ["src/yanartas_pillowbox/static", "docs/partition/partition.ipynb"]  # (the notebook: teaching code)
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ANN", "RUF", "SIM"]
