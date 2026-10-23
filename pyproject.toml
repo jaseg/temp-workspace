@@ -50,7 +50,11 @@ markers = ["slow: full-size layouts that take minutes (run with -m slow)"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["src/yanartas_pillowbox/static", "docs/partition/partition.ipynb"]  # (the notebook: teaching code)
+extend-exclude = [
+    "src/yanartas_pillowbox/static",
+    "docs/partition/partition.ipynb",  # (the notebooks: teaching code)
+    "docs/mesh/mesh.ipynb",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ANN", "RUF", "SIM"]
@@ -58,3 +62,5 @@ ignore = ["ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ANN"]
+"docs/mesh/support/*" = ["ANN", "RUF046"]  # (the notebook's support: ports, kept close to the core's)
+"docs/mesh/export_mesh_cases.py" = ["ANN"]  # (its recorder: the core's calls, as they come)

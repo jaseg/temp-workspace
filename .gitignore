@@ -11,3 +11,4 @@ build/
 /artifact/.cache/
 /rust/target/
 .claude/worktrees/
+.ipynb_checkpoints/

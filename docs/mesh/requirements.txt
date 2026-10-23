@@ -1,0 +1,6 @@
+# The notebook's (mesh.ipynb) requirements: none of the project's own code.
+# shapely pinned: the port must reproduce the stored geometry (Voronoi, unions) exactly.
+shapely==2.2.0
+numpy>=2.0
+matplotlib>=3.8
+jupyter>=1.0

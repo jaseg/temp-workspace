@@ -1,0 +1,11 @@
+[package]
+name = "cells-recorder"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Records the curve graph's cells (graph::cells, the core unmodified) for the mesh notebook's test data."
+
+[dependencies]
+yanartas-mesh-core = { path = "../../../rust/core" }
+
+[workspace]
