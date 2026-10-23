@@ -523,6 +523,34 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "smoother pieces.",
     ),
     FieldSpec(
+        "mesh_partition_folds",
+        "Partitions at folds",
+        "choice",
+        "PCB mesh",
+        choices=(
+            ("follow", "Follow the folds"),
+            ("ignore", "Ignore the folds"),
+        ),
+        help="Space-filling curve: the Voronoi map the partitions are made of. Follow the "
+        "folds: each panel's cells on their own, crossing a fold costs more, and the "
+        "partitions' borders keep to the folds where they can. Ignore the folds: cells and "
+        "borders across the folds as anywhere else.",
+    ),
+    FieldSpec(
+        "mesh_curve_folds",
+        "Curve at folds",
+        "choice",
+        "PCB mesh",
+        choices=(
+            ("avoid", "Cross as seldom as can be"),
+            ("free", "Cross freely"),
+        ),
+        help="Space-filling curve: cross as seldom as can be: each panel's curve laid out "
+        "on its own, half a spacing off the folds, the panels joined across them only as "
+        "often as needed. Cross freely: the curve laid out over the folds as if there were "
+        "none (more crossings, no bare strips along the folds).",
+    ),
+    FieldSpec(
         "mesh_back_offset",
         "Back mesh offset",
         "choice",
@@ -605,6 +633,8 @@ class Config:
     stiffener_tab_offset: float = 0.5
     mesh_algorithm: str = "kimesh"
     mesh_shape: str = "lines"
+    mesh_partition_folds: str = "follow"
+    mesh_curve_folds: str = "avoid"
     mesh_back_offset: str = "cell"
     thickness: float = 0.2
     print_side: str = "outside"

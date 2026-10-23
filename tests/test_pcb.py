@@ -8,6 +8,7 @@ from collections import defaultdict
 
 import pytest
 import shapely
+import shapely.affinity
 from shapely.geometry import LineString, Point, Polygon, box
 
 from yanartas_pillowbox import pcb, progress
@@ -268,28 +269,56 @@ def test_export_draws_arcs(layout, tmp_path):
 
 
 def test_kicad_page_holds_the_design_centred(layout, tmp_path):
-    """The KiCad board's page is big enough for the design and a margin (the title block
-    below it), at least A5, the design (its outline on Edge.Cuts) in its middle; the tracks,
-    contacts and vias moved along with it."""
+    """The KiCad board's page: the smallest A-series sheet that holds the design (the
+    default box's: A3 landscape) inside the drawing sheet's frame and off its title block,
+    the design (its outline on Edge.Cuts) in its middle; the tracks, contacts and vias moved
+    along with it."""
     from gerbonara.cad.kicad.pcb import Board
 
     pcb.export(layout, tmp_path, "page")
     text = (tmp_path / "page.kicad_pcb").read_text()
     board = Board.open(tmp_path / "page.kicad_pcb")
-    assert board.paper.page_format == "User"
-    w, h = board.paper.width, board.paper.height
+    assert (board.paper.page_format, board.paper.portrait) == ("A3", False)
+    w, h = 420, 297
     xs = [c for ln in board.lines if ln.layer == "Edge.Cuts" for c in (ln.start.x, ln.end.x)]
     ys = [c for ln in board.lines if ln.layer == "Edge.Cuts" for c in (ln.start.y, ln.end.y)]
     assert (min(xs) + max(xs)) / 2 == pytest.approx(w / 2, abs=0.01)
     assert (min(ys) + max(ys)) / 2 == pytest.approx(h / 2, abs=0.01)
-    assert min(xs) >= pcb.PAGE_MARGIN[0] - 0.01 and max(xs) <= w - pcb.PAGE_MARGIN[0] + 0.01
-    assert min(ys) >= pcb.PAGE_MARGIN[1] - 0.01 and max(ys) <= h - pcb.PAGE_MARGIN[1] + 0.01
-    assert (w, h) >= pcb.PAGE_MIN
+    assert min(xs) >= pcb.FRAME and max(xs) <= w - pcb.FRAME
+    assert min(ys) >= pcb.FRAME and max(ys) <= h - pcb.FRAME
     # (everything inside the outline: the tracks and contacts too)
     x0, y0, x1, y1 = min(xs), min(ys), max(xs), max(ys)
     for seg in board.track_segments[:500]:
         assert x0 <= seg.start.x <= x1 and y0 <= seg.start.y <= y1
-    assert '(paper "User"' in text
+    assert '(paper "A3")' in text
+
+
+@pytest.mark.parametrize(
+    ("outline", "want", "centred"),
+    [
+        (box(0, 0, 180, 110), ("A4", False), True),
+        (box(0, 0, 120, 200), ("A4", True), True),  # (tall: portrait)
+        # (centred, it would reach into the title block: centred above it instead)
+        (box(0, 0, 260, 120), ("A4", False), False),
+        (box(0, 0, 300, 200), ("A3", False), True),
+        (box(0, 0, 1300, 900), ("User", False), True),  # (larger than A0)
+    ],
+)
+def test_sheet_is_the_smallest_a_size_that_holds_the_design(outline, want, centred):
+    class Result:
+        board = shapely.affinity.translate(outline, -40, 25)
+
+    s = pcb.sheet(Result())
+    assert (s.format, s.portrait) == want
+    w, h = s.size
+    placed = shapely.affinity.translate(Result.board, *s.offset)
+    mid = placed.centroid
+    assert (abs(mid.x - w / 2) < 0.01 and abs(mid.y - h / 2) < 0.01) == centred
+    if s.format != "User":
+        x0, y0, x1, y1 = placed.bounds
+        assert x0 >= pcb.FRAME and y0 >= pcb.FRAME and x1 <= w - pcb.FRAME and y1 <= h - pcb.FRAME
+        title = box(w - pcb.TITLE_BLOCK[0], h - pcb.TITLE_BLOCK[1], w, h)
+        assert not placed.intersects(title)
 
 
 def test_stiffeners_on_user_1(layout):
@@ -537,6 +566,35 @@ def test_space_filling_curve_is_wired_in(monkeypatch):
     assert pcb.verify(result) == []
 
 
+@pytest.mark.parametrize(
+    ("cells", "curve"), [("follow", "avoid"), ("ignore", "avoid"), ("follow", "free")]
+)
+def test_folds_followed_or_ignored(monkeypatch, cells, curve):
+    """The partitions' cells and the curve each keep to the panels (the zones) or take the
+    layer's whole area as one; the strips' ends checked against the curve's zones."""
+    from yanartas_pillowbox import partition, sfc
+    from yanartas_pillowbox.geometry import build_pattern
+
+    seen = {}
+    real = partition.partition
+
+    def spy(area, zones, *args, ends=None, **kw):
+        seen["cells"], seen["ends"] = len(zones), len(ends)
+        return real(area, zones, *args, ends=ends, **kw)
+
+    def fake(mask, corner, side, n, pitch, *, zones=(), partitions=(), **_):
+        seen["curve"] = len(zones)
+        return _ports_only(mask, corner, side, n, pitch, partitions=partitions)
+
+    monkeypatch.setattr(partition, "partition", spy)
+    monkeypatch.setattr(sfc, "generate", fake)
+    cfg = D.with_values(mesh_algorithm="sfc", mesh_partition_folds=cells, mesh_curve_folds=curve)
+    pcb.layout(cfg)
+    panels = len(pcb.mesh_zones(build_pattern(D)))
+    want = {"cells": panels if cells == "follow" else 1, "curve": panels if curve == "avoid" else 1}
+    assert seen == {**want, "ends": want["curve"]}
+
+
 def test_partitions_need_pins(monkeypatch):
     """The plug must hold every partition's ends: too few pins are an error, not cut."""
     with pytest.raises(pcb.PcbError, match="pins"):
@@ -732,7 +790,7 @@ def test_a_layer_whose_curves_leave_a_region_out_is_tried_again_salted(monkeypat
 
     seeds, strict = [], []
 
-    def split(area, zones, ports, inward, width, seed):
+    def split(area, zones, ports, inward, width, seed, ends=None):
         seeds.append(seed)
         return [partition.Partition(box(0, 0, 1, 1), box(0, 0, 1, 1), 1.0)]
 

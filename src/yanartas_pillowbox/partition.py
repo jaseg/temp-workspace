@@ -296,13 +296,15 @@ def partition(
     inward: tuple[float, float],
     width: float,
     seed: int,
+    ends: list[Polygon] | None = None,
 ) -> list[Partition]:
     """``area`` split into one partition per port (in their order along the junction;
     ``inward`` the way from the junction into the area), of equal area, each holding its
     port, ``width`` wide (a pair of trace lanes: the ports' width), and its strip. A split
-    that comes out uneven is tried again afresh."""
+    that comes out uneven is tried again afresh. ``ends``: the zones each strip's end must
+    lie within one of (where its curve opens; default: ``zones``)."""
     rng = Rand.of(seed, "partition")
-    cut = _Cells(area, zones, ports, inward, width, rng)
+    cut = _Cells(area, zones, ports, inward, width, rng, ends)
     tried = []
     for _ in range(ATTEMPTS):
         owner, necks = cut.attempt(rng)
@@ -382,11 +384,12 @@ class _Cells:
         inward: tuple[float, float],
         width: float,
         rng: Rand,
+        ends_in: list[Polygon] | None = None,
     ) -> None:
         count = len(ports)
         self.inv = inv = np.asarray(inward, float) / math.hypot(*inward)
         self.ports, self.width = ports, width
-        self.lanes = lanes = strips(ports, inward, width, zones)
+        self.lanes = lanes = strips(ports, inward, width, zones if ends_in is None else ends_in)
         # (a cell pinned in front of each strip's end, its own: where its curve opens)
         ends = []
         for s in lanes:

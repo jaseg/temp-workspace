@@ -40,6 +40,7 @@ from typing import Any
 
 import numpy as np
 import shapely
+import shapely.affinity
 from shapely.geometry import LineString, Polygon
 
 from yanartas_pillowbox import checkpoint, geometry, kimesh, partition, progress, rand, sfc
@@ -84,8 +85,15 @@ STITCH_PITCH = 6.0  # GND stitching vias along the cable
 # ... each where it falls, or (on a fold) this far along the lane from there, the nearest first
 STITCH_SHIFTS = tuple(sorted((0.25 * k for k in range(-11, 12)), key=abs))
 GND_VIA_EVERY = 4  # in a run of GND contacts, a via behind every this many (joined along)
-PAGE_MARGIN = (25.0, 50.0)  # KiCad page: around the design (x, y; the title block below)
-PAGE_MIN = (210.0, 148.0)  # ... and at least this big (A5 landscape)
+# KiCad's page: the smallest A-series sheet from A4 up, landscape or portrait, that holds
+# the design inside the default drawing sheet's frame and off its title block
+PAPER = (("A4", 297.0, 210.0), ("A3", 420.0, 297.0), ("A2", 594.0, 420.0),
+         ("A1", 841.0, 594.0), ("A0", 1189.0, 841.0))  # fmt: skip
+FRAME = 12.0  # ... the frame's inside (its rulers' edge) this far in from the page's edges
+TITLE_BLOCK = (120.0, 44.0)  # ... the title block's outer edges this far in from the right, bottom
+PAGE_CLEAR = 3.0  # ... the design kept this far off both
+PAGE_MARGIN = (25.0, 50.0)  # larger than A0: a user page, this around the design (x, y)
+PAGE_MIN = (210.0, 148.0)  # ... and at least this big
 
 
 @dataclass
@@ -275,15 +283,51 @@ def stiffeners(
     ]
 
 
+@dataclass(frozen=True)
+class Sheet:
+    """The KiCad page: its format ("A4" ... "A0", or "User"), whether portrait, its size and
+    the offset added to every coordinate (to place the design on it)."""
+
+    format: str
+    portrait: bool
+    size: tuple[float, float]
+    offset: Point
+
+
+def sheet(result: Layout) -> Sheet:
+    """The KiCad page for the layout: the smallest of ``PAPER`` (landscape or portrait)
+    that holds the design (its outline) inside the frame and off the title block, each by
+    ``PAGE_CLEAR``: the design in the page's middle if it fits there, else in the middle of
+    the frame above the title block, or beside it. Larger than A0: a user page, the design's
+    bounds and ``PAGE_MARGIN`` around them, in its middle (the title block below)."""
+    board = result.board
+    x0, y0, x1, y1 = board.bounds
+    mid = ((x0 + x1) / 2, (y0 + y1) / 2)
+    for name, long, short in PAPER:
+        places = []
+        for portrait in (False, True):
+            w, h = (short, long) if portrait else (long, short)
+            lo, hi = FRAME + PAGE_CLEAR, (w - FRAME - PAGE_CLEAR, h - FRAME - PAGE_CLEAR)
+            tx, ty = w - TITLE_BLOCK[0] - PAGE_CLEAR, h - TITLE_BLOCK[1] - PAGE_CLEAR
+            title = shapely.box(tx, ty, w, h)
+            centres = ((w / 2, h / 2), (w / 2, (lo + ty) / 2), ((lo + tx) / 2, h / 2))
+            for rank, (cx, cy) in enumerate(centres):
+                dx, dy = cx - mid[0], cy - mid[1]
+                inside = lo <= x0 + dx and x1 + dx <= hi[0] and lo <= y0 + dy and y1 + dy <= hi[1]
+                if inside and not shapely.affinity.translate(board, dx, dy).intersects(title):
+                    places.append((rank, portrait, (w, h), (round(dx, 3), round(dy, 3))))
+        if places:  # (centred rather than not, landscape rather than portrait)
+            _, portrait, size, offset = min(places)
+            return Sheet(name, portrait, size, offset)
+    w = math.ceil(max(x1 - x0 + 2 * PAGE_MARGIN[0], PAGE_MIN[0]))
+    h = math.ceil(max(y1 - y0 + 2 * PAGE_MARGIN[1], PAGE_MIN[1]))
+    return Sheet("User", False, (w, h), (round(w / 2 - mid[0], 3), round(h / 2 - mid[1], 3)))
+
+
 def page(result: Layout) -> tuple[Point, tuple[float, float]]:
-    """The KiCad page for the layout: its offset (added to every coordinate: the design in
-    the page's middle) and its size, the design's bounds and ``PAGE_MARGIN`` around them,
-    at least ``PAGE_MIN``."""
-    x0, y0, x1, y1 = result.board.bounds
-    w = max(x1 - x0 + 2 * PAGE_MARGIN[0], PAGE_MIN[0])
-    h = max(y1 - y0 + 2 * PAGE_MARGIN[1], PAGE_MIN[1])
-    w, h = math.ceil(w), math.ceil(h)
-    return (round(w / 2 - (x0 + x1) / 2, 3), round(h / 2 - (y0 + y1) / 2, 3)), (w, h)
+    """The KiCad page's offset and size (``sheet``)."""
+    s = sheet(result)
+    return s.offset, s.size
 
 
 def mesh_zones(pattern: Pattern) -> list[Polygon]:
@@ -493,9 +537,13 @@ def _partitioned(
         if salt:
             progress.report("graph", 0, 1, retry=salt)
         try:
-            parts = partition.partition(area, zones, ports, (1.0, 0.0), port, seed)
+            # (the folds ignored: the whole area one zone, for the cells or the curve)
+            whole = [area]
+            cells = zones if cfg.mesh_partition_folds == "follow" else whole
+            panels = zones if cfg.mesh_curve_folds == "avoid" else whole
+            parts = partition.partition(area, cells, ports, (1.0, 0.0), port, seed, ends=panels)
             return sfc.generate(
-                area, exits, side, each, pitch, seed=seed, zones=zones,
+                area, exits, side, each, pitch, seed=seed, zones=panels,
                 arcs=cfg.mesh_shape == "arcs", partitions=[p.area for p in parts],
                 stems=[p.reach for p in parts], strict=not last,
             )  # fmt: skip
@@ -805,8 +853,13 @@ def to_kicad(result: Layout, name: str = "pillowbox", tracks: bool = True) -> An
 
     board = kpcb.Board.empty_board()
     board.legacy_footprints = None  # (gerbonara cannot write an empty legacy list)
-    (ox, oy), (pw, ph) = page(result)
-    board.paper = kbt.PageSettings(page_format="User", width=pw, height=ph)
+    paper = sheet(result)
+    (ox, oy), (pw, ph) = paper.offset, paper.size
+    board.paper = (
+        kbt.PageSettings(page_format="User", width=pw, height=ph)
+        if paper.format == "User"
+        else kbt.PageSettings(page_format=paper.format, portrait=paper.portrait)
+    )
     board.nets[0] = ""
     nets = sorted({t.net for t in result.tracks} | {"GND"})
     for net in nets:

@@ -202,6 +202,8 @@ All lengths are in millimetres.
 | `stiffener_tab_offset` | 0.5 | The same for the glue tab's stiffener (mm). 0–10. |
 | `mesh_algorithm` | `kimesh` | How the mesh is laid out: `kimesh` (tiles on a square grid, fast) or `sfc` (a closed space-filling curve after Bedel et al. 2022: follows edges and folds, crosses each fold as seldom as can be, takes a minute or more per layer). See *PCB layout*. |
 | `mesh_shape` | `lines` | Space-filling curve only: how its traces are drawn: `lines` each trace redrawn as the smooth curve through its vertices, in straight segments no two of which turn more than 10° (but where that would bring copper closer); `arcs` that curve redrawn in straight lines and circular arcs (KiCad track arcs) within the polyline's own error of it, further (up to 3 % of the pitch) where it has room to the copper beside it, so mostly arcs. |
+| `mesh_partition_folds` | `follow` | Space-filling curve only: the Voronoi map the partitions are cut from. `follow`: each panel's cells on their own, crossing a fold costs more and the partitions' borders keep to the folds where they can; `ignore`: the whole area one zone, cells and borders across the folds as anywhere else. |
+| `mesh_curve_folds` | `avoid` | Space-filling curve only: `avoid` lays each panel's curve out on its own, half a spacing off the folds, joined across them only as often as needed (two crossings a join); `free` lays it out over the whole area as if there were no folds (no bare strips along them, but many crossings). The strips' ends (where each partition's curve opens) are kept within one zone either way. |
 | `mesh_back_offset` | `cell` | KiMesh only: how far the back (B.Cu) mesh's grid is offset from the front one's, in x and y: `cell` half a cell; `cell_trace` half a cell plus a trace width, so that the back traces also lie over the front traces' gaps. |
 | `print_side` | `outside` | `outside` or `inside`: the side of the material the fold indicators are drawn for (e.g. the side the laser scores). It only switches the fold lines between mountain and valley; the pattern is identical either way. |
 | `thickness` | 0.2 | Material thickness, 0–5. Width, length and height are interior dimensions; the pattern adds the material around them (see *Material thickness* below). Height − thickness must be at least 0.5. |
@@ -376,9 +378,12 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   (as wide as the plug, `fpc_plug_length` back from its tip) are copied as filled polygons
   onto KiCad's User.1 layer, and into the pattern SVG as a hidden layer "User.1
   (stiffeners)", for stiffeners later.
-* **KiCad page:** a custom page as big as the design plus 25 mm a side and 50 mm above and
-  below (room for the title block), at least A5; the design in its middle (the Gerbers and
-  SVGs use the same coordinates).
+* **KiCad page:** the smallest A-series sheet from A4 to A0, landscape or portrait (landscape
+  if both fit), that holds the design inside the default drawing sheet's frame and clear of
+  its title block, 3 mm off each. The design sits in the page's middle; if it would reach
+  into the title block there, it is centred in the frame above the title block (or else
+  beside it). Larger than A0: a custom page, the design plus 25 mm a side and 50 mm above
+  and below. The Gerbers and SVGs use the same coordinates.
 * **Ground:** the cable is a GND zone on both layers. It is a KiCad zone, filled in KiCad;
   the Gerber and SVG output leaves it out (fill and re-export in KiCad for fabrication).
   Vias behind the GND contacts and stitching vias along both edges of the cable, through
