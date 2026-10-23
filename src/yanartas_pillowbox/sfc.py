@@ -176,16 +176,46 @@ def _polygons(g: shapely.Geometry) -> list[Polygon]:
     return [p for p in shapely.get_parts(g) if isinstance(p, Polygon) and not p.is_empty]
 
 
-def _regions(area: shapely.Geometry, zones: list[Polygon], least: float) -> list[Polygon]:
+def _regions(
+    area: shapely.Geometry, zones: list[Polygon], least: float, spacing: float = 0.0
+) -> list[Polygon]:
     """The area cut into the zones' pieces (and what no zone covers), pieces too small to
-    take a curve left out."""
+    take a curve left out; with ``spacing``, each also cut where its domain (shrunk by half
+    a spacing, where its curve runs) comes apart (``_split``)."""
     out: list[Polygon] = []
     rest = area
     for z in zones:
         out += _polygons(shapely.intersection(area, z))
         rest = shapely.difference(rest, z)
     out += _polygons(rest)
+    if spacing > 0:
+        out = [q for r in out for q in _split(r, spacing)]
     return [r for r in out if r.area >= least]
+
+
+def _split(region: Polygon, spacing: float) -> list[Polygon]:
+    """The region cut where its domain comes apart (at a neck narrower than a spacing, or a
+    crack along a seam): a piece round each piece of the domain, the largest first, what
+    lies within half a spacing of it; a region of its own each, so that the curve joins them
+    across their border as any two regions' (else the core lays each out apart, joins
+    neither to the other, and leaves all but the stem's bare)."""
+    domains = sorted(
+        (d for d in _polygons(region.buffer(-spacing / 2)) if d.area >= spacing**2),
+        key=lambda d: -d.area,
+    )
+    if len(domains) < 2:
+        return [region]
+    out = []
+    rest = region
+    for d in domains:
+        piece = shapely.intersection(rest, d.buffer(spacing / 2 + 1e-6))
+        rest = shapely.difference(rest, piece)
+        out.append(max(_polygons(piece) or [Polygon()], key=lambda q: q.area))
+    # (what is left, the necks themselves: to the piece it borders most)
+    for q in _polygons(rest):
+        k = max(range(len(out)), key=lambda i: out[i].buffer(1e-6).intersection(q).area)
+        out[k] = shapely.union_all([out[k], q])
+    return [g for o in out for g in _polygons(o)]
 
 
 # ----------------------------------------------------------------------------- curve
@@ -214,7 +244,7 @@ def _curve(
         raise MeshError("no room for the mesh")
     borders = [b for b in _shared_borders(regions, spacing) if owner[b[0]] == owner[b[1]]]
     try:
-        found, cells, left = _core().curve_graph(
+        found, cells, lost = _core().curve_graph(
             [(ri, [np.asarray(r.coords, float)[:-1] for r in _rings(d)]) for ri, d in segments],
             borders,
             [(tuple(map(float, a)), tuple(map(float, b))) for a, b in openings],
@@ -225,7 +255,7 @@ def _curve(
         )
     except ValueError as e:
         raise MeshError(str(e)) from e
-    return [(np.asarray(p), np.asarray(r)) for p, r in found], int(cells), int(left)
+    return [(np.asarray(p), np.asarray(r)) for p, r in found], int(cells), [int(r) for r in lost]
 
 
 def _shared_borders(
@@ -302,11 +332,16 @@ def _merged(
 
 
 def _lost(
-    regions: list[Polygon], found: list[tuple[np.ndarray, np.ndarray]], spacing: float
+    regions: list[Polygon],
+    found: list[tuple[np.ndarray, np.ndarray]],
+    spacing: float,
+    lost: Sequence[int] = (),
 ) -> set[int]:
-    """The regions no curve reached that could take one (their domains not empty)."""
+    """The regions no curve reached that could take one (their domains not empty), and
+    those the core says it reached in part only (``lost``: a cycle of theirs no curve took
+    in, as a flap a partition's curve reaches along a strip only)."""
     reached = {int(r) for _, regs in found for r in np.asarray(regs).ravel()}
-    return {
+    return set(lost) | {
         i
         for i, r in enumerate(regions)
         if i not in reached and any(d.area >= spacing**2 for d in _polygons(r.buffer(-spacing / 2)))
@@ -653,7 +688,11 @@ def _browser_core() -> object | None:
         pts = unflat(out.points, out.lens)
         ends = np.cumsum([len(q) for q in pts])[:-1]
         region = np.split(np.asarray(out.region.to_py(), int), ends)
-        return list(zip(pts, region, strict=True)), int(out.cells), int(out.left)
+        return (
+            list(zip(pts, region, strict=True)),
+            int(out.cells),
+            [int(r) for r in out.lost.to_py()],
+        )
 
     def fit_arcs(lines, tol, pitch=0.0, most=0.0, edges=None, max_turn=0.0, give=0.0):  # noqa: ANN001, ANN202
         out = mesh.fit_arcs(*flat(lines), tol, pitch, most, *flat(edges or []), max_turn, give)
@@ -782,7 +821,7 @@ def generate(
     regions: list[Polygon] = []
     owner: list[int] = []
     for k, part in enumerate(parts):
-        got = _regions(part, zs, 2 * spacing**2)
+        got = _regions(part, zs, 2 * spacing**2, spacing)
         regions += got
         owner += [k] * len(got)
     # The stems: two rails, a run's spacing apart, straight up through each exit cell.
@@ -790,7 +829,7 @@ def generate(
         ((x0 + c / 4, ym + spacing / 2), (x0 + 3 * c / 4, ym + spacing / 2))
         for (x0, _), ym in zip(exits, tops, strict=True)
     ]
-    found, cells, left = _curve(regions, owner, spacing, openings, next(graph_keys))
+    found, cells, lost = _curve(regions, owner, spacing, openings, next(graph_keys))
     # (regions a partition's curve cannot reach, e.g. past a sliver of it too thin for a run
     # in and back out: to the partition beside them whose curve does reach there, and the
     # curves found again)
@@ -806,14 +845,17 @@ def generate(
                     partitions[owner[i]] = shapely.difference(partitions[owner[i]], back)
                     partitions[k] = shapely.union_all([partitions[k], back])
         owner = moved
-        found, cells, left = _curve(regions, owner, spacing, openings, next(graph_keys))
+        found, cells, lost = _curve(regions, owner, spacing, openings, next(graph_keys))
     # (and a small one that still none reaches, e.g. a lid's glue tab whose one cell finds no
     # run of the narrow lid beside it to join across their border: one region with that
     # neighbour, its curve crossing the fold between them inside it)
     merged = _merged(regions, owner, found, spacing)
     if merged is not None:
         regions, owner = merged
-        found, cells, left = _curve(regions, owner, spacing, openings, next(graph_keys))
+        found, cells, lost = _curve(regions, owner, spacing, openings, next(graph_keys))
+    # (any not wholly reached: also those the core reached in part only, a cycle of theirs
+    # no curve took in; counted, so that the layout says so)
+    left = len(_lost(regions, found, spacing, lost))
     progress.report("graph", cells=cells)
     lines = []
     for k, ((x0, y0), ym, (pts, _)) in enumerate(zip(exits, tops, found, strict=True)):

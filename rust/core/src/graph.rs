@@ -58,7 +58,9 @@ pub struct GraphInput {
 pub struct Curves {
     pub curves: Vec<(Vec<P>, Vec<usize>)>,
     pub cells: usize,
-    pub left: usize,
+    /// The regions with a cycle no exit's curve took in (wholly or in part: a region one
+    /// reaches only along a sliver may leave most of itself bare), in order.
+    pub lost: Vec<usize>,
 }
 
 /// A deterministic, cryptographically secure random source: the ChaCha20 stream (RFC 8439's
@@ -346,18 +348,14 @@ pub fn curve(
     if roots.len() < ends.len() {
         return Err("two exits' curves were joined".into());
     }
-    let all: HashSet<usize> = (0..g.pts.len())
-        .filter(|&v| !g.nbr[v].is_empty())
-        .map(region)
-        .collect();
-    let reached: HashSet<usize> = (0..g.pts.len())
-        .filter(|&v| !g.nbr[v].is_empty() && roots.contains(&u.find(v)))
+    let lost: BTreeSet<usize> = (0..g.pts.len())
+        .filter(|&v| !g.nbr[v].is_empty() && !roots.contains(&u.find(v)))
         .map(region)
         .collect();
     Ok(Curves {
         curves,
         cells,
-        left: all.difference(&reached).count(),
+        lost: lost.into_iter().collect(),
     })
 }
 
@@ -579,6 +577,33 @@ fn stem(g: &mut Graph, segments: &[Segment], opening: [P; 2]) -> Result<(usize, 
     let rim: Vec<Edge> = order.into_iter().filter(|e| count[e] == 1).collect();
     if rim.is_empty() {
         return Err(Retry);
+    }
+    // (a cell wall meeting the rim between the opening's ends, narrower than a cell, as the
+    // pinned cell's neighbour may: its foot moved to the nearer end, so that the opening lies
+    // on one edge of the rim; more than one such: tried afresh)
+    let span = dist(opening[0], opening[1]);
+    let inside: Vec<usize> = rim
+        .iter()
+        .flat_map(|&(p, q)| [p, q])
+        .collect::<BTreeSet<usize>>()
+        .into_iter()
+        .filter(|&v| {
+            let (c, t) = closest(g.pts[v], opening[0], opening[1]);
+            let t = t * span;
+            dist(c, g.pts[v]) < 1e-6 && t > 1e-6 && t < span - 1e-6
+        })
+        .collect();
+    match inside[..] {
+        [] => {}
+        [v] => {
+            let to = if dist(g.pts[v], opening[0]) < dist(g.pts[v], opening[1]) {
+                opening[0]
+            } else {
+                opening[1]
+            };
+            g.pts[v] = to;
+        }
+        _ => return Err(Retry),
     }
     let gap = |e: &Edge, q: P| dist(closest(q, g.pts[e.0], g.pts[e.1]).0, q);
     // (the edge nearest both ends: an end on a corner is as near the next edge too)

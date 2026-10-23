@@ -278,8 +278,8 @@ fn offset_lanes<'py>(
 /// domain's rings), `borders` each (region, region, the lines of their shared border; the
 /// longest first), `openings` each a stem's ends, `key` the random key (32 bytes, for
 /// ChaCha20: `graph::Rng`). Returns per
-/// opening its curve's points and each one's region, the number of cells and of regions
-/// left out.
+/// opening its curve's points and each one's region, the number of cells, and the regions
+/// with a cycle no curve took in (wholly or in part).
 #[pyfunction]
 #[pyo3(signature = (segments, borders, openings, spacing, key, params, progress=None))]
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
@@ -292,7 +292,11 @@ fn curve_graph<'py>(
     key: &[u8],
     params: &Bound<'py, PyDict>,
     progress: Option<PyObject>,
-) -> PyResult<(Vec<(Bound<'py, PyArray2<f64>>, Vec<usize>)>, usize, usize)> {
+) -> PyResult<(
+    Vec<(Bound<'py, PyArray2<f64>>, Vec<usize>)>,
+    usize,
+    Vec<usize>,
+)> {
     let input = GraphInput {
         segments: segments
             .iter()
@@ -340,7 +344,7 @@ fn curve_graph<'py>(
         .iter()
         .map(|(pts, region)| (array(py, pts), region.clone()))
         .collect();
-    Ok((curves, c.cells, c.left))
+    Ok((curves, c.cells, c.lost))
 }
 
 /// A random key: exactly 32 bytes.

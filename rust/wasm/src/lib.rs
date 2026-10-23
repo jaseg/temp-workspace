@@ -265,7 +265,7 @@ pub fn offset_lanes(
 /// `seg_rings`); the borders: `pairs` (region, region) flat, `pair_lines` each pair's
 /// number of lines, the lines flat (`lines`, `line_lens`); the random key (32 bytes, for
 /// ChaCha20: `graph::Rng`). Returns
-/// `{points, lens, region, cells, left}`: the curves' points and regions flat, each
+/// `{points, lens, region, cells, lost}`: the curves' points and regions flat, each
 /// curve's number of points (one curve per opening, `openings` four numbers each).
 #[wasm_bindgen]
 #[allow(clippy::too_many_arguments)]
@@ -358,7 +358,8 @@ pub fn curve_graph(
     Reflect::set(&o, &"lens".into(), &Uint32Array::from(lens.as_slice()))?;
     Reflect::set(&o, &"region".into(), &Uint32Array::from(region.as_slice()))?;
     Reflect::set(&o, &"cells".into(), &(c.cells as f64).into())?;
-    Reflect::set(&o, &"left".into(), &(c.left as f64).into())?;
+    let lost: Vec<u32> = c.lost.iter().map(|&r| r as u32).collect();
+    Reflect::set(&o, &"lost".into(), &Uint32Array::from(&lost[..]).into())?;
     Ok(o)
 }
 
