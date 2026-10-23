@@ -380,9 +380,9 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   (stiffeners)", for stiffeners later.
 * **KiCad page:** the smallest A-series sheet from A4 to A0, landscape or portrait (landscape
   if both fit), that holds the design inside the default drawing sheet's frame and clear of
-  its title block, 2 mm off each. The design sits in the page's middle; if it would reach
-  into the title block there, it is centred in the frame above the title block (or else
-  beside it). Larger than A0: a custom page, the design plus 25 mm a side and 50 mm above
+  its title block, 2 mm off each, wherever on the sheet it fits: the design sits as near
+  the page's middle as that allows (in its middle, if it does not reach into the title
+  block there). Larger than A0: a custom page, the design plus 25 mm a side and 50 mm above
   and below. The Gerbers and SVGs use the same coordinates.
 * **Ground:** the cable is a GND zone on both layers. It is a KiCad zone, filled in KiCad;
   the Gerber and SVG output leaves it out (fill and re-export in KiCad for fabrication).

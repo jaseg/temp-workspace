@@ -298,8 +298,10 @@ def test_kicad_page_holds_the_design_centred(layout, tmp_path):
     [
         (box(0, 0, 180, 110), ("A4", False), True),
         (box(0, 0, 120, 200), ("A4", True), True),  # (tall: portrait)
-        # (centred, it would reach into the title block: centred above it instead)
+        # (centred, it would reach into the title block: moved up off it)
         (box(0, 0, 260, 120), ("A4", False), False),
+        # (notched: it fits only off the middle, the title block in its notch)
+        (shapely.union(box(0, 0, 260, 120), box(0, 0, 120, 170)), ("A4", False), False),
         (box(0, 0, 300, 200), ("A3", False), True),
         (box(0, 0, 1300, 900), ("User", False), True),  # (larger than A0)
     ],

@@ -92,6 +92,7 @@ PAPER = (("A4", 297.0, 210.0), ("A3", 420.0, 297.0), ("A2", 594.0, 420.0),
 FRAME = 12.0  # ... the frame's inside (its rulers' edge) this far in from the page's edges
 TITLE_BLOCK = (120.0, 44.0)  # ... the title block's outer edges this far in from the right, bottom
 PAGE_CLEAR = 2.0  # ... the design kept this far off both
+PLACES = 41  # ... tried at this many offsets each way across the room it has
 PAGE_MARGIN = (25.0, 50.0)  # larger than A0: a user page, this around the design (x, y)
 PAGE_MIN = (210.0, 148.0)  # ... and at least this big
 
@@ -296,11 +297,13 @@ class Sheet:
 
 def sheet(result: Layout) -> Sheet:
     """The KiCad page for the layout: the smallest of ``PAPER`` (landscape or portrait)
-    that holds the design (its outline) inside the frame and off the title block, each by
-    ``PAGE_CLEAR``: the design in the page's middle if it fits there, else in the middle of
-    the frame above the title block, or beside it. Larger than A0: a user page, the design's
-    bounds and ``PAGE_MARGIN`` around them, in its middle (the title block below)."""
+    that holds the design (its outline) anywhere inside the frame and off the title block,
+    each by ``PAGE_CLEAR``; on it, the design where it fits nearest the page's middle (of
+    ``PLACES`` x ``PLACES`` places across the room it has, and the middle itself). Larger
+    than A0: a user page, the design's bounds and ``PAGE_MARGIN`` around them, in its
+    middle (the title block below)."""
     board = result.board
+    shapely.prepare(board)
     x0, y0, x1, y1 = board.bounds
     mid = ((x0 + x1) / 2, (y0 + y1) / 2)
     for name, long, short in PAPER:
@@ -308,17 +311,22 @@ def sheet(result: Layout) -> Sheet:
         for portrait in (False, True):
             w, h = (short, long) if portrait else (long, short)
             lo, hi = FRAME + PAGE_CLEAR, (w - FRAME - PAGE_CLEAR, h - FRAME - PAGE_CLEAR)
+            if x1 - x0 > hi[0] - lo or y1 - y0 > hi[1] - lo:
+                continue
             tx, ty = w - TITLE_BLOCK[0] - PAGE_CLEAR, h - TITLE_BLOCK[1] - PAGE_CLEAR
-            title = shapely.box(tx, ty, w, h)
-            centres = ((w / 2, h / 2), (w / 2, (lo + ty) / 2), ((lo + tx) / 2, h / 2))
-            for rank, (cx, cy) in enumerate(centres):
-                dx, dy = cx - mid[0], cy - mid[1]
-                inside = lo <= x0 + dx and x1 + dx <= hi[0] and lo <= y0 + dy and y1 + dy <= hi[1]
-                if inside and not shapely.affinity.translate(board, dx, dy).intersects(title):
-                    places.append((rank, portrait, (w, h), (round(dx, 3), round(dy, 3))))
-        if places:  # (centred rather than not, landscape rather than portrait)
-            _, portrait, size, offset = min(places)
-            return Sheet(name, portrait, size, offset)
+            # (the offsets that keep it inside the frame; the title block moved back by
+            # each: where it meets the design, the design moved there would meet it)
+            xs = np.append(np.linspace(lo - x0, hi[0] - x1, PLACES), w / 2 - mid[0])
+            ys = np.append(np.linspace(lo - y0, hi[1] - y1, PLACES), h / 2 - mid[1])
+            dx, dy = (a.ravel() for a in np.meshgrid(xs, ys))
+            ok = ~shapely.intersects(board, shapely.box(tx - dx, ty - dy, w - dx, h - dy))
+            if ok.any():
+                off = np.hypot(dx + mid[0] - w / 2, dy + mid[1] - h / 2)
+                i = int(np.flatnonzero(ok)[np.argmin(off[ok])])
+                places.append((round(float(off[i]), 3), portrait, (w, h), (dx[i], dy[i])))
+        if places:  # (nearest the middle, landscape rather than portrait)
+            _, portrait, size, (dx, dy) = min(places)
+            return Sheet(name, portrait, size, (round(float(dx), 3), round(float(dy), 3)))
     w = math.ceil(max(x1 - x0 + 2 * PAGE_MARGIN[0], PAGE_MIN[0]))
     h = math.ceil(max(y1 - y0 + 2 * PAGE_MARGIN[1], PAGE_MIN[1]))
     return Sheet("User", False, (w, h), (round(w / 2 - mid[0], 3), round(h / 2 - mid[1], 3)))
