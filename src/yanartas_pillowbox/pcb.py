@@ -91,7 +91,7 @@ PAPER = (("A4", 297.0, 210.0), ("A3", 420.0, 297.0), ("A2", 594.0, 420.0),
          ("A1", 841.0, 594.0), ("A0", 1189.0, 841.0))  # fmt: skip
 FRAME = 12.0  # ... the frame's inside (its rulers' edge) this far in from the page's edges
 TITLE_BLOCK = (120.0, 44.0)  # ... the title block's outer edges this far in from the right, bottom
-PAGE_CLEAR = 3.0  # ... the design kept this far off both
+PAGE_CLEAR = 2.0  # ... the design kept this far off both
 PAGE_MARGIN = (25.0, 50.0)  # larger than A0: a user page, this around the design (x, y)
 PAGE_MIN = (210.0, 148.0)  # ... and at least this big
 

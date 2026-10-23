@@ -380,7 +380,7 @@ side, and the mesh's traces leave through the FPC cable to the plug.
   (stiffeners)", for stiffeners later.
 * **KiCad page:** the smallest A-series sheet from A4 to A0, landscape or portrait (landscape
   if both fit), that holds the design inside the default drawing sheet's frame and clear of
-  its title block, 3 mm off each. The design sits in the page's middle; if it would reach
+  its title block, 2 mm off each. The design sits in the page's middle; if it would reach
   into the title block there, it is centred in the frame above the title block (or else
   beside it). Larger than A0: a custom page, the design plus 25 mm a side and 50 mm above
   and below. The Gerbers and SVGs use the same coordinates.
