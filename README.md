@@ -66,7 +66,8 @@ the defaults. It never crashes because of the file.
 ## Web UI
 
 * **Left column:** the parameter form, in collapsible groups (*Payload* first and the only
-  one open at first; which are open is remembered per browser). The button left of the title
+  one open at first; which are open is remembered per browser). The cable and its connector
+  have a group each; picking a connector preset locks the connector's fields. The button left of the title
   hides the column (and shows it again). Invalid values are flagged inline next to the field.
   While any value is invalid, the previews keep showing the last valid design and
   *Download* is disabled.
@@ -183,6 +184,7 @@ All lengths are in millimetres.
 | `fpc_cable` | `up` | `none`, `up` or `down`: a flat cable of the flex PCB leaving the front panel's free straight edge (the glued edge), turning up (towards the top of the pattern, the box's front end) or down along it (see *FPC cable* below). |
 | `fpc_entry_offset` | 0 | Where the cable leaves the edge: how far (mm) from the lowest it can go (turning up; the highest, turning down). Folded into the box, its first corner lies on the back panel beside the edge and must stay clear of the inner flap at that end: 0 puts it as near as that allows. |
 | `fpc_cable_length` | 55 | From the front panel's edge to the plug's tip, with every corner folded flat. 10–2000. The cable sticks out beside the edge; every further row makes the pattern wider (the default takes one). |
+| `fpc_connector` | `custom` | A connector preset, `<series>-<pins>` (e.g. `hirose-fh12-30`): fixes `fpc_pins`, `fpc_pitch`, `fpc_edge_margin` and `fpc_plug_length` to the series' recommended FPC end, whatever is given for them (the UI locks those fields). Series: Hirose FH12, Hirose FH34SRJ, Molex 503480, Omron XF2M, TE 1734839, XUNPU FPC-05F (0.5 mm), TE 84953 (1 mm); only the pin counts in stock at LCSC (October 2026). `custom`: set them yourself. |
 | `fpc_pins` | 61 | Contacts of the FPC connector, 2–200. The default holds the default space-filling-curve mesh: 3 partitions × 4 traces × 2 ends × 2 sides, and a GND pin after every four ends (plus pin 1). The PCB layout refuses a plug with too few pins. |
 | `fpc_pitch` | 0.5 | Contact pitch, 0.1–2.54. |
 | `fpc_edge_margin` | 0.5 | From the outermost contacts' centres to the plug's edges: the plug is `(pins − 1)·pitch + 2·margin` wide (31 mm by default, the usual `(pins + 1)·pitch`). At most the front panel's straight edge beside the back panel, less 1 mm. |

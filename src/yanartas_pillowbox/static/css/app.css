@@ -206,6 +206,7 @@ details.group[open] > summary::before { transform: rotate(45deg); }
 
 /* pb-param renders into light DOM so these rules apply. */
 pb-param { display: block; padding: 5px 0; }
+pb-param.locked .control input, pb-param.locked .control select { opacity: 0.6; cursor: not-allowed; }
 pb-param .row { display: grid; grid-template-columns: 1fr minmax(0, 150px); align-items: center; gap: 8px; }
 pb-param label { font-size: var(--label-font-size); }
 pb-param .control { display: flex; align-items: center; gap: 6px; min-width: 0; }

@@ -13,6 +13,7 @@ from dataclasses import dataclass, fields, replace
 from typing import Any, Literal
 
 from yanartas_pillowbox import crosssection
+from yanartas_pillowbox.presets import CUSTOM, connector_choices, connector_values
 
 # Bumped whenever the meaning of saved settings changes; documents of any other version are
 # rejected (no migrations).
@@ -49,6 +50,9 @@ class FieldSpec:
     step: float | None = None
     choices: tuple[tuple[str, str], ...] = ()
     help: str = ""
+    # Per choice (by value): its group in the dropdown, and the settings it fixes (presets).
+    choice_groups: tuple[tuple[str, str], ...] = ()
+    choice_values: tuple[tuple[str, dict[str, float]], ...] = ()
     # Per-field UI action button: (action id, button label, tooltip).
     action: tuple[str, str, str] | None = None
 
@@ -68,7 +72,16 @@ class FieldSpec:
         if self.step is not None:
             out["step"] = self.step
         if self.choices:
-            out["choices"] = [{"value": v, "label": lbl} for v, lbl in self.choices]
+            groups, values = dict(self.choice_groups), dict(self.choice_values)
+            out["choices"] = [
+                {
+                    "value": v,
+                    "label": lbl,
+                    **({"group": groups[v]} if v in groups else {}),
+                    **({"values": values[v]} if v in values else {}),
+                }
+                for v, lbl in self.choices
+            ]
         if self.action is not None:
             out["action"] = dict(zip(("id", "label", "title"), self.action, strict=True))
         return out
@@ -285,10 +298,25 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "flat. Rows that do not fit beside the edge make the pattern wider.",
     ),
     FieldSpec(
+        "fpc_connector",
+        "Connector",
+        "choice",
+        "FPC connector",
+        choices=(
+            (CUSTOM, "Custom"),
+            *((v, label) for v, label, _, _ in connector_choices()),
+        ),
+        choice_groups=tuple((v, group) for v, _, group, _ in connector_choices()),
+        choice_values=tuple((v, values) for v, _, _, values in connector_choices()),
+        help="A common FPC connector series and pin count (those in stock at LCSC): its pin "
+        "pitch, the plug's width (edge margin) and the stiffened length its makers recommend "
+        "for the FPC's end, fixed. Custom: set them yourself.",
+    ),
+    FieldSpec(
         "fpc_pins",
         "Pin count",
         "float",
-        "FPC cable",
+        "FPC connector",
         "",
         2,
         200,
@@ -299,7 +327,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "fpc_pitch",
         "Pin pitch",
         "float",
-        "FPC cable",
+        "FPC connector",
         "mm",
         0.1,
         2.54,
@@ -309,7 +337,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "fpc_edge_margin",
         "Plug edge margin",
         "float",
-        "FPC cable",
+        "FPC connector",
         "mm",
         0,
         10,
@@ -321,7 +349,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "fpc_plug_length",
         "Plug length",
         "float",
-        "FPC cable",
+        "FPC connector",
         "mm",
         1,
         50,
@@ -557,6 +585,7 @@ class Config:
     fpc_cutout: str = "none"
     fpc_cutout_width: float = 15.0
     fpc_cable: str = "up"
+    fpc_connector: str = "custom"  # (a preset: fixes the pins, pitch, edge margin, plug length)
     fpc_entry_offset: float = 0.0  # (0: the lowest it can go, the cable turning up)
     fpc_cable_length: float = 55.0  # (one row, beside the default pattern's free edge)
     fpc_pins: float = 61.0  # (the default curve mesh's ends and GND pins take 55)
@@ -659,6 +688,9 @@ class Config:
                 errors[spec.name] = str(exc)
 
         cfg = replace(defaults, **values)
+        preset = connector_values(cfg.fpc_connector)
+        if preset is not None:  # (its settings fixed, whatever was given for them)
+            cfg = replace(cfg, **preset)
         for name, msg in validate(cfg).items():
             errors.setdefault(name, msg)
         if errors:

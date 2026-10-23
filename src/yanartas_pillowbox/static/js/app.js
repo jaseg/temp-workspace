@@ -25,6 +25,8 @@ const PROGRESS_POLL = 500; // ms between looks at a running layout's progress
 const GROUPS_KEY = "pb-groups"; // which settings groups are open (per viewer)
 const SIDEBAR_KEY = "pb-sidebar"; // whether the settings are collapsed (per viewer)
 const FIRST_GROUP = "Payload"; // shown first, and the only group open at first
+// set by the connector preset (``fpc_connector``), locked while one is chosen
+const CONNECTOR_FIELDS = ["fpc_pins", "fpc_pitch", "fpc_edge_margin", "fpc_plug_length"];
 const MESH_GROUP = "PCB mesh"; // holds the Generate mesh button, progress and log
 const NOT_YET = "Mesh not yet generated: Generate mesh, in the PCB mesh settings";
 
@@ -194,6 +196,20 @@ function readForm() {
 function writeForm(config) {
   for (const [name, p] of params) if (name in config) p.value = config[name];
   syncPreset();
+  syncConnector();
+}
+
+/** The connector preset's settings: filled in and locked; Custom: unlocked, as they are. */
+function syncConnector() {
+  const preset = params.get("fpc_connector");
+  if (!preset) return;
+  const values = preset.spec.choices.find((c) => c.value === preset.value)?.values;
+  for (const name of CONNECTOR_FIELDS) {
+    const p = params.get(name);
+    if (!p) continue;
+    if (values) p.value = values[name];
+    p.locked = Boolean(values);
+  }
 }
 
 function showErrors(errors) {
@@ -713,6 +729,7 @@ async function main() {
 
   form.addEventListener("pb-change", () => {
     syncPreset();
+    syncConnector();
     setStatus("Updating…");
     scheduleRender();
   });

@@ -262,3 +262,35 @@ def test_mesh_seed_is_any_text():
     assert len(a.seed) == 32 and len(cfg.with_values(mesh_seed="").seed) == 32
     assert parse_cli_value("mesh_seed", "my box") == "my box"
     assert errors_for(mesh_seed=1) == {"mesh_seed": "must be text"}
+
+
+def test_connector_preset_fixes_its_fields():
+    cfg = Config.from_dict({"fpc_connector": "hirose-fh34srj-40", "fpc_pins": 61, "fpc_pitch": 1})
+    assert (cfg.fpc_pins, cfg.fpc_pitch, cfg.fpc_edge_margin, cfg.fpc_plug_length) == (
+        40,
+        0.5,
+        0.5,
+        2.5,
+    )
+    custom = Config.from_dict({"fpc_connector": "custom", "fpc_pins": 61, "fpc_pitch": 1})
+    assert (custom.fpc_pins, custom.fpc_pitch) == (61, 1)
+    with pytest.raises(ConfigError) as exc:
+        Config.from_dict({"fpc_connector": "hirose-fh12-7"})  # (not a stocked count)
+    assert "fpc_connector" in exc.value.errors
+
+
+def test_connector_choices_carry_their_series_and_values():
+    spec = next(s for s in FIELD_SPECS if s.name == "fpc_connector")
+    choices = spec.to_json()["choices"]
+    assert choices[0]["value"] == "custom" and "values" not in choices[0]
+    fh12 = next(c for c in choices if c["value"] == "hirose-fh12-30")
+    assert fh12["group"] == "Hirose FH12 (0.5 mm)"
+    assert fh12["values"] == {
+        "fpc_pins": 30,
+        "fpc_pitch": 0.5,
+        "fpc_edge_margin": 0.5,
+        "fpc_plug_length": 4.5,
+    }
+    # every preset is a valid configuration of its own (the default mesh may need more pins)
+    for c in choices[1:]:
+        Config.from_dict({"fpc_connector": c["value"]})

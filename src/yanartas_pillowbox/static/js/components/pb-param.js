@@ -37,6 +37,17 @@ export class PbParam extends HTMLElement {
     this.#input.value = v;
   }
 
+  /** Locked: set by something else (a preset), not editable here. */
+  set locked(on) {
+    this.#input.disabled = Boolean(on);
+    this.classList.toggle("locked", Boolean(on));
+    this.title = on ? "Set by the preset above: choose Custom to change it" : "";
+  }
+
+  get locked() {
+    return this.#input.disabled;
+  }
+
   /** Focus the field's input and bring it into view. */
   focusInput() {
     this.#input.scrollIntoView({ block: "nearest", behavior: "smooth" });
