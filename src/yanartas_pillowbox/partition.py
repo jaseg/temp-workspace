@@ -51,9 +51,6 @@ BALANCE = 0.01  # partitions' areas within this share of each other
 HOPS = 6  # a partition kept of a piece: looked for this many cells round a cell it gives up
 ATTEMPTS = 6  # tries at an even split
 UNEVEN = 0.03  # ... even: the partitions' areas within this share of each other
-NECK = 2.0  # a partition's cells no narrower than this many ports anywhere it can be wider
-WIDEN = 60  # ... widened a cell at a time, at most this many cells a partition a round
-TRIES = 200  # ... of the neighbours' cells nearest both sides, these tried
 
 
 @dataclass(frozen=True)
@@ -425,8 +422,9 @@ def _partition(
     owner = _refine(owner, nbrs, zone, cell_area, want, front)
     # (necks widened, then the areas evened out again without narrowing any: no cell passed
     # on whose partition would come apart without it, eroded as for a neck, round it)
-    owner = _widened(owner, arr, zone, loose, front, width)
-    owner = _refine(owner, nbrs, zone, cell_area, want, front, _neck_guard(arr, zone, width))
+    necks = _Necks(loose, zone, front)
+    owner = _widened(owner, necks, set(front))
+    owner = _refine(owner, nbrs, zone, cell_area, want, front, necks.spares)
     owner = _pinched(owner, arr, zone, loose, front, width)
     out = []
     for k in range(count):
@@ -437,135 +435,174 @@ def _partition(
     return out
 
 
-def _neck_guard(
-    arr: np.ndarray, zone: list[int], width: float
-) -> Callable[[np.ndarray, int], bool]:
-    """Whether a cell can leave its partition without narrowing it: its partition's cells
-    round it in its zone (a few cells across), eroded as ``_widened`` does, come apart into
-    no more pieces without it than with it."""
-    cen = shapely.get_coordinates(shapely.centroid(arr))
-    zn = np.asarray(zone)
-    tree = shapely.STRtree(arr)
-    reach = 3 * CELL * width
+class _Necks:
+    """Necks on the cell graph: a cell is *interior* to its partition when every neighbour
+    of it (through any wall; in its zone, zone by zone) is of the same partition, and a
+    partition's *wide parts* are its interior cells' groups (joined through walls), so that
+    two wide parts are joined only through a neck under three cells wide, where a curve
+    runs in and back out with no room to turn: its graph's cycles there join the rest at a
+    few cells only, if at all, and leave the part beyond bare. Its exit's cell, with no wide
+    part within two steps of it, counts as a part of its own (a neck cuts it off from the
+    rest)."""
 
-    near_of: dict[int, np.ndarray] = {}
-    seen: dict[tuple, bool] = {}  # (by the cell and its neighbourhood's owners: unchanged, as was)
+    def __init__(
+        self, loose: list[list[tuple[int, float]]], zone: list[int], front: list[int]
+    ) -> None:
+        self.loose = loose
+        self.nb = [[j for j, _ in v] for v in loose]
+        self.zn = np.asarray(zone)
+        self.front = front
+        self.src = np.repeat(np.arange(len(loose)), [len(v) for v in loose])
+        self.dst = np.array([j for v in loose for j, _ in v], int)
+        self.same = self.zn[self.src] == self.zn[self.dst]
 
-    def ok(owner: np.ndarray, i: int) -> bool:
-        if i not in near_of:
-            near_of[i] = np.sort(tree.query(shapely.Point(cen[i]).buffer(reach)))
-        near = near_of[i]
-        state = (i, owner[near].tobytes())
-        if state in seen:
-            return seen[state]
-        mine = [int(j) for j in near if owner[j] == owner[i] and zn[j] == zn[i]]
+    def parts(self, owner: np.ndarray, k: int, z: int | None) -> list[list[int]]:
+        """Partition ``k``'s wide parts (in zone ``z``; None: all), the largest first."""
+        n = len(owner)
+        edges = np.ones(len(self.src), bool) if z is None else self.same
+        out_edge = edges & (owner[self.dst] != k)
+        interior = (owner == k) & (np.bincount(self.src[out_edge], minlength=n) == 0)
+        if z is not None:
+            interior &= self.zn == z
+        cells = set(np.nonzero(interior)[0].tolist())
+        groups = []
+        while cells:
+            start = cells.pop()
+            group, todo = [start], [start]
+            while todo:
+                i = todo.pop()
+                for j in self.nb[i]:
+                    if j in cells:
+                        cells.discard(j)
+                        group.append(j)
+                        todo.append(j)
+            if len(group) > 1:  # (a lone interior cell: no room to turn either)
+                groups.append(group)
+        groups.sort(key=len, reverse=True)
+        f = self.front[k] if k < len(self.front) else None
+        if f is not None and groups and (z is None or self.zn[f] == z) and owner[f] == k:
+            # (within two steps: the cells beside the exit's touch the strips' ends beside)
+            near = {f, *self.nb[f]}
+            near |= {j for c in list(near) for j in self.nb[c]}
+            if not any(near.intersection(g) for g in groups):
+                groups.insert(1, [f])
+        return groups
 
-        def count(cells: list[int]) -> int:
-            g = shapely.union_all(arr[cells], grid_size=1e-6).buffer(-NECK * width / 2)
-            return len(_parts(g))  # (all: seen through a window, both sides may be small)
+    def count(self, owner: np.ndarray, k: int, z: int | None) -> int:
+        return len(self.parts(owner, k, z))
 
-        seen[state] = out = count([j for j in mine if j != i]) <= count(mine)
-        return out
+    def spares(self, owner: np.ndarray, i: int) -> bool:
+        """Whether cell ``i`` can leave its partition without narrowing it: round it (three
+        steps through walls, in its zone), its partition's wide parts come apart into no more
+        groups without it than with it."""
+        m, z = int(owner[i]), int(self.zn[i])
+        ring, seen = [i], {i}
+        for _ in range(3):
+            ring = [j for c in ring for j in self.nb[c] if j not in seen and self.zn[j] == z]
+            seen.update(ring)
+        window = [c for c in seen if owner[c] == m]
+        near = {c: [j for j in self.nb[c] if j in seen and self.zn[j] == z] for c in window}
 
-    return ok
+        def groups(without: int | None) -> int:
+            mine = {c for c in window if c != without}
+            # (interior: every neighbour seen, in the zone, its own; beyond the window: as if)
+            inner = {
+                c
+                for c in mine
+                if all(owner[j] == m and j != without for j in self.nb[c] if j in near[c])
+            }
+            n, left = 0, set(inner)
+            while left:
+                todo = [left.pop()]
+                n += 1
+                while todo:
+                    c = todo.pop()
+                    for j in self.nb[c]:
+                        if j in left:
+                            left.discard(j)
+                            todo.append(j)
+            return n
+
+        return groups(i) <= groups(None)
 
 
-def _widened(
-    owner: np.ndarray,
-    arr: np.ndarray,
-    zone: list[int],
-    loose: list[list[tuple[int, float]]],
-    front: list[int],
-    width: float,
-) -> np.ndarray:
+def _widened(owner: np.ndarray, necks: _Necks, fixed: set[int]) -> np.ndarray:
     """Each partition's necks widened where the cells beside allow, as a whole and zone by
     zone (a curve's regions are a partition's pieces in each zone, each laid out on its own,
-    joined to the others across the folds): where its cells, or those in a zone, eroded to
-    leave out what is narrower than ``NECK`` ports, come apart (or leave where its curve
-    comes in, its strip's end's cell, off the rest), it takes the neighbour's cell there
-    nearest both sides at once (of the ``TRIES`` nearest, the first a neighbour can spare: not
-    one it needs to hold together itself or to stay as wide, nor its strip's end's), until
-    they hold together or none can be spared. A narrow neck is where a curve has to run in to
-    a part beyond and back out: its graph's cycles there join the rest at a few cells only,
-    if at all (narrower than a spacing, its region's domain comes apart: not at all), and
-    leave the part beyond bare."""
+    joined to the others across the folds): where its wide parts (``_Necks``) are several,
+    it takes the cells on the cheapest way from its largest to the next (its own cells free,
+    a neighbour's at a cost) and those beside them, each a neighbour can spare (not one it
+    needs to hold together itself or to stay wide, nor a strip's end's), a corridor three
+    cells wide, until its wide parts are one or none can be spared."""
     owner = owner.copy()
-    fixed = set(front)
-    cen = shapely.get_coordinates(shapely.centroid(arr))
-    zn = np.asarray(zone)
-    keeps = _neck_guard(arr, zone, width)  # (a cell taken from a neighbour: not narrowing it)
-
-    def pieces(k: int) -> tuple[list[Polygon], int | None]:
-        """Partition ``k``'s wide parts, the largest first, where a neck splits them: its
-        cells as a whole first (a thin path through one zone between wide parts in others),
-        then zone by zone (with that zone; None: any); and where its curve comes in (its
-        strip's end's cell) if no wide part is there: what a neck may cut off it from."""
-        start = shapely.Point(cen[front[k]])
-        reach = NECK * width / 2 + CELL * width  # (the wide parts grown back, a cell on)
-        mine = owner == k
-        for z in [None, *sorted(set(zn[mine].tolist()))]:
-            cells = np.nonzero(mine if z is None else mine & (zn == z))[0]
-            g = shapely.union_all(arr[cells], grid_size=1e-6).buffer(-NECK * width / 2)
-            out = sorted(
-                (q for q in _parts(g) if q.area > (width * NECK) ** 2),
-                key=lambda q: -q.area,
-            )
-            here = z is None or zn[front[k]] == z
-            if here and out and not any(q.distance(start) < reach for q in out):
-                out.insert(1, start.buffer(1e-3))
-            if len(out) >= 2:
-                return out, z
-        return [], None
-
-    def holds(k: int, without: int) -> bool:
-        """Partition ``k`` still of a piece without cell ``without`` (through any wall)."""
-        mine = [i for i in np.nonzero(owner == k)[0] if i != without]
-        if not mine:
-            return False
-        seen, todo = {mine[0]}, [mine[0]]
-        mine_set = set(mine)
-        while todo:
-            i = todo.pop()
-            for j, _ in loose[i]:
-                if j in mine_set and j not in seen:
-                    seen.add(j)
-                    todo.append(j)
-        return len(seen) == len(mine)
-
-    for _ in range(4):
+    nb, zn = necks.nb, necks.zn
+    for _ in range(3):
         moved = False
-        for k in range(owner.max() + 1):
-            for _ in range(WIDEN):
-                parts, z = pieces(k)
-                if len(parts) < 2:
-                    break
-                main, other = parts[0], parts[1]
-                inside = (owner == k) if z is None else (owner == k) & (zn == z)
-                mine = set(np.nonzero(inside)[0].tolist())
-                cand = {
-                    j
-                    for i in mine
-                    for j, _ in loose[i]
-                    if owner[j] != k and j not in fixed and (z is None or zn[j] == z)
-                }
-                # (the nearest both sides first; the costly checks only until one passes)
-                pts = shapely.points(cen[list(cand)])
-                cost = shapely.distance(main, pts) + shapely.distance(other, pts)
-                best = next(
-                    (
+        for k in range(int(owner.max()) + 1):
+            for z in [None, *sorted(set(zn[owner == k].tolist()))]:
+                for _ in range(4):
+                    parts = necks.parts(owner, k, z)
+                    if len(parts) < 2:
+                        break
+                    path = _cheapest(owner, nb, zn, k, z, parts[0], set(parts[1]), fixed)
+                    if path is None:
+                        break
+                    want = [c for c in path if owner[c] != k]
+                    want += [
                         j
-                        for _, j in sorted(zip(cost.tolist(), cand, strict=True))[:TRIES]
-                        if holds(owner[j], j) and keeps(owner, j)
-                    ),
-                    None,
-                )
-                if best is None:
-                    break
-                owner[best] = k
-                moved = True
+                        for c in path
+                        for j in nb[c]
+                        if owner[j] != k and (z is None or zn[j] == z)
+                    ]
+                    took = False
+                    for j in dict.fromkeys(want):
+                        if owner[j] == k or j in fixed:
+                            continue
+                        if _connected(owner, necks.loose, int(owner[j]), j) and necks.spares(
+                            owner, j
+                        ):
+                            owner[j] = k
+                            took = moved = True
+                    if not took:
+                        break
         if not moved:
             break
     return owner
+
+
+def _cheapest(
+    owner: np.ndarray,
+    nb: list[list[int]],
+    zn: np.ndarray,
+    k: int,
+    z: int | None,
+    start: list[int],
+    goal: set[int],
+    fixed: set[int],
+) -> list[int] | None:
+    """The cheapest way through the cells (in zone ``z``; None: any) from ``start`` to
+    ``goal``: partition ``k``'s cells free, any other's one each (a strip's end's: none)."""
+    dist = {c: 0 for c in start}
+    back: dict[int, int] = {}
+    heap = [(0, c) for c in start]
+    while heap:
+        d, c = heapq.heappop(heap)
+        if c in goal:
+            path = [c]
+            while path[-1] in back:
+                path.append(back[path[-1]])
+            return path
+        if d > dist[c]:
+            continue
+        for j in nb[c]:
+            if (z is not None and zn[j] != z) or (j in fixed and owner[j] != k):
+                continue
+            nd = d + (0 if owner[j] == k else 1)
+            if nd < dist.get(j, math.inf):
+                dist[j] = nd
+                back[j] = c
+                heapq.heappush(heap, (nd, j))
+    return None
 
 
 def _pinched(
