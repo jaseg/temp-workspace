@@ -334,7 +334,7 @@ namespace BeatSaverVoting.UI
             }
             else if (voteWWW.responseCode < 200 || voteWWW.responseCode > 299)
             {
-                var errorMessage = _errorMessages[voteWWW.responseCode] ?? "Error\n" + voteWWW.responseCode;
+                var errorMessage = _errorMessages.TryGetValue(voteWWW.responseCode, out var message) ? message : "Error\n" + voteWWW.responseCode;
                 UpdateView(errorMessage, !_errorMessages.ContainsKey(voteWWW.responseCode));
 
                 Logging.log.Error("Error: " + voteWWW.downloadHandler.text);

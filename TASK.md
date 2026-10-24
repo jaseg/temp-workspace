@@ -42,6 +42,7 @@ See `PLAN.md` for the design. Some details there predate later decisions; this f
 | `mod/PROTOCOL.md` | WebSocket protocol. |
 | `mod/tools/` | Headless-Chromium smoke tests (test page, live viewer, song transitions, level browser, suggestions). |
 | `viewer/` | Live viewer: a fork of BeatLeader/BeatSaber-Web-Replays (imported as a git subtree), cut down to live play only (`viewer/README.md`). |
+| `ports/BeatSaverVoting/` | Top-Cat/BeatSaverVoting (git subtree) ported to 1.44.1 and installed on the Frame; not part of the live viewer (`ports/BeatSaverVoting/PORT.md`). |
 
 ## The Frame
 
