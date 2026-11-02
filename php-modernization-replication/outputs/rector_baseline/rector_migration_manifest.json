@@ -1,0 +1,502 @@
+[
+ {
+  "file": "001_getid3.lib.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "002_module.audio-video.asf.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "003_wp-db.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "004_class-IXR.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "005_class-snoopy.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "006_widgets.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "007_class-wp.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "008_wp-login.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "009_getid3.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "010_class-wp-theme.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "011_translations.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "012_module.audio-video.riff.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "013_file.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "014_module.tag.id3v2.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "015_Diff.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "016_module.audio.ac3.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "017_press-this.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "018_streams.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "019_atomlib.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "020_class-ftp.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "021_class-pop3.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "022_class-wp-customize-setting.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "023_module.tag.id3v1.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "024_edit-form-advanced.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "025_widgets.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "026_Source.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "027_upload.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "028_themes.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "029_module.audio.ogg.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "030_class-json.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "031_class-wp-plugins-list-table.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "032_class-wp-comments-list-table.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "033_ms-settings.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "034_inline.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "035_wp-trackback.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "036_module.tag.apetag.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "037_class-wp-ms-sites-list-table.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "038_class.wp-styles.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "039_class-wp-upgrader-skins.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "040_class-wp-media-list-table.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "041_module.tag.lyrics3.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "042_image-edit.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "043_image.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "044_class-wp-image-editor.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "045_Locator.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "046_module.audio-video.flv.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "047_update-core.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "048_about.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "049_Parser.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "050_class-oembed.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "051_ms-deprecated.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "052_class-wp-ms-themes-list-table.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "053_class-wp-themes-list-table.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "054_nav-menu.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "055_rss.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "056_class.akismet.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "057_class-wp-customize-manager.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "058_session.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "059_credits.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "060_themes.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "061_class.wp-scripts.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "062_string.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "063_module.audio.dts.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "064_wp-diff.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "065_class-wp-image-editor-imagick.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "066_class.wp-dependencies.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "067_user.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "068_revision.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "069_class-wp-image-editor-gd.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "070_File.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "071_plugins.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "072_class-wp-users-list-table.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "073_site-settings.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "074_site-themes.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "075_my-sites.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "076_upgrade.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "077_post-thumbnail-template.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "078_media.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "079_load-styles.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "080_site-info.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "081_site-new.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "082_import.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "083_shell.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "084_class-wp-ajax-response.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "085_async-upload.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "086_user-new.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "087_Restriction.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "088_Credit.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "089_Category.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "090_Author.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "091_Rating.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "092_Copyright.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "093_vars.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "094_class.akismet-widget.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "095_class-wp-http-ixr-client.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "096_class-ftp-pure.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "097_class-wp-customize-section.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "098_wp-load.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "099_ms-files.php",
+  "exit": 0,
+  "changed": true
+ },
+ {
+  "file": "100_wp-links-opml.php",
+  "exit": 0,
+  "changed": true
+ }
+]

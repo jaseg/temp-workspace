@@ -1,0 +1,109 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "7220e7cea8c95a971251d7af3861a007",
+    "packages": [],
+    "packages-dev": [
+        {
+            "name": "phpstan/phpstan",
+            "version": "2.1.17",
+            "dist": {
+                "type": "path",
+                "url": "/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/gitsrc/phpstan",
+                "reference": "89b5ef665716fa2a52ecd2633f21007a6a349053"
+            },
+            "require": {
+                "php": "^7.4|^8.0"
+            },
+            "conflict": {
+                "phpstan/phpstan-shim": "*"
+            },
+            "bin": [
+                "phpstan",
+                "phpstan.phar"
+            ],
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "bootstrap.php"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "PHPStan - PHP Static Analysis Tool",
+            "keywords": [
+                "dev",
+                "static analysis"
+            ],
+            "support": {
+                "issues": "https://github.com/phpstan/phpstan/issues",
+                "forum": "https://github.com/phpstan/phpstan/discussions",
+                "source": "https://github.com/phpstan/phpstan-src",
+                "docs": "https://phpstan.org/user-guide/getting-started",
+                "security": "https://github.com/phpstan/phpstan/security/policy"
+            },
+            "transport-options": {
+                "symlink": false,
+                "relative": false
+            }
+        },
+        {
+            "name": "rector/rector",
+            "version": "2.1.0",
+            "dist": {
+                "type": "path",
+                "url": "/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/gitsrc/rector",
+                "reference": "d513dea45a94394b660e15c155d1fa27826f8e30"
+            },
+            "require": {
+                "php": "^7.4|^8.0",
+                "phpstan/phpstan": "^2.1.17"
+            },
+            "conflict": {
+                "rector/rector-doctrine": "*",
+                "rector/rector-downgrade-php": "*",
+                "rector/rector-phpunit": "*",
+                "rector/rector-symfony": "*"
+            },
+            "suggest": {
+                "ext-dom": "To manipulate phpunit.xml via the custom-rule command"
+            },
+            "bin": [
+                "bin/rector"
+            ],
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "bootstrap.php"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Instant Upgrade and Automated Refactoring of any PHP code",
+            "homepage": "https://getrector.com/",
+            "keywords": [
+                "automation",
+                "dev",
+                "migration",
+                "refactoring"
+            ],
+            "transport-options": {
+                "symlink": false,
+                "relative": false
+            }
+        }
+    ],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": {},
+    "prefer-stable": false,
+    "prefer-lowest": false,
+    "platform": {},
+    "platform-dev": {},
+    "plugin-api-version": "2.6.0"
+}

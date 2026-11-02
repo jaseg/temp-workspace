@@ -1,0 +1,1277 @@
+PHPUnit 9.6.34 by Sebastian Bergmann and contributors.
+
+FFFFFFFFFFF........FFF.FFF.F.F.F......F.FF.F.......FFFFFF......  63 / 631 (  9%)
+....F.F................FFFFFF.FFFFFFFFFFFF.......FFFFFFF.FFFFFF 126 / 631 ( 19%)
+FFFFFFFFFFFFFFF..........FFFFFFFFFF......................FFFFFF 189 / 631 ( 29%)
+F.............................................................. 252 / 631 ( 39%)
+............................................................... 315 / 631 ( 49%)
+............................................................... 378 / 631 ( 59%)
+........FFFF................................................... 441 / 631 ( 69%)
+............................................................... 504 / 631 ( 79%)
+............................................................... 567 / 631 ( 89%)
+............................................................... 630 / 631 ( 99%)
+.                                                               631 / 631 (100%)
+
+Time: 03:18.713, Memory: 18.00 MB
+
+There were 99 failures:
+
+1) GetId3LibRuntimeBehaviorTest::test_runtime_loads_getid3_lib_class_without_fatal_error
+Library subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-lib-runtime-load/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:47
+
+2) GetId3LibRuntimeBehaviorTest::test_behavior_numeric_and_binary_conversions_match_expected_contract
+Library subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-lib-numeric-binary/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:84
+
+3) GetId3LibRuntimeBehaviorTest::test_behavior_arrays_paths_time_and_lookup_tables_match_expected_contract
+Library subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-lib-arrays-paths-time/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:177
+
+4) GetId3LibRuntimeBehaviorTest::test_behavior_copy_file_parts_copies_selected_byte_range
+Library subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-lib-copy-file-parts/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:271
+
+5) GetId3LibRuntimeBehaviorTest::test_behavior_include_dependency_reports_missing_dependency_without_throwing
+Library subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-lib-include-dependency/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:305
+
+6) GetId3LibRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_getid3_lib_scenarios
+Library subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-lib-semantic-fingerprint/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/001_GetId3LibRuntimeBehaviorTest.php:350
+
+7) GetId3AsfRuntimeBehaviorTest::test_runtime_loads_asf_class_and_constructs_parser
+ASF module subprocess failed.
+STDERR:
+PHP Fatal error:  'break' not in the 'loop' or 'switch' context in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/asf-runtime-load/wp-includes/ID3/module.audio-video.asf.php on line 79
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:24
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:61
+
+8) GetId3AsfRuntimeBehaviorTest::test_behavior_guid_conversion_round_trip_matches_asf_byte_order
+ASF module subprocess failed.
+STDERR:
+PHP Fatal error:  'break' not in the 'loop' or 'switch' context in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/asf-guid-roundtrip/wp-includes/ID3/module.audio-video.asf.php on line 79
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:24
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:98
+
+9) GetId3AsfRuntimeBehaviorTest::test_behavior_filetime_and_lookup_tables_match_expected_contract
+ASF module subprocess failed.
+STDERR:
+PHP Fatal error:  'break' not in the 'loop' or 'switch' context in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/asf-filetime-lookups/wp-includes/ID3/module.audio-video.asf.php on line 79
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:24
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:131
+
+10) GetId3AsfRuntimeBehaviorTest::test_behavior_wm_picture_type_lookup_and_parser
+ASF module subprocess failed.
+STDERR:
+PHP Fatal error:  'break' not in the 'loop' or 'switch' context in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/asf-wm-picture/wp-includes/ID3/module.audio-video.asf.php on line 79
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:24
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:188
+
+11) GetId3AsfRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_asf_helpers
+ASF module subprocess failed.
+STDERR:
+PHP Fatal error:  'break' not in the 'loop' or 'switch' context in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/asf-semantic-fingerprint/wp-includes/ID3/module.audio-video.asf.php on line 79
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:24
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/002_GetId3AsfRuntimeBehaviorTest.php:245
+
+12) IxrRuntimeBehaviorTest::test_behavior_ixr_value_encodes_scalar_array_and_struct_values
+Failed asserting that null is identical to 'string'.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/004_IxrRuntimeBehaviorTest.php:103
+
+13) IxrRuntimeBehaviorTest::test_behavior_ixr_date_base64_error_and_request_xml
+Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'20240102T03:04:05'
++'T::'
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/004_IxrRuntimeBehaviorTest.php:159
+
+14) IxrRuntimeBehaviorTest::test_behavior_ixr_message_parses_method_call_with_params
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/004_IxrRuntimeBehaviorTest.php:229
+
+15) IxrRuntimeBehaviorTest::test_behavior_ixr_server_callbacks_and_multicall_without_network
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/004_IxrRuntimeBehaviorTest.php:323
+
+16) IxrRuntimeBehaviorTest::test_behavior_ixr_client_url_parsing_and_error_accessors
+Failed asserting that null is identical to 'example.com'.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/004_IxrRuntimeBehaviorTest.php:367
+
+17) IxrRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_ixr_scenarios
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 (
+-    'value_struct_xml' => '<struct>\n
+-  <member><name>title</name><value><string>Hello</string></value></member>\n
+-  <member><name>count</name><value><int>3</int></value></member>\n
+-</struct>'
+-    'date_iso' => '20240102T03:04:05'
+-    'base64_xml' => '<base64>aGVsbG8=</base64>'
++    'value_struct_xml' => false
++    'date_iso' => 'T::'
++    'base64_xml' => '<base64></base64>'
+     'error_xml_contains' => Array &1 (
+-        0 => true
+-        1 => true
++        0 => false
++        1 => false
+     )
+     'request_contains' => Array &2 (
+-        0 => true
+-        1 => true
++        0 => false
++        1 => false
+     )
+     'message_parse' => Array &3 (
+-        0 => true
+-        1 => 'methodCall'
+-        2 => 'demo.echo'
+-        3 => Array &4 (
+-            0 => 'hello'
+-            1 => 10
+-        )
++        0 => false
++        1 => null
++        2 => null
++        3 => null
+     )
+-    'client_url' => Array &5 (
+-        0 => 'example.com'
+-        1 => 8080
+-        2 => '/xmlrpc.php?x=1'
++    'client_url' => Array &4 (
++        0 => null
++        1 => null
++        2 => null
+     )
+ )
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/004_IxrRuntimeBehaviorTest.php:464
+
+18) SnoopyRuntimeBehaviorTest::test_behavior_striplinks_and_expandlinks_match_expected_contract
+Snoopy execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Call to undefined function each()
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/snoopy-links-expand/wp-includes/class-snoopy.php
+    [line] => 632
+    [trace] => #0 [internal function]: Snoopy->_striplinks()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(24): ReflectionMethod->invokeArgs()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(42): snoopy_call_method()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:61
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:150
+
+19) SnoopyRuntimeBehaviorTest::test_behavior_prepare_post_body_urlencoded_and_multipart
+Snoopy execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Call to undefined function each()
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/snoopy-post-body/wp-includes/class-snoopy.php
+    [line] => 1204
+    [trace] => #0 [internal function]: Snoopy->_prepare_post_body()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(24): ReflectionMethod->invokeArgs()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(30): snoopy_call_method()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:61
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:274
+
+20) SnoopyRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_snoopy_helpers
+Snoopy execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Call to undefined function each()
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/snoopy-semantic-fingerprint/wp-includes/class-snoopy.php
+    [line] => 632
+    [trace] => #0 [internal function]: Snoopy->_striplinks()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(24): ReflectionMethod->invokeArgs()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(33): snoopy_call_method()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:61
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:393
+
+21) ClassWpRuntimeBehaviorTest::test_behavior_matches_map_regex_substitutes_rewrite_matches
+Failed asserting that null is identical to 'name=hello+world&category=cat%2Fname&missing='.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/007_ClassWpRuntimeBehaviorTest.php:100
+
+22) ClassWpRuntimeBehaviorTest::test_behavior_parse_request_without_rewrites_uses_extra_get_post_and_private_vars
+Failed asserting that an array has the key 'post_type'.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/007_ClassWpRuntimeBehaviorTest.php:226
+
+23) ClassWpRuntimeBehaviorTest::test_behavior_parse_request_with_rewrite_rule_sets_matched_rule_and_query_vars
+Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'name=hello-world&post_type=post'
++''
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/007_ClassWpRuntimeBehaviorTest.php:292
+
+24) ClassWpRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_class_wp_scenarios
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 (
+     'request' => 'article/sample-post'
+     'matched_rule' => 'article/([^/]+)/?$'
+-    'matched_query' => 'name=sample-post&post_type=post'
++    'matched_query' => ''
+     'query_vars' => Array &1 (
+         'year' => '2024'
+-        'name' => 'sample-post'
+-        'post_type' => 'post'
+         'posts_per_page' => 5
+         'custom' => 'manual-after-parse'
+     )
+-    'query_string' => 'year=2024&name=sample-post&post_type=post&posts_per_page=5&custom=manual-after-parse'
+-    'matches_output' => 'a=hello+world&b=cat%2Fname&c='
++    'query_string' => 'year=2024&posts_per_page=5&custom=manual-after-parse'
++    'matches_output' => null
+     'did_permalink' => true
+ )
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/007_ClassWpRuntimeBehaviorTest.php:529
+
+25) GetId3CoreRuntimeBehaviorTest::test_runtime_loads_getid3_core_classes_and_default_options
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-core-runtime-load/wp-includes/ID3/getid3.php on line 359
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:172
+
+26) GetId3CoreRuntimeBehaviorTest::test_behavior_set_option_and_openfile_contract
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-core-options-openfile/wp-includes/ID3/getid3.php on line 359
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:270
+
+27) GetId3CoreRuntimeBehaviorTest::test_behavior_file_format_detection_matches_expected_contract
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-core-format-detection/wp-includes/ID3/getid3.php on line 359
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:334
+
+28) GetId3CoreRuntimeBehaviorTest::test_behavior_tags_calculations_hashing_and_module_loading
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-core-tags-calculations-hash-module/wp-includes/ID3/getid3.php on line 359
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:478
+
+29) GetId3CoreRuntimeBehaviorTest::test_behavior_analyze_unknown_local_file_returns_error_without_modules
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-core-analyze-unknown/wp-includes/ID3/getid3.php on line 359
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:548
+
+30) GetId3CoreRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_getid3_core_scenarios
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/getid3-core-semantic-fingerprint/wp-includes/ID3/getid3.php on line 359
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:629
+
+31) PomoTranslationsRuntimeBehaviorTest::test_behavior_gettext_header_parsing_plural_function_and_headers
+POMO translations execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Call to undefined function create_function()
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/pomo-gettext-plural-headers/wp-includes/pomo/translations.php
+    [line] => 171
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/pomo-gettext-plural-headers/wp-includes/pomo/translations.php(224): Gettext_Translations->make_plural_form_function()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(13): Gettext_Translations->set_header()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#3 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/011_PomoTranslationsRuntimeBehaviorTest.php:31
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/011_PomoTranslationsRuntimeBehaviorTest.php:275
+
+32) PomoTranslationsRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_pomo_translation_scenarios
+POMO translations execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Call to undefined function create_function()
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/pomo-translations-semantic-fingerprint/wp-includes/pomo/translations.php
+    [line] => 171
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/pomo-translations-semantic-fingerprint/wp-includes/pomo/translations.php(224): Gettext_Translations->make_plural_form_function()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(26): Gettext_Translations->set_header()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#3 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/011_PomoTranslationsRuntimeBehaviorTest.php:31
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/011_PomoTranslationsRuntimeBehaviorTest.php:420
+
+33) GetId3Id3v2RuntimeBehaviorTest::test_runtime_loads_id3v2_class_and_expected_methods
+ID3v2 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/id3v2-runtime-load/wp-includes/ID3/module.tag.id3v2.php on line 58
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:62
+
+34) GetId3Id3v2RuntimeBehaviorTest::test_behavior_lookup_helpers_match_expected_contract
+ID3v2 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/id3v2-helper-lookups/wp-includes/ID3/module.tag.id3v2.php on line 58
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:111
+
+35) GetId3Id3v2RuntimeBehaviorTest::test_behavior_genre_parsing_and_deunsynchronise_match_expected_contract
+ID3v2 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/id3v2-genre-deunsynch/wp-includes/ID3/module.tag.id3v2.php on line 58
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:170
+
+36) GetId3Id3v2RuntimeBehaviorTest::test_behavior_parse_text_frames_and_user_text_frame
+ID3v2 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/id3v2-parse-text-frames/wp-includes/ID3/module.tag.id3v2.php on line 58
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:242
+
+37) GetId3Id3v2RuntimeBehaviorTest::test_behavior_analyze_minimal_id3v23_tag_extracts_core_comments
+ID3v2 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/id3v2-analyze-minimal-tag/wp-includes/ID3/module.tag.id3v2.php on line 58
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:332
+
+38) GetId3Id3v2RuntimeBehaviorTest::test_semantic_fingerprint_for_representative_id3v2_scenarios
+ID3v2 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/id3v2-semantic-fingerprint/wp-includes/ID3/module.tag.id3v2.php on line 58
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/014_GetId3Id3v2RuntimeBehaviorTest.php:454
+
+39) TextDiffRuntimeBehaviorTest::test_behavior_operation_objects_count_and_reverse_correctly
+Failed asserting that null is identical to Array &0 (
+    0 => 'a'
+    1 => 'b'
+).
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:138
+
+40) TextDiffRuntimeBehaviorTest::test_behavior_diff_native_engine_reconstructs_counts_reverse_and_lcs
+Text_Diff execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => array_map(): Argument #2 ($array) must be of type array, null given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code
+    [line] => 10
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(10): array_map()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:31
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:203
+
+41) TextDiffRuntimeBehaviorTest::test_behavior_backward_compatible_constructor_signature_still_works
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+-Array &0 (
+-    0 => 'one'
+-    1 => 'two'
+-    2 => 'three'
+-)
++Array &0 ()
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:247
+
+42) TextDiffRuntimeBehaviorTest::test_behavior_mapped_diff_uses_mapped_lines_but_preserves_original_lines
+Text_Diff execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => array_map(): Argument #2 ($array) must be of type array, null given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code
+    [line] => 16
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(16): array_map()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:31
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:276
+
+43) TextDiffRuntimeBehaviorTest::test_behavior_trim_newlines_temp_dir_and_check_contract
+Text_Diff subprocess failed.
+STDERR:
+PHP Warning:  foreach() argument must be of type array|object, null given in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/text-diff-utility-methods/wp-includes/Text/Diff.php on line 175
+PHP Fatal error:  Reconstructed original doesn't match in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/text-diff-utility-methods/wp-includes/Text/Diff.php on line 258
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:314
+
+44) TextDiffRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_text_diff_scenarios
+Text_Diff execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => array_map(): Argument #2 ($array) must be of type array, null given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code
+    [line] => 16
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(16): array_map()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:31
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:368
+
+45) GetId3Ac3RuntimeBehaviorTest::test_runtime_loads_ac3_class_and_expected_methods
+AC3 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/ac3-runtime-load/wp-includes/ID3/module.audio.ac3.php on line 379
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:63
+
+46) GetId3Ac3RuntimeBehaviorTest::test_behavior_core_lookup_tables_match_expected_contract
+AC3 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/ac3-core-lookups/wp-includes/ID3/module.audio.ac3.php on line 379
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:120
+
+47) GetId3Ac3RuntimeBehaviorTest::test_behavior_channel_mix_room_and_compression_helpers_match_expected_contract
+AC3 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/ac3-channel-mix-compression/wp-includes/ID3/module.audio.ac3.php on line 379
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:187
+
+48) GetId3Ac3RuntimeBehaviorTest::test_behavior_analyze_minimal_valid_ac3_frame_extracts_core_audio_metadata
+AC3 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/ac3-analyze-minimal-valid/wp-includes/ID3/module.audio.ac3.php on line 379
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:330
+
+49) GetId3Ac3RuntimeBehaviorTest::test_behavior_analyze_invalid_syncword_reports_error_and_clears_ac3_format
+AC3 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/ac3-analyze-invalid-syncword/wp-includes/ID3/module.audio.ac3.php on line 379
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:392
+
+50) GetId3Ac3RuntimeBehaviorTest::test_semantic_fingerprint_for_representative_ac3_scenarios
+AC3 module subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/ac3-semantic-fingerprint/wp-includes/ID3/module.audio.ac3.php on line 379
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:445
+
+51) PomoStreamsRuntimeBehaviorTest::test_string_reader_reads_seeks_and_tracks_position
+Failed asserting that 0 is identical to 6.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/018_PomoStreamsRuntimeBehaviorTest.php:114
+
+52) PomoStreamsRuntimeBehaviorTest::test_string_reader_clamps_position_when_reading_past_end
+Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'abc'
++''
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/018_PomoStreamsRuntimeBehaviorTest.php:138
+
+53) PomoStreamsRuntimeBehaviorTest::test_readint32_supports_little_and_big_endian_values
+Failed asserting that false is identical to 16909060.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/018_PomoStreamsRuntimeBehaviorTest.php:165
+
+54) PomoStreamsRuntimeBehaviorTest::test_readint32array_reads_multiple_values
+streams.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => array_values(): Argument #1 ($array) must be of type array, false given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code
+    [line] => 9
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(9): array_values()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/018_PomoStreamsRuntimeBehaviorTest.php:33
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/018_PomoStreamsRuntimeBehaviorTest.php:184
+
+55) PomoStreamsRuntimeBehaviorTest::test_file_reader_reads_file_contents_and_closes_resource
+streams.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => fread(): Argument #1 ($stream) must be of type resource, null given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/file_reader_behavior/wp-includes/pomo/streams.php
+    [line] => 113
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/file_reader_behavior/wp-includes/pomo/streams.php(113): fread()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(7): POMO_FileReader->read()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#3 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/018_PomoStreamsRuntimeBehaviorTest.php:33
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/018_PomoStreamsRuntimeBehaviorTest.php:217
+
+56) PomoStreamsRuntimeBehaviorTest::test_cached_file_reader_loads_entire_file_into_string_reader
+Failed asserting that 0 is identical to 14.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/018_PomoStreamsRuntimeBehaviorTest.php:249
+
+57) AtomLibRuntimeBehaviorTest::test_runtime_loads_atomlib_classes_and_constructor_initializes_parser
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:71
+
+58) AtomLibRuntimeBehaviorTest::test_parse_basic_atom_feed_with_one_entry
+atomlib.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Call to undefined function split()
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/parse_basic_feed/wp-includes/atomlib.php
+    [line] => 151
+    [trace] => #0 [internal function]: AtomParser->start_element()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/parse_basic_feed/wp-includes/atomlib.php(132): xml_parse()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(23): AtomParser->parse()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:33
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:152
+
+59) AtomLibRuntimeBehaviorTest::test_parse_html_content_preserves_html_content_type
+atomlib.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Call to undefined function split()
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/parse_html_content/wp-includes/atomlib.php
+    [line] => 151
+    [trace] => #0 [internal function]: AtomParser->start_element()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/parse_html_content/wp-includes/atomlib.php(132): xml_parse()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): AtomParser->parse()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:33
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:207
+
+60) AtomLibRuntimeBehaviorTest::test_content_with_src_attribute_is_stored_as_attributes
+atomlib.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Call to undefined function split()
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/parse_content_src_attribute/wp-includes/atomlib.php
+    [line] => 151
+    [trace] => #0 [internal function]: AtomParser->start_element()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/parse_content_src_attribute/wp-includes/atomlib.php(132): xml_parse()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): AtomParser->parse()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:33
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:249
+
+61) FtpBaseRuntimeBehaviorTest::test_runtime_loads_ftp_base_class_and_required_constants
+class-ftp.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/runtime_load_classes_constants/wp-admin/includes/class-ftp.php on line 188
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:67
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:117
+
+62) FtpBaseRuntimeBehaviorTest::test_constructor_initializes_default_state_without_network_connection
+class-ftp.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/constructor_default_state/wp-admin/includes/class-ftp.php on line 188
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:67
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:166
+
+63) FtpBaseRuntimeBehaviorTest::test_set_type_accepts_valid_modes_and_rejects_invalid_mode
+class-ftp.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/set_type_behavior/wp-admin/includes/class-ftp.php on line 188
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:67
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:212
+
+64) FtpBaseRuntimeBehaviorTest::test_passive_mode_respects_port_mode_availability
+class-ftp.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/passive_mode_behavior/wp-admin/includes/class-ftp.php on line 188
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:67
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:247
+
+65) FtpBaseRuntimeBehaviorTest::test_parselisting_parses_unix_file_directory_and_symlink_entries
+class-ftp.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/parse_unix_listing/wp-admin/includes/class-ftp.php on line 188
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:67
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:276
+
+66) FtpBaseRuntimeBehaviorTest::test_parselisting_parses_windows_file_and_directory_entries
+class-ftp.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/parse_windows_listing/wp-admin/includes/class-ftp.php on line 188
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:67
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:308
+
+67) FtpBaseRuntimeBehaviorTest::test_glob_pattern_match_supports_star_and_question_mark_patterns
+class-ftp.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/glob_pattern_match_behavior/wp-admin/includes/class-ftp.php on line 188
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:67
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:335
+
+68) FtpBaseRuntimeBehaviorTest::test_error_stack_pushes_and_pops_last_error
+class-ftp.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/error_stack_behavior/wp-admin/includes/class-ftp.php on line 188
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:67
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:364
+
+69) Pop3RuntimeBehaviorTest::test_runtime_loads_pop3_class_and_constructor_sets_defaults
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/runtime_load_constructor_defaults/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:202
+
+70) Pop3RuntimeBehaviorTest::test_methods_without_connection_return_false_and_set_errors
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/no_connection_errors/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:270
+
+71) Pop3RuntimeBehaviorTest::test_send_cmd_writes_command_with_crlf_and_reads_single_line_reply
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/send_cmd_behavior/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:307
+
+72) Pop3RuntimeBehaviorTest::test_login_sends_user_pass_and_stat_and_returns_message_count
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/login_success_flow/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:332
+
+73) Pop3RuntimeBehaviorTest::test_last_and_popstat_parse_stat_response
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/stat_parsing_behavior/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:372
+
+74) Pop3RuntimeBehaviorTest::test_pop_list_parses_single_message_size
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/pop_list_single_message_size/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:392
+
+75) Pop3RuntimeBehaviorTest::test_pop_list_parses_full_mailbox_listing
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/pop_list_full_mailbox_listing/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:419
+
+76) Pop3RuntimeBehaviorTest::test_pop_list_returns_empty_mailbox_marker_when_count_is_zero
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/pop_list_empty_mailbox/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:443
+
+77) Pop3RuntimeBehaviorTest::test_uidl_parses_single_and_full_uidl_listing
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/uidl_behavior/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:474
+
+78) Pop3RuntimeBehaviorTest::test_get_retrieves_message_lines_and_unstuffs_dot_prefixed_lines
+class-pop3.php subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/get_message_behavior/wp-includes/class-pop3.php on line 369
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:164
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:505
+
+79) GetId3Id3v1RuntimeBehaviorTest::test_runtime_loads_id3v1_class_and_static_api
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/runtime_load_class_static_api/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:116
+
+80) GetId3Id3v1RuntimeBehaviorTest::test_cutfield_trims_at_null_byte_and_outer_whitespace
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/cutfield_behavior/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:136
+
+81) GetId3Id3v1RuntimeBehaviorTest::test_genre_lookup_name_id_and_standardisation
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/genre_lookup_behavior/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:159
+
+82) GetId3Id3v1RuntimeBehaviorTest::test_array_of_genres_includes_standard_and_scmpx_extended_values
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/array_of_genres_behavior/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:190
+
+83) GetId3Id3v1RuntimeBehaviorTest::test_generate_id3v1_tag_without_track_uses_128_bytes_and_unknown_genre_for_invalid_id
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/generate_tag_without_track/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:227
+
+84) GetId3Id3v1RuntimeBehaviorTest::test_generate_id3v1_tag_with_track_uses_id3v11_comment_layout
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/generate_tag_with_track/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:262
+
+85) GetId3Id3v1RuntimeBehaviorTest::test_analyze_parses_valid_id3v11_tag_from_file
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/analyze_valid_id3v11_tag/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:313
+
+86) GetId3Id3v1RuntimeBehaviorTest::test_analyze_warns_for_duplicate_id3v1_tag_before_final_tag
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/analyze_duplicate_id3v1_tag/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:388
+
+87) GetId3Id3v1RuntimeBehaviorTest::test_analyze_no_tag_leaves_id3v1_unset_and_returns_true
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/analyze_no_tag/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:429
+
+88) GetId3Id3v1RuntimeBehaviorTest::test_analyze_returns_false_and_warns_when_filesize_not_supported
+ID3v1 subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/analyze_unsupported_filesize/wp-includes/ID3/module.tag.id3v1.php on line 70
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:77
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/023_GetId3Id3v1RuntimeBehaviorTest.php:469
+
+89) ServicesJsonRuntimeBehaviorTest::test_runtime_loads_services_json_class_and_contract
+Services_JSON subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/runtime_services_json_load/wp-includes/class-json.php on line 173
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:64
+
+90) ServicesJsonRuntimeBehaviorTest::test_behavior_encode_primitives_null_boolean_number_string
+Services_JSON subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/behavior_encode_primitives/wp-includes/class-json.php on line 173
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:92
+
+91) ServicesJsonRuntimeBehaviorTest::test_behavior_encode_arrays_and_objects
+Services_JSON subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/behavior_encode_arrays_objects/wp-includes/class-json.php on line 173
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:136
+
+92) ServicesJsonRuntimeBehaviorTest::test_behavior_decode_json_to_php_and_roundtrip
+Services_JSON subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/behavior_decode_json/wp-includes/class-json.php on line 173
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:170
+
+93) ServicesJsonRuntimeBehaviorTest::test_behavior_error_handling_and_invalid_json
+Services_JSON subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/behavior_error_handling/wp-includes/class-json.php on line 173
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:209
+
+94) ServicesJsonRuntimeBehaviorTest::test_behavior_unicode_and_special_characters
+Services_JSON subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/behavior_unicode_special/wp-includes/class-json.php on line 173
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:236
+
+95) ServicesJsonRuntimeBehaviorTest::test_semantic_fingerprint_json_encode_decode_behavior
+Services_JSON subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/original/semantic_fingerprint_json/wp-includes/class-json.php on line 173
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:279
+
+96) WpImageEditorGdRuntimeBehaviorTest::test_php8_loads_valid_png_instead_of_treating_gdimage_as_invalid_image
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/069_WpImageEditorGdRuntimeBehaviorTest.php:696
+
+97) WpImageEditorGdRuntimeBehaviorTest::test_php8_resize_accepts_gdimage_from_imagecreatetruecolor
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/069_WpImageEditorGdRuntimeBehaviorTest.php:727
+
+98) WpImageEditorGdRuntimeBehaviorTest::test_php8_crop_accepts_gdimage_destination
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/069_WpImageEditorGdRuntimeBehaviorTest.php:758
+
+99) WpImageEditorGdRuntimeBehaviorTest::test_php8_rotate_and_flip_accept_gdimage_results
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/069_WpImageEditorGdRuntimeBehaviorTest.php:799
+
+FAILURES!
+Tests: 631, Assertions: 5514, Failures: 99.

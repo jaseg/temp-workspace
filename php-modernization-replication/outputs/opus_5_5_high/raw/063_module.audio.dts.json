@@ -1,0 +1,65 @@
+{
+ "file": "063_module.audio.dts.php",
+ "attempts": [
+  {
+   "attempt": 1,
+   "secs": 49.5,
+   "stop_reason": "end_turn",
+   "is_error": false,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 6306,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 6333,
+    "output_tokens_details": {
+     "thinking_tokens": 1503
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 6306,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 6333,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 6306,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 6306
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "model_usage": {
+    "claude-opus-5-5": {
+     "inputTokens": 2,
+     "outputTokens": 6333,
+     "cacheReadInputTokens": 0,
+     "cacheCreationInputTokens": 6306,
+     "webSearchRequests": 0,
+     "costUSD": 0.177116,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 1503,
+     "cacheCreationEphemeral5mInputTokens": 0,
+     "cacheCreationEphemeral1hInputTokens": 6306,
+     "canonicalModel": "claude-opus-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   },
+   "cost_usd": 0.177116,
+   "status": "complete"
+  }
+ ]
+}

@@ -1,0 +1,154 @@
+q-team.de)
+			QPEG	Q-Team QPEG 1.0
+			qpeq	Q-Team QPEG 1.1
+			RGB 	Raw BGR32
+			RGBA	Raw RGB w/ Alpha
+			RMP4	REALmagic MPEG-4 (unauthorized XVID copy) (www.sigmadesigns.com)
+			ROQV	Id RoQ File Video Decoder
+			RPZA	Quicktime Apple Video (RPZA)
+			RUD0	Rududu video codec (http://rududu.ifrance.com/rududu/)
+			RV10	RealVideo 1.0 (aka RealVideo 5.0)
+			RV13	RealVideo 1.0 (RV13)
+			RV20	RealVideo G2
+			RV30	RealVideo 8
+			RV40	RealVideo 9
+			RGBT	Raw RGB w/ Transparency
+			RLE 	Microsoft Run Length Encoder
+			RLE4	Run Length Encoded (4bpp, 16-color)
+			RLE8	Run Length Encoded (8bpp, 256-color)
+			RT21	Intel Indeo RealTime Video 2.1
+			rv20	RealVideo G2
+			rv30	RealVideo 8
+			RVX 	Intel RDX (RVX )
+			SMC 	Apple Graphics (SMC )
+			SP54	Logitech Sunplus Sp54 Codec for Mustek GSmart Mini 2
+			SPIG	Radius Spigot
+			SVQ3	Sorenson Video 3 (Apple Quicktime 5)
+			s422	Tekram VideoCap C210 YUV 4:2:2
+			SDCC	Sun Communication Digital Camera Codec
+			SFMC	CrystalNet Surface Fitting Method
+			SMSC	Radius SMSC
+			SMSD	Radius SMSD
+			smsv	WorldConnect Wavelet Video
+			SPIG	Radius Spigot
+			SPLC	Splash Studios ACM Audio Codec (www.splashstudios.net)
+			SQZ2	Microsoft VXTreme Video Codec V2
+			STVA	ST Microelectronics CMOS Imager Data (Bayer)
+			STVB	ST Microelectronics CMOS Imager Data (Nudged Bayer)
+			STVC	ST Microelectronics CMOS Imager Data (Bunched)
+			STVX	ST Microelectronics CMOS Imager Data (Extended CODEC Data Format)
+			STVY	ST Microelectronics CMOS Imager Data (Extended CODEC Data Format with Correction Data)
+			SV10	Sorenson Video R1
+			SVQ1	Sorenson Video
+			T420	Toshiba YUV 4:2:0
+			TM2A	Duck TrueMotion Archiver 2.0 (www.duck.com)
+			TVJP	Pinnacle/Truevision Targa 2000 board (TVJP)
+			TVMJ	Pinnacle/Truevision Targa 2000 board (TVMJ)
+			TY0N	Tecomac Low-Bit Rate Codec (www.tecomac.com)
+			TY2C	Trident Decompression Driver
+			TLMS	TeraLogic Motion Intraframe Codec (TLMS)
+			TLST	TeraLogic Motion Intraframe Codec (TLST)
+			TM20	Duck TrueMotion 2.0
+			TM2X	Duck TrueMotion 2X
+			TMIC	TeraLogic Motion Intraframe Codec (TMIC)
+			TMOT	Horizons Technology TrueMotion S
+			tmot	Horizons TrueMotion Video Compression
+			TR20	Duck TrueMotion RealTime 2.0
+			TSCC	TechSmith Screen Capture Codec
+			TV10	Tecomac Low-Bit Rate Codec
+			TY2N	Trident ?TY2N?
+			U263	UB Video H.263/H.263+/H.263++ Decoder
+			UMP4	UB Video MPEG 4 (www.ubvideo.com)
+			UYNV	Nvidia UYVY packed 4:2:2
+			UYVP	Evans & Sutherland YCbCr 4:2:2 extended precision
+			UCOD	eMajix.com ClearVideo
+			ULTI	IBM Ultimotion
+			UYVY	UYVY packed 4:2:2
+			V261	Lucent VX2000S
+			VIFP	VFAPI Reader Codec (www.yks.ne.jp/~hori/)
+			VIV1	FFmpeg H263+ decoder
+			VIV2	Vivo H.263
+			VQC2	Vector-quantised codec 2 (research) http://eprints.ecs.soton.ac.uk/archive/00001310/01/VTC97-js.pdf)
+			VTLP	Alaris VideoGramPiX
+			VYU9	ATI YUV (VYU9)
+			VYUY	ATI YUV (VYUY)
+			V261	Lucent VX2000S
+			V422	Vitec Multimedia 24-bit YUV 4:2:2 Format
+			V655	Vitec Multimedia 16-bit YUV 4:2:2 Format
+			VCR1	ATI Video Codec 1
+			VCR2	ATI Video Codec 2
+			VCR3	ATI VCR 3.0
+			VCR4	ATI VCR 4.0
+			VCR5	ATI VCR 5.0
+			VCR6	ATI VCR 6.0
+			VCR7	ATI VCR 7.0
+			VCR8	ATI VCR 8.0
+			VCR9	ATI VCR 9.0
+			VDCT	Vitec Multimedia Video Maker Pro DIB
+			VDOM	VDOnet VDOWave
+			VDOW	VDOnet VDOLive (H.263)
+			VDTZ	Darim Vison VideoTizer YUV
+			VGPX	Alaris VideoGramPiX
+			VIDS	Vitec Multimedia YUV 4:2:2 CCIR 601 for V422
+			VIVO	Vivo H.263 v2.00
+			vivo	Vivo H.263
+			VIXL	Miro/Pinnacle Video XL
+			VLV1	VideoLogic/PURE Digital Videologic Capture
+			VP30	On2 VP3.0
+			VP31	On2 VP3.1
+			VP6F	On2 TrueMotion VP6
+			VX1K	Lucent VX1000S Video Codec
+			VX2K	Lucent VX2000S Video Codec
+			VXSP	Lucent VX1000SP Video Codec
+			WBVC	Winbond W9960
+			WHAM	Microsoft Video 1 (WHAM)
+			WINX	Winnov Software Compression
+			WJPG	AverMedia Winbond JPEG
+			WMV1	Windows Media Video V7
+			WMV2	Windows Media Video V8
+			WMV3	Windows Media Video V9
+			WNV1	Winnov Hardware Compression
+			XYZP	Extended PAL format XYZ palette (www.riff.org)
+			x263	Xirlink H.263
+			XLV0	NetXL Video Decoder
+			XMPG	Xing MPEG (I-Frame only)
+			XVID	XviD MPEG-4 (www.xvid.org)
+			XXAN	?XXAN?
+			YU92	Intel YUV (YU92)
+			YUNV	Nvidia Uncompressed YUV 4:2:2
+			YUVP	Extended PAL format YUV palette (www.riff.org)
+			Y211	YUV 2:1:1 Packed
+			Y411	YUV 4:1:1 Packed
+			Y41B	Weitek YUV 4:1:1 Planar
+			Y41P	Brooktree PC1 YUV 4:1:1 Packed
+			Y41T	Brooktree PC1 YUV 4:1:1 with transparency
+			Y42B	Weitek YUV 4:2:2 Planar
+			Y42T	Brooktree UYUV 4:2:2 with transparency
+			Y422	ADS Technologies Copy of UYVY used in Pyro WebCam firewire camera
+			Y800	Simple, single Y plane for monochrome images
+			Y8  	Grayscale video
+			YC12	Intel YUV 12 codec
+			YUV8	Winnov Caviar YUV8
+			YUV9	Intel YUV9
+			YUY2	Uncompressed YUV 4:2:2
+			YUYV	Canopus YUV
+			YV12	YVU12 Planar
+			YVU9	Intel YVU9 Planar (8-bpp Y plane, followed by 8-bpp 4x4 U and V planes)
+			YVYU	YVYU 4:2:2 Packed
+			ZLIB	Lossless Codec Library zlib compression (www.geocities.co.jp/Playtown-Denei/2837/LRC.htm)
+			ZPEG	Metheus Video Zipper
+
+		*/
+
+		return getid3_lib::EmbeddedLookup($fourcc, $begin, __LINE__, __FILE__, 'riff-fourcc');
+	}
+
+	private function EitherEndian2Int($byteword, $signed = false) {
+		if ($this->getid3->info['fileformat'] == 'riff') {
+			return getid3_lib::LittleEndian2Int($byteword, $signed);
+		}
+		return getid3_lib::BigEndian2Int($byteword, false, $signed);
+	}
+
+}
+// MIGRATION_END

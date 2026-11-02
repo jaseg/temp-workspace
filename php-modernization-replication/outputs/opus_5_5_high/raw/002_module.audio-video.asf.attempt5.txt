@@ -1,0 +1,362 @@
+ject['guid_name'] = $this->GUIDname($thisObject['guid_text']);
+
+			$thisObject['size']                              = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  8));
+			$offset += 8;
+			if ($thisObject['size'] <= 0) {
+				break;
+			}
+
+			switch ($thisObject['guid']) {
+				case GETID3_ASF_Extended_Stream_Properties_Object:
+					$thisObject['start_time']                        = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  8));
+					$offset += 8;
+					$thisObject['start_time_unix']                   = $this->FILETIMEtoUNIXtime($thisObject['start_time']);
+
+					$thisObject['end_time']                          = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  8));
+					$offset += 8;
+					$thisObject['end_time_unix']                     = $this->FILETIMEtoUNIXtime($thisObject['end_time']);
+
+					$thisObject['data_bitrate']                      = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+
+					$thisObject['buffer_size']                       = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+
+					$thisObject['initial_buffer_fullness']           = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+
+					$thisObject['alternate_data_bitrate']            = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+
+					$thisObject['alternate_buffer_size']             = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+
+					$thisObject['alternate_initial_buffer_fullness'] = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+
+					$thisObject['maximum_object_size']               = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+
+					$thisObject['flags_raw']                         = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+					// note: (bool) binds tighter than &, preserved as in original implementation
+					$thisObject['flags']['reliable']                = (bool) $thisObject['flags_raw'] & 0x00000001;
+					$thisObject['flags']['seekable']                = (bool) $thisObject['flags_raw'] & 0x00000002;
+					$thisObject['flags']['no_cleanpoints']          = (bool) $thisObject['flags_raw'] & 0x00000004;
+					$thisObject['flags']['resend_live_cleanpoints'] = (bool) $thisObject['flags_raw'] & 0x00000008;
+
+					$thisObject['stream_number']                     = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+					$offset += 2;
+
+					$thisObject['stream_language_id_index']          = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+					$offset += 2;
+
+					$thisObject['average_time_per_frame']            = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+					$offset += 4;
+
+					$thisObject['stream_name_count']                 = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+					$offset += 2;
+
+					$thisObject['payload_extension_system_count']    = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+					$offset += 2;
+
+					for ($i = 0; $i < $thisObject['stream_name_count']; $i++) {
+						$streamName = [];
+
+						$streamName['language_id_index']             = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+
+						$streamName['stream_name_length']            = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+
+						$streamName['stream_name']                   = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  $streamName['stream_name_length']));
+						$offset += $streamName['stream_name_length'];
+
+						$thisObject['stream_names'][$i] = $streamName;
+					}
+
+					for ($i = 0; $i < $thisObject['payload_extension_system_count']; $i++) {
+						$payloadExtensionSystem = [];
+
+						$payloadExtensionSystem['extension_system_id']   =                              substr($asf_header_extension_object_data, $offset, 16);
+						$offset += 16;
+						$payloadExtensionSystem['extension_system_id_text'] = $this->BytestringToGUID($payloadExtensionSystem['extension_system_id']);
+
+						$payloadExtensionSystem['extension_system_size'] = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+						if ($payloadExtensionSystem['extension_system_size'] <= 0) {
+							break 2;
+						}
+
+						$payloadExtensionSystem['extension_system_info_length'] = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+						$offset += 4;
+
+						$payloadExtensionSystem['extension_system_info_length'] = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  $payloadExtensionSystem['extension_system_info_length']));
+						$offset += $payloadExtensionSystem['extension_system_info_length'];
+
+						$thisObject['payload_extension_systems'][$i] = $payloadExtensionSystem;
+					}
+
+					break;
+
+				case GETID3_ASF_Padding_Object:
+					// padding, skip it
+					break;
+
+				case GETID3_ASF_Metadata_Object:
+					$thisObject['description_record_counts'] = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+					$offset += 2;
+
+					for ($i = 0; $i < $thisObject['description_record_counts']; $i++) {
+						$descriptionRecord = [];
+
+						$descriptionRecord['reserved_1']         = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2)); // must be zero
+						$offset += 2;
+
+						$descriptionRecord['stream_number']      = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+
+						$descriptionRecord['name_length']        = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+
+						$descriptionRecord['data_type']          = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+						$descriptionRecord['data_type_text'] = $this->ASFmetadataLibraryObjectDataTypeLookup($descriptionRecord['data_type']);
+
+						$descriptionRecord['data_length']        = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+						$offset += 4;
+
+						$descriptionRecord['name']               =                              substr($asf_header_extension_object_data, $offset,  $descriptionRecord['name_length']);
+						$offset += $descriptionRecord['name_length'];
+
+						$descriptionRecord['data']               =                              substr($asf_header_extension_object_data, $offset,  $descriptionRecord['data_length']);
+						$offset += $descriptionRecord['data_length'];
+						switch ($descriptionRecord['data_type']) {
+							case 0x0000: // Unicode string
+								break;
+
+							case 0x0001: // BYTE array
+								// do nothing
+								break;
+
+							case 0x0002: // BOOL
+								$descriptionRecord['data'] = (bool) getid3_lib::LittleEndian2Int($descriptionRecord['data']);
+								break;
+
+							case 0x0003: // DWORD
+							case 0x0004: // QWORD
+							case 0x0005: // WORD
+								$descriptionRecord['data'] = getid3_lib::LittleEndian2Int($descriptionRecord['data']);
+								break;
+
+							case 0x0006: // GUID
+								$descriptionRecord['data_text'] = $this->BytestringToGUID($descriptionRecord['data']);
+								break;
+						}
+
+						$thisObject['description_record'][$i] = $descriptionRecord;
+					}
+					break;
+
+				case GETID3_ASF_Language_List_Object:
+					$thisObject['language_id_record_counts'] = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+					$offset += 2;
+
+					for ($i = 0; $i < $thisObject['language_id_record_counts']; $i++) {
+						$languageIDrecord = [];
+
+						$languageIDrecord['language_id_length']         = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  1));
+						$offset += 1;
+
+						$languageIDrecord['language_id']                =                              substr($asf_header_extension_object_data, $offset,  $languageIDrecord['language_id_length']);
+						$offset += $languageIDrecord['language_id_length'];
+
+						$thisObject['language_id_record'][$i] = $languageIDrecord;
+					}
+					break;
+
+				case GETID3_ASF_Metadata_Library_Object:
+					$thisObject['description_records_count'] = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+					$offset += 2;
+
+					for ($i = 0; $i < $thisObject['description_records_count']; $i++) {
+						$descriptionRecord = [];
+
+						$descriptionRecord['language_list_index'] = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+
+						$descriptionRecord['stream_number']       = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+
+						$descriptionRecord['name_length']         = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+
+						$descriptionRecord['data_type']           = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  2));
+						$offset += 2;
+						$descriptionRecord['data_type_text'] = $this->ASFmetadataLibraryObjectDataTypeLookup($descriptionRecord['data_type']);
+
+						$descriptionRecord['data_length']         = getid3_lib::LittleEndian2Int(substr($asf_header_extension_object_data, $offset,  4));
+						$offset += 4;
+
+						$descriptionRecord['name']                =                              substr($asf_header_extension_object_data, $offset,  $descriptionRecord['name_length']);
+						$offset += $descriptionRecord['name_length'];
+
+						$descriptionRecord['data']                =                              substr($asf_header_extension_object_data, $offset,  $descriptionRecord['data_length']);
+						$offset += $descriptionRecord['data_length'];
+
+						if (preg_match('#^WM/Picture$#', str_replace("\x00", '', trim($descriptionRecord['name'])))) {
+							$WMpicture = $this->ASF_WMpicture($descriptionRecord['data']);
+							if (!empty($WMpicture)) {
+								$descriptionRecord['data'] = $WMpicture;
+							}
+							unset($WMpicture);
+						}
+
+						$thisObject['description_record'][$i] = $descriptionRecord;
+					}
+					break;
+
+				default:
+					$unhandled_sections++;
+					if ($this->GUIDname($thisObject['guid_text'])) {
+						$this->getid3->info['warning'][] = 'unhandled Header Extension Object GUID "'.$this->GUIDname($thisObject['guid_text']).'" {'.$thisObject['guid_text'].'} at offset '.($offset - 16 - 8);
+					} else {
+						$this->getid3->info['warning'][] = 'unknown Header Extension Object GUID {'.$thisObject['guid_text'].'} in at offset '.($offset - 16 - 8);
+					}
+					break;
+			}
+			$HeaderExtensionObjectParsed[] = $thisObject;
+
+			$objectOffset += $thisObject['size'];
+		}
+		return $HeaderExtensionObjectParsed;
+	}
+
+
+	public static function ASFmetadataLibraryObjectDataTypeLookup($id) {
+		static $ASFmetadataLibraryObjectDataTypeLookup = [
+			0x0000 => 'Unicode string', // The data consists of a sequence of Unicode characters
+			0x0001 => 'BYTE array',     // The type of the data is implementation-specific
+			0x0002 => 'BOOL',           // The data is 2 bytes long and should be interpreted as a 16-bit unsigned integer. Only 0x0000 or 0x0001 are permitted values
+			0x0003 => 'DWORD',          // The data is 4 bytes long and should be interpreted as a 32-bit unsigned integer
+			0x0004 => 'QWORD',          // The data is 8 bytes long and should be interpreted as a 64-bit unsigned integer
+			0x0005 => 'WORD',           // The data is 2 bytes long and should be interpreted as a 16-bit unsigned integer
+			0x0006 => 'GUID',           // The data is 16 bytes long and should be interpreted as a 128-bit GUID
+		];
+		return $ASFmetadataLibraryObjectDataTypeLookup[$id] ?? 'invalid';
+	}
+
+	public function ASF_WMpicture(&$data) {
+		//typedef struct _WMPicture{
+		//  LPWSTR  pwszMIMEType;
+		//  BYTE  bPictureType;
+		//  LPWSTR  pwszDescription;
+		//  DWORD  dwDataLen;
+		//  BYTE*  pbData;
+		//} WM_PICTURE;
+
+		$WMpicture = [];
+
+		$offset = 0;
+		$WMpicture['image_type_id'] = getid3_lib::LittleEndian2Int(substr($data, $offset, 1));
+		$offset += 1;
+		$WMpicture['image_type']    = $this->WMpictureTypeLookup($WMpicture['image_type_id']);
+		$WMpicture['image_size']    = getid3_lib::LittleEndian2Int(substr($data, $offset, 4));
+		$offset += 4;
+
+		$WMpicture['image_mime'] = '';
+		do {
+			$next_byte_pair = substr($data, $offset, 2);
+			$offset += 2;
+			$WMpicture['image_mime'] .= $next_byte_pair;
+		} while ($next_byte_pair !== "\x00\x00");
+
+		$WMpicture['image_description'] = '';
+		do {
+			$next_byte_pair = substr($data, $offset, 2);
+			$offset += 2;
+			$WMpicture['image_description'] .= $next_byte_pair;
+		} while ($next_byte_pair !== "\x00\x00");
+
+		$WMpicture['dataoffset'] = $offset;
+		$WMpicture['data'] = substr($data, $offset);
+
+		$imageinfo = [];
+		$WMpicture['image_mime'] = '';
+		$imagechunkcheck = getid3_lib::GetDataImageSize($WMpicture['data'], $imageinfo);
+		unset($imageinfo);
+		if (!empty($imagechunkcheck)) {
+			$WMpicture['image_mime'] = image_type_to_mime_type($imagechunkcheck[2]);
+		}
+		if (!isset($this->getid3->info['asf']['comments']['picture'])) {
+			$this->getid3->info['asf']['comments']['picture'] = [];
+		}
+		$this->getid3->info['asf']['comments']['picture'][] = ['data'=>$WMpicture['data'], 'image_mime'=>$WMpicture['image_mime']];
+
+		return $WMpicture;
+	}
+
+
+	// Remove terminator 00 00 and convert UTF-16LE to Latin-1
+	public static function TrimConvert($string) {
+		return trim((string) getid3_lib::iconv_fallback('UTF-16LE', 'ISO-8859-1', self::TrimTerm($string)), ' ');
+	}
+
+
+	// Remove terminator 00 00
+	public static function TrimTerm($string) {
+		// remove terminator, only if present (it should be, but...)
+		if (substr((string) $string, -2) === "\x00\x00") {
+			$string = substr($string, 0, -2);
+		}
+		return $string;
+	}
+
+
+	/**
+	 * Reads $length bytes from the file pointer, returning false for non-positive
+	 * lengths (legacy fread() behaviour; PHP 8 throws a ValueError instead).
+	 */
+	private function readBytes($length): string|false {
+		$length = (int) $length;
+		if ($length <= 0) {
+			return false;
+		}
+		return fread($this->getid3->fp, $length);
+	}
+
+	/**
+	 * Converts a value to a number the way PHP 7 arithmetic did
+	 * (leading-numeric strings use their numeric prefix, non-numeric strings become 0),
+	 * avoiding the TypeError PHP 8 throws for non-numeric strings in arithmetic.
+	 */
+	private static function legacyNumericValue($value): int|float {
+		if (is_int($value) || is_float($value)) {
+			return $value;
+		}
+		if (is_bool($value) || $value === null) {
+			return (int) $value;
+		}
+		$value = (string) $value;
+		if (is_numeric($value)) {
+			return $value + 0;
+		}
+		if (preg_match('/^[ \t\n\r\v\f]*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/', $value, $matches)) {
+			return $matches[1] + 0;
+		}
+		return 0;
+	}
+
+	/**
+	 * Division that yields INF/-INF/NAN on a zero divisor (legacy PHP 7 behaviour)
+	 * instead of throwing DivisionByZeroError.
+	 */
+	private static function legacyDivide($dividend, $divisor): int|float {
+		if ($divisor == 0) {
+			return fdiv((float) $dividend, (float) $divisor);
+		}
+		return $dividend / $divisor;
+	}
+
+}
+// MIGRATION_END

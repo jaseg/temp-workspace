@@ -1,0 +1,10 @@
+{
+    "repositories": [
+        {"type": "path", "url": "/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/gitsrc/rector", "options": {"symlink": false, "versions": {"rector/rector": "2.1.0"}}},
+        {"type": "path", "url": "/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/gitsrc/phpstan", "options": {"symlink": false, "versions": {"phpstan/phpstan": "2.1.17"}}}
+    ],
+    "require-dev": {
+        "rector/rector": "2.1.0",
+        "phpstan/phpstan": "2.1.17"
+    }
+}

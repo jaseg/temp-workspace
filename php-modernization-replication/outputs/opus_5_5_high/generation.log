@@ -1,0 +1,108 @@
+014_module.tag.id3v2.php: incomplete
+002_module.audio-video.asf.php: incomplete
+012_module.audio-video.riff.php: incomplete
+009_getid3.php: complete
+003_wp-db.php: complete
+006_widgets.php: complete
+013_file.php: complete
+001_getid3.lib.php: complete
+030_class-json.php: complete
+010_class-wp-theme.php: complete
+005_class-snoopy.php: complete
+056_class.akismet.php: complete
+008_wp-login.php: complete
+004_class-IXR.php: complete
+057_class-wp-customize-manager.php: complete
+029_module.audio.ogg.php: complete
+042_image-edit.php: complete
+024_edit-form-advanced.php: complete
+054_nav-menu.php: complete
+039_class-wp-upgrader-skins.php: complete
+047_update-core.php: complete
+020_class-ftp.php: complete
+017_press-this.php: complete
+031_class-wp-plugins-list-table.php: complete
+007_class-wp.php: complete
+046_module.audio-video.flv.php: complete
+055_rss.php: complete
+050_class-oembed.php: complete
+032_class-wp-comments-list-table.php: complete
+021_class-pop3.php: complete
+026_Source.php: complete
+071_plugins.php: complete
+043_image.php: complete
+016_module.audio.ac3.php: complete
+040_class-wp-media-list-table.php: complete
+068_revision.php: complete
+060_themes.php: complete
+036_module.tag.apetag.php: complete
+025_widgets.php: complete
+037_class-wp-ms-sites-list-table.php: complete
+052_class-wp-ms-themes-list-table.php: complete
+067_user.php: complete
+022_class-wp-customize-setting.php: complete
+064_wp-diff.php: complete
+065_class-wp-image-editor-imagick.php: complete
+072_class-wp-users-list-table.php: complete
+069_class-wp-image-editor-gd.php: complete
+066_class.wp-dependencies.php: complete
+027_upload.php: complete
+015_Diff.php: complete
+049_Parser.php: complete
+044_class-wp-image-editor.php: complete
+023_module.tag.id3v1.php: complete
+045_Locator.php: complete
+041_module.tag.lyrics3.php: complete
+028_themes.php: complete
+019_atomlib.php: complete
+063_module.audio.dts.php: complete
+058_session.php: complete
+070_File.php: complete
+053_class-wp-themes-list-table.php: complete
+051_ms-deprecated.php: complete
+033_ms-settings.php: complete
+Traceback (most recent call last):
+  File "/home/user/temp-workspace/php-modernization-replication/scripts/generate_opus.py", line 153, in <module>
+    with cf.ThreadPoolExecutor(a.jobs) as ex:
+             ^^^^^^
+  File "/home/user/temp-workspace/php-modernization-replication/scripts/generate_opus.py", line 148, in main
+    files = sorted(a.subjects.glob("[0-9][0-9][0-9]_*.php"))
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/concurrent/futures/_base.py", line 625, in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.13/concurrent/futures/_base.py", line 318, in _result_or_cancel
+    return fut.result(timeout)
+           ~~~~~~~~~~^^^^^^^^^
+  File "/usr/local/lib/python3.13/concurrent/futures/_base.py", line 453, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.13/concurrent/futures/_base.py", line 402, in __get_result
+    raise self._exception
+  File "/usr/local/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/user/temp-workspace/php-modernization-replication/scripts/generate_opus.py", line 148, in <lambda>
+    files = sorted(a.subjects.glob("[0-9][0-9][0-9]_*.php"))
+                                             ^^^^^^^^^^^^^^^
+  File "/home/user/temp-workspace/php-modernization-replication/scripts/generate_opus.py", line 101, in migrate
+    res = call_model(prompt, wd, max_tokens)
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/temp-workspace/php-modernization-replication/scripts/generate_opus.py", line 84, in call_model
+    p = subprocess.run(
+        cmd, input=prompt, capture_output=True, text=True, cwd=workdir, env=env, timeout=TIMEOUT_S
+    )
+  File "/usr/local/lib/python3.13/subprocess.py", line 557, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/subprocess.py", line 1223, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/subprocess.py", line 2129, in _communicate
+    self._save_input(input)
+    ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/local/lib/python3.13/subprocess.py", line 2215, in _save_input
+    self._input = self._input.encode(self.stdin.encoding,
+                  ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+                                     self.stdin.errors)
+                                     ^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'utf-8' codec can't encode character '\udcd6' in position 664: surrogates not allowed

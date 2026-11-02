@@ -1,0 +1,160 @@
+<?php
+/**
+ * Creates common globals for the rest of WordPress
+ *
+ * Sets $pagenow global which is the current page. Checks
+ * for the browser to set which one is currently being used.
+ *
+ * Detects which user environment WordPress is being used on.
+ * Only attempts to check for Apache, Nginx and IIS -- three web
+ * servers with known pretty permalink capability.
+ *
+ * Note: Though Nginx is detected, WordPress does not currently
+ * generate rewrite rules for it. See http://codex.wordpress.org/Nginx
+ *
+ * @package WordPress
+ */
+
+global $pagenow,
+	$is_lynx, $is_gecko, $is_winIE, $is_macIE, $is_opera, $is_NS4, $is_safari, $is_chrome, $is_iphone, $is_IE,
+	$is_apache, $is_IIS, $is_iis7, $is_nginx;
+
+$_wp_php_self = (string) ( $_SERVER['PHP_SELF'] ?? '' );
+
+// On which page are we ?
+if ( is_admin() ) {
+	// wp-admin pages are checked more carefully
+	if ( is_network_admin() ) {
+		preg_match( '#/wp-admin/network/?(.*?)$#i', $_wp_php_self, $self_matches );
+	} elseif ( is_user_admin() ) {
+		preg_match( '#/wp-admin/user/?(.*?)$#i', $_wp_php_self, $self_matches );
+	} else {
+		preg_match( '#/wp-admin/?(.*?)$#i', $_wp_php_self, $self_matches );
+	}
+	$pagenow = (string) ( $self_matches[1] ?? '' );
+	$pagenow = trim( $pagenow, '/' );
+	$pagenow = preg_replace( '#\?.*?$#', '', $pagenow );
+	if ( '' === $pagenow || 'index' === $pagenow || 'index.php' === $pagenow ) {
+		$pagenow = 'index.php';
+	} else {
+		preg_match( '#(.*?)(/|$)#', $pagenow, $self_matches );
+		$pagenow = strtolower( (string) ( $self_matches[1] ?? '' ) );
+		if ( ! str_ends_with( $pagenow, '.php' ) ) {
+			$pagenow .= '.php'; // for Options +Multiviews: /wp-admin/themes/index.php (themes.php is queried)
+		}
+	}
+} else {
+	if ( preg_match( '#([^/]+\.php)([?/].*?)?$#i', $_wp_php_self, $self_matches ) ) {
+		$pagenow = strtolower( $self_matches[1] );
+	} else {
+		$pagenow = 'index.php';
+	}
+}
+unset( $self_matches, $_wp_php_self );
+
+// Simple browser detection
+$is_lynx = $is_gecko = $is_winIE = $is_macIE = $is_opera = $is_NS4 = $is_safari = $is_chrome = $is_iphone = false;
+
+if ( isset( $_SERVER['HTTP_USER_AGENT'] ) ) {
+	$_wp_user_agent = (string) $_SERVER['HTTP_USER_AGENT'];
+
+	if ( str_contains( $_wp_user_agent, 'Lynx' ) ) {
+		$is_lynx = true;
+	} elseif ( stripos( $_wp_user_agent, 'chrome' ) !== false ) {
+		if ( stripos( $_wp_user_agent, 'chromeframe' ) !== false ) {
+			$is_admin = is_admin();
+			/**
+			 * Filter whether Google Chrome Frame should be used, if available.
+			 *
+			 * @since 3.2.0
+			 *
+			 * @param bool $is_admin Whether to use the Google Chrome Frame. Default is the value of is_admin().
+			 */
+			if ( $is_chrome = apply_filters( 'use_google_chrome_frame', $is_admin ) ) {
+				header( 'X-UA-Compatible: chrome=1' );
+			}
+			$is_winIE = ! $is_chrome;
+		} else {
+			$is_chrome = true;
+		}
+	} elseif ( stripos( $_wp_user_agent, 'safari' ) !== false ) {
+		$is_safari = true;
+	} elseif ( ( str_contains( $_wp_user_agent, 'MSIE' ) || str_contains( $_wp_user_agent, 'Trident' ) ) && str_contains( $_wp_user_agent, 'Win' ) ) {
+		$is_winIE = true;
+	} elseif ( str_contains( $_wp_user_agent, 'MSIE' ) && str_contains( $_wp_user_agent, 'Mac' ) ) {
+		$is_macIE = true;
+	} elseif ( str_contains( $_wp_user_agent, 'Gecko' ) ) {
+		$is_gecko = true;
+	} elseif ( str_contains( $_wp_user_agent, 'Opera' ) ) {
+		$is_opera = true;
+	} elseif ( str_contains( $_wp_user_agent, 'Nav' ) && str_contains( $_wp_user_agent, 'Mozilla/4.' ) ) {
+		$is_NS4 = true;
+	}
+
+	unset( $_wp_user_agent );
+}
+
+if ( $is_safari && stripos( (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' ), 'mobile' ) !== false ) {
+	$is_iphone = true;
+}
+
+$is_IE = ( $is_macIE || $is_winIE );
+
+// Server detection
+
+$_wp_server_software = (string) ( $_SERVER['SERVER_SOFTWARE'] ?? '' );
+
+/**
+ * Whether the server software is Apache or something else
+ * @global bool $is_apache
+ */
+$is_apache = ( str_contains( $_wp_server_software, 'Apache' ) || str_contains( $_wp_server_software, 'LiteSpeed' ) );
+
+/**
+ * Whether the server software is Nginx or something else
+ * @global bool $is_nginx
+ */
+$is_nginx = str_contains( $_wp_server_software, 'nginx' );
+
+/**
+ * Whether the server software is IIS or something else
+ * @global bool $is_IIS
+ */
+$is_IIS = ! $is_apache && ( str_contains( $_wp_server_software, 'Microsoft-IIS' ) || str_contains( $_wp_server_software, 'ExpressionDevServer' ) );
+
+/**
+ * Whether the server software is IIS 7.X or greater
+ * @global bool $is_iis7
+ */
+$is_iis7 = $is_IIS && (int) substr( $_wp_server_software, (int) strpos( $_wp_server_software, 'Microsoft-IIS/' ) + 14 ) >= 7;
+
+unset( $_wp_server_software );
+
+/**
+ * Test if the current browser runs on a mobile device (smart phone, tablet, etc.)
+ *
+ * @return bool true|false
+ */
+function wp_is_mobile(): bool {
+	static $is_mobile = null;
+
+	if ( isset( $is_mobile ) ) {
+		return $is_mobile;
+	}
+
+	if ( empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+		$is_mobile = false;
+	} else {
+		$user_agent = (string) $_SERVER['HTTP_USER_AGENT'];
+
+		$is_mobile = str_contains( $user_agent, 'Mobile' ) // many mobile devices (all iPhone, iPad, etc.)
+			|| str_contains( $user_agent, 'Android' )
+			|| str_contains( $user_agent, 'Silk/' )
+			|| str_contains( $user_agent, 'Kindle' )
+			|| str_contains( $user_agent, 'BlackBerry' )
+			|| str_contains( $user_agent, 'Opera Mini' )
+			|| str_contains( $user_agent, 'Opera Mobi' );
+	}
+
+	return $is_mobile;
+}

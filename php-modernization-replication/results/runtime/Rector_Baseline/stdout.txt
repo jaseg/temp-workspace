@@ -1,0 +1,692 @@
+PHPUnit 9.6.34 by Sebastian Bergmann and contributors.
+
+..........................FF...F.F......FE.F.......FFFFFF.F....  63 / 631 (  9%)
+F...F.F......................FFFFFFF.F...................FFF.FF 126 / 631 ( 19%)
+FFFFFF......F.............................................F.... 189 / 631 ( 29%)
+........FF..................................................... 252 / 631 ( 39%)
+.................F............................................. 315 / 631 ( 49%)
+...........F..F................F............................... 378 / 631 ( 59%)
+........FFFF................................................... 441 / 631 ( 69%)
+............................................................... 504 / 631 ( 79%)
+............................................................... 567 / 631 ( 89%)
+.................F............................................. 630 / 631 ( 99%)
+.                                                               631 / 631 (100%)
+
+Time: 03:17.953, Memory: 18.00 MB
+
+There was 1 error:
+
+1) ClassWpRuntimeBehaviorTest::test_behavior_parse_request_with_rewrite_rule_sets_matched_rule_and_query_vars
+Undefined array key "post_type"
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/007_ClassWpRuntimeBehaviorTest.php:295
+
+--
+
+There were 48 failures:
+
+1) SnoopyRuntimeBehaviorTest::test_runtime_loads_snoopy_class_and_default_properties
+Failed asserting that Array &0 () is identical to ''.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:114
+
+2) SnoopyRuntimeBehaviorTest::test_behavior_striplinks_and_expandlinks_match_expected_contract
+Failed asserting that 'http://example.com/dir/Array' is identical to Array &0 (
+    0 => 'http://example.com/a'
+    1 => 'http://example.com/b'
+    2 => 'http://example.com/dir/relative/c'
+    3 => 'mailto:test@example.com'
+    4 => 'http://example.com/dir/plain/d'
+).
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:165
+
+3) SnoopyRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_snoopy_helpers
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+         1 => '/b'
+         2 => 'relative/c'
+     )
+-    'expanded' => Array &3 (
+-        0 => 'http://example.com/a'
+-        1 => 'http://example.com/b'
+-        2 => 'http://example.com/dir/relative/c'
+-    )
++    'expanded' => 'http://example.com/dir/Array'
+     'text' => 'Hello World & Test'
+     'post' => 'name=Alice+Bob&items[]=x&items[]=y&'
+-    'cookies' => Array &4 (
++    'cookies' => Array &3 (
+         'token' => 'abc123'
+     )
+-    'invalid_fetch' => Array &5 (
++    'invalid_fetch' => Array &4 (
+         0 => false
+         1 => 'Invalid protocol "ftp"\n'
+     )
+ )
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/005_SnoopyRuntimeBehaviorTest.php:427
+
+4) WidgetsRuntimeBehaviorTest::test_wp_widget_constructor_field_names_form_update_and_callbacks
+widgets.php subprocess failed.
+STDERR:
+PHP Fatal error:  Declaration of Standalone_Test_Widget::widget($args, $instance): void must be compatible with WP_Widget::widget($args, $instance): never in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/widgets-standalone-base-class/.standalone-widgets-runner.php(203) : eval()'d code on line 11
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/006_WidgetsRuntimeBehaviorTest.php:298
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/006_WidgetsRuntimeBehaviorTest.php:398
+
+5) ClassWpRuntimeBehaviorTest::test_behavior_parse_request_without_rewrites_uses_extra_get_post_and_private_vars
+Failed asserting that an array has the key 'post_type'.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/007_ClassWpRuntimeBehaviorTest.php:226
+
+6) ClassWpRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_class_wp_scenarios
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+     'query_vars' => Array &1 (
+         'year' => '2024'
+         'name' => 'sample-post'
+-        'post_type' => 'post'
+         'posts_per_page' => 5
+         'custom' => 'manual-after-parse'
+     )
+-    'query_string' => 'year=2024&name=sample-post&post_type=post&posts_per_page=5&custom=manual-after-parse'
++    'query_string' => 'year=2024&name=sample-post&posts_per_page=5&custom=manual-after-parse'
+     'matches_output' => 'a=hello+world&b=cat%2Fname&c='
+     'did_permalink' => true
+ )
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/007_ClassWpRuntimeBehaviorTest.php:529
+
+7) GetId3CoreRuntimeBehaviorTest::test_runtime_loads_getid3_core_classes_and_default_options
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/getid3-core-runtime-load/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:172
+
+8) GetId3CoreRuntimeBehaviorTest::test_behavior_set_option_and_openfile_contract
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/getid3-core-options-openfile/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:270
+
+9) GetId3CoreRuntimeBehaviorTest::test_behavior_file_format_detection_matches_expected_contract
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/getid3-core-format-detection/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:334
+
+10) GetId3CoreRuntimeBehaviorTest::test_behavior_tags_calculations_hashing_and_module_loading
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/getid3-core-tags-calculations-hash-module/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:478
+
+11) GetId3CoreRuntimeBehaviorTest::test_behavior_analyze_unknown_local_file_returns_error_without_modules
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/getid3-core-analyze-unknown/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:548
+
+12) GetId3CoreRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_getid3_core_scenarios
+getID3 core subprocess failed.
+STDERR:
+PHP Fatal error:  Array and string offset access syntax with curly braces is no longer supported in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/getid3-core-semantic-fingerprint/wp-includes/ID3/getid3.lib.php on line 21
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:123
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/009_GetId3CoreRuntimeBehaviorTest.php:629
+
+13) WpThemeRuntimeBehaviorTest::test_behavior_constructs_valid_theme_and_reads_headers_paths_uris_and_screenshot
+WP_Theme execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => implode(): Argument #2 ($array) must be of type ?array, string given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/wp-theme-valid-theme/wp-includes/class-wp-theme.php
+    [line] => 630
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/wp-theme-valid-theme/wp-includes/class-wp-theme.php(630): implode()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/wp-theme-valid-theme/wp-includes/class-wp-theme.php(543): WP_Theme->markup_header()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(41): WP_Theme->display()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/010_WpThemeRuntimeBehaviorTest.php:31
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/010_WpThemeRuntimeBehaviorTest.php:127
+
+14) WpThemeRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_wp_theme_scenarios
+WP_Theme execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => implode(): Argument #2 ($array) must be of type ?array, string given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/wp-theme-semantic-fingerprint/wp-includes/class-wp-theme.php
+    [line] => 630
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/wp-theme-semantic-fingerprint/wp-includes/class-wp-theme.php(630): implode()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/wp-theme-semantic-fingerprint/wp-includes/class-wp-theme.php(543): WP_Theme->markup_header()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(51): WP_Theme->display()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/010_WpThemeRuntimeBehaviorTest.php:31
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/010_WpThemeRuntimeBehaviorTest.php:541
+
+15) PomoTranslationsRuntimeBehaviorTest::test_behavior_gettext_header_parsing_plural_function_and_headers
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 (
+-    0 => 0
+-    1 => 1
+-    2 => 2
++    0 => null
++    1 => null
++    2 => null
+ )
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/011_PomoTranslationsRuntimeBehaviorTest.php:294
+
+16) PomoTranslationsRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_pomo_translation_scenarios
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+         3 => 'apples'
+     )
+     'gettext_plural_indexes' => Array &5 (
+-        0 => 0
+-        1 => 1
+-        2 => 2
++        0 => null
++        1 => null
++        2 => null
+     )
+     'noop' => Array &6 (
+         0 => 'Hello'
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/011_PomoTranslationsRuntimeBehaviorTest.php:457
+
+17) TextDiffRuntimeBehaviorTest::test_runtime_loads_text_diff_classes_and_methods
+Text_Diff subprocess failed.
+STDERR:
+PHP Fatal error:  Declaration of & Text_Diff_Op_copy::reverse() must be compatible with & Text_Diff_Op::reverse(): never in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/text-diff-runtime-load/wp-includes/Text/Diff.php on line 377
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:70
+
+18) TextDiffRuntimeBehaviorTest::test_behavior_operation_objects_count_and_reverse_correctly
+Text_Diff subprocess failed.
+STDERR:
+PHP Fatal error:  Declaration of & Text_Diff_Op_copy::reverse() must be compatible with & Text_Diff_Op::reverse(): never in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/text-diff-ops-contract/wp-includes/Text/Diff.php on line 377
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:133
+
+19) TextDiffRuntimeBehaviorTest::test_behavior_diff_native_engine_reconstructs_counts_reverse_and_lcs
+Text_Diff subprocess failed.
+STDERR:
+PHP Fatal error:  Declaration of & Text_Diff_Op_copy::reverse() must be compatible with & Text_Diff_Op::reverse(): never in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/text-diff-native-engine/wp-includes/Text/Diff.php on line 377
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:203
+
+20) TextDiffRuntimeBehaviorTest::test_behavior_backward_compatible_constructor_signature_still_works
+Text_Diff subprocess failed.
+STDERR:
+PHP Fatal error:  Declaration of & Text_Diff_Op_copy::reverse() must be compatible with & Text_Diff_Op::reverse(): never in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/text-diff-backcompat-constructor/wp-includes/Text/Diff.php on line 377
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:243
+
+21) TextDiffRuntimeBehaviorTest::test_behavior_mapped_diff_uses_mapped_lines_but_preserves_original_lines
+Text_Diff subprocess failed.
+STDERR:
+PHP Fatal error:  Declaration of & Text_Diff_Op_copy::reverse() must be compatible with & Text_Diff_Op::reverse(): never in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/text-mapped-diff/wp-includes/Text/Diff.php on line 377
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:276
+
+22) TextDiffRuntimeBehaviorTest::test_behavior_trim_newlines_temp_dir_and_check_contract
+Text_Diff subprocess failed.
+STDERR:
+PHP Fatal error:  Declaration of & Text_Diff_Op_copy::reverse() must be compatible with & Text_Diff_Op::reverse(): never in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/text-diff-utility-methods/wp-includes/Text/Diff.php on line 377
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:314
+
+23) TextDiffRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_text_diff_scenarios
+Text_Diff subprocess failed.
+STDERR:
+PHP Fatal error:  Declaration of & Text_Diff_Op_copy::reverse() must be compatible with & Text_Diff_Op::reverse(): never in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/text-diff-semantic-fingerprint/wp-includes/Text/Diff.php on line 377
+
+STDOUT:
+
+Failed asserting that 255 is identical to 0.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:20
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/015_TextDiffRuntimeBehaviorTest.php:368
+
+24) GetId3Ac3RuntimeBehaviorTest::test_behavior_core_lookup_tables_match_expected_contract
+AC3 module execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => Unsupported operand types: array + int
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/ac3-core-lookups/wp-includes/ID3/module.audio.ac3.php
+    [line] => 432
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(20): getid3_ac3::frameSizeLookup()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:31
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/016_GetId3Ac3RuntimeBehaviorTest.php:120
+
+25) AtomLibRuntimeBehaviorTest::test_parse_basic_atom_feed_with_one_entry
+atomlib.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => count(): Argument #1 ($value) must be of type Countable|array, string given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/parse_basic_feed/wp-includes/atomlib.php
+    [line] => 250
+    [trace] => #0 [internal function]: AtomParser->end_element()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/parse_basic_feed/wp-includes/atomlib.php(138): xml_parse()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(23): AtomParser->parse()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:33
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:152
+
+26) AtomLibRuntimeBehaviorTest::test_parse_html_content_preserves_html_content_type
+atomlib.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => count(): Argument #1 ($value) must be of type Countable|array, string given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/parse_html_content/wp-includes/atomlib.php
+    [line] => 250
+    [trace] => #0 [internal function]: AtomParser->end_element()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/parse_html_content/wp-includes/atomlib.php(138): xml_parse()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): AtomParser->parse()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:33
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:207
+
+27) AtomLibRuntimeBehaviorTest::test_content_with_src_attribute_is_stored_as_attributes
+atomlib.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => TypeError
+    [message] => count(): Argument #1 ($value) must be of type Countable|array, string given
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/parse_content_src_attribute/wp-includes/atomlib.php
+    [line] => 250
+    [trace] => #0 [internal function]: AtomParser->end_element()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/parse_content_src_attribute/wp-includes/atomlib.php(138): xml_parse()
+#2 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): AtomParser->parse()
+#3 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#4 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:33
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/019_AtomLibRuntimeBehaviorTest.php:249
+
+28) FtpBaseRuntimeBehaviorTest::test_constructor_initializes_default_state_without_network_connection
+class-ftp.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Undefined constant "FTP_OS_UNIX"
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/constructor_default_state/wp-admin/includes/class-ftp.php
+    [line] => 133
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): ftp_base->__construct()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:78
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:166
+
+29) FtpBaseRuntimeBehaviorTest::test_set_type_accepts_valid_modes_and_rejects_invalid_mode
+class-ftp.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Undefined constant "FTP_OS_UNIX"
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/set_type_behavior/wp-admin/includes/class-ftp.php
+    [line] => 133
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): ftp_base->__construct()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:78
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:212
+
+30) FtpBaseRuntimeBehaviorTest::test_passive_mode_respects_port_mode_availability
+class-ftp.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Undefined constant "FTP_OS_UNIX"
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/passive_mode_behavior/wp-admin/includes/class-ftp.php
+    [line] => 133
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): ftp_base->__construct()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:78
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:247
+
+31) FtpBaseRuntimeBehaviorTest::test_parselisting_parses_unix_file_directory_and_symlink_entries
+class-ftp.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Undefined constant "FTP_OS_UNIX"
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/parse_unix_listing/wp-admin/includes/class-ftp.php
+    [line] => 133
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): ftp_base->__construct()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:78
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:276
+
+32) FtpBaseRuntimeBehaviorTest::test_parselisting_parses_windows_file_and_directory_entries
+class-ftp.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Undefined constant "FTP_OS_UNIX"
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/parse_windows_listing/wp-admin/includes/class-ftp.php
+    [line] => 133
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): ftp_base->__construct()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:78
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:308
+
+33) FtpBaseRuntimeBehaviorTest::test_glob_pattern_match_supports_star_and_question_mark_patterns
+class-ftp.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Undefined constant "FTP_OS_UNIX"
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/glob_pattern_match_behavior/wp-admin/includes/class-ftp.php
+    [line] => 133
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): ftp_base->__construct()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:78
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:335
+
+34) FtpBaseRuntimeBehaviorTest::test_error_stack_pushes_and_pops_last_error
+class-ftp.php execution failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => Undefined constant "FTP_OS_UNIX"
+    [file] => /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/error_stack_behavior/wp-admin/includes/class-ftp.php
+    [line] => 133
+    [trace] => #0 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36) : eval()'d code(19): ftp_base->__construct()
+#1 /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/support/library-runner.php(36): eval()
+#2 {main}
+    [output] => 
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:78
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/020_FtpBaseRuntimeBehaviorTest.php:364
+
+35) Pop3RuntimeBehaviorTest::test_runtime_loads_pop3_class_and_constructor_sets_defaults
+Failed asserting that 60 is identical to 25.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:206
+
+36) Pop3RuntimeBehaviorTest::test_pop_list_returns_empty_mailbox_marker_when_count_is_zero
+Failed asserting that false is of type "array".
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/021_Pop3RuntimeBehaviorTest.php:445
+
+37) ServicesJsonRuntimeBehaviorTest::test_behavior_encode_primitives_null_boolean_number_string
+Failed asserting that 0 is identical to '0'.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/030_ServicesJsonRuntimeBehaviorTest.php:99
+
+38) CommentsListTableRuntimeBehaviorTest::test_behavior_post_comments_table_uses_compact_columns_and_fixed_page_size
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 (
+-    0 => 'widefat'
+-    1 => 'comments'
+-    2 => 'comments-box'
++    0 => 'comments-box'
+ )
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/032_CommentsListTableRuntimeBehaviorTest.php:275
+
+39) CommentsListTableRuntimeBehaviorTest::test_semantic_fingerprint_for_representative_comments_table_state
+Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'17b5139c54db41578bbe92c52762d988'
++'ddbee20585bd0c2e678f2b17b7964e96'
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/032_CommentsListTableRuntimeBehaviorTest.php:338
+
+40) SimplePieLocatorRuntimeBehaviorTest::test_find_with_local_extension_fallback_returns_feed_and_updates_working_reference
+Locator.php scenario failed.
+Array
+(
+    [ok] => 
+    [exception_class] => Error
+    [message] => SimplePie_Locator::find(): Argument #1 ($working) could not be passed by reference
+    [file] => /tmp/loc_runner_U5JyKY(238) : eval()'d code
+    [line] => 16
+    [trace] => #0 /tmp/loc_runner_U5JyKY(238): eval()
+#1 {main}
+    [output] => 
+Deprecated: Creation of dynamic property SimplePie_Locator::$dom is deprecated in /tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/build/sandboxes/Rector_Baseline/045_locator_find_local_extension/wp-includes/SimplePie/Locator.php on line 71
+
+)
+
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/045_SimplePieLocatorRuntimeBehaviorTest.php:356
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/045_SimplePieLocatorRuntimeBehaviorTest.php:512
+
+41) WpCustomizeManagerRuntimeBehaviorTest::test_runtime_loads_constructor_and_registers_core_hooks
+Failed asserting that an array contains 'wp_die_handler'.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/057_WpCustomizeManagerRuntimeBehaviorTest.php:138
+
+42) WpCustomizeManagerRuntimeBehaviorTest::test_behavior_previewing_inactive_theme_adds_and_removes_theme_filters
+Failed asserting that an array contains 'get_template'.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/057_WpCustomizeManagerRuntimeBehaviorTest.php:288
+
+43) WpScriptsRuntimeBehaviorTest::test_runtime_constructor_initializes_state_and_registers_init_hook
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 (
+     0 => Array &1 (
+         0 => 'init'
+-        1 => 'init'
++        1 => Array &2 ()
+         2 => 0
+     )
+ )
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/061_WpScriptsRuntimeBehaviorTest.php:524
+
+44) WpImageEditorGdRuntimeBehaviorTest::test_php8_loads_valid_png_instead_of_treating_gdimage_as_invalid_image
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/069_WpImageEditorGdRuntimeBehaviorTest.php:696
+
+45) WpImageEditorGdRuntimeBehaviorTest::test_php8_resize_accepts_gdimage_from_imagecreatetruecolor
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/069_WpImageEditorGdRuntimeBehaviorTest.php:727
+
+46) WpImageEditorGdRuntimeBehaviorTest::test_php8_crop_accepts_gdimage_destination
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/069_WpImageEditorGdRuntimeBehaviorTest.php:758
+
+47) WpImageEditorGdRuntimeBehaviorTest::test_php8_rotate_and_flip_accept_gdimage_results
+Failed asserting that false is true.
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/069_WpImageEditorGdRuntimeBehaviorTest.php:799
+
+48) AkismetWidgetRuntimeBehaviorTest::test_constructor_adds_css_action_when_widget_is_active
+Failed asserting that an array contains Array &0 (
+    'hook' => 'wp_head'
+    'callback' => Array &1 (
+        0 => 'Akismet_Widget'
+        1 => 'css'
+    )
+    'priority' => 10
+    'accepted_args' => 1
+).
+
+/tmp/claude-0/-home-user-temp-workspace/65f6cac9-2064-53d5-8c0b-db861347fb05/scratchpad/work/harness/tests/files/094_AkismetWidgetRuntimeBehaviorTest.php:391
+
+ERRORS!
+Tests: 631, Assertions: 6057, Errors: 1, Failures: 48.

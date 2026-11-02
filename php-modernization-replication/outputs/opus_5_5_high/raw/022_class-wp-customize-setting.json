@@ -1,0 +1,65 @@
+{
+ "file": "022_class-wp-customize-setting.php",
+ "attempts": [
+  {
+   "attempt": 1,
+   "secs": 82.8,
+   "stop_reason": "end_turn",
+   "is_error": false,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 7711,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 10123,
+    "output_tokens_details": {
+     "thinking_tokens": 3712
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 7711,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 10123,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 7711,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 7711
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "model_usage": {
+    "claude-opus-5-5": {
+     "inputTokens": 2,
+     "outputTokens": 10123,
+     "cacheReadInputTokens": 0,
+     "cacheCreationInputTokens": 7711,
+     "webSearchRequests": 0,
+     "costUSD": 0.264156,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 3712,
+     "cacheCreationEphemeral5mInputTokens": 0,
+     "cacheCreationEphemeral1hInputTokens": 7711,
+     "canonicalModel": "claude-opus-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   },
+   "cost_usd": 0.264156,
+   "status": "complete"
+  }
+ ]
+}
