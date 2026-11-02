@@ -1,0 +1,833 @@
+Get Id3Lib Runtime Behavior
+ [x] Runtime loads getid3 lib class without fatal error
+ [x] Behavior numeric and binary conversions match expected contract
+ [x] Behavior arrays paths time and lookup tables match expected contract
+ [x] Behavior copy file parts copies selected byte range
+ [x] Behavior include dependency reports missing dependency without throwing
+ [x] Semantic fingerprint for representative getid3 lib scenarios
+
+Get Id3Asf Runtime Behavior
+ [x] Runtime loads asf class and constructs parser
+ [x] Behavior guid conversion round trip matches asf byte order
+ [x] Behavior filetime and lookup tables match expected contract
+ [x] Behavior wm picture type lookup and parser
+ [x] Semantic fingerprint for representative asf helpers
+
+Wp Db Runtime Behavior
+ [x] Runtime loads wpdb class and core constants
+ [x] Behavior prepare and esc like match expected contract
+ [x] Behavior prefix tables and blog prefix match expected contract
+ [x] Behavior insert update delete build expected prepared queries
+ [x] Behavior cached result accessors and flush match expected contract
+ [x] Behavior error visibility toggles match expected contract
+ [x] Semantic fingerprint for representative wpdb scenarios
+
+Ixr Runtime Behavior
+ [x] Runtime loads ixr classes
+ [x] Behavior ixr value encodes scalar array and struct values
+ [x] Behavior ixr date base64 error and request xml
+ [x] Behavior ixr message parses method call with params
+ [x] Behavior ixr message rejects invalid xml and invalid root
+ [x] Behavior ixr server callbacks and multicall without network
+ [x] Behavior ixr client url parsing and error accessors
+ [x] Semantic fingerprint for representative ixr scenarios
+
+Snoopy Runtime Behavior
+ [x] Runtime loads snoopy class and default properties
+ [x] Behavior striplinks and expandlinks match expected contract
+ [x] Behavior striptext and stripform match expected contract
+ [x] Behavior prepare post body urlencoded and multipart
+ [x] Behavior set submit modes cookies and invalid protocol
+ [x] Semantic fingerprint for representative snoopy helpers
+
+Widgets Runtime Behavior
+ [x] Runtime loads widget api without external stub
+ [x] Wp widget constructor field names form update and callbacks
+ [x] Register sidebar register sidebars descriptions and unregister
+ [x] Widget registration control description and unregister
+ [x] Dynamic sidebar active detection and semantic fingerprint
+
+Class Wp Runtime Behavior
+ [x] Runtime loads wp and matches map classes
+ [x] Behavior matches map regex substitutes rewrite matches
+ [x] Behavior query var helpers and build query string
+ [ ] Behavior parse request without rewrites uses extra get post and private vars
+ [ ] Behavior parse request with rewrite rule sets matched rule and query vars
+ [x] Behavior query posts register globals and handle 404
+ [ ] Semantic fingerprint for representative class wp scenarios
+
+Wp Login Runtime Behavior
+ [x] Runtime loads login endpoint and defines expected functions
+ [x] Behavior default login form renders invalid username error
+ [x] Behavior loggedout message is rendered as message not error
+ [x] Behavior lostpassword get renders form
+ [x] Behavior lostpassword post empty username renders expected error
+ [x] Behavior register get renders registration form when enabled
+ [x] Semantic fingerprint for representative wp login scenarios
+
+Get Id3Core Runtime Behavior
+ [ ] Runtime loads getid3 core classes and default options
+ [ ] Behavior set option and openfile contract
+ [ ] Behavior file format detection matches expected contract
+ [ ] Behavior tags calculations hashing and module loading
+ [ ] Behavior analyze unknown local file returns error without modules
+ [ ] Semantic fingerprint for representative getid3 core scenarios
+
+Wp Theme Runtime Behavior
+ [x] Runtime loads wp theme class and array access contract
+ [x] Behavior constructs valid theme and reads headers paths uris and screenshot
+ [x] Behavior missing stylesheet and missing index errors match contract
+ [x] Behavior child theme parent resolution and legacy magic properties
+ [x] Behavior array access files page templates cache delete and sort
+ [x] Behavior allowed theme logic for single and multisite
+ [x] Semantic fingerprint for representative wp theme scenarios
+
+Pomo Translations Runtime Behavior
+ [x] Runtime loads translation classes and entry dependency
+ [x] Behavior headers entry add translate and context lookup
+ [x] Behavior add entry or merge and merge collections
+ [x] Behavior gettext header parsing plural function and headers
+ [x] Behavior noop translations preserve original strings
+ [x] Semantic fingerprint for representative pomo translation scenarios
+
+Get Id3Riff Runtime Behavior
+ [x] Runtime loads riff module class and expected methods
+ [x] Behavior parse waveformatex for pcm and mp3 contract
+ [x] Behavior parse bitmapinfoheader matches expected contract
+ [x] Behavior lookup tables return known and unknown values
+ [x] Behavior analyze minimal pcm wave file
+ [x] Semantic fingerprint for representative riff scenarios
+
+Wp Admin File Runtime Behavior
+ [x] Runtime loads file helpers and global descriptions
+ [x] Behavior get file description standard template and fallback
+ [x] Behavior get home path for root and subdirectory install
+ [x] Behavior list files recursion and depth contract
+ [x] Behavior wp tempnam creates unique tmp file
+ [x] Behavior validate file to edit returns file or dies on invalid
+ [x] Behavior verify file md5 accepts hex and base64 and reports mismatch
+ [x] Behavior wp handle sideload success and error paths
+ [x] Behavior download url and http error contract
+ [x] Semantic fingerprint for representative admin file scenarios
+
+Get Id3Id3v2Runtime Behavior
+ [x] Runtime loads id3v2 class and expected methods
+ [x] Behavior lookup helpers match expected contract
+ [x] Behavior genre parsing and deunsynchronise match expected contract
+ [x] Behavior parse text frames and user text frame
+ [x] Behavior analyze minimal id3v23 tag extracts core comments
+ [x] Semantic fingerprint for representative id3v2 scenarios
+
+Text Diff Runtime Behavior
+ [x] Runtime loads text diff classes and methods
+ [x] Behavior operation objects count and reverse correctly
+ [x] Behavior diff native engine reconstructs counts reverse and lcs
+ [x] Behavior backward compatible constructor signature still works
+ [x] Behavior mapped diff uses mapped lines but preserves original lines
+ [x] Behavior trim newlines temp dir and check contract
+ [x] Semantic fingerprint for representative text diff scenarios
+
+Get Id3Ac3Runtime Behavior
+ [x] Runtime loads ac3 class and expected methods
+ [ ] Behavior core lookup tables match expected contract
+ [x] Behavior channel mix room and compression helpers match expected contract
+ [x] Behavior analyze minimal valid ac3 frame extracts core audio metadata
+ [x] Behavior analyze invalid syncword reports error and clears ac3 format
+ [x] Semantic fingerprint for representative ac3 scenarios
+
+Press This Runtime Behavior
+ [x] Runtime renders press this page without fatal error
+ [x] Ajax video panel renders embed code ui
+ [x] Ajax photo images returns direct image url array
+ [x] Ajax photo thickbox renders image selector ui
+ [x] Post submission saves draft and shows success message
+
+Pomo Streams Runtime Behavior
+ [x] Runtime loads pomo stream classes
+ [x] String reader read method remains public api
+ [x] String reader reads seeks and tracks position
+ [x] String reader clamps position when reading past end
+ [x] Readint32 supports little and big endian values
+ [x] Readint32array reads multiple values
+ [x] File reader reads file contents and closes resource
+ [x] Cached file reader loads entire file into string reader
+
+Atom Lib Runtime Behavior
+ [x] Runtime loads atomlib classes and constructor initializes parser
+ [x] Atom feed and entry default collections are arrays
+ [x] Parse basic atom feed with one entry
+ [x] Parse html content preserves html content type
+ [x] Content with src attribute is stored as attributes
+
+Ftp Base Runtime Behavior
+ [x] Runtime loads ftp base class and required constants
+ [x] Constructor initializes default state without network connection
+ [x] Set type accepts valid modes and rejects invalid mode
+ [x] Passive mode respects port mode availability
+ [x] Parselisting parses unix file directory and symlink entries
+ [x] Parselisting parses windows file and directory entries
+ [x] Glob pattern match supports star and question mark patterns
+ [x] Error stack pushes and pops last error
+
+Pop3Runtime Behavior
+ [x] Runtime loads pop3 class and constructor sets defaults
+ [x] Methods without connection return false and set errors
+ [x] Send cmd writes command with crlf and reads single line reply
+ [x] Login sends user pass and stat and returns message count
+ [x] Last and popstat parse stat response
+ [x] Pop list parses single message size
+ [x] Pop list parses full mailbox listing
+ [ ] Pop list returns empty mailbox marker when count is zero
+ [x] Uidl parses single and full uidl listing
+ [x] Get retrieves message lines and unstuffs dot prefixed lines
+
+Customize Setting Runtime Behavior
+ [x] Runtime loads customize setting classes
+ [x] Constructor normalizes array style id and registers sanitize filters
+ [x] Post value is fetched from manager and cached
+ [x] Sanitize unslashes value
+ [x] Value and update handle nested theme mods and options
+ [x] Preview filter replaces post value inside nested array
+ [x] Save checks capabilities and updates only when allowed
+ [x] Js value applies js sanitize filter and decodes html entities
+ [x] Header and background image specialized settings update expected targets
+ [x] Multidimensional helpers replace get and isset nested values
+
+Get Id3Id3v1Runtime Behavior
+ [x] Runtime loads id3v1 class and static api
+ [x] Cutfield trims at null byte and outer whitespace
+ [x] Genre lookup name id and standardisation
+ [x] Array of genres includes standard and scmpx extended values
+ [x] Generate id3v1 tag without track uses 128 bytes and unknown genre for invalid id
+ [x] Generate id3v1 tag with track uses id3v11 comment layout
+ [x] Analyze parses valid id3v11 tag from file
+ [x] Analyze warns for duplicate id3v1 tag before final tag
+ [x] Analyze no tag leaves id3v1 unset and returns true
+ [x] Analyze returns false and warns when filesize not supported
+
+Edit Form Advanced Runtime Behavior
+ [x] Runtime loads post editor without fatal error
+ [x] Behavior registers expected post meta boxes and help tabs
+ [x] Semantic fingerprint for representative post editor scenario
+
+Widgets Admin Page Runtime Behavior
+ [x] Runtime renders widgets admin screen without fatal error
+ [x] Behavior renders available widgets and sidebar layout
+ [x] Semantic fingerprint for representative widgets screen
+
+Simple Pie Source Runtime Behavior
+ [x] Runtime loads simplepie source class without fatal error
+ [x] Behavior extracts title links categories and people
+ [x] Behavior extracts metadata language geo and image
+ [x] Semantic fingerprint for representative source data
+
+Media Library Admin Runtime Behavior
+ [x] Runtime renders media library list screen without fatal error
+ [x] Behavior prepares list table and registers list mode screen features
+ [x] Behavior renders status message for updated attachment
+ [x] Semantic fingerprint for representative media library list screen
+
+Network Themes Admin Runtime Behavior
+ [x] Runtime renders network themes screen without fatal error
+ [x] Behavior prepares network themes list table and screen features
+ [x] Behavior preserves default request state for theme table
+ [x] Semantic fingerprint for representative network themes screen
+
+Get Id3Ogg Runtime Behavior
+ [x] Runtime loads ogg handler and static helpers
+ [x] Behavior parses vorbis identification header
+ [x] Behavior handles abr sentinel bitrates and zero samplerate error
+ [x] Semantic fingerprint for representative ogg parser helpers
+
+Services Json Runtime Behavior
+ [x] Runtime loads services json class and contract
+ [ ] Behavior encode primitives null boolean number string
+ [x] Behavior encode arrays and objects
+ [x] Behavior decode json to php and roundtrip
+ [x] Behavior error handling and invalid json
+ [x] Behavior unicode and special characters
+ [x] Semantic fingerprint json encode decode behavior
+
+Plugins List Table Runtime Behavior
+ [x] Runtime loads plugins list table class and columns
+ [x] Behavior prepare items classifies plugins and updates totals
+ [x] Behavior search views bulk actions and row rendering
+ [x] Semantic fingerprint for representative plugins table state
+
+Comments List Table Runtime Behavior
+ [x] Runtime loads comments list table classes and columns
+ [x] Behavior prepare items fetches comments and pagination state
+ [x] Behavior views bulk actions and comment row rendering
+ [x] Behavior post comments table uses compact columns and fixed page size
+ [x] Semantic fingerprint for representative comments table state
+
+Multisite Settings Runtime Behavior
+ [x] Runtime resolves configured current site and blog without fatal error
+ [x] Behavior finds network first for non subdomain path install
+ [x] Behavior normalizes admin request path and https port
+ [x] Behavior uses preexisting current site and blog but still initializes runtime
+ [x] Semantic fingerprint for representative multisite resolution
+
+Text Diff Inline Renderer Runtime Behavior
+ [x] Runtime loads inline renderer and default markup settings
+ [x] Behavior encodes lines and wraps added deleted text
+ [x] Behavior splits words and renders word level changes
+ [x] Behavior renders native diff with inline markup
+ [x] Semantic fingerprint for representative inline renderer behavior
+
+Trackback Endpoint Runtime Behavior
+ [x] Runtime accepts valid trackback and returns success xml
+ [x] Behavior parses trackback id from request uri when query id missing
+ [x] Behavior rejects duplicate trackback url for same post
+ [x] Behavior rejects trackback when pings are closed
+ [x] Behavior missing id returns xml error
+ [x] Behavior redirects when request does not look like trackback
+ [x] Semantic fingerprint for representative trackback success
+
+Get Id3Ape Tag Runtime Behavior
+ [x] Runtime loads apetag handler and default properties
+ [x] Behavior parses ape header footer and flags
+ [x] Behavior content type and utf8 item lookups
+ [x] Behavior analyzes valid ape tag comments and replaygain
+ [x] Behavior returns false when no ape tag found
+ [x] Semantic fingerprint for representative apetag behavior
+
+MSSites List Table Runtime Behavior
+ [x] Runtime loads sites list table columns and actions
+ [x] Behavior prepare items default query and pagination
+ [x] Behavior prepare items searches path and sorts by blogname
+ [x] Behavior prepare items searches ipv4 registration log
+ [x] Behavior display rows renders site state actions dates and users
+ [x] Semantic fingerprint for representative sites table behavior
+
+Wp Styles Runtime Behavior
+ [x] Runtime loads styles class and constructor hook
+ [x] Behavior do item renders stylesheet and inline style
+ [x] Behavior rtl replace conditional and alternate styles
+ [x] Behavior concat accumulates default directory styles only
+ [x] Behavior css href default dirs all deps and reset
+ [x] Semantic fingerprint for representative styles behavior
+
+Wp Upgrader Skins Runtime Behavior
+ [x] Runtime loads upgrader skin classes
+ [x] Base skin options header footer feedback error and credentials
+ [x] Decrement update count outputs only for successful result
+ [x] Plugin upgrader skin after iframe actions and filter
+ [x] Bulk upgrader skin messages error success and reset
+ [x] Installer theme language and automatic skins representative behavior
+ [x] Semantic fingerprint for representative upgrader skin behavior
+
+Wp Media List Table Runtime Behavior
+ [x] Runtime loads media list table class and constructor flags
+ [x] Prepare items sets query globals pagination and trash mode
+ [x] Views columns bulk actions sortable and filter bar output
+ [x] Current action has items and no items behavior
+ [x] Display rows renders regular attachment columns and actions
+ [x] Display rows renders detached and trash specific actions
+ [x] Semantic fingerprint for representative media table behavior
+
+Get Id3Lyrics3Runtime Behavior
+ [x] Runtime loads and public helper methods preserve legacy return values
+ [x] Lyrics timestamp parser builds synced and unsynced comment arrays
+ [x] Get lyrics3 data v1 parses raw lyrics offsets and id3v1 overlap warning
+ [x] Get lyrics3 data v2 parses fields images flags and timestamped lyrics
+ [x] Analyze detects lyrics3v2 before id3v1 and records expected markers
+
+Image Edit Runtime Behavior
+ [x] Runtime loads core image edit functions
+ [x] Preview ratio caps images larger than four hundred pixels
+ [x] Apply changes combines adjacent rotate and flip operations before crop
+ [x] Semantic fingerprint for safe editor operations
+
+Image Admin Runtime Behavior
+ [x] Runtime loads expected image admin functions
+ [x] Exif fraction and date helpers preserve wordpress legacy conversions
+ [x] Displayable image check preserves filter short circuit even for invalid file
+ [x] Crop image uses editor crop save unique name and creates destination directory
+
+Image Editor Base Runtime Behavior
+ [x] Runtime loads abstract base and default static capabilities
+ [x] Quality getter and setter preserve filter order and range behavior
+ [x] Size suffix filename and output format are derived from file and mime maps
+ [x] Make image creates local directory and returns callback result
+ [x] Semantic fingerprint for representative editor base state
+
+Simple Pie Locator Runtime Behavior
+ [x] Runtime loads and is feed distinguishes remote content types and local files
+ [x] Get base and autodiscovery return first discovered feed with registry file creation
+ [x] Get links classifies local and remote links then extension returns first valid feed
+ [x] Find with local extension fallback returns feed and updates working reference
+ [x] Semantic fingerprint for extension body failure removal and limit behavior
+
+Get Id3Flv Runtime Behavior
+ [x] Runtime loads constants and codec lookup tables
+ [x] Analyze rejects invalid flv signature without leaving fileformat
+ [x] Audio video header byte decoding and lookup behavior without full analyze
+ [x] Amf stream and reader decode mixed array values
+ [x] Semantic fingerprint for codecs amf and exp golomb escape
+
+Update Core Runtime Behavior
+ [x] Runtime loads default update page and registers assets
+ [x] List core update renders compatible upgrade form and download link
+ [x] List core update blocks incompatible php and mysql without upgrade buttons
+ [x] Dismissed updates renders toggle and hidden localized update
+ [x] Semantic fingerprint for reinstall and empty update dashboard markers
+
+About Admin Runtime Behavior
+ [x] Runtime loads about page enqueues mediaelement and renders english overview
+ [x] Non english locale uses static overview image instead of flash embed
+ [x] Video shortcodes and plugin browse link are rendered with expected attributes
+ [x] Return to dashboard links follow update capability and admin context
+ [x] Semantic fingerprint for multisite updated about page markers
+
+Simple Pie Parser Runtime Behavior
+ [x] Runtime loads and registry can be attached
+ [x] Split ns normalizes itunes and media rss namespaces
+ [x] Manual tag stack tracks xml base language attributes and child data
+ [x] Parse strips bom rewrites xml declaration and reports errors
+ [x] Semantic fingerprint for xhtml construct and parser stack state
+
+Wp Oembed Runtime Behavior
+ [x] Runtime loads constructor registers filter and popular providers
+ [x] Early provider add remove and provider matching behavior
+ [x] Discover prefers json link and falls back to xml link
+ [x] Fetch builds provider url parses json and get html filters result
+ [x] Semantic fingerprint for data conversion and private call compatibility
+
+Wp Ms Deprecated Runtime Behavior
+ [x] Runtime loads and exposes deprecated multisite functions
+ [x] User and password deprecated wrappers delegate to expected helpers
+ [x] Dashboard blog main blog and blogaddress legacy behavior
+ [x] Blog list and most active blogs use legacy postcount sorting and display
+ [x] Redirect helpers and semantic fingerprint for representative paths
+
+Wp Ms Themes List Table Runtime Behavior
+ [x] Runtime loads and ajax capability depends on screen mode
+ [x] Prepare items network mode partitions update and paginates themes
+ [x] Prepare items site mode excludes network enabled themes
+ [x] Single row renders network actions meta filters and row hooks
+ [x] Semantic fingerprint for disabled network theme listing
+
+Wp Themes List Table Runtime Behavior
+ [x] Runtime loads and ajax capability check uses switch themes
+ [x] Prepare items filters search features excludes active theme and sets pagination
+ [x] Display rows renders theme actions preview delete and update markers
+ [x] No items and js vars emit expected observable output
+ [x] Semantic fingerprint for filtered theme display scenario
+
+Nav Menu Runtime Behavior
+ [x] Runtime loads and exposes expected functions
+ [x] Register unregister and location assignment behavior
+ [x] Menu object create update delete and duplicate protection
+ [x] Update custom nav menu item persists post meta and term link
+ [ ] Semantic fingerprint for menu item setup filtering and sorting
+
+Magpie Rss Runtime Behavior
+ [x] Runtime loads magpie classes functions and wp hooks
+ [x] Behavior parses rss feed and normalizes item fields
+ [x] Behavior parses atom feed and normalizes content fields
+ [x] Behavior remote fetch wrapper and cache round trip
+ [x] Semantic fingerprint for dates status cache and rendered rss
+
+Akismet Runtime Behavior
+ [x] Runtime init registers expected hooks once
+ [x] Behavior api key and query building are stable
+ [x] Behavior last comment matching and nonce output
+ [x] Behavior roles discard policy and moderation email suppression
+ [x] Semantic fingerprint for representative akismet helpers
+
+Wp Customize Manager Runtime Behavior
+ [x] Runtime loads constructor and registers core hooks
+ [x] Behavior color sanitizers and header textcolor callback
+ [x] Behavior add remove and prepare controls orders visible containers
+ [x] Behavior previewing inactive theme adds and removes theme filters
+ [x] Semantic fingerprint for post values and preview markup helpers
+
+Wp Session Tokens Runtime Behavior
+ [x] Runtime loads base and default manager classes
+ [x] Behavior create get verify update and destroy session
+ [x] Behavior filters expired sessions and prepares legacy integer sessions
+ [x] Behavior destroy others keeps known token or clears all for missing token
+ [x] Semantic fingerprint for representative session lifecycle
+
+Wp Admin Credits Runtime Behavior
+ [x] Runtime renders credits admin page from cached credits
+ [x] Behavior renders profile people and library links
+ [x] Behavior fetches remote credits and caches them when transient missing
+ [x] Behavior remote failure renders fallback message and footer
+ [x] Semantic fingerprint for representative credits screen
+
+Wp Admin Themes Runtime Behavior
+ [x] Runtime renders themes admin page
+ [x] Behavior registers help tabs scripts and theme settings
+ [x] Behavior activate action switches theme and redirects
+ [x] Behavior delete action deletes theme and redirects
+ [x] Semantic fingerprint for representative theme screen
+
+Wp Scripts Runtime Behavior
+ [x] Runtime constructor initializes state and registers init hook
+ [x] Print extra script and localize preserve inline script behavior
+ [x] Do item prints extra data and versioned script source
+ [x] Footer group script is deferred from head and printed in footer
+ [x] Concat default dir external handles and reset state
+
+Text Diff Engine String Runtime Behavior
+ [x] Runtime loads engine and reports invalid mode errors
+ [x] Unified diff parses copy change delete and add without final newline
+ [x] Context diff parses copy change and add operations
+ [x] Autodetect selects unified and context modes from headers
+
+Get Id3Dts Runtime Behavior
+ [x] Runtime loads class syncwords and lookup tables
+ [x] Channel dialog and invalid scalar lookup behavior
+ [x] Analyze valid raw big endian header populates audio and dts fields
+ [x] Analyze invalid syncword reports error and removes fileformat
+ [x] Analyze matroska dependency allows header without syncword
+
+Wp Diff Runtime Behavior
+ [x] Runtime loads renderer classes and constructor sets split view
+ [x] Added deleted and context rows preserve split and unified markup
+ [x] String distance and difference helpers match original formula
+ [x] Interleave changed lines identifies matches insertions and row alignment
+ [x] Changed lines render inline diff rows and semantic fingerprint
+
+Wp Image Editor Imagick Runtime Behavior
+ [x] Runtime loads class reports environment and supports known mime types
+ [x] Load missing and valid file behaviors are preserved
+ [x] Resize crop rotate and flip update size and imagick operations
+ [x] Set quality save and stream preserve output metadata and blob
+ [x] Multi resize generates metadata for valid sizes and ignores invalid size specs
+
+Wp Dependencies Runtime Behavior
+ [x] Runtime loads dependency classes and default state
+ [x] Register data query and remove preserve observable state
+ [x] Enqueue dequeue and query queue with handle arguments
+ [x] All deps builds dependency order and ignores missing top level items
+ [x] Do items processes dependency graph aliases done state and fingerprint
+
+User Admin Api Runtime Behavior
+ [x] Runtime loads user admin api and registers password nag hooks
+ [x] Role user and draft helpers return expected observable values
+ [x] Edit user returns validation errors for bad new user payload
+ [x] Edit user creates new user with sanitized fields role and notification
+ [x] Delete user reassigns content cleans caches deletes user and revoke removes caps
+
+Post Revisions Runtime Behavior
+ [x] Runtime loads revision functions and filters protected fields
+ [x] Revision field extraction builds revision and autosave payloads
+ [x] Put post revision rejects invalid inputs and inserts slashed revision
+ [x] Revision lookup autosave detection and version parsing
+ [x] Restore post revision updates parent fields meta and action
+
+Wp Image Editor Gd Runtime Behavior
+ [x] Runtime loads class and reports gd capability
+ [x] Php8 loads valid png instead of treating gdimage as invalid image
+ [x] Php8 resize accepts gdimage from imagecreatetruecolor
+ [x] Php8 crop accepts gdimage destination
+ [x] Php8 rotate and flip accept gdimage results
+
+Simple Pie File Runtime Behavior
+ [x] Runtime loads class and required source constants
+ [x] Local file success reads body and sets local method
+ [x] Missing local file records failure without throwing
+ [x] Empty local file is treated as failed read like original simplepie
+
+Plugins Admin Runtime Behavior
+ [x] Runtime renders plugins page with list table and help markers
+ [x] Activate action activates plugin updates recent list and redirects
+ [x] Clear recent list updates option then renders page
+
+Users List Table Runtime Behavior
+ [x] Runtime constructor sets regular and site user modes
+ [x] Permissions and promote action are selected from context
+ [x] Prepare items and single row emit expected behavior markers
+
+Network Site Settings Runtime Behavior
+ [x] Runtime renders site settings screen
+ [x] Non multisite installation dies
+ [x] User without manage sites permission dies
+ [x] Missing site id dies as invalid site id
+ [x] Cannot edit network dies after blog details lookup
+ [x] Updated message is rendered when update query parameter is present
+ [x] Main site renders siteurl and home as readonly code
+ [x] Update site updates scalar options skips protected array and allowedthemes
+ [x] Multiline option is rendered as textarea and serialized array is disabled
+ [x] Semantic fingerprint for representative site settings screen
+
+Network Site Themes Runtime Behavior
+ [x] Runtime renders site themes screen
+ [x] Non multisite installation dies
+ [x] User without manage sites permission dies
+ [x] Missing site id dies as invalid site id
+ [x] Cannot edit network dies after blog details lookup
+ [x] Enabled message is rendered for single theme
+ [x] Disabled message is rendered for multiple themes
+ [x] Error message is rendered when no theme selected
+ [x] Enable single theme updates allowedthemes and redirects
+ [x] Disable single theme removes allowedtheme and redirects
+ [x] Enable selected themes updates multiple allowedthemes and redirects
+ [x] Disable selected without checked redirects with error none
+ [x] Update site action redirects to clean referer
+ [x] Semantic fingerprint for representative rendered site themes screen
+
+My Sites Runtime Behavior
+ [x] Runtime loads default my sites screen with user blogs
+ [x] Non multisite installation dies before rendering page
+ [x] User without read capability dies before rendering page
+ [x] Empty blog list displays membership warning without form
+ [x] Update primary blog success saves user option and shows updated message
+ [x] Update primary blog dies when selected site does not exist
+ [x] Global settings filter output is rendered when non empty
+ [x] Blog action filter can extend visit and dashboard links
+ [x] Site specific settings filter output is rendered for each blog
+ [x] Many blogs are split into multiple columns
+ [x] Semantic fingerprint for representative my sites screen
+
+Network Upgrade Runtime Behavior
+ [x] Runtime show action loads header help and default screen
+ [x] Non multisite installation dies before admin screen
+ [x] User without manage network capability dies after header
+ [x] Show action displays database upgrade required when site option is old
+ [x] Show action omits database upgrade required when site option matches db version
+ [x] Upgrade action updates site option for first batch and processes blogs
+ [x] Upgrade action does not update site option after first batch
+ [x] Upgrade action outputs all done when no blogs remaining
+ [x] Upgrade action dies when remote upgrade request returns wp error
+ [x] Semantic fingerprint for representative upgrade batch
+
+Post Thumbnail Template Runtime Behavior
+ [x] Runtime loads thumbnail template functions
+ [x] Get post thumbnail id uses explicit post id and current post fallback
+ [x] Has post thumbnail casts thumbnail id to boolean
+ [x] Get the post thumbnail returns empty string when no thumbnail exists
+ [x] Get the post thumbnail fetches image and fires expected actions
+ [x] Post thumbnail size filter can change requested size
+ [x] Post thumbnail html filter can modify final html
+ [x] The post thumbnail echoes generated thumbnail html
+ [x] Update post thumbnail cache primes thumbnail ids and marks query cached
+ [x] Update post thumbnail cache returns early when already cached
+ [x] Get the post thumbnail updates cache when inside loop
+
+Media Admin Runtime Behavior
+ [x] Default action redirects to upload page
+ [x] Edit action without attachment id redirects to upload page
+ [x] Edit action renders attachment edit form
+ [x] Edit action renders updated message when message query is updated
+ [x] Edit action denies user without edit post capability
+ [x] Edit action dies when attachment does not exist
+ [x] Edit action dies when post is not attachment
+ [x] Edit action dies when attachment is in trash
+ [x] Editattachment success redirects to media updated message
+ [x] Editattachment success redirects back to upload referer with posted id
+ [x] Editattachment with errors falls through to edit form and renders errors
+ [x] Semantic fingerprint for representative edit screen
+
+Load Styles Runtime Behavior
+ [x] Runtime with empty load exits cleanly with empty output
+ [x] Loads registered styles and ignores unknown handles
+ [x] Duplicate handles are loaded once
+ [x] Sanitizes load parameter before resolving handles
+ [x] Rtl request uses rtl stylesheet when registered
+ [x] Wp includes css paths are rewritten to wp includes assets
+ [x] Wp admin css image paths are rewritten relative to admin images
+ [x] Deflate compression when client accepts deflate
+ [x] Force gzip compression when c parameter is gzip
+ [x] Semantic fingerprint for representative style bundle
+
+Network Site Info Runtime Behavior
+ [x] Runtime loads site info page and renders form
+ [x] Update message is rendered
+ [x] Main site renders domain and path as code not editable inputs
+ [x] Update site action updates blog details options and redirects
+ [x] Invalid site id dies before rendering page
+ [x] Multisite disabled dies before rendering page
+ [x] Missing manage sites capability dies before rendering page
+ [x] Cannot edit network dies before rendering page
+ [x] Semantic fingerprint for representative rendered page
+
+Network Site New Runtime Behavior
+ [x] Runtime loads add new site page and renders form
+ [x] Update added message is rendered
+ [x] Add site action creates new user blog sends mail and redirects
+ [x] Add site action uses existing user without creating new user
+ [x] Reserved subdirectory site name dies before creation
+ [x] Invalid email dies before site creation
+ [x] Multisite disabled dies before rendering page
+ [x] Missing manage sites capability dies before rendering page
+ [x] Semantic fingerprint for representative rendered page
+
+Import Admin Runtime Behavior
+ [x] Runtime loads import page and renders available importers
+ [x] Missing import capability dies before rendering page
+ [x] Invalid popular importer redirects to registered importer id
+ [x] Invalid unknown importer renders error message
+ [x] No importers available message when no registered or popular importers
+ [x] Installed but inactive popular importer renders activation link
+ [x] Non main site shows main site install instruction for missing popular importer
+ [x] Semantic fingerprint for representative import page
+
+Text Diff Shell Engine Runtime Behavior
+ [x] Runtime loads shell engine class and default command
+ [x] Get lines returns requested slice and advances line number
+ [x] Diff returns copy operation when no changes exist
+ [x] Diff parses added lines from shell diff output
+ [x] Diff parses deleted lines from shell diff output
+ [x] Diff parses changed lines from shell diff output
+ [x] Semantic fingerprint for representative shell diff scenarios
+
+Wp Ajax Response Runtime Behavior
+ [x] Runtime loads wp ajax response class and methods
+ [x] Constructor adds initial response and magic get exposes responses
+ [x] Magic set isset and unset preserve backwards compatibility
+ [x] Add builds basic xml response using post action fallback
+ [x] Add sanitizes position includes old id and supplemental xml
+ [x] Add serializes wp error data when id is wp error
+ [x] Add serializes array error data
+ [x] Send outputs xml wrapper and terminates with wp die when doing ajax
+ [x] Semantic fingerprint for representative ajax responses
+
+Async Upload Runtime Behavior
+ [x] Runtime short upload returns attachment id and checks nonce
+ [x] Long upload applies async upload type filter
+ [x] Upload error outputs error div with dismiss link and message
+ [x] Fetch attachment thumbnail detail outputs expected markup
+ [x] Fetch attachment form adds filter and outputs media item
+ [x] Upload attachment ajax action sets ajax headers and calls ajax handler
+ [x] Permission denied dies before upload logic
+ [x] Flash cookie values are forwarded for non ajax uploads
+ [x] Semantic fingerprint for representative short upload
+
+Network User New Runtime Behavior
+ [x] Runtime loads add new user page and renders form
+ [x] Update added message is rendered
+ [x] Add user action shows validation errors for invalid submission
+ [x] Add user action creates user sends notification and redirects
+ [x] Multisite disabled dies before rendering page
+ [x] Missing create users capability dies before rendering page
+ [x] Missing manage network users capability dies on add user action
+ [x] Semantic fingerprint for representative rendered page
+
+Simple Pie Restriction Runtime Behavior
+ [x] Runtime loads simplepie restriction class
+ [x] Constructor stores relationship type and value
+ [x] Constructor defaults to null values
+ [x] Getters return mixed null and string values correctly
+ [x] To string returns md5 of serialized object
+ [x] To string for empty restriction is deterministic
+ [x] Semantic fingerprint for representative restriction objects
+
+Simple Pie Credit Runtime Behavior
+ [x] Runtime loads simplepie credit class
+ [x] Constructor stores role scheme and name
+ [x] Constructor defaults to null values
+ [x] Getters return mixed null and string values correctly
+ [x] To string returns md5 of serialized object
+ [x] To string for empty credit is deterministic
+ [x] Semantic fingerprint for representative credit objects
+
+Simple Pie Category Runtime Behavior
+ [x] Runtime loads simplepie category class
+ [x] Constructor stores category term scheme and label
+ [x] Default constructor leaves category fields null
+ [x] Get label falls back to term when label is null
+ [x] Getters preserve empty strings and zero like values
+ [x] To string returns md5 hash of serialized category object
+ [x] Semantic fingerprint for representative category states
+
+Simple Pie Author Runtime Behavior
+ [x] Runtime loads simplepie author class
+ [x] Constructor stores author name link and email
+ [x] Default constructor leaves author fields null
+ [x] Getters preserve empty strings and zero like values
+ [x] To string returns md5 hash of serialized author object
+ [x] Semantic fingerprint for representative author states
+
+Simple Pie Rating Runtime Behavior
+ [x] Runtime loads simplepie rating and default null values
+ [x] Constructor preserves scheme and value without sanitizing or casting
+ [x] Getters distinguish null from empty string and zero like values
+ [x] Public legacy properties remain mutable and getters reflect mutations
+ [x] To string matches md5 of serialized object and is deterministic
+ [x] Semantic fingerprint for representative simplepie rating behavior
+
+Simple Pie Copyright Runtime Behavior
+ [x] Runtime loads simplepie copyright and default null values
+ [x] Constructor preserves url and label without sanitizing or casting
+ [x] Getters distinguish null from empty string and zero like values
+ [x] Public legacy properties remain mutable and getters reflect mutations
+ [x] To string matches md5 of serialized object and is deterministic
+ [x] Semantic fingerprint for representative simplepie copyright behavior
+
+Wp Vars Runtime Behavior
+ [x] Front end pagenow detection and default globals
+ [x] Admin network user and multiviews pagenow detection
+ [x] Browser detection and chrome frame filter behavior
+ [x] Server detection for apache litespeed nginx and iis
+ [x] Wp is mobile detection and static cache behavior
+ [x] Semantic fingerprint for representative vars behavior
+
+Akismet Widget Runtime Behavior
+ [x] Runtime loads class and registers widget hook
+ [x] Constructor initializes widget metadata and loads textdomain
+ [x] Constructor adds css action when widget is active
+ [x] Css outputs expected akismet stats rules
+ [x] Form uses default title and escapes custom title
+ [x] Update strips html tags from title
+ [x] Widget outputs title count link and wrapper markup
+ [x] Akismet register widgets registers widget class
+ [x] Semantic fingerprint for representative widget scenario
+
+Wp Http Ixr Client Runtime Behavior
+ [x] Runtime loads class and extends ixr client
+ [x] Constructor parses full url with port path and query
+ [x] Constructor uses explicit server path and port
+ [x] Query success sends xml rpc request with headers timeout and custom headers
+ [x] Query omits timeout argument when timeout is false
+ [x] Query transport wp error sets ixr transport error
+ [x] Query non 200 response sets http status error
+ [x] Query parse failure sets xml parse error
+ [x] Query fault response sets ixr fault error
+ [x] Semantic fingerprint for representative successful request
+
+Pem Ftp Pure Runtime Behavior
+ [x] Runtime loads ftp class and constructor calls parent
+ [x] Readmsg parses single and multiline control responses
+ [x] Data read converts ascii line endings and writes to file pointer
+ [x] Data write converts ascii line endings and validates sources
+ [x] Data prepare rejects active mode and data close resets socket
+ [x] Semantic fingerprint for representative pure ftp behavior
+
+Wp Customize Section Runtime Behavior
+ [x] Runtime loads customize section and constructor defaults
+ [x] Constructor applies args but resets controls and sets manager and id
+ [x] Check capabilities handles capability and theme support combinations
+ [x] Maybe render fires actions and outputs section with controls
+ [x] Maybe render suppresses output and actions when capability fails
+ [x] Semantic fingerprint for representative customize section behavior
+
+Wp Load Runtime Behavior
+ [x] Loads config from abspath and defines abspath
+ [x] Loads parent config when root config missing and parent not install root
+ [x] Missing config redirect branch loads minimal bootstrap and exits
+ [x] Missing config setup config request calls version checks translations and wp die
+ [x] Parent config is not loaded when parent has wp settings
+ [x] Semantic fingerprint for representative wp load bootstrap behavior
+
+Ms Files Runtime Behavior
+ [x] Runtime serves existing file for active multisite blog
+ [x] Non multisite and inactive blog return expected error outputs
+ [x] Missing file returns 404 and does not emit file body
+ [x] Conditional get returns 304 for matching etag or last modified
+ [x] Accel redirect and sendfile branches exit without reading body
+ [x] Semantic fingerprint for representative ms files behavior
+
+Wp Links Opml Runtime Behavior
+ [x] Runtime outputs valid opml for all link categories
+ [x] Link cat request filters categories and handles all zero invalid values
+ [x] Filters opml head action and attribute escaping are observable
+ [x] Output contains one outline per category and bookmark order is preserved
+ [x] Semantic fingerprint for representative opml export
+
+Setup Smoke
+ [x] Resolves numbered flat file to wordpress path
+

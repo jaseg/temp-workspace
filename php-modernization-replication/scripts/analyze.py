@@ -23,17 +23,11 @@ ROOT = Path(__file__).resolve().parent.parent
 BASE = "original"
 LABELS = {
     "original": "Unchanged originals",
-    "claude_sonnet_4_20250514": "Claude Sonnet 4",
-    "gemini_2_5_flash": "Gemini 2.5 Flash",
-    "gemini_2_5_pro": "Gemini 2.5 Pro",
-    "gpt_5_codex": "GPT-5 Codex",
-    "meta_llama_llama_3_3_70b_instruct": "Llama 3.3 70B",
-    "opus_5_5_high": "**Claude Opus 5.5 (high)**",
-    "Rector_Baseline": "Rector (authors' output)",
-    "rector_baseline": "Rector (re-run, 2.1.0)",
+    "opus_5_5_high": "Claude Opus 5.5 (high)",
+    "Rector_Baseline": "Rector",
 }
 ORDER = list(LABELS)
-NON_LLM = {"original", "Rector_Baseline", "rector_baseline"}
+NON_LLM = {"original", "Rector_Baseline"}
 
 
 # ---------------------------------------------------------------- checks
