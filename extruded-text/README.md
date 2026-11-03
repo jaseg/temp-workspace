@@ -12,3 +12,8 @@ A single-file web app (`index.html`) that renders text as oblique-extruded 3D SV
   hatch lines; no fonts are embedded.
 
 Open `index.html` in a browser (it needs network access for opentype.js and the fonts).
+
+If a `fonts/index.json` sits next to the page, fonts are read from bundled packs
+(concatenated WOFF files, indexed as `[pack, offset, length]`) instead of Fontsource. The
+claude.ai artifact build uses this, because its sandbox blocks requests to other hosts.
+Inside an artifact, Download SVG goes through the viewer's `downloads` capability.

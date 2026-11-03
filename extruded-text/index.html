@@ -42,7 +42,7 @@ body {
   background: var(--bg); color: var(--ink);
   font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-.app { display: grid; grid-template-columns: 320px 1fr; height: 100vh; }
+.app { display: grid; grid-template-columns: 320px 1fr; height: 100%; }
 aside {
   background: var(--panel); border-right: 1px solid var(--line);
   overflow-y: auto; padding: 16px 16px 32px;
@@ -473,6 +473,7 @@ const FALLBACK_FONTS = [
 ].map(([id, family, category, weights]) => ({ id, family, category, weights, styles: ['normal'], subsets: ['latin'], defSubset: 'latin' }));
 
 let FONTS = [];
+let bundled = null;                // { base } when fonts ship in packs next to the page
 const fontById = new Map();
 const parsedFonts = new Map();     // url -> Promise<opentype.Font>
 let currentFont = null;
@@ -481,19 +482,38 @@ let fontToken = 0;
 
 function fontMeta() { return fontById.get(state.fontId) || FONTS[0]; }
 function fontURL(meta, s) {
+  if (bundled) return 'bundle:' + meta.id + '/' + s.weight;
   const style = s.italic && meta.styles.includes('italic') ? 'italic' : (meta.styles.includes('normal') ? 'normal' : 'italic');
   return `https://cdn.jsdelivr.net/fontsource/fonts/${meta.id}@latest/${s.subset}-${s.weight}-${style}.ttf`;
 }
 function getParsed(url) {
   if (!parsedFonts.has(url)) {
-    const p = fetch(url).then((r) => {
+    const p = (url.startsWith('bundle:') ? bundledBytes(url) : fetch(url).then((r) => {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.arrayBuffer();
-    }).then((buf) => opentype.parse(buf));
+    })).then((buf) => opentype.parse(buf));
     p.catch(() => parsedFonts.delete(url));
     parsedFonts.set(url, p);
   }
   return parsedFonts.get(url);
+}
+/* Bundled mode: many WOFF files concatenated per pack; the index gives [pack, offset, length]. */
+const packs = new Map();
+function bundledBytes(url) {
+  const [id, w] = url.slice(7).split('/');
+  const meta = fontById.get(id);
+  const loc = meta && meta.files && meta.files[w];
+  if (!loc) return Promise.reject(new Error('not bundled'));
+  const [pack, off, len] = loc;
+  if (!packs.has(pack)) {
+    const p = fetch(bundled.base + pack).then((r) => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.arrayBuffer();
+    });
+    p.catch(() => packs.delete(pack));
+    packs.set(pack, p);
+  }
+  return packs.get(pack).then((buf) => buf.slice(off, off + len));
 }
 async function loadCurrentFont() {
   if (localFont) { currentFont = localFont.font; scheduleRender(); return; }
@@ -814,9 +834,25 @@ function render() {
 textEl.value = state.text;
 textEl.addEventListener('input', () => { state.text = textEl.value; onChange(false); });
 
-$('#downloadBtn').addEventListener('click', () => {
+// Inside a claude.ai artifact, files are saved through the viewer's downloads capability.
+let downloadsP = null;
+function getDownloads() {
+  if (!downloadsP) downloadsP = (window.claude && typeof window.claude.use === 'function')
+    ? window.claude.use('downloads').catch(() => null) : Promise.resolve(null);
+  return downloadsP;
+}
+$('#downloadBtn').addEventListener('click', async () => {
   if (!lastSVG) return;
   const slug = state.text.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'text';
+  const downloads = await getDownloads();
+  if (downloads) {
+    try { await downloads.save({ filename: slug + '.svg', data: lastSVG }); setStatus('SVG saved.'); setTimeout(() => setStatus(''), 1500); }
+    catch (e) {
+      if (e && e.code === 'declined') return;
+      setStatus(e && e.code === 'rate_limited' ? 'A save is already waiting for your answer.' : 'Saving is unavailable here. Use Copy SVG instead.', true);
+    }
+    return;
+  }
   const url = URL.createObjectURL(new Blob([lastSVG], { type: 'image/svg+xml' }));
   const a = el('a', { href: url, download: slug + '.svg' });
   document.body.append(a); a.click(); a.remove();
@@ -838,6 +874,7 @@ function setFonts(list) {
       styles: f.styles && f.styles.length ? f.styles : ['normal'],
       subsets: f.subsets && f.subsets.length ? f.subsets : ['latin'],
       defSubset: f.defSubset || 'latin',
+      files: f.files || null,
     }))
     .sort((a, b) => a.family.localeCompare(b.family));
   fontById.clear();
@@ -851,6 +888,19 @@ function setFonts(list) {
 (async function boot() {
   syncUI();
   if (typeof opentype === 'undefined') { setStatus('Could not load opentype.js — check your connection.', true); return; }
+  getDownloads();
+  try {
+    const r = await fetch('fonts/index.json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const idx = await r.json();
+    bundled = { base: 'fonts/' };
+    setFonts(idx.fonts.map((f) => ({
+      id: f.id, family: f.family, category: f.category, files: f.w,
+      weights: Object.keys(f.w).map(Number), styles: ['normal'], subsets: [f.subset], defSubset: f.subset,
+    })));
+    loadCurrentFont();
+    return;
+  } catch (e) { bundled = null; /* not bundled: fetch fonts from Fontsource */ }
   setFonts(FALLBACK_FONTS);
   loadCurrentFont();
   try {
