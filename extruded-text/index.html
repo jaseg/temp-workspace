@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hatched Extruded Type</title>
+<meta name="description" content="Render text as oblique-extruded 3D SVG with hatched sides and crosshatched faces, in any Google Font.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
+<style>
+:root {
+  --bg: #f4f3f0;
+  --panel: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6b6a66;
+  --line: #dddbd5;
+  --accent: #2f5bd3;
+  --accent-ink: #ffffff;
+  --field: #f7f6f3;
+  --danger: #b3261e;
+  --check-a: #ffffff;
+  --check-b: #ebeae6;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161616; --panel: #1f1f1f; --ink: #ecebe8; --muted: #9b9a96; --line: #34332f;
+    --accent: #7c9cff; --accent-ink: #0d0d0d; --field: #262624; --danger: #ff8a80;
+    --check-a: #2a2a28; --check-b: #232321; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161616; --panel: #1f1f1f; --ink: #ecebe8; --muted: #9b9a96; --line: #34332f;
+  --accent: #7c9cff; --accent-ink: #0d0d0d; --field: #262624; --danger: #ff8a80;
+  --check-a: #2a2a28; --check-b: #232321; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.app { display: grid; grid-template-columns: 320px 1fr; height: 100vh; }
+aside {
+  background: var(--panel); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px 16px 32px;
+}
+aside h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .01em; }
+aside .sub { color: var(--muted); margin: 0 0 12px; }
+fieldset { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 12px 0 6px; }
+legend { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 0 6px 0 0; }
+.field { margin: 8px 0 10px; }
+.field.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.field .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.field label { color: var(--ink); }
+.field .unit { color: var(--muted); font-size: 11px; margin-left: 4px; }
+.field.disabled { opacity: .55; }
+input[type=number] {
+  width: 72px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--field); color: var(--ink); font: inherit; text-align: right;
+}
+input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+select, .btn, input[type=search] {
+  font: inherit; color: var(--ink); background: var(--field);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px;
+}
+select { max-width: 170px; }
+input[type=color] { width: 40px; height: 26px; padding: 0 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); cursor: pointer; }
+input[type=checkbox] { accent-color: var(--accent); }
+.colorbox { display: flex; align-items: center; gap: 8px; }
+.colorbox .none { display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 12px; }
+.btn { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .5; cursor: default; }
+.lockrow { display: flex; align-items: center; gap: 6px; margin: 6px 0 2px; }
+
+/* Font chooser */
+.chooser { position: relative; }
+.chooser-btn {
+  width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 10px; font-size: 18px; min-height: 42px; overflow: hidden; white-space: nowrap;
+}
+.chooser-btn .caret { font: 12px system-ui, sans-serif; color: var(--muted); flex: none; margin-left: 8px; }
+.chooser-btn .name { overflow: hidden; text-overflow: ellipsis; }
+.chooser-pop {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow);
+  display: none; flex-direction: column; max-height: min(460px, 70vh);
+}
+.chooser.open .chooser-pop { display: flex; }
+.chooser-tools { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--line); }
+.chooser-tools input[type=search] { flex: 1; min-width: 0; }
+.chooser-tools select { max-width: 110px; }
+.font-list { overflow-y: auto; flex: 1; padding: 4px 0; }
+.font-item {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  padding: 6px 10px; cursor: pointer; font-size: 19px; line-height: 1.25; min-height: 34px;
+}
+.font-item .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.font-item .fcat { font: 10px system-ui, sans-serif; color: var(--muted); flex: none; text-transform: uppercase; letter-spacing: .04em; }
+.font-item[hidden] { display: none; }
+.font-item:hover, .font-item.active { background: var(--field); }
+.font-item.selected .fname { color: var(--accent); }
+.font-count { color: var(--muted); font-size: 11px; padding: 6px 10px; border-top: 1px solid var(--line); }
+.upload { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.upload input { display: none; }
+.upload label { cursor: pointer; text-decoration: underline; color: var(--ink); }
+
+main { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 16px; gap: 12px; }
+.textbox { display: flex; flex-direction: column; gap: 6px; }
+.textbox label { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+textarea {
+  width: 100%; min-height: 64px; height: 84px; resize: vertical; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink);
+  font: 16px/1.4 system-ui, sans-serif;
+}
+.preview-card {
+  flex: 1; min-height: 260px; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+.toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.toolbar .status { flex: 1; color: var(--muted); min-width: 120px; }
+.toolbar .status.err { color: var(--danger); }
+.toolbar .dims { color: var(--muted); font-variant-numeric: tabular-nums; }
+#preview {
+  flex: 1; min-height: 0; padding: 16px; display: flex; align-items: center; justify-content: center;
+  background-color: var(--check-a);
+  background-image:
+    linear-gradient(45deg, var(--check-b) 25%, transparent 25%, transparent 75%, var(--check-b) 75%),
+    linear-gradient(45deg, var(--check-b) 25%, transparent 25%, transparent 75%, var(--check-b) 75%);
+  background-size: 16px 16px; background-position: 0 0, 8px 8px;
+}
+#preview svg { width: 100%; height: 100%; display: block; }
+#preview .msg { color: var(--muted); }
+
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  aside { border-right: 0; border-bottom: 1px solid var(--line); order: 2; }
+  main { order: 1; padding: 16px; }
+  .preview-card { min-height: 300px; height: 55vh; flex: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="controls">
+    <h1>Hatched Extruded Type</h1>
+    <p class="sub">Oblique 3D text as plain SVG paths.</p>
+    <!-- sections are built by script -->
+  </aside>
+  <main>
+    <div class="textbox">
+      <label for="text">Text</label>
+      <textarea id="text" spellcheck="false"></textarea>
+    </div>
+    <div class="preview-card">
+      <div class="toolbar">
+        <span class="status" id="status" role="status"></span>
+        <span class="dims" id="dims"></span>
+        <button class="btn" id="copyBtn" type="button">Copy SVG</button>
+        <button class="btn primary" id="downloadBtn" type="button">Download SVG</button>
+      </div>
+      <div id="preview"><span class="msg">Loading…</span></div>
+    </div>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+/* ------------------------------------------------------------------ *
+ * Settings
+ * ------------------------------------------------------------------ */
+const DEFAULTS = {
+  text: 'Hatched\nType',
+  fontId: 'rubik', family: 'Rubik', weight: 800, italic: false, subset: 'latin',
+  fontSize: 120, lineHeight: 1.1, letterSpacing: 0.02, align: 'left',
+  extAngle: 45, extLen: 0.5,
+  extW: 1, extSp: 4, extFg: '#1d1d1f', extBg: '#ffffff', extBgNone: false,
+  faceLock: true, faceW: 1, faceSp: 6, faceAngle: 0, faceCross: 90,
+  faceFg: '#1d1d1f', faceBg: '#ffffff', faceBgNone: false,
+  outlineW: 0, outlineColor: '#1d1d1f',
+  pageBg: '#ffffff', pageBgNone: false, padding: 12,
+};
+const STORE_KEY = 'hatched-extruded-type:v1';
+let state = Object.assign({}, DEFAULTS);
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+  if (saved && typeof saved === 'object') {
+    for (const k of Object.keys(DEFAULTS)) if (k in saved && typeof saved[k] === typeof DEFAULTS[k]) state[k] = saved[k];
+  }
+} catch (e) { /* storage unavailable */ }
+let saveTimer = 0;
+function persist() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }, 300);
+}
+
+/* ------------------------------------------------------------------ *
+ * Small helpers
+ * ------------------------------------------------------------------ */
+const $ = (sel) => document.querySelector(sel);
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) e.append(c);
+  return e;
+}
+const escXML = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+function f2(n) { const r = Math.round(n * 100) / 100; return Object.is(r, -0) ? '0' : String(r); }
+
+/* ------------------------------------------------------------------ *
+ * Geometry: glyph outlines -> contours of segments
+ * A segment is an array of points: 2 = line, 3 = quadratic, 4 = cubic.
+ * ------------------------------------------------------------------ */
+function toContours(cmds) {
+  const out = [];
+  let segs = null, pos = null, start = null;
+  const close = () => {
+    if (!segs) return;
+    if (pos && (Math.abs(pos[0] - start[0]) > 1e-9 || Math.abs(pos[1] - start[1]) > 1e-9)) segs.push([pos, start]);
+    if (segs.length) out.push(segs);
+    segs = null;
+  };
+  for (const c of cmds) {
+    switch (c.type) {
+      case 'M': close(); start = pos = [c.x, c.y]; segs = []; break;
+      case 'L': { const p = [c.x, c.y]; segs.push([pos, p]); pos = p; break; }
+      case 'Q': { const p = [c.x, c.y]; segs.push([pos, [c.x1, c.y1], p]); pos = p; break; }
+      case 'C': { const p = [c.x, c.y]; segs.push([pos, [c.x1, c.y1], [c.x2, c.y2], p]); pos = p; break; }
+      case 'Z': close(); break;
+    }
+  }
+  close();
+  return out;
+}
+
+function segCmd(pts, dx, dy) {
+  const P = (p) => f2(p[0] + dx) + ' ' + f2(p[1] + dy);
+  if (pts.length === 2) return 'L' + P(pts[1]);
+  if (pts.length === 3) return 'Q' + P(pts[1]) + ' ' + P(pts[2]);
+  return 'C' + P(pts[1]) + ' ' + P(pts[2]) + ' ' + P(pts[3]);
+}
+
+function contoursToD(contours, dx = 0, dy = 0) {
+  let d = '';
+  for (const segs of contours) {
+    d += 'M' + f2(segs[0][0][0] + dx) + ' ' + f2(segs[0][0][1] + dy);
+    for (const s of segs) d += segCmd(s, dx, dy);
+    d += 'Z';
+  }
+  return d;
+}
+
+const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+const cross = (a, b) => a[0] * b[1] - a[1] * b[0];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+
+function splitAt(pts, t) {
+  if (pts.length === 2) { const m = lerp(pts[0], pts[1], t); return [[pts[0], m], [m, pts[1]]]; }
+  if (pts.length === 3) {
+    const a = lerp(pts[0], pts[1], t), b = lerp(pts[1], pts[2], t), m = lerp(a, b, t);
+    return [[pts[0], a, m], [m, b, pts[2]]];
+  }
+  const a = lerp(pts[0], pts[1], t), b = lerp(pts[1], pts[2], t), c = lerp(pts[2], pts[3], t);
+  const ab = lerp(a, b, t), bc = lerp(b, c, t), m = lerp(ab, bc, t);
+  return [[pts[0], a, ab, m], [m, bc, c, pts[3]]];
+}
+
+/* cross(B'(t), d) as polynomial coefficients; returns {roots in (0,1), sign at t} helpers */
+function tangentCrossCoeffs(pts, d) {
+  if (pts.length === 2) { const a = cross(sub(pts[1], pts[0]), d); return [0, 0, a]; }
+  if (pts.length === 3) {
+    const a = cross(sub(pts[1], pts[0]), d), b = cross(sub(pts[2], pts[1]), d);
+    return [0, b - a, a];                         // a + (b-a) t
+  }
+  const a = cross(sub(pts[1], pts[0]), d), b = cross(sub(pts[2], pts[1]), d), c = cross(sub(pts[3], pts[2]), d);
+  return [a - 2 * b + c, 2 * (b - a), a];         // A t^2 + B t + C
+}
+function rootsIn01([A, B, C]) {
+  const scale = Math.abs(A) + Math.abs(B) + Math.abs(C);
+  if (scale < 1e-12) return [];
+  const eps = 1e-9 * scale, r = [];
+  if (Math.abs(A) < eps) { if (Math.abs(B) > eps) r.push(-C / B); }
+  else {
+    const disc = B * B - 4 * A * C;
+    if (disc >= 0) { const s = Math.sqrt(disc); r.push((-B - s) / (2 * A), (-B + s) / (2 * A)); }
+  }
+  return r.filter((t) => t > 1e-6 && t < 1 - 1e-6).sort((x, y) => x - y);
+}
+
+/*
+ * The extruded solid's silhouette is the Minkowski sum of the glyph shape
+ * with the segment [0, d]: shape ∪ (shape + d) ∪ sweep of every outline
+ * segment along d. Each segment is split where its tangent is parallel to d,
+ * so every piece sweeps out a simple region. Every piece is emitted with the
+ * same orientation as the glyph's outer contours (orient = sign of the glyph
+ * area), so glyph + shifted glyph + sweep in ONE path with a nonzero fill is
+ * exactly their union: no winding cancels, and no seams between pieces.
+ */
+function signedArea(contours) {
+  let a = 0;
+  for (const segs of contours) {
+    const pts = [];
+    for (const sg of segs) for (let i = 0; i < sg.length - 1; i++) pts.push(sg[i]);
+    for (let i = 0; i < pts.length; i++) a += cross(pts[i], pts[(i + 1) % pts.length]);
+  }
+  return a / 2;
+}
+function sweepD(contours, d, orient) {
+  let out = '';
+  for (const segs of contours) for (const seg of segs) {
+    const roots = rootsIn01(tangentCrossCoeffs(seg, d));
+    const pieces = [];
+    let rest = seg, prev = 0;
+    for (const t of roots) {
+      const [l, r] = splitAt(rest, (t - prev) / (1 - prev));
+      pieces.push(l); rest = r; prev = t;
+    }
+    pieces.push(rest);
+    for (const p of pieces) {
+      const [A, B, C] = tangentCrossCoeffs(p, d);
+      const s = A * 0.25 + B * 0.5 + C;           // sign of cross(B'(0.5), d)
+      const len = Math.hypot(...sub(p[p.length - 1], p[0]));
+      if (Math.abs(s) < 1e-9 * (1 + len * len)) continue;  // parallel to d: no area
+      const rev = p.slice().reverse();
+      const n = p[p.length - 1];
+      if ((s > 0) === (orient > 0)) {   // loop p0 → p1 → p1+d → p0+d has signed area ∝ s
+        out += 'M' + f2(p[0][0]) + ' ' + f2(p[0][1]) + segCmd(p, 0, 0)
+             + 'L' + f2(n[0] + d[0]) + ' ' + f2(n[1] + d[1]) + segCmd(rev, d[0], d[1]) + 'Z';
+      } else {
+        out += 'M' + f2(p[0][0] + d[0]) + ' ' + f2(p[0][1] + d[1]) + segCmd(p, d[0], d[1])
+             + 'L' + f2(n[0]) + ' ' + f2(n[1]) + segCmd(rev, 0, 0) + 'Z';
+      }
+    }
+  }
+  return out;
+}
+
+function contourBounds(contours) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const segs of contours) for (const s of segs) for (const p of s) {
+    if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+    if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+  }
+  return { x0, y0, x1, y1 };
+}
+
+/* Parallel lines at angleDeg (counter-clockwise from +x, as seen on screen)
+ * covering the box, anchored to the origin so the pattern stays put. */
+function hatchD(box, angleDeg, spacing) {
+  spacing = Math.max(0.25, spacing);
+  const r = angleDeg * Math.PI / 180;
+  const u = [Math.cos(r), -Math.sin(r)], n = [-u[1], u[0]];
+  const corners = [[box.x0, box.y0], [box.x1, box.y0], [box.x0, box.y1], [box.x1, box.y1]];
+  let nmin = Infinity, nmax = -Infinity, umin = Infinity, umax = -Infinity;
+  for (const c of corners) {
+    const pn = c[0] * n[0] + c[1] * n[1], pu = c[0] * u[0] + c[1] * u[1];
+    nmin = Math.min(nmin, pn); nmax = Math.max(nmax, pn); umin = Math.min(umin, pu); umax = Math.max(umax, pu);
+  }
+  const k0 = Math.ceil(nmin / spacing), k1 = Math.floor(nmax / spacing);
+  if (k1 - k0 > 40000) return '';
+  let d = '';
+  for (let k = k0; k <= k1; k++) {
+    const bx = n[0] * k * spacing, by = n[1] * k * spacing;
+    d += 'M' + f2(bx + u[0] * umin) + ' ' + f2(by + u[1] * umin) + 'L' + f2(bx + u[0] * umax) + ' ' + f2(by + u[1] * umax);
+  }
+  return d;
+}
+
+/* ------------------------------------------------------------------ *
+ * SVG assembly
+ * ------------------------------------------------------------------ */
+function buildSVG(font, s) {
+  const size = Math.max(1, s.fontSize);
+  const opts = { kerning: true, letterSpacing: s.letterSpacing };
+  const lines = s.text.replace(/\r/g, '').split('\n');
+  const contours = [];
+  lines.forEach((line, i) => {
+    if (!line.trim()) return;
+    const w = font.getAdvanceWidth(line, size, opts);
+    const x = s.align === 'center' ? -w / 2 : s.align === 'right' ? -w : 0;
+    const y = i * s.lineHeight * size;
+    contours.push(...toContours(font.getPath(line, x, y, size, opts).commands));
+  });
+  if (!contours.length) return null;
+
+  const ang = s.extAngle * Math.PI / 180, L = Math.max(0, s.extLen) * size;
+  const d = [L * Math.cos(ang), -L * Math.sin(ang)];
+  const hasExt = L > 1e-6;
+  const g = contourBounds(contours);
+  const box = {
+    x0: Math.min(g.x0, g.x0 + d[0]), y0: Math.min(g.y0, g.y0 + d[1]),
+    x1: Math.max(g.x1, g.x1 + d[0]), y1: Math.max(g.y1, g.y1 + d[1]),
+  };
+  const pad = Math.max(0, s.padding) + Math.max(0, s.outlineW) / 2;
+  const vb = { x: box.x0 - pad, y: box.y0 - pad, w: box.x1 - box.x0 + 2 * pad, h: box.y1 - box.y0 + 2 * pad };
+  const hb = { x0: box.x0 - 2, y0: box.y0 - 2, x1: box.x1 + 2, y1: box.y1 + 2 };  // hatch coverage
+  const rect = (fill) => `<rect x="${f2(hb.x0)}" y="${f2(hb.y0)}" width="${f2(hb.x1 - hb.x0)}" height="${f2(hb.y1 - hb.y0)}" fill="${fill}"/>`;
+
+  const faceD = contoursToD(contours);
+  const extW = Math.max(0, s.extW);
+  const faceW = Math.max(0, s.faceLock ? s.extW : s.faceW);
+  const o = [];
+  o.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f2(vb.x)} ${f2(vb.y)} ${f2(vb.w)} ${f2(vb.h)}" width="${f2(vb.w)}" height="${f2(vb.h)}">`);
+  o.push(`<title>${escXML(s.text.replace(/\s+/g, ' ').trim())}</title>`);
+  o.push('<defs>');
+  if (hasExt) {
+    const orient = signedArea(contours) >= 0 ? 1 : -1;
+    o.push('<clipPath id="xt-extrusion" clipPathUnits="userSpaceOnUse">');
+    o.push(`<path clip-rule="nonzero" d="${faceD}${contoursToD(contours, d[0], d[1])}${sweepD(contours, d, orient)}"/>`);
+    o.push('</clipPath>');
+    if (s.faceBgNone) {
+      // transparent faces must still hide the extrusion behind them
+      o.push(`<mask id="xt-hide-faces" maskUnits="userSpaceOnUse" x="${f2(vb.x)}" y="${f2(vb.y)}" width="${f2(vb.w)}" height="${f2(vb.h)}">`);
+      o.push(`<rect x="${f2(vb.x)}" y="${f2(vb.y)}" width="${f2(vb.w)}" height="${f2(vb.h)}" fill="#fff"/><path d="${faceD}" fill="#000"/>`);
+      o.push('</mask>');
+    }
+  }
+  o.push(`<clipPath id="xt-faces" clipPathUnits="userSpaceOnUse"><path d="${faceD}"/></clipPath>`);
+  o.push('</defs>');
+  if (!s.pageBgNone) o.push(`<rect x="${f2(vb.x)}" y="${f2(vb.y)}" width="${f2(vb.w)}" height="${f2(vb.h)}" fill="${s.pageBg}"/>`);
+
+  if (hasExt) {
+    const mask = s.faceBgNone ? ' mask="url(#xt-hide-faces)"' : '';
+    o.push(`<g id="extrusion" clip-path="url(#xt-extrusion)"${mask}>`);
+    if (!s.extBgNone) o.push(rect(s.extBg));
+    if (extW > 0) o.push(`<path d="${hatchD(hb, s.extAngle, s.extSp)}" fill="none" stroke="${s.extFg}" stroke-width="${f2(extW)}"/>`);
+    o.push('</g>');
+  }
+
+  o.push('<g id="faces" clip-path="url(#xt-faces)">');
+  if (!s.faceBgNone) o.push(rect(s.faceBg));
+  if (faceW > 0) {
+    o.push(`<path d="${hatchD(hb, s.faceAngle, s.faceSp)}" fill="none" stroke="${s.faceFg}" stroke-width="${f2(faceW)}"/>`);
+    if (Math.abs(s.faceCross % 180) > 1e-6)
+      o.push(`<path d="${hatchD(hb, s.faceAngle + s.faceCross, s.faceSp)}" fill="none" stroke="${s.faceFg}" stroke-width="${f2(faceW)}"/>`);
+  }
+  o.push('</g>');
+  if (s.outlineW > 0) o.push(`<path id="outline" d="${faceD}" fill="none" stroke="${s.outlineColor}" stroke-width="${f2(s.outlineW)}" stroke-linejoin="round"/>`);
+  o.push('</svg>');
+  return { svg: o.join('\n'), w: vb.w, h: vb.h };
+}
+
+/* ------------------------------------------------------------------ *
+ * Fonts
+ * ------------------------------------------------------------------ */
+const FALLBACK_FONTS = [
+  ['rubik', 'Rubik', 'sans-serif', [300, 400, 500, 600, 700, 800, 900]],
+  ['roboto', 'Roboto', 'sans-serif', [100, 300, 400, 500, 700, 900]],
+  ['inter', 'Inter', 'sans-serif', [100, 200, 300, 400, 500, 600, 700, 800, 900]],
+  ['montserrat', 'Montserrat', 'sans-serif', [100, 200, 300, 400, 500, 600, 700, 800, 900]],
+  ['archivo-black', 'Archivo Black', 'sans-serif', [400]],
+  ['bebas-neue', 'Bebas Neue', 'display', [400]],
+  ['anton', 'Anton', 'sans-serif', [400]],
+  ['bungee', 'Bungee', 'display', [400]],
+  ['lobster', 'Lobster', 'display', [400]],
+  ['pacifico', 'Pacifico', 'handwriting', [400]],
+  ['playfair-display', 'Playfair Display', 'serif', [400, 500, 600, 700, 800, 900]],
+  ['merriweather', 'Merriweather', 'serif', [300, 400, 700, 900]],
+  ['abril-fatface', 'Abril Fatface', 'display', [400]],
+  ['space-mono', 'Space Mono', 'monospace', [400, 700]],
+  ['jetbrains-mono', 'JetBrains Mono', 'monospace', [100, 200, 300, 400, 500, 600, 700, 800]],
+].map(([id, family, category, weights]) => ({ id, family, category, weights, styles: ['normal'], subsets: ['latin'], defSubset: 'latin' }));
+
+let FONTS = [];
+const fontById = new Map();
+const parsedFonts = new Map();     // url -> Promise<opentype.Font>
+let currentFont = null;
+let localFont = null;              // { name, font } for an uploaded file
+let fontToken = 0;
+
+function fontMeta() { return fontById.get(state.fontId) || FONTS[0]; }
+function fontURL(meta, s) {
+  const style = s.italic && meta.styles.includes('italic') ? 'italic' : (meta.styles.includes('normal') ? 'normal' : 'italic');
+  return `https://cdn.jsdelivr.net/fontsource/fonts/${meta.id}@latest/${s.subset}-${s.weight}-${style}.ttf`;
+}
+function getParsed(url) {
+  if (!parsedFonts.has(url)) {
+    const p = fetch(url).then((r) => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.arrayBuffer();
+    }).then((buf) => opentype.parse(buf));
+    p.catch(() => parsedFonts.delete(url));
+    parsedFonts.set(url, p);
+  }
+  return parsedFonts.get(url);
+}
+async function loadCurrentFont() {
+  if (localFont) { currentFont = localFont.font; scheduleRender(); return; }
+  const meta = fontMeta();
+  if (!meta) return;
+  const tok = ++fontToken;
+  const url = fontURL(meta, state);
+  setStatus(`Loading ${meta.family} ${state.weight}…`);
+  try {
+    const font = await getParsed(url);
+    if (tok !== fontToken) return;
+    currentFont = font;
+    setStatus('');
+    scheduleRender();
+  } catch (e) {
+    if (tok !== fontToken) return;
+    setStatus(`Could not load ${meta.family} (${state.subset}, ${state.weight}): ${e.message}`, true);
+  }
+}
+
+/* Lightweight previews: Google Fonts CSS API with text= returns only the glyphs needed */
+const previewLoaded = new Set();
+function previewWeight(meta, w) {
+  if (w && meta.weights.includes(w)) return w;
+  if (meta.weights.includes(400)) return 400;
+  return meta.weights[0] || 400;
+}
+function ensurePreview(meta, weight, italic) {
+  const w = previewWeight(meta, weight);
+  const ital = (italic && meta.styles.includes('italic')) || !meta.styles.includes('normal') ? 1 : 0;
+  const key = meta.family + '|' + w + '|' + ital;
+  if (previewLoaded.has(key)) return;
+  previewLoaded.add(key);
+  const fam = encodeURIComponent(meta.family).replace(/%20/g, '+');
+  const spec = ital ? `:ital,wght@1,${w}` : `:wght@${w}`;
+  document.head.append(el('link', { rel: 'stylesheet', href: `https://fonts.googleapis.com/css2?family=${fam}${spec}&text=${encodeURIComponent(meta.family)}&display=swap` }));
+}
+const cssFamily = (meta) => `'${meta.family.replace(/'/g, "\\'")}', system-ui, sans-serif`;
+
+/* ------------------------------------------------------------------ *
+ * Controls
+ * ------------------------------------------------------------------ */
+const syncers = [];
+const fieldSync = {};
+function onChange(fontRelated) {
+  persist();
+  if (fontRelated) loadCurrentFont(); else scheduleRender();
+}
+
+function numField(key, label, min, max, step, unit, opts = {}) {
+  const num = el('input', { type: 'number', min, max, step, id: 'f-' + key, 'aria-label': label });
+  const range = el('input', { type: 'range', min, max, step, 'aria-label': label });
+  const wrap = el('div', { class: 'field' },
+    el('div', { class: 'head' }, el('label', { for: 'f-' + key, text: label }),
+      el('span', null, num, unit ? el('span', { class: 'unit', text: unit }) : null)),
+    range);
+  const set = (v, other) => {
+    v = parseFloat(v);
+    if (!Number.isFinite(v)) return;
+    state[key] = v;
+    other.value = v;               // never write back into the control being edited
+    if (opts.after) opts.after();
+    onChange(false);
+  };
+  num.addEventListener('input', () => set(num.value, range));
+  range.addEventListener('input', () => set(range.value, num));
+  num.addEventListener('change', () => { num.value = state[key]; });
+  syncers.push(fieldSync[key] = () => {
+    const v = opts.value ? opts.value() : state[key];
+    num.value = v; range.value = v;
+    const dis = opts.disabled ? opts.disabled() : false;
+    num.disabled = range.disabled = dis;
+    wrap.classList.toggle('disabled', dis);
+  });
+  return wrap;
+}
+function colorField(key, label, noneKey) {
+  const inp = el('input', { type: 'color', id: 'f-' + key, 'aria-label': label });
+  inp.addEventListener('input', () => { state[key] = inp.value; onChange(false); });
+  let none = null;
+  if (noneKey) {
+    none = el('input', { type: 'checkbox', 'aria-label': label + ' transparent' });
+    none.addEventListener('change', () => { state[noneKey] = none.checked; inp.disabled = none.checked; onChange(false); });
+  }
+  syncers.push(() => { inp.value = state[key]; if (none) { none.checked = state[noneKey]; inp.disabled = none.checked; } });
+  return el('div', { class: 'field row' }, el('label', { for: 'f-' + key, text: label }),
+    el('span', { class: 'colorbox' }, none ? el('label', { class: 'none' }, none, 'none') : null, inp));
+}
+function selectField(key, label, options) {
+  const sel = el('select', { id: 'f-' + key });
+  for (const [v, t] of options) sel.append(el('option', { value: v, text: t }));
+  sel.addEventListener('change', () => { state[key] = sel.value; onChange(false); });
+  syncers.push(() => { sel.value = state[key]; });
+  return el('div', { class: 'field row' }, el('label', { for: 'f-' + key, text: label }), sel);
+}
+function section(title, ...kids) { return el('fieldset', null, el('legend', { text: title }), ...kids); }
+
+const WEIGHT_NAMES = { 100: 'Thin', 200: 'Extra Light', 300: 'Light', 400: 'Regular', 500: 'Medium', 600: 'Semi Bold', 700: 'Bold', 800: 'Extra Bold', 900: 'Black' };
+
+/* Font chooser */
+const chooser = el('div', { class: 'chooser' });
+const chooserBtn = el('button', { class: 'btn chooser-btn', type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' },
+  el('span', { class: 'name' }), el('span', { class: 'caret', text: '▾' }));
+const search = el('input', { type: 'search', placeholder: 'Search fonts…', 'aria-label': 'Search fonts' });
+const catSel = el('select', { 'aria-label': 'Category' });
+for (const [v, t] of [['', 'All'], ['sans-serif', 'Sans'], ['serif', 'Serif'], ['display', 'Display'], ['handwriting', 'Script'], ['monospace', 'Mono'], ['other', 'Other']])
+  catSel.append(el('option', { value: v, text: t }));
+const list = el('div', { class: 'font-list', role: 'listbox', 'aria-label': 'Fonts' });
+const countEl = el('div', { class: 'font-count' });
+chooser.append(chooserBtn, el('div', { class: 'chooser-pop' }, el('div', { class: 'chooser-tools' }, search, catSel), list, countEl));
+let items = [], activeItem = null;
+
+const io = new IntersectionObserver((entries) => {
+  for (const en of entries) if (en.isIntersecting) {
+    const meta = fontById.get(en.target.dataset.id);
+    if (meta) ensurePreview(meta);
+    io.unobserve(en.target);
+  }
+}, { root: list, rootMargin: '200px 0px' });
+
+function buildList() {
+  list.textContent = '';
+  items = FONTS.map((meta) => {
+    const it = el('div', { class: 'font-item', role: 'option', 'data-id': meta.id },
+      el('span', { class: 'fname', text: meta.family }), el('span', { class: 'fcat', text: meta.category }));
+    it.firstChild.style.fontFamily = cssFamily(meta);
+    if (!meta.styles.includes('normal')) it.firstChild.style.fontStyle = 'italic';
+    it.addEventListener('click', () => { pickFont(meta.id); closeChooser(); });
+    list.append(it);
+    io.observe(it);
+    return it;
+  });
+  filterList();
+}
+function filterList() {
+  const q = search.value.trim().toLowerCase(), cat = catSel.value;
+  let n = 0;
+  for (const it of items) {
+    const meta = fontById.get(it.dataset.id);
+    const show = (!q || meta.family.toLowerCase().includes(q)) && (!cat || meta.category === cat);
+    it.hidden = !show;
+    if (show) n++;
+  }
+  countEl.textContent = `${n} of ${items.length} fonts`;
+  setActive(items.find((it) => !it.hidden) || null, false);
+}
+function setActive(it, scroll = true) {
+  if (activeItem) activeItem.classList.remove('active');
+  activeItem = it;
+  if (it) { it.classList.add('active'); if (scroll) it.scrollIntoView({ block: 'nearest' }); }
+}
+function openChooser() {
+  chooser.classList.add('open'); chooserBtn.setAttribute('aria-expanded', 'true');
+  const sel = items.find((it) => it.dataset.id === state.fontId);
+  items.forEach((it) => it.classList.toggle('selected', it === sel));
+  if (sel && !sel.hidden) { setActive(sel, false); sel.scrollIntoView({ block: 'center' }); }
+  search.focus(); search.select();
+}
+function closeChooser() { chooser.classList.remove('open'); chooserBtn.setAttribute('aria-expanded', 'false'); }
+chooserBtn.addEventListener('click', () => chooser.classList.contains('open') ? closeChooser() : openChooser());
+search.addEventListener('input', () => { filterList(); list.scrollTop = 0; });
+catSel.addEventListener('change', () => { filterList(); list.scrollTop = 0; });
+search.addEventListener('keydown', (e) => {
+  const vis = items.filter((it) => !it.hidden);
+  const i = vis.indexOf(activeItem);
+  if (e.key === 'ArrowDown') { e.preventDefault(); setActive(vis[Math.min(vis.length - 1, i + 1)] || null); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(vis[Math.max(0, i - 1)] || null); }
+  else if (e.key === 'Enter') { e.preventDefault(); if (activeItem) { pickFont(activeItem.dataset.id); closeChooser(); chooserBtn.focus(); } }
+  else if (e.key === 'Escape') { closeChooser(); chooserBtn.focus(); }
+});
+document.addEventListener('mousedown', (e) => { if (!chooser.contains(e.target)) closeChooser(); });
+
+const weightSel = el('select', { id: 'f-weight' });
+const subsetSel = el('select', { id: 'f-subset' });
+const italicChk = el('input', { type: 'checkbox', id: 'f-italic' });
+weightSel.addEventListener('change', () => { state.weight = +weightSel.value; syncFontUI(); onChange(true); });
+subsetSel.addEventListener('change', () => { state.subset = subsetSel.value; onChange(true); });
+italicChk.addEventListener('change', () => { state.italic = italicChk.checked; syncFontUI(); onChange(true); });
+const fileInp = el('input', { type: 'file', id: 'f-file', accept: '.ttf,.otf,.woff,font/ttf,font/otf,font/woff' });
+const fileNote = el('span');
+fileInp.addEventListener('change', async () => {
+  const f = fileInp.files[0];
+  if (!f) return;
+  try {
+    const font = opentype.parse(await f.arrayBuffer());
+    localFont = { name: f.name, font };
+    fontToken++;
+    syncFontUI();
+    loadCurrentFont();
+  } catch (e) { setStatus(`Could not read ${f.name}: ${e.message}`, true); }
+  fileInp.value = '';
+});
+
+function pickFont(id) {
+  const meta = fontById.get(id);
+  if (!meta) return;
+  localFont = null;
+  state.fontId = meta.id; state.family = meta.family;
+  normalizeFontState();
+  syncFontUI();
+  onChange(true);
+}
+function normalizeFontState() {
+  const meta = fontMeta();
+  if (!meta) return;
+  if (!meta.weights.includes(state.weight)) {
+    state.weight = meta.weights.reduce((best, w) => Math.abs(w - state.weight) < Math.abs(best - state.weight) ? w : best, meta.weights[0]);
+  }
+  if (!meta.subsets.includes(state.subset)) state.subset = meta.subsets.includes('latin') ? 'latin' : meta.defSubset || meta.subsets[0];
+  if (!meta.styles.includes('italic')) state.italic = false;
+}
+function syncFontUI() {
+  const meta = fontMeta();
+  const nameEl = chooserBtn.querySelector('.name');
+  if (localFont) {
+    nameEl.textContent = localFont.name; nameEl.style.fontFamily = ''; nameEl.style.fontWeight = ''; nameEl.style.fontStyle = '';
+    fileNote.textContent = 'Using uploaded file.';
+  } else if (meta) {
+    ensurePreview(meta, state.weight, state.italic);
+    nameEl.textContent = meta.family;
+    nameEl.style.fontFamily = cssFamily(meta);
+    nameEl.style.fontWeight = previewWeight(meta, state.weight);
+    nameEl.style.fontStyle = state.italic || !meta.styles.includes('normal') ? 'italic' : 'normal';
+    fileNote.textContent = '';
+  }
+  const dis = !!localFont || !meta;
+  weightSel.textContent = ''; subsetSel.textContent = '';
+  if (meta) {
+    for (const w of meta.weights) weightSel.append(el('option', { value: w, text: `${w} ${WEIGHT_NAMES[w] || ''}`.trim() }));
+    for (const sb of meta.subsets) subsetSel.append(el('option', { value: sb, text: sb }));
+    weightSel.value = state.weight; subsetSel.value = state.subset;
+    italicChk.checked = state.italic;
+    italicChk.disabled = dis || !meta.styles.includes('italic') || !meta.styles.includes('normal');
+  }
+  weightSel.disabled = subsetSel.disabled = dis;
+  if (dis) italicChk.disabled = true;
+}
+
+const lockChk = el('input', { type: 'checkbox', id: 'f-faceLock' });
+lockChk.addEventListener('change', () => {
+  if (!lockChk.checked) state.faceW = state.extW;   // unlocking starts from the shared value
+  state.faceLock = lockChk.checked;
+  syncUI(); onChange(false);
+});
+syncers.push(() => { lockChk.checked = state.faceLock; });
+
+const resetBtn = el('button', { class: 'btn', type: 'button', text: 'Reset settings' });
+resetBtn.addEventListener('click', () => {
+  const text = state.text;
+  state = Object.assign({}, DEFAULTS, { text });
+  localFont = null;
+  normalizeFontState(); syncUI(); syncFontUI(); onChange(true);
+});
+
+$('#controls').append(
+  section('Font',
+    chooser,
+    el('div', { class: 'field row' }, el('label', { for: 'f-weight', text: 'Weight' }), weightSel),
+    el('div', { class: 'field row' }, el('label', { for: 'f-italic', text: 'Italic' }), italicChk),
+    el('div', { class: 'field row' }, el('label', { for: 'f-subset', text: 'Character set' }), subsetSel),
+    el('div', { class: 'upload' }, el('label', { for: 'f-file', text: 'Use a local font file…' }), fileInp, fileNote)),
+  section('Layout',
+    numField('fontSize', 'Font size', 8, 400, 1, 'px'),
+    numField('lineHeight', 'Line height', 0.5, 3, 0.01, '× size'),
+    numField('letterSpacing', 'Letter spacing', -0.2, 1, 0.005, 'em'),
+    selectField('align', 'Alignment', [['left', 'Left'], ['center', 'Center'], ['right', 'Right']])),
+  section('Extrusion',
+    numField('extAngle', 'Angle', -180, 180, 1, '°'),
+    numField('extLen', 'Length', 0, 2, 0.01, '× size'),
+    numField('extW', 'Line width', 0, 10, 0.1, 'px', { after: () => fieldSync.faceW && fieldSync.faceW() }),
+    numField('extSp', 'Line spacing', 0.5, 40, 0.25, 'px'),
+    colorField('extFg', 'Line color'),
+    colorField('extBg', 'Background', 'extBgNone')),
+  section('Face crosshatch',
+    el('div', { class: 'lockrow' }, lockChk, el('label', { for: 'f-faceLock', text: 'Lock line width to extrusion' })),
+    numField('faceW', 'Line width', 0, 10, 0.1, 'px', { value: () => state.faceLock ? state.extW : state.faceW, disabled: () => state.faceLock }),
+    numField('faceSp', 'Line spacing', 0.5, 40, 0.25, 'px'),
+    numField('faceAngle', 'Angle', -90, 90, 1, '°'),
+    numField('faceCross', 'Crossing angle', 0, 90, 1, '°'),
+    colorField('faceFg', 'Line color'),
+    colorField('faceBg', 'Background', 'faceBgNone')),
+  section('Outline & page',
+    numField('outlineW', 'Face outline width', 0, 10, 0.1, 'px'),
+    colorField('outlineColor', 'Outline color'),
+    colorField('pageBg', 'Page background', 'pageBgNone'),
+    numField('padding', 'Padding', 0, 200, 1, 'px')),
+  el('div', { style: 'padding-top:8px' }, resetBtn),
+);
+
+function syncUI() { for (const f of syncers) f(); }
+
+/* ------------------------------------------------------------------ *
+ * Rendering & export
+ * ------------------------------------------------------------------ */
+const preview = $('#preview'), statusEl = $('#status'), dimsEl = $('#dims');
+const textEl = $('#text');
+let lastSVG = '', rafId = 0;
+
+function setStatus(msg, err) { statusEl.textContent = msg; statusEl.classList.toggle('err', !!err); }
+function scheduleRender() { if (!rafId) rafId = requestAnimationFrame(() => { rafId = 0; render(); }); }
+function render() {
+  if (!currentFont) return;
+  let res;
+  try { res = buildSVG(currentFont, state); }
+  catch (e) { setStatus('Render failed: ' + e.message, true); return; }
+  if (!res) {
+    lastSVG = '';
+    preview.innerHTML = '<span class="msg">Type some text above.</span>';
+    dimsEl.textContent = '';
+  } else {
+    lastSVG = '<?xml version="1.0" encoding="UTF-8"?>\n' + res.svg + '\n';
+    preview.innerHTML = res.svg;
+    dimsEl.textContent = `${Math.round(res.w)} × ${Math.round(res.h)} px`;
+  }
+  $('#downloadBtn').disabled = $('#copyBtn').disabled = !lastSVG;
+}
+
+textEl.value = state.text;
+textEl.addEventListener('input', () => { state.text = textEl.value; onChange(false); });
+
+$('#downloadBtn').addEventListener('click', () => {
+  if (!lastSVG) return;
+  const slug = state.text.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'text';
+  const url = URL.createObjectURL(new Blob([lastSVG], { type: 'image/svg+xml' }));
+  const a = el('a', { href: url, download: slug + '.svg' });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+$('#copyBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(lastSVG); setStatus('SVG copied to clipboard.'); setTimeout(() => setStatus(''), 1500); }
+  catch (e) { setStatus('Clipboard unavailable.', true); }
+});
+
+/* ------------------------------------------------------------------ *
+ * Boot
+ * ------------------------------------------------------------------ */
+function setFonts(list) {
+  FONTS = list.filter((f) => f && f.id && f.family && Array.isArray(f.weights) && f.weights.length)
+    .map((f) => ({
+      id: f.id, family: f.family, category: f.category || 'other',
+      weights: f.weights.slice().sort((a, b) => a - b),
+      styles: f.styles && f.styles.length ? f.styles : ['normal'],
+      subsets: f.subsets && f.subsets.length ? f.subsets : ['latin'],
+      defSubset: f.defSubset || 'latin',
+    }))
+    .sort((a, b) => a.family.localeCompare(b.family));
+  fontById.clear();
+  for (const f of FONTS) fontById.set(f.id, f);
+  if (!fontById.has(state.fontId)) { state.fontId = fontById.has('rubik') ? 'rubik' : FONTS[0].id; }
+  normalizeFontState();
+  buildList();
+  syncFontUI();
+}
+
+(async function boot() {
+  syncUI();
+  if (typeof opentype === 'undefined') { setStatus('Could not load opentype.js — check your connection.', true); return; }
+  setFonts(FALLBACK_FONTS);
+  loadCurrentFont();
+  try {
+    const r = await fetch('https://api.fontsource.org/v1/fonts?type=google');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const all = await r.json();
+    if (Array.isArray(all) && all.length) {
+      const before = fontURL(fontMeta(), state);
+      setFonts(all);
+      if (fontURL(fontMeta(), state) !== before) loadCurrentFont();
+    }
+  } catch (e) {
+    setStatus('Full font list unavailable; showing a short list.', true);
+  }
+})();
+</script>
+</body>
+</html>
