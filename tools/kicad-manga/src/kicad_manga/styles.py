@@ -1,7 +1,7 @@
 """The SVG <defs>: fonts, styles, screentone patterns, faces and the mascot."""
 
 from .characters import resistor_face_defs
-from .palette import INK, INK_SOFT, PAPER
+from .palette import INK, INK_SOFT, LINE, PAPER
 from .sexp import f2
 
 
@@ -14,16 +14,16 @@ def defs(fonts, width, height):
 {faces}
 text{{font-family:'MPR','M PLUS Rounded 1c',sans-serif}}
 :where(text:not([fill])){{fill:{INK}}}
-.wire-o{{fill:none;stroke:{INK};stroke-width:.62;stroke-linecap:round;stroke-linejoin:round}}
+.wire-o{{fill:none;stroke:{LINE};stroke-width:.62;stroke-linecap:round;stroke-linejoin:round}}
 .wire-i{{fill:none;stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}}
-.bus-o{{fill:none;stroke:{INK};stroke-width:1.35;stroke-linecap:round}}
+.bus-o{{fill:none;stroke:{LINE};stroke-width:1.35;stroke-linecap:round}}
 .bus-i{{fill:none;stroke:#c7a9ff;stroke-width:.85;stroke-linecap:round}}
-.sym-s{{fill:none;stroke:{INK};stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}}
+.sym-s{{fill:none;stroke:{LINE};stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}}
 .sym-s.thick{{stroke-width:.4}}
-.pin{{fill:none;stroke:{INK};stroke-width:.24;stroke-linecap:round}}
-.nc-o{{fill:none;stroke:{INK};stroke-width:.7;stroke-linecap:round}}
+.pin{{fill:none;stroke:{LINE};stroke-width:.24;stroke-linecap:round}}
+.nc-o{{fill:none;stroke:{LINE};stroke-width:.7;stroke-linecap:round}}
 .nc-i{{fill:none;stroke:#ff8fa8;stroke-width:.35;stroke-linecap:round}}
-.flag{{fill:none;stroke:{INK};stroke-width:.25}}
+.flag{{fill:none;stroke:{LINE};stroke-width:.25}}
 .dnp{{fill:none;stroke:#ff6f91;stroke-width:.8;stroke-linecap:round;opacity:.75}}
 .pinname{{font-weight:500}}
 .pinnum{{fill:#b0709d;font-weight:500}}
@@ -42,8 +42,8 @@ text{{font-family:'MPR','M PLUS Rounded 1c',sans-serif}}
 .sheetname{{font-family:'Pop';fill:{INK}}}
 .sheetfile{{font-family:'Zen';font-weight:700;font-style:italic;fill:{INK_SOFT}}}
 .field{{font-weight:500;fill:{INK_SOFT}}}
-.pin-deco{{fill:none;stroke:{INK};stroke-width:.24;stroke-linecap:round;stroke-linejoin:round}}
-.pin-bubble{{fill:#fff;stroke:{INK};stroke-width:.24}}
+.pin-deco{{fill:none;stroke:{LINE};stroke-width:.24;stroke-linecap:round;stroke-linejoin:round}}
+.pin-bubble{{fill:#fff;stroke:{LINE};stroke-width:.24}}
 .sfx{{font-family:'Pop';paint-order:stroke;stroke:#fff;stroke-width:.9;stroke-linejoin:round;opacity:.55}}
 .sfx-ro{{font-family:'Zen';font-weight:700;fill:{INK_SOFT};opacity:.5}}
 .frame{{fill:none;stroke:{INK};stroke-width:1.6}}

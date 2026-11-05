@@ -242,34 +242,50 @@ def dancing_crystal(rng, cx, cy, body, free=lambda x, y: True):
 
 
 
-def legend(rng):
-    """The cast of characters, as (svg, width, height) with the origin at the top left."""
-    w, h = 150, 54
+def legend(rng, cast):
+    """The cast of characters on this sheet, as (svg, width, height), origin top left.
+    `cast`: {'cap': True, 'res': True, 'ind': 'inductor' | 'ferrite bead', 'xtal': True}."""
+    w = 150
     t = lambda x, y, txt, size, fam='Pop', col=INK, anchor='start', extra='': (
         f'<text x="{f(x)}" y="{f(y)}" font-family="{fam}" font-size="{f(size)}" fill="{col}" '
         f'text-anchor="{anchor}"{extra}>{txt}</text>')
-    out = [f'<rect x="1.5" y="1.5" width="{w}" height="{h}" rx="6" fill="url(#tone-ink)" opacity=".5"/>',
-           f'<rect width="{w}" height="{h}" rx="6" fill="#fff" stroke="{INK}" stroke-width=".8"/>',
-           f'<rect x="2" y="2" width="{w - 4}" height="{h - 4}" rx="4.5" fill="none" stroke="#ffb8d0" stroke-width=".45" stroke-dasharray="1.6 1"/>',
-           t(w / 2, 9, '♡ cast of characters ♡', 5, anchor='middle', col='#ff7fb2',
-             extra=' stroke="#fff" stroke-width=".8" paint-order="stroke"')]
-    # capacitors: a row of cats from slim to chonky
-    for i, v in enumerate(['10p', '1n', '100n', '1u', '4u7', '22u']):
-        cx = 12 + i * 13.5
-        out.append(f'<g transform="translate({f(cx)} 21) scale(2.2) translate({f(-cx)} -21)">'
-                   f'{cat_capacitor(rng, cx, 21, True, v, [])}</g>')
-        out.append(t(cx, 30.5, v.replace('u', 'µ') + 'F', 2.6, 'MPR', '#2f8f86', 'middle', ' font-weight="800"'))
-    out.append(t(92, 18.5, 'capacitors', 4))
-    out.append(t(92, 23.5, 'more capacitance, more chonk', 2.7, 'Zen', '#7b5b94', extra=' font-weight="700"'))
-    out.append(t(92, 27.5, '(the wires go in one end and out the other)', 2.2, 'Zen', '#a08cb0', extra=' font-weight="700"'))
-    # resistor, ferrite, crystal
-    out.append(f'<g transform="translate(10 44) scale(1.9)">{resistor_guy(rng, 0, 0, True, 1.778, "grumpy", (3.6, -.6, "brick"))}</g>')
-    out.append(t(22, 42, 'resistor', 3.6) + t(22, 46.5, 'grumpy, throws bricks', 2.5, 'Zen', '#7b5b94', extra=' font-weight="700"')
-               + t(22, 50, '(and the odd molotov)', 2.2, 'Zen', '#a08cb0', extra=' font-weight="700"'))
-    out.append(f'<g transform="translate(66 45) scale(1.9)">{caterpillar(rng, (-2.6, 0), (2.6, 0), [])}</g>')
-    out.append(t(75, 42, 'ferrite bead', 3.6) + t(75, 46.5, 'a very hungry inductor', 2.5, 'Zen', '#7b5b94', extra=' font-weight="700"'))
-    out.append(f'<g transform="translate(116 45) scale(1.7)">'
-               f'{dancing_crystal(rng, 0, 0, (-.762, -1.524, .762, 1.524), lambda x, y: y < -1 and abs(x) < 5)}</g>')
-    out.append(t(126, 42, 'crystal', 3.6) + t(126, 46.5, 'dances at its', 2.5, 'Zen', '#7b5b94', extra=' font-weight="700"')
-               + t(126, 50, 'own frequency ♪', 2.5, 'Zen', '#7b5b94', extra=' font-weight="700"'))
-    return ''.join(out), w, h
+    sub = lambda x, y, txt, size=2.5, col='#7b5b94': t(x, y, txt, size, 'Zen', col, extra=' font-weight="700"')
+    out, y = [], 12
+    if cast.get('cap'):       # a row of cats from slim to chonky
+        for i, v in enumerate(['10p', '1n', '100n', '1u', '4u7', '22u']):
+            cx = 12 + i * 13.5
+            out.append(f'<g transform="translate({f(cx)} {f(y + 9)}) scale(2.2) translate({f(-cx)} {f(-y - 9)})">'
+                       f'{cat_capacitor(rng, cx, y + 9, True, v, [])}</g>')
+            out.append(t(cx, y + 18.5, v.replace('u', 'µ') + 'F', 2.6, 'MPR', '#2f8f86', 'middle', ' font-weight="800"'))
+        out.append(t(92, y + 6.5, 'capacitors', 4))
+        out.append(sub(92, y + 11.5, 'more capacitance, more chonk', 2.7))
+        out.append(sub(92, y + 15.5, '(the wires go in one end and out the other)', 2.2, '#a08cb0'))
+        y += 22
+    others = []
+    if cast.get('res'):
+        others.append(lambda x, y: f'<g transform="translate({f(x + 4)} {f(y + 4)}) scale(1.9)">'
+                      f'{resistor_guy(rng, 0, 0, True, 1.778, "grumpy", (3.6, -.6, "brick"))}</g>'
+                      + t(x + 16, y + 2, 'resistor', 3.6) + sub(x + 16, y + 6.5, 'grumpy, throws bricks')
+                      + sub(x + 16, y + 10, '(and the odd molotov)', 2.2, '#a08cb0'))
+    if cast.get('ind'):
+        bead = cast['ind'] == 'ferrite bead'
+        others.append(lambda x, y: f'<g transform="translate({f(x + 6)} {f(y + 5)}) scale(1.9)">'
+                      f'{caterpillar(rng, (-2.6, 0), (2.6, 0), [])}</g>'
+                      + t(x + 15, y + 2, cast['ind'], 3.6)
+                      + sub(x + 15, y + 6.5, 'eats high frequencies' if bead else 'a very hungry caterpillar'))
+    if cast.get('xtal'):
+        others.append(lambda x, y: f'<g transform="translate({f(x + 4)} {f(y + 5)}) scale(1.7)">'
+                      f'{dancing_crystal(rng, 0, 0, (-.762, -1.524, .762, 1.524), lambda a, b: b < -1 and abs(a) < 5)}</g>'
+                      + t(x + 14, y + 2, 'crystal', 3.6) + sub(x + 14, y + 6.5, 'dances at its')
+                      + sub(x + 14, y + 10, 'own frequency ♪'))
+    for i, draw in enumerate(others):
+        out.append(draw(6 + i * 50, y + 6))
+    if others:
+        y += 18
+    h = y + 2
+    frame = [f'<rect x="1.5" y="1.5" width="{w}" height="{h}" rx="6" fill="url(#tone-ink)" opacity=".5"/>',
+             f'<rect width="{w}" height="{h}" rx="6" fill="#fff" stroke="{INK}" stroke-width=".8"/>',
+             f'<rect x="2" y="2" width="{w - 4}" height="{h - 4}" rx="4.5" fill="none" stroke="#ffb8d0" stroke-width=".45" stroke-dasharray="1.6 1"/>',
+             t(w / 2, 9, '♡ cast of characters ♡', 5, anchor='middle', col='#ff7fb2',
+               extra=' stroke="#fff" stroke-width=".8" paint-order="stroke"')]
+    return ''.join(frame + out), w, h

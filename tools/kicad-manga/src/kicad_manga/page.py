@@ -143,7 +143,7 @@ class Page:
 </g>''')
 
     def legend(self):
-        svg, w, h = C.legend(random.Random(5))
+        svg, w, h = C.legend(random.Random(5), self.c.cast())
         W, H, m = self.DW, self.DH, FM + 8
         for s in (1, .8, .62):
             sw, sh = w * s, h * s

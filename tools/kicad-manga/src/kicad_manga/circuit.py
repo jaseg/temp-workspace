@@ -15,7 +15,7 @@ import re
 from html import escape
 
 from . import characters as C
-from .palette import INK, LibColors, NetColors
+from .palette import LINE, LibColors, NetColors
 from .sexp import (CHAR_W, DASHES, FS, Xf, angle, color, f2, font, font_size, is_hidden, justify, kid, kids,
                    plain, pts, stroke, text_el, text_extent, val, xy, yes)
 
@@ -390,8 +390,10 @@ class Circuit:
         for j in kids(self.sch, 'junction'):
             x, y = xy(j)
             d = val(j, 'diameter', default=0, conv=float)
-            r = d / 2 if d else .62
-            self.add('junctions', f'<circle data-kind="junction" cx="{f2(x)}" cy="{f2(y)}" r="{f2(r)}" fill="{color(j) or INK}"/>')
+            r = d / 2 if d else .72
+            fill = color(j) or self.color_at((x, y))
+            self.add('junctions', f'<circle data-kind="junction" cx="{f2(x)}" cy="{f2(y)}" r="{f2(r)}" fill="{fill}" '
+                                  f'stroke="{LINE}" stroke-width=".22"/>')
         for n in kids(self.sch, 'no_connect'):
             x, y = xy(n)
             d = f'M{f2(x - .7)} {f2(y - .7)}l1.4 1.4M{f2(x + .7)} {f2(y - .7)}l-1.4 1.4'
@@ -403,9 +405,9 @@ class Circuit:
         w, dash, scol = stroke(node)
         fill = kid(node, 'fill') or []
         ftype = val(fill, 'type', default=fill_default)
-        fcol = {'none': 'none', 'outline': scol or INK, 'background': '#fff1e0'}.get(ftype) or color(fill) or 'none'
+        fcol = {'none': 'none', 'outline': scol or LINE, 'background': '#fff1e0'}.get(ftype) or color(fill) or 'none'
         da = f' stroke-dasharray="{DASHES[dash]}"' if dash in DASHES else ''
-        return f'fill="{fcol}" stroke="{scol or INK}" stroke-width="{f2(max(w, .25))}"{da} stroke-linejoin="round" stroke-linecap="round"'
+        return f'fill="{fcol}" stroke="{scol or LINE}" stroke-width="{f2(max(w, .25))}"{da} stroke-linejoin="round" stroke-linecap="round"'
 
     def render_graphics(self):
         for kind in GRAPHIC_KINDS:
@@ -494,7 +496,7 @@ class Circuit:
         fill = kid(tb, 'fill') or []
         fcol = color(fill) or ('#e9e0ff' if header else '#fffbe8' if kind == 'text_box' else '#fffdf6')
         da = f' stroke-dasharray="{DASHES[dash]}"' if dash in DASHES else ''
-        border = '' if sw < 0 else f' stroke="{scol or INK}" stroke-width="{f2(max(sw, .25))}"{da}'
+        border = '' if sw < 0 else f' stroke="{scol or LINE}" stroke-width="{f2(max(sw, .25))}"{da}'
         tx = {'left': x + mg[0], 'right': x + w - mg[2], 'center': x + w / 2}[hj]
         ty = {'top': y + mg[1], 'bottom': y + h - mg[3], 'center': y + h / 2}[vj]
         s = wrap_text(tb[1], w - mg[0] - mg[2], size)
@@ -509,7 +511,7 @@ class Circuit:
             (x, y), (w, h) = xy(sh), xy(sh, 'size')
             fcol = color(kid(sh, 'fill')) or '#eef0ff'
             parts = [f'<path d="{rounded_rect(x + .9, y + .9, x + w + .9, y + h + .9, 1.2)}" fill="url(#tone-ink)" opacity=".5"/>',
-                     f'<path d="{rounded_rect(x, y, x + w, y + h, 1.2)}" fill="{fcol}" stroke="{INK}" stroke-width=".4"/>',
+                     f'<path d="{rounded_rect(x, y, x + w, y + h, 1.2)}" fill="{fcol}" stroke="{LINE}" stroke-width=".4"/>',
                      f'<path d="{rounded_rect(x, y, x + w, y + h, 1.2)}" fill="url(#tone-w)"/>']
             for prop in kids(sh, 'property'):
                 if is_hidden(prop):
@@ -604,11 +606,11 @@ class Circuit:
         if shape == 'dot':
             head = f'<use href="#blossom" x="{f2(ex)}" y="{f2(ey)}" fill="{col}"/>'
         elif shape == 'diamond':
-            head = f'<path d="M{f2(ex)} {f2(ey - .9)}l.9 .9-.9 .9-.9-.9z" fill="{col}" stroke="{INK}" stroke-width=".2"/>'
+            head = f'<path d="M{f2(ex)} {f2(ey - .9)}l.9 .9-.9 .9-.9-.9z" fill="{col}" stroke="{LINE}" stroke-width=".2"/>'
         elif shape == 'rectangle':
-            head = f'<rect x="{f2(ex - .8)}" y="{f2(ey - .8)}" width="1.6" height="1.6" rx=".3" fill="{col}" stroke="{INK}" stroke-width=".2"/>'
+            head = f'<rect x="{f2(ex - .8)}" y="{f2(ey - .8)}" width="1.6" height="1.6" rx=".3" fill="{col}" stroke="{LINE}" stroke-width=".2"/>'
         else:
-            head = f'<circle cx="{f2(ex)}" cy="{f2(ey)}" r=".8" fill="{col}" stroke="{INK}" stroke-width=".2"/>'
+            head = f'<circle cx="{f2(ex)}" cy="{f2(ey)}" r=".8" fill="{col}" stroke="{LINE}" stroke-width=".2"/>'
         parts = [f'<path class="flag" d="M{f2(x)} {f2(y)}L{f2(ex)} {f2(ey)}"/>', head]
         for p in props:
             if not is_hidden(p) and p[2]:
@@ -768,7 +770,7 @@ class Circuit:
                 elif ftype == 'pale' and closed:
                     fills.append(f'<path d="{d}" fill="{fill_col}" fill-opacity=".85"/>')
                 elif ftype == 'outline' and closed:
-                    fills.append(f'<path d="{d}" fill="{scol or INK}"/>')
+                    fills.append(f'<path d="{d}" fill="{scol or LINE}"/>')
                 strokes.append(f'<path d="{d}" class="sym-s{" thick" if sw >= 0.25 else ""}"{sc}{da}/>')
 
         # pins
@@ -871,7 +873,8 @@ class Circuit:
         entry = {'id': sid, 'ref': ref, 'lib_id': lib_id, 'parts': []}
         parts = entry['parts']
         if shadow:
-            parts.append(f'<g class="shadow" transform="translate(.9 .9)">{"".join(shadow)}</g>')
+            parts.append(f'<g class="shadow" transform="translate(.9 .9)" fill="url(#tone-ink)" opacity=".55">'
+                         f'{"".join(shadow)}</g>')
         parts += fills + strokes
         if pins_svg:
             parts.append(f'<path class="pin" d="{"".join(pins_svg)}"/>')
@@ -949,6 +952,15 @@ class Circuit:
         return f'<use class="face" href="#face-{mood}" transform="translate({f2(cx)} {f2(cy)}) scale({f2(size / 10)})"/>'
 
     # -- passive components as characters -----------------------------------
+    def cast(self):
+        """Which characters appear on the sheet, for the legend."""
+        cast = {p['kind']: True for p in self.passives}
+        inds = [p for p in self.passives if p['kind'] == 'ind']
+        if inds:
+            beads = [p for p in inds if ref_prefix(p['entry']['ref']) == 'FB' or 'bead' in p['lib_id'].lower()]
+            cast['ind'] = 'ferrite bead' if len(beads) == len(inds) else 'inductor'
+        return cast
+
     def render_characters(self):
         rng = random.Random(11)
         moods = ['grumpy', 'yell', 'smug', 'pout']
@@ -1021,4 +1033,4 @@ def hier_glyph(x, y, ux, uy, shape, size, fill):
         d = f'M{P(0, 0)}L{P(s, s)}L{P(2 * s, 0)}L{P(s, -s)}Z'
     else:
         d = f'M{P(0, s)}L{P(2 * s, s)}L{P(2 * s, -s)}L{P(0, -s)}Z'
-    return f'<path d="{d}" fill="{fill}" stroke="{INK}" stroke-width=".22" stroke-linejoin="round"/>'
+    return f'<path d="{d}" fill="{fill}" stroke="{LINE}" stroke-width=".22" stroke-linejoin="round"/>'

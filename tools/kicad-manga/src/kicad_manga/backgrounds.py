@@ -8,7 +8,7 @@ coordinate system (it sits in a translated/rotated <g>)."""
 import re
 
 from .circuit import hier_glyph, rounded_poly
-from .palette import INK
+from .palette import LINE
 from .sexp import f2
 
 MARKER = re.compile(r'<!--bg:(t\d+)-->')
@@ -30,7 +30,7 @@ def build(info, box):
     if kind == 'pill':
         hh, yy = h * .86, y + h * .1
         return (f'<rect class="bg" x="{f2(x - .55)}" y="{f2(yy - .18)}" width="{f2(w + 1.1)}" height="{f2(hh + .36)}" '
-                f'rx="{f2((hh + .36) / 2)}" fill="{info[1]}" stroke="{INK}" stroke-width=".16"/>')
+                f'rx="{f2((hh + .36) / 2)}" fill="{info[1]}" stroke="{LINE}" stroke-width=".16"/>')
     if kind in ('global_label', 'hierarchical_label'):
         _, col, shape, sign, off, size = info
         y0, y1 = y + h * .08 - .3, y + h * .92 + .3
@@ -40,7 +40,7 @@ def build(info, box):
             glyph = hier_glyph(xa, ym, sign, 0, shape, size, col)
             hh = h * .86
             pill = (f'<rect class="bg" x="{f2(x - .5)}" y="{f2(y + h * .07 - .15)}" width="{f2(w + 1)}" height="{f2(hh + .3)}" '
-                    f'rx="{f2((hh + .3) / 2)}" fill="{col}" fill-opacity=".55" stroke="{INK}" stroke-width=".12" stroke-dasharray=".5 .35"/>')
+                    f'rx="{f2((hh + .3) / 2)}" fill="{col}" fill-opacity=".55" stroke="{LINE}" stroke-width=".12" stroke-dasharray=".5 .35"/>')
             return pill + glyph
         far = (x + w if sign > 0 else x) + sign * .6
         pa = shape in ('input', 'bidirectional', 'tri_state')
@@ -51,7 +51,7 @@ def build(info, box):
         right = [(far - sign * d, y0), (far, ym), (far - sign * d, y1)] if pf else [(far, y0), (far, y1)]
         bottom = [(xa + sign * d, y1)] if pa else []
         poly = top + right + bottom
-        return f'<path class="bg" d="{rounded_poly(poly, .35)}" fill="{col}" stroke="{INK}" stroke-width=".2" stroke-linejoin="round"/>'
+        return f'<path class="bg" d="{rounded_poly(poly, .35)}" fill="{col}" stroke="{LINE}" stroke-width=".2" stroke-linejoin="round"/>'
     if kind == 'bubble':
         p = 1.1
         x0, y0, x1, y1 = x - p, y - p * .7, x + w + p, y + h + p * .7
@@ -60,7 +60,7 @@ def build(info, box):
         d = (f'M{f2(x0 + rr)} {f2(y0)}H{f2(x1 - rr)}Q{f2(x1)} {f2(y0)} {f2(x1)} {f2(y0 + rr)}V{f2(y1 - rr)}'
              f'Q{f2(x1)} {f2(y1)} {f2(x1 - rr)} {f2(y1)}H{f2(tx + 2.2)}L{f2(tx - .6)} {f2(y1 + 2)}L{f2(tx + .6)} {f2(y1)}'
              f'H{f2(x0 + rr)}Q{f2(x0)} {f2(y1)} {f2(x0)} {f2(y1 - rr)}V{f2(y0 + rr)}Q{f2(x0)} {f2(y0)} {f2(x0 + rr)} {f2(y0)}Z')
-        return f'<path class="bg" d="{d}" fill="#fff" stroke="{INK}" stroke-width=".28" stroke-linejoin="round"/>'
+        return f'<path class="bg" d="{d}" fill="#fff" stroke="{LINE}" stroke-width=".28" stroke-linejoin="round"/>'
     if kind == 'banner':
         px, py, n = 3.2, .9, 1.6
         x0, x1 = x - px, x + w + px
@@ -68,7 +68,7 @@ def build(info, box):
         ym = (y0 + y1) / 2
         rib = f'M{f2(x0 - n)} {f2(y0)}H{f2(x1 + n)}L{f2(x1)} {f2(ym)}L{f2(x1 + n)} {f2(y1)}H{f2(x0 - n)}L{f2(x0)} {f2(ym)}Z'
         out = [f'<path d="{rib}" transform="translate(.7 .7)" fill="url(#tone-ink)" opacity=".6"/>',
-               f'<path class="bg" d="{rib}" fill="url(#banner-grad)" stroke="{INK}" stroke-width=".35" stroke-linejoin="round"/>',
+               f'<path class="bg" d="{rib}" fill="url(#banner-grad)" stroke="{LINE}" stroke-width=".35" stroke-linejoin="round"/>',
                f'<path d="M{f2(x0 + .6)} {f2(y0 + .7)}H{f2(x1 - .6)}M{f2(x0 + .6)} {f2(y1 - .7)}H{f2(x1 - .6)}" '
                f'stroke="#fff" stroke-width=".25" stroke-dasharray=".8 .6" fill="none"/>']
         for sx, c in ((x0 - n - 2.6, '#ffe58f'), (x1 + n + 2.6, '#ff9cc2')):

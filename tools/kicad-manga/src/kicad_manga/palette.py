@@ -11,6 +11,7 @@ from .sexp import natural_key
 
 INK = '#4b3a5a'          # soft plum "ink" instead of black
 INK_SOFT = '#8a7499'
+LINE = '#7a6888'         # outlines: lighter than the ink used for text
 PAPER = '#fffaf2'
 
 
