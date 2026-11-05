@@ -146,10 +146,15 @@ class NetColors:
         a = start
         for p in order:
             w = span * len(fams[p]) / total
-            g = min(2.5, w * .15)
             bases = sorted({self.base(n) for n, _, _ in fams[p]}, key=natural_key)
+            nb = len(bases)
+            # members may spread a bit past the family's own arc (its wheel neighbours sit
+            # far away on the sheet), and consecutive names are scattered across it
+            spread = max(w, 9 * nb ** .5) * 1.4
+            stride = next(st for st in range(max(1, round(nb * .618)), nb + 1) if math.gcd(st, nb) == 1) if nb > 2 else 1
             for k, b in enumerate(bases):
-                self.member[b] = (a + g + (w - 2 * g) * (k + .5) / len(bases), k)
+                pos = (k * stride) % nb
+                self.member[b] = (a + w / 2 + spread * ((pos + .5) / nb - .5), k)
             a += w
 
     @staticmethod
@@ -215,9 +220,10 @@ class NetColors:
             return hls_hex(262 + 18 * j, .80 + .05 * j, .22)
         if self.is_supply(name):
             lo, hi = self.RAILS
-            return hls_hex(lo + (hi - lo) * j, .76, .92)
+            return hls_hex(lo + (hi - lo) * j, .8 + .06 * j, .95)
         hue, k = self.member.get(self.base(name), (self.RAILS[1] + 5 + _jitter(name, 300), 0))
-        return hls_hex(hue, (.74, .81, .77)[k % 3], .78)
+        l, sat = ((.82, .9), (.88, .95), (.85, .68), (.9, .85))[k % 4]   # pastel steps
+        return hls_hex(hue, l, sat)
 
 
 def natural_key(s):
