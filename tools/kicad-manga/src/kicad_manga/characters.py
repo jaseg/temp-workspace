@@ -303,10 +303,12 @@ def legend(rng, cast):
 BUS_FUR, BUS_STRIPE = '#ffd6a8', '#efae78'
 
 
-def cat_bus(segments, head, tail, legs):
+def cat_bus(segments, head, tail, legs, entries=()):
     """`segments`: [(a, b)] in sheet coordinates (each one a <path data-kind="bus">);
     `head`/`tail`: (x, y, ux, uy), an end point and the direction pointing out of the bus;
-    `legs`: [(x, y, nx, ny)] where a leg starts and which side it hangs to."""
+    `legs`: [(x, y, nx, ny)] where a leg starts and which side it hangs to;
+    `entries`: [(point on the bus, point on the wire, colour)] bus entries, which get a
+    window each and come in as slightly squiggly wires."""
     line = '#7a6888'
     half = 1.45                     # half the body's thickness
     out = []
@@ -327,6 +329,13 @@ def cat_bus(segments, head, tail, legs):
     out.append(f'<path d="{body}" fill="none" stroke="{BUS_FUR}" stroke-width="{f(2 * half)}" stroke-linecap="round" stroke-linejoin="round"/>')
     stripes, windows = [], []
     hx, hy = head[0], head[1]
+    taps = [p for p, _, _ in entries]
+
+    def window(px, py, ang):
+        windows.append(f'<g transform="translate({f(px)} {f(py)}) rotate({f(ang)})">'
+                       f'<rect x="-.85" y="-.75" width="1.7" height="1.3" rx=".35" fill="#d9f1ff" fill-opacity=".72" '
+                       f'stroke="{line}" stroke-width=".16"/>'
+                       f'<path d="M-.5 -.45l.45 .55" stroke="#fff" stroke-width=".22" stroke-linecap="round"/></g>')
     for a, b in segments:          # windows along the back, tabby stripes between them
         L = math.hypot(b[0] - a[0], b[1] - a[1])
         if L < 1:
@@ -336,17 +345,26 @@ def cat_bus(segments, head, tail, legs):
         t, k = 1.4, 0
         while t < L - 1:
             px, py = a[0] + ux * t, a[1] + uy * t
-            if math.hypot(px - hx, py - hy) > 3.5:
+            near_tap = min((math.hypot(px - q[0], py - q[1]) for q in taps), default=99)
+            if math.hypot(px - hx, py - hy) > 3.5 and near_tap > 1.6:
                 if k % 2:
-                    windows.append(f'<g transform="translate({f(px)} {f(py)}) rotate({f(math.degrees(math.atan2(uy, ux)))})">'
-                                   f'<rect x="-.85" y="-.75" width="1.7" height="1.3" rx=".35" fill="#d9f1ff" stroke="{line}" stroke-width=".16"/>'
-                                   f'<path d="M-.5 -.45l.45 .55" stroke="#fff" stroke-width=".22" stroke-linecap="round"/></g>')
+                    window(px, py, math.degrees(math.atan2(uy, ux)))
                 else:
                     stripes.append(f'M{f(px + nx * 1.05)} {f(py + ny * 1.05)}Q{f(px + ux * .4)} {f(py + uy * .4)} '
                                    f'{f(px - nx * 1.05)} {f(py - ny * 1.05)}')
             t += 1.9
             k += 1
+        for q in taps:             # a window wherever a bus entry comes in
+            if on_seg(q, a, b):
+                window(q[0], q[1], math.degrees(math.atan2(uy, ux)))
     out.append(f'<path d="{"".join(stripes)}" fill="none" stroke="{BUS_STRIPE}" stroke-width=".4" stroke-linecap="round"/>')
+    for p, q, col in entries:      # entries: ordinary wires with a little wiggle, into the window
+        dx, dy = p[0] - q[0], p[1] - q[1]
+        n = math.hypot(dx, dy) or 1
+        nx, ny = -dy / n * .55, dx / n * .55
+        d = (f'M{f(q[0])} {f(q[1])}C{f(q[0] + dx * .35 + nx)} {f(q[1] + dy * .35 + ny)} '
+             f'{f(q[0] + dx * .7 - nx)} {f(q[1] + dy * .7 - ny)} {f(p[0])} {f(p[1])}')
+        out.append(f'<g data-kind="bus_entry"><path class="wire-o" d="{d}"/><path class="wire-i" stroke="{col}" d="{d}"/></g>')
     out += windows
     # the head, upright, just past the end of the bus: headlight eyes and a big grin
     ux, uy = head[2], head[3]
@@ -368,3 +386,10 @@ def cat_bus(segments, head, tail, legs):
                f'<ellipse cx="2.05" cy=".55" rx=".42" ry=".22" fill="#ff9cc2" stroke="none" opacity=".8"/>'
                f'<path d="M-1.6 .2l-1.6 -.25M-1.6 .5l-1.6 .15M1.6 .2l1.6 -.25M1.6 .5l1.6 .15" fill="none" stroke-width=".09"/></g>')
     return ''.join(out)
+
+
+def on_seg(p, a, b, eps=0.01):
+    (px, py), (ax, ay), (bx, by) = p, a, b
+    if abs((bx - ax) * (py - ay) - (by - ay) * (px - ax)) > eps * max(1, math.hypot(bx - ax, by - ay)):
+        return False
+    return min(ax, bx) - eps <= px <= max(ax, bx) + eps and min(ay, by) - eps <= py <= max(ay, by) + eps

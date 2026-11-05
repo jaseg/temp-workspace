@@ -383,27 +383,35 @@ class Circuit:
                 inner.append(f'<path class="wire-i" stroke="{scol or col}" d="{d}"{da}/>')
             self.add('wires', f'<g class="net" data-net="{escape(name)}">{"".join(outer + inner)}</g>')
         buses = [pts(b) for b in kids(self.sch, 'bus')]
-        if self.characters:
-            self.cat_buses(buses)
-        else:
+        segs = [(a, b) for p in buses for a, b in zip(p, p[1:]) if key(a) != key(b)]
+        entries = []           # (point on the bus, point on the wire, colour)
+        for be in kids(self.sch, 'bus_entry'):
+            (x, y), (sx, sy) = xy(be), xy(be, 'size')
+            p, q = (x, y), (x + sx, y + sy)
+            if not any(on_segment(p, a, b) for a, b in segs) and any(on_segment(q, a, b) for a, b in segs):
+                p, q = q, p
+            entries.append((p, q, self.color_at(q)))
+            self.mark(x, y, x + sx, y + sy, pad=1)
+        drawn = self.cat_buses(segs, entries) if self.characters else set()
+        if not self.characters:
             for p in buses:
                 d = 'M' + 'L'.join(f'{f2(x)} {f2(y)}' for x, y in p)
                 self.add('wires', f'<g data-kind="bus"><path class="bus-o" d="{d}"/><path class="bus-i" d="{d}"/></g>')
+        for i, (p, q, col) in enumerate(entries):   # entries not taken care of by a cat: plain wires
+            if i not in drawn:
+                d = f'M{f2(p[0])} {f2(p[1])}L{f2(q[0])} {f2(q[1])}'
+                self.add('wires', f'<g data-kind="bus_entry"><path class="wire-o" d="{d}"/>'
+                                  f'<path class="wire-i" stroke="{col}" d="{d}"/></g>')
         for p in buses:
             for a, c in zip(p, p[1:]):
                 self.mark(a[0], a[1], c[0], c[1], pad=2.5 if self.characters else 1.2, fine_pad=2.6 if self.characters else .4)
-        for be in kids(self.sch, 'bus_entry'):
-            x, y = xy(be)
-            sx, sy = xy(be, 'size')
-            d = f'M{f2(x)} {f2(y)}l{f2(sx)} {f2(sy)}'
-            self.add('wires', f'<g data-kind="bus_entry"><path class="bus-o" d="{d}"/><path class="bus-i" d="{d}"/></g>')
-            self.mark(x, y, x + sx, y + sy, pad=1)
 
-    def cat_buses(self, buses):
+    def cat_buses(self, segs, all_entries):
         """Each connected bus becomes one long cat: head at one end, tail at the other,
-        legs on the side away from the bus entries."""
-        entries = [(xy(be), xy(be, 'size')) for be in kids(self.sch, 'bus_entry')]
-        segs = [(a, b) for p in buses for a, b in zip(p, p[1:]) if key(a) != key(b)]
+        legs on the side away from the bus entries, which come in through its windows.
+        Returns the indices of the entries it drew."""
+        entries = [(p, (q[0] - p[0], q[1] - p[1])) for p, q, _ in all_entries]
+        drawn = set()
         uf = UF(len(segs))
         first = {}
         for i, (a, b) in enumerate(segs):
@@ -434,27 +442,47 @@ class Circuit:
                 near = sum(1 for (p, _) in entries if math.hypot(p[0] - x, p[1] - y) < 5)
                 return self.fine.count(hx - 3, hy - 3.5, hx + 3, hy + 2.5) + 10 * near
             head, tail = (e1, e2) if crowd(e1) <= crowd(e2) else (e2, e1)
-            legs = []
-            for a, b in chain:
-                L = math.hypot(b[0] - a[0], b[1] - a[1])
-                ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
-                nx, ny = (0, 1) if abs(ux) > abs(uy) else (1, 0)     # legs down, or to the right
-                here = [s for p, s in entries if on_segment(p, a, b)]
+            # walk the bus from head to tail, so "left" and "right" mean the same along the
+            # whole cat, then put all its legs on whichever side is less cluttered
+            path, left, at = [], list(chain), head[0]
+            while left:
+                nxt = next(((a, b) for a, b in left if key(a) == key(at)), None) or \
+                    next(((b, a) for a, b in left if key(b) == key(at)), None) or left[0]
+                left.remove(nxt if nxt in left else nxt[::-1])
+                path.append(nxt)
+                at = nxt[1]
 
-                def clutter(sx, sy):    # bus entries on that side, and whatever else is in the way
-                    hits = sum(1 for s in here if s[0] * sx + s[1] * sy > 0)
-                    x0, y0 = a[0] + sx * 1.6, a[1] + sy * 1.6
-                    x1, y1 = b[0] + sx * 3.4, b[1] + sy * 3.4
-                    return 20 * hits + self.fine.count(x0, y0, x1, y1)
-                if clutter(-nx, -ny) < clutter(nx, ny):
-                    nx, ny = -nx, -ny
+            def clutter(a, b, sx, sy):    # bus entries on that side, and whatever else is in the way
+                here = [v for p, v in entries if on_segment(p, a, b)]
+                hits = sum(1 for v in here if v[0] * sx + v[1] * sy > 0)
+                return 20 * hits + self.fine.count(a[0] + sx * 1.6, a[1] + sy * 1.6, b[0] + sx * 3.4, b[1] + sy * 3.4)
+
+            def side_normals(sign):
+                out = []
+                for a, b in path:
+                    L = math.hypot(b[0] - a[0], b[1] - a[1]) or 1
+                    ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+                    out.append((a, b, L, ux, uy, -uy * sign, ux * sign))
+                return out
+            options = [side_normals(1), side_normals(-1)]
+            best = min(options, key=lambda segs_: sum(clutter(a, b, nx, ny) for a, b, _, _, _, nx, ny in segs_))
+            legs = []
+            for a, b, L, ux, uy, nx, ny in best:
                 t = 2.4
                 while t < L - 2:
                     px, py = a[0] + ux * t, a[1] + uy * t
-                    if min(math.hypot(px - e[0][0], py - e[0][1]) for e in (head, tail)) > 4.5:
+                    qx, qy = px + nx * 2.7, py + ny * 2.7          # where the paw lands
+                    clear = min(math.hypot(px - e[0][0], py - e[0][1]) for e in (head, tail)) > 4.5 and \
+                        all(math.hypot(px - p[0], py - p[1]) > 1.8 for p, _ in entries) and \
+                        not self.fine.count(qx - .6, qy - .5, qx + .6, qy + .5)
+                    if clear:
                         legs.append((px, py, nx, ny))
                     t += 3.8
-            self.add('wires', f'<g data-kind="cat_bus">{C.cat_bus(chain, outward(head), outward(tail), legs)}</g>')
+            mine = [i for i, (p, q, _) in enumerate(all_entries) if any(on_segment(p, a, b) for a, b in chain)]
+            drawn.update(mine)
+            svg = C.cat_bus(chain, outward(head), outward(tail), legs, [all_entries[i] for i in mine])
+            self.add('wires', f'<g data-kind="cat_bus">{svg}</g>')
+        return drawn
 
     def render_junctions(self):
         for j in kids(self.sch, 'junction'):
