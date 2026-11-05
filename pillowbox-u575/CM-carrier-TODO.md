@@ -4,97 +4,110 @@ Items marked **verify** are from general CM4/CM5 platform knowledge, not checked
 datasheets in this project. Confirm against the CM4 and CM5 datasheets and the official
 CM4/CM5 IO-board reference designs.
 
-## Decisions first
+## Decisions (settled)
 
-- [ ] **Power input**: USB-C PD sink (9–20 V → 5 V buck) vs. plain 5 V/5 A input. 5.1 kΩ Rd
-      only (today's J5) caps the board at 3 A @ 5 V, and only with a 3 A source: too little
-      for CM5 + USB devices. Raspberry Pi's CM5 IO board uses a 27 W PD supply (**verify**).
-- [ ] **Role of J5**: power-only, power + STM32 USB, or power + CM USB2 (rpiboot/flashing).
-- [ ] **Lite variants** (no eMMC): support them (microSD socket on the SD pins) or not.
-- [ ] **Ethernet magnetics location**: far end of the FPC (recommended) or on this board.
-- [ ] **Connector mated height** (DF40 1.5 mm vs 3.0 mm): sets what fits under the module.
-- [ ] Keep or drop the ID EEPROM (U11): no longer a HAT; optional as carrier ID.
+- Power: 12–24 V / 2 A arrives over the FPC; on-board 5 V / 5 A buck feeds the CM and U7.
+- FPC carries **only** input power + the CM's Ethernet (4 MDI pairs, LEDs).
+- Ethernet magnetics / RJ45 at the **far end** of the FPC.
+- CM USB2 comes out on a **second on-board USB-C**; J5 stays for the STM32.
+- microSD socket fitted (only used by CM4/CM5 Lite variants).
+- DF40 mated height **3.0 mm** (components allowed under the module).
+- No carrier ID EEPROM (CM carriers don't normally have one) → drop U11 and its parts.
 
-## Power
+## 5 V / 5 A buck (input 12–24 V, from the FPC)
 
-- [ ] 5 V rail for the CM: size for CM5 worst case (plan ≥ 5 A at 5 V incl. downstream USB).
-      Check module input current and allowed ripple/transient specs (**verify** both modules).
-- [ ] Input protection: reverse polarity, TVS, inrush limit / eFuse on the CM 5 V feed.
-- [ ] Re-budget the board rails: U7 (TMI7003C) currently runs from +5 V; check total load with
-      U2 (~0.3 A @ 3V3), STM32, FPGA, and confirm U7 input/current limits.
-- [ ] Don't load the CM's own 3.3 V / 1.8 V outputs with board circuitry beyond their rating
-      (**verify** limits). Keep the board's own rails.
-- [ ] Power sequencing / control: GLOBAL_EN, RUN_PG (CM4), PWR_BUT (CM5): decide whether the
-      STM32 can hold the CM off or reset it; add a power button if needed (**verify** pin names).
-- [ ] Remove the J5 ↔ Pi back-feed concern (single supply now) and update J5's protection.
+LCSC stock/prices checked 2026-11-05 (USD, 100-pc price).
+
+| Part | LCSC | Vin max | Type | LCSC stock | ~100 pc | Notes |
+|---|---|---|---|---|---|---|
+| **TPS54560BDDAR** (TI) | C1850354 | 60 V | async, 92 mΩ HS | 26 539 | $0.57 | Recommended: 60 V absorbs hot-plug ringing; needs a 5 A/60 V Schottky; WEBENCH/EVM available |
+| RT6365GSP (Richtek) | C3024482 | 60 V | async, 70 mΩ HS | 8 234 | $0.76 | Same class as TPS54560B, 2nd-source candidate (pinout not checked) |
+| **AP64500SP-13** (Diodes) | C2070920 | 40 V | **sync**, 45/20 mΩ, 6.8 A min peak limit | 1 972 | $1.13 | Best efficiency/least heat; 40 V needs a damped input (see below) |
+| SCT2450STER (SCT) | C509400 | 36 V | sync, 45/20 mΩ | 1 620 | $1.98 | Sync alternative, less margin at 24 V |
+| SCT2650STER (SCT) | C2840771 | 60 V | async, 80 mΩ HS | 10 830 | $1.97 | Works, but pricier than TPS54560B |
+| LM76005RNPR (TI) | C2866241 | 60 V | sync | 5 474 | $3.74 | Only cheap-ish 60 V sync option; WQFN-30, not "inexpensive" |
+| SY8205FCC | C111875 | 30 V | sync | 7 801 | $0.25 | **Rejected**: 30 V too close to 24 V + transients |
+| XL4005E1 | C73332 | 32 V | async, 300 kHz | 33 526 | $0.59 | **Rejected**: 32 V, low frequency, big inductor |
+
+- [ ] Pick TPS54560B (robust, cheapest) or AP64500 (cooler, needs input damping).
+- [ ] Hot-plug of 24 V through cable + FPC can ring to ~2× Vin. A 40 V part cannot be protected
+      by a TVS at 24 V nominal (a 24–26 V standoff TVS clamps above 40 V); add a damping bulk
+      cap with real ESR (aluminium electrolytic / polymer, 50 V) at the input regardless.
+- [ ] Input protection: reverse polarity (P-FET), TVS (SMBJ-class, standoff ≥ 26 V; fine for a
+      60 V buck), fuse/PTC, π-filter so buck noise doesn't couple onto the FPC next to the MDI pairs.
+- [ ] Rough parts for 400 kHz: L ≈ 6.8 µH, Isat ≥ 8 A; Schottky 5 A / 60 V (SS56/B560C class)
+      for the async options; 50 V input MLCCs; ≥ 2×22 µF output + bulk.
+- [ ] **Power budget**: 12 V × 2 A = 24 W in → ≈ 21 W at 5 V ≈ 4.2 A total, minus the board
+      (~0.5 A) ≈ 3.6 A for the CM at 12 V input. The full 5 A is only available above ~15 V input.
+      Tell CM5 firmware the supply limit (`usb_max_current_enable` etc., **verify**) and/or cap
+      the downstream USB current.
+- [ ] +5V net today = J5 VBUS + J4 5V + J3 pin 1 + U7 inputs. New: buck output → U7 + CM;
+      **disconnect J5 VBUS from +5V** (VBUS sense only, or keep as standalone input via an
+      ideal-diode OR — decide), remove J4, decide whether J3 pin 1 still exports +5V.
+- [ ] Don't load the CM's own 3.3 V / 1.8 V outputs beyond their rating (**verify** limits).
+- [ ] Power/reset control: GLOBAL_EN, RUN_PG (CM4), PWR_BUT (CM5) — STM32 control optional
+      (**verify** pin names).
+
+## FPC (power + Ethernet only)
+
+- [ ] Pin plan: 12–24 V ×N, GND ×N (≥ 4+4 pins at ~0.5 A/pin for 0.5 mm FFC; fewer at 1.0 mm
+      pitch — check connector/FFC current rating and drop), 4 MDI pairs G-S-S-G, 2 LED lines,
+      3.3 V for LEDs. Power pins at one edge, MDI at the other, ground pins in between.
+- [ ] 100 Ω ±10 % differential pairs over solid ground, length-matched within each pair;
+      stackup/impedance from the flex vendor; keep the FPC short.
+- [ ] Far-end board: MagJack/magnetics, center taps per CM4/CM5 IO-board design (CM4: caps
+      only, not to a supply, **verify**), Bob Smith termination, shield → chassis via RC.
+- [ ] Optional low-C TVS on the PHY side at the carrier end.
+- [ ] No PoE.
 
 ## CM connectors and GPIO interface
 
-- [ ] Place 2× Hirose DF40C-100DS (100-pin, 0.4 mm). Use the official CM4 footprint/pinout
-      and check the CM5 compatibility table (**verify**).
-- [ ] **GPIO_VREF**: tie to the CM's 3.3 V output so GPIO bank 0 runs at 3.3 V (matches the
-      STM32). On CM4 this pin selects 1.8 / 3.3 V (**verify** CM5 behaviour).
-- [ ] Re-route all existing Pi nets by BCM GPIO number (same on CM4/CM5):
+- [ ] 2× Hirose DF40C-100DS (100-pin, 0.4 mm), 3.0 mm mated height. Official CM4 footprint
+      and the CM5 compatibility table (**verify**).
+- [ ] GPIO_VREF to the CM's 3.3 V output (3.3 V GPIO bank, matches the STM32) (**verify** CM5).
+- [ ] Re-route the existing Pi nets by BCM GPIO number:
       - HOST_TX / HOST_RX → GPIO15 RXD / GPIO14 TXD
       - HOST_SCK / HOST_HIPO / HOST_HOPI / HOST_nCS → GPIO11 / GPIO9 / GPIO10 / GPIO8 (CE0)
       - HOST_ALM / HOST_ALMn → GPIO16 / GPIO17
-      - ID_EEP_SDA / ID_EEP_SCL → ID_SD / ID_SC (GPIO0/1)
-- [ ] Fix the open net-name mismatch first: `HOST_CS` (U15 PB12) vs `HOST_nCS` (J4 pin 24).
-- [ ] Optional: NRST and BOOT0 of the STM32 to two spare CM GPIOs (flash STM32 via its ROM
-      bootloader over USART1 or SPI2 from the CM).
-- [ ] Optional: STM32 USB to a CM USB2 port instead of / in addition to UART + SPI.
-- [ ] Leave unused high-speed interfaces (PCIe, HDMI, MIPI, USB3) unconnected per datasheet
-      recommendations (**verify** any required terminations/straps).
+- [ ] Fix the open name mismatch: `HOST_CS` (U15 PB12) vs `HOST_nCS` (J4 pin 24).
+- [ ] Leave GPIO0/GPIO1 (ID_SD/ID_SC) free — firmware reserves them for HAT ID.
+- [ ] Optional: STM32 NRST/BOOT0 to two spare CM GPIOs (flash the STM32 from the CM).
+- [ ] Leave PCIe, HDMI, MIPI, USB3 unconnected (**verify** required straps/terminations).
 
-## Boot / provisioning
+## CM USB-C (second connector)
 
-- [ ] nRPIBOOT: jumper or button + test point (forces USB boot for eMMC flashing).
-- [ ] Route the CM's USB2 port used for rpiboot (CM4: USB2 OTG; CM5: **verify** which port)
-      to a connector or test pads. J5 is the obvious candidate if it's not used for the STM32.
-- [ ] CM4 EEPROM_nWP: decide on bootloader-EEPROM write protect (**verify** CM5 equivalent).
-- [ ] Console: the CM's primary UART (GPIO14/15) is now the STM32 link → disable the Linux
-      serial console there, or move the console to another UART / test pads.
+- [ ] Use the USB2 port common to CM4 (OTG) and CM5 (**verify** which CM5 port does rpiboot).
+- [ ] Decide role: device-only (Rd 5.1 kΩ, rpiboot/gadget; VBUS only sensed, never fed into
+      +5V) vs dual-role (CC controller, VBUS from +5V through a current-limited switch).
+- [ ] ESD on D+/D− (another USBLC6), shield/CC per Type-C spec.
+- [ ] nRPIBOOT jumper/button + test point; CM4 EEPROM_nWP decision (**verify** CM5).
 
-## Ethernet over FPC
+## microSD
 
-- [ ] Use the CM's integrated GbE PHY. Route the 4 MDI pairs (TRD0–3) + 2 LED pins to the FPC.
-- [ ] Recommended: **magnetics at the far end** (MagJack on the panel board); the FPC then
-      carries PHY-side, ground-referenced pairs. Magnetics on this board would put the 1500 Vrms
-      isolation boundary on the FPC, which conflicts with a ground-referenced flex stackup.
-- [ ] Center-tap handling per the CM4/CM5 IO-board designs (CM4: center taps to caps only,
-      not to a supply, **verify** for both modules), Bob Smith termination at the jack.
-- [ ] FPC: 100 Ω ±10 % differential pairs over a solid ground layer, ground pins between pairs
-      (G-S-S-G), length-matched within each pair, as short as practical. Pin count roughly:
-      8 MDI + 2 LED + 3V3 + several GND (≥ 16–20 pins).
-- [ ] Get the FPC stackup and impedance from the flex vendor; include connector transitions
-      in the budget.
-- [ ] RJ45 shield → chassis, not directly to logic ground (RC/cap). ESD handled on the line
-      side by the magnetics; optional low-C TVS on the PHY side.
-- [ ] Check total MDI routing length / loss from PHY to jack against the CM layout guidance.
-- [ ] No PoE unless explicitly added (would need PoE magnetics + PD controller).
+- [ ] Wire to the CM's SD pins (used only by Lite variants; eMMC variants leave them unused,
+      **verify** for CM5).
+- [ ] Card power switch driven by the CM's SD_PWR_ON (**verify**), 3.3 V card supply with
+      decoupling, card-detect if supported, ESD on the lines.
+- [ ] Short, matched SDIO routing.
+
+## Clean-up of the current design
+
+- [ ] Remove J4 (40-pin header).
+- [ ] Remove the ID EEPROM: U11, R86/R87 (ID bus pull-ups), R90/R91 (E0 strap), R108 (WC
+      pull-up); delete nets ID_EEP_SCL/SDA/~{WC}. Frees STM32 PB6, PB7, PC14.
+- [ ] Console: GPIO14/15 are the STM32 link → disable the Linux serial console there or move it.
+- [ ] Re-run ERC/connectivity; regenerate the MCU pin table.
+- [ ] Software: device-tree overlays for UART/SPI0/GPIO on CM4 and CM5 (CM5 GPIOs via RP1).
 
 ## Mechanical / thermal
 
-- [ ] Board outline and keep-outs for the 55 × 40 mm module, 4× M2.5 mounting standoffs.
-- [ ] CM5 runs much hotter than CM4: heatsink/fan clearance; CM5 fan pins (**verify**).
-- [ ] Keep the TDR front end (bridges, clip lines, U2, muxes) away from the CM and its
-      switching supply; re-check noise coupling into the hold nodes.
-- [ ] Wireless variants: antenna keep-out / U.FL access and enclosure.
-
-## Clean-up
-
-- [ ] Remove J4 (40-pin header) and its HAT-specific parts (U11 if dropped, R86/R87 if
-      the CM side provides pull-ups, HAT+ stacking address strap R90/R91).
-- [ ] Re-run ERC/connectivity after re-routing; regenerate the MCU pin table.
-- [ ] Software: device-tree overlays for UART/SPI0/GPIO on CM4 and CM5 (CM5 GPIOs come from
-      RP1; same BCM numbering, different drivers).
+- [ ] 55 × 40 mm module outline, 4× M2.5 standoffs at 3 mm stack height.
+- [ ] CM5 heat: heatsink/fan clearance; CM5 fan pins (**verify**).
+- [ ] Keep the buck and its switching node away from the TDR front end and the hold nodes.
+- [ ] Wireless variants: antenna keep-out / U.FL access.
 
 ## CM4 vs CM5 caveats
 
-- Mechanically and largely electrically compatible on the two DF40 connectors, but some
-  CM4 pins were repurposed on CM5 (MIPI lanes ↔ USB3, power button, RTC battery, fan).
-  This board doesn't need those interfaces; keep them unconnected so both modules work
-  (**verify** in the CM5 datasheet's compatibility table).
-- CM5 power and thermal budgets are substantially higher: size the input for CM5.
-- CM5 RTC: optional VBAT backup cell (**verify** pin).
-- Bring-up: test with both a CM4 and a CM5 before the next revision.
+- Some CM4 pins were repurposed on CM5 (MIPI lanes ↔ USB3, power button, RTC battery, fan).
+  None are used here; keep them unconnected so both modules work (**verify**).
+- Size power and thermal for CM5. Bring up with both a CM4 and a CM5.
