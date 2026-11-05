@@ -467,3 +467,57 @@ def shelf(x0, y, w):
     return wrap(f'<rect x="{f(x0 + .9)}" y="{f(y + .9)}" width="{f(w)}" height="1.8" rx=".5" fill="url(#tone-ink)" stroke="none" opacity=".35"/>'
                 + br + f'<rect x="{f(x0)}" y="{f(y)}" width="{f(w)}" height="1.8" rx=".5" fill="#f6dcbc"/>'
                 f'<path d="M{f(x0 + 2)} {f(y + .7)}h{f(w * .3)}M{f(x0 + w * .55)} {f(y + 1.1)}h{f(w * .25)}" fill="none" stroke-width=".2" opacity=".6"/>')
+
+
+def twining_vine(rng, ex, y_start, y_end, lead_in=None):
+    """A vine wound around the vertical frame line at x = ex, from y_start to y_end.
+
+    Returns (behind, in_front): the stem passes behind the frame line on every other
+    half-turn, so `behind` belongs under the frame and `in_front` over it.
+    `lead_in` is an optional list of points the stem follows before it reaches the frame."""
+    amp, wl = 1.7, rng.uniform(7, 9)
+    ph = rng.uniform(0, 2 * math.pi)
+    dirn = 1 if y_end > y_start else -1
+    pts, front = [], []
+    n = int(abs(y_end - y_start) / .5)
+    for i in range(n + 1):
+        y = y_start + dirn * i * .5
+        a = ph + 2 * math.pi * i * .5 / wl
+        pts.append((ex + amp * math.sin(a), y))
+        front.append(math.cos(a) > 0)
+    behind_d, front_d = [], []
+    run, cur = [pts[0]], front[0]
+    for p, fr in zip(pts[1:], front[1:]):
+        run.append(p)
+        if fr != cur:
+            (front_d if cur else behind_d).append(smooth_d(run))
+            run, cur = [p], fr
+    (front_d if cur else behind_d).append(smooth_d(run))
+
+    def stem(ds, light):
+        d = ''.join(ds)
+        return (f'<path d="{d}" fill="none" stroke="{LINE}" stroke-width=".95" stroke-linecap="round"/>'
+                f'<path d="{d}" fill="none" stroke="{light}" stroke-width=".5" stroke-linecap="round"/>')
+
+    behind = stem(behind_d, DEEP_GREENS[2])
+    out = []
+    if lead_in:
+        out.append(vine(rng, lead_in + [pts[0]], leaf_gap=2.6))
+    out.append(stem(front_d, DEEP_GREENS[1]))
+    side = 1
+    for i in range(6, len(pts), 5):
+        if not front[i]:
+            continue
+        x, y = pts[i]
+        side = -side
+        r = rng.random()
+        if r < .1:
+            out.append(wrap(flower(x + side * 1.2, y, 1.4, rng.choice(FLOWERS), rot=rng.uniform(0, 72)), .3))
+        else:
+            L = rng.uniform(2.6, 3.8)
+            out.append(wrap(leaf(x, y, side * rng.uniform(55, 100) + (0 if dirn > 0 else 180) * 0, L, L * .42, rng.choice(GREENS)), .3))
+    # a curl at the growing tip
+    x, y = pts[-1]
+    out.append(f'<path d="{smooth_d([(x, y), (x + 1.2, y + dirn * 1), (x + .6, y + dirn * 2), (x - .2, y + dirn * 1.4), (x + .2, y + dirn * 1)])}" '
+               f'fill="none" stroke="{LINE}" stroke-width=".28"/>')
+    return behind, ''.join(out)

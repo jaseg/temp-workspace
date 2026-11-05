@@ -2,9 +2,15 @@
 
 `yanartas-pillowbox-sensors-manga.svg` / `.png` are the sensor board's KiCad schematic redrawn
 in a pastel manga style: wires coloured per net, junctions drawn as hearts, label pills, ribbon
-banners for the section titles, screentone shadows and little faces on the larger ICs. The
+banners for the section titles, screentone shadows and little faces on the larger ICs.
+
+The passives are characters (`characters.py`). Capacitors are cats whose build follows their
+capacitance, from a skinny 10 pF kitten to a round 22 µF loaf, with the plates as collar and
+belly band. Resistors are grumpy boxes that throw cute bricks and Molotov cocktails into
+whatever space is free nearby. The crystal dances, and the ferrite beads are caterpillars. The
+symbols' own marks stay on top and the pin ends stay visible, so the schematic still reads. The
 empty parts of the sheet get plants standing along the bottom edge, garlands along the top,
-climbing vines, loose cables with plugs coming in from the edges, wall shelves, stray parts,
+vines wound around the side frame lines (hanging from the garlands or growing out of a corner pot), loose cables with plugs coming in from the edges, wall shelves, stray parts,
 clouds and a few faint sound effects. These are drawn procedurally in `drawings.py` and placed
 only where the circuit leaves room.
 

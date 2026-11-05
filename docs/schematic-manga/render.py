@@ -15,6 +15,8 @@ import math
 import random
 import re
 import sys
+
+import characters as C
 from html import escape
 
 # ----------------------------------------------------------------------------
@@ -292,6 +294,10 @@ def key(p):
 PAPER_SIZES = {'A4': (297, 210), 'A3': (420, 297), 'A2': (594, 420), 'A1': (841, 594), 'A0': (1189, 841)}
 
 
+CHARACTER_PARTS = {'Device:C_Small', 'Device:C', 'Device:R', 'Device:R_Small', 'Device:L_Ferrite',
+                   'Device:Crystal_GND24_Small'}
+
+
 class Renderer:
     def __init__(self, sch):
         self.sch = sch
@@ -302,6 +308,8 @@ class Renderer:
         self.libs = {s[1]: s for s in kids(kid(sch, 'lib_symbols'), 'symbol')}
         self.rng = random.Random(7)
         self.faces = []
+        self.fine = Grid(self.W, self.H, 0.5)   # tight occupancy, for the characters' props
+        self.passives = []
 
     # -- nets ---------------------------------------------------------------
     def build_nets(self):
@@ -360,6 +368,7 @@ class Renderer:
             outer.append(d)
             inner.append((self.net_color(root), d))
             self.grid.mark_rect(a[0], a[1], b[0], b[1], pad=0.8)
+            self.fine.mark_rect(a[0], a[1], b[0], b[1], pad=0.45)
         self.svg.add('wire_o', f'<path class="wire-o" d="{"".join(outer)}"/>')
         by_col = {}
         for c, d in inner:
@@ -406,6 +415,7 @@ class Renderer:
             self.svg.add('flag', f'<path class="flag" d="M{f2(x)} {f2(y)}L{f2(ex)} {f2(ey)}"/>'
                                  f'<use href="#blossom" x="{f2(ex)}" y="{f2(ey)}" fill="{col}"/>')
             self.grid.mark_rect(x, y, ex, ey, pad=1.0)
+            self.fine.mark_rect(x, y, ex, ey, pad=1.0)
 
     def render_labels(self):
         for lab in kids(self.sch, 'label'):
@@ -431,8 +441,10 @@ class Renderer:
             sign = 1 if h == 'left' else -1
             if vertical:
                 self.grid.mark_rect(x - off - hh, y, x, y - sign * w, pad=0.6)
+                self.fine.mark_rect(x - off - hh, y, x, y - sign * w, pad=0.4)
             else:
                 self.grid.mark_rect(x, y - off - hh, x + sign * w, y, pad=0.6)
+                self.fine.mark_rect(x, y - off - hh, x + sign * w, y, pad=0.4)
 
     def render_texts(self):
         for t in kids(self.sch, 'text'):
@@ -457,8 +469,10 @@ class Renderer:
             vy = {'top': (0, hh), 'bottom': (-hh, 0), 'center': (-hh / 2, hh / 2)}[v]
             if ang % 180 == 90:
                 self.grid.mark_rect(x + vy[0], y - hx[1], x + vy[1], y - hx[0], pad=2.5)
+                self.fine.mark_rect(x + vy[0], y - hx[1], x + vy[1], y - hx[0], pad=0.8)
             else:
                 self.grid.mark_rect(x + hx[0], y + vy[0], x + hx[1], y + vy[1], pad=2.5)
+                self.fine.mark_rect(x + hx[0], y + vy[0], x + hx[1], y + vy[1], pad=0.8)
 
     # -- symbols ------------------------------------------------------------
     def render_symbols(self):
@@ -661,10 +675,17 @@ class Renderer:
             texts.append(text_el(fx, fy, s, font_size(prop), 90 if vertical else 0, h, v, cls))
             w, hh = text_extent(s, font_size(prop))
             self.grid.mark_rect(fx - w, fy - w if vertical else fy - hh, fx + w, fy + (w if vertical else hh), pad=0.8)
+            fsz = font_size(prop) * 1.1
+            ext = {'left': (0, w), 'right': (-w, 0), 'center': (-w / 2, w / 2)}[h]
+            if vertical:
+                self.fine.mark_rect(fx - fsz, fy - ext[1], fx + fsz, fy - ext[0], pad=0.4)
+            else:
+                self.fine.mark_rect(fx + ext[0], fy - fsz, fx + ext[1], fy + fsz, pad=0.4)
 
         if xs:
             x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
             self.grid.mark_rect(x0, y0, x1, y1, pad=2.0)
+            self.fine.mark_rect(x0, y0, x1, y1, pad=0.3)
 
         if shadow:
             self.svg.add('shadow', f'<g transform="translate(.9 .9)">{"".join(shadow)}</g>')
@@ -676,6 +697,9 @@ class Renderer:
             self.svg.add('stroke', f'<path class="pin" d="{"".join(pins_svg)}"/>')
         if texts:
             self.svg.add('symtext', ''.join(texts))
+        if lib_id in CHARACTER_PARTS and xs:
+            self.passives.append({'lib_id': lib_id, 'xf': xf, 'lib': lib, 'subs': subs,
+                                  'value': props.get('Value', [0, 0, ''])[2], 'dnp': dnp})
         if dnp and xs:
             self.svg.add('dnp', f'<path class="dnp" d="M{f2(x0)} {f2(y0)}L{f2(x1)} {f2(y1)}M{f2(x1)} {f2(y0)}L{f2(x0)} {f2(y1)}"/>')
 
@@ -737,6 +761,53 @@ class Renderer:
         mood = self.rng.choice(['happy', 'wink', 'smile', 'cat', 'sparkle'])
         self.svg.add('face', f'<use href="#face-{mood}" transform="translate({f2(cx)} {f2(cy)}) scale({f2(size / 10)})"/>')
 
+    # -- passive components as characters -----------------------------------
+    def render_characters(self):
+        rng = random.Random(11)
+        moods = ['grumpy', 'yell', 'smug', 'pout']
+        add = lambda svg: self.svg.add('char', svg)
+        for p in self.passives:
+            xf, lib_id = p['xf'], p['lib_id']
+            cx, cy = xf(0, 0)
+            ax, ay = xf.lin(0, 1)
+            vertical = abs(ay) > .5
+            polys = [[xf(float(q[1]), float(q[2])) for q in kids(kid(g, 'pts'), 'xy')]
+                     for sub in p['subs'] for g in kids(sub, 'polyline')]
+            if lib_id in ('Device:C_Small', 'Device:C'):
+                add(C.cat_capacitor(rng, cx, cy, vertical, p['value'], [(q[0], q[-1]) for q in polys]))
+                self.fine.mark_rect(cx - 2.4, cy - 2.4, cx + 2.4, cy + 2.4)
+            elif lib_id in ('Device:R', 'Device:R_Small'):
+                half = 2.54 if lib_id == 'Device:R' else 1.778
+                throw = None
+                if rng.random() < .8:
+                    nx, ny = (1, 0) if vertical else (0, 1)
+                    tx, ty = (0, 1) if vertical else (1, 0)
+                    cands = []
+                    for dist in (3.8, 5.2, 6.6, 8.2):
+                        ring = [(s1 * nx * dist + s2 * tx * 1.6, s1 * ny * dist + s2 * ty * 1.6 - (0 if vertical else .4 * s1))
+                                for s1 in (-1, 1) for s2 in (-1.5, -.5, .5, 1.5)]
+                        rng.shuffle(ring)
+                        cands += ring
+                    for dx, dy in cands:
+                        px, py = cx + dx, cy + dy
+                        mx, my = cx + dx * .6, cy + dy * .6 - 1
+                        if self.fine.free(px - 1.8, py - 3.2, px + 1.8, py + 1.9) and \
+                                self.fine.free(mx - .5, my - .5, mx + .5, my + .5):
+                            throw = (dx, dy, rng.choice(('brick', 'molotov')))
+                            self.fine.mark_rect(px - 1.8, py - 3.2, px + 1.8, py + 1.9)
+                            self.fine.mark_rect(mx - .6, my - .6, mx + .6, my + .6)
+                            break
+                add(C.resistor_guy(rng, cx, cy, vertical, half, rng.choice(moods), throw))
+            elif lib_id == 'Device:L_Ferrite':
+                a, b = xf(0, 2.54), xf(0, -2.54)
+                if (a[1], a[0]) > (b[1], b[0]):
+                    a, b = b, a
+                add(C.caterpillar(rng, a, b, [(q[0], q[-1]) for q in polys]))
+            elif lib_id == 'Device:Crystal_GND24_Small':
+                (x0, y0), (x1, y1) = xf(-.762, -1.524), xf(.762, 1.524)
+                add(C.dancing_crystal(rng, cx, cy, (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)),
+                                      lambda qx, qy: self.fine.free(qx - .9, qy - .9, qx + .9, qy + .9)))
+
     # -- decorations --------------------------------------------------------
     def decorate(self):
         import drawings as D
@@ -746,6 +817,7 @@ class Renderer:
         fm = 8          # outer frame line
         m = 14          # keep floating things this far inside the page edge
         add = self.svg.add
+        top, base = fm + 0.8, H - fm - 0.8   # inner edges of the frame line
 
         def try_place(wd, ht, tries, pad=1.0):
             for _ in range(tries):
@@ -756,8 +828,62 @@ class Renderer:
                     return x, y
             return None
 
-        # 1. things standing on the bottom of the frame: plants, a mug, books, a cat
-        base = H - fm - 0.8
+        # 1. leafy garlands hanging from the top of the frame, with charms
+        x = fm + 5
+        joints = []
+        while x < W - fm - 25:
+            span, sag = rng.uniform(40, 75), rng.uniform(6, 12)
+            x1 = min(x + span, W - fm - 5)
+            if G.free(x, top + 1.5, x1, top + sag + 4):
+                add('edgefront', D.vine(rng, D.garland_pts(x, x1, top + .4, sag), leaf_gap=2.4))
+                G.mark_rect(x, top, x1, top + sag + 4, pad=1)
+                joints += [x, x1]
+                mid = (x + x1) / 2 + rng.uniform(-6, 6)
+                L = rng.uniform(5, 13)
+                ymid = top + .4 + sag * (1 - ((mid - (x + x1) / 2) / ((x1 - x) / 2)) ** 2) - .3
+                if rng.random() < .55 and G.free(mid - 4, ymid + 1, mid + 4, ymid + L + 12):
+                    add('edgefront', D.charm(rng, mid, ymid, L))
+                    G.mark_rect(mid - 4, ymid, mid + 4, ymid + L + 10, pad=1)
+                x = x1
+            else:
+                x += 5
+        for jx in sorted(set(round(v, 1) for v in joints)):
+            add('edgefront', D.bow(jx, top + .6, rng.choice(D.FLOWERS)))
+
+        # 2. vines wound around the side frame lines: hanging from the garlands at the
+        #    top corners, and growing up out of a pot in the bottom corners
+        def strip_free(ex, side, y0, y1, reach=5.5):
+            x0, x1 = (ex - 2, ex + reach) if side < 0 else (ex - reach, ex + 2)
+            return G.free(x0, min(y0, y1), x1, max(y0, y1))
+
+        for side in (-1, 1):
+            ex = fm if side < 0 else W - fm
+            # from the top corner downwards
+            y, y_stop = top + 1, top + rng.uniform(90, 200)
+            while y < y_stop and strip_free(ex, side, y, y + 1, 3 if y < top + 20 else 5.5):
+                y += 1
+            if y - top > 25:
+                back, front = D.twining_vine(rng, ex, top + .6, y - 2)
+                add('edgeback', back)
+                add('edgefront', front)
+                G.mark_rect(ex - 4, top, ex + 4, y, pad=1)
+            # from a pot in the bottom corner upwards
+            pcx = ex - side * 7
+            if G.free(pcx - 5, base - 9, pcx + 5, base - 1.2):
+                pot_svg, ptop = D.pot(rng, 8, 6.5, rng.choice(D.POTS), True)
+                start = base - 6.5 - 1
+                y, y_stop = start - 6, start - rng.uniform(80, 190)
+                while y > y_stop and strip_free(ex, side, y - 1, y):
+                    y -= 1
+                if start - y > 25:
+                    lead = [(pcx, base - 6.5), (pcx + side * 1.5, base - 9), (ex - side * 1.2, base - 12.5)]
+                    back, front = D.twining_vine(rng, ex, base - 13, y + 2, lead_in=lead)
+                    add('edgeback', back)
+                    add('edgefront', front + f'<g transform="translate({f2(pcx)} {f2(base)})">{D.wrap(pot_svg)}</g>')
+                    G.mark_rect(pcx - 5, base - 9, pcx + 5, base, pad=1)
+                    G.mark_rect(ex - 4, y, ex + 4, base, pad=1)
+
+        # 3. things standing on the bottom of the frame: plants, a mug, books, a cat
         limits = {'cat': 1, 'mug': 2, 'books': 2}
         x = fm + 6
         while x < W - fm - 8:
@@ -784,55 +910,6 @@ class Renderer:
                 add('edgefront', D.grass(rng, x, base, gw))
                 G.mark_rect(x, base - 6, x + gw, base, pad=.5)
                 x += gw + rng.uniform(0, 3)
-
-        # 2. leafy garlands hanging from the top of the frame, with charms
-        top = fm + 0.8
-        x = fm + 5
-        joints = []
-        while x < W - fm - 25:
-            span, sag = rng.uniform(40, 75), rng.uniform(6, 12)
-            x1 = min(x + span, W - fm - 5)
-            if G.free(x, top + 1.5, x1, top + sag + 4):
-                add('edgefront', D.vine(rng, D.garland_pts(x, x1, top + .4, sag), leaf_gap=2.4))
-                G.mark_rect(x, top, x1, top + sag + 4, pad=1)
-                joints += [x, x1]
-                mid = (x + x1) / 2 + rng.uniform(-6, 6)
-                L = rng.uniform(5, 13)
-                ymid = top + .4 + sag * (1 - ((mid - (x + x1) / 2) / ((x1 - x) / 2)) ** 2) - .3
-                if rng.random() < .55 and G.free(mid - 4, ymid + 1, mid + 4, ymid + L + 12):
-                    add('edgefront', D.charm(rng, mid, ymid, L))
-                    G.mark_rect(mid - 4, ymid, mid + 4, ymid + L + 10, pad=1)
-                x = x1
-            else:
-                x += 5
-        for jx in sorted(set(round(v, 1) for v in joints)):
-            add('edgefront', D.bow(jx, top + .6, rng.choice(D.FLOWERS)))
-
-        # 3. vines climbing the left and right sides of the frame
-        for side in (-1, 1):
-            ex = fm + 0.8 if side < 0 else W - fm - 0.8
-            runs, start = [], None
-            for yy in range(int(top + 2), int(base - 2)):
-                x0, x1 = (ex, ex + 7) if side < 0 else (ex - 7, ex)
-                if G.free(x0, yy, x1, yy + 1):
-                    start = yy if start is None else start
-                else:
-                    if start is not None and yy - start > 30:
-                        runs.append((start, yy))
-                    start = None
-            if start is not None and base - 2 - start > 30:
-                runs.append((start, int(base - 2)))
-            for y0, y1 in runs:
-                if rng.random() < .25:
-                    continue
-                length = min(y1 - y0 - 4, rng.uniform(35, 110))
-                ya = rng.uniform(y0 + 2, y1 - 2 - length)
-                ph = rng.uniform(0, 6)
-                pts = [(ex - side * (2.6 + 1.6 * math.sin(t / 6 + ph)), ya + t) for t in range(0, int(length), 2)]
-                if rng.random() < .5:
-                    pts.reverse()
-                add('edgefront', D.vine(rng, pts, leaf_gap=2.8))
-                G.mark_rect(ex - 7, ya, ex + 7, ya + length, pad=1)
 
         # 4. loose cables wandering in from the edges
         cables = 0
@@ -993,7 +1070,8 @@ class Renderer:
         return f'''<defs>
 <style>
 {faces}
-text{{font-family:'MPR',sans-serif;fill:{INK};}}
+text{{font-family:'MPR',sans-serif}}
+:where(text:not([fill])){{fill:{INK}}}
 .wire-o{{fill:none;stroke:{INK};stroke-width:.62;stroke-linecap:round;stroke-linejoin:round}}
 .wire-i{{fill:none;stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}}
 .bus-o{{fill:none;stroke:{INK};stroke-width:1.35;stroke-linecap:round}}
@@ -1046,6 +1124,7 @@ text{{font-family:'MPR',sans-serif;fill:{INK};}}
   <circle r="1.3" fill="#fff3a0"/>
 </g>
 {face_defs()}
+{C.resistor_face_defs()}
 {mascot_def()}
 </defs>'''
 
@@ -1057,9 +1136,10 @@ text{{font-family:'MPR',sans-serif;fill:{INK};}}
         self.render_flags()
         self.render_labels()
         self.render_texts()
+        self.render_characters()
         self.frame_and_title(title)
         self.decorate()
-        order = ['bg', 'deco', 'edgeback', 'shadow', 'fill', 'face', 'wire_o', 'wire_i', 'stroke', 'dnp', 'junction',
+        order = ['bg', 'deco', 'edgeback', 'shadow', 'fill', 'face', 'wire_o', 'wire_i', 'stroke', 'char', 'dnp', 'junction',
                  'flag', 'symtext', 'text', 'label', 'title', 'frame', 'edgefront', 'titlepanel']
         body = []
         for layer in order:
