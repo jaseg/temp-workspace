@@ -27,6 +27,7 @@ mkdir -p fonts && for f in m-plus-rounded-1c/files/m-plus-rounded-1c-latin-{500,
 python3 render.py path/to/yanartas-pillowbox-sensors.kicad_sch fonts raw.svg
 node finish.js raw.svg yanartas-pillowbox-sensors-manga.svg yanartas-pillowbox-sensors-manga.png 10
 python3 stitch.py yanartas-pillowbox-sensors-manga.png   # PNG is rendered in tiles
+node topdf.js yanartas-pillowbox-sensors-manga.svg yanartas-pillowbox-sensors-manga.pdf  # vector A1 PDF
 ```
 
 The last argument to `finish.js` sets the PNG resolution in px/mm. At 10 px/mm an A1 sheet
