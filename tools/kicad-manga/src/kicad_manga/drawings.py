@@ -380,35 +380,6 @@ def cable(rng, pts, color):
     return out + plug(rng, x1, y1, ang, color)
 
 
-def walk_cable(rng, start, heading, free, length):
-    """Random-walk a cable from `start`; `free(x, y)` says whether a point may be used."""
-    pts = [start]
-    x, y = start
-    h = heading
-    k = 0
-    step = 1.6
-    loop_at = rng.uniform(.3, .7) * length if rng.random() < .75 else None
-    looping = 0
-    travelled = 0
-    while travelled < length:
-        if loop_at is not None and travelled >= loop_at and not looping:
-            looping = int(2 * math.pi / .42) + 1
-            loop_dir = rng.choice((-1, 1))
-            loop_at = None
-        if looping:
-            h += .42 * loop_dir
-            looping -= 1
-        else:
-            k = max(-.16, min(.16, k + rng.gauss(0, .05)))
-            h += k
-        x, y = x + math.cos(h) * step, y + math.sin(h) * step
-        travelled += step
-        if not free(x, y):
-            break
-        pts.append((x, y))
-    return pts
-
-
 # ----------------------------------------------------------------------------
 # Little parts lying around, centred at (0, 0), about 14 mm long
 

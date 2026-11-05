@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kicad-manga"
+version = "0.1.0"
+description = "Render a KiCad schematic as a pastel, manga-styled poster (SVG, PNG, PDF)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "jaseg" }]
+dependencies = [
+    "pillow>=10",
+    "playwright>=1.49",
+]
+
+[project.scripts]
+kicad-manga = "kicad_manga.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

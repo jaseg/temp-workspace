@@ -1,13 +1,13 @@
 """Passive components as little characters.
 
-Each function draws over the symbol it replaces. The symbol's own marks (the
-plates, the box, the core lines) are kept on top, so the schematic still reads
-correctly, and the pin ends stay visible so you can see where the wires attach.
-Faces are always drawn upright.
+Each function draws in place of the symbol it replaces (the inductor's core lines
+are drawn back on top). The pin ends stay visible so you can see where the wires
+attach. Faces are always drawn upright.
 """
 
 import math
-import re
+
+from .sexp import parse_si
 
 INK = '#4b3a5a'
 FUR = [('#ffffff', '#ffd0a8'), ('#fff1dc', '#ffb98a'), ('#e9e3f2', '#b9adc9'), ('#ffd9b3', '#f7a86b'),
@@ -19,21 +19,10 @@ def f(v):
     return f'{v:.3f}'.rstrip('0').rstrip('.')
 
 
-def parse_si(s):
-    """'4u7/10V' -> 4.7e-6, '3k3' -> 3300, '100n' -> 1e-7. None if unknown."""
-    m = re.match(r'^\s*(\d+)(?:([pnumkKMR.])(\d*))?', s)
-    if not m:
-        return None
-    mult = {'p': 1e-12, 'n': 1e-9, 'u': 1e-6, 'm': 1e-3, 'k': 1e3, 'K': 1e3, 'M': 1e6, 'R': 1, '.': 1, None: 1}
-    whole, unit, frac = m.groups()
-    v = float(f'{whole}.{frac or 0}')
-    return v * mult[unit]
-
-
 # ----------------------------------------------------------------------------
 # Capacitor cats
 
-def cat_capacitor(rng, cx, cy, vertical, value, plates):
+def cat_capacitor(rng, cx, cy, vertical, value, plates, plus=None):
     """`plates`: the two plate lines in sheet coordinates, redrawn on top."""
     c = parse_si(value)
     if c is None:
@@ -105,7 +94,14 @@ def cat_capacitor(rng, cx, cy, vertical, value, plates):
     cat = (f'<g transform="translate({f(cx)} {f(cy)}) rotate({rot}) scale(1.12)" stroke="{INK}" stroke-width=".14" '
            f'stroke-linejoin="round">{"".join(parts)}</g>')
     pl = ''.join(f'<path d="M{f(a[0])} {f(a[1])}L{f(b[0])} {f(b[1])}"/>' for a, b in plates)
-    return cat + f'<g stroke="{INK}" stroke-width=".34" stroke-linecap="round">{pl}</g>'
+    if pl:
+        cat += f'<g stroke="{INK}" stroke-width=".34" stroke-linecap="round">{pl}</g>'
+    if plus:   # polarised: a little "+" badge by the positive end
+        px, py = plus
+        ox, oy = (1.9, 0) if vertical else (0, -1.9)
+        cat += (f'<g transform="translate({f(px + ox)} {f(py + oy)})"><circle r=".62" fill="#ffd95e" stroke="{INK}" stroke-width=".12"/>'
+                f'<path d="M-.32 0H.32M0 -.32V.32" stroke="{INK}" stroke-width=".16" stroke-linecap="round"/></g>')
+    return cat
 
 
 # ----------------------------------------------------------------------------
@@ -256,7 +252,7 @@ def legend(rng):
            f'<rect width="{w}" height="{h}" rx="6" fill="#fff" stroke="{INK}" stroke-width=".8"/>',
            f'<rect x="2" y="2" width="{w - 4}" height="{h - 4}" rx="4.5" fill="none" stroke="#ffb8d0" stroke-width=".45" stroke-dasharray="1.6 1"/>',
            t(w / 2, 9, '♡ cast of characters ♡', 5, anchor='middle', col='#ff7fb2',
-             extra=f' stroke="#fff" stroke-width=".8" paint-order="stroke"')]
+             extra=' stroke="#fff" stroke-width=".8" paint-order="stroke"')]
     # capacitors: a row of cats from slim to chonky
     for i, v in enumerate(['10p', '1n', '100n', '1u', '4u7', '22u']):
         cx = 12 + i * 13.5

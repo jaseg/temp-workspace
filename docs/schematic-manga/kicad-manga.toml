@@ -1,0 +1,6 @@
+# Settings for rendering yanartas-pillowbox-sensors.kicad_sch with tools/kicad-manga.
+# The schematic has no title block, so the title panel text is set here.
+[title]
+subtitle = "the pillowbox sensor board"
+kicker = "センサー回路図"
+bubble = "let's sense some pillows~! ♡"
