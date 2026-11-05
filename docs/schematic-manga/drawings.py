@@ -263,6 +263,7 @@ GROUND_ITEMS = [
 ]
 
 
+
 def grass(rng, x, y, w):
     blades = []
     for _ in range(int(w * 1.4)):
@@ -521,3 +522,72 @@ def twining_vine(rng, ex, y_start, y_end, lead_in=None):
     out.append(f'<path d="{smooth_d([(x, y), (x + 1.2, y + dirn * 1), (x + .6, y + dirn * 2), (x - .2, y + dirn * 1.4), (x + .2, y + dirn * 1)])}" '
                f'fill="none" stroke="{LINE}" stroke-width=".28"/>')
     return behind, ''.join(out)
+
+
+# ----------------------------------------------------------------------------
+# Cables that obey gravity
+
+def cable_clip(x, y):
+    return wrap(f'<rect x="{f(x - 1.3)}" y="{f(y - 1.6)}" width="2.6" height="3.2" rx=".8" fill="#fff6c8"/>'
+                f'<circle cx="{f(x)}" cy="{f(y - .6)}" r=".35" fill="#ffb3cf" stroke="none"/>', .3)
+
+
+def hanging_cable(rng, ax, ay, side, drop, color):
+    """Clipped to the side frame line at (ax, ay); it bends inwards and falls straight down."""
+    reach = rng.uniform(8, 11)          # clear of the vines wound round the frame
+    sway = rng.uniform(-1.2, 1.2)
+    pts = [(ax, ay), (ax + side * reach * .55, ay + .4), (ax + side * reach, ay + reach * .55)]
+    x0, y0 = pts[-1]
+    n = max(3, int(drop / 3))
+    for i in range(1, n + 1):
+        t = i / n
+        pts.append((x0 + side * .6 * t + sway * math.sin(t * math.pi) * (1 - t * .5), y0 + drop * t))
+    return cable(rng, pts, color) + cable_clip(ax, ay)
+
+
+def draped_cable(rng, edge_x, plank_y, side, drop, color):
+    """Lying on a shelf, slipping over its end (side=+1: right end) and hanging down."""
+    r = .75
+    lie = [(edge_x - side * rng.uniform(6, 10), plank_y - r), (edge_x - side * 2.5, plank_y - r),
+           (edge_x - side * .2, plank_y - r * .8), (edge_x + side * .7, plank_y + .6), (edge_x + side * 1.0, plank_y + 2.5)]
+    x0, y0 = lie[-1]
+    n = max(3, int(drop / 3))
+    sway = rng.uniform(-.8, .8)
+    pts = lie + [(x0 + sway * math.sin(i / n * math.pi), y0 + drop * i / n) for i in range(1, n + 1)]
+    end = (pts[0][0] - side * 1, pts[0][1])
+    return cable(rng, pts, color) + plug(rng, end[0], end[1], 0 if side < 0 else 180, color)
+
+
+def floor_cable(rng, x0, base, w, color):
+    """Lying on the bottom of the frame between x0 and x0 + w: a plug at each end lying flat,
+    and a loose coil in the middle."""
+    y = base - 1.1
+    a, b = x0 + 11, x0 + w - 11          # leave room for the plugs
+    cx = (a + b) / 2 + rng.uniform(-2, 2)
+    rx, ry = rng.uniform(3.6, 4.6), rng.uniform(2.1, 2.8)
+    lead_end = cx - .9
+    pts = [(a + (lead_end - a) * i / 4, y - .25 * (i % 2)) for i in range(4)] + [(lead_end, y)]
+    for k in range(1, 25):
+        t = 2 * math.pi * k / 24
+        pts.append((cx - .9 + 1.8 * k / 24 - rx * math.sin(t) * .95, y - ry + ry * math.cos(t)))
+    lx = pts[-1][0]
+    pts += [(lx + (b - lx) * i / 3, y - .25 * (i % 2)) for i in range(1, 3)] + [(b - 1, y), (b, y)]
+    return cable(rng, pts, color) + plug(rng, a, y, 180, color)
+
+
+def standing(fn, foot, height):
+    """Turn one of the loose-part drawings into an item that stands on a surface."""
+    def draw(rng, h):
+        k = h / height
+        return f'<g transform="scale({f(k)}) translate(0 {f(-foot)})">{fn(rng)}</g>'
+    draw.__name__ = 'part_' + fn.__name__
+    return draw
+
+
+PART_ITEMS = [
+    (standing(resistor, 1.5, 3.2), 3.4, 4.2, 14 / 3.2),
+    (standing(led, 7.5, 11.1), 7, 10, 6.5 / 11.1),
+    (standing(electrolytic, 8.5, 13.1), 8, 11, 5.8 / 13.1),
+    (standing(chip, 4, 8), 5, 7, 10.5 / 8),
+    (standing(ceramic, 6.5, 8.6), 6, 8, 5 / 8.6),
+]

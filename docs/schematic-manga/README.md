@@ -10,7 +10,8 @@ belly band. Resistors are grumpy boxes that throw cute bricks and Molotov cockta
 whatever space is free nearby. The crystal dances, and the ferrite beads are caterpillars. The
 symbols' own marks stay on top and the pin ends stay visible, so the schematic still reads. The
 empty parts of the sheet get plants standing along the bottom edge, garlands along the top,
-vines wound around the side frame lines (hanging from the garlands or growing out of a corner pot), loose cables with plugs coming in from the edges, wall shelves, stray parts,
+vines wound around the side frame lines (hanging from the garlands or growing out of a corner pot), cables that obey gravity (hanging from clips on the frame, draped over shelf ends, or lying
+on the floor with a coil), wall shelves, parts standing on shelves and on the floor,
 clouds and a few faint sound effects. These are drawn procedurally in `drawings.py` and placed
 only where the circuit leaves room.
 

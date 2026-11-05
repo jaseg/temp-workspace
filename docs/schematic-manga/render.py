@@ -884,11 +884,20 @@ class Renderer:
                     G.mark_rect(ex - 4, y, ex + 4, base, pad=1)
 
         # 3. things standing on the bottom of the frame: plants, a mug, books, a cat
-        limits = {'cat': 1, 'mug': 2, 'books': 2}
+        limits = {'cat': 1, 'mug': 2, 'books': 2, 'floor_cable': 3}
+        ground = D.GROUND_ITEMS * 3 + D.PART_ITEMS + [(None, 3, 3, 0)] * 2
         x = fm + 6
         while x < W - fm - 8:
-            draw, lo, hi, ar = rng.choice(D.GROUND_ITEMS)
-            name = draw.__name__
+            draw, lo, hi, ar = rng.choice(ground)
+            name = draw.__name__ if draw else 'floor_cable'
+            if name == 'floor_cable' and limits['floor_cable'] > 0:
+                cw = rng.uniform(40, 52)
+                if x + cw < W - fm - 6 and G.free(x, base - 6, x + cw, base - 1.2):
+                    add('edgefront', D.floor_cable(rng, x, base, cw, rng.choice(D.CABLES)))
+                    G.mark_rect(x, base - 5, x + cw, base, pad=1)
+                    limits['floor_cable'] -= 1
+                    x += cw + rng.uniform(2, 5)
+                continue
             if limits.get(name, 99) <= 0:
                 continue
             placed = False
@@ -911,44 +920,23 @@ class Renderer:
                 G.mark_rect(x, base - 6, x + gw, base, pad=.5)
                 x += gw + rng.uniform(0, 3)
 
-        # 4. loose cables wandering in from the edges
-        cables = 0
-        for _ in range(60):
-            if cables >= 13:
-                break
-            edge = rng.choice('LRTB')
-            if edge in 'LR':
-                sx = fm if edge == 'L' else W - fm
-                sy = rng.uniform(fm + 20, H - fm - 20)
-                hd = 0 if edge == 'L' else math.pi
-            else:
-                sx = rng.uniform(fm + 20, W - fm - 20)
-                sy = fm if edge == 'T' else H - fm
-                hd = math.pi / 2 if edge == 'T' else -math.pi / 2
-            hd += rng.uniform(-.6, .6)
-            steps = [0]
-
-            def free(px, py):
-                steps[0] += 1
-                if steps[0] <= 5:
-                    return G.free(px - 2, py - 2, px + 2, py + 2) or not (fm + 1 < px < W - fm - 1 and fm + 1 < py < H - fm - 1)
-                return (fm + 3 < px < W - fm - 3 and fm + 3 < py < H - fm - 3
-                        and G.free(px - 2.2, py - 2.2, px + 2.2, py + 2.2))
-
-            pts = D.walk_cable(rng, (sx, sy), hd, free, rng.uniform(45, 140))
-            pts = pts[:-7]
-            if len(pts) * 1.6 < 28:
+        # 4. cables clipped to the side frame lines, hanging straight down
+        cables, tries = 0, 0
+        while cables < 8 and tries < 200:
+            tries += 1
+            side = rng.choice((-1, 1))
+            ex = fm if side < 0 else W - fm
+            ay = rng.uniform(top + 15, base - 60)
+            drop = rng.uniform(22, 55)
+            x0, x1 = sorted((ex - side * 5, ex - side * 14))
+            if not G.free(x0, ay - 2, x1, ay + drop + 12):
                 continue
-            add('edgeback', D.cable(rng, pts, rng.choice(D.CABLES)))
-            for (px, py) in pts:
-                G.mark_rect(px - 1, py - 1, px + 1, py + 1, pad=1.5)
-            (ax, ay), (bx, by) = pts[-2], pts[-1]
-            n = math.hypot(bx - ax, by - ay) or 1
-            G.mark_rect(bx, by, bx + (bx - ax) / n * 10, by + (by - ay) / n * 10, pad=2.5)
+            add('edgefront', D.hanging_cable(rng, ex, ay, -side, drop, rng.choice(D.CABLES)))
+            G.mark_rect(x0, ay - 3, x1, ay + drop + 12, pad=4)
             cables += 1
 
         # 5. wall shelves with plants and clutter in the big empty areas
-        shelf_items = [it for it in D.GROUND_ITEMS if it[0].__name__ != 'cat']
+        shelf_items = [it for it in D.GROUND_ITEMS if it[0].__name__ != 'cat'] * 3 + D.PART_ITEMS
         for _ in range(5):
             sw, sh = rng.uniform(42, 72), rng.uniform(26, 40)
             pos = try_place(sw, sh + 7, 500, pad=5)
@@ -957,22 +945,30 @@ class Renderer:
             x0 = pos[0] - sw / 2
             plank = pos[1] + (sh + 7) / 2 - 7
             add('deco', D.shelf(x0, plank, sw))
-            x, fails = x0 + 3, 0
+            x, fails, once = x0 + 3, 0, set()
             while x < x0 + sw - 4 and fails < 12:
                 draw, lo, hi, ar = rng.choice(shelf_items)
+                if draw.__name__ in once:
+                    fails += 1
+                    continue
+                if draw.__name__ in ('mug', 'books'):
+                    once.add(draw.__name__)
                 h = rng.uniform(lo, min(hi, sh - 2)) if lo < sh - 2 else 0
                 if not h or x + h * ar > x0 + sw - 2:
                     fails += 1
                     continue
                 add('deco', f'<g transform="translate({f2(x + h * ar / 2)} {f2(plank)})">{draw(rng, h)}</g>')
                 x += h * ar + rng.uniform(1.5, 4)
+            if rng.random() < .75:
+                side = rng.choice((-1, 1))
+                edge = x0 + sw if side > 0 else x0
+                drop = rng.uniform(14, 30)
+                gx0, gx1 = sorted((edge - side * 2, edge + side * 6))
+                if G.free(gx0, plank + 13, gx1, plank + drop + 12):
+                    add('deco', D.draped_cable(rng, edge, plank, side, drop, rng.choice(D.CABLES)))
+                    G.mark_rect(gx0, plank, gx1, plank + drop + 12, pad=2)
 
-        # 6. parts lying around, and a few clouds
-        for i in range(14):
-            pos = try_place(20, 20, 300, pad=3)
-            if pos:
-                part = D.PARTS[i % len(D.PARTS)]
-                add('deco', f'<g transform="translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rng.uniform(-60, 60))}) scale(1.25)">{part(rng)}</g>')
+        # 6. a few clouds
         for _ in range(6):
             w = rng.uniform(16, 28)
             pos = try_place(w * 1.2, w * .55, 300, pad=3)
@@ -997,12 +993,12 @@ class Renderer:
             sz = rng.uniform(lo, hi)
             pos = try_place(sz, sz, 3, pad=6)
             if pos:
-                add('deco', f'<use href="#{k}" transform="translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rng.uniform(-25, 25))}) scale({f2(sz / 10)})" fill="{rng.choice(cols)}"/>')
+                add('deco', f'<use href="#{k}" transform="translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rng.uniform(-25, 25))}) scale({f2(sz / 10)})" fill="{rng.choice(cols)}" opacity=".38"/>')
         for _ in range(260):
             sz = rng.uniform(.8, 1.6)
             pos = try_place(sz, sz, 2, pad=4)
             if pos:
-                add('deco', f'<circle cx="{f2(pos[0])}" cy="{f2(pos[1])}" r="{f2(sz / 2)}" fill="{rng.choice(cols)}" opacity=".4"/>')
+                add('deco', f'<circle cx="{f2(pos[0])}" cy="{f2(pos[1])}" r="{f2(sz / 2)}" fill="{rng.choice(cols)}" opacity=".28"/>')
 
     # -- page ---------------------------------------------------------------
     def frame_and_title(self, title):
@@ -1087,6 +1083,7 @@ text{{font-family:'MPR',sans-serif}}
 .pinnum{{fill:#b0709d;font-weight:500}}
 .ref{{font-family:'MPR';font-weight:800;fill:#d6457f}}
 .value{{font-family:'MPR';font-weight:800;fill:#2f8f86}}
+.ref,.value{{paint-order:stroke;stroke:{PAPER};stroke-width:.32;stroke-linejoin:round}}
 .pwr{{font-family:'Pop';fill:{INK};paint-order:stroke;stroke:#fff;stroke-width:.35}}
 .symtxt{{font-weight:500}}
 .lbl{{font-weight:800}}

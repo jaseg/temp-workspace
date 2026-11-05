@@ -38,37 +38,46 @@ def cat_capacitor(rng, cx, cy, vertical, value, plates):
     c = parse_si(value)
     if c is None:
         chub = .45
-    else:
-        chub = max(0, min(1, (math.log10(c) + 11.5) / 7))   # 10p -> ~.07, 22u -> ~.98
-    w = 1.5 + 2.7 * chub          # body width across the pin axis
+    else:   # 10p -> .05, 1n -> .25, 100n -> .54, 1u -> .72, 22u -> .9
+        chub = max(0, min(1, (math.log10(c) + 12) / 7.5)) ** 1.5
     fur, patch = rng.choice(FUR)
     rot = 0 if vertical else -90
-    bw, bh = w / 2, 1.25 + .1 * chub
-    hr = .85 + .15 * chub
+    # body: narrow at the neck, wide and flat at the bottom; slim cats are a column,
+    # fat cats a bottom-heavy loaf
+    n = .42 + .3 * chub                # neck half-width
+    b = .5 + 1.95 * chub               # base half-width
+    yb = 1.72                          # flat bottom
+    r = .3 + .3 * chub                 # bottom corner radius
+    hr = .78 + .22 * chub              # head radius (x)
+    hy = hr * (.9 - .18 * chub)        # fat cats have wide, squashed heads
+    ear = 1.15 - .35 * chub            # big ears on the slim ones
     tail_side = rng.choice((-1, 1))
-    tl = 1.2 + .5 * (1 - chub)
+    ts = tail_side
+    if chub < .35:   # slim: tail standing up in a hook
+        tail = f'M{f(ts * b * .8)} 1.55C{f(ts * (b + 1.3))} 1.6 {f(ts * (b + 1.1))} .2 {f(ts * (b + 1.25))} -.5'
+    else:            # fat: short tail wrapped along the floor
+        tail = f'M{f(ts * b * .7)} 1.55C{f(ts * (b + .7))} 1.75 {f(ts * (b + .8))} 1.1 {f(ts * (b + .35))} .8'
+    body = (f'M{f(-n)} -.5Q0 -.78 {f(n)} -.5C{f(n + (b - n) * .15)} .2 {f(b)} .55 {f(b)} {f(yb - r)}'
+            f'Q{f(b)} {f(yb)} {f(b - r)} {f(yb)}H{f(-b + r)}Q{f(-b)} {f(yb)} {f(-b)} {f(yb - r)}'
+            f'C{f(-b)} .55 {f(-n - (b - n) * .15)} .2 {f(-n)} -.5Z')
+    pw = max(.42, b - .45)
     parts = [
-        # tail
-        f'<path d="M{f(tail_side * bw * .7)} 1.2C{f(tail_side * (bw + .9))} 1.3 {f(tail_side * (bw + .9))} {f(.2 - tl * .3)} '
-        f'{f(tail_side * (bw + .35))} {f(-tl * .55)}" fill="none" stroke="{INK}" stroke-width=".62" stroke-linecap="round"/>',
-        f'<path d="M{f(tail_side * bw * .7)} 1.2C{f(tail_side * (bw + .9))} 1.3 {f(tail_side * (bw + .9))} {f(.2 - tl * .3)} '
-        f'{f(tail_side * (bw + .35))} {f(-tl * .55)}" fill="none" stroke="{fur}" stroke-width=".34" stroke-linecap="round"/>',
-        # body: a pear that gets rounder with capacitance
-        f'<path d="M0 -.6C{f(bw * .75)} -.6 {f(bw)} .25 {f(bw)} .95C{f(bw)} 1.55 {f(bw * .6)} 1.7 0 1.7'
-        f'C{f(-bw * .6)} 1.7 {f(-bw)} 1.55 {f(-bw)} .95C{f(-bw)} .25 {f(-bw * .75)} -.6 0 -.6Z" fill="{fur}"/>',
-        f'<ellipse cx="{f(bw * .35)}" cy="1" rx="{f(bw * .35)}" ry=".45" fill="{patch}" stroke="none" opacity=".55"/>',
-        # paws
-        f'<ellipse cx="-.45" cy="1.62" rx=".36" ry=".22" fill="{fur}"/><ellipse cx=".45" cy="1.62" rx=".36" ry=".22" fill="{fur}"/>',
-        # ears and head
-        f'<path d="M{f(-hr * .9)} {f(-.85 - hr * .3)}L{f(-hr * .78)} {f(-.85 - hr * 1.12)}L{f(-hr * .22)} {f(-.85 - hr * .8)}Z" fill="{fur}"/>',
-        f'<path d="M{f(hr * .9)} {f(-.85 - hr * .3)}L{f(hr * .78)} {f(-.85 - hr * 1.12)}L{f(hr * .22)} {f(-.85 - hr * .8)}Z" fill="{fur}"/>',
-        f'<path d="M{f(-hr * .72)} {f(-.85 - hr * .5)}L{f(-hr * .7)} {f(-.85 - hr * .92)}L{f(-hr * .4)} {f(-.85 - hr * .72)}Z" fill="#ffb3cf" stroke="none"/>',
-        f'<path d="M{f(hr * .72)} {f(-.85 - hr * .5)}L{f(hr * .7)} {f(-.85 - hr * .92)}L{f(hr * .4)} {f(-.85 - hr * .72)}Z" fill="#ffb3cf" stroke="none"/>',
-        f'<ellipse cx="0" cy="-.85" rx="{f(hr)}" ry="{f(hr * .86)}" fill="{fur}"/>',
+        f'<path d="{tail}" fill="none" stroke="{INK}" stroke-width=".62" stroke-linecap="round"/>',
+        f'<path d="{tail}" fill="none" stroke="{fur}" stroke-width=".34" stroke-linecap="round"/>',
+        f'<path d="{body}" fill="{fur}"/>',
+        f'<ellipse cx="0" cy="{f(1.05 + .1 * chub)}" rx="{f(.25 + b * .45)}" ry="{f(.3 + .3 * chub)}" fill="#fff" stroke="none" opacity=".75"/>',
+        f'<ellipse cx="{f(b * .45)}" cy=".95" rx="{f(b * .3)}" ry=".4" fill="{patch}" stroke="none" opacity=".5"/>',
+        f'<ellipse cx="{f(-pw)}" cy="{f(yb - .05)}" rx=".36" ry=".22" fill="{fur}"/><ellipse cx="{f(pw)}" cy="{f(yb - .05)}" rx=".36" ry=".22" fill="{fur}"/>',
+        f'<path d="M{f(-hr * .92)} {f(-.85 - hy * .3)}L{f(-hr * .8)} {f(-.85 - hy * .55 - ear * .75)}L{f(-hr * .18)} {f(-.85 - hy * .82)}Z" fill="{fur}"/>',
+        f'<path d="M{f(hr * .92)} {f(-.85 - hy * .3)}L{f(hr * .8)} {f(-.85 - hy * .55 - ear * .75)}L{f(hr * .18)} {f(-.85 - hy * .82)}Z" fill="{fur}"/>',
+        f'<path d="M{f(-hr * .72)} {f(-.85 - hy * .5)}L{f(-hr * .72)} {f(-.85 - hy * .55 - ear * .55)}L{f(-hr * .38)} {f(-.85 - hy * .72)}Z" fill="#ffb3cf" stroke="none"/>',
+        f'<path d="M{f(hr * .72)} {f(-.85 - hy * .5)}L{f(hr * .72)} {f(-.85 - hy * .55 - ear * .55)}L{f(hr * .38)} {f(-.85 - hy * .72)}Z" fill="#ffb3cf" stroke="none"/>',
+        f'<ellipse cx="0" cy="-.85" rx="{f(hr)}" ry="{f(hy)}" fill="{fur}"/>',
     ]
+    bw = b
     if rng.random() < .45:
-        parts.append(f'<path d="M{f(hr * .1)} {f(-.85 - hr * .85)}C{f(hr * .7)} {f(-.85 - hr * .8)} {f(hr * .95)} -.9 {f(hr * .9)} -.6'
-                     f'C{f(hr * .5)} -.7 {f(hr * .2)} -1.2 {f(hr * .1)} {f(-.85 - hr * .85)}Z" fill="{patch}" stroke="none" opacity=".7"/>')
+        parts.append(f'<path d="M{f(hr * .1)} {f(-.85 - hy * .92)}C{f(hr * .7)} {f(-.85 - hy * .85)} {f(hr * .95)} -.9 {f(hr * .9)} -.6'
+                     f'C{f(hr * .5)} -.7 {f(hr * .2)} -1.2 {f(hr * .1)} {f(-.85 - hy * .92)}Z" fill="{patch}" stroke="none" opacity=".7"/>')
     eyes = rng.choice(['dot', 'happy', 'sleepy'])
     ex, ey = hr * .4, -1.02
     if eyes == 'dot':
@@ -86,7 +95,7 @@ def cat_capacitor(rng, cx, cy, vertical, value, plates):
         f'<path d="M{f(-hr * .5)} -.8l{f(-hr * .55)} -.06M{f(-hr * .5)} -.7l{f(-hr * .55)} .05'
         f'M{f(hr * .5)} -.8l{f(hr * .55)} -.06M{f(hr * .5)} -.7l{f(hr * .55)} .05" fill="none" stroke-width=".06" opacity=".7"/>')
     if c is None:
-        parts.append(f'<text x="{f(bw + .2)}" y="-1.4" font-family="Pop" font-size="1.2" fill="#ff7fb2" stroke="none">?</text>')
+        parts.append(f'<text x="{f(max(bw, hr) + .2)}" y="-1.4" font-family="Pop" font-size="1.2" fill="#ff7fb2" stroke="none">?</text>')
     # the bell on the collar (the upper plate)
     parts.append('<circle cx="0" cy="-.25" r=".22" fill="#ffd95e" stroke-width=".07"/>')
     cat = (f'<g transform="translate({f(cx)} {f(cy)}) rotate({rot}) scale(1.12)" stroke="{INK}" stroke-width=".14" '
