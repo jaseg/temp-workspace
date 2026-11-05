@@ -44,10 +44,10 @@ def cat_capacitor(rng, cx, cy, vertical, value, plates):
     rot = 0 if vertical else -90
     # body: narrow at the neck, wide and flat at the bottom; slim cats are a column,
     # fat cats a bottom-heavy loaf
-    n = .42 + .3 * chub                # neck half-width
+    n = .42 + .5 * chub                # shoulder half-width: broad on the chonky ones
     b = .5 + 1.95 * chub               # base half-width
     yb = 1.72                          # flat bottom
-    r = .3 + .3 * chub                 # bottom corner radius
+    r = .3 + .5 * chub                 # bottom corner radius
     hr = .78 + .22 * chub              # head radius (x)
     hy = hr * (.9 - .18 * chub)        # fat cats have wide, squashed heads
     ear = 1.15 - .35 * chub            # big ears on the slim ones
@@ -57,9 +57,13 @@ def cat_capacitor(rng, cx, cy, vertical, value, plates):
         tail = f'M{f(ts * b * .8)} 1.55C{f(ts * (b + 1.3))} 1.6 {f(ts * (b + 1.1))} .2 {f(ts * (b + 1.25))} -.5'
     else:            # fat: short tail wrapped along the floor
         tail = f'M{f(ts * b * .7)} 1.55C{f(ts * (b + .7))} 1.75 {f(ts * (b + .8))} 1.1 {f(ts * (b + .35))} .8'
-    body = (f'M{f(-n)} -.5Q0 -.78 {f(n)} -.5C{f(n + (b - n) * .15)} .2 {f(b)} .55 {f(b)} {f(yb - r)}'
+    # the sides bulge out right below the shoulders, so big cats come out as a plump
+    # mochi/loaf rather than a bottle
+    k1 = .15 + .8 * chub
+    y1, y2 = -.45 + .55 * (1 - chub), .55 - .45 * chub
+    body = (f'M{f(-n)} -.5Q0 -.78 {f(n)} -.5C{f(n + (b - n) * k1)} {f(y1)} {f(b)} {f(y2)} {f(b)} {f(yb - r)}'
             f'Q{f(b)} {f(yb)} {f(b - r)} {f(yb)}H{f(-b + r)}Q{f(-b)} {f(yb)} {f(-b)} {f(yb - r)}'
-            f'C{f(-b)} .55 {f(-n - (b - n) * .15)} .2 {f(-n)} -.5Z')
+            f'C{f(-b)} {f(y2)} {f(-n - (b - n) * k1)} {f(y1)} {f(-n)} -.5Z')
     pw = max(.42, b - .45)
     parts = [
         f'<path d="{tail}" fill="none" stroke="{INK}" stroke-width=".62" stroke-linecap="round"/>',
@@ -239,3 +243,37 @@ def dancing_crystal(rng, cx, cy, body, free=lambda x, y: True):
         out.append(f'<path d="M{f(cx + s * 2.4)} {f(cy - 2.6)}q{f(s * .6)} .5 {f(s * .5)} 1.2M{f(cx + s * 2.9)} {f(cy - 2.1)}q{f(s * .45)} .4 {f(s * .35)} .9" '
                    f'fill="none" stroke="#c9a0c2" stroke-width=".13" stroke-linecap="round"/>')
     return ''.join(out)
+
+
+
+def legend(rng):
+    """The cast of characters, as (svg, width, height) with the origin at the top left."""
+    w, h = 150, 54
+    t = lambda x, y, txt, size, fam='Pop', col=INK, anchor='start', extra='': (
+        f'<text x="{f(x)}" y="{f(y)}" font-family="{fam}" font-size="{f(size)}" fill="{col}" '
+        f'text-anchor="{anchor}"{extra}>{txt}</text>')
+    out = [f'<rect x="1.5" y="1.5" width="{w}" height="{h}" rx="6" fill="url(#tone-ink)" opacity=".5"/>',
+           f'<rect width="{w}" height="{h}" rx="6" fill="#fff" stroke="{INK}" stroke-width=".8"/>',
+           f'<rect x="2" y="2" width="{w - 4}" height="{h - 4}" rx="4.5" fill="none" stroke="#ffb8d0" stroke-width=".45" stroke-dasharray="1.6 1"/>',
+           t(w / 2, 9, '♡ cast of characters ♡', 5, anchor='middle', col='#ff7fb2',
+             extra=f' stroke="#fff" stroke-width=".8" paint-order="stroke"')]
+    # capacitors: a row of cats from slim to chonky
+    for i, v in enumerate(['10p', '1n', '100n', '1u', '4u7', '22u']):
+        cx = 12 + i * 13.5
+        out.append(f'<g transform="translate({f(cx)} 21) scale(2.2) translate({f(-cx)} -21)">'
+                   f'{cat_capacitor(rng, cx, 21, True, v, [])}</g>')
+        out.append(t(cx, 30.5, v.replace('u', 'µ') + 'F', 2.6, 'MPR', '#2f8f86', 'middle', ' font-weight="800"'))
+    out.append(t(92, 18.5, 'capacitors', 4))
+    out.append(t(92, 23.5, 'more capacitance, more chonk', 2.7, 'Zen', '#7b5b94', extra=' font-weight="700"'))
+    out.append(t(92, 27.5, '(the wires go in one end and out the other)', 2.2, 'Zen', '#a08cb0', extra=' font-weight="700"'))
+    # resistor, ferrite, crystal
+    out.append(f'<g transform="translate(10 44) scale(1.9)">{resistor_guy(rng, 0, 0, True, 1.778, "grumpy", (3.6, -.6, "brick"))}</g>')
+    out.append(t(22, 42, 'resistor', 3.6) + t(22, 46.5, 'grumpy, throws bricks', 2.5, 'Zen', '#7b5b94', extra=' font-weight="700"')
+               + t(22, 50, '(and the odd molotov)', 2.2, 'Zen', '#a08cb0', extra=' font-weight="700"'))
+    out.append(f'<g transform="translate(66 45) scale(1.9)">{caterpillar(rng, (-2.6, 0), (2.6, 0), [])}</g>')
+    out.append(t(75, 42, 'ferrite bead', 3.6) + t(75, 46.5, 'a very hungry inductor', 2.5, 'Zen', '#7b5b94', extra=' font-weight="700"'))
+    out.append(f'<g transform="translate(116 45) scale(1.7)">'
+               f'{dancing_crystal(rng, 0, 0, (-.762, -1.524, .762, 1.524), lambda x, y: y < -1 and abs(x) < 5)}</g>')
+    out.append(t(126, 42, 'crystal', 3.6) + t(126, 46.5, 'dances at its', 2.5, 'Zen', '#7b5b94', extra=' font-weight="700"')
+               + t(126, 50, 'own frequency ♪', 2.5, 'Zen', '#7b5b94', extra=' font-weight="700"'))
+    return ''.join(out), w, h

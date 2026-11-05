@@ -10,6 +10,7 @@ import math
 LINE = '#7a6888'          # softer than the circuit ink, so drawings stay in the background
 GREENS = ['#a6dfb5', '#bfe6a4', '#94d6bd', '#cdeeb8', '#b2e2c8']
 DEEP_GREENS = ['#7cc79a', '#93cf86', '#6fc3a5']
+GRASS_LINE = '#5f9f78'
 POTS = ['#ffc7d9', '#c9d8ff', '#ffe0a8', '#d8c8ff', '#ffd2bd', '#bfeee6']
 FLOWERS = ['#ffa8c8', '#ffd27f', '#c7b2ff', '#ff9fae', '#a9d8ff', '#fff2a0']
 CABLES = ['#ff9fb5', '#9fcbff', '#ffd77a', '#a9e3b5', '#c8b0ff', '#ffb98a']
@@ -88,8 +89,7 @@ def pot(rng, w, h, color, face):
     else:
         body = f'M{f(-w * .38)} {f(-h)}V{f(-h * .08)}Q{f(-w * .38)} 0 {f(-w * .3)} 0H{f(w * .3)}Q{f(w * .38)} 0 {f(w * .38)} {f(-h * .08)}V{f(-h)}Z'
         shade = f'M{f(w * .16)} {f(-h)}V0H{f(w * .3)}Q{f(w * .38)} 0 {f(w * .38)} {f(-h * .08)}V{f(-h)}Z'
-        rims = (f'<ellipse cx="0" cy="{f(-h)}" rx="{f(w * .38)}" ry="{f(h * .09)}" fill="{color}"/>'
-                f'<path d="M{f(-w * .38)} {f(-h * .45)}H{f(w * .38)}" stroke-dasharray=".6 .7" fill="none" stroke-width=".3"/>')
+        rims = f'<ellipse cx="0" cy="{f(-h)}" rx="{f(w * .38)}" ry="{f(h * .09)}" fill="{color}"/>'
         top = -h
     out = (f'<ellipse cx="0" cy=".3" rx="{f(w * .45)}" ry="{f(h * .07 + .3)}" fill="url(#tone-ink)" stroke="none" opacity=".3"/>'
            f'<path d="{body}" fill="{color}"/><path d="{shade}" fill="url(#tone-ink)" stroke="none" opacity=".18"/>{rims}')
@@ -265,20 +265,23 @@ GROUND_ITEMS = [
 
 
 def grass(rng, x, y, w):
-    blades = []
-    for _ in range(int(w * 1.4)):
-        bx = x + rng.uniform(0, w)
-        bh = rng.uniform(1.5, 4)
-        lean = rng.uniform(-1.4, 1.4)
-        blades.append(f'M{f(bx - .35)} {f(y)}Q{f(bx + lean * .3)} {f(y - bh * .6)} {f(bx + lean)} {f(y - bh)}Q{f(bx + lean * .2)} {f(y - bh * .5)} {f(bx + .35)} {f(y)}Z')
-    out = f'<path d="{"".join(blades)}" fill="{rng.choice(GREENS)}" stroke="{LINE}" stroke-width=".22" stroke-linejoin="round"/>'
-    if w > 6 and rng.random() < .8:
-        for _ in range(rng.randint(1, 3)):
+    """Neat cartoon grass tufts (three rounded blades each), with the odd flower."""
+    out = []
+    n = max(1, int(w / 4.2))
+    for i in range(n):
+        cx = x + (i + .5) * w / n + rng.uniform(-.5, .5)
+        hgt = rng.uniform(2.2, 3.4)
+        col = rng.choice(GREENS)
+        blades = ''.join(leaf(cx + dx, y + .1, a + rng.uniform(-6, 6), hgt * k, .62, col, rib=False)
+                         for dx, a, k in ((-.5, -30, .72), (0, 0, 1), (.5, 30, .78)))
+        out.append(f'<g stroke="{GRASS_LINE}" stroke-width=".2" stroke-linejoin="round">{blades}</g>')
+    if w > 6 and rng.random() < .7:
+        for _ in range(rng.randint(1, 2)):
             fx = x + rng.uniform(1, w - 1)
-            fh = rng.uniform(3, 6)
-            out += wrap(f'<path d="M{f(fx)} {f(y)}V{f(y - fh)}" fill="none" stroke-width=".3"/>'
-                        + flower(fx, y - fh, rng.uniform(.9, 1.4), rng.choice(FLOWERS)), .25)
-    return out
+            fh = rng.uniform(3.5, 5.5)
+            out.append(f'<path d="M{f(fx)} {f(y)}Q{f(fx + .4)} {f(y - fh / 2)} {f(fx)} {f(y - fh)}" fill="none" stroke="{GRASS_LINE}" stroke-width=".35"/>'
+                       + wrap(flower(fx, y - fh, rng.uniform(.9, 1.3), rng.choice(FLOWERS)), .25))
+    return ''.join(out)
 
 
 # ----------------------------------------------------------------------------

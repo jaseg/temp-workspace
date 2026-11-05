@@ -10,6 +10,7 @@ SVG and PNG.
 """
 
 import base64
+import colorsys
 import hashlib
 import math
 import random
@@ -109,8 +110,53 @@ INK_SOFT = '#8a7499'
 PAPER = '#fffaf2'
 PASTELS = ['#ffb8d0', '#a9e6cf', '#a9d4ff', '#ffe58f', '#d4c1ff', '#ffc9a3',
            '#9fe3e0', '#f7b9f0', '#c5e89c', '#ffd0dc', '#b9c7ff', '#ffdf9e']
-RAILS = {'GND': '#cdbfe6', 'GNDS': '#bfd8e6', '+3V3': '#ffb3b3', '+5V': '#ffc48c',
-         '+1V8': '#b5e8a6', '+1V2': '#9fd9ff', '+3V3A': '#ffb8d9'}
+
+
+def hls_hex(h, l, s):
+    r, g, b = colorsys.hls_to_rgb((h % 360) / 360, l, s)
+    return '#%02x%02x%02x' % (round(r * 255), round(g * 255), round(b * 255))
+
+
+def _jitter(name, n):
+    return int(hashlib.md5(name.encode()).hexdigest()[:8], 16) % n
+
+
+class NetColors:
+    """Pastel net colours in families: every net whose name starts with the same word
+    (FPGA_*, SEND_*, LED1..3, ...) gets a shade of one hue; positive supply rails share
+    warm coral/amber shades and grounds share neutral lilac-greys."""
+
+    SIGNAL_HUES = (55, 330)   # the warm 330..55 range is kept for the supply rails
+
+    def __init__(self, names):
+        prefixes = sorted({self.prefix(n) for n in names if not self.is_supply(n)})
+        lo, hi = self.SIGNAL_HUES
+        golden = 0.6180339887
+        self.hue = {p: lo + ((i * golden) % 1) * (hi - lo) for i, p in enumerate(prefixes)}
+
+    @staticmethod
+    def is_supply(name):
+        return name.startswith('+') or name.startswith('GND') or name.startswith('VCC')
+
+    @staticmethod
+    def prefix(name):
+        m = re.match(r'[A-Za-z]+', name.lstrip('+~{'))
+        return m.group(0).upper() if m else name
+
+    def __call__(self, name):
+        if name is None:
+            return None
+        j = _jitter(name, 1000) / 1000
+        if name.startswith('GND'):
+            return hls_hex(262 + 18 * j, .80 + .05 * j, .22)
+        if self.is_supply(name):
+            return hls_hex(-8 + 48 * j, .78, .9)
+        base = re.sub(r'(_?[PN])$', '', name)          # a diff pair's two halves match
+        j = _jitter(base, 1000) / 1000
+        lo, hi = self.SIGNAL_HUES
+        hue = self.hue.get(self.prefix(name), lo + _jitter(self.prefix(name), hi - lo))
+        return hls_hex(hue + 14 * (j - .5), .76 + .08 * j, .72)
+
 BODY_COLORS = [
     (('MCU', 'FPGA', 'Gowin'), '#e6d9ff'),
     (('Connector',), '#d3ebff'),
@@ -349,16 +395,14 @@ class Renderer:
                     name_at(xy(sym), v)
         self.net_of = [uf.find(i) for i in range(len(wires))]
         self.net_name = names
-        self.label_color = {}
+        self.colors = NetColors(set(names.values()))
 
     def net_color(self, root):
         name = self.net_name.get(root)
-        if name in RAILS:
-            return RAILS[name]
         if name:
-            base = re.sub(r'(_?[PN]|[+-])$', '', name)  # diff pairs share a colour
-            return hashcol(base)
-        return hashcol(str(root * 7919))
+            return self.colors(name)
+        # unnamed nets: a muted grey-teal family
+        return hls_hex(175 + 30 * _jitter(str(root), 1000) / 1000, .8, .28)
 
     # -- primitives ---------------------------------------------------------
     def render_wires(self):
@@ -392,7 +436,7 @@ class Renderer:
     def render_junctions(self):
         for j in kids(self.sch, 'junction'):
             x, y = xy(j)
-            self.svg.add('junction', f'<use href="#heart" x="{f2(x)}" y="{f2(y)}"/>')
+            self.svg.add('junction', f'<circle cx="{f2(x)}" cy="{f2(y)}" r=".62" fill="{INK}"/>')
         for n in kids(self.sch, 'no_connect'):
             x, y = xy(n)
             d = f'M{f2(x - .7)} {f2(y - .7)}l1.4 1.4M{f2(x + .7)} {f2(y - .7)}l-1.4 1.4'
@@ -495,7 +539,7 @@ class Renderer:
         rail_col = None
         props = {p[1]: p for p in kids(sym, 'property')}
         if power:
-            rail_col = RAILS.get(props.get('Value', [0, 0, ''])[2], '#ffd0e0')
+            rail_col = self.colors(props.get('Value', [0, 0, ''])[2]) or '#ffd0e0'
 
         pn = kid(lib, 'pin_names')
         name_off = val(pn, 'offset', default=0.508, conv=float) if pn is not None else 0.508
@@ -536,6 +580,8 @@ class Renderer:
                     pts = [P(float(p[1]), float(p[2])) for p in kids(kid(g, 'pts'), 'xy')]
                     d = 'M' + 'L'.join(f'{f2(a)} {f2(b)}' for a, b in pts)
                     closed = len(pts) > 2 and (ftype != 'none' or power)
+                    if closed and ftype == 'background':
+                        d = rounded_poly(pts, 1.0)
                 elif kind == 'rectangle':
                     (sx, sy), (ex, ey) = xy(g, 'start'), xy(g, 'end')
                     a, b = P(sx, sy), P(ex, ey)
@@ -705,15 +751,36 @@ class Renderer:
 
         # a little face on the larger ICs
         if not power and not dnp:
-            self.face_for(lib, xf, rects, pins, name_off, names_hidden)
+            self.face_for(lib, xf, rects, pins, name_off, names_hidden, subs)
 
-    def face_for(self, lib, xf, rects, pins, name_off, names_hidden):
+    def face_for(self, lib, xf, rects, pins, name_off, names_hidden, subs):
         big = [r for r in rects if r[4] == 'background' and abs(r[2] - r[0]) >= 9 and abs(r[3] - r[1]) >= 9]
         if not big:
             return
-        sx, sy, ex, ey, _ = max(big, key=lambda r: abs(r[2] - r[0]) * abs(r[3] - r[1]))
+        body = max(big, key=lambda r: abs(r[2] - r[0]) * abs(r[3] - r[1]))
+        sx, sy, ex, ey, _ = body
         x0, x1 = sorted((sx, ex))
         y0, y1 = sorted((sy, ey))
+        # no face if the body already has drawings in it (diodes, logos, ...)
+        for sub in subs:
+            for g in sub[2:]:
+                if not isinstance(g, list) or g[0] not in ('polyline', 'rectangle', 'circle', 'arc', 'bezier', 'text'):
+                    continue
+                if g[0] == 'rectangle':
+                    (a, b), (c, d) = xy(g, 'start'), xy(g, 'end')
+                    if (a, b, c, d) == (sx, sy, ex, ey):
+                        continue
+                    gp = [(a, b), (c, d)]
+                elif g[0] in ('polyline', 'bezier'):
+                    gp = [(float(q[1]), float(q[2])) for q in kids(kid(g, 'pts'), 'xy')]
+                elif g[0] == 'circle':
+                    gp = [xy(g, 'center')]
+                elif g[0] == 'arc':
+                    gp = [xy(g, 'start'), xy(g, 'mid'), xy(g, 'end')]
+                else:
+                    gp = [xy(g)]
+                if any(x0 + .3 < px < x1 - .3 and y0 + .3 < py < y1 - .3 for px, py in gp):
+                    return
         fx0, fx1, fy0, fy1 = x0 + 1, x1 - 1, y0 + 1, y1 - 1
         for pin in pins:
             if is_hidden(pin):
@@ -774,7 +841,7 @@ class Renderer:
             polys = [[xf(float(q[1]), float(q[2])) for q in kids(kid(g, 'pts'), 'xy')]
                      for sub in p['subs'] for g in kids(sub, 'polyline')]
             if lib_id in ('Device:C_Small', 'Device:C'):
-                add(C.cat_capacitor(rng, cx, cy, vertical, p['value'], [(q[0], q[-1]) for q in polys]))
+                add(C.cat_capacitor(rng, cx, cy, vertical, p['value'], []))
                 self.fine.mark_rect(cx - 2.4, cy - 2.4, cx + 2.4, cy + 2.4)
             elif lib_id in ('Device:R', 'Device:R_Small'):
                 half = 2.54 if lib_id == 'Device:R' else 1.778
@@ -807,6 +874,16 @@ class Renderer:
                 (x0, y0), (x1, y1) = xf(-.762, -1.524), xf(.762, 1.524)
                 add(C.dancing_crystal(rng, cx, cy, (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)),
                                       lambda qx, qy: self.fine.free(qx - .9, qy - .9, qx + .9, qy + .9)))
+
+    def render_legend(self):
+        svg, w, h = C.legend(random.Random(5))
+        W, H, m = self.W, self.H, 16
+        for x, y in ((m, 30), (W - m - w, 30), (m, H - 70 - h), (m, (H - h) / 2), (W - m - w, (H - h) / 2)):
+            if self.grid.free(x - 3, y - 3, x + w + 3, y + h + 3):
+                self.svg.add('titlepanel', f'<g transform="translate({f2(x)} {f2(y)})">{svg}</g>')
+                self.grid.mark_rect(x, y, x + w, y + h, pad=4)
+                return
+        print('warning: no free corner for the legend', file=sys.stderr)
 
     # -- decorations --------------------------------------------------------
     def decorate(self):
@@ -1134,6 +1211,7 @@ text{{font-family:'MPR',sans-serif}}
         self.render_labels()
         self.render_texts()
         self.render_characters()
+        self.render_legend()
         self.frame_and_title(title)
         self.decorate()
         order = ['bg', 'deco', 'edgeback', 'shadow', 'fill', 'face', 'wire_o', 'wire_i', 'stroke', 'char', 'dnp', 'junction',
@@ -1145,6 +1223,21 @@ text{{font-family:'MPR',sans-serif}}
             body.append(f'<g id="layer-{layer}"{extra}>' + '\n'.join(items) + '</g>')
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.W}mm" height="{self.H}mm" '
                 f'viewBox="0 0 {self.W} {self.H}">\n{self.defs(fonts)}\n' + '\n'.join(body) + '\n</svg>\n')
+
+
+def rounded_poly(pts, r):
+    """A closed polygon with its corners rounded off by up to r."""
+    if math.hypot(pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]) < 1e-6:
+        pts = pts[:-1]
+    out = []
+    for i, (x1, y1) in enumerate(pts):
+        (x0, y0), (x2, y2) = pts[i - 1], pts[(i + 1) % len(pts)]
+        d1, d2 = math.hypot(x0 - x1, y0 - y1), math.hypot(x2 - x1, y2 - y1)
+        rr = min(r, d1 * .3, d2 * .3)
+        ax, ay = x1 + (x0 - x1) * rr / d1, y1 + (y0 - y1) * rr / d1
+        bx, by = x1 + (x2 - x1) * rr / d2, y1 + (y2 - y1) * rr / d2
+        out.append(f'{"M" if not i else "L"}{f2(ax)} {f2(ay)}Q{f2(x1)} {f2(y1)} {f2(bx)} {f2(by)}')
+    return ''.join(out) + 'Z'
 
 
 def arc_path(s, m, e):
