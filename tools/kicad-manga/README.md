@@ -52,7 +52,8 @@ the schematic.
   active-low, non-logic). IC bodies get a pastel per library, and a face when the body is
   otherwise empty.
 - **Characters:** passives are matched by reference prefix, so they work with any library:
-  `C` is a cat, `R`/`TH` a resistor, `L`/`FB` a caterpillar, and `Y`/`X` a crystal.
+  `C` is a cat, `R`/`TH` a resistor, `L`/`FB` a caterpillar, and `Y`/`X` a crystal. Buses become one long
+  cat each, with windows, headlight eyes and lots of little legs.
   Polarised capacitors wear a "+" badge.
 - **Labels:** local, global (with their input/output/bidirectional/tri-state/passive
   shapes), hierarchical, and netclass/directive flags.

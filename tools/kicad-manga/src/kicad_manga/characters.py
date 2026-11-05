@@ -278,6 +278,12 @@ def legend(rng, cast):
                       f'{dancing_crystal(rng, 0, 0, (-.762, -1.524, .762, 1.524), lambda a, b: b < -1 and abs(a) < 5)}</g>'
                       + t(x + 14, y + 2, 'crystal', 3.6) + sub(x + 14, y + 6.5, 'dances at its')
                       + sub(x + 14, y + 10, 'own frequency ♪'))
+    if cast.get('bus'):
+        others.append(lambda x, y: cat_bus([((x + 4, y + 5), (x + 13, y + 5))], (x + 13, y + 5, 1, 0), (x + 4, y + 5, -1, 0),
+                                           [(x + 6.5, y + 5, 0, 1), (x + 10.5, y + 5, 0, 1)]).replace('data-kind="bus" ', '')
+                      + t(x + 20, y + 2, 'bus', 3.6) + sub(x + 20, y + 6.5, 'a very long cat')
+                      + sub(x + 20, y + 10, 'carries lots of signals', 2.2, '#a08cb0'))
+    w = max(w, 12 + 50 * len(others))
     for i, draw in enumerate(others):
         out.append(draw(6 + i * 50, y + 6))
     if others:
@@ -289,3 +295,76 @@ def legend(rng, cast):
              t(w / 2, 9, '♡ cast of characters ♡', 5, anchor='middle', col='#ff7fb2',
                extra=' stroke="#fff" stroke-width=".8" paint-order="stroke"')]
     return ''.join(frame + out), w, h
+
+
+# ----------------------------------------------------------------------------
+# Buses: one long fluffy tabby per connected bus, with lots of little legs
+
+BUS_FUR, BUS_STRIPE = '#ffd6a8', '#efae78'
+
+
+def cat_bus(segments, head, tail, legs):
+    """`segments`: [(a, b)] in sheet coordinates (each one a <path data-kind="bus">);
+    `head`/`tail`: (x, y, ux, uy), an end point and the direction pointing out of the bus;
+    `legs`: [(x, y, nx, ny)] where a leg starts and which side it hangs to."""
+    line = '#7a6888'
+    half = 1.45                     # half the body's thickness
+    out = []
+    for x, y, nx, ny in legs:      # legs first, the body covers their tops
+        d = f'M{f(x + nx * .9)} {f(y + ny * .9)}L{f(x + nx * 2.6)} {f(y + ny * 2.6)}'
+        out.append(f'<path d="{d}" stroke="{line}" stroke-width="1.05" stroke-linecap="round"/>'
+                   f'<path d="{d}" stroke="{BUS_FUR}" stroke-width=".65" stroke-linecap="round"/>'
+                   f'<ellipse cx="{f(x + nx * 2.75)}" cy="{f(y + ny * 2.75)}" rx=".62" ry=".42" fill="#fff" stroke="{line}" stroke-width=".15"/>')
+    tx, ty, tux, tuy = tail        # a fluffy tail curling up
+    td = (f'M{f(tx)} {f(ty)}C{f(tx + tux * 2.8)} {f(ty + tuy * 2.8)} {f(tx + tux * 3.8)} {f(ty + tuy * 3.8 - 2.6)} '
+          f'{f(tx + tux * 2.2)} {f(ty + tuy * 2.2 - 3.1)}')
+    out.append(f'<path d="{td}" fill="none" stroke="{line}" stroke-width="1.6" stroke-linecap="round"/>'
+               f'<path d="{td}" fill="none" stroke="{BUS_FUR}" stroke-width="1.15" stroke-linecap="round"/>')
+    body = ''.join(f'M{f(a[0])} {f(a[1])}L{f(b[0])} {f(b[1])}' for a, b in segments)
+    for a, b in segments:
+        out.append(f'<path data-kind="bus" d="M{f(a[0])} {f(a[1])}L{f(b[0])} {f(b[1])}" fill="none" stroke="{line}" '
+                   f'stroke-width="{f(2 * half + .45)}" stroke-linecap="round" stroke-linejoin="round"/>')
+    out.append(f'<path d="{body}" fill="none" stroke="{BUS_FUR}" stroke-width="{f(2 * half)}" stroke-linecap="round" stroke-linejoin="round"/>')
+    stripes, windows = [], []
+    hx, hy = head[0], head[1]
+    for a, b in segments:          # windows along the back, tabby stripes between them
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        if L < 1:
+            continue
+        ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+        nx, ny = -uy, ux
+        t, k = 1.4, 0
+        while t < L - 1:
+            px, py = a[0] + ux * t, a[1] + uy * t
+            if math.hypot(px - hx, py - hy) > 3.5:
+                if k % 2:
+                    windows.append(f'<g transform="translate({f(px)} {f(py)}) rotate({f(math.degrees(math.atan2(uy, ux)))})">'
+                                   f'<rect x="-.85" y="-.75" width="1.7" height="1.3" rx=".35" fill="#d9f1ff" stroke="{line}" stroke-width=".16"/>'
+                                   f'<path d="M-.5 -.45l.45 .55" stroke="#fff" stroke-width=".22" stroke-linecap="round"/></g>')
+                else:
+                    stripes.append(f'M{f(px + nx * 1.05)} {f(py + ny * 1.05)}Q{f(px + ux * .4)} {f(py + uy * .4)} '
+                                   f'{f(px - nx * 1.05)} {f(py - ny * 1.05)}')
+            t += 1.9
+            k += 1
+    out.append(f'<path d="{"".join(stripes)}" fill="none" stroke="{BUS_STRIPE}" stroke-width=".4" stroke-linecap="round"/>')
+    out += windows
+    # the head, upright, just past the end of the bus: headlight eyes and a big grin
+    ux, uy = head[2], head[3]
+    cx, cy = hx + ux * 3.1, hy + uy * 3.1
+    out.append(f'<g transform="translate({f(cx)} {f(cy)})" stroke="{line}" stroke-width=".22" stroke-linejoin="round">'
+               f'<path d="M-2.45 -.9L-2.1 -3.4L-.8 -2.2Z" fill="{BUS_FUR}"/><path d="M2.45 -.9L2.1 -3.4L.8 -2.2Z" fill="{BUS_FUR}"/>'
+               f'<path d="M-2.05 -1.3L-1.95 -2.75L-1.15 -2.05Z" fill="#ffb3cf" stroke="none"/>'
+               f'<path d="M2.05 -1.3L1.95 -2.75L1.15 -2.05Z" fill="#ffb3cf" stroke="none"/>'
+               f'<ellipse rx="2.75" ry="2.3" fill="{BUS_FUR}"/>'
+               f'<path d="M-.6 -2.2Q0 -1.6 .6 -2.2M-.3 -2.25V-1.75M.3 -2.25V-1.75" fill="none" stroke="{BUS_STRIPE}" stroke-width=".28"/>'
+               f'<circle cx="-1.15" cy="-.55" r="1.35" fill="#fff6a0" stroke="none" opacity=".45"/>'
+               f'<circle cx="1.15" cy="-.55" r="1.35" fill="#fff6a0" stroke="none" opacity=".45"/>'
+               f'<circle cx="-1.15" cy="-.55" r=".82" fill="#fff8c2"/><circle cx="1.15" cy="-.55" r=".82" fill="#fff8c2"/>'
+               f'<circle cx="-1.05" cy="-.5" r=".34" fill="{INK}" stroke="none"/><circle cx="1.25" cy="-.5" r=".34" fill="{INK}" stroke="none"/>'
+               f'<circle cx="-.95" cy="-.62" r=".11" fill="#fff" stroke="none"/><circle cx="1.35" cy="-.62" r=".11" fill="#fff" stroke="none"/>'
+               f'<path d="M-1.75 .55Q0 2.5 1.75 .55Q0 1.25 -1.75 .55Z" fill="#fff" stroke-width=".18"/>'
+               f'<path d="M-.9 .95l.05 .55M-.3 1.08v.7M.3 1.08v.7M.9 .95l-.05 .55" fill="none" stroke-width=".1"/>'
+               f'<ellipse cx="-2.05" cy=".55" rx=".42" ry=".22" fill="#ff9cc2" stroke="none" opacity=".8"/>'
+               f'<ellipse cx="2.05" cy=".55" rx=".42" ry=".22" fill="#ff9cc2" stroke="none" opacity=".8"/>'
+               f'<path d="M-1.6 .2l-1.6 -.25M-1.6 .5l-1.6 .15M1.6 .2l1.6 -.25M1.6 .5l1.6 .15" fill="none" stroke-width=".09"/></g>')
+    return ''.join(out)

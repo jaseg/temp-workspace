@@ -78,6 +78,15 @@ class Grid:
                 return False
         return True
 
+    def count(self, x0, y0, x1, y1):
+        """How many occupied cells (or cells off the grid) a rectangle covers."""
+        c = self.cell
+        n = 0
+        for j in range(int(min(y0, y1) / c), int(max(y0, y1) / c) + 1):
+            for i in range(int(min(x0, x1) / c), int(max(x0, x1) / c) + 1):
+                n += 1 if not (0 <= i < self.nx and 0 <= j < self.ny) else self.occ[j * self.nx + i]
+        return n
+
     def bbox(self):
         """Bounding box of everything marked, or None."""
         rows = [j for j in range(self.ny) if any(self.occ[j * self.nx:(j + 1) * self.nx])]
@@ -373,18 +382,79 @@ class Circuit:
                 outer.append(f'<path class="wire-o" data-kind="wire" d="{d}"/>')
                 inner.append(f'<path class="wire-i" stroke="{scol or col}" d="{d}"{da}/>')
             self.add('wires', f'<g class="net" data-net="{escape(name)}">{"".join(outer + inner)}</g>')
-        for b in kids(self.sch, 'bus'):
-            p = pts(b)
-            d = 'M' + 'L'.join(f'{f2(x)} {f2(y)}' for x, y in p)
-            self.add('wires', f'<g data-kind="bus"><path class="bus-o" d="{d}"/><path class="bus-i" d="{d}"/></g>')
+        buses = [pts(b) for b in kids(self.sch, 'bus')]
+        if self.characters:
+            self.cat_buses(buses)
+        else:
+            for p in buses:
+                d = 'M' + 'L'.join(f'{f2(x)} {f2(y)}' for x, y in p)
+                self.add('wires', f'<g data-kind="bus"><path class="bus-o" d="{d}"/><path class="bus-i" d="{d}"/></g>')
+        for p in buses:
             for a, c in zip(p, p[1:]):
-                self.mark(a[0], a[1], c[0], c[1], pad=1.2)
+                self.mark(a[0], a[1], c[0], c[1], pad=2.5 if self.characters else 1.2, fine_pad=2.6 if self.characters else .4)
         for be in kids(self.sch, 'bus_entry'):
             x, y = xy(be)
             sx, sy = xy(be, 'size')
             d = f'M{f2(x)} {f2(y)}l{f2(sx)} {f2(sy)}'
             self.add('wires', f'<g data-kind="bus_entry"><path class="bus-o" d="{d}"/><path class="bus-i" d="{d}"/></g>')
             self.mark(x, y, x + sx, y + sy, pad=1)
+
+    def cat_buses(self, buses):
+        """Each connected bus becomes one long cat: head at one end, tail at the other,
+        legs on the side away from the bus entries."""
+        entries = [(xy(be), xy(be, 'size')) for be in kids(self.sch, 'bus_entry')]
+        segs = [(a, b) for p in buses for a, b in zip(p, p[1:]) if key(a) != key(b)]
+        uf = UF(len(segs))
+        first = {}
+        for i, (a, b) in enumerate(segs):
+            for q in (a, b):
+                first.setdefault(key(q), i)
+                uf.union(first[key(q)], i)
+        chains = {}
+        for i in range(len(segs)):
+            chains.setdefault(uf.find(i), []).append(segs[i])
+        for chain in chains.values():
+            degree, owner = {}, {}
+            for a, b in chain:
+                for q, other in ((a, b), (b, a)):
+                    degree[key(q)] = degree.get(key(q), 0) + 1
+                    owner[key(q)] = (q, other)
+            ends = [owner[k] for k, n in degree.items() if n == 1] or [chain[0], chain[-1][::-1]]
+            e1, e2 = max(((u, v) for i, u in enumerate(ends) for v in ends[i + 1:]),
+                         key=lambda uv: math.hypot(uv[0][0][0] - uv[1][0][0], uv[0][0][1] - uv[1][0][1]),
+                         default=(ends[0], ends[-1]))
+            def outward(e):
+                (x, y), (ox, oy) = e
+                n = math.hypot(x - ox, y - oy) or 1
+                return (x, y, (x - ox) / n, (y - oy) / n)
+
+            def crowd(e):   # how cluttered the spot for the head is
+                x, y, ux, uy = outward(e)
+                hx, hy = x + ux * 3.1, y + uy * 3.1
+                near = sum(1 for (p, _) in entries if math.hypot(p[0] - x, p[1] - y) < 5)
+                return self.fine.count(hx - 3, hy - 3.5, hx + 3, hy + 2.5) + 10 * near
+            head, tail = (e1, e2) if crowd(e1) <= crowd(e2) else (e2, e1)
+            legs = []
+            for a, b in chain:
+                L = math.hypot(b[0] - a[0], b[1] - a[1])
+                ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+                nx, ny = (0, 1) if abs(ux) > abs(uy) else (1, 0)     # legs down, or to the right
+                here = [s for p, s in entries if on_segment(p, a, b)]
+
+                def clutter(sx, sy):    # bus entries on that side, and whatever else is in the way
+                    hits = sum(1 for s in here if s[0] * sx + s[1] * sy > 0)
+                    x0, y0 = a[0] + sx * 1.6, a[1] + sy * 1.6
+                    x1, y1 = b[0] + sx * 3.4, b[1] + sy * 3.4
+                    return 20 * hits + self.fine.count(x0, y0, x1, y1)
+                if clutter(-nx, -ny) < clutter(nx, ny):
+                    nx, ny = -nx, -ny
+                t = 2.4
+                while t < L - 2:
+                    px, py = a[0] + ux * t, a[1] + uy * t
+                    if min(math.hypot(px - e[0][0], py - e[0][1]) for e in (head, tail)) > 4.5:
+                        legs.append((px, py, nx, ny))
+                    t += 3.8
+            self.add('wires', f'<g data-kind="cat_bus">{C.cat_bus(chain, outward(head), outward(tail), legs)}</g>')
 
     def render_junctions(self):
         for j in kids(self.sch, 'junction'):
@@ -892,6 +962,9 @@ class Circuit:
             self.passives.append({'entry': entry, 'kind': char, 'xf': xf, 'subs': subs, 'value': value,
                                   'lib_id': lib_id, 'pins': pin_info})
         if dnp and xs:
+            mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+            x0, x1 = min(x0, mx - 1.6), max(x1, mx + 1.6)
+            y0, y1 = min(y0, my - 1.6), max(y1, my + 1.6)
             entry['dnp'] = f'<path class="dnp" d="M{f2(x0)} {f2(y0)}L{f2(x1)} {f2(y1)}M{f2(x1)} {f2(y0)}L{f2(x0)} {f2(y1)}"/>'
         self.symbols.append(entry)
         # texts and the DNP cross go on top of characters, so finalise lazily
@@ -955,6 +1028,8 @@ class Circuit:
     def cast(self):
         """Which characters appear on the sheet, for the legend."""
         cast = {p['kind']: True for p in self.passives}
+        if self.characters and kids(self.sch, 'bus'):
+            cast['bus'] = True
         inds = [p for p in self.passives if p['kind'] == 'ind']
         if inds:
             beads = [p for p in inds if ref_prefix(p['entry']['ref']) == 'FB' or 'bead' in p['lib_id'].lower()]
