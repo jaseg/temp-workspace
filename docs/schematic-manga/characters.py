@@ -38,8 +38,8 @@ def cat_capacitor(rng, cx, cy, vertical, value, plates):
     c = parse_si(value)
     if c is None:
         chub = .45
-    else:   # 10p -> .05, 1n -> .25, 100n -> .54, 1u -> .72, 22u -> .9
-        chub = max(0, min(1, (math.log10(c) + 12) / 7.5)) ** 1.5
+    else:   # 1n -> .03, 100n -> .2, 1u -> .41, 4u7 -> .63, 10u -> .75, 22u -> .92
+        chub = max(0, min(1, (math.log10(c) + 12) / 7.5)) ** 4
     fur, patch = rng.choice(FUR)
     rot = 0 if vertical else -90
     # body: narrow at the neck, wide and flat at the bottom; slim cats are a column,
