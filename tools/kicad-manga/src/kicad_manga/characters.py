@@ -307,11 +307,25 @@ def cat_bus(segments, head, tail, legs, entries=()):
     """`segments`: [(a, b)] in sheet coordinates (each one a <path data-kind="bus">);
     `head`/`tail`: (x, y, ux, uy), an end point and the direction pointing out of the bus;
     `legs`: [(x, y, nx, ny)] where a leg starts and which side it hangs to;
-    `entries`: [(point on the bus, point on the wire, colour)] bus entries, which get a
-    window each and come in as slightly squiggly wires."""
+    `entries`: [(point on the bus, point on the wire, colour, is_leg)] bus entries: on the
+    legs' side they are legs (the wire leaves from the paw), otherwise slightly squiggly
+    wires coming in through a window."""
     line = '#7a6888'
     half = 1.45                     # half the body's thickness
     out = []
+    for p, q, col, is_leg in entries:      # entries that are legs: wire from the paw outwards
+        if not is_leg:
+            continue
+        vx, vy = q[0] - p[0], q[1] - p[1]
+        px, py = p[0] + vx * .84, p[1] + vy * .84
+        d = f'M{f(px)} {f(py)}L{f(q[0])} {f(q[1])}'
+        out.append(f'<g data-kind="bus_entry"><path class="wire-o" d="{d}"/><path class="wire-i" stroke="{col}" d="{d}"/></g>')
+        d = f'M{f(p[0] + vx * .38)} {f(p[1] + vy * .38)}L{f(p[0] + vx * .79)} {f(p[1] + vy * .79)}'
+        ang = math.degrees(math.atan2(vy, vx))
+        out.append(f'<path d="{d}" stroke="{line}" stroke-width="1.05" stroke-linecap="round"/>'
+                   f'<path d="{d}" stroke="{BUS_FUR}" stroke-width=".65" stroke-linecap="round"/>'
+                   f'<ellipse transform="translate({f(px)} {f(py)}) rotate({f(ang + 90)})" rx=".62" ry=".42" fill="#fff" '
+                   f'stroke="{line}" stroke-width=".15"/>')
     for x, y, nx, ny in legs:      # legs first, the body covers their tops
         d = f'M{f(x + nx * .9)} {f(y + ny * .9)}L{f(x + nx * 2.6)} {f(y + ny * 2.6)}'
         out.append(f'<path d="{d}" stroke="{line}" stroke-width="1.05" stroke-linecap="round"/>'
@@ -329,7 +343,7 @@ def cat_bus(segments, head, tail, legs, entries=()):
     out.append(f'<path d="{body}" fill="none" stroke="{BUS_FUR}" stroke-width="{f(2 * half)}" stroke-linecap="round" stroke-linejoin="round"/>')
     stripes, windows = [], []
     hx, hy = head[0], head[1]
-    taps = [p for p, _, _ in entries]
+    taps = [p for p, _, _, is_leg in entries if not is_leg]
 
     def window(px, py, ang):
         windows.append(f'<g transform="translate({f(px)} {f(py)}) rotate({f(ang)})">'
@@ -358,7 +372,9 @@ def cat_bus(segments, head, tail, legs, entries=()):
             if on_seg(q, a, b):
                 window(q[0], q[1], math.degrees(math.atan2(uy, ux)))
     out.append(f'<path d="{"".join(stripes)}" fill="none" stroke="{BUS_STRIPE}" stroke-width=".4" stroke-linecap="round"/>')
-    for p, q, col in entries:      # entries: ordinary wires with a little wiggle, into the window
+    for p, q, col, is_leg in entries:      # the others: ordinary wires with a little wiggle, into a window
+        if is_leg:
+            continue
         dx, dy = p[0] - q[0], p[1] - q[1]
         n = math.hypot(dx, dy) or 1
         nx, ny = -dy / n * .55, dx / n * .55

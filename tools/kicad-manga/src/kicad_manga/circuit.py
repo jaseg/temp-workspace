@@ -466,21 +466,41 @@ class Circuit:
                 return out
             options = [side_normals(1), side_normals(-1)]
             best = min(options, key=lambda segs_: sum(clutter(a, b, nx, ny) for a, b, _, _, _, nx, ny in segs_))
-            legs = []
-            for a, b, L, ux, uy, nx, ny in best:
-                t = 2.4
-                while t < L - 2:
-                    px, py = a[0] + ux * t, a[1] + uy * t
-                    qx, qy = px + nx * 2.7, py + ny * 2.7          # where the paw lands
-                    clear = min(math.hypot(px - e[0][0], py - e[0][1]) for e in (head, tail)) > 4.5 and \
-                        all(math.hypot(px - p[0], py - p[1]) > 1.8 for p, _ in entries) and \
-                        not self.fine.count(qx - .6, qy - .5, qx + .6, qy + .5)
-                    if clear:
-                        legs.append((px, py, nx, ny))
-                    t += 3.8
             mine = [i for i, (p, q, _) in enumerate(all_entries) if any(on_segment(p, a, b) for a, b in chain)]
             drawn.update(mine)
-            svg = C.cat_bus(chain, outward(head), outward(tail), legs, [all_entries[i] for i in mine])
+            # bus entries on the legs' side become legs themselves; the others come in
+            # through windows. Elsewhere legs run the whole length at an even spacing.
+            cat_entries, leg_taps = [], []
+            for i in mine:
+                p, q, col = all_entries[i]
+                seg = next((sg for sg in best if on_segment(p, sg[0], sg[1])), None)
+                is_leg = seg is not None and (q[0] - p[0]) * seg[5] + (q[1] - p[1]) * seg[6] > 0
+                cat_entries.append((p, q, col, is_leg))
+                if is_leg:
+                    leg_taps.append(p)
+            legs = []
+            for a, b, L, ux, uy, nx, ny in best:
+                along = sorted(((p[0] - a[0]) * ux + (p[1] - a[1]) * uy, q[0] - p[0], q[1] - p[1])
+                               for p, q, _, leg in cat_entries if leg and on_segment(p, a, b))
+                if along:   # match the entries: same direction, same spacing, all along this run
+                    gaps = [t2 - t1 for (t1, _, _), (t2, _, _) in zip(along, along[1:]) if t2 - t1 > .5]
+                    step = max(2.5, min(gaps)) if gaps else 3.8
+                    vx, vy = along[0][1], along[0][2]
+                    n = math.hypot(vx, vy) or 1
+                    # reach as far out from the body as the entry legs do (paw ~2.1 mm out)
+                    c = abs(vx / n * nx + vy / n * ny) or 1
+                    dx, dy = vx / n / c * .775, vy / n / c * .775
+                    t0 = along[0][0]
+                    ts = [t0 + k * step for k in range(-int(t0 / step), int((L - t0) / step) + 1)]
+                    ts = [t for t in ts if 2 <= t <= L - 1.5 and all(abs(t - e[0]) > .5 for e in along)]
+                else:       # nothing to line up with: evenly spaced, straight out
+                    dx, dy = nx, ny
+                    ts = [2.4 + k * 3.8 for k in range(int(max(0, L - 4.4) / 3.8) + 1)]
+                for t in ts:
+                    px, py = a[0] + ux * t, a[1] + uy * t
+                    if min(math.hypot(px - e[0][0], py - e[0][1]) for e in (head, tail)) > 4.5:
+                        legs.append((px, py, dx, dy))
+            svg = C.cat_bus(chain, outward(head), outward(tail), legs, cat_entries)
             self.add('wires', f'<g data-kind="cat_bus">{svg}</g>')
         return drawn
 
