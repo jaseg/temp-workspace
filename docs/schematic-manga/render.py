@@ -739,65 +739,205 @@ class Renderer:
 
     # -- decorations --------------------------------------------------------
     def decorate(self):
+        import drawings as D
         rng = random.Random(42)
         W, H = self.W, self.H
-        m = 14  # inside the panel frame
-        placed = []
+        G = self.grid
+        fm = 8          # outer frame line
+        m = 14          # keep floating things this far inside the page edge
+        add = self.svg.add
 
         def try_place(wd, ht, tries, pad=1.0):
             for _ in range(tries):
                 x = rng.uniform(m + wd / 2, W - m - wd / 2)
                 y = rng.uniform(m + ht / 2, H - m - ht / 2)
-                if self.grid.free(x - wd / 2 - pad, y - ht / 2 - pad, x + wd / 2 + pad, y + ht / 2 + pad):
-                    self.grid.mark_rect(x - wd / 2, y - ht / 2, x + wd / 2, y + ht / 2, pad=pad)
+                if G.free(x - wd / 2 - pad, y - ht / 2 - pad, x + wd / 2 + pad, y + ht / 2 + pad):
+                    G.mark_rect(x - wd / 2, y - ht / 2, x + wd / 2, y + ht / 2, pad=pad)
                     return x, y
             return None
 
-        # manga sound effects in the big empty spots
-        sfx = [('キラキラ', 'kira kira'), ('ドキドキ', 'doki doki'), ('ピカッ', 'pika!'), ('ワクワク', 'waku waku'),
-               ('ふわふわ', 'fuwa fuwa'), ('ビリビリ', 'biri biri'), ('ジジジ', 'ji ji ji'), ('ぽわん', 'powan')]
-        cols = ['#ff8fbf', '#7fd8c0', '#8fc3ff', '#ffc65c', '#b79cff', '#ff9f7a']
-        for i, (jp, ro) in enumerate(sfx):
-            size = rng.uniform(11, 15)
-            wd, ht = len(jp) * size * 1.05, size * 1.6
-            ang = rng.uniform(-14, 14)
-            pos = try_place(wd, ht, 600, pad=5)
+        # 1. things standing on the bottom of the frame: plants, a mug, books, a cat
+        base = H - fm - 0.8
+        limits = {'cat': 1, 'mug': 2, 'books': 2}
+        x = fm + 6
+        while x < W - fm - 8:
+            draw, lo, hi, ar = rng.choice(D.GROUND_ITEMS)
+            name = draw.__name__
+            if limits.get(name, 99) <= 0:
+                continue
+            placed = False
+            for h in (rng.uniform(lo, hi), lo, lo * .75):
+                w = h * ar
+                need = h * (1.6 if name == 'cat' else 1.08)
+                if x + w < W - fm - 6 and G.free(x, base - need - 1, x + w, base - 1.2):
+                    add('edgefront', f'<g transform="translate({f2(x + w / 2)} {f2(base)})">{draw(rng, h)}</g>')
+                    G.mark_rect(x, base - need, x + w, base, pad=1.5)
+                    limits[name] = limits.get(name, 99) - 1
+                    x += w + rng.uniform(1, 4)
+                    placed = True
+                    break
+            if not placed:
+                x += 2.5
+                continue
+            gw = rng.uniform(5, 16)
+            if rng.random() < .7 and G.free(x, base - 7, x + gw, base - 1.2):
+                add('edgefront', D.grass(rng, x, base, gw))
+                G.mark_rect(x, base - 6, x + gw, base, pad=.5)
+                x += gw + rng.uniform(0, 3)
+
+        # 2. leafy garlands hanging from the top of the frame, with charms
+        top = fm + 0.8
+        x = fm + 5
+        joints = []
+        while x < W - fm - 25:
+            span, sag = rng.uniform(40, 75), rng.uniform(6, 12)
+            x1 = min(x + span, W - fm - 5)
+            if G.free(x, top + 1.5, x1, top + sag + 4):
+                add('edgefront', D.vine(rng, D.garland_pts(x, x1, top + .4, sag), leaf_gap=2.4))
+                G.mark_rect(x, top, x1, top + sag + 4, pad=1)
+                joints += [x, x1]
+                mid = (x + x1) / 2 + rng.uniform(-6, 6)
+                L = rng.uniform(5, 13)
+                ymid = top + .4 + sag * (1 - ((mid - (x + x1) / 2) / ((x1 - x) / 2)) ** 2) - .3
+                if rng.random() < .55 and G.free(mid - 4, ymid + 1, mid + 4, ymid + L + 12):
+                    add('edgefront', D.charm(rng, mid, ymid, L))
+                    G.mark_rect(mid - 4, ymid, mid + 4, ymid + L + 10, pad=1)
+                x = x1
+            else:
+                x += 5
+        for jx in sorted(set(round(v, 1) for v in joints)):
+            add('edgefront', D.bow(jx, top + .6, rng.choice(D.FLOWERS)))
+
+        # 3. vines climbing the left and right sides of the frame
+        for side in (-1, 1):
+            ex = fm + 0.8 if side < 0 else W - fm - 0.8
+            runs, start = [], None
+            for yy in range(int(top + 2), int(base - 2)):
+                x0, x1 = (ex, ex + 7) if side < 0 else (ex - 7, ex)
+                if G.free(x0, yy, x1, yy + 1):
+                    start = yy if start is None else start
+                else:
+                    if start is not None and yy - start > 30:
+                        runs.append((start, yy))
+                    start = None
+            if start is not None and base - 2 - start > 30:
+                runs.append((start, int(base - 2)))
+            for y0, y1 in runs:
+                if rng.random() < .25:
+                    continue
+                length = min(y1 - y0 - 4, rng.uniform(35, 110))
+                ya = rng.uniform(y0 + 2, y1 - 2 - length)
+                ph = rng.uniform(0, 6)
+                pts = [(ex - side * (2.6 + 1.6 * math.sin(t / 6 + ph)), ya + t) for t in range(0, int(length), 2)]
+                if rng.random() < .5:
+                    pts.reverse()
+                add('edgefront', D.vine(rng, pts, leaf_gap=2.8))
+                G.mark_rect(ex - 7, ya, ex + 7, ya + length, pad=1)
+
+        # 4. loose cables wandering in from the edges
+        cables = 0
+        for _ in range(60):
+            if cables >= 13:
+                break
+            edge = rng.choice('LRTB')
+            if edge in 'LR':
+                sx = fm if edge == 'L' else W - fm
+                sy = rng.uniform(fm + 20, H - fm - 20)
+                hd = 0 if edge == 'L' else math.pi
+            else:
+                sx = rng.uniform(fm + 20, W - fm - 20)
+                sy = fm if edge == 'T' else H - fm
+                hd = math.pi / 2 if edge == 'T' else -math.pi / 2
+            hd += rng.uniform(-.6, .6)
+            steps = [0]
+
+            def free(px, py):
+                steps[0] += 1
+                if steps[0] <= 5:
+                    return G.free(px - 2, py - 2, px + 2, py + 2) or not (fm + 1 < px < W - fm - 1 and fm + 1 < py < H - fm - 1)
+                return (fm + 3 < px < W - fm - 3 and fm + 3 < py < H - fm - 3
+                        and G.free(px - 2.2, py - 2.2, px + 2.2, py + 2.2))
+
+            pts = D.walk_cable(rng, (sx, sy), hd, free, rng.uniform(45, 140))
+            pts = pts[:-7]
+            if len(pts) * 1.6 < 28:
+                continue
+            add('edgeback', D.cable(rng, pts, rng.choice(D.CABLES)))
+            for (px, py) in pts:
+                G.mark_rect(px - 1, py - 1, px + 1, py + 1, pad=1.5)
+            (ax, ay), (bx, by) = pts[-2], pts[-1]
+            n = math.hypot(bx - ax, by - ay) or 1
+            G.mark_rect(bx, by, bx + (bx - ax) / n * 10, by + (by - ay) / n * 10, pad=2.5)
+            cables += 1
+
+        # 5. wall shelves with plants and clutter in the big empty areas
+        shelf_items = [it for it in D.GROUND_ITEMS if it[0].__name__ != 'cat']
+        for _ in range(5):
+            sw, sh = rng.uniform(42, 72), rng.uniform(26, 40)
+            pos = try_place(sw, sh + 7, 500, pad=5)
             if not pos:
                 continue
-            x, y = pos
-            c = cols[i % len(cols)]
-            self.svg.add('deco', f'<g transform="translate({f2(x)} {f2(y)}) rotate({f2(ang)})">'
-                                 f'<text class="sfx" font-size="{f2(size)}" fill="{c}" text-anchor="middle" dominant-baseline="central">{jp}</text>'
-                                 f'<text class="sfx-ro" font-size="{f2(size * 0.24)}" y="{f2(size * 0.85)}" text-anchor="middle">{ro} ♡</text></g>')
-        # sparkles, hearts, stars, blossoms, dots
-        kinds = [('sparkle', 5, 9), ('heart-d', 3.5, 6), ('star', 4, 7), ('blossom-d', 4, 7), ('sparkle', 2.5, 4)]
-        for _ in range(420):
-            k, lo, hi = rng.choice(kinds)
-            s = rng.uniform(lo, hi)
-            pos = try_place(s, s, 3, pad=4.5)
-            if not pos:
-                continue
-            x, y = pos
-            c = rng.choice(cols + ['#ffd6e7', '#c9f0ff'])
-            self.svg.add('deco', f'<use href="#{k}" transform="translate({f2(x)} {f2(y)}) rotate({f2(rng.uniform(-25, 25))}) scale({f2(s / 10)})" fill="{c}"/>')
-        for _ in range(700):
-            s = rng.uniform(0.8, 1.8)
-            pos = try_place(s, s, 2, pad=3)
+            x0 = pos[0] - sw / 2
+            plank = pos[1] + (sh + 7) / 2 - 7
+            add('deco', D.shelf(x0, plank, sw))
+            x, fails = x0 + 3, 0
+            while x < x0 + sw - 4 and fails < 12:
+                draw, lo, hi, ar = rng.choice(shelf_items)
+                h = rng.uniform(lo, min(hi, sh - 2)) if lo < sh - 2 else 0
+                if not h or x + h * ar > x0 + sw - 2:
+                    fails += 1
+                    continue
+                add('deco', f'<g transform="translate({f2(x + h * ar / 2)} {f2(plank)})">{draw(rng, h)}</g>')
+                x += h * ar + rng.uniform(1.5, 4)
+
+        # 6. parts lying around, and a few clouds
+        for i in range(14):
+            pos = try_place(20, 20, 300, pad=3)
             if pos:
-                c = rng.choice(cols)
-                self.svg.add('deco', f'<circle cx="{f2(pos[0])}" cy="{f2(pos[1])}" r="{f2(s / 2)}" fill="{c}" opacity=".55"/>')
+                part = D.PARTS[i % len(D.PARTS)]
+                add('deco', f'<g transform="translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rng.uniform(-60, 60))}) scale(1.25)">{part(rng)}</g>')
+        for _ in range(6):
+            w = rng.uniform(16, 28)
+            pos = try_place(w * 1.2, w * .55, 300, pad=3)
+            if pos:
+                add('deco', f'<g transform="translate({f2(pos[0])} {f2(pos[1] + w * .25)})">{D.cloud(w)}</g>')
+
+        # 7. just a few faint sound effects
+        sfx = [('キラキラ', 'kira kira'), ('ふわふわ', 'fuwa fuwa'), ('ドキドキ', 'doki doki')]
+        cols = ['#ffb3d1', '#a6e3d3', '#b3d4ff', '#ffd98f', '#cdb8ff', '#ffbfa3']
+        for i, (jp, ro) in enumerate(sfx):
+            size = rng.uniform(7, 9)
+            pos = try_place(len(jp) * size * 1.05, size * 1.6, 600, pad=6)
+            if pos:
+                add('deco', f'<g transform="translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rng.uniform(-12, 12))})">'
+                            f'<text class="sfx" font-size="{f2(size)}" fill="{cols[i]}" text-anchor="middle" dominant-baseline="central">{jp}</text>'
+                            f'<text class="sfx-ro" font-size="{f2(size * 0.24)}" y="{f2(size * 0.85)}" text-anchor="middle">{ro} ♡</text></g>')
+
+        # 8. a light sprinkle of sparkles and confetti
+        kinds = [('sparkle', 4, 7), ('heart-d', 3, 5), ('star', 3.5, 6), ('blossom-d', 3.5, 6), ('sparkle', 2.5, 3.5)]
+        for _ in range(170):
+            k, lo, hi = rng.choice(kinds)
+            sz = rng.uniform(lo, hi)
+            pos = try_place(sz, sz, 3, pad=6)
+            if pos:
+                add('deco', f'<use href="#{k}" transform="translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rng.uniform(-25, 25))}) scale({f2(sz / 10)})" fill="{rng.choice(cols)}"/>')
+        for _ in range(260):
+            sz = rng.uniform(.8, 1.6)
+            pos = try_place(sz, sz, 2, pad=4)
+            if pos:
+                add('deco', f'<circle cx="{f2(pos[0])}" cy="{f2(pos[1])}" r="{f2(sz / 2)}" fill="{rng.choice(cols)}" opacity=".4"/>')
 
     # -- page ---------------------------------------------------------------
     def frame_and_title(self, title):
         W, H = self.W, self.H
         m = 8
         self.svg.add('bg', f'<rect width="{W}" height="{H}" fill="{PAPER}"/>'
-                           f'<rect width="{W}" height="{H}" fill="url(#tone-pink)" mask="url(#vignette)"/>')
+                           f'<rect width="{W}" height="{H}" fill="url(#tone-bg)" mask="url(#vignette)" opacity=".7"/>')
         # speed lines radiating from the title corner
         rng = random.Random(3)
         lines = []
         ox, oy = W - 120, H - 60
-        for i in range(140):
+        for i in range(80):
             a = rng.uniform(0, 2 * math.pi)
             r0 = rng.uniform(95, 140)
             r1 = r0 + rng.uniform(40, 160)
@@ -806,7 +946,7 @@ class Renderer:
             x1, y1 = ox + math.cos(a) * r1, oy + math.sin(a) * r1 * 0.55
             nx, ny = -math.sin(a) * w, math.cos(a) * w
             lines.append(f'M{f2(x0)} {f2(y0)}L{f2(x1 + nx)} {f2(y1 + ny)}L{f2(x1 - nx)} {f2(y1 - ny)}Z')
-        self.svg.add('bg', f'<path d="{"".join(lines)}" fill="#f3d7ea" opacity=".7"/>')
+        self.svg.add('bg', f'<path d="{"".join(lines)}" fill="#f6e2ee" opacity=".4"/>')
         # manga panel frame
         self.svg.add('frame', f'<rect x="{m}" y="{m}" width="{W - 2 * m}" height="{H - 2 * m}" rx="6" class="frame"/>'
                               f'<rect x="{m + 2.6}" y="{m + 2.6}" width="{W - 2 * m - 5.2}" height="{H - 2 * m - 5.2}" rx="4.5" class="frame2"/>')
@@ -877,8 +1017,8 @@ text{{font-family:'MPR',sans-serif;fill:{INK};}}
 .note{{font-family:'Zen';font-weight:700;fill:{INK}}}
 .remark{{font-family:'Zen';font-weight:700;fill:#7b5b94}}
 .ovl{{text-decoration:overline}}
-.sfx{{font-family:'Pop';paint-order:stroke;stroke:{INK};stroke-width:.7;stroke-linejoin:round;opacity:.9}}
-.sfx-ro{{font-family:'Zen';font-weight:700;fill:{INK_SOFT}}}
+.sfx{{font-family:'Pop';paint-order:stroke;stroke:#fff;stroke-width:.9;stroke-linejoin:round;opacity:.55}}
+.sfx-ro{{font-family:'Zen';font-weight:700;fill:{INK_SOFT};opacity:.5}}
 .frame{{fill:none;stroke:{INK};stroke-width:1.6}}
 .frame2{{fill:none;stroke:#ffb8d0;stroke-width:.6;stroke-dasharray:2.2 1.4}}
 .coord{{font-family:'Pop';font-size:3.6px;fill:#d68ab5}}
@@ -891,7 +1031,8 @@ text{{font-family:'MPR',sans-serif;fill:{INK};}}
 <pattern id="tone-w" width="1.1" height="1.1" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><circle cx=".55" cy=".55" r=".2" fill="#fff" opacity=".7"/></pattern>
 <pattern id="tone-ink" width=".9" height=".9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><circle cx=".45" cy=".45" r=".3" fill="{INK}"/></pattern>
 <pattern id="tone-pink" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><circle cx="1.5" cy="1.5" r=".7" fill="#ffc2da"/></pattern>
-<radialGradient id="vig-g" cx=".5" cy=".5" r=".72"><stop offset=".62" stop-color="#000"/><stop offset="1" stop-color="#fff"/></radialGradient>
+<pattern id="tone-bg" width="3.2" height="3.2" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><circle cx="1.6" cy="1.6" r=".42" fill="#ffd3e4"/></pattern>
+<radialGradient id="vig-g" cx=".5" cy=".5" r=".72"><stop offset=".75" stop-color="#000"/><stop offset="1" stop-color="#fff"/></radialGradient>
 <mask id="vignette"><rect width="{self.W}" height="{self.H}" fill="url(#vig-g)"/></mask>
 <linearGradient id="title-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd6e8"/><stop offset=".5" stop-color="#e7dcff"/><stop offset="1" stop-color="#cdf3ea"/></linearGradient>
 <linearGradient id="banner-grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffc1dc"/><stop offset=".5" stop-color="#d9c8ff"/><stop offset="1" stop-color="#bdeee2"/></linearGradient>
@@ -918,8 +1059,8 @@ text{{font-family:'MPR',sans-serif;fill:{INK};}}
         self.render_texts()
         self.frame_and_title(title)
         self.decorate()
-        order = ['bg', 'deco', 'shadow', 'fill', 'face', 'wire_o', 'wire_i', 'stroke', 'dnp', 'junction',
-                 'flag', 'symtext', 'text', 'label', 'title', 'frame', 'titlepanel']
+        order = ['bg', 'deco', 'edgeback', 'shadow', 'fill', 'face', 'wire_o', 'wire_i', 'stroke', 'dnp', 'junction',
+                 'flag', 'symtext', 'text', 'label', 'title', 'frame', 'edgefront', 'titlepanel']
         body = []
         for layer in order:
             items = self.svg.layers.get(layer, [])

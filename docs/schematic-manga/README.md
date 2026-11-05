@@ -2,8 +2,11 @@
 
 `yanartas-pillowbox-sensors-manga.svg` / `.png` are the sensor board's KiCad schematic redrawn
 in a pastel manga style: wires coloured per net, junctions drawn as hearts, label pills, ribbon
-banners for the section titles, screentone shadows, little faces on the larger ICs, and sound
-effects and sparkles in the empty parts of the sheet.
+banners for the section titles, screentone shadows and little faces on the larger ICs. The
+empty parts of the sheet get plants standing along the bottom edge, garlands along the top,
+climbing vines, loose cables with plugs coming in from the edges, wall shelves, stray parts,
+clouds and a few faint sound effects. These are drawn procedurally in `drawings.py` and placed
+only where the circuit leaves room.
 
 KiCad isn't needed. `render.py` parses the `.kicad_sch` and draws it from scratch. Then
 `finish.js` lays out the text-dependent shapes in Chromium and writes the outputs.
