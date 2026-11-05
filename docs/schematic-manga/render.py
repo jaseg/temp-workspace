@@ -10,6 +10,7 @@ SVG and PNG.
 """
 
 import base64
+import collections
 import colorsys
 import hashlib
 import math
@@ -122,17 +123,76 @@ def _jitter(name, n):
 
 
 class NetColors:
-    """Pastel net colours in families: every net whose name starts with the same word
-    (FPGA_*, SEND_*, LED1..3, ...) gets a shade of one hue; positive supply rails share
-    warm coral/amber shades and grounds share neutral lilac-greys."""
+    """Pastel net colours in families: nets whose names start with the same word (FPGA_*,
+    SEND_*, LED1..3, ...) share a stretch of the colour wheel; positive supply rails share
+    a narrow orange-amber slot and grounds are lilac-grey.
 
-    SIGNAL_HUES = (55, 330)   # the warm 330..55 range is kept for the supply rails
+    Each family's stretch is as wide as its share of the sheet's labels, so all hues show
+    up in roughly equal measure. Families next to each other on the wheel are picked to
+    sit far apart on the sheet, so labels near each other rarely look alike."""
 
-    def __init__(self, names):
-        prefixes = sorted({self.prefix(n) for n in names if not self.is_supply(n)})
-        lo, hi = self.SIGNAL_HUES
-        golden = 0.6180339887
-        self.hue = {p: lo + ((i * golden) % 1) * (hi - lo) for i, p in enumerate(prefixes)}
+    RAILS = (20, 46)
+
+    def __init__(self, labels):
+        fams = collections.defaultdict(list)
+        for name, x, y in labels:
+            if not self.is_supply(name):
+                fams[self.prefix(name)].append((name, x, y))
+        order = self.arrange(fams)
+        gap = 5
+        start, span = self.RAILS[1] + gap, 360 - (self.RAILS[1] - self.RAILS[0]) - 2 * gap
+        total = sum(len(m) for m in fams.values())
+        self.member = {}
+        a = start
+        for p in order:
+            w = span * len(fams[p]) / total
+            g = min(2.5, w * .15)
+            bases = sorted({self.base(n) for n, _, _ in fams[p]}, key=natural_key)
+            for k, b in enumerate(bases):
+                self.member[b] = (a + g + (w - 2 * g) * (k + .5) / len(bases), k)
+            a += w
+
+    @staticmethod
+    def arrange(fams, near=35.0):
+        """Order the families around the wheel so that families with many labels close
+        to each other on the sheet end up with hues far apart (swap hill-climbing)."""
+        names = sorted(fams)
+        n = len(names)
+        total = sum(len(fams[p]) for p in names)
+        width = [360 * len(fams[p]) / total for p in names]
+        prox = [[0.0] * n for _ in range(n)]
+        for i in range(n):
+            for j in range(i + 1, n):
+                c = sum(1 for _, ax, ay in fams[names[i]] for _, bx, by in fams[names[j]]
+                        if math.hypot(ax - bx, ay - by) < near)
+                prox[i][j] = prox[j][i] = c
+
+        def cost(order):
+            centre, a = {}, 0
+            for i in order:
+                centre[i] = a + width[i] / 2
+                a += width[i]
+            tot = 0
+            for i in range(n):
+                for j in range(i + 1, n):
+                    if prox[i][j]:
+                        d = abs(centre[i] - centre[j])
+                        d = min(d, 360 - d) - (width[i] + width[j]) / 2
+                        tot += prox[i][j] * math.exp(-max(0, d) / 25)
+            return tot
+
+        rng = random.Random(1)
+        order = sorted(range(n), key=lambda i: -width[i])
+        best = cost(order)
+        for _ in range(6000):
+            i, j = rng.sample(range(n), 2)
+            order[i], order[j] = order[j], order[i]
+            c = cost(order)
+            if c <= best:
+                best = c
+            else:
+                order[i], order[j] = order[j], order[i]
+        return [names[i] for i in order]
 
     @staticmethod
     def is_supply(name):
@@ -143,6 +203,10 @@ class NetColors:
         m = re.match(r'[A-Za-z]+', name.lstrip('+~{'))
         return m.group(0).upper() if m else name
 
+    @staticmethod
+    def base(name):
+        return re.sub(r'(_?[PN])$', '', name)          # a diff pair's two halves match
+
     def __call__(self, name):
         if name is None:
             return None
@@ -150,12 +214,15 @@ class NetColors:
         if name.startswith('GND'):
             return hls_hex(262 + 18 * j, .80 + .05 * j, .22)
         if self.is_supply(name):
-            return hls_hex(-8 + 48 * j, .78, .9)
-        base = re.sub(r'(_?[PN])$', '', name)          # a diff pair's two halves match
-        j = _jitter(base, 1000) / 1000
-        lo, hi = self.SIGNAL_HUES
-        hue = self.hue.get(self.prefix(name), lo + _jitter(self.prefix(name), hi - lo))
-        return hls_hex(hue + 14 * (j - .5), .76 + .08 * j, .72)
+            lo, hi = self.RAILS
+            return hls_hex(lo + (hi - lo) * j, .76, .92)
+        hue, k = self.member.get(self.base(name), (self.RAILS[1] + 5 + _jitter(name, 300), 0))
+        return hls_hex(hue, (.74, .81, .77)[k % 3], .78)
+
+
+def natural_key(s):
+    return [int(t) if t.isdigit() else t for t in re.split(r'(\d+)', s)]
+
 
 BODY_COLORS = [
     (('MCU', 'FPGA', 'Gowin'), '#e6d9ff'),
@@ -395,7 +462,7 @@ class Renderer:
                     name_at(xy(sym), v)
         self.net_of = [uf.find(i) for i in range(len(wires))]
         self.net_name = names
-        self.colors = NetColors(set(names.values()))
+        self.colors = NetColors([(lab[1], *xy(lab)) for lab in kids(self.sch, 'label')])
 
     def net_color(self, root):
         name = self.net_name.get(root)
@@ -576,6 +643,8 @@ class Renderer:
                 sw = val(kid(g, 'stroke') or [], 'width', default=0, conv=float)
                 d = None
                 closed = False
+                if kind == 'polyline' and lib_id in ('Device:C_Small', 'Device:C'):
+                    continue   # drawn as a cat instead; no plates
                 if kind == 'polyline':
                     pts = [P(float(p[1]), float(p[2])) for p in kids(kid(g, 'pts'), 'xy')]
                     d = 'M' + 'L'.join(f'{f2(a)} {f2(b)}' for a, b in pts)
