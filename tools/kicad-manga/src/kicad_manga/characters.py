@@ -289,7 +289,7 @@ def legend(rng, cast):
     if others:
         y += 18
     h = y + 2
-    frame = [f'<rect x="1.5" y="1.5" width="{w}" height="{h}" rx="6" fill="url(#tone-ink)" opacity=".5"/>',
+    frame = [f'<rect x="1.5" y="1.5" width="{w}" height="{h}" rx="6" fill="url(#tone-ink)" opacity=".5" data-shadow="1.5 1.5"/>',
              f'<rect width="{w}" height="{h}" rx="6" fill="#fff" stroke="{INK}" stroke-width=".8"/>',
              f'<rect x="2" y="2" width="{w - 4}" height="{h - 4}" rx="4.5" fill="none" stroke="#ffb8d0" stroke-width=".45" stroke-dasharray="1.6 1"/>',
              t(w / 2, 9, '♡ cast of characters ♡', 5, anchor='middle', col='#ff7fb2',

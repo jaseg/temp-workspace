@@ -83,9 +83,9 @@ reference as id, and wires are grouped by net.
 1. `circuit.py` draws the sheet; `page.py` lays out the page and decorations.
 2. Headless Chromium (Playwright) measures text in the embedded fonts, so label pills,
    banners and bubbles fit exactly.
-3. The same browser rasterises the PNG in tiles and prints the PDF. Before printing, the
-   halftone patterns become flat tints, since Chromium would otherwise embed a bitmap per
-   pattern use.
+3. The same browser rasterises the PNG in tiles and prints the PDF. Chromium would turn every
+   pattern into a bitmap when printing, so for the PDF the halftones are redrawn as vector dots,
+   with drop shadows only dotted where they show. That keeps the A1 sheet at about 2 MB.
 
 It uses whichever Chromium Playwright finds. If the installed Playwright doesn't match the
 browser on the system, set `KICAD_MANGA_CHROMIUM` to a Chrome or Chromium binary.

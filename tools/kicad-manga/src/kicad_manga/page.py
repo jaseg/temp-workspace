@@ -126,7 +126,7 @@ class Page:
         bw = max(40, max(est_width(line, 4.6) for line in bub) + 10)
         self.add('titlepanel', f'''
 <g id="title-panel" transform="translate({f2(tx)} {f2(ty)})">
-  <rect x="2.2" y="2.2" width="{TW}" height="{TH}" rx="7" fill="url(#tone-ink)"/>
+  <rect x="2.2" y="2.2" width="{TW}" height="{TH}" rx="7" fill="url(#tone-ink)" data-shadow="2.2 2.2"/>
   <rect width="{TW}" height="{TH}" rx="7" fill="#fff" stroke="{INK}" stroke-width="1.1"/>
   <rect x="2" y="2" width="{TW - 4}" height="{TH - 4}" rx="5.5" fill="url(#title-grad)"/>
   <rect x="2" y="2" width="{TW - 4}" height="{TH - 4}" rx="5.5" fill="url(#tone-w)" opacity=".8"/>

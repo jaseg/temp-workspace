@@ -628,7 +628,7 @@ class Circuit:
         for sh in kids(self.sch, 'sheet'):
             (x, y), (w, h) = xy(sh), xy(sh, 'size')
             fcol = color(kid(sh, 'fill')) or '#eef0ff'
-            parts = [f'<path d="{rounded_rect(x + .9, y + .9, x + w + .9, y + h + .9, 1.2)}" fill="url(#tone-ink)" opacity=".5"/>',
+            parts = [f'<path d="{rounded_rect(x + .9, y + .9, x + w + .9, y + h + .9, 1.2)}" fill="url(#tone-ink)" opacity=".5" data-shadow=".9 .9"/>',
                      f'<path d="{rounded_rect(x, y, x + w, y + h, 1.2)}" fill="{fcol}" stroke="{LINE}" stroke-width=".4"/>',
                      f'<path d="{rounded_rect(x, y, x + w, y + h, 1.2)}" fill="url(#tone-w)"/>']
             for prop in kids(sh, 'property'):
@@ -991,7 +991,7 @@ class Circuit:
         entry = {'id': sid, 'ref': ref, 'lib_id': lib_id, 'parts': []}
         parts = entry['parts']
         if shadow:
-            parts.append(f'<g class="shadow" transform="translate(.9 .9)" fill="url(#tone-ink)" opacity=".55">'
+            parts.append(f'<g class="shadow" transform="translate(.9 .9)" fill="url(#tone-ink)" opacity=".55" data-shadow=".9 .9">'
                          f'{"".join(shadow)}</g>')
         parts += fills + strokes
         if pins_svg:

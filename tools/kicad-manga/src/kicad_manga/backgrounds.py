@@ -67,7 +67,7 @@ def build(info, box):
         y0, y1 = y + h * .08 - py, y + h * .92 + py
         ym = (y0 + y1) / 2
         rib = f'M{f2(x0 - n)} {f2(y0)}H{f2(x1 + n)}L{f2(x1)} {f2(ym)}L{f2(x1 + n)} {f2(y1)}H{f2(x0 - n)}L{f2(x0)} {f2(ym)}Z'
-        out = [f'<path d="{rib}" transform="translate(.7 .7)" fill="url(#tone-ink)" opacity=".6"/>',
+        out = [f'<path d="{rib}" transform="translate(.7 .7)" fill="url(#tone-ink)" opacity=".6" data-shadow=".7 .7"/>',
                f'<path class="bg" d="{rib}" fill="url(#banner-grad)" stroke="{LINE}" stroke-width=".35" stroke-linejoin="round"/>',
                f'<path d="M{f2(x0 + .6)} {f2(y0 + .7)}H{f2(x1 - .6)}M{f2(x0 + .6)} {f2(y1 - .7)}H{f2(x1 - .6)}" '
                f'stroke="#fff" stroke-width=".25" stroke-dasharray=".8 .6" fill="none"/>']

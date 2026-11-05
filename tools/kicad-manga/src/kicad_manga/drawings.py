@@ -439,7 +439,7 @@ def shelf(x0, y, w):
     """A little wall shelf; y is the top of the plank."""
     br = ''.join(f'<path d="M{f(bx - 1.6)} {f(y + 1.8)}H{f(bx + 1.6)}L{f(bx)} {f(y + 6)}Z" fill="#e9c9a6"/>'
                  for bx in (x0 + 7, x0 + w - 7))
-    return wrap(f'<rect x="{f(x0 + .9)}" y="{f(y + .9)}" width="{f(w)}" height="1.8" rx=".5" fill="url(#tone-ink)" stroke="none" opacity=".35"/>'
+    return wrap(f'<rect x="{f(x0 + .9)}" y="{f(y + .9)}" width="{f(w)}" height="1.8" rx=".5" fill="url(#tone-ink)" stroke="none" opacity=".35" data-shadow=".9 .9"/>'
                 + br + f'<rect x="{f(x0)}" y="{f(y)}" width="{f(w)}" height="1.8" rx=".5" fill="#f6dcbc"/>'
                 f'<path d="M{f(x0 + 2)} {f(y + .7)}h{f(w * .3)}M{f(x0 + w * .55)} {f(y + 1.1)}h{f(w * .25)}" fill="none" stroke-width=".2" opacity=".6"/>')
 
