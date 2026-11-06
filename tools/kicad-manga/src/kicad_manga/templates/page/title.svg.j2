@@ -1,0 +1,20 @@
+{#- The title panel (TW x TH, top left corner at tx, ty) with its texts and their font sizes, the mascot to its
+    left and the mascot's speech bubble above it: `bw` wide, `bubble` [(y, line)]. #}
+<g id="title-panel" transform="translate({{ tx|f }} {{ ty|f }})">
+  <rect x="2.2" y="2.2" width="{{ TW|f }}" height="{{ TH|f }}" rx="7" fill="url(#tone-ink)" data-shadow="2.2 2.2"/>
+  <rect width="{{ TW|f }}" height="{{ TH|f }}" rx="7" fill="#fff" stroke="{{ INK }}" stroke-width="1.1"/>
+  <rect x="2" y="2" width="{{ (TW - 4)|f }}" height="{{ (TH - 4)|f }}" rx="5.5" fill="url(#title-grad)"/>
+  <rect x="2" y="2" width="{{ (TW - 4)|f }}" height="{{ (TH - 4)|f }}" rx="5.5" fill="url(#tone-w)" opacity=".8"/>
+  <text class="t-jp" x="{{ (TW / 2)|f }}" y="14" text-anchor="middle" style="font-size:{{ kicker_size|f }}px">{{ kicker }}</text>
+  <text class="t-main" x="{{ (TW / 2)|f }}" y="30" text-anchor="middle" style="font-size:{{ title_size|f }}px">{{ title }}</text>
+  <text class="t-sub" x="{{ (TW / 2)|f }}" y="40" text-anchor="middle" style="font-size:{{ subtitle_size|f }}px">{{ subtitle }}</text>
+  <text class="t-small" x="12" y="50">{{ footer_left }}</text>
+  <text class="t-small" x="{{ (TW - 12)|f }}" y="50" text-anchor="end">{{ footer_right }}</text>
+</g>
+<g id="mascot-group" transform="translate({{ (tx - 22)|f }} {{ (ty + 28)|f }})"><use href="#mascot" transform="scale(1.9)"/></g>
+<g id="speech-bubble" transform="translate({{ (tx - 6)|f }} {{ (ty - 34)|f }})">
+  <path d="M6 0H{{ (bw - 6)|f }}A6 6 0 0 1 {{ bw|f }} 6V16A6 6 0 0 1 {{ (bw - 6)|f }} 22H16L-10 30 8 22H6A6 6 0 0 1 0 16V6A6 6 0 0 1 6 0Z" fill="#fff" stroke="{{ INK }}" stroke-width=".7" stroke-linejoin="round"/>
+{% for y, line in bubble %}
+  <text class="bubble-t" x="{{ (bw / 2)|f }}" y="{{ y|f }}" text-anchor="middle">{{ line }}</text>
+{% endfor %}
+</g>

@@ -1,0 +1,9 @@
+{#- The ribbon banner behind a title text: `rib` its outline (path data), drawn with a screentone drop shadow,
+    the banner gradient and dashed stitching along the top and bottom edges (x0..x1 at y0 and y1, inset);
+    `sparkles` [(x, colour)] at mid height `ym` on either side. #}
+<path d="{{ rib }}" transform="translate(.7 .7)" fill="url(#tone-ink)" opacity=".6" data-shadow=".7 .7"/>
+<path class="bg" d="{{ rib }}" fill="url(#banner-grad)" stroke="{{ LINE }}" stroke-width=".35" stroke-linejoin="round"/>
+<path d="M{{ (x0 + 0.6)|f }} {{ (y0 + 0.7)|f }}H{{ (x1 - 0.6)|f }}M{{ (x0 + 0.6)|f }} {{ (y1 - 0.7)|f }}H{{ (x1 - 0.6)|f }}" stroke="#fff" stroke-width=".25" stroke-dasharray=".8 .6" fill="none"/>
+{% for sx, c in sparkles %}
+<use href="#sparkle" transform="translate({{ sx|f }} {{ ym|f }}) scale(.36)" fill="{{ c }}"/>
+{% endfor %}

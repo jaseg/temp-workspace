@@ -1,0 +1,16 @@
+{#- The whole document, W x H mm: `defs`, then Inkscape layers from back to front. `layers` [(id, label, items)]
+    are in design units, scaled by `k`; the schematic `circuit` goes after the first two, at `T` scaled by `sc`. #}
+{% macro layer(lid, label, items) %}
+<g id="{{ lid }}" inkscape:groupmode="layer" inkscape:label="{{ label }}" transform="scale({{ k|f }})">{{ items|join('\n') }}</g>
+{% endmacro %}
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="{{ W|f }}mm" height="{{ H|f }}mm" viewBox="0 0 {{ W|f }} {{ H|f }}">
+{{ defs }}
+{% for lid, label, items in layers[:2] %}
+{{ layer(lid, label, items) }}
+{%- endfor %}
+<g id="schematic" inkscape:groupmode="layer" inkscape:label="Schematic" transform="translate({{ T[0]|f }} {{ T[1]|f }}) scale({{ sc|f }})">
+{{ circuit }}</g>
+{% for lid, label, items in layers[2:] %}
+{{ layer(lid, label, items) }}
+{%- endfor %}
+</svg>

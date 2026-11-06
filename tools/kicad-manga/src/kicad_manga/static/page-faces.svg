@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-5 -3 50 6" width="100mm" height="12mm">
+  <!-- Faces for the characters and the mascot, about 8 units wide and centred between the eyes: face-happy,
+       face-smile, face-wink, face-cat and face-sparkle. Placed with <use href="#face-..." transform="..."/>. -->
+  <defs>
+    <g id="face-happy">
+      <ellipse cx="-1.9" cy="-.6" rx=".75" ry="1.05" fill="#4b3a5a"/><circle cx="-1.65" cy="-1" r=".3" fill="#fff"/>
+      <ellipse cx="1.9" cy="-.6" rx=".75" ry="1.05" fill="#4b3a5a"/><circle cx="2.15" cy="-1" r=".3" fill="#fff"/>
+      <ellipse cx="-3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/><ellipse cx="3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/>
+      <path d="M-.7 .7Q0 1.5.7 .7" fill="none" stroke="#4b3a5a" stroke-width=".38" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="face-smile">
+      <path d="M-2.7 -.4Q-1.9 -1.5 -1.1 -.4M1.1 -.4Q1.9 -1.5 2.7 -.4" fill="none" stroke="#4b3a5a" stroke-width=".38" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="-3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/><ellipse cx="3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/>
+      <path d="M-.9 .6Q0 1.7.9 .6Z" fill="#ff7f9e" stroke="#4b3a5a" stroke-width=".3"/>
+    </g>
+    <g id="face-wink">
+      <ellipse cx="-1.9" cy="-.6" rx=".75" ry="1.05" fill="#4b3a5a"/><circle cx="-1.65" cy="-1" r=".3" fill="#fff"/>
+      <path d="M1.2 -.5Q1.9 -1.3 2.6 -.5" fill="none" stroke="#4b3a5a" stroke-width=".38" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="-3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/><ellipse cx="3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/>
+      <path d="M-.7 .7Q0 1.4.7 .7" fill="none" stroke="#4b3a5a" stroke-width=".38" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="face-cat">
+      <ellipse cx="-1.9" cy="-.6" rx=".75" ry="1.05" fill="#4b3a5a"/><circle cx="-1.65" cy="-1" r=".3" fill="#fff"/>
+      <ellipse cx="1.9" cy="-.6" rx=".75" ry="1.05" fill="#4b3a5a"/><circle cx="2.15" cy="-1" r=".3" fill="#fff"/>
+      <ellipse cx="-3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/><ellipse cx="3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/>
+      <path d="M-1 .6Q-.5 1.2 0 .6Q.5 1.2 1 .6" fill="none" stroke="#4b3a5a" stroke-width=".38" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="face-sparkle">
+      <path d="M-1.9 -1.6l.35 .8.8 .35-.8 .35-.35 .8-.35-.8-.8-.35.8-.35zM1.9 -1.6l.35 .8.8 .35-.8 .35-.35 .8-.35-.8-.8-.35.8-.35z" fill="#4b3a5a"/>
+      <ellipse cx="-3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/><ellipse cx="3" cy=".9" rx="1.1" ry=".6" fill="#ff9cc2" opacity=".75"/>
+      <path d="M-.7 .7Q0 1.5.7 .7" fill="none" stroke="#4b3a5a" stroke-width=".38" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </defs>
+  <use href="#face-happy"/>
+  <use href="#face-smile" transform="translate(10 0)"/>
+  <use href="#face-wink" transform="translate(20 0)"/>
+  <use href="#face-cat" transform="translate(30 0)"/>
+  <use href="#face-sparkle" transform="translate(40 0)"/>
+</svg>
