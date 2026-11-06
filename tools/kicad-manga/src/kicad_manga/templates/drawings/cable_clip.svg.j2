@@ -1,0 +1,6 @@
+{#- A little cable clip centred at (x, y): a cream clip (rect at (rx, ry)) with a pink rivet at (x, rivet_y). #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap(0.3) %}
+<rect x="{{ rx|f }}" y="{{ ry|f }}" width="2.6" height="3.2" rx=".8" fill="#fff6c8"/>
+<circle cx="{{ x|f }}" cy="{{ rivet_y|f }}" r=".35" fill="#ffb3cf" stroke="none"/>
+{% endcall %}

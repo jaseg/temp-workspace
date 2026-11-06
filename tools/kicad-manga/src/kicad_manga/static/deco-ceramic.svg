@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -2.6 6 9.6" width="30mm" height="48mm">
+  <!-- A loose ceramic capacitor ("104"), centred at (0, 0). Placed with <use href="#deco-ceramic"
+       transform="..." stroke="#7a6888" stroke-width=".3" stroke-linejoin="round" stroke-linecap="round"/>,
+       which also sets the outline. -->
+  <defs>
+    <g id="deco-ceramic">
+      <path d="M-.9 1.8V6.5M.9 1.8V5.5" fill="none" stroke="#bdb5c9" stroke-width=".45"/>
+      <ellipse cx="0" cy="0" rx="2.4" ry="2.1" fill="#ffd27f"/>
+      <text x="0" y=".7" font-family="MPR" font-weight="800" font-size="1.6" text-anchor="middle" fill="#7a6888" stroke="none">104</text>
+    </g>
+  </defs>
+  <use href="#deco-ceramic" stroke="#7a6888" stroke-width=".3" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

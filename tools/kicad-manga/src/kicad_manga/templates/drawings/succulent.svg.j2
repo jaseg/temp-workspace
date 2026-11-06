@@ -1,0 +1,13 @@
+{#- A succulent rosette: the drawn `leaves`, optionally a flower stalk path `stalk` with its drawn `flower`,
+    then the drawn `pot`. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap() %}
+{% for leaf in leaves %}
+{{ leaf }}
+{% endfor %}
+{% if stalk %}
+<path d="{{ stalk }}" fill="none" stroke-width=".3"/>
+{{ flower }}
+{% endif %}
+{{ pot }}
+{% endcall %}

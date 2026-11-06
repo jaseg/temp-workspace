@@ -1,0 +1,3 @@
+{#- The outline style shared by the drawings: LINE (softer than the circuit ink, so drawings stay in the
+    background), `sw` wide, round joins and caps. Use as {% call wrap(sw) %}...{% endcall %}. #}
+{% macro wrap(sw=0.38) %}<g stroke="{{ LINE }}" stroke-width="{{ sw|f }}" stroke-linejoin="round" stroke-linecap="round">{{ caller() }}</g>{% endmacro %}

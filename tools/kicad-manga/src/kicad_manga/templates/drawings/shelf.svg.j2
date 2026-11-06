@@ -1,0 +1,11 @@
+{#- A wall shelf: a plank `w` wide with its top left corner at (x, y), its toned shadow at (shadow_x, shadow_y),
+    the `brackets` (paths) under it and wood grain (path `grain`). #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap() %}
+<rect x="{{ shadow_x|f }}" y="{{ shadow_y|f }}" width="{{ w|f }}" height="1.8" rx=".5" fill="url(#tone-ink)" stroke="none" opacity=".35" data-shadow=".9 .9"/>
+{% for d in brackets %}
+<path d="{{ d }}" fill="#e9c9a6"/>
+{% endfor %}
+<rect x="{{ x|f }}" y="{{ y|f }}" width="{{ w|f }}" height="1.8" rx=".5" fill="#f6dcbc"/>
+<path d="{{ grain }}" fill="none" stroke-width=".2" opacity=".6"/>
+{% endcall %}

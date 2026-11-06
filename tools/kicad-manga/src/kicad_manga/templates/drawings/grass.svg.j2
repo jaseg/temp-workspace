@@ -1,0 +1,14 @@
+{#- Grass: `tufts` is a list of drawn blades per tuft (outlined in the grass green), and `flowers`
+    [(stalk, flower)] are stalk paths, each with a drawn flower. #}
+{% set GRASS_LINE = '#5f9f78' %}
+{% for blades in tufts %}
+<g stroke="{{ GRASS_LINE }}" stroke-width=".2" stroke-linejoin="round">
+{% for b in blades %}
+{{ b }}
+{% endfor %}
+</g>
+{% endfor %}
+{% for stalk, flower in flowers %}
+<path d="{{ stalk }}" fill="none" stroke="{{ GRASS_LINE }}" stroke-width=".35"/>
+{{ flower }}
+{% endfor %}

@@ -1,0 +1,11 @@
+{#- A loose DIP chip in `color`, centred at (0, 0): a leg pair at each x in `legs`, the body, the pin-1 dot and
+    a sparkly face. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap(0.3) %}
+{% for x in legs %}
+<path d="M{{ x|f }} -2.6v-1.4M{{ x|f }} 2.6v1.4" fill="none" stroke="#bdb5c9" stroke-width=".7"/>
+{% endfor %}
+<rect x="-5" y="-2.7" width="10" height="5.4" rx=".5" fill="{{ color }}"/>
+<circle cx="-3.9" cy="-1.6" r=".45" fill="#9b8aad" stroke="none"/>
+<g transform="translate(.4 .3) scale(.32)" stroke="none"><use href="#face-sparkle"/></g>
+{% endcall %}

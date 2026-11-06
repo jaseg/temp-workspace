@@ -1,0 +1,10 @@
+{#- A leafy pot plant: `stems` [(d, leaf)] are stem paths, each ending in an already drawn leaf; then the
+    drawn `pot`. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap() %}
+{% for d, leaf in stems %}
+<path d="{{ d }}" fill="none" stroke-width=".35"/>
+{{ leaf }}
+{% endfor %}
+{{ pot }}
+{% endcall %}
