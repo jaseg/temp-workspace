@@ -9,13 +9,15 @@ down and moved to make room.
 
 import math
 import random
-from html import escape
+
+from markupsafe import Markup
 
 from . import characters as C
 from . import drawings as D
 from .circuit import Grid
-from .palette import INK, PAPER
+from .palette import PAPER
 from .sexp import f2
+from .svg import group, render, tag
 
 DESIGN_SHORT = 594.0
 FM = 8            # frame line inset (design units)
@@ -43,7 +45,7 @@ class Page:
         self.layout()
 
     def add(self, layer, svg):
-        self.layers[layer].append(svg)
+        self.layers[layer].append(Markup(svg))
 
     # -- where the circuit goes -------------------------------------------------
     def title_rect(self):
@@ -87,8 +89,8 @@ class Page:
     def frame_and_title(self):
         W, H, m = self.DW, self.DH, FM
         t = self.title
-        self.add('bg', f'<rect width="{f2(W)}" height="{f2(H)}" fill="{PAPER}"/>'
-                       f'<rect width="{f2(W)}" height="{f2(H)}" fill="url(#tone-bg)" mask="url(#vignette)" opacity=".7"/>')
+        self.add('bg', tag('rect', width=W, height=H, fill=PAPER))
+        self.add('bg', tag('rect', width=W, height=H, fill='url(#tone-bg)', mask='url(#vignette)', opacity=.7))
         rx0, ry0, rx1, ry1 = self.title_rect()
         rng = random.Random(3)
         lines = []
@@ -102,45 +104,25 @@ class Page:
             x1, y1 = ox + math.cos(a) * r1, oy + math.sin(a) * r1 * 0.55
             nx, ny = -math.sin(a) * w, math.cos(a) * w
             lines.append(f'M{f2(x0)} {f2(y0)}L{f2(x1 + nx)} {f2(y1 + ny)}L{f2(x1 - nx)} {f2(y1 - ny)}Z')
-        self.add('bg', f'<path d="{"".join(lines)}" fill="#f6e2ee" opacity=".4"/>')
-        self.add('frame', f'<rect x="{m}" y="{m}" width="{f2(W - 2 * m)}" height="{f2(H - 2 * m)}" rx="6" class="frame"/>'
-                          f'<rect x="{m + 2.6}" y="{m + 2.6}" width="{f2(W - 2 * m - 5.2)}" height="{f2(H - 2 * m - 5.2)}" rx="4.5" class="frame2"/>')
-        for (cx, cy) in ((m + 2, m + 2), (W - m - 2, m + 2), (m + 2, H - m - 2), (W - m - 2, H - m - 2)):
-            self.add('frame', f'<use href="#blossom-d" transform="translate({f2(cx)} {f2(cy)}) scale(1.1)" fill="#ffb8d0"/>')
+        self.add('bg', tag('path', d=''.join(lines), fill='#f6e2ee', opacity=.4))
         ncol, nrow = (8, 6) if W >= H else (6, 8)
-        for i in range(ncol):
-            x = m + (W - 2 * m) * (i + 0.5) / ncol
-            self.add('frame', f'<text class="coord" x="{f2(x)}" y="{m - 2.4}" text-anchor="middle">{i + 1}</text>'
-                              f'<text class="coord" x="{f2(x)}" y="{f2(H - m + 5.2)}" text-anchor="middle">{i + 1}</text>')
-        for i in range(nrow):
-            y = m + (H - 2 * m) * (i + 0.5) / nrow
-            ch = chr(ord('A') + i)
-            self.add('frame', f'<text class="coord" x="{m - 4}" y="{f2(y)}" text-anchor="middle" dominant-baseline="central">{ch}</text>'
-                              f'<text class="coord" x="{f2(W - m + 4)}" y="{f2(y)}" text-anchor="middle" dominant-baseline="central">{ch}</text>')
+        self.add('frame', render(
+            'page/frame.svg.j2', W=W, H=H, m=m,
+            corners=[(m + 2, m + 2), (W - m - 2, m + 2), (m + 2, H - m - 2), (W - m - 2, H - m - 2)],
+            cols=[(m + (W - 2 * m) * (i + 0.5) / ncol, i + 1) for i in range(ncol)],
+            rows=[(m + (H - 2 * m) * (i + 0.5) / nrow, chr(ord('A') + i)) for i in range(nrow)]))
         tx, ty = rx1 - TW, ry1 - TH
         self.grid.mark_rect(rx0, ry0, rx1 + 4, ry1 + 4)
         kicker = f'✦ {t["kicker"]} ✦' if t['kicker'] else ''
-        fs_main = fit(t['title'], 8.6, TW - 16)
-        fs_sub = fit(t['subtitle'], 5, TW - 16)
         bub = split_two(t['bubble'])
         bw = max(40, max(est_width(line, 4.6) for line in bub) + 10)
-        self.add('titlepanel', f'''
-<g id="title-panel" transform="translate({f2(tx)} {f2(ty)})">
-  <rect x="2.2" y="2.2" width="{TW}" height="{TH}" rx="7" fill="url(#tone-ink)" data-shadow="2.2 2.2"/>
-  <rect width="{TW}" height="{TH}" rx="7" fill="#fff" stroke="{INK}" stroke-width="1.1"/>
-  <rect x="2" y="2" width="{TW - 4}" height="{TH - 4}" rx="5.5" fill="url(#title-grad)"/>
-  <rect x="2" y="2" width="{TW - 4}" height="{TH - 4}" rx="5.5" fill="url(#tone-w)" opacity=".8"/>
-  <text class="t-jp" x="{TW / 2}" y="14" text-anchor="middle" style="font-size:{f2(fit(kicker, 7.5, TW - 20))}px">{escape(kicker)}</text>
-  <text class="t-main" x="{TW / 2}" y="30" text-anchor="middle" style="font-size:{f2(fs_main)}px">{escape(t['title'])}</text>
-  <text class="t-sub" x="{TW / 2}" y="40" text-anchor="middle" style="font-size:{f2(fs_sub)}px">{escape(f"~ {t['subtitle']} ~" if t['subtitle'] else '')}</text>
-  <text class="t-small" x="12" y="50">{escape(t['footer_left'])}</text>
-  <text class="t-small" x="{TW - 12}" y="50" text-anchor="end">{escape(t['footer_right'])}</text>
-</g>
-<g id="mascot-group" transform="translate({f2(tx - 22)} {f2(ty + 28)})"><use href="#mascot" transform="scale(1.9)"/></g>
-<g id="speech-bubble" transform="translate({f2(tx - 6)} {f2(ty - 34)})">
-  <path d="M6 0H{f2(bw - 6)}A6 6 0 0 1 {f2(bw)} 6V16A6 6 0 0 1 {f2(bw - 6)} 22H16L-10 30 8 22H6A6 6 0 0 1 0 16V6A6 6 0 0 1 6 0Z" fill="#fff" stroke="{INK}" stroke-width=".7" stroke-linejoin="round"/>
-  {''.join(f'<text class="bubble-t" x="{f2(bw / 2)}" y="{f2(8.6 + 7 * i if len(bub) > 1 else 12.2)}" text-anchor="middle">{escape(line)}</text>' for i, line in enumerate(bub))}
-</g>''')
+        self.add('titlepanel', render(
+            'page/title.svg.j2', tx=tx, ty=ty, TW=TW, TH=TH,
+            kicker=kicker, kicker_size=fit(kicker, 7.5, TW - 20),
+            title=t['title'], title_size=fit(t['title'], 8.6, TW - 16),
+            subtitle=f"~ {t['subtitle']} ~" if t['subtitle'] else '', subtitle_size=fit(t['subtitle'], 5, TW - 16),
+            footer_left=t['footer_left'], footer_right=t['footer_right'],
+            bw=bw, bubble=[(8.6 + 7 * i if len(bub) > 1 else 12.2, line) for i, line in enumerate(bub)]))
 
     def legend(self):
         svg, w, h = C.legend(random.Random(5), self.c.cast())
@@ -150,7 +132,7 @@ class Page:
             for x, y in ((m, 30), (W - m - sw, 30), (m, H - 70 - sh), (m, (H - sh) / 2), (W - m - sw, (H - sh) / 2),
                          ((W - sw) / 2, 30), ((W - sw) / 2, H - 70 - sh)):
                 if self.grid.free(x - 3, y - 3, x + sw + 3, y + sh + 3):
-                    self.add('titlepanel', f'<g id="legend" transform="translate({f2(x)} {f2(y)}) scale({f2(s)})">{svg}</g>')
+                    self.add('titlepanel', group([svg], id='legend', transform=f'translate({f2(x)} {f2(y)}) scale({f2(s)})'))
                     self.grid.mark_rect(x, y, x + sw, y + sh, pad=4)
                     return True
         return False
@@ -223,7 +205,8 @@ class Page:
                     lead = [(pcx, base - 6.5), (pcx + side * 1.5, base - 9), (ex - side * 1.2, base - 12.5)]
                     back, front = D.twining_vine(rng, ex, base - 13, y + 2, lead_in=lead)
                     add('edgeback', back)
-                    add('edgefront', front + f'<g transform="translate({f2(pcx)} {f2(base)})">{D.wrap(pot_svg)}</g>')
+                    add('edgefront', front)
+                    add('edgefront', group([D.wrap(pot_svg)], transform=f'translate({f2(pcx)} {f2(base)})'))
                     G.mark_rect(pcx - 5, base - 9, pcx + 5, base, pad=1)
                     G.mark_rect(ex - 4, y, ex + 4, base, pad=1)
 
@@ -249,7 +232,7 @@ class Page:
                 w = h * ar
                 need = h * (1.6 if name == 'cat' else 1.08)
                 if x + w < W - fm - 6 and G.free(x, base - need - 1, x + w, base - 1.2):
-                    add('edgefront', f'<g transform="translate({f2(x + w / 2)} {f2(base)})">{draw(rng, h)}</g>')
+                    add('edgefront', group([draw(rng, h)], transform=f'translate({f2(x + w / 2)} {f2(base)})'))
                     G.mark_rect(x, base - need, x + w, base, pad=1.5)
                     limits[name] = limits.get(name, 99) - 1
                     x += w + rng.uniform(1, 4)
@@ -301,7 +284,7 @@ class Page:
                 if not h or x + h * ar > x0 + sw - 2:
                     fails += 1
                     continue
-                items.append(f'<g transform="translate({f2(x + h * ar / 2)} {f2(plank)})">{draw(rng, h)}</g>')
+                items.append(group([draw(rng, h)], transform=f'translate({f2(x + h * ar / 2)} {f2(plank)})'))
                 x += h * ar + rng.uniform(1.5, 4)
             if rng.random() < .75:
                 side = rng.choice((-1, 1))
@@ -311,14 +294,14 @@ class Page:
                 if G.free(gx0, plank + 13, gx1, plank + drop + 12):
                     items.append(D.draped_cable(rng, edge, plank, side, drop, rng.choice(D.CABLES)))
                     G.mark_rect(gx0, plank, gx1, plank + drop + 12, pad=2)
-            add('deco', f'<g class="shelf">{"".join(items)}</g>')
+            add('deco', group(items, cls='shelf'))
 
         # 6. a few clouds
         for _ in range(6):
             w = rng.uniform(16, 28)
             pos = try_place(w * 1.2, w * .55, 300, pad=3)
             if pos:
-                add('deco', f'<g transform="translate({f2(pos[0])} {f2(pos[1] + w * .25)})">{D.cloud(w)}</g>')
+                add('deco', group([D.cloud(w)], transform=f'translate({f2(pos[0])} {f2(pos[1] + w * .25)})'))
 
         # 7. just a few faint sound effects
         cols = ['#ffb3d1', '#a6e3d3', '#b3d4ff', '#ffd98f', '#cdb8ff', '#ffbfa3']
@@ -328,9 +311,8 @@ class Page:
                 size = rng.uniform(7, 9)
                 pos = try_place(len(jp) * size * 1.05, size * 1.6, 600, pad=6)
                 if pos:
-                    add('deco', f'<g transform="translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rng.uniform(-12, 12))})">'
-                                f'<text class="sfx" font-size="{f2(size)}" fill="{cols[i]}" text-anchor="middle" dominant-baseline="central">{jp}</text>'
-                                f'<text class="sfx-ro" font-size="{f2(size * 0.24)}" y="{f2(size * 0.85)}" text-anchor="middle">{ro} ♡</text></g>')
+                    add('deco', render('page/sound-effect.svg.j2', x=pos[0], y=pos[1], angle=rng.uniform(-12, 12),
+                                       size=size, colour=cols[i], jp=jp, ro=ro))
 
         # 8. a light sprinkle of sparkles and confetti
         kinds = [('sparkle', 4, 7), ('heart-d', 3, 5), ('star', 3.5, 6), ('blossom-d', 3.5, 6), ('sparkle', 2.5, 3.5)]
@@ -339,13 +321,14 @@ class Page:
             sz = rng.uniform(lo, hi)
             pos = try_place(sz, sz, 3, pad=6)
             if pos:
-                add('deco', f'<use href="#{k}" transform="translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rng.uniform(-25, 25))}) '
-                            f'scale({f2(sz / 10)})" fill="{rng.choice(cols)}" opacity=".38"/>')
+                rot = rng.uniform(-25, 25)
+                add('deco', tag('use', href=f'#{k}', transform=f'translate({f2(pos[0])} {f2(pos[1])}) rotate({f2(rot)}) '
+                                f'scale({f2(sz / 10)})', fill=rng.choice(cols), opacity=.38))
         for _ in range(260):
             sz = rng.uniform(.8, 1.6)
             pos = try_place(sz, sz, 2, pad=4)
             if pos:
-                add('deco', f'<circle cx="{f2(pos[0])}" cy="{f2(pos[1])}" r="{f2(sz / 2)}" fill="{rng.choice(cols)}" opacity=".28"/>')
+                add('deco', tag('circle', cx=pos[0], cy=pos[1], r=sz / 2, fill=rng.choice(cols), opacity=.28))
 
     # -- the whole thing ----------------------------------------------------------
     def svg(self, defs, decorations=True, legend=True, seed=42, sound_effects=True):
@@ -354,22 +337,15 @@ class Page:
             self.legend()
         if decorations:
             self.decorate(seed, sound_effects)
-        k = f2(self.k)
-
-        def layer(lid, label, items, transform=f'scale({k})'):
-            return (f'<g id="{lid}" inkscape:groupmode="layer" inkscape:label="{label}" transform="{transform}">'
-                    + '\n'.join(items) + '</g>\n')
-        circuit = (f'<g id="schematic" inkscape:groupmode="layer" inkscape:label="Schematic" '
-                   f'transform="translate({f2(self.T[0])} {f2(self.T[1])}) scale({f2(self.sc)})">\n{self.c.svg()}</g>\n')
-        return (f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" '
-                f'width="{f2(self.W)}mm" height="{f2(self.H)}mm" viewBox="0 0 {f2(self.W)} {f2(self.H)}">\n{defs}\n'
-                + layer('background', 'Background', self.layers['bg'])
-                + layer('decorations-back', 'Decorations (back)', self.layers['deco'] + self.layers['edgeback'])
-                + circuit
-                + layer('frame', 'Frame', self.layers['frame'])
-                + layer('decorations-front', 'Decorations (front)', self.layers['edgefront'])
-                + layer('title', 'Title &amp; legend', self.layers['titlepanel'])
-                + '</svg>\n')
+        L = self.layers
+        return str(render(
+            'page/document.svg.j2', W=self.W, H=self.H, k=self.k, defs=Markup(defs), T=self.T, sc=self.sc,
+            circuit=Markup(self.c.svg()),
+            layers=[('background', 'Background', L['bg']),
+                    ('decorations-back', 'Decorations (back)', L['deco'] + L['edgeback']),
+                    ('frame', 'Frame', L['frame']),
+                    ('decorations-front', 'Decorations (front)', L['edgefront']),
+                    ('title', 'Title & legend', L['titlepanel'])])) + '\n'
 
 
 def overlaps(a, b):

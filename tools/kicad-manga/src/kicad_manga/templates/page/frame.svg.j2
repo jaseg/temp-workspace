@@ -1,0 +1,16 @@
+{#- The page frame: a thick line inset by `m` from the W x H page with a dashed pink line inside it, a blossom on
+    each of the `corners` [(x, y)], and the grid references `cols` [(x, label)] above and below and `rows`
+    [(y, label)] to the left and right of it. #}
+<rect x="{{ m|f }}" y="{{ m|f }}" width="{{ (W - 2 * m)|f }}" height="{{ (H - 2 * m)|f }}" rx="6" class="frame"/>
+<rect x="{{ (m + 2.6)|f }}" y="{{ (m + 2.6)|f }}" width="{{ (W - 2 * m - 5.2)|f }}" height="{{ (H - 2 * m - 5.2)|f }}" rx="4.5" class="frame2"/>
+{% for cx, cy in corners %}
+<use href="#blossom-d" transform="translate({{ cx|f }} {{ cy|f }}) scale(1.1)" fill="#ffb8d0"/>
+{% endfor %}
+{% for x, label in cols %}
+<text class="coord" x="{{ x|f }}" y="{{ (m - 2.4)|f }}" text-anchor="middle">{{ label }}</text>
+<text class="coord" x="{{ x|f }}" y="{{ (H - m + 5.2)|f }}" text-anchor="middle">{{ label }}</text>
+{% endfor %}
+{% for y, label in rows %}
+<text class="coord" x="{{ (m - 4)|f }}" y="{{ y|f }}" text-anchor="middle" dominant-baseline="central">{{ label }}</text>
+<text class="coord" x="{{ (W - m + 4)|f }}" y="{{ y|f }}" text-anchor="middle" dominant-baseline="central">{{ label }}</text>
+{% endfor %}

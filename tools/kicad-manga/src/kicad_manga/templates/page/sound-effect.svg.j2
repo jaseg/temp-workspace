@@ -1,0 +1,6 @@
+{#- A faint manga sound effect at (x, y), turned by `angle`: the Japanese `jp` at font size `size` in `colour`,
+    with its romaji reading `ro` small underneath. #}
+<g transform="translate({{ x|f }} {{ y|f }}) rotate({{ angle|f }})">
+<text class="sfx" font-size="{{ size|f }}" fill="{{ colour }}" text-anchor="middle" dominant-baseline="central">{{ jp }}</text>
+<text class="sfx-ro" font-size="{{ (size * 0.24)|f }}" y="{{ (size * 0.85)|f }}" text-anchor="middle">{{ ro }} ♡</text>
+</g>
