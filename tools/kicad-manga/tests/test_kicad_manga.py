@@ -7,15 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from kicad_manga import config
+from kicad_manga import config, kicad
 from kicad_manga.page import FM
-from kicad_manga.render import build_svg
-from kicad_manga.sexp import kids, parse_si, parse_sexp
+from kicad_manga.render import build_svg, pdf_tool
+from kicad_manga.util import parse_si
 
 FIXTURE = Path(__file__).parent / 'fixtures' / 'demo.kicad_sch'
-ITEM_KINDS = ('wire', 'bus', 'bus_entry', 'junction', 'no_connect', 'label', 'global_label', 'hierarchical_label',
-              'netclass_flag', 'text', 'text_box', 'table', 'image', 'sheet', 'polyline', 'rectangle', 'circle',
-              'arc', 'bezier', 'rule_area')
+# data-kind -> the list of those items in gerbonara's Schematic
+ITEM_KINDS = {'wire': 'wires', 'bus': 'buses', 'bus_entry': 'bus_entries', 'junction': 'junctions',
+              'no_connect': 'no_connects', 'label': 'local_labels', 'global_label': 'global_labels',
+              'hierarchical_label': 'hierarchical_labels', 'netclass_flag': 'netclass_flags', 'text': 'texts',
+              'text_box': 'text_boxes', 'table': 'tables', 'image': 'images', 'sheet': 'subsheets',
+              'polyline': 'polylines', 'rectangle': 'rectangles', 'circle': 'circles', 'arc': 'arcs',
+              'bezier': 'beziers', 'rule_area': 'rule_areas'}
 
 
 def render(path=FIXTURE, **settings):
@@ -26,17 +30,17 @@ def render(path=FIXTURE, **settings):
 
 
 def test_every_schematic_item_is_drawn():
-    sch = parse_sexp(FIXTURE.read_text())
+    sch = kicad.load(FIXTURE)
     root, _ = render()
     drawn = collections.Counter(e.get('data-kind') for e in root.iter() if e.get('data-kind'))
-    for kind in ITEM_KINDS:
-        assert drawn[kind] == len(kids(sch, kind)), kind
-    refs = {p[2] for s in kids(sch, 'symbol') for p in kids(s, 'property') if p[1] == 'Reference'}
+    for kind, attr in ITEM_KINDS.items():
+        assert drawn[kind] == len(getattr(sch, attr)) > 0, kind
+    refs = {p.value for s in sch.symbols for p in s.properties if p.key == 'Reference'}
     assert {e.get('data-ref') for e in root.iter() if e.get('data-kind') == 'symbol'} == refs
     text = ''.join(root.itertext())
-    for kind in ('label', 'global_label', 'hierarchical_label', 'text'):
-        for item in kids(sch, kind):
-            assert item[1] in text
+    for attr in ('local_labels', 'global_labels', 'hierarchical_labels', 'texts'):
+        for item in getattr(sch, attr):
+            assert item.text in text
     assert 'Demo Board' in text and 'a tiny test sheet' in text      # title block -> title panel
 
 
@@ -74,22 +78,19 @@ def test_value_parser():
 
 
 def test_cli_writes_all_formats(tmp_path):
-    from kicad_manga.browser import Browser
+    from click.testing import CliRunner
     from kicad_manga.cli import main
-    try:
-        with Browser():
-            pass
-    except Exception as e:  # pragma: no cover
-        pytest.skip(f'no usable Chromium: {e}')
     cfg = tmp_path / 'settings.toml'
     cfg.write_text('png_px_per_mm = 2\n[title]\nkicker = "テスト"\n')
     out = tmp_path / 'out' / 'demo'
-    assert main([str(FIXTURE), '-o', str(out), '-c', str(cfg), '--title', 'Hello Board',
-                 '--font-dir', str(tmp_path / 'nofonts')]) == 0
+    args = [str(FIXTURE), '-o', str(out), '-c', str(cfg), '--title', 'Hello Board', '--font-dir', str(tmp_path)]
+    if pdf_tool() is None:
+        args += ['-f', 'svg', '-f', 'png']
+    res = CliRunner().invoke(main, args)
+    assert res.exit_code == 0, res.output
     svg = out.with_suffix('.svg').read_text()
-    assert 'Hello Board' in svg and 'テスト' in svg and '<!--bg:' not in svg
+    assert 'Hello Board' in svg and 'テスト' in svg
     ET.fromstring(svg)
-    from PIL import Image
-    with Image.open(out.with_suffix('.png')) as im:
-        assert im.size == (594, 420)
-    assert out.with_suffix('.pdf').read_bytes()[:5] == b'%PDF-'
+    assert kicad.png_info(out.with_suffix('.png').read_bytes())[:2] == (594, 420)
+    if pdf_tool() is not None:
+        assert out.with_suffix('.pdf').read_bytes()[:5] == b'%PDF-'

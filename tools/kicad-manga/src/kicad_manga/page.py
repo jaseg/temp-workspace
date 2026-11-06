@@ -16,20 +16,23 @@ from . import characters as C
 from . import drawings as D
 from .circuit import Grid
 from .palette import PAPER
-from .sexp import f2
-from .svg import group, render, tag
+from .util import f2
+from .svg import FONT_POP, FONT_ZEN, group, render, tag
+from .text import metrics
 
 DESIGN_SHORT = 594.0
 FM = 8            # frame line inset (design units)
 TW, TH = 176, 58  # title panel
 
 
-def est_width(s, size):
-    return len(s) * .62 * size
+def text_width(s, size, family=FONT_POP, weight=400):
+    """Width of `s` at font size `size`, measured in the page's fonts."""
+    return metrics().advance(s, family, weight) * size
 
 
-def fit(s, size, width):
-    return min(size, width / max(1, est_width(s, 1)))
+def fit(s, size, width, family=FONT_POP, weight=400):
+    """The font size, at most `size`, at which `s` fits into `width`."""
+    return min(size, width / max(1e-6, text_width(s, 1, family, weight))) if s else size
 
 
 class Page:
@@ -115,12 +118,12 @@ class Page:
         self.grid.mark_rect(rx0, ry0, rx1 + 4, ry1 + 4)
         kicker = f'✦ {t["kicker"]} ✦' if t['kicker'] else ''
         bub = split_two(t['bubble'])
-        bw = max(40, max(est_width(line, 4.6) for line in bub) + 10)
+        bw = max(40, max(text_width(line, 4.6) for line in bub) + 10)
         self.add('titlepanel', render(
             'page/title.svg.j2', tx=tx, ty=ty, TW=TW, TH=TH,
             kicker=kicker, kicker_size=fit(kicker, 7.5, TW - 20),
             title=t['title'], title_size=fit(t['title'], 8.6, TW - 16),
-            subtitle=f"~ {t['subtitle']} ~" if t['subtitle'] else '', subtitle_size=fit(t['subtitle'], 5, TW - 16),
+            subtitle=f"~ {t['subtitle']} ~" if t['subtitle'] else '', subtitle_size=fit(f"~ {t['subtitle']} ~", 5, TW - 16, FONT_ZEN, 700),
             footer_left=t['footer_left'], footer_right=t['footer_right'],
             bw=bw, bubble=[(8.6 + 7 * i if len(bub) > 1 else 12.2, line) for i, line in enumerate(bub)]))
 

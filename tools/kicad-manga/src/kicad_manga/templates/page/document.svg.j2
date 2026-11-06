@@ -3,7 +3,7 @@
 {% macro layer(lid, label, items) %}
 <g id="{{ lid }}" inkscape:groupmode="layer" inkscape:label="{{ label }}" transform="scale({{ k|f }})">{{ items|join('\n') }}</g>
 {% endmacro %}
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="{{ W|f }}mm" height="{{ H|f }}mm" viewBox="0 0 {{ W|f }} {{ H|f }}">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="{{ W|f }}mm" height="{{ H|f }}mm" viewBox="0 0 {{ W|f }} {{ H|f }}" font-family="'{{ FONT_MPR }}', sans-serif" font-weight="500" fill="{{ INK }}">
 {{ defs }}
 {% for lid, label, items in layers[:2] %}
 {{ layer(lid, label, items) }}

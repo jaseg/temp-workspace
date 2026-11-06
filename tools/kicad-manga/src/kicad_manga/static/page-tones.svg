@@ -3,8 +3,7 @@
        tone-w: fine white dots (highlights); tone-ink: dense ink dots (drop shadows); tone-pink: big pink dots
        (the mascot); tone-bg: the page background, shown through the #vignette mask (styles/defs.svg.j2), which
        fades it in towards the edges with vig-g. title-grad and banner-grad colour the title panel and the text
-       banners. browser.py turns the tones into vector dots for PDFs and keeps its own copy of their pitch, dot
-       size, angle and colour (TONES), so change both together. -->
+       banners. In PDFs the tones become tiling patterns. -->
   <defs>
     <pattern id="tone-w" width="1.1" height="1.1" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><circle cx=".55" cy=".55" r=".2" fill="#fff" opacity=".7"/></pattern>
     <pattern id="tone-ink" width=".9" height=".9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><circle cx=".45" cy=".45" r=".3" fill="#4b3a5a"/></pattern>

@@ -15,8 +15,13 @@ uv run kicad-manga board.kicad_sch -f pdf -o out/board --title "My Board" --kick
 ```
 
 The tool handles one `.kicad_sch` file per run. Sub-sheets show up as boxes with their pins;
-run it again on each sub-sheet file if you want those too. It is tested with KiCad 9 and 10
-files. KiCad 7 and 8 files should mostly work; older formats aren't supported.
+run it again on each sub-sheet file if you want those too. Schematics are read with
+[gerbonara](https://gitlab.com/gerbolyze/gerbonara), from a local fork in `../gerbonara` that adds KiCad 9
+and 10 support (see `../gerbonara/FORK.md`). It is tested with KiCad 9 and 10 files; KiCad 7 and 8 files
+should mostly work.
+
+PDF output needs `rsvg-convert` (librsvg; on Debian/Ubuntu the `librsvg2-bin` package) or Inkscape on the
+`PATH`. SVG and PNG output need nothing beyond the Python dependencies.
 
 ## Settings
 
@@ -80,19 +85,23 @@ reference as id, and wires are grouped by net.
 
 ## How it works
 
-1. `circuit.py` draws the sheet; `page.py` lays out the page and decorations.
-2. Headless Chromium (Playwright) measures text in the embedded fonts, so label pills,
-   banners and bubbles fit exactly.
-3. The same browser rasterises the PNG in tiles and prints the PDF. Chromium would turn every
-   pattern into a bitmap when printing, so for the PDF the halftones are redrawn as vector dots,
-   with drop shadows only dotted where they show. That keeps the A1 sheet at about 2 MB.
-
-It uses whichever Chromium Playwright finds. If the installed Playwright doesn't match the
-browser on the system, set `KICAD_MANGA_CHROMIUM` to a Chrome or Chromium binary.
+1. `kicad.py` loads the schematic with gerbonara. `circuit.py` draws the sheet, and `page.py` lays out the page
+   and the decorations.
+2. Text is measured with HarfBuzz in the fonts the page uses (`text.py`), so label pills, banners and speech
+   bubbles fit exactly. Text sits on explicit baselines, so every renderer draws it at the same place.
+3. SVG output (`svg.py`):
+   - Elements built in code use gerbonara's `Tag`.
+   - Artwork lives outside the Python code. Drawings with computed geometry are jinja2 templates in
+     `templates/`. Fixed artwork (faces, the mascot, screentones, symbols) is standalone SVG files in `static/`,
+     whose `<defs>` go into the page and can be edited in Inkscape on their own.
+4. resvg rasterises the PNG. `rsvg-convert` (or Inkscape) converts the SVG to PDF, with a fontconfig
+   configuration that points it at the page's fonts. The screentones end up as PDF tiling patterns.
+5. Fonts: the SVG embeds them as WOFF2 for browsers. resvg, `rsvg-convert` and HarfBuzz use TTF copies with
+   clean family names, all cached in `~/.cache/kicad-manga/fonts`.
 
 ## Development
 
 ```sh
 uv sync
-uv run pytest      # a few high-level sanity checks; the end-to-end test is skipped without Chromium
+uv run pytest      # a few high-level sanity checks
 ```

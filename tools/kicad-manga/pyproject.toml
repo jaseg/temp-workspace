@@ -7,19 +7,25 @@ name = "kicad-manga"
 version = "0.1.0"
 description = "Render a KiCad schematic as a pastel, manga-styled poster (SVG, PNG, PDF)."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"
 authors = [{ name = "jaseg" }]
 dependencies = [
-    "gerbonara>=1.5.0",
+    "click>=8.5.1",
+    "fonttools[woff]>=4.68.0",
+    "gerbonara",
     "jinja2>=3.1.6",
     "markupsafe>=3.0.4",
-    "pillow>=10",
-    "playwright>=1.49",
+    "requests>=2.34.2",
+    "resvg-py>=0.5.0",
+    "uharfbuzz>=0.57.0",
 ]
 
 [project.scripts]
 kicad-manga = "kicad_manga.cli:main"
+
+[tool.uv.sources]
+gerbonara = { path = "../gerbonara" }   # local fork with KiCad 9/10 schematic support, see ../gerbonara/FORK.md
 
 [dependency-groups]
 dev = ["pytest>=8"]

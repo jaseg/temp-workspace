@@ -4,78 +4,69 @@
     kicad-manga board.kicad_sch -f pdf -o out/board --title "My Board"
 """
 
-import argparse
-import sys
 from pathlib import Path
 
+import click
+
 from . import config, fonts
-from .browser import Browser
-from .render import build_svg
+from .render import build_svg, write_pdf, write_png
 
 
-def parse_args(argv):
-    ap = argparse.ArgumentParser(prog='kicad-manga', description=__doc__.split('\n')[0].split(': ', 1)[1],
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('schematic', help='a .kicad_sch file (one sheet; sub-sheets are drawn as boxes)')
-    ap.add_argument('-o', '--output', help='output path without extension (default: ./<schematic name>-manga)')
-    ap.add_argument('-c', '--config', help=f'settings file (default: {config.FILENAME} next to the schematic or here)')
-    ap.add_argument('-f', '--format', action='append', choices=['svg', 'png', 'pdf'],
-                    help='output format, repeatable (default: all three)')
-    ap.add_argument('--dpmm', type=float, help='PNG resolution in pixels per mm (default 10)')
-    ap.add_argument('--title', help='title panel heading (default: title block title or file name)')
-    ap.add_argument('--subtitle', help='line under the title (default: title block comment 1)')
-    ap.add_argument('--kicker', help='small line above the title (default: 回路図)')
-    ap.add_argument('--bubble', help="the mascot's speech bubble (default: title block comment 2)")
-    ap.add_argument('--seed', type=int, help='random seed for the decorations')
-    ap.add_argument('--no-decorations', action='store_true', help='no plants, cables, shelves or sparkles')
-    ap.add_argument('--no-characters', action='store_true', help='draw passives as plain symbols')
-    ap.add_argument('--font-dir', help='where the fonts are (or get downloaded to)')
-    return ap.parse_args(argv)
-
-
-def settings(args):
-    cfg = config.load(config.find(args.schematic, args.config))
-    if args.format:
-        cfg['formats'] = args.format
-    if args.dpmm:
-        cfg['png_px_per_mm'] = args.dpmm
-    if args.seed is not None:
-        cfg['seed'] = args.seed
-    if args.no_decorations:
+@click.command(help='Render a KiCad schematic as a pastel, manga-styled poster.\n\n'
+                    'SCHEMATIC is one .kicad_sch file; sub-sheets are drawn as boxes.')
+@click.argument('schematic', type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option('-o', '--output', type=click.Path(path_type=Path),
+              help='Output path without extension (default: ./<schematic name>-manga).')
+@click.option('-c', '--config', 'config_file', type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help=f'Settings file (default: {config.FILENAME} next to the schematic or here).')
+@click.option('-f', '--format', 'formats', multiple=True, type=click.Choice(['svg', 'png', 'pdf']),
+              help='Output format, repeatable (default: all three).')
+@click.option('--dpmm', type=float, help='PNG resolution in pixels per mm (default 10).')
+@click.option('--title', help='Title panel heading (default: title block title or file name).')
+@click.option('--subtitle', help='Line under the title (default: title block comment 1).')
+@click.option('--kicker', help='Small line above the title (default: 回路図).')
+@click.option('--bubble', help="The mascot's speech bubble (default: title block comment 2).")
+@click.option('--seed', type=int, help='Random seed for the decorations.')
+@click.option('--no-decorations', is_flag=True, help='No plants, cables, shelves or sparkles.')
+@click.option('--no-characters', is_flag=True, help='Draw passives as plain symbols.')
+@click.option('--font-dir', type=click.Path(file_okay=False, path_type=Path),
+              help='Where the fonts are (default: downloaded once into ~/.cache/kicad-manga/fonts).')
+def main(schematic, output, config_file, formats, dpmm, title, subtitle, kicker, bubble, seed, no_decorations,
+         no_characters, font_dir):
+    cfg = config.load(config.find(schematic, config_file))
+    if formats:
+        cfg['formats'] = list(formats)
+    if dpmm:
+        cfg['png_px_per_mm'] = dpmm
+    if seed is not None:
+        cfg['seed'] = seed
+    if no_decorations:
         cfg['decorations'] = False
-    if args.no_characters:
+    if no_characters:
         cfg['characters'] = False
-    if args.font_dir:
-        cfg['font_dir'] = args.font_dir
-    for k in ('title', 'subtitle', 'kicker', 'bubble'):
-        if getattr(args, k) is not None:
-            cfg['title'][k] = getattr(args, k)
-    return cfg
+    if font_dir:
+        cfg['font_dir'] = str(font_dir)
+    for k, v in (('title', title), ('subtitle', subtitle), ('kicker', kicker), ('bubble', bubble)):
+        if v is not None:
+            cfg['title'][k] = v
 
-
-def main(argv=None):
-    args = parse_args(sys.argv[1:] if argv is None else argv)
-    cfg = settings(args)
-    src = Path(args.schematic)
-    out = Path(args.output) if args.output else Path.cwd() / f'{src.stem}-manga'
+    out = output or Path.cwd() / f'{schematic.stem}-manga'
     out.parent.mkdir(parents=True, exist_ok=True)
     font_list = fonts.load(cfg['font_dir'] or None)
-    with Browser() as browser:
-        svg, page = build_svg(src, cfg, font_list, browser)
-        written = []
-        if 'svg' in cfg['formats']:
-            out.with_suffix('.svg').write_text(svg, encoding='utf-8')
-            written.append(out.with_suffix('.svg'))
-        if 'png' in cfg['formats']:
-            browser.png(svg, page.W, page.H, cfg['png_px_per_mm'], out.with_suffix('.png'))
-            written.append(out.with_suffix('.png'))
-        if 'pdf' in cfg['formats']:
-            browser.pdf(svg, page.W, page.H, out.with_suffix('.pdf'))
-            written.append(out.with_suffix('.pdf'))
-    for p in written:
-        print(f'wrote {p}')
-    return 0
+    svg, page = build_svg(schematic, cfg, font_list)
+    if 'svg' in cfg['formats']:
+        out.with_suffix('.svg').write_text(svg, encoding='utf-8')
+        click.echo(f'wrote {out.with_suffix(".svg")}')
+    if 'png' in cfg['formats']:
+        write_png(svg, font_list, cfg['png_px_per_mm'], page.W, out.with_suffix('.png'))
+        click.echo(f'wrote {out.with_suffix(".png")}')
+    if 'pdf' in cfg['formats']:
+        try:
+            write_pdf(svg, font_list, out.with_suffix('.pdf'))
+        except RuntimeError as e:
+            raise click.ClickException(str(e))
+        click.echo(f'wrote {out.with_suffix(".pdf")}')
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    main()

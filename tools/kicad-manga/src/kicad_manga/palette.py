@@ -7,7 +7,7 @@ import math
 import random
 import re
 
-from .sexp import natural_key
+from .util import natural_key
 
 INK = '#4b3a5a'          # soft plum "ink" instead of black
 INK_SOFT = '#8a7499'

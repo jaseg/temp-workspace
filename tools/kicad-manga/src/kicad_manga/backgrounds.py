@@ -1,30 +1,13 @@
-"""Backgrounds behind text (label pills and flags, note bubbles, title banners).
-
-They depend on the real text extents in the embedded fonts, so the renderer leaves a
-`<!--bg:ID-->` marker in front of each such text and `fill()` swaps it for a shape
-built from the bounding box the browser measured. All shapes are in the text's own
-coordinate system (it sits in a translated/rotated <g>)."""
-
-import re
+"""Backgrounds behind text (label pills and flags, note bubbles, title banners), fitted to the text's measured
+bounding box (see text.text_el). All shapes are in the text's own coordinate system (it sits in a
+translated/rotated <g>)."""
 
 from markupsafe import Markup
 
 from .circuit import hier_glyph, rounded_poly
 from .palette import LINE
-from .sexp import f2
+from .util import f2
 from .svg import render, tag
-
-MARKER = re.compile(r'<!--bg:(t\d+)-->')
-
-
-def fill(svg, bgs, boxes):
-    """Replace every marker; markers without a measurement are just dropped."""
-    def sub(m):
-        tid = m.group(1)
-        if tid not in bgs or tid not in boxes:
-            return ''
-        return build(bgs[tid], boxes[tid])
-    return MARKER.sub(sub, svg)
 
 
 def build(info, box):

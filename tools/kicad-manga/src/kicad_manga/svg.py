@@ -20,9 +20,7 @@ from markupsafe import Markup, escape
 from . import palette
 
 # CSS font families, as named inside the font files (see fonts.py)
-FONT_POP = 'Pop'
-FONT_ZEN = 'Zen'
-FONT_MPR = 'MPR'
+from .fonts import MPR as FONT_MPR, POP as FONT_POP, ZEN as FONT_ZEN  # noqa: E402
 
 
 def num(v):

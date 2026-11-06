@@ -9,7 +9,7 @@ import math
 
 from markupsafe import Markup
 
-from .sexp import parse_si
+from .util import parse_si
 from .svg import num as f, render, tag
 
 INK = '#4b3a5a'

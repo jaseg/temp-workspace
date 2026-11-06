@@ -5,8 +5,6 @@
 <defs>
 <style>
 {% for fam, wt, b64, rng in fonts %}@font-face{font-family:'{{ fam }}';font-weight:{{ wt }};src:url(data:font/woff2;base64,{{ b64 }}) format('woff2');{{ rng }}}{% endfor +%}
-text{font-family:'MPR','M PLUS Rounded 1c',sans-serif}
-:where(text:not([fill])){fill:{{ INK }}}
 .wire-o{fill:none;stroke:{{ LINE }};stroke-width:.62;stroke-linecap:round;stroke-linejoin:round}
 .wire-i{fill:none;stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}
 .bus-o{fill:none;stroke:{{ LINE }};stroke-width:1.35;stroke-linecap:round}
@@ -17,36 +15,36 @@ text{font-family:'MPR','M PLUS Rounded 1c',sans-serif}
 .nc-o{fill:none;stroke:{{ LINE }};stroke-width:.7;stroke-linecap:round}
 .nc-i{fill:none;stroke:#ff8fa8;stroke-width:.35;stroke-linecap:round}
 .flag{fill:none;stroke:{{ LINE }};stroke-width:.25}
-.dnp{fill:none;stroke:#ff6f91;stroke-width:.8;stroke-linecap:round;opacity:.75}
+.dnp{fill:none;stroke:#ff6f91;stroke-width:.8;stroke-linecap:round;stroke-opacity:.75}
 .pinname{font-weight:500}
 .pinnum{fill:#b0709d;font-weight:500}
-.ref{font-family:'MPR';font-weight:800;fill:#d6457f}
-.value{font-family:'MPR';font-weight:800;fill:#2f8f86}
+.ref{font-family:'{{ FONT_MPR }}';font-weight:800;fill:#d6457f}
+.value{font-family:'{{ FONT_MPR }}';font-weight:800;fill:#2f8f86}
 .ref,.value{paint-order:stroke;stroke:{{ PAPER }};stroke-width:.32;stroke-linejoin:round}
-.pwr{font-family:'Pop';fill:{{ INK }};paint-order:stroke;stroke:#fff;stroke-width:.35}
+.pwr{font-family:'{{ FONT_POP }}';fill:{{ INK }};paint-order:stroke;stroke:#fff;stroke-width:.35}
 .symtxt{font-weight:500}
 .lbl{font-weight:800}
-.title{font-family:'Pop';fill:#fff;paint-order:stroke;stroke:{{ INK }};stroke-width:.55;stroke-linejoin:round}
-.caption{font-family:'Zen';font-weight:700;fill:#7b5b94}
-.note{font-family:'Zen';font-weight:700;fill:{{ INK }}}
-.remark{font-family:'Zen';font-weight:700;fill:#7b5b94}
+.title{font-family:'{{ FONT_POP }}';fill:#fff;paint-order:stroke;stroke:{{ INK }};stroke-width:.55;stroke-linejoin:round}
+.caption{font-family:'{{ FONT_ZEN }}';font-weight:700;fill:#7b5b94}
+.note{font-family:'{{ FONT_ZEN }}';font-weight:700;fill:{{ INK }}}
+.remark{font-family:'{{ FONT_ZEN }}';font-weight:700;fill:#7b5b94}
 .ovl{text-decoration:overline}
-.boxtext{font-family:'Zen';font-weight:700}
-.sheetname{font-family:'Pop';fill:{{ INK }}}
-.sheetfile{font-family:'Zen';font-weight:700;font-style:italic;fill:{{ INK_SOFT }}}
+.boxtext{font-family:'{{ FONT_ZEN }}';font-weight:700}
+.sheetname{font-family:'{{ FONT_POP }}';fill:{{ INK }}}
+.sheetfile{font-family:'{{ FONT_ZEN }}';font-weight:700;font-style:italic;fill:{{ INK_SOFT }}}
 .field{font-weight:500;fill:{{ INK_SOFT }}}
 .pin-deco{fill:none;stroke:{{ LINE }};stroke-width:.24;stroke-linecap:round;stroke-linejoin:round}
 .pin-bubble{fill:#fff;stroke:{{ LINE }};stroke-width:.24}
-.sfx{font-family:'Pop';paint-order:stroke;stroke:#fff;stroke-width:.9;stroke-linejoin:round;opacity:.55}
-.sfx-ro{font-family:'Zen';font-weight:700;fill:{{ INK_SOFT }};opacity:.5}
+.sfx{font-family:'{{ FONT_POP }}';paint-order:stroke;stroke:#fff;stroke-width:.9;stroke-linejoin:round;fill-opacity:.55;stroke-opacity:.55}
+.sfx-ro{font-family:'{{ FONT_ZEN }}';font-weight:700;fill:{{ INK_SOFT }};fill-opacity:.5}
 .frame{fill:none;stroke:{{ INK }};stroke-width:1.6}
 .frame2{fill:none;stroke:#ffb8d0;stroke-width:.6;stroke-dasharray:2.2 1.4}
-.coord{font-family:'Pop';font-size:3.6px;fill:#d68ab5}
-.t-jp{font-family:'Pop';font-size:7.5px;fill:#ff7fb2;paint-order:stroke;stroke:#fff;stroke-width:1.2}
-.t-main{font-family:'Pop';font-size:8.6px;fill:#fff;paint-order:stroke;stroke:{{ INK }};stroke-width:1.1;stroke-linejoin:round}
-.t-sub{font-family:'Zen';font-weight:700;font-size:5px;fill:#7b5b94}
-.t-small{font-family:'MPR';font-weight:800;font-size:3.2px;fill:{{ INK_SOFT }}}
-.bubble-t{font-family:'Pop';font-size:4.6px;fill:{{ INK }}}
+.coord{font-family:'{{ FONT_POP }}';font-size:3.6px;fill:#d68ab5}
+.t-jp{font-family:'{{ FONT_POP }}';font-size:7.5px;fill:#ff7fb2;paint-order:stroke;stroke:#fff;stroke-width:1.2}
+.t-main{font-family:'{{ FONT_POP }}';font-size:8.6px;fill:#fff;paint-order:stroke;stroke:{{ INK }};stroke-width:1.1;stroke-linejoin:round}
+.t-sub{font-family:'{{ FONT_ZEN }}';font-weight:700;font-size:5px;fill:#7b5b94}
+.t-small{font-family:'{{ FONT_MPR }}';font-weight:800;font-size:3.2px;fill:{{ INK_SOFT }}}
+.bubble-t{font-family:'{{ FONT_POP }}';font-size:4.6px;fill:{{ INK }}}
 </style>
 <mask id="vignette"><rect width="{{ width|f }}" height="{{ height|f }}" fill="url(#vig-g)"/></mask>
 {{ resistor_faces }}
