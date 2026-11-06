@@ -1,0 +1,35 @@
+{#- Cat bus: one long tabby along `segments` [(a, b)] (each also a <path data-kind="bus"> unless `tagged` is
+    false), `half` = half its thickness, outline `line`, colours `fur` and `stripe`.
+    `leg_entries` [(paw, q, col, (a, b), angle)]: bus entries that are legs, the wire (colour col) going from
+    the paw to q, the leg from a to b, the paw turned by angle; `legs` [(a, b, paw)]: plain legs; `tail`
+    (start, c1, c2, end): the curled tail; `stripes` [(a, c, b)]: tabby stripes across the back;
+    `wires` [(q, c1, c2, p, col)]: the other bus entries, wiggly wires from q into a window at p;
+    `windows` [(x, y, angle)]; `head` (x, y). #}
+{% macro pt(p) %}{{ p[0]|f }} {{ p[1]|f }}{% endmacro %}
+{% for paw, q, col, leg, angle in leg_entries %}
+<g data-kind="bus_entry"><path class="wire-o" d="M{{ pt(paw) }}L{{ pt(q) }}"/><path class="wire-i" stroke="{{ col }}" d="M{{ pt(paw) }}L{{ pt(q) }}"/></g>
+<path d="M{{ pt(leg[0]) }}L{{ pt(leg[1]) }}" stroke="{{ line }}" stroke-width="1.05" stroke-linecap="round"/>
+<path d="M{{ pt(leg[0]) }}L{{ pt(leg[1]) }}" stroke="{{ fur }}" stroke-width=".65" stroke-linecap="round"/>
+<ellipse transform="translate({{ pt(paw) }}) rotate({{ angle|f }})" rx=".62" ry=".42" fill="#fff" stroke="{{ line }}" stroke-width=".15"/>
+{% endfor %}
+{% for a, b, paw in legs %}
+<path d="M{{ pt(a) }}L{{ pt(b) }}" stroke="{{ line }}" stroke-width="1.05" stroke-linecap="round"/>
+<path d="M{{ pt(a) }}L{{ pt(b) }}" stroke="{{ fur }}" stroke-width=".65" stroke-linecap="round"/>
+<ellipse cx="{{ paw[0]|f }}" cy="{{ paw[1]|f }}" rx=".62" ry=".42" fill="#fff" stroke="{{ line }}" stroke-width=".15"/>
+{% endfor %}
+{% set td %}M{{ pt(tail[0]) }}C{{ pt(tail[1]) }} {{ pt(tail[2]) }} {{ pt(tail[3]) }}{% endset %}
+<path d="{{ td }}" fill="none" stroke="{{ line }}" stroke-width="1.6" stroke-linecap="round"/>
+<path d="{{ td }}" fill="none" stroke="{{ fur }}" stroke-width="1.15" stroke-linecap="round"/>
+{% for a, b in segments %}
+<path{% if tagged %} data-kind="bus"{% endif %} d="M{{ pt(a) }}L{{ pt(b) }}" fill="none" stroke="{{ line }}" stroke-width="{{ (2 * half + 0.45)|f }}" stroke-linecap="round" stroke-linejoin="round"/>
+{% endfor %}
+<path d="{% for a, b in segments %}M{{ pt(a) }}L{{ pt(b) }}{% endfor %}" fill="none" stroke="{{ fur }}" stroke-width="{{ (2 * half)|f }}" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="{% for a, c, b in stripes %}M{{ pt(a) }}Q{{ pt(c) }} {{ pt(b) }}{% endfor %}" fill="none" stroke="{{ stripe }}" stroke-width=".4" stroke-linecap="round"/>
+{% for q, c1, c2, p, col in wires %}
+{% set d %}M{{ pt(q) }}C{{ pt(c1) }} {{ pt(c2) }} {{ pt(p) }}{% endset %}
+<g data-kind="bus_entry"><path class="wire-o" d="{{ d }}"/><path class="wire-i" stroke="{{ col }}" d="{{ d }}"/></g>
+{% endfor %}
+{% for x, y, angle in windows %}
+<use href="#bus-window" transform="translate({{ x|f }} {{ y|f }}) rotate({{ angle|f }})"/>
+{% endfor %}
+<use href="#bus-head" transform="translate({{ pt(head) }})" stroke="{{ line }}" stroke-width=".22" stroke-linejoin="round"/>

@@ -1,0 +1,44 @@
+{#- "Cast of characters" box, w x h, origin top left. `cats` [(x, svg, value)]: the capacitor cats from slim to
+    chonky, drawn around (x, cats_y + 9) and scaled up there, with their value below. `others`
+    [(kind, x, y, svg)]: the other characters in their slots ('res', 'ind', 'xtal', 'bus'), each drawn around
+    the origin (the bus already in place), with a name and a caption; `ind` is the inductor's name. #}
+{% macro label(x, y, txt, size, fam=FONT_POP, col=INK, anchor='start', weight=None) -%}
+<text x="{{ x|f }}" y="{{ y|f }}" font-family="{{ fam }}" font-size="{{ size|f }}" fill="{{ col }}" text-anchor="{{ anchor }}"{% if weight %} font-weight="{{ weight }}"{% endif %}>{{ txt }}</text>
+{%- endmacro %}
+{% macro sub(x, y, txt, size=2.5, col='#7b5b94') %}{{ label(x, y, txt, size, FONT_ZEN, col, weight='700') }}{% endmacro %}
+<rect x="1.5" y="1.5" width="{{ w|f }}" height="{{ h|f }}" rx="6" fill="url(#tone-ink)" opacity=".5" data-shadow="1.5 1.5"/>
+<rect width="{{ w|f }}" height="{{ h|f }}" rx="6" fill="#fff" stroke="{{ INK }}" stroke-width=".8"/>
+<rect x="2" y="2" width="{{ (w - 4)|f }}" height="{{ (h - 4)|f }}" rx="4.5" fill="none" stroke="#ffb8d0" stroke-width=".45" stroke-dasharray="1.6 1"/>
+<text x="{{ (w / 2)|f }}" y="9" font-family="{{ FONT_POP }}" font-size="5" fill="#ff7fb2" text-anchor="middle" stroke="#fff" stroke-width=".8" paint-order="stroke">♡ cast of characters ♡</text>
+{% if cats %}
+{% set y = cats_y %}
+{% for x, svg, value in cats %}
+<g transform="translate({{ x|f }} {{ (y + 9)|f }}) scale(2.2) translate({{ (-x)|f }} {{ (-y - 9)|f }})">{{ svg }}</g>
+{{ label(x, y + 18.5, value, 2.6, FONT_MPR, '#2f8f86', 'middle', '800') }}
+{% endfor %}
+{{ label(92, y + 6.5, 'capacitors', 4) }}
+{{ sub(92, y + 11.5, 'more capacitance, more chonk', 2.7) }}
+{{ sub(92, y + 15.5, '(the wires go in one end and out the other)', 2.2, '#a08cb0') }}
+{% endif %}
+{% for kind, x, y, svg in others %}
+{% if kind == 'res' %}
+<g transform="translate({{ (x + 4)|f }} {{ (y + 4)|f }}) scale(1.9)">{{ svg }}</g>
+{{ label(x + 16, y + 2, 'resistor', 3.6) }}
+{{ sub(x + 16, y + 6.5, 'grumpy, throws bricks') }}
+{{ sub(x + 16, y + 10, '(and the odd molotov)', 2.2, '#a08cb0') }}
+{% elif kind == 'ind' %}
+<g transform="translate({{ (x + 6)|f }} {{ (y + 5)|f }}) scale(1.9)">{{ svg }}</g>
+{{ label(x + 15, y + 2, ind, 3.6) }}
+{{ sub(x + 15, y + 6.5, 'eats high frequencies' if ind == 'ferrite bead' else 'a very hungry caterpillar') }}
+{% elif kind == 'xtal' %}
+<g transform="translate({{ (x + 4)|f }} {{ (y + 5)|f }}) scale(1.7)">{{ svg }}</g>
+{{ label(x + 14, y + 2, 'crystal', 3.6) }}
+{{ sub(x + 14, y + 6.5, 'dances at its') }}
+{{ sub(x + 14, y + 10, 'own frequency ♪') }}
+{% elif kind == 'bus' %}
+{{ svg }}
+{{ label(x + 20, y + 2, 'bus', 3.6) }}
+{{ sub(x + 20, y + 6.5, 'a very long cat') }}
+{{ sub(x + 20, y + 10, 'carries lots of signals', 2.2, '#a08cb0') }}
+{% endif %}
+{% endfor %}

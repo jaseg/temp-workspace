@@ -7,17 +7,15 @@ attach. Faces are always drawn upright.
 
 import math
 
+from markupsafe import Markup
+
 from .sexp import parse_si
-from .svg import render, tag
+from .svg import num as f, render, tag
 
 INK = '#4b3a5a'
 FUR = [('#ffffff', '#ffd0a8'), ('#fff1dc', '#ffb98a'), ('#e9e3f2', '#b9adc9'), ('#ffd9b3', '#f7a86b'),
        ('#f2f0f5', '#4b3a5a'), ('#fde7ef', '#d9b8c9')]
 BODY = ['#ffe3c2', '#ffd6e5', '#d9f2e6', '#dfe8ff', '#fff0b8', '#eadcff']
-
-
-def f(v):
-    return f'{v:.3f}'.rstrip('0').rstrip('.')
 
 
 # ----------------------------------------------------------------------------
@@ -54,55 +52,15 @@ def cat_capacitor(rng, cx, cy, vertical, value, plates, plus=None):
     body = (f'M{f(-n)} -.5Q0 -.78 {f(n)} -.5C{f(n + (b - n) * k1)} {f(y1)} {f(b)} {f(y2)} {f(b)} {f(yb - r)}'
             f'Q{f(b)} {f(yb)} {f(b - r)} {f(yb)}H{f(-b + r)}Q{f(-b)} {f(yb)} {f(-b)} {f(yb - r)}'
             f'C{f(-b)} {f(y2)} {f(-n - (b - n) * k1)} {f(y1)} {f(-n)} -.5Z')
-    pw = max(.42, b - .45)
-    parts = [
-        f'<path d="{tail}" fill="none" stroke="{INK}" stroke-width=".62" stroke-linecap="round"/>',
-        f'<path d="{tail}" fill="none" stroke="{fur}" stroke-width=".34" stroke-linecap="round"/>',
-        f'<path d="{body}" fill="{fur}"/>',
-        f'<ellipse cx="0" cy="{f(1.05 + .1 * chub)}" rx="{f(.25 + b * .45)}" ry="{f(.3 + .3 * chub)}" fill="#fff" stroke="none" opacity=".75"/>',
-        f'<ellipse cx="{f(b * .45)}" cy=".95" rx="{f(b * .3)}" ry=".4" fill="{patch}" stroke="none" opacity=".5"/>',
-        f'<ellipse cx="{f(-pw)}" cy="{f(yb - .05)}" rx=".36" ry=".22" fill="{fur}"/><ellipse cx="{f(pw)}" cy="{f(yb - .05)}" rx=".36" ry=".22" fill="{fur}"/>',
-        f'<path d="M{f(-hr * .92)} {f(-.85 - hy * .3)}L{f(-hr * .8)} {f(-.85 - hy * .55 - ear * .75)}L{f(-hr * .18)} {f(-.85 - hy * .82)}Z" fill="{fur}"/>',
-        f'<path d="M{f(hr * .92)} {f(-.85 - hy * .3)}L{f(hr * .8)} {f(-.85 - hy * .55 - ear * .75)}L{f(hr * .18)} {f(-.85 - hy * .82)}Z" fill="{fur}"/>',
-        f'<path d="M{f(-hr * .72)} {f(-.85 - hy * .5)}L{f(-hr * .72)} {f(-.85 - hy * .55 - ear * .55)}L{f(-hr * .38)} {f(-.85 - hy * .72)}Z" fill="#ffb3cf" stroke="none"/>',
-        f'<path d="M{f(hr * .72)} {f(-.85 - hy * .5)}L{f(hr * .72)} {f(-.85 - hy * .55 - ear * .55)}L{f(hr * .38)} {f(-.85 - hy * .72)}Z" fill="#ffb3cf" stroke="none"/>',
-        f'<ellipse cx="0" cy="-.85" rx="{f(hr)}" ry="{f(hy)}" fill="{fur}"/>',
-    ]
-    bw = b
-    if rng.random() < .45:
-        parts.append(f'<path d="M{f(hr * .1)} {f(-.85 - hy * .92)}C{f(hr * .7)} {f(-.85 - hy * .85)} {f(hr * .95)} -.9 {f(hr * .9)} -.6'
-                     f'C{f(hr * .5)} -.7 {f(hr * .2)} -1.2 {f(hr * .1)} {f(-.85 - hy * .92)}Z" fill="{patch}" stroke="none" opacity=".7"/>')
+    head_patch = rng.random() < .45
     eyes = rng.choice(['dot', 'happy', 'sleepy'])
-    ex, ey = hr * .4, -1.02
-    if eyes == 'dot':
-        parts.append(f'<circle cx="{f(-ex)}" cy="{f(ey)}" r=".15" fill="{INK}" stroke="none"/><circle cx="{f(ex)}" cy="{f(ey)}" r=".15" fill="{INK}" stroke="none"/>'
-                     f'<circle cx="{f(-ex + .05)}" cy="{f(ey - .05)}" r=".05" fill="#fff" stroke="none"/><circle cx="{f(ex + .05)}" cy="{f(ey - .05)}" r=".05" fill="#fff" stroke="none"/>')
-    elif eyes == 'happy':
-        parts.append(f'<path d="M{f(-ex - .17)} {f(ey + .05)}q.17 -.22 .34 0M{f(ex - .17)} {f(ey + .05)}q.17 -.22 .34 0" fill="none" stroke-width=".11"/>')
-    else:
-        parts.append(f'<path d="M{f(-ex - .17)} {f(ey)}q.17 .16 .34 0M{f(ex - .17)} {f(ey)}q.17 .16 .34 0" fill="none" stroke-width=".11"/>')
-    parts.append(
-        f'<ellipse cx="{f(-hr * .62)}" cy="-.72" rx=".2" ry=".11" fill="#ff9cc2" stroke="none" opacity=".8"/>'
-        f'<ellipse cx="{f(hr * .62)}" cy="-.72" rx=".2" ry=".11" fill="#ff9cc2" stroke="none" opacity=".8"/>'
-        f'<path d="M-.17 -.74q.085 .1 .17 0q.085 .1 .17 0" fill="none" stroke-width=".09"/>'
-        f'<path d="M-.03 -.86h.06l-.03 .05z" fill="#ff8fab" stroke-width=".05"/>'
-        f'<path d="M{f(-hr * .5)} -.8l{f(-hr * .55)} -.06M{f(-hr * .5)} -.7l{f(-hr * .55)} .05'
-        f'M{f(hr * .5)} -.8l{f(hr * .55)} -.06M{f(hr * .5)} -.7l{f(hr * .55)} .05" fill="none" stroke-width=".06" opacity=".7"/>')
-    if c is None:
-        parts.append(f'<text x="{f(max(bw, hr) + .2)}" y="-1.4" font-family="Pop" font-size="1.2" fill="#ff7fb2" stroke="none">?</text>')
-    # the bell on the collar (the upper plate)
-    parts.append('<circle cx="0" cy="-.25" r=".22" fill="#ffd95e" stroke-width=".07"/>')
-    cat = (f'<g transform="translate({f(cx)} {f(cy)}) rotate({rot}) scale(1.12)" stroke="{INK}" stroke-width=".14" '
-           f'stroke-linejoin="round">{"".join(parts)}</g>')
-    pl = ''.join(f'<path d="M{f(a[0])} {f(a[1])}L{f(b[0])} {f(b[1])}"/>' for a, b in plates)
-    if pl:
-        cat += f'<g stroke="{INK}" stroke-width=".34" stroke-linecap="round">{pl}</g>'
     if plus:   # polarised: a little "+" badge by the positive end
-        px, py = plus
         ox, oy = (1.9, 0) if vertical else (0, -1.9)
-        cat += (f'<g transform="translate({f(px + ox)} {f(py + oy)})"><circle r=".62" fill="#ffd95e" stroke="{INK}" stroke-width=".12"/>'
-                f'<path d="M-.32 0H.32M0 -.32V.32" stroke="{INK}" stroke-width=".16" stroke-linecap="round"/></g>')
-    return cat
+        plus = (plus[0] + ox, plus[1] + oy)
+    return render('characters/cat_capacitor.svg.j2', cx=cx, cy=cy, rot=rot, fur=fur, patch=patch, chub=chub,
+                  tail=tail, body=body, b=b, yb=yb, pw=max(.42, b - .45), hr=hr, hy=hy, ear=ear,
+                  head_patch=head_patch, eyes=eyes, ex=hr * .4, ey=-1.02, unknown=c is None, qx=max(b, hr) + .2,
+                  plates=plates, plus=plus)
 
 
 # ----------------------------------------------------------------------------
@@ -114,14 +72,8 @@ def brick(x, y, ang, k=1.5):
 
 
 def molotov(x, y, ang, k=1.35):
-    return (f'<g transform="translate({f(x)} {f(y)}) rotate({f(ang)}) scale({f(k)})" stroke="{INK}" stroke-width=".12" stroke-linejoin="round">'
-            '<path d="M-.45 1.1V.1Q-.45 -.3 -.18 -.45V-.85H.18V-.45Q.45 -.3 .45 .1V1.1Q.45 1.25 .3 1.25H-.3Q-.45 1.25 -.45 1.1Z" fill="#bfeee6"/>'
-            '<path d="M-.42 .45H.42V1.1Q.42 1.22 .3 1.22H-.3Q-.42 1.22 -.42 1.1Z" fill="#ffb3cf" stroke="none"/>'
-            '<path d="M-.1 .75l.1 .1.1 -.1" fill="none" stroke="#fff" stroke-width=".09"/>'
-            '<path d="M-.1 -.85Q-.25 -1.15 0 -1.3" fill="none" stroke="#fff3c4" stroke-width=".18"/>'
-            '<path d="M0 -1.25C-.55 -1.45 -.4 -1.95 -.1 -2.35-.05 -2.05.15 -2 .2 -2.25.55 -1.85.45 -1.4 0 -1.25Z" fill="#ffb86b"/>'
-            '<path d="M0 -1.35C-.22 -1.5 -.15 -1.75 0 -1.9.05 -1.75.2 -1.6 0 -1.35Z" fill="#fff1a0" stroke="none"/>'
-            '<circle cx="-.13" cy=".15" r=".06" fill="' + INK + '" stroke="none"/><circle cx=".13" cy=".15" r=".06" fill="' + INK + '" stroke="none"/></g>')
+    return tag('use', href='#molotov', transform=f'translate({f(x)} {f(y)}) rotate({f(ang)}) scale({f(k)})',
+               stroke=INK, stroke_width=.12, stroke_linejoin='round')
 
 
 def resistor_guy(rng, cx, cy, vertical, half_len, mood, throw):
@@ -134,8 +86,7 @@ def resistor_guy(rng, cx, cy, vertical, half_len, mood, throw):
     else:
         x0, y0, x1, y1 = cx - half_len, cy - hw, cx + half_len, cy + hw
     col = rng.choice(BODY)
-    out = []
-    arm = 'fill="none" stroke="' + INK + '" stroke-width=".26" stroke-linecap="round" stroke-linejoin="round"'
+    arms, thrown = [], None
     if throw:
         dx, dy, kind = throw
         n = math.hypot(dx, dy)
@@ -146,39 +97,26 @@ def resistor_guy(rng, cx, cy, vertical, half_len, mood, throw):
         else:
             hx, hy = cx + ux * .6, (y1 if uy > 0 else y0)
         tx, ty = hx + ux * 1.1 - .2 * (1 if uy <= 0 else -1) * abs(uy), hy + uy * 1.1 - .5 * abs(ux)
-        out.append(f'<path d="M{f(hx)} {f(hy)}Q{f(hx + ux * .3)} {f(hy - .8)} {f(tx)} {f(ty)}" {arm}/>')
         px, py = cx + dx, cy + dy
         mx, my = (tx + px) / 2 - uy * .9 * 0 , min(ty, py) - 1.1
-        out.append(f'<path d="M{f(tx)} {f(ty)}Q{f(mx)} {f(my)} {f(px)} {f(py)}" fill="none" stroke="#c9a0c2" stroke-width=".13" stroke-dasharray=".25 .25"/>')
         ang = rng.uniform(-35, 35)
-        out.append(brick(px, py, ang) if kind == 'brick' else molotov(px, py, ang * .6))
-        for i in (-1, 1):
-            out.append(f'<path d="M{f(px - ux * 1.4 + i * uy * .4)} {f(py - uy * 1.4 - i * ux * .4)}l{f(-ux * .5)} {f(-uy * .5)}" fill="none" stroke="#c9a0c2" stroke-width=".12" stroke-linecap="round"/>')
         # the other arm on its hip
         ox, oy = (x0, cy + .3) if vertical and ux > 0 else (x1, cy + .3) if vertical else (cx - ux * .6, y0 if uy > 0 else y1)
         sgn = -1 if (vertical and ux > 0) else 1
-        if vertical:
-            out.append(f'<path d="M{f(ox)} {f(oy - .5)}l{f(sgn * .55)} .35l{f(-sgn * .45)} .4" {arm}/>')
-    else:
-        for sx in (-1, 1):
-            if vertical:
-                ex = x1 if sx > 0 else x0
-                out.append(f'<path d="M{f(ex)} {f(cy)}q{f(sx * .5)} -.2 {f(sx * .55)} -.9" {arm}/>')
-    out.append(f'<rect x="{f(x0)}" y="{f(y0)}" width="{f(x1 - x0)}" height="{f(y1 - y0)}" rx=".45" fill="{col}" stroke="{INK}" stroke-width=".3"/>')
-    out.append(f'<rect x="{f(x0)}" y="{f(y0)}" width="{f(x1 - x0)}" height="{f(y1 - y0)}" rx=".45" fill="url(#tone-w)" stroke="none"/>')
-    out.append(f'<use href="#rface-{mood}" transform="translate({f(cx)} {f(cy - (.25 if vertical else 0))}) scale(.3)"/>')
-    return ''.join(out)
+        thrown = dict(hx=hx, hy=hy, cx=hx + ux * .3, cy=hy - .8, tx=tx, ty=ty, mx=mx, my=my, px=px, py=py,
+                      projectile=brick(px, py, ang) if kind == 'brick' else molotov(px, py, ang * .6),
+                      speed=[(px - ux * 1.4 + i * uy * .4, py - uy * 1.4 - i * ux * .4) for i in (-1, 1)],
+                      dx=-ux * .5, dy=-uy * .5, hip=(ox, oy, sgn) if vertical else None)
+    elif vertical:
+        arms = [(x1 if sx > 0 else x0, cy, sx) for sx in (-1, 1)]
+    return render('characters/resistor_guy.svg.j2', x0=x0, y0=y0, x1=x1, y1=y1, col=col, arms=arms, throw=thrown,
+                  mood=mood, fx=cx, fy=cy - (.25 if vertical else 0))
 
 
 def resistor_face_defs():
-    st = f'fill="none" stroke="{INK}" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"'
-    blush = '<ellipse cx="-2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/><ellipse cx="2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>'
-    eyes = f'<circle cx="-1.4" cy="0" r=".62" fill="{INK}"/><circle cx="1.4" cy="0" r=".62" fill="{INK}"/><circle cx="-1.2" cy="-.2" r=".22" fill="#fff"/><circle cx="1.6" cy="-.2" r=".22" fill="#fff"/>'
-    return f'''
-<g id="rface-grumpy">{eyes}<path d="M-2.3 -1.5L-.6 -.9M2.3 -1.5L.6 -.9" {st}/>{blush}<path d="M-.6 1.6Q0 1.1 .6 1.6" {st}/></g>
-<g id="rface-yell"><path d="M-2 -.6L-.9 0-2 .6M2 -.6L.9 0 2 .6" {st}/>{blush}<path d="M-.6 1Q0 2.3.6 1Z" fill="#ff7f9e" stroke="{INK}" stroke-width=".4"/></g>
-<g id="rface-smug">{eyes}<path d="M-2.2 -1.3L-.7 -1.1M2.2 -1.5L.7 -1" {st}/>{blush}<path d="M-.7 1.2Q.2 1.9.9 .9" {st}/></g>
-<g id="rface-pout"><path d="M-2 -.1q.6 .5 1.2 0M.8 -.1q.6 .5 1.2 0" {st}/><path d="M-2.3 -1.2L-.8 -.8M2.3 -1.2L.8 -.8" {st}/>{blush}<circle cx="0" cy="1.4" r=".45" {st}/></g>'''
+    """The faces (#rface-grumpy, -yell, -smug, -pout) are in static/char-resistor-faces.svg now, whose <defs>
+    go into the document's <defs> by themselves; kept for styles.py."""
+    return Markup('')
 
 
 # ----------------------------------------------------------------------------
@@ -208,91 +146,60 @@ def caterpillar(rng, a, b, core_lines):
 # ----------------------------------------------------------------------------
 # Dancing crystal
 
+NOTES = [(-3.2, -3.6, 1.6, '♪'), (2.8, -3.9, 1.9, '♫'), (4.3, -2.2, 1.3, '♪'), (-4.4, -2.0, 1.2, '♬'),
+         (-3.4, 3.2, 1.5, '♫'), (3.6, 3.0, 1.5, '♪'), (-5.5, .6, 1.3, '♪'), (5.6, .4, 1.3, '♬'),
+         (-7.5, -1.8, 1.7, '♫'), (-9.2, .8, 1.4, '♪'), (-7, 3.4, 1.3, '♬'), (-10.5, -2.6, 1.2, '♪')]
+NOTE_COLOURS = ['#ff8fbf', '#8fc3ff', '#b79cff', '#7fd8c0']
+
+
 def dancing_crystal(rng, cx, cy, body, free=lambda x, y: True):
     """`body` = the crystal's box (x0, y0, x1, y1) in sheet coordinates."""
     x0, y0, x1, y1 = body
-    arm = f'fill="none" stroke="{INK}" stroke-width=".24" stroke-linecap="round"'
-    out = [f'<path d="M{f(x0)} {f(cy - .2)}q-.7 -.3 -.9 -1.3M{f(x1)} {f(cy - .2)}q.6 -.6 1.3 -.5" {arm}/>',
-           f'<circle cx="{f(x0 - .9)}" cy="{f(cy - 1.5)}" r=".2" fill="#fff" stroke="{INK}" stroke-width=".12"/>',
-           f'<circle cx="{f(x1 + 1.35)}" cy="{f(cy - .7)}" r=".2" fill="#fff" stroke="{INK}" stroke-width=".12"/>',
-           f'<g transform="rotate(-8 {f(cx)} {f(cy)})"><rect x="{f(x0)}" y="{f(y0)}" width="{f(x1 - x0)}" height="{f(y1 - y0)}" rx=".35" fill="#e6f7ff" stroke="{INK}" stroke-width=".26"/>'
-           f'<path d="M{f(x0 + .3)} {f(y0 + .3)}l.5 .5" stroke="#fff" stroke-width=".25" stroke-linecap="round"/>'
-           f'<use href="#face-happy" transform="translate({f(cx)} {f(cy - .2)}) scale(.17)"/></g>']
-    spots = [(-3.2, -3.6, 1.6, '♪'), (2.8, -3.9, 1.9, '♫'), (4.3, -2.2, 1.3, '♪'), (-4.4, -2.0, 1.2, '♬'),
-             (-3.4, 3.2, 1.5, '♫'), (3.6, 3.0, 1.5, '♪'), (-5.5, .6, 1.3, '♪'), (5.6, .4, 1.3, '♬'),
-             (-7.5, -1.8, 1.7, '♫'), (-9.2, .8, 1.4, '♪'), (-7, 3.4, 1.3, '♬'), (-10.5, -2.6, 1.2, '♪')]
-    for i, (dx, dy, s, ch) in enumerate(spots):
+    notes = []
+    for i, (dx, dy, s, ch) in enumerate(NOTES):
         if not free(cx + dx + s * .3, cy + dy - s * .4):
             continue
-        col = ['#ff8fbf', '#8fc3ff', '#b79cff', '#7fd8c0'][i % 4]
-        out.append(f'<text x="{f(cx + dx)}" y="{f(cy + dy)}" font-size="{f(s * 1.5)}" font-family="DejaVu Sans, sans-serif" fill="{col}" '
-                   f'stroke="{INK}" stroke-width=".12" paint-order="stroke" transform="rotate({rng.uniform(-20, 20):.0f} {f(cx + dx)} {f(cy + dy)})">{ch}</text>')
-    for s in (-1, 1):
-        out.append(f'<path d="M{f(cx + s * 2.4)} {f(cy - 2.6)}q{f(s * .6)} .5 {f(s * .5)} 1.2M{f(cx + s * 2.9)} {f(cy - 2.1)}q{f(s * .45)} .4 {f(s * .35)} .9" '
-                   f'fill="none" stroke="#c9a0c2" stroke-width=".13" stroke-linecap="round"/>')
-    return ''.join(out)
-
+        notes.append((cx + dx, cy + dy, s, NOTE_COLOURS[i % 4], f'{rng.uniform(-20, 20):.0f}', ch))
+    return render('characters/dancing_crystal.svg.j2', cx=cx, cy=cy, x0=x0, y0=y0, x1=x1, y1=y1, notes=notes)
 
 
 def legend(rng, cast):
     """The cast of characters on this sheet, as (svg, width, height), origin top left.
     `cast`: {'cap': True, 'res': True, 'ind': 'inductor' | 'ferrite bead', 'xtal': True}."""
-    w = 150
-    t = lambda x, y, txt, size, fam='Pop', col=INK, anchor='start', extra='': (
-        f'<text x="{f(x)}" y="{f(y)}" font-family="{fam}" font-size="{f(size)}" fill="{col}" '
-        f'text-anchor="{anchor}"{extra}>{txt}</text>')
-    sub = lambda x, y, txt, size=2.5, col='#7b5b94': t(x, y, txt, size, 'Zen', col, extra=' font-weight="700"')
-    out, y = [], 12
+    cats, cats_y, y = [], None, 12
     if cast.get('cap'):       # a row of cats from slim to chonky
+        cats_y = y
         for i, v in enumerate(['10p', '1n', '100n', '1u', '4u7', '22u']):
             cx = 12 + i * 13.5
-            out.append(f'<g transform="translate({f(cx)} {f(y + 9)}) scale(2.2) translate({f(-cx)} {f(-y - 9)})">'
-                       f'{cat_capacitor(rng, cx, y + 9, True, v, [])}</g>')
-            out.append(t(cx, y + 18.5, v.replace('u', 'µ') + 'F', 2.6, 'MPR', '#2f8f86', 'middle', ' font-weight="800"'))
-        out.append(t(92, y + 6.5, 'capacitors', 4))
-        out.append(sub(92, y + 11.5, 'more capacitance, more chonk', 2.7))
-        out.append(sub(92, y + 15.5, '(the wires go in one end and out the other)', 2.2, '#a08cb0'))
+            cats.append((cx, cat_capacitor(rng, cx, y + 9, True, v, []), v.replace('u', 'µ') + 'F'))
         y += 22
+    # the other characters in a row of slots, each drawn around the origin (the bus in place)
     others = []
-    if cast.get('res'):
-        others.append(lambda x, y: f'<g transform="translate({f(x + 4)} {f(y + 4)}) scale(1.9)">'
-                      f'{resistor_guy(rng, 0, 0, True, 1.778, "grumpy", (3.6, -.6, "brick"))}</g>'
-                      + t(x + 16, y + 2, 'resistor', 3.6) + sub(x + 16, y + 6.5, 'grumpy, throws bricks')
-                      + sub(x + 16, y + 10, '(and the odd molotov)', 2.2, '#a08cb0'))
-    if cast.get('ind'):
-        bead = cast['ind'] == 'ferrite bead'
-        others.append(lambda x, y: f'<g transform="translate({f(x + 6)} {f(y + 5)}) scale(1.9)">'
-                      f'{caterpillar(rng, (-2.6, 0), (2.6, 0), [])}</g>'
-                      + t(x + 15, y + 2, cast['ind'], 3.6)
-                      + sub(x + 15, y + 6.5, 'eats high frequencies' if bead else 'a very hungry caterpillar'))
-    if cast.get('xtal'):
-        others.append(lambda x, y: f'<g transform="translate({f(x + 4)} {f(y + 5)}) scale(1.7)">'
-                      f'{dancing_crystal(rng, 0, 0, (-.762, -1.524, .762, 1.524), lambda a, b: b < -1 and abs(a) < 5)}</g>'
-                      + t(x + 14, y + 2, 'crystal', 3.6) + sub(x + 14, y + 6.5, 'dances at its')
-                      + sub(x + 14, y + 10, 'own frequency ♪'))
-    if cast.get('bus'):
-        others.append(lambda x, y: cat_bus([((x + 4, y + 5), (x + 13, y + 5))], (x + 13, y + 5, 1, 0), (x + 4, y + 5, -1, 0),
-                                           [(x + 6.5, y + 5, 0, 1), (x + 10.5, y + 5, 0, 1)]).replace('data-kind="bus" ', '')
-                      + t(x + 20, y + 2, 'bus', 3.6) + sub(x + 20, y + 6.5, 'a very long cat')
-                      + sub(x + 20, y + 10, 'carries lots of signals', 2.2, '#a08cb0'))
-    w = max(w, 12 + 50 * len(others))
-    for i, draw in enumerate(others):
-        out.append(draw(6 + i * 50, y + 6))
+    for i, kind in enumerate(k for k in ('res', 'ind', 'xtal', 'bus') if cast.get(k)):
+        x, oy = 6 + i * 50, y + 6
+        if kind == 'res':
+            svg = resistor_guy(rng, 0, 0, True, 1.778, 'grumpy', (3.6, -.6, 'brick'))
+        elif kind == 'ind':
+            svg = caterpillar(rng, (-2.6, 0), (2.6, 0), [])
+        elif kind == 'xtal':
+            svg = dancing_crystal(rng, 0, 0, (-.762, -1.524, .762, 1.524), lambda a, b: b < -1 and abs(a) < 5)
+        else:
+            svg = _cat_bus([((x + 4, oy + 5), (x + 13, oy + 5))], (x + 13, oy + 5, 1, 0), (x + 4, oy + 5, -1, 0),
+                           [(x + 6.5, oy + 5, 0, 1), (x + 10.5, oy + 5, 0, 1)], (), tagged=False)
+        others.append((kind, x, oy, svg))
+    w = max(150, 12 + 50 * len(others))
     if others:
         y += 18
     h = y + 2
-    frame = [f'<rect x="1.5" y="1.5" width="{w}" height="{h}" rx="6" fill="url(#tone-ink)" opacity=".5" data-shadow="1.5 1.5"/>',
-             f'<rect width="{w}" height="{h}" rx="6" fill="#fff" stroke="{INK}" stroke-width=".8"/>',
-             f'<rect x="2" y="2" width="{w - 4}" height="{h - 4}" rx="4.5" fill="none" stroke="#ffb8d0" stroke-width=".45" stroke-dasharray="1.6 1"/>',
-             t(w / 2, 9, '♡ cast of characters ♡', 5, anchor='middle', col='#ff7fb2',
-               extra=' stroke="#fff" stroke-width=".8" paint-order="stroke"')]
-    return ''.join(frame + out), w, h
+    svg = render('characters/legend.svg.j2', w=w, h=h, cats=cats, cats_y=cats_y, others=others, ind=cast.get('ind'))
+    return svg, w, h
 
 
 # ----------------------------------------------------------------------------
 # Buses: one long fluffy tabby per connected bus, with lots of little legs
 
-BUS_FUR, BUS_STRIPE = '#ffd6a8', '#efae78'
+BUS_FUR, BUS_STRIPE = '#ffd6a8', '#efae78'   # also in static/char-bus.svg
+BUS_LINE = '#7a6888'
 
 
 def cat_bus(segments, head, tail, legs, entries=()):
@@ -302,46 +209,29 @@ def cat_bus(segments, head, tail, legs, entries=()):
     `entries`: [(point on the bus, point on the wire, colour, is_leg)] bus entries: on the
     legs' side they are legs (the wire leaves from the paw), otherwise slightly squiggly
     wires coming in through a window."""
-    line = '#7a6888'
+    return _cat_bus(segments, head, tail, legs, entries)
+
+
+def _cat_bus(segments, head, tail, legs, entries, tagged=True):
+    """`tagged`: mark the segments data-kind="bus" (not in the legend)."""
     half = 1.45                     # half the body's thickness
-    out = []
+    leg_entries = []
     for p, q, col, is_leg in entries:      # entries that are legs: wire from the paw outwards
         if not is_leg:
             continue
         vx, vy = q[0] - p[0], q[1] - p[1]
-        px, py = p[0] + vx * .84, p[1] + vy * .84
-        d = f'M{f(px)} {f(py)}L{f(q[0])} {f(q[1])}'
-        out.append(f'<g data-kind="bus_entry"><path class="wire-o" d="{d}"/><path class="wire-i" stroke="{col}" d="{d}"/></g>')
-        d = f'M{f(p[0] + vx * .38)} {f(p[1] + vy * .38)}L{f(p[0] + vx * .79)} {f(p[1] + vy * .79)}'
-        ang = math.degrees(math.atan2(vy, vx))
-        out.append(f'<path d="{d}" stroke="{line}" stroke-width="1.05" stroke-linecap="round"/>'
-                   f'<path d="{d}" stroke="{BUS_FUR}" stroke-width=".65" stroke-linecap="round"/>'
-                   f'<ellipse transform="translate({f(px)} {f(py)}) rotate({f(ang + 90)})" rx=".62" ry=".42" fill="#fff" '
-                   f'stroke="{line}" stroke-width=".15"/>')
-    for x, y, nx, ny in legs:      # legs first, the body covers their tops
-        d = f'M{f(x + nx * .9)} {f(y + ny * .9)}L{f(x + nx * 2.6)} {f(y + ny * 2.6)}'
-        out.append(f'<path d="{d}" stroke="{line}" stroke-width="1.05" stroke-linecap="round"/>'
-                   f'<path d="{d}" stroke="{BUS_FUR}" stroke-width=".65" stroke-linecap="round"/>'
-                   f'<ellipse cx="{f(x + nx * 2.75)}" cy="{f(y + ny * 2.75)}" rx=".62" ry=".42" fill="#fff" stroke="{line}" stroke-width=".15"/>')
+        paw = (p[0] + vx * .84, p[1] + vy * .84)
+        leg = ((p[0] + vx * .38, p[1] + vy * .38), (p[0] + vx * .79, p[1] + vy * .79))
+        leg_entries.append((paw, q, col, leg, math.degrees(math.atan2(vy, vx)) + 90))
+    # legs first, the body covers their tops
+    plain_legs = [((x + nx * .9, y + ny * .9), (x + nx * 2.6, y + ny * 2.6), (x + nx * 2.75, y + ny * 2.75))
+                  for x, y, nx, ny in legs]
     tx, ty, tux, tuy = tail        # a fluffy tail curling up
-    td = (f'M{f(tx)} {f(ty)}C{f(tx + tux * 2.8)} {f(ty + tuy * 2.8)} {f(tx + tux * 3.8)} {f(ty + tuy * 3.8 - 2.6)} '
-          f'{f(tx + tux * 2.2)} {f(ty + tuy * 2.2 - 3.1)}')
-    out.append(f'<path d="{td}" fill="none" stroke="{line}" stroke-width="1.6" stroke-linecap="round"/>'
-               f'<path d="{td}" fill="none" stroke="{BUS_FUR}" stroke-width="1.15" stroke-linecap="round"/>')
-    body = ''.join(f'M{f(a[0])} {f(a[1])}L{f(b[0])} {f(b[1])}' for a, b in segments)
-    for a, b in segments:
-        out.append(f'<path data-kind="bus" d="M{f(a[0])} {f(a[1])}L{f(b[0])} {f(b[1])}" fill="none" stroke="{line}" '
-                   f'stroke-width="{f(2 * half + .45)}" stroke-linecap="round" stroke-linejoin="round"/>')
-    out.append(f'<path d="{body}" fill="none" stroke="{BUS_FUR}" stroke-width="{f(2 * half)}" stroke-linecap="round" stroke-linejoin="round"/>')
+    tail_curve = ((tx, ty), (tx + tux * 2.8, ty + tuy * 2.8), (tx + tux * 3.8, ty + tuy * 3.8 - 2.6),
+                  (tx + tux * 2.2, ty + tuy * 2.2 - 3.1))
     stripes, windows = [], []
     hx, hy = head[0], head[1]
     taps = [p for p, _, _, is_leg in entries if not is_leg]
-
-    def window(px, py, ang):
-        windows.append(f'<g transform="translate({f(px)} {f(py)}) rotate({f(ang)})">'
-                       f'<rect x="-.85" y="-.75" width="1.7" height="1.3" rx=".35" fill="#d9f1ff" fill-opacity=".72" '
-                       f'stroke="{line}" stroke-width=".16"/>'
-                       f'<path d="M-.5 -.45l.45 .55" stroke="#fff" stroke-width=".22" stroke-linecap="round"/></g>')
     for a, b in segments:          # windows along the back, tabby stripes between them
         L = math.hypot(b[0] - a[0], b[1] - a[1])
         if L < 1:
@@ -354,46 +244,29 @@ def cat_bus(segments, head, tail, legs, entries=()):
             near_tap = min((math.hypot(px - q[0], py - q[1]) for q in taps), default=99)
             if math.hypot(px - hx, py - hy) > 3.5 and near_tap > 1.6:
                 if k % 2:
-                    window(px, py, math.degrees(math.atan2(uy, ux)))
+                    windows.append((px, py, math.degrees(math.atan2(uy, ux))))
                 else:
-                    stripes.append(f'M{f(px + nx * 1.05)} {f(py + ny * 1.05)}Q{f(px + ux * .4)} {f(py + uy * .4)} '
-                                   f'{f(px - nx * 1.05)} {f(py - ny * 1.05)}')
+                    stripes.append(((px + nx * 1.05, py + ny * 1.05), (px + ux * .4, py + uy * .4),
+                                    (px - nx * 1.05, py - ny * 1.05)))
             t += 1.9
             k += 1
         for q in taps:             # a window wherever a bus entry comes in
             if on_seg(q, a, b):
-                window(q[0], q[1], math.degrees(math.atan2(uy, ux)))
-    out.append(f'<path d="{"".join(stripes)}" fill="none" stroke="{BUS_STRIPE}" stroke-width=".4" stroke-linecap="round"/>')
+                windows.append((q[0], q[1], math.degrees(math.atan2(uy, ux))))
+    wires = []
     for p, q, col, is_leg in entries:      # the others: ordinary wires with a little wiggle, into a window
         if is_leg:
             continue
         dx, dy = p[0] - q[0], p[1] - q[1]
         n = math.hypot(dx, dy) or 1
         nx, ny = -dy / n * .55, dx / n * .55
-        d = (f'M{f(q[0])} {f(q[1])}C{f(q[0] + dx * .35 + nx)} {f(q[1] + dy * .35 + ny)} '
-             f'{f(q[0] + dx * .7 - nx)} {f(q[1] + dy * .7 - ny)} {f(p[0])} {f(p[1])}')
-        out.append(f'<g data-kind="bus_entry"><path class="wire-o" d="{d}"/><path class="wire-i" stroke="{col}" d="{d}"/></g>')
-    out += windows
+        wires.append((q, (q[0] + dx * .35 + nx, q[1] + dy * .35 + ny), (q[0] + dx * .7 - nx, q[1] + dy * .7 - ny),
+                      p, col))
     # the head, upright, just past the end of the bus: headlight eyes and a big grin
     ux, uy = head[2], head[3]
-    cx, cy = hx + ux * 3.1, hy + uy * 3.1
-    out.append(f'<g transform="translate({f(cx)} {f(cy)})" stroke="{line}" stroke-width=".22" stroke-linejoin="round">'
-               f'<path d="M-2.45 -.9L-2.1 -3.4L-.8 -2.2Z" fill="{BUS_FUR}"/><path d="M2.45 -.9L2.1 -3.4L.8 -2.2Z" fill="{BUS_FUR}"/>'
-               f'<path d="M-2.05 -1.3L-1.95 -2.75L-1.15 -2.05Z" fill="#ffb3cf" stroke="none"/>'
-               f'<path d="M2.05 -1.3L1.95 -2.75L1.15 -2.05Z" fill="#ffb3cf" stroke="none"/>'
-               f'<ellipse rx="2.75" ry="2.3" fill="{BUS_FUR}"/>'
-               f'<path d="M-.6 -2.2Q0 -1.6 .6 -2.2M-.3 -2.25V-1.75M.3 -2.25V-1.75" fill="none" stroke="{BUS_STRIPE}" stroke-width=".28"/>'
-               f'<circle cx="-1.15" cy="-.55" r="1.35" fill="#fff6a0" stroke="none" opacity=".45"/>'
-               f'<circle cx="1.15" cy="-.55" r="1.35" fill="#fff6a0" stroke="none" opacity=".45"/>'
-               f'<circle cx="-1.15" cy="-.55" r=".82" fill="#fff8c2"/><circle cx="1.15" cy="-.55" r=".82" fill="#fff8c2"/>'
-               f'<circle cx="-1.05" cy="-.5" r=".34" fill="{INK}" stroke="none"/><circle cx="1.25" cy="-.5" r=".34" fill="{INK}" stroke="none"/>'
-               f'<circle cx="-.95" cy="-.62" r=".11" fill="#fff" stroke="none"/><circle cx="1.35" cy="-.62" r=".11" fill="#fff" stroke="none"/>'
-               f'<path d="M-1.75 .55Q0 2.5 1.75 .55Q0 1.25 -1.75 .55Z" fill="#fff" stroke-width=".18"/>'
-               f'<path d="M-.9 .95l.05 .55M-.3 1.08v.7M.3 1.08v.7M.9 .95l-.05 .55" fill="none" stroke-width=".1"/>'
-               f'<ellipse cx="-2.05" cy=".55" rx=".42" ry=".22" fill="#ff9cc2" stroke="none" opacity=".8"/>'
-               f'<ellipse cx="2.05" cy=".55" rx=".42" ry=".22" fill="#ff9cc2" stroke="none" opacity=".8"/>'
-               f'<path d="M-1.6 .2l-1.6 -.25M-1.6 .5l-1.6 .15M1.6 .2l1.6 -.25M1.6 .5l1.6 .15" fill="none" stroke-width=".09"/></g>')
-    return ''.join(out)
+    return render('characters/cat_bus.svg.j2', segments=segments, half=half, tagged=tagged, line=BUS_LINE,
+                  fur=BUS_FUR, stripe=BUS_STRIPE, leg_entries=leg_entries, legs=plain_legs, tail=tail_curve,
+                  stripes=stripes, wires=wires, windows=windows, head=(hx + ux * 3.1, hy + uy * 3.1))
 
 
 def on_seg(p, a, b, eps=0.01):

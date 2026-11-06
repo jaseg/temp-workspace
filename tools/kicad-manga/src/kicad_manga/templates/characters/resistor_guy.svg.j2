@@ -1,0 +1,24 @@
+{#- Resistor guy: the box (x0, y0)-(x1, y1) in colour `col`, with the face for `mood` at (fx, fy).
+    `arms` [(x, y, s)]: arms waving up from (x, y), to the side s (-1 or 1); empty when throwing.
+    `throw`: None, or a dict with the throwing arm (hx, hy, cx, cy: control point, tx, ty: the hand),
+    the flight path to the projectile (mx, my: control point, px, py), `projectile` (markup), `speed`
+    [(x, y)] the starts of the speed lines (dx, dy long) and `hip`: None or (x, y, s), the other arm on
+    its hip, s = which way the elbow points. #}
+{% if throw %}
+<path d="M{{ throw.hx|f }} {{ throw.hy|f }}Q{{ throw.cx|f }} {{ throw.cy|f }} {{ throw.tx|f }} {{ throw.ty|f }}" fill="none" stroke="{{ INK }}" stroke-width=".26" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M{{ throw.tx|f }} {{ throw.ty|f }}Q{{ throw.mx|f }} {{ throw.my|f }} {{ throw.px|f }} {{ throw.py|f }}" fill="none" stroke="#c9a0c2" stroke-width=".13" stroke-dasharray=".25 .25"/>
+{{ throw.projectile }}
+{% for x, y in throw.speed %}
+<path d="M{{ x|f }} {{ y|f }}l{{ throw.dx|f }} {{ throw.dy|f }}" fill="none" stroke="#c9a0c2" stroke-width=".12" stroke-linecap="round"/>
+{% endfor %}
+{% if throw.hip %}
+{% set x, y, s = throw.hip %}
+<path d="M{{ x|f }} {{ (y - 0.5)|f }}l{{ (s * 0.55)|f }} .35l{{ (-s * 0.45)|f }} .4" fill="none" stroke="{{ INK }}" stroke-width=".26" stroke-linecap="round" stroke-linejoin="round"/>
+{% endif %}
+{% endif %}
+{% for x, y, s in arms %}
+<path d="M{{ x|f }} {{ y|f }}q{{ (s * 0.5)|f }} -.2 {{ (s * 0.55)|f }} -.9" fill="none" stroke="{{ INK }}" stroke-width=".26" stroke-linecap="round" stroke-linejoin="round"/>
+{% endfor %}
+<rect x="{{ x0|f }}" y="{{ y0|f }}" width="{{ (x1 - x0)|f }}" height="{{ (y1 - y0)|f }}" rx=".45" fill="{{ col }}" stroke="{{ INK }}" stroke-width=".3"/>
+<rect x="{{ x0|f }}" y="{{ y0|f }}" width="{{ (x1 - x0)|f }}" height="{{ (y1 - y0)|f }}" rx=".45" fill="url(#tone-w)" stroke="none"/>
+<use href="#rface-{{ mood }}" transform="translate({{ fx|f }} {{ fy|f }}) scale(.3)"/>

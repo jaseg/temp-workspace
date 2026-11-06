@@ -1,0 +1,54 @@
+{#- Capacitor cat, sitting upright at (cx, cy) and turned by `rot` degrees; the bell on its collar is the upper
+    plate. Colours `fur` and `patch`; `chub` (0..1) is how chonky it is. Computed in Python: `tail` and `body`
+    (path data), `b` (base half-width), `yb` (the floor), `pw` (paw offset), `hr`/`hy` (head radii), `ear`
+    (ear size), `ex`/`ey` (eye position). `head_patch`: a patch of colour over one eye; `eyes`: 'dot', 'happy'
+    or 'sleepy'; `unknown`: the value didn't parse, so the cat wonders (a "?" at `qx`). `plates` [(a, b)]: plate
+    lines redrawn on top; `plus`: where the "+" badge of a polarised one goes, or None. #}
+<g transform="translate({{ cx|f }} {{ cy|f }}) rotate({{ rot }}) scale(1.12)" stroke="{{ INK }}" stroke-width=".14" stroke-linejoin="round">
+  <path d="{{ tail }}" fill="none" stroke="{{ INK }}" stroke-width=".62" stroke-linecap="round"/>
+  <path d="{{ tail }}" fill="none" stroke="{{ fur }}" stroke-width=".34" stroke-linecap="round"/>
+  <path d="{{ body }}" fill="{{ fur }}"/>
+  <ellipse cx="0" cy="{{ (1.05 + 0.1 * chub)|f }}" rx="{{ (0.25 + b * 0.45)|f }}" ry="{{ (0.3 + 0.3 * chub)|f }}" fill="#fff" stroke="none" opacity=".75"/>
+  <ellipse cx="{{ (b * 0.45)|f }}" cy=".95" rx="{{ (b * 0.3)|f }}" ry=".4" fill="{{ patch }}" stroke="none" opacity=".5"/>
+  <ellipse cx="{{ (-pw)|f }}" cy="{{ (yb - 0.05)|f }}" rx=".36" ry=".22" fill="{{ fur }}"/>
+  <ellipse cx="{{ pw|f }}" cy="{{ (yb - 0.05)|f }}" rx=".36" ry=".22" fill="{{ fur }}"/>
+{% for s in (-1, 1) %}
+  <path d="M{{ (s * hr * 0.92)|f }} {{ (-0.85 - hy * 0.3)|f }}L{{ (s * hr * 0.8)|f }} {{ (-0.85 - hy * 0.55 - ear * 0.75)|f }}L{{ (s * hr * 0.18)|f }} {{ (-0.85 - hy * 0.82)|f }}Z" fill="{{ fur }}"/>
+{% endfor %}
+{% for s in (-1, 1) %}
+  <path d="M{{ (s * hr * 0.72)|f }} {{ (-0.85 - hy * 0.5)|f }}L{{ (s * hr * 0.72)|f }} {{ (-0.85 - hy * 0.55 - ear * 0.55)|f }}L{{ (s * hr * 0.38)|f }} {{ (-0.85 - hy * 0.72)|f }}Z" fill="#ffb3cf" stroke="none"/>
+{% endfor %}
+  <ellipse cx="0" cy="-.85" rx="{{ hr|f }}" ry="{{ hy|f }}" fill="{{ fur }}"/>
+{% if head_patch %}
+  <path d="M{{ (hr * 0.1)|f }} {{ (-0.85 - hy * 0.92)|f }}C{{ (hr * 0.7)|f }} {{ (-0.85 - hy * 0.85)|f }} {{ (hr * 0.95)|f }} -.9 {{ (hr * 0.9)|f }} -.6C{{ (hr * 0.5)|f }} -.7 {{ (hr * 0.2)|f }} -1.2 {{ (hr * 0.1)|f }} {{ (-0.85 - hy * 0.92)|f }}Z" fill="{{ patch }}" stroke="none" opacity=".7"/>
+{% endif %}
+{% if eyes == 'dot' %}
+  <circle cx="{{ (-ex)|f }}" cy="{{ ey|f }}" r=".15" fill="{{ INK }}" stroke="none"/>
+  <circle cx="{{ ex|f }}" cy="{{ ey|f }}" r=".15" fill="{{ INK }}" stroke="none"/>
+  <circle cx="{{ (-ex + 0.05)|f }}" cy="{{ (ey - 0.05)|f }}" r=".05" fill="#fff" stroke="none"/>
+  <circle cx="{{ (ex + 0.05)|f }}" cy="{{ (ey - 0.05)|f }}" r=".05" fill="#fff" stroke="none"/>
+{% elif eyes == 'happy' %}
+  <path d="M{{ (-ex - 0.17)|f }} {{ (ey + 0.05)|f }}q.17 -.22 .34 0M{{ (ex - 0.17)|f }} {{ (ey + 0.05)|f }}q.17 -.22 .34 0" fill="none" stroke-width=".11"/>
+{% else %}
+  <path d="M{{ (-ex - 0.17)|f }} {{ ey|f }}q.17 .16 .34 0M{{ (ex - 0.17)|f }} {{ ey|f }}q.17 .16 .34 0" fill="none" stroke-width=".11"/>
+{% endif %}
+  <ellipse cx="{{ (-hr * 0.62)|f }}" cy="-.72" rx=".2" ry=".11" fill="#ff9cc2" stroke="none" opacity=".8"/>
+  <ellipse cx="{{ (hr * 0.62)|f }}" cy="-.72" rx=".2" ry=".11" fill="#ff9cc2" stroke="none" opacity=".8"/>
+  <path d="M-.17 -.74q.085 .1 .17 0q.085 .1 .17 0" fill="none" stroke-width=".09"/>
+  <path d="M-.03 -.86h.06l-.03 .05z" fill="#ff8fab" stroke-width=".05"/>
+  <path d="M{{ (-hr * 0.5)|f }} -.8l{{ (-hr * 0.55)|f }} -.06M{{ (-hr * 0.5)|f }} -.7l{{ (-hr * 0.55)|f }} .05M{{ (hr * 0.5)|f }} -.8l{{ (hr * 0.55)|f }} -.06M{{ (hr * 0.5)|f }} -.7l{{ (hr * 0.55)|f }} .05" fill="none" stroke-width=".06" opacity=".7"/>
+{% if unknown %}
+  <text x="{{ qx|f }}" y="-1.4" font-family="{{ FONT_POP }}" font-size="1.2" fill="#ff7fb2" stroke="none">?</text>
+{% endif %}
+  <circle cx="0" cy="-.25" r=".22" fill="#ffd95e" stroke-width=".07"/>
+</g>
+{% if plates %}
+<g stroke="{{ INK }}" stroke-width=".34" stroke-linecap="round">
+{% for p, q in plates %}
+  <path d="M{{ p[0]|f }} {{ p[1]|f }}L{{ q[0]|f }} {{ q[1]|f }}"/>
+{% endfor %}
+</g>
+{% endif %}
+{% if plus %}
+<use href="#cap-plus" transform="translate({{ plus[0]|f }} {{ plus[1]|f }})"/>
+{% endif %}

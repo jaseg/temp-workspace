@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3.5 -2.5 28 5" width="112mm" height="20mm">
+  <!-- The resistor's faces, one per mood (#rface-grumpy, #rface-yell, #rface-smug, #rface-pout). Placed with
+       <use href="#rface-MOOD" transform="translate(...) scale(.3)"/>. -->
+  <defs>
+    <g id="rface-grumpy">
+      <circle cx="-1.4" cy="0" r=".62" fill="#4b3a5a"/>
+      <circle cx="1.4" cy="0" r=".62" fill="#4b3a5a"/>
+      <circle cx="-1.2" cy="-.2" r=".22" fill="#fff"/>
+      <circle cx="1.6" cy="-.2" r=".22" fill="#fff"/>
+      <path d="M-2.3 -1.5L-.6 -.9M2.3 -1.5L.6 -.9" fill="none" stroke="#4b3a5a" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="-2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>
+      <ellipse cx="2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>
+      <path d="M-.6 1.6Q0 1.1 .6 1.6" fill="none" stroke="#4b3a5a" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="rface-yell">
+      <path d="M-2 -.6L-.9 0-2 .6M2 -.6L.9 0 2 .6" fill="none" stroke="#4b3a5a" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="-2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>
+      <ellipse cx="2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>
+      <path d="M-.6 1Q0 2.3.6 1Z" fill="#ff7f9e" stroke="#4b3a5a" stroke-width=".4"/>
+    </g>
+    <g id="rface-smug">
+      <circle cx="-1.4" cy="0" r=".62" fill="#4b3a5a"/>
+      <circle cx="1.4" cy="0" r=".62" fill="#4b3a5a"/>
+      <circle cx="-1.2" cy="-.2" r=".22" fill="#fff"/>
+      <circle cx="1.6" cy="-.2" r=".22" fill="#fff"/>
+      <path d="M-2.2 -1.3L-.7 -1.1M2.2 -1.5L.7 -1" fill="none" stroke="#4b3a5a" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="-2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>
+      <ellipse cx="2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>
+      <path d="M-.7 1.2Q.2 1.9.9 .9" fill="none" stroke="#4b3a5a" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="rface-pout">
+      <path d="M-2 -.1q.6 .5 1.2 0M.8 -.1q.6 .5 1.2 0" fill="none" stroke="#4b3a5a" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M-2.3 -1.2L-.8 -.8M2.3 -1.2L.8 -.8" fill="none" stroke="#4b3a5a" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="-2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>
+      <ellipse cx="2.5" cy="1.1" rx=".9" ry=".5" fill="#ff9cc2" opacity=".8"/>
+      <circle cx="0" cy="1.4" r=".45" fill="none" stroke="#4b3a5a" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </defs>
+  <use href="#rface-grumpy"/>
+  <use href="#rface-yell" transform="translate(7 0)"/>
+  <use href="#rface-smug" transform="translate(14 0)"/>
+  <use href="#rface-pout" transform="translate(21 0)"/>
+</svg>

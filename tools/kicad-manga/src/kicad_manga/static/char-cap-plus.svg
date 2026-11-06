@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.8 -0.8 1.6 1.6" width="32mm" height="32mm">
+  <!-- The "+" badge next to the positive end of a polarised capacitor cat. Placed with
+       <use href="#cap-plus" transform="translate(...)"/>. -->
+  <defs>
+    <g id="cap-plus">
+      <circle r=".62" fill="#ffd95e" stroke="#4b3a5a" stroke-width=".12"/>
+      <path d="M-.32 0H.32M0 -.32V.32" stroke="#4b3a5a" stroke-width=".16" stroke-linecap="round"/>
+    </g>
+  </defs>
+  <use href="#cap-plus"/>
+</svg>
