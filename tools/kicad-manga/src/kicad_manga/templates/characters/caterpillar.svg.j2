@@ -1,0 +1,19 @@
+{#- Inductor/ferrite bead caterpillar: `segments` [(x, y, r, fill, legs)] from tail to head, legs being
+    [(x, y, dx, dy)] stubs; `antennae` [(x0, y0, x1, y1)]; head at (hx, hy); `core_lines` [((x, y), (x, y))]
+    redrawn on top. #}
+{% for x, y, r, fill, legs in segments %}
+<circle cx="{{ x|f }}" cy="{{ y|f }}" r="{{ r|f }}" fill="{{ fill }}" stroke="{{ INK }}" stroke-width=".14"/>
+{% for lx, ly, dx, dy in legs %}
+<path d="M{{ lx|f }} {{ ly|f }}l{{ dx|f }} {{ dy|f }}" stroke="{{ INK }}" stroke-width=".14" stroke-linecap="round"/>
+{% endfor %}
+{% endfor %}
+{% for x0, y0, x1, y1 in antennae %}
+<path d="M{{ x0|f }} {{ y0|f }}L{{ x1|f }} {{ y1|f }}" stroke="{{ INK }}" stroke-width=".12"/>
+<circle cx="{{ x1|f }}" cy="{{ y1|f }}" r=".16" fill="#ffb3cf" stroke="{{ INK }}" stroke-width=".08"/>
+{% endfor %}
+<use href="#face-happy" transform="translate({{ hx|f }} {{ hy|f }}) scale(.19)"/>
+<g stroke="{{ INK }}" stroke-width=".3" stroke-linecap="round">
+{% for p, q in core_lines %}
+  <path d="M{{ p[0]|f }} {{ p[1]|f }}L{{ q[0]|f }} {{ q[1]|f }}"/>
+{% endfor %}
+</g>

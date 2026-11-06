@@ -8,6 +8,7 @@ attach. Faces are always drawn upright.
 import math
 
 from .sexp import parse_si
+from .svg import render, tag
 
 INK = '#4b3a5a'
 FUR = [('#ffffff', '#ffd0a8'), ('#fff1dc', '#ffb98a'), ('#e9e3f2', '#b9adc9'), ('#ffd9b3', '#f7a86b'),
@@ -108,11 +109,8 @@ def cat_capacitor(rng, cx, cy, vertical, value, plates, plus=None):
 # Resistors: grumpy little boxes that throw things
 
 def brick(x, y, ang, k=1.5):
-    return (f'<g transform="translate({f(x)} {f(y)}) rotate({f(ang)}) scale({f(k)})" stroke="{INK}" stroke-width=".12" stroke-linejoin="round">'
-            '<rect x="-.95" y="-.55" width="1.9" height="1.1" rx=".2" fill="#ff9f9f"/>'
-            '<path d="M-.95 0H.95M-.3 -.55V0M.4 0V.55" fill="none" stroke="#fff" stroke-width=".1"/>'
-            '<circle cx="-.5" cy=".25" r=".07" fill="' + INK + '" stroke="none"/><circle cx="-.1" cy=".25" r=".07" fill="' + INK + '" stroke="none"/>'
-            '<ellipse cx="-.62" cy=".4" rx=".12" ry=".06" fill="#ffd0dc" stroke="none"/></g>')
+    return tag('use', href='#brick', transform=f'translate({f(x)} {f(y)}) rotate({f(ang)}) scale({f(k)})',
+               stroke=INK, stroke_width=.12, stroke_linejoin='round')
 
 
 def molotov(x, y, ang, k=1.35):
@@ -194,23 +192,17 @@ def caterpillar(rng, a, b, core_lines):
     nx, ny = -uy, ux
     col = rng.choice(['#bfe6a4', '#a6dfb5', '#cdeeb8'])
     n = 5
-    out = []
+    segments = []
     for i in reversed(range(n)):
         t = (i + .5) / n
         px, py = ax + ux * L * t, ay + uy * L * t
-        r = .62 if i else .78
-        out.append(f'<circle cx="{f(px)}" cy="{f(py)}" r="{f(r)}" fill="{col if i else "#d9f5c4"}" stroke="{INK}" stroke-width=".14"/>')
-        if i:
-            for s in (-1, 1):
-                out.append(f'<path d="M{f(px + nx * s * .55)} {f(py + ny * s * .55)}l{f(nx * s * .3)} {f(ny * s * .3)}" stroke="{INK}" stroke-width=".14" stroke-linecap="round"/>')
+        legs = [(px + nx * s * .55, py + ny * s * .55, nx * s * .3, ny * s * .3) for s in (-1, 1)] if i else []
+        segments.append((px, py, .62 if i else .78, col if i else '#d9f5c4', legs))
     hx, hy = ax + ux * L * .5 / n, ay + uy * L * .5 / n
-    for s in (-1, 1):
-        tx, ty = hx - ux * .9 + nx * s * .55, hy - uy * .9 + ny * s * .55
-        out.append(f'<path d="M{f(hx - ux * .5 + nx * s * .25)} {f(hy - uy * .5 + ny * s * .25)}L{f(tx)} {f(ty)}" stroke="{INK}" stroke-width=".12"/>'
-                   f'<circle cx="{f(tx)}" cy="{f(ty)}" r=".16" fill="#ffb3cf" stroke="{INK}" stroke-width=".08"/>')
-    out.append(f'<use href="#face-happy" transform="translate({f(hx)} {f(hy)}) scale(.19)"/>')
-    lines = ''.join(f'<path d="M{f(p[0])} {f(p[1])}L{f(q[0])} {f(q[1])}"/>' for p, q in core_lines)
-    return ''.join(out) + f'<g stroke="{INK}" stroke-width=".3" stroke-linecap="round">{lines}</g>'
+    antennae = [(hx - ux * .5 + nx * s * .25, hy - uy * .5 + ny * s * .25,
+                 hx - ux * .9 + nx * s * .55, hy - uy * .9 + ny * s * .55) for s in (-1, 1)]
+    return render('characters/caterpillar.svg.j2', segments=segments, antennae=antennae, hx=hx, hy=hy,
+                  core_lines=core_lines)
 
 
 # ----------------------------------------------------------------------------

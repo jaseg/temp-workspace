@@ -3,6 +3,7 @@
 from .characters import resistor_face_defs
 from .palette import INK, INK_SOFT, LINE, PAPER
 from .sexp import f2
+from .svg import all_static_defs
 
 
 def defs(fonts, width, height):
@@ -75,6 +76,7 @@ text{{font-family:'MPR','M PLUS Rounded 1c',sans-serif}}
 {face_defs()}
 {resistor_face_defs()}
 {mascot_def()}
+{all_static_defs()}
 </defs>'''
 
 

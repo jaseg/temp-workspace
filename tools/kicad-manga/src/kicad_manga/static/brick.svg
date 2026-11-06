@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1.2 -0.8 2.4 1.6" width="48mm" height="32mm">
+  <!-- The brick a resistor throws. Placed with <use href="#brick" transform="..." stroke="..." stroke-width=".12"
+       stroke-linejoin="round"/>, which also sets the outline. -->
+  <defs>
+    <g id="brick">
+      <rect x="-.95" y="-.55" width="1.9" height="1.1" rx=".2" fill="#ff9f9f"/>
+      <path d="M-.95 0H.95M-.3 -.55V0M.4 0V.55" fill="none" stroke="#fff" stroke-width=".1"/>
+      <circle cx="-.5" cy=".25" r=".07" fill="#4b3a5a" stroke="none"/>
+      <circle cx="-.1" cy=".25" r=".07" fill="#4b3a5a" stroke="none"/>
+      <ellipse cx="-.62" cy=".4" rx=".12" ry=".06" fill="#ffd0dc" stroke="none"/>
+    </g>
+  </defs>
+  <use href="#brick" stroke="#4b3a5a" stroke-width=".12" stroke-linejoin="round"/>
+</svg>
