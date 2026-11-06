@@ -1,0 +1,15 @@
+{#- A pot standing at (0, 0): a toned shadow ellipse (shadow_rx, shadow_ry), the `body` path in `color` with
+    the toned `shade` path on its right, the rim (`rim`: a rect x, y, width, height, rx for kind 'flowerpot',
+    else an ellipse cy, rx, ry) and optionally a face (#face-<face>) at height face_y, scaled by face_k.
+    Not outlined: the caller puts it inside the plant's outline group. #}
+<ellipse cx="0" cy=".3" rx="{{ shadow_rx|f }}" ry="{{ shadow_ry|f }}" fill="url(#tone-ink)" stroke="none" opacity=".3"/>
+<path d="{{ body }}" fill="{{ color }}"/>
+<path d="{{ shade }}" fill="url(#tone-ink)" stroke="none" opacity=".18"/>
+{% if kind == 'flowerpot' %}
+<rect x="{{ rim.x|f }}" y="{{ rim.y|f }}" width="{{ rim.width|f }}" height="{{ rim.height|f }}" rx="{{ rim.rx|f }}" fill="{{ color }}"/>
+{% else %}
+<ellipse cx="0" cy="{{ rim.cy|f }}" rx="{{ rim.rx|f }}" ry="{{ rim.ry|f }}" fill="{{ color }}"/>
+{% endif %}
+{% if face %}
+<g transform="translate(0 {{ face_y|f }}) scale({{ face_k|f }})" stroke="none"><use href="#face-{{ face }}"/></g>
+{% endif %}

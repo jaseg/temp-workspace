@@ -1,0 +1,9 @@
+{#- A loose LED in `color`, centred at (0, 0): legs, the dome and its rim, a highlight and a sparkle. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap(0.3) %}
+<path d="M-1 1.6V7.5M1 1.6V5.5Q1 6.5 2 7" fill="none" stroke="#bdb5c9" stroke-width=".5"/>
+<path d="M-2.2 1.6V-1.5A2.2 2.2 0 0 1 2.2 -1.5V1.6Z" fill="{{ color }}" fill-opacity=".85"/>
+<rect x="-2.7" y="1.2" width="5.4" height=".9" rx=".3" fill="{{ color }}"/>
+<path d="M-1.1 -1.8Q-1 -2.9 0 -3.1" fill="none" stroke="#fff" stroke-width=".4"/>
+<use href="#sparkle" transform="translate(3.6 -3.6) scale(.18)" fill="#fff6a8"/>
+{% endcall %}

@@ -1,0 +1,12 @@
+{#- Tulips in a pot: `tulips` [(stem, leaf, tx, ty)] are stem paths (green `stem_color` under a thin outline),
+    each with a drawn leaf and a flower head (path `head`, in `color`) at (tx, ty); then the drawn `pot`. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap() %}
+{% for stem, leaf, tx, ty in tulips %}
+<path d="{{ stem }}" fill="none" stroke="{{ stem_color }}" stroke-width=".9"/>
+<path d="{{ stem }}" fill="none" stroke-width=".25"/>
+{{ leaf }}
+<path transform="translate({{ tx|f }} {{ ty|f }})" d="{{ head }}" fill="{{ color }}"/>
+{% endfor %}
+{{ pot }}
+{% endcall %}

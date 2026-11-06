@@ -1,0 +1,10 @@
+{#- The front half of a vine wound round a frame line: the drawn `lead_in` vine (or none), the drawn front
+    `stem`, the drawn leaves and flowers in `nodes`, and the curl path `tip` at the growing end. #}
+{% if lead_in %}
+{{ lead_in }}
+{% endif %}
+{{ stem }}
+{% for node in nodes %}
+{{ node }}
+{% endfor %}
+<path d="{{ tip }}" fill="none" stroke="{{ LINE }}" stroke-width=".28"/>

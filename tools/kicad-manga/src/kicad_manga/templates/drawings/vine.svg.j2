@@ -1,0 +1,11 @@
+{#- A vine: the stem path `d` (an outline `outline` wide, then the green `color`, `core` wide), then `nodes`
+    along it: ('curl', path data) for a tendril, or ('piece', drawn leaf or flower). #}
+<path d="{{ d }}" fill="none" stroke="{{ LINE }}" stroke-width="{{ outline|f }}"/>
+<path d="{{ d }}" fill="none" stroke="{{ color }}" stroke-width="{{ core|f }}"/>
+{% for kind, v in nodes %}
+{% if kind == 'curl' %}
+<path d="{{ v }}" fill="none" stroke="{{ LINE }}" stroke-width=".25"/>
+{% else %}
+{{ v }}
+{% endif %}
+{% endfor %}

@@ -1,0 +1,15 @@
+{#- A steaming mug in `color`: shadow ellipse (shadow_rx), the `handle` path (an outline handle_outline wide,
+    then handle_w in the mug colour), the `body` path, the coffee ellipse (coffee_cx, coffee_cy, coffee_rx,
+    coffee_ry), a heart at (heart_x, heart_y) scaled by heart_k, and the `steam` paths. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap() %}
+<ellipse cx="0" cy=".3" rx="{{ shadow_rx|f }}" ry=".6" fill="url(#tone-ink)" stroke="none" opacity=".3"/>
+<path d="{{ handle }}" fill="none" stroke-width="{{ handle_outline|f }}"/>
+<path d="{{ handle }}" fill="none" stroke="{{ color }}" stroke-width="{{ handle_w|f }}"/>
+<path d="{{ body }}" fill="{{ color }}"/>
+<ellipse cx="{{ coffee_cx|f }}" cy="{{ coffee_cy|f }}" rx="{{ coffee_rx|f }}" ry="{{ coffee_ry|f }}" fill="#c99a7a"/>
+<use href="#heart-d" transform="translate({{ heart_x|f }} {{ heart_y|f }}) scale({{ heart_k|f }})" fill="#ff9cc2"/>
+{% for d in steam %}
+<path d="{{ d }}" fill="none" stroke-width=".3" opacity=".7"/>
+{% endfor %}
+{% endcall %}

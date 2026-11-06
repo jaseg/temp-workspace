@@ -1,0 +1,6 @@
+{#- A white cloud with the outline path `d`, and a pink screentone copy just behind its lower right. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap(0.32) %}
+<path d="{{ d }}" fill="#fff"/>
+<path d="{{ d }}" fill="url(#tone-pink)" stroke="none" opacity=".45" transform="translate(.6 .6)"/>
+{% endcall %}

@@ -1,0 +1,8 @@
+{#- A flower at (x, y) turned by `rot` degrees: one petal ellipse (rx, ry, centred at cy above the middle)
+    for each rotation in `angles`, filled with `color`, round a yellow middle of radius `mid`. #}
+<g transform="translate({{ x|f }} {{ y|f }}) rotate({{ rot|f }})" fill="{{ color }}">
+{% for a in angles %}
+  <ellipse cx="0" cy="{{ cy|f }}" rx="{{ rx|f }}" ry="{{ ry|f }}" transform="rotate({{ a }})"/>
+{% endfor %}
+  <circle r="{{ mid|f }}" fill="#fff3a0"/>
+</g>

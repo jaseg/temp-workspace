@@ -1,0 +1,17 @@
+{#- A charm on a dashed string from (x, y) down `length`. With `planter`: the drawn `trail` vine, then the
+    hanging planter (drawn `leaves`, the `pot` path in `color`, the `hanger` strings). Otherwise the shape
+    #<kind> at (x, use_y), scaled by `k` and filled with `fill`. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+<path d="M{{ x|f }} {{ y|f }}v{{ length|f }}" fill="none" stroke="{{ LINE }}" stroke-width=".25" stroke-dasharray=".6 .4"/>
+{% if planter %}
+{{ trail }}
+{% call wrap(0.3) %}
+{% for leaf in leaves %}
+{{ leaf }}
+{% endfor %}
+<path d="{{ pot }}" fill="{{ color }}"/>
+<path d="{{ hanger }}" fill="none" stroke-width=".22"/>
+{% endcall %}
+{% else %}
+<use href="#{{ kind }}" transform="translate({{ x|f }} {{ use_y|f }}) scale({{ k|f }})" fill="{{ fill }}" stroke="{{ LINE }}"/>
+{% endif %}

@@ -1,0 +1,11 @@
+{#- A loose resistor, centred at (0, 0) and about 14 long: bent leads, the body and colour bands `bands`
+    [(x, color)], then the gold tolerance band. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap(0.3) %}
+<path d="M-7 1.5Q-6 0 -3.4 0M3.4 0Q6 0 7 -1.5" fill="none" stroke="#bdb5c9" stroke-width=".55"/>
+<path d="M-3.6 -1.3Q-3.6 -1.7 -3 -1.7H3Q3.6 -1.7 3.6 -1.3V1.3Q3.6 1.7 3 1.7H-3Q-3.6 1.7 -3.6 1.3Z" fill="#ffe3c2"/>
+{% for x, color in bands %}
+<rect x="{{ x|f }}" y="-1.4" width=".7" height="2.8" fill="{{ color }}" stroke="none"/>
+{% endfor %}
+<rect x="1.9" y="-1.4" width=".7" height="2.8" fill="#d4af37" stroke="none"/>
+{% endcall %}

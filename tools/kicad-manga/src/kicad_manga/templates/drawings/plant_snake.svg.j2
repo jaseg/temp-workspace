@@ -1,0 +1,14 @@
+{#- A snake plant: `blades` [(x, y, ang, d, color, stripes)] are blade outlines `d` standing at (x, y),
+    turned by `ang`, with light cross stripes (paths); then the drawn `pot`. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap() %}
+{% for x, y, ang, d, color, stripes in blades %}
+<g transform="translate({{ x|f }} {{ y|f }}) rotate({{ ang|f }})">
+  <path d="{{ d }}" fill="{{ color }}"/>
+{% for s in stripes %}
+  <path d="{{ s }}" fill="none" stroke="#e9ffe9" stroke-width=".3"/>
+{% endfor %}
+</g>
+{% endfor %}
+{{ pot }}
+{% endcall %}

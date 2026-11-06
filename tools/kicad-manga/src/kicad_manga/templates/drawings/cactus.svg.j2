@@ -1,0 +1,17 @@
+{#- A cactus in `color`: `arms` [(d, outline_w, w)] are thick strokes (an outline stroke, then the green one),
+    `body` the column path, a faint middle line from (0, top) up to `line_top`, `spines` [(x, y)] little
+    ticks, then the drawn `flower` on top and the drawn `pot`. #}
+{% from 'drawings/wrap.svg.j2' import wrap %}
+{% call wrap() %}
+{% for d, outline_w, w in arms %}
+<path d="{{ d }}" fill="none" stroke="{{ LINE }}" stroke-width="{{ outline_w|f }}"/>
+<path d="{{ d }}" fill="none" stroke="{{ color }}" stroke-width="{{ w|f }}"/>
+{% endfor %}
+<path d="{{ body }}" fill="{{ color }}"/>
+<path d="M0 {{ top|f }}V{{ line_top|f }}" fill="none" stroke-width=".25" opacity=".6"/>
+{% for x, y in spines %}
+<path d="M{{ x|f }} {{ y|f }}l.5 -.4" fill="none" stroke-width=".22"/>
+{% endfor %}
+{{ flower }}
+{{ pot }}
+{% endcall %}

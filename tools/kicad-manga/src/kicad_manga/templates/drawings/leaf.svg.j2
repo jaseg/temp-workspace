@@ -1,0 +1,8 @@
+{#- A leaf (or grass blade) with its base at (x, y), turned by `ang` degrees: outline path `d` filled with
+    `color`, and an optional midrib path `rib`. The stroke comes from the surrounding group. #}
+<g transform="translate({{ x|f }} {{ y|f }}) rotate({{ ang|f }})">
+  <path d="{{ d }}" fill="{{ color }}"/>
+{% if rib %}
+  <path d="{{ rib }}" fill="none" stroke-width=".22"/>
+{% endif %}
+</g>
