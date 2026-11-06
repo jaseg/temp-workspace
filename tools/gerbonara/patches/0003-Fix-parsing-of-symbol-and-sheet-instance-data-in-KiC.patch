@@ -1,0 +1,117 @@
+From 71f7f234475a79ec258c3abba0ff5ca3fa205944 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:08:47 +0000
+Subject: [PATCH 03/19] Fix parsing of symbol and sheet instance data in KiCad
+ schematics
+
+Array() mapped every element as a bare value, so sexp_type elements such
+as the (project ...) entries of (instances ...) came out empty, and the
+reference and unit data of every placed symbol and sheet was lost on a
+round trip. Sheet instances also used Named(List(...)), which parsed any
+second project as a child of the first, and the path entries of sheet
+instance projects were mapped with the symbol variant that has no page.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py   |  6 ++--
+ src/gerbonara/cad/kicad/sexp_mapper.py |  5 +++-
+ tests/test_kicad_schematic.py          | 38 ++++++++++++++++++++++++++
+ 3 files changed, 45 insertions(+), 4 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 0cf3017..aa0ce49 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -464,7 +464,7 @@ class SubsheetCrosslinkSheet:
+ @sexp_type('project')
+ class SubsheetCrosslinkProject:
+     project_name: str = ''
+-    instances: List(SymbolCrosslinkSheet) = field(default_factory=list)
++    instances: List(SubsheetCrosslinkSheet) = field(default_factory=list)
+ 
+ 
+ @sexp_type('pin')
+@@ -528,7 +528,7 @@ class Subsheet:
+     _properties: List(DrawnProperty) = field(default_factory=list)
+     pins: List(SubsheetPin) = field(default_factory=list)
+     # AFAICT this is completely redundant, just like the one in SymbolInstance
+-    instances: Named(List(SubsheetCrosslinkProject)) = field(default_factory=list)
++    instances: Named(Array(SubsheetCrosslinkProject)) = field(default_factory=list)
+     _ : SEXP_END = None
+     sheet_name: object = field(default_factory=lambda: DrawnProperty('Sheetname', ''))
+     file_name: object = field(default_factory=lambda: DrawnProperty('Sheetfile', ''))
+@@ -641,7 +641,7 @@ class Schematic:
+     symbols: List(SymbolInstance) = field(default_factory=list)
+     subsheets: List(Subsheet) = field(default_factory=list)
+     sheet_instances: Named(Array(SubsheetCrosslinkSheet)) = field(default_factory=list)
+-    symbol_instances: Named(Array(SymbolCrosslinkProject)) = field(default_factory=list)
++    symbol_instances: Named(Array(SymbolCrosslinkSheet)) = field(default_factory=list)
+     embedded_fonts: Named(YesNoAtom()) = False
+     _ : SEXP_END = None
+     original_filename: str = None
+diff --git a/src/gerbonara/cad/kicad/sexp_mapper.py b/src/gerbonara/cad/kicad/sexp_mapper.py
+index afd61dc..d3afccd 100644
+--- a/src/gerbonara/cad/kicad/sexp_mapper.py
++++ b/src/gerbonara/cad/kicad/sexp_mapper.py
+@@ -256,7 +256,10 @@ class Wrap(WrapperType):
+ 
+ class Array(WrapperType):
+     def __map__(self, value, parent=None, path=''):
+-        return [map_sexp(self.next_type, [elem], parent=parent, path=path) for elem in value]
++        # sexp_type classes map a whole (key ...) list, everything else maps a list of values.
++        whole = isinstance(self.next_type, type) and hasattr(self.next_type, 'name_atom')
++        return [map_sexp(self.next_type, elem if whole and isinstance(elem, list) else [elem], parent=parent, path=path)
++                for elem in value]
+     
+     def __sexp__(self, value):
+         for e in value:
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 21f7faa..80947c4 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -46,3 +46,41 @@ def test_serialize_minimal_schematic():
+     assert Schematic.parse(sch.serialize()).lib_symbols.symbols == []
+     assert Schematic().serialize()
+ 
++
++
++def test_subsheet_instances():
++    sch = Schematic.parse('''(kicad_sch (version 20250114) (generator "eeschema")
++        (sheet (at 10 10) (size 20 10)
++            (property "Sheetname" "foo" (at 10 9 0) (effects (font (size 1.27 1.27))))
++            (property "Sheetfile" "foo.kicad_sch" (at 10 21 0) (effects (font (size 1.27 1.27))))
++            (instances
++                (project "a" (path "/1234" (page "2")))
++                (project "b" (path "/5678" (page "3")) (path "/9abc" (page "4"))))))''')
++    sheet, = sch.subsheets
++    assert [p.project_name for p in sheet.instances] == ['a', 'b']
++    assert [(i.path, i.page) for i in sheet.instances[1].instances] == [('/5678', '3'), ('/9abc', '4')]
++    sheet, = Schematic.parse(sch.serialize()).subsheets
++    assert [(i.path, i.page) for p in sheet.instances for i in p.instances] == [('/1234', '2'), ('/5678', '3'), ('/9abc', '4')]
++
++
++def test_symbol_instances():
++    sch = Schematic.parse('''(kicad_sch (version 20250114) (generator "eeschema")
++        (symbol (lib_id "Device:R") (at 10 10 0) (unit 1)
++            (instances
++                (project "a" (path "/1234" (reference "R1") (unit 1)))
++                (project "b" (path "/5678" (reference "R2") (unit 2))))))''')
++    sym, = sch.symbols
++    assert [(p.project_name, i.reference, i.unit) for p in sym.instances for i in p.instances] == [('a', 'R1', 1), ('b', 'R2', 2)]
++    sym, = Schematic.parse(sch.serialize()).symbols
++    assert [(p.project_name, i.reference, i.unit) for p in sym.instances for i in p.instances] == [('a', 'R1', 1), ('b', 'R2', 2)]
++
++
++def test_legacy_symbol_instances():
++    sch = Schematic.parse('''(kicad_sch (version 20211123) (generator "eeschema")
++        (sheet_instances (path "/" (page "1")))
++        (symbol_instances
++            (path "/1234" (reference "R1") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0603_1608Metric"))))''')
++    assert [(i.path, i.page) for i in sch.sheet_instances] == [('/', '1')]
++    assert [(i.path, i.reference, i.value) for i in sch.symbol_instances] == [('/1234', 'R1', '10k')]
++    sch = Schematic.parse(sch.serialize())
++    assert [(i.path, i.reference, i.value) for i in sch.symbol_instances] == [('/1234', 'R1', '10k')]
+-- 
+2.43.0
+

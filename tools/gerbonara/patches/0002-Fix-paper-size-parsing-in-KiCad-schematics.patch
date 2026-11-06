@@ -1,0 +1,53 @@
+From 00526698631f187dbddf9780e33e777b04b50d5e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:07:30 +0000
+Subject: [PATCH 02/19] Fix paper size parsing in KiCad schematics
+
+The legacy_paper field shared its (paper ...) key with page_settings, so
+it shadowed page_settings: every schematic came out as A4 landscape, and
+portrait or custom paper sizes failed to parse.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py |  1 -
+ tests/test_kicad_schematic.py        | 11 +++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 12eac55..0cf3017 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -617,7 +617,6 @@ class Schematic:
+     uuid: UUID = field(default_factory=UUID)
+     page_settings: PageSettings = field(default_factory=PageSettings)
+     legacy_page: Named(Array(int), name='page') = None
+-    legacy_paper: Named(str, name='paper') = None
+     title_block: TitleBlock = None
+     # The doc says this is expected, but eeschema barfs when it's there.
+     # path: SheetPath = field(default_factory=SheetPath)
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index e148770..21f7faa 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -30,6 +30,17 @@ def test_load_kicad_schematic(kicad_sch_file):
+         print('Loaded sub-sheet with', len(subsh.wires), 'wires and', len(subsh.symbols), 'symbols.')
+ 
+ 
++def test_schematic_paper_settings():
++    sch = Schematic.parse('(kicad_sch (version 20250114) (generator "eeschema") (paper "A3" portrait))')
++    assert sch.page_settings.page_format == 'A3'
++    assert sch.page_settings.portrait
++
++    sch = Schematic.parse('(kicad_sch (version 20250114) (generator "eeschema") (paper "User" 300 200))')
++    assert (sch.page_settings.page_format, sch.page_settings.width, sch.page_settings.height) == ('User', 300, 200)
++    sch = Schematic.parse(sch.serialize())
++    assert (sch.page_settings.page_format, sch.page_settings.width, sch.page_settings.height) == ('User', 300, 200)
++
++
+ def test_serialize_minimal_schematic():
+     sch = Schematic.parse('(kicad_sch (version 20250114) (generator "eeschema"))')
+     assert Schematic.parse(sch.serialize()).lib_symbols.symbols == []
+-- 
+2.43.0
+

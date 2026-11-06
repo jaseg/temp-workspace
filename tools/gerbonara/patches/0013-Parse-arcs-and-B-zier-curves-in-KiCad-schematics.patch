@@ -1,0 +1,77 @@
+From ff446683f5607140f30824464ba974bf1d7a68eb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:12:57 +0000
+Subject: [PATCH 13/19] =?UTF-8?q?Parse=20arcs=20and=20B=C3=A9zier=20curves?=
+ =?UTF-8?q?=20in=20KiCad=20schematics?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 20 ++++++++++++++++++++
+ tests/test_kicad_schematic.py        | 12 ++++++++++++
+ 2 files changed, 32 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index a74cdf5..8e53b5b 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -195,6 +195,24 @@ class Rectangle:
+     uuid: UUID = field(default_factory=UUID)
+ 
+ 
++@sexp_type('arc')
++class Arc:
++    start: Rename(XYCoord) = field(default_factory=XYCoord)
++    mid: Rename(XYCoord) = field(default_factory=XYCoord)
++    end: Rename(XYCoord) = field(default_factory=XYCoord)
++    stroke: Stroke = field(default_factory=Stroke)
++    fill: OmitDefault(Fill) = None
++    uuid: UUID = field(default_factory=UUID)
++
++
++@sexp_type('bezier')
++class Bezier:
++    points: PointList = field(default_factory=list)
++    stroke: Stroke = field(default_factory=Stroke)
++    fill: OmitDefault(Fill) = None
++    uuid: UUID = field(default_factory=UUID)
++
++
+ def label_shape_path_d(shape, w, h):
+     l, r = {
+         Atom.input: '<]',
+@@ -660,6 +678,8 @@ class Schematic:
+     polylines: List(Polyline) = field(default_factory=list)
+     circles: List(Circle) = field(default_factory=list)
+     rectangles: List(Rectangle) = field(default_factory=list)
++    arcs: List(Arc) = field(default_factory=list)
++    beziers: List(Bezier) = field(default_factory=list)
+     texts: List(Text) = field(default_factory=list)
+     text_boxes: List(TextBox) = field(default_factory=list)
+     local_labels: List(LocalLabel) = field(default_factory=list)
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 5cebdf3..29b4435 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -161,3 +161,15 @@ def test_subsheet_variants():
+             (instances (project "a" (path "/1234" (page "2") (variant (name "Variant 1") (exclude_from_sim yes)))))))''')
+     path, = sch.subsheets[0].instances[0].instances
+     assert [(v.name, v.exclude_from_sim) for v in path.variants] == [('Variant 1', True)]
++
++
++def test_schematic_arcs_and_beziers():
++    sch = Schematic.parse('''(kicad_sch (version 20250114) (generator "eeschema")
++        (arc (start 0 0) (mid 1 1) (end 2 0) (stroke (width 0) (type default)) (fill (type none)) (uuid "a"))
++        (bezier (pts (xy 0 0) (xy 1 2) (xy 3 2) (xy 4 0)) (stroke (width 0) (type default)) (fill (type none)) (uuid "b")))''')
++    arc, = sch.arcs
++    bezier, = sch.beziers
++    assert (arc.mid.x, arc.mid.y) == (1, 1)
++    assert len(bezier.points) == 4
++    sch = Schematic.parse(sch.serialize())
++    assert len(sch.arcs) == len(sch.beziers) == 1
+-- 
+2.43.0
+

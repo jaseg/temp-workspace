@@ -1,0 +1,76 @@
+From 7987b1ce2240a11d30d04f0bf6409e6966d15250 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:10:21 +0000
+Subject: [PATCH 06/19] Parse KiCad 9/10 jumper and position file attributes of
+ symbols
+
+KiCad 9 added (duplicate_pin_numbers_are_jumpers ...) and
+(jumper_pin_groups (...) ...) to library symbols, KiCad 10 added
+(in_pos_files ...).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/symbols.py | 19 +++++++++++++++++++
+ tests/test_kicad_symbols.py        | 11 +++++++++++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index a2545ed..8ff1602 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -500,6 +500,22 @@ class Unit:
+         return stacks
+ 
+ 
++class JumperPinGroups:
++    """ KiCad 9's ``(jumper_pin_groups ("1" "2") ("3" "4"))``: groups of pin numbers that are connected inside the
++    part. Maps to a list of lists of pin numbers. """
++
++    def __atoms__(self):
++        return [Atom.jumper_pin_groups]
++
++    def __map__(self, obj, parent=None):
++        _key, *groups = obj
++        return [[str(number) for number in group] for group in groups]
++
++    def __sexp__(self, value):
++        if value:
++            yield [Atom.jumper_pin_groups, *(list(group) for group in value)]
++
++
+ @sexp_type('power')
+ class PowerSpec:
+     """ Marks a symbol as a power symbol. KiCad 9 added local power symbols, whose net is local to their sheet. Their
+@@ -523,6 +539,9 @@ class Symbol:
+     exclude_from_sim: Named(YesNoAtom()) = False
+     in_bom: Named(YesNoAtom()) = True
+     on_board: Named(YesNoAtom()) = True
++    in_pos_files: Named(YesNoAtom()) = None
++    duplicate_pin_numbers_are_jumpers: Named(YesNoAtom()) = None
++    jumper_pin_groups: JumperPinGroups() = None
+     properties: List(Property) = field(default_factory=list)
+     units: List(Unit) = field(default_factory=list)
+     embedded_fonts: Named(YesNoAtom()) = False
+diff --git a/tests/test_kicad_symbols.py b/tests/test_kicad_symbols.py
+index 7778d56..1ececc5 100644
+--- a/tests/test_kicad_symbols.py
++++ b/tests/test_kicad_symbols.py
+@@ -136,3 +136,14 @@ def test_property_flags():
+     serialized = build_sexp(sym.sexp())
+     assert '(show_name no)' in serialized and '(hide yes)' in serialized
+     assert build_sexp(Symbol.parse(serialized).sexp()) == serialized
++
++
++def test_jumper_attributes():
++    sym = Symbol.parse('''(symbol "Jumper:SolderJumper_2_Bridged" (exclude_from_sim no) (in_bom yes) (on_board yes)
++        (in_pos_files no) (duplicate_pin_numbers_are_jumpers no) (jumper_pin_groups ("1" "3") ("2" "4")))''')
++    assert sym.in_pos_files is False
++    assert sym.duplicate_pin_numbers_are_jumpers is False
++    assert sym.jumper_pin_groups == [['1', '3'], ['2', '4']]
++    serialized = build_sexp(sym.sexp())
++    assert build_sexp(Symbol.parse(serialized).sexp()) == serialized
++    assert '(jumper_pin_groups' not in build_sexp(Symbol.parse('(symbol "Device:R" (in_bom yes) (on_board yes))').sexp())
+-- 
+2.43.0
+

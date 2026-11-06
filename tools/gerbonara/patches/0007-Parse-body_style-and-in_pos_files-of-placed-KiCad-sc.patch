@@ -1,0 +1,58 @@
+From f91e6effa376c835768e98c6f0865c10cadf1326 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:10:21 +0000
+Subject: [PATCH 07/19] Parse body_style and in_pos_files of placed KiCad
+ schematic symbols
+
+KiCad 9 writes the De Morgan body style of placed symbols as
+(body_style ...), earlier versions as (convert ...). KiCad 10 adds
+(in_pos_files ...).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py |  4 ++++
+ tests/test_kicad_schematic.py        | 12 ++++++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 0abb4ba..928054c 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -377,9 +377,13 @@ class SymbolInstance:
+     at: AtPos = field(default_factory=AtPos)
+     mirror: OmitDefault(MirrorFlags) = field(default_factory=MirrorFlags)
+     unit: Named(int) = 1
++    # De Morgan body style. KiCad 9 renamed (convert ...) to (body_style ...).
++    convert: Named(int) = None
++    body_style: Named(int) = None
+     exclude_from_sim: Named(YesNoAtom()) = False
+     in_bom: Named(YesNoAtom()) = True
+     on_board: Named(YesNoAtom()) = True
++    in_pos_files: Named(YesNoAtom()) = None
+     dnp: Named(YesNoAtom()) = True
+     fields_autoplaced: Named(YesNoAtom()) = True
+     uuid: UUID = field(default_factory=UUID)
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index cc634db..1ef9440 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -100,3 +100,15 @@ def test_symbol_property_flags():
+     sym, = Schematic.parse(sch.serialize()).symbols
+     assert [(p.show_name, p.do_not_autoplace, p.hide) for p in sym.properties] == [
+             (False, False, False), (None, None, True), (None, None, False), (None, None, True)]
++
++
++def test_symbol_body_style():
++    sch = Schematic.parse('''(kicad_sch (version 20260101) (generator "eeschema")
++        (symbol (lib_id "74xx:74LS00") (at 10 10 0) (unit 2) (body_style 2) (exclude_from_sim no)
++                (in_bom yes) (on_board yes) (in_pos_files yes) (dnp no)))''')
++    sym, = sch.symbols
++    assert (sym.unit, sym.body_style, sym.in_pos_files, sym.dnp) == (2, 2, True, False)
++    serialized = sch.serialize()
++    assert '(body_style 2)' in serialized and '(in_pos_files yes)' in serialized
++    sym, = Schematic.parse(serialized).symbols
++    assert (sym.unit, sym.body_style, sym.in_pos_files) == (2, 2, True)
+-- 
+2.43.0
+

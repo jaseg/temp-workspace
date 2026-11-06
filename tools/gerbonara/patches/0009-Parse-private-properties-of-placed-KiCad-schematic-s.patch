@@ -1,0 +1,49 @@
+From f40d96a6d46712677f9a22fb28ac2a9d00a6277b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:11:38 +0000
+Subject: [PATCH 09/19] Parse private properties of placed KiCad schematic
+ symbols
+
+Private library properties, such as the KLC_* notes of some library
+symbols, end up in placed symbols as (property private ...).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py |  1 +
+ tests/test_kicad_schematic.py        | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 476c733..f2baeac 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -220,6 +220,7 @@ def label_shape_path_d(shape, w, h):
+ 
+ @sexp_type('property')
+ class DrawnProperty(TextMixin):
++    private: Flag() = False
+     key: str = None
+     value: str = None
+     id: Named(int) = None
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 164170d..74e2878 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -124,3 +124,13 @@ def test_label_properties():
+     assert (prop.key, prop.text, prop.show_name, prop.hide) == ('Intersheetrefs', '${INTERSHEET_REFS}', False, True)
+     label, = Schematic.parse(sch.serialize()).global_labels
+     assert label.properties[0].hide
++
++
++def test_private_symbol_property():
++    sch = Schematic.parse('''(kicad_sch (version 20260101) (generator "eeschema")
++        (symbol (lib_id "Device:R") (at 10 10 0) (unit 1)
++            (property private "KLC_S3.3" "The rectangle is not a symbol body" (at 0 0 0) (hide yes)
++                (effects (font (size 1.27 1.27))))))''')
++    prop, = sch.symbols[0].properties
++    assert (prop.private, prop.key, prop.value) == (True, 'KLC_S3.3', 'The rectangle is not a symbol body')
++    assert '(property private "KLC_S3.3"' in sch.serialize()
+-- 
+2.43.0
+

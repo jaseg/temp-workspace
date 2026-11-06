@@ -1,0 +1,75 @@
+From d06f3458100c6aaec4be4182cb3f0cf095cb521d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:09:11 +0000
+Subject: [PATCH 04/19] Support KiCad 9 local power symbols
+
+KiCad 9 writes (power global) or (power local) instead of a bare (power).
+Parse it into a PowerSpec that keeps the scope, so both round trip.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/symbols.py | 14 +++++++++++++-
+ tests/test_kicad_symbols.py        | 13 ++++++++++++-
+ 2 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index c742e08..6615b41 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -496,11 +496,23 @@ class Unit:
+         return stacks
+ 
+ 
++@sexp_type('power')
++class PowerSpec:
++    """ Marks a symbol as a power symbol. KiCad 9 added local power symbols, whose net is local to their sheet. Their
++    scope is ``local``, and the scope of global power symbols is ``global``. Files from older KiCad versions only have a
++    bare ``(power)``, for which scope is None. """
++    scope: AtomChoice(Atom('global'), Atom('local')) = None
++
++    @property
++    def is_local(self):
++        return self.scope == 'local'
++
++
+ @sexp_type('symbol')
+ class Symbol:
+     raw_name: str = None
+     extends: Named(str) = None
+-    power: Wrap(Flag()) = False
++    power: PowerSpec = None
+     pin_numbers: OmitDefault(PinNumberSpec) = field(default_factory=PinNumberSpec)
+     pin_names: OmitDefault(PinNameSpec) = field(default_factory=PinNameSpec)
+     exclude_from_sim: OmitDefault(Named(YesNoAtom())) = False
+diff --git a/tests/test_kicad_symbols.py b/tests/test_kicad_symbols.py
+index 8553a37..7a489de 100644
+--- a/tests/test_kicad_symbols.py
++++ b/tests/test_kicad_symbols.py
+@@ -5,7 +5,7 @@ import re
+ 
+ from gerbonara.cad.kicad.sexp import build_sexp
+ from gerbonara.cad.kicad.sexp_mapper import sexp
+-from gerbonara.cad.kicad.symbols import Library
++from gerbonara.cad.kicad.symbols import Library, Symbol
+ 
+ from .utils import tmpfile
+ 
+@@ -110,3 +110,14 @@ def test_round_trip(kicad_library_file, tmpfile):
+         i, j = i+1, j+1
+     
+ 
++
++
++@pytest.mark.parametrize('spec, power, local', [('', False, False), ('(power)', True, False),
++                                                 ('(power global)', True, False), ('(power local)', True, True)])
++def test_power_symbol_scope(spec, power, local):
++    sym = Symbol.parse(f'(symbol "power:GND" {spec} (in_bom yes) (on_board yes))')
++    assert bool(sym.power) == power
++    assert bool(sym.power and sym.power.is_local) == local
++    serialized = build_sexp(sym.sexp())
++    assert spec in serialized
++    assert build_sexp(Symbol.parse(serialized).sexp()) == serialized
+-- 
+2.43.0
+

@@ -1,0 +1,63 @@
+From 43f134aec3ca6d388e50148f1326834b480f6e32 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:13:37 +0000
+Subject: [PATCH 14/19] Parse font colors and hyperlinks in KiCad schematic
+ text
+
+Schematic text can have its own color in (font ... (color r g b a)) and
+a hyperlink in (effects ... (href "...")).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/base_types.py |  4 ++++
+ tests/test_kicad_schematic.py         | 14 ++++++++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/base_types.py b/src/gerbonara/cad/kicad/base_types.py
+index 6a5d23e..f794ea9 100644
+--- a/src/gerbonara/cad/kicad/base_types.py
++++ b/src/gerbonara/cad/kicad/base_types.py
+@@ -372,6 +372,8 @@ class FontSpec:
+     thickness: Named(float) = None
+     bold: OmitDefault(Named(LegacyCompatibleFlag())) = False
+     italic: OmitDefault(Named(LegacyCompatibleFlag())) = False
++    # Schematic text only
++    color: Color = None
+     line_spacing: Named(float) = None
+ 
+ 
+@@ -401,6 +403,8 @@ class TextEffect:
+     font: FontSpec = field(default_factory=FontSpec)
+     justify: OmitDefault(Justify) = field(default_factory=Justify)
+     hide: OmitDefault(Named(LegacyCompatibleFlag())) = False
++    # Hyperlink of schematic text
++    href: Named(str) = None
+ 
+ 
+ class TextMixin:
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 29b4435..13e0b0b 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -173,3 +173,17 @@ def test_schematic_arcs_and_beziers():
+     assert len(bezier.points) == 4
+     sch = Schematic.parse(sch.serialize())
+     assert len(sch.arcs) == len(sch.beziers) == 1
++
++
++def test_text_color_and_href():
++    sch = Schematic.parse('''(kicad_sch (version 20250114) (generator "eeschema")
++        (text "docs" (exclude_from_sim no) (at 10 10 0)
++            (effects (font (size 1.27 1.27) (thickness 0.254) (bold yes) (color 255 0 0 1)) (justify left bottom)
++                (href "https://example.com/docs"))
++            (uuid "c")))''')
++    text, = sch.texts
++    assert (text.effects.font.color.r, text.effects.font.color.a) == (255, 1)
++    assert text.effects.href == 'https://example.com/docs'
++    text, = Schematic.parse(sch.serialize()).texts
++    assert (text.effects.font.color.r, text.effects.font.color.a) == (255, 1)
++    assert text.effects.href == 'https://example.com/docs'
+-- 
+2.43.0
+

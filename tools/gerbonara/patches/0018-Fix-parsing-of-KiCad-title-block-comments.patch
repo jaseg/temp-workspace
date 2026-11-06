@@ -1,0 +1,80 @@
+From c9a956fe004a6aa81610fd88aca5c03755af127c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:43:42 +0000
+Subject: [PATCH 18/19] Fix parsing of KiCad title block comments
+
+TitleComment.__map__ did not return anything, so the comments of every
+title block were dropped, and with several (comment N "...") entries
+only the last one was even looked at. Parse each entry into a
+TitleComment with its line number and text, and add
+TitleBlock.comment(n) to look one up.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/primitives.py | 23 +++++++----------------
+ tests/test_kicad_schematic.py         | 11 +++++++++++
+ 2 files changed, 18 insertions(+), 16 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/primitives.py b/src/gerbonara/cad/kicad/primitives.py
+index cc395bf..8554d80 100644
+--- a/src/gerbonara/cad/kicad/primitives.py
++++ b/src/gerbonara/cad/kicad/primitives.py
+@@ -239,21 +239,8 @@ class Margins:
+ 
+ @sexp_type('comment')
+ class TitleComment:
+-    @classmethod
+-    def __map__(kls, obj, parent=None, path=''):
+-        lines = []
+-        for lineno, content in zip(obj[1::2], obj[2::2]):
+-            while lineno > len(lines):
+-                lines.append('')
+-            lines[lineno-1] = content
+-
+-    @classmethod
+-    def __sexp__(kls, value):
+-        l = [Atom.comment]
+-        for i, line in enumerate(value.splitlines(), start=1):
+-            l.append(i)
+-            l.append(line.rstrip('\n'))
+-        return l
++    number: int = 1
++    text: str = ''
+ 
+ 
+ @sexp_type('title_block')
+@@ -262,6 +249,10 @@ class TitleBlock:
+     date: Named(str) = ''
+     rev: Named(str) = ''
+     company: Named(str) = ''
+-    comment: TitleComment = None
++    comments: List(TitleComment) = field(default_factory=list)
++
++    def comment(self, number):
++        """ Text of comment line `number` (1-9), or '' when it is not set. """
++        return next((c.text for c in self.comments if c.number == number), '')
+ 
+ 
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index a5264a4..1e49769 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -226,3 +226,14 @@ def test_schematic_tables():
+     table, = Schematic.parse(sch.serialize()).tables
+     assert [[c.text for c in row] for row in table.rows] == [['a', 'b'], ['c', 'd']]
+     assert (table.cells[0].span.columns, table.cells[0].span.rows) == (1, 1)
++
++
++def test_title_block_comments():
++    sch = Schematic.parse('''(kicad_sch (version 20250114) (generator "eeschema")
++        (title_block (title "Board") (date "2025-01-01") (rev "2") (company "ACME")
++            (comment 1 "first") (comment 3 "third")))''')
++    tb = sch.title_block
++    assert (tb.title, tb.rev, tb.company) == ('Board', '2', 'ACME')
++    assert (tb.comment(1), tb.comment(2), tb.comment(3)) == ('first', '', 'third')
++    tb = Schematic.parse(sch.serialize()).title_block
++    assert [(c.number, c.text) for c in tb.comments] == [(1, 'first'), (3, 'third')]
+-- 
+2.43.0
+
