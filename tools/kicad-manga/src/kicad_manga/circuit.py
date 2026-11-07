@@ -10,8 +10,8 @@ import random
 import re
 
 from . import characters as C
-from .kicad import DASHES, Xf, at, fill, font, hex_color, hidden, justify, lib_symbols, mirror, paper_size, \
-    png_info, rotation, stroke, xy
+from .kicad import DASHES, at, fill, font, hex_color, hidden, justify, lib_symbols, paper_size, quarter_turned, \
+    rotation, stroke, xy
 from .palette import LINE, LibColors, NetColors
 from .svg import Markup, group, num as f2, path, tag
 from .text import CHAR_W, FS, plain, text_el, text_extent
@@ -583,15 +583,11 @@ class Circuit:
 
     def render_image(self, img):
         x, y = at(img)
-        raw = img.data or b''
-        info = png_info(raw)
-        if info is None:
+        if img.size is None:
             return
-        pw, ph, ppi = info
-        scale = float(img.scale or 1)
-        w, h = pw / ppi * 25.4 * scale, ph / ppi * 25.4 * scale
+        w, h = img.size
         self.add('graphics', tag('image', data_kind='image', x=x - w / 2, y=y - h / 2, width=w, height=h,
-                                 href=f'data:image/png;base64,{base64.b64encode(raw).decode()}'))
+                                 href=f'data:image/png;base64,{base64.b64encode(img.data).decode()}'))
         self.mark(x - w / 2, y - h / 2, x + w / 2, y + h / 2)
 
     def text_box(self, tb, kind, header=False):
@@ -758,12 +754,10 @@ class Circuit:
         lib = self.lib(sym)
         if lib is None:
             return
-        x, y = at(sym)
-        rot = rotation(sym)
         unit = int(sym.unit or 1)
         style = int(sym.body_style or sym.convert or 1)
         dnp = bool(sym.dnp)
-        xf = Xf(x, y, rot, mirror(sym))
+        xf = sym.transform_point
         power = lib.is_power
         props = {p.key: p for p in sym.properties}
         ref = props['Reference'].value if 'Reference' in props else '?'
@@ -840,7 +834,7 @@ class Circuit:
                     h, v = justify(g)
                     ang = rotation(g)
                     ang = ang / 10 if ang > 360 else ang
-                    swap = xf.c == 0
+                    swap = quarter_turned(sym)
                     texts.append(text_el(tx, ty, g.text, size, 90 if (round(ang) % 180 == 90) != swap else 0, h, v,
                                          'symtxt', style=text_style(bold, italic, tcol)))
                     continue
@@ -943,12 +937,12 @@ class Circuit:
             fang = rotation(prop)
             h, v = justify(prop)
             size, bold, italic, tcol = font(prop)
-            swap = xf.c == 0  # rotated by 90/270: KiCad toggles field orientation
+            swap = quarter_turned(sym)  # rotated by 90/270: KiCad toggles field orientation
             vertical = (round(fang) % 180 == 90) != swap
             dvec = {'left': 1, 'right': -1, 'center': 0}[h]
             if dvec:        # justification, transformed like the symbol, then made readable
                 rd = (math.cos(math.radians(fang)), -math.sin(math.radians(fang)))
-                tx_, ty_ = xf.lin(rd[0] * dvec, -rd[1] * dvec)
+                tx_, ty_ = sym.transform_vector(rd[0] * dvec, -rd[1] * dvec)
                 if vertical and abs(ty_) > 0.5:
                     h = 'left' if ty_ < 0 else 'right'
                 elif not vertical and abs(tx_) > 0.5:

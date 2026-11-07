@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
+from gerbonara.cad.kicad.graphical_primitives import png_size
 
 from kicad_manga import config, kicad
 from kicad_manga.page import FM
@@ -91,6 +92,6 @@ def test_cli_writes_all_formats(tmp_path):
     svg = out.with_suffix('.svg').read_text()
     assert 'Hello Board' in svg and 'テスト' in svg
     ET.fromstring(svg)
-    assert kicad.png_info(out.with_suffix('.png').read_bytes())[:2] == (594, 420)
+    assert png_size(out.with_suffix('.png').read_bytes())[:2] == (594, 420)
     if pdf_tool() is not None:
         assert out.with_suffix('.pdf').read_bytes()[:5] == b'%PDF-'
