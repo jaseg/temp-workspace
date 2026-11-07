@@ -1,7 +1,7 @@
 From 4a5b9395958f7fc32431ba4a0ae02b1517adb936 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:13:46 +0000
-Subject: [PATCH 15/19] Parse the symbol attributes of KiCad 10 rule areas
+Subject: [PATCH 15/41] Parse the symbol attributes of KiCad 10 rule areas
 
 KiCad 10 rule areas can override the DNP, simulation, BOM and board
 attributes of the symbols inside them.

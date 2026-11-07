@@ -1,7 +1,7 @@
 From 45373fba4f2d47fac77e52793040d6036a11d946 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:11:48 +0000
-Subject: [PATCH 10/19] Parse the body styles of KiCad 10 symbols
+Subject: [PATCH 10/41] Parse the body styles of KiCad 10 symbols
 
 KiCad 10 lists a symbol's body styles as (body_styles demorgan) or as
 (body_styles "name" ...) for custom body styles.

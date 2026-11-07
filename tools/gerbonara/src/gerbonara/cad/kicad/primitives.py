@@ -86,6 +86,16 @@ def kicad_mid_to_center_arc(mid, start, end):
     return (cx, cy), radius, det < 0
 
 
+def kicad_arc_svg_flags(start, mid, end):
+    """ (center, radius, sweep flag, large arc flag) for drawing a KiCad start/mid/end arc as an SVG arc. The sweep
+    flag is set when the arc runs from start through mid to end in the direction of increasing angle. """
+    (cx, cy), r, _ = kicad_mid_to_center_arc(mid, start, end)
+    sweep = (mid.x - start.x)*(end.y - start.y) - (mid.y - start.y)*(end.x - start.x) > 0
+    a1, a2 = math.atan2(start.y - cy, start.x - cx), math.atan2(end.y - cy, end.x - cx)
+    span = (a2 - a1) % (2*math.pi) if sweep else (a1 - a2) % (2*math.pi)
+    return (cx, cy), r, sweep, span > math.pi
+
+
 @sexp_type('hatch')
 class Hatch:
     style: AtomChoice(Atom.none, Atom.edge, Atom.full) = Atom.edge

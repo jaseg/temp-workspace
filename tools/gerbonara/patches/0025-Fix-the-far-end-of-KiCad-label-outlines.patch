@@ -1,0 +1,75 @@
+From 6d2c52eb67547482a0bbb9b29ec42e7426b7cee2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:11:27 +0000
+Subject: [PATCH 25/41] Fix the far end of KiCad label outlines
+
+label_shape_path_d() reused the variable holding the shape of the far end
+for the half height and then decided both ends by the near one, so input
+labels got a pointed far end and output labels a square one.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 12 +++++++-----
+ tests/test_kicad_schematic.py        | 10 ++++++++++
+ 2 files changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index a5c6d4b..084a750 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -215,7 +215,9 @@ class Bezier:
+ 
+ 
+ def label_shape_path_d(shape, w, h):
+-    l, r = {
++    """ Outline of a global or hierarchical label of the given shape, height `h` and body width `w`, starting at the
++    origin (the connection point) and extending towards +x. Each end is either pointed or square. """
++    left, right = {
+         Atom.input: '<]',
+         Atom.output: '[>',
+         Atom.bidirectional: '<>',
+@@ -223,7 +225,7 @@ def label_shape_path_d(shape, w, h):
+         Atom.passive: '[]'}.get(shape, '<]')
+     r = h/2
+ 
+-    if l == '[':
++    if left == '[':
+         d = f'M {r:.3f} {r:.3f} L 0 {r:.3f} L 0 {-r:.3f} L {r:.3f} {-r:.3f}'
+     else:
+         d = f'M {r:.3f} {r:.3f} L 0 0 L {r:.3f} {-r:.3f}'
+@@ -231,10 +233,10 @@ def label_shape_path_d(shape, w, h):
+     e = w+r
+     d += f' L {e:.3f} {-r:.3f}'
+ 
+-    if l == '[':
+-        return d + f'L {e+r:.3f} {-r:.3f} L {e+r:.3f} {r:.3f} L {e:.3f} {r:.3f} Z'
++    if right == ']':
++        return d + f' L {e+r:.3f} {-r:.3f} L {e+r:.3f} {r:.3f} L {e:.3f} {r:.3f} Z'
+     else:
+-        return d + f'L {e+r:.3f} {0:.3f} L {e:.3f} {r:.3f} Z'
++        return d + f' L {e+r:.3f} {0:.3f} L {e:.3f} {r:.3f} Z'
+ 
+ 
+ @sexp_type('property')
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index eaf1493..0968490 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -260,3 +260,13 @@ def test_text_h_align(justify, align):
+     sch = Schematic.parse(f'''(kicad_sch (version 20250114) (generator "eeschema")
+         (text "hello" (at 10 10 0) (effects (font (size 1.27 1.27)) {justify}) (uuid "t")))''')
+     assert sch.texts[0].h_align == align
++
++
++@pytest.mark.parametrize('shape, ends', [('input', '<]'), ('output', '[>'), ('bidirectional', '<>'), ('passive', '[]')])
++def test_label_shape_ends(shape, ends):
++    from gerbonara.cad.kicad.schematic import label_shape_path_d
++    d = label_shape_path_d(Atom(shape), 10, 2)
++    pts = [tuple(map(float, p.split())) for p in re.findall(r'(-?[\d.]+ -?[\d.]+)', d)]
++    # a pointed end has a vertex on the center line at that end, a square one two corners
++    assert ((0.0, 0.0) in pts) == (ends[0] == '<')
++    assert ((12.0, 0.0) in pts) == (ends[1] == '>')
+-- 
+2.43.0
+

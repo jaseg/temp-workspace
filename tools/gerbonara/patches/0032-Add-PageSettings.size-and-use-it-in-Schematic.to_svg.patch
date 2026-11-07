@@ -1,0 +1,122 @@
+From a02f55e017dd05d2a592fddd65fe78bf7999ae76 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:13:39 +0000
+Subject: [PATCH 32/41] Add PageSettings.size and use it in Schematic.to_svg
+
+Schematic.to_svg() looked the page format up in the paper size table,
+which failed for custom (User) sizes and ignored portrait orientation.
+PageSettings.size handles both; the table moves to base_types next to it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/base_types.py | 30 +++++++++++++++++++++++++++
+ src/gerbonara/cad/kicad/schematic.py  | 19 +----------------
+ tests/test_kicad_schematic.py         |  9 ++++++++
+ 3 files changed, 40 insertions(+), 18 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/base_types.py b/src/gerbonara/cad/kicad/base_types.py
+index 665b93c..3538603 100644
+--- a/src/gerbonara/cad/kicad/base_types.py
++++ b/src/gerbonara/cad/kicad/base_types.py
+@@ -562,6 +562,24 @@ class EditTime:
+         self.value = time.time()
+ 
+ 
++KICAD_PAPER_SIZES = {
++    'A5': (210,   148),
++    'A4': (297,   210),
++    'A3': (420,   297),
++    'A2': (594,   420),
++    'A1': (841,   594),
++    'A0': (1189,  841),
++    'A': (11*25.4, 8.5*25.4),
++    'B': (17*25.4, 11*25.4),
++    'C': (22*25.4, 17*25.4),
++    'D': (34*25.4, 22*25.4),
++    'E': (44*25.4, 34*25.4),
++    'USLetter': (11*25.4, 8.5*25.4),
++    'USLegal': (14*25.4, 8.5*25.4),
++    'USLedger': (17*25.4, 11*25.4),
++    }
++
++
+ @sexp_type('paper')
+ class PageSettings:
+     page_format: str = 'A4'
+@@ -569,6 +587,18 @@ class PageSettings:
+     height: float = None
+     portrait: Flag() = False
+ 
++    @property
++    def size(self):
++        """ (width, height) of the page in mm, taking custom sizes and portrait orientation into account. Unknown
++        formats are treated as A4. """
++        if self.page_format == 'User' and self.width and self.height:
++            w, h = float(self.width), float(self.height)
++        else:
++            w, h = KICAD_PAPER_SIZES.get(str(self.page_format), KICAD_PAPER_SIZES['A4'])
++        if self.portrait:
++            w, h = min(w, h), max(w, h)
++        return w, h
++
+ 
+ @sexp_type('property')
+ class Property:
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 68d6f84..a37b370 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -30,23 +30,6 @@ from ...utils import MM, rotate_point, Tag, setup_svg
+ from .schematic_colors import *
+ 
+ 
+-KICAD_PAPER_SIZES = {
+-    'A5': (210,   148),
+-    'A4': (297,   210),
+-    'A3': (420,   297),
+-    'A2': (594,   420),
+-    'A1': (841,   594),
+-    'A0': (1189,  841),
+-    'A': (11*25.4, 8.5*25.4),
+-    'B': (17*25.4, 11*25.4),
+-    'C': (22*25.4, 17*25.4),
+-    'D': (34*25.4, 22*25.4),
+-    'E': (44*25.4, 34*25.4),
+-    'USLetter': (11*25.4, 8.5*25.4),
+-    'USLegal': (14*25.4, 8.5*25.4),
+-    'USLedger': (17*25.4, 11*25.4),
+-    }
+-
+ @sexp_type('path')
+ class SheetPath:
+     path: str = '/'
+@@ -817,7 +800,7 @@ class Schematic:
+         children = []
+         for elem in self.elements:
+             children += elem.to_svg(colorscheme)
+-        w, h = KICAD_PAPER_SIZES[self.page_settings.page_format]
++        w, h = self.page_settings.size
+         return setup_svg(children, ((0, 0), (w, h)), pagecolor=colorscheme.background)
+ 
+ 
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 016ade3..eb7d8a8 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -325,3 +325,12 @@ def test_paper_sizes():
+     from gerbonara.cad.kicad.schematic import KICAD_PAPER_SIZES
+     assert KICAD_PAPER_SIZES['B'] == pytest.approx((431.8, 279.4))
+     assert KICAD_PAPER_SIZES['USLedger'] == KICAD_PAPER_SIZES['B']
++
++
++@pytest.mark.parametrize('paper, size', [('"A4"', (297, 210)), ('"A3" portrait', (297, 420)),
++                                         ('"User" 300 200', (300, 200)), ('"USLetter"', (279.4, 215.9))])
++def test_page_size(paper, size):
++    sch = Schematic.parse(f'(kicad_sch (version 20250114) (generator "eeschema") (paper {paper}))')
++    assert sch.page_settings.size == pytest.approx(size)
++    w, h = map(float, re.search(r'viewBox="0 0 (\S+) (\S+)"', str(sch.to_svg())).groups())
++    assert (w, h) == pytest.approx(size)
+-- 
+2.43.0
+

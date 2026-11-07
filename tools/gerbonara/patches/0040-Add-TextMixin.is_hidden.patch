@@ -1,0 +1,93 @@
+From 3ba3f1ac627cc5047f59ff950b557c9deb39398c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:18:20 +0000
+Subject: [PATCH 40/41] Add TextMixin.is_hidden
+
+Text can be hidden with (hide yes) on the item itself, as KiCad 8 and
+later write it on properties, or in its effects, as older files and other
+text items do. The SVG export checked only one of the two in each case;
+is_hidden checks both.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/base_types.py |  8 +++++++-
+ src/gerbonara/cad/kicad/schematic.py  |  2 +-
+ src/gerbonara/cad/kicad/symbols.py    |  2 +-
+ tests/test_kicad_schematic.py         | 11 +++++++++++
+ 4 files changed, 20 insertions(+), 3 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/base_types.py b/src/gerbonara/cad/kicad/base_types.py
+index 95b0377..5557932 100644
+--- a/src/gerbonara/cad/kicad/base_types.py
++++ b/src/gerbonara/cad/kicad/base_types.py
+@@ -420,6 +420,12 @@ class TextMixin:
+     def line_width(self):
+         return self.effects.font.thickness or 0.254
+ 
++    @property
++    def is_hidden(self):
++        """ Whether the text is hidden: newer KiCad versions put (hide yes) on properties themselves, older ones and
++        other text items in their effects. """
++        return bool(getattr(self, 'hide', False)) or bool(self.effects and self.effects.hide)
++
+     @line_width.setter
+     def line_width(self, value):
+         self.effects.font.thickness = value
+@@ -453,7 +459,7 @@ class TextMixin:
+         return False, False
+ 
+     def to_svg(self, color='black', variables={}):
+-        if not self.effects or self.effects.hide or not self.effects.font:
++        if not self.effects or self.is_hidden or not self.effects.font:
+             return
+ 
+         font = Newstroke.load()
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index ddf90ed..0031d8f 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -311,7 +311,7 @@ class DrawnProperty(TextMixin):
+         return False, False
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        if not self.hide:
++        if not self.is_hidden:
+             yield from TextMixin.to_svg(self, colorscheme.values)
+ 
+ 
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index ed4e28c..8c45ab0 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -460,7 +460,7 @@ class Property(TextMixin):
+         self.value = value
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        if not self.hide:
++        if not self.is_hidden:
+             yield from TextMixin.to_svg(self, colorscheme.text)
+ 
+ 
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 410bf7e..1d1cd1d 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -415,3 +415,14 @@ def test_symbol_transform(rotation, mirror, expected):
+     sym, = sch.symbols
+     # library point (2, 3): right and up from the symbol's origin. KiCad rotates counter-clockwise on screen.
+     assert sym.transform_point(2, 3) == pytest.approx(expected)
++
++
++def test_property_is_hidden():
++    sch = Schematic.parse('''(kicad_sch (version 20250114) (generator "eeschema")
++        (symbol (lib_id "Device:R") (at 10 10 0) (unit 1)
++            (property "Reference" "R1" (at 0 0 0) (effects (font (size 1.27 1.27))))
++            (property "Value" "10k" (at 0 0 0) (hide yes) (effects (font (size 1.27 1.27))))
++            (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))))''')
++    ref, value, fp = sch.symbols[0].properties
++    assert [p.is_hidden for p in (ref, value, fp)] == [False, True, True]
++    assert list(fp.to_svg()) == [] and list(value.to_svg()) == []
+-- 
+2.43.0
+

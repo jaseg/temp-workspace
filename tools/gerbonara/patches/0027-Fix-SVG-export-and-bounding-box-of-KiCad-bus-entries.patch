@@ -1,0 +1,65 @@
+From 837aa1f8040729dad2c43b56f70f179604600035 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:11:47 +0000
+Subject: [PATCH 27/41] Fix SVG export and bounding box of KiCad bus entries
+
+The path data was missing its f-string prefix, the stroke width was
+written to a 'width' attribute, and the bounding box rotated a diagonal
+of the entry's length instead of using its size.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py |  9 ++++-----
+ tests/test_kicad_schematic.py        | 10 ++++++++++
+ 2 files changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 7694dd1..24a6b63 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -99,9 +99,8 @@ class BusEntry:
+     uuid: UUID = field(default_factory=UUID)
+ 
+     def bounding_box(self, default=None):
+-        r = math.hypot(self.size.x, self.size.y)
+         x1, y1 = self.at.x, self.at.y
+-        x2, y2 = rotate_point(x1+r, y1+r, self.at.rotation or 0)
++        x2, y2 = x1 + self.size.x, y1 + self.size.y
+         x1, x2 = min(x1, x2), max(x1, x2)
+         y1, y2 = min(y1, y2), max(y1, y2)
+ 
+@@ -109,9 +108,9 @@ class BusEntry:
+         return (x1-r, y1-r), (x2+r, y2+r)
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        yield Tag('path', d='M {self.at.x} {self.at.y} l {self.size.x} {self.size.y}',
+-                   transform=f'rotate({self.at.rotation or 0})',
+-                   fill='none', stroke=self.stroke.svg_color(colorscheme.bus), width=self.stroke.width or '0.254')
++        yield Tag('path', d=f'M {self.at.x:.3f} {self.at.y:.3f} l {self.size.x:.3f} {self.size.y:.3f}',
++                  fill='none', stroke=self.stroke.svg_color(colorscheme.bus), stroke_width=self.stroke.width or 0.254,
++                  stroke_linecap='round')
+ 
+ 
+ def _polyline_svg(self, default_color):
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 5c706ab..75f19b4 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -287,3 +287,13 @@ def test_label_svg(rotation, side):
+             assert (tx - 10) * side > 0 and ty == 20
+         else:
+             assert (ty - 20) * side > 0 and tx == 10
++
++
++def test_bus_entry():
++    sch = Schematic.parse('''(kicad_sch (version 20250114) (generator "eeschema")
++        (bus_entry (at 10 20) (size 2.54 -2.54) (stroke (width 0) (type default)) (uuid "b")))''')
++    entry, = sch.bus_entries
++    path, = entry.to_svg()
++    assert path.attrs['d'] == 'M 10.000 20.000 l 2.540 -2.540'
++    (x1, y1), (x2, y2) = entry.bounding_box()
++    assert x1 < 10 < 12.54 < x2 and y1 < 17.46 < 20 < y2
+-- 
+2.43.0
+

@@ -1,0 +1,61 @@
+From 674ab5f59ec6f2407114796b41d1d338645e8d96 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:09:26 +0000
+Subject: [PATCH 23/41] Add pin colors to the default KiCad schematic
+ colorscheme
+
+Pin.to_svg() uses colorscheme.pin_names and colorscheme.pin_numbers,
+which the tmTheme colorschemes have but the default KiCad one lacked, so
+exporting any pin with it failed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic_colors.py |  2 ++
+ tests/test_kicad_symbols.py                 | 13 +++++++++++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic_colors.py b/src/gerbonara/cad/kicad/schematic_colors.py
+index d38a88d..1c84187 100644
+--- a/src/gerbonara/cad/kicad/schematic_colors.py
++++ b/src/gerbonara/cad/kicad/schematic_colors.py
+@@ -8,6 +8,8 @@ class Colorscheme:
+         text = 'black'
+         values = 'black'
+         labels = 'black'
++        pin_names = 'black'
++        pin_numbers = 'black'
+         fill = '#cccccc'
+         background = 'white'
+ 
+diff --git a/tests/test_kicad_symbols.py b/tests/test_kicad_symbols.py
+index de50810..4b39df1 100644
+--- a/tests/test_kicad_symbols.py
++++ b/tests/test_kicad_symbols.py
+@@ -6,6 +6,7 @@ import re
+ from gerbonara.cad.kicad.sexp import build_sexp
+ from gerbonara.cad.kicad.sexp_mapper import sexp
+ from gerbonara.cad.kicad.symbols import Library, Symbol
++from gerbonara.cad.kicad.schematic_colors import Colorscheme
+ 
+ from .utils import tmpfile
+ 
+@@ -200,3 +201,15 @@ def test_symbol_arc(mid, bbox, flags):
+     assert [round(v, 6) for v in (x1, y1, x2, y2)] == [*bbox[0], *bbox[1]]
+     path, = arc.to_svg()
+     assert path.attrs['d'] == f'M 1.000 0.000 A 1.000 1.000 0 {flags} -1.000 0.000'
++
++
++def test_pin_svg_with_default_colorscheme():
++    from gerbonara.cad.kicad.schematic import MirrorFlags
++    lib = Library.parse('''(kicad_symbol_lib (version 20241209) (generator "kicad_symbol_editor")
++        (symbol "Buf" (in_bom yes) (on_board yes)
++            (symbol "Buf_1_1"
++                (pin input inverted (at -5 0 0) (length 2.54)
++                    (name "IN" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27))))))))''')
++    pin, = lib.symbols[0].units[0].pins
++    tags = list(pin.to_svg(Colorscheme.KiCad, MirrorFlags(), 0))
++    assert [t.name for t in tags[:2]] == ['path', 'circle']
+-- 
+2.43.0
+

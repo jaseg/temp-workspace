@@ -1,7 +1,7 @@
 From 621558faf5cc7c06af0de470da4f01f52b2759af Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:11:30 +0000
-Subject: [PATCH 08/19] Use the schematic property type for KiCad label
+Subject: [PATCH 08/41] Use the schematic property type for KiCad label
  properties
 
 TextLabel was defined before the schematic DrawnProperty, so the

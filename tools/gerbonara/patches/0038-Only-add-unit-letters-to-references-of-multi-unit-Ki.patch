@@ -1,0 +1,74 @@
+From 7954068648c92a8bc8ae432fc4b19ecaf44863c2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:17:39 +0000
+Subject: [PATCH 38/41] Only add unit letters to references of multi-unit KiCad
+ symbols
+
+The reference text of every placed symbol got a unit letter, so a
+resistor came out as R1A. Add SymbolInstance.unit_count and only add the
+letter when the symbol has more than one unit, like KiCad.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 14 ++++++++++++--
+ tests/test_kicad_schematic.py        | 14 ++++++++++++++
+ 2 files changed, 26 insertions(+), 2 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 1fb61de..a194309 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -277,8 +277,9 @@ class DrawnProperty(TextMixin):
+     # Alias value for text mixin
+     @property
+     def text(self):
+-        if self.key == 'Reference' and getattr(self.parent, 'unit', 0) > 0:
+-            return f'{self.value}{string.ascii_uppercase[self.parent.unit-1]}'
++        unit = getattr(self.parent, 'unit', 0)
++        if self.key == 'Reference' and unit > 0 and getattr(self.parent, 'unit_count', 1) > 1:
++            return f'{self.value}{string.ascii_uppercase[unit-1]}'
+         else:
+             return self.value
+ 
+@@ -504,6 +505,15 @@ class SymbolInstance:
+     def rotation(self):
+         return self.at.rotation
+ 
++    @property
++    def unit_count(self):
++        """ Number of units of this symbol's library symbol, or 1 if it can't be found. """
++        try:
++            sym = self.schematic.lookup_symbol(self.lib_name, self.lib_id).resolve()
++        except (AttributeError, KeyError):
++            return 1
++        return len({unit.unit_index for unit in sym.units} - {0}) or 1
++
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+         children = []
+         rot = self.at.rotation
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 8ec2b66..9dbff01 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -390,3 +390,17 @@ def test_derived_symbol_resolve():
+     assert lib['Device:R'].resolve() is lib['Device:R']
+     with pytest.raises(KeyError):
+         lib['Device:C']
++
++
++def test_reference_unit_letters():
++    sch = Schematic.parse('''(kicad_sch (version 20250114) (generator "eeschema")
++        (lib_symbols
++            (symbol "Device:R" (in_bom yes) (on_board yes) (symbol "R_1_1"))
++            (symbol "74xx:74LS00" (in_bom yes) (on_board yes) (symbol "74LS00_1_1") (symbol "74LS00_2_1")))
++        (symbol (lib_id "Device:R") (at 10 10 0) (unit 1)
++            (property "Reference" "R1" (at 0 0 0) (effects (font (size 1.27 1.27)))))
++        (symbol (lib_id "74xx:74LS00") (at 30 10 0) (unit 2)
++            (property "Reference" "U1" (at 0 0 0) (effects (font (size 1.27 1.27))))))''')
++    r1, u1 = sch.symbols
++    assert (r1.unit_count, r1['Reference'].text) == (1, 'R1')
++    assert (u1.unit_count, u1['Reference'].text) == (2, 'U1B')
+-- 
+2.43.0
+

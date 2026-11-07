@@ -1,7 +1,7 @@
 From 71f7f234475a79ec258c3abba0ff5ca3fa205944 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:08:47 +0000
-Subject: [PATCH 03/19] Fix parsing of symbol and sheet instance data in KiCad
+Subject: [PATCH 03/41] Fix parsing of symbol and sheet instance data in KiCad
  schematics
 
 Array() mapped every element as a bare value, so sexp_type elements such

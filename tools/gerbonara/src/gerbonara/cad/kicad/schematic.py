@@ -15,7 +15,7 @@ import warnings
 from .sexp import *
 from .base_types import *
 from .primitives import *
-from .symbols import Symbol
+from .symbols import Symbol, _lookup_symbol
 from . import graphical_primitives as gr
 
 from .. import primitives as cad_pr
@@ -29,23 +29,6 @@ from ...newstroke import Newstroke
 from ...utils import MM, rotate_point, Tag, setup_svg
 from .schematic_colors import *
 
-
-KICAD_PAPER_SIZES = {
-    'A5': (210,   148),
-    'A4': (297,   210),
-    'A3': (420,   297),
-    'A2': (594,   420),
-    'A1': (841,   594),
-    'A0': (1189,  841),
-    'A': (11*25.4, 8.5*25.4),
-    'B': (17*25.4, 11*15.4),
-    'C': (22*25.4, 17*25.4),
-    'D': (34*25.4, 22*25.4),
-    'E': (44*25.4, 34*25.4),
-    'USLetter': (11*25.4, 8.5*25.4),
-    'USLegal': (14*25.4, 8.5*25.4),
-    'USLedger': (17*25.4, 11*25.4),
-    }
 
 @sexp_type('path')
 class SheetPath:
@@ -99,9 +82,8 @@ class BusEntry:
     uuid: UUID = field(default_factory=UUID)
 
     def bounding_box(self, default=None):
-        r = math.hypot(self.size.x, self.size.y)
         x1, y1 = self.at.x, self.at.y
-        x2, y2 = rotate_point(x1+r, y1+r, self.at.rotation or 0)
+        x2, y2 = x1 + self.size.x, y1 + self.size.y
         x1, x2 = min(x1, x2), max(x1, x2)
         y1, y2 = min(y1, y2), max(y1, y2)
 
@@ -109,22 +91,37 @@ class BusEntry:
         return (x1-r, y1-r), (x2+r, y2+r)
 
     def to_svg(self, colorscheme=Colorscheme.KiCad):
-        yield Tag('path', d='M {self.at.x} {self.at.y} l {self.size.x} {self.size.y}',
-                   transform=f'rotate({self.at.rotation or 0})',
-                   fill='none', stroke=self.stroke.svg_color(colorscheme.bus), width=self.stroke.width or '0.254')
+        yield Tag('path', d=f'M {self.at.x:.3f} {self.at.y:.3f} l {self.size.x:.3f} {self.size.y:.3f}',
+                  fill='none', stroke=self.stroke.svg_color(colorscheme.bus), stroke_width=self.stroke.width or 0.254,
+                  stroke_linecap='round')
 
 
 def _polyline_svg(self, default_color):
     da = Dasher(self)
-    if len(self.points.xy) < 2:
+    if len(self.points) < 2:
         warnings.warn(f'Schematic {type(self)} with less than two points')
+        return Tag('path', d='')
 
-    p0, *rest = self.points.xy
+    p0, *rest = self.points
     da.move(p0.x, p0.y)
     for pn in rest:
         da.line(pn.x, pn.y)
 
     return da.svg(stroke=self.stroke.svg_color(default_color))
+
+
+def _fill_svg(fill, colorscheme):
+    if fill is None or fill.type == Atom.none:
+        return 'none'
+    elif fill.type == Atom.outline:
+        return colorscheme.lines
+    elif fill.type == Atom.color and fill.color:
+        return fill.color.svg(colorscheme.fill)
+    return colorscheme.fill
+
+
+def _shape_svg(self, colorscheme, name='path', **attrs):
+    return Tag(name, **attrs, fill=_fill_svg(self.fill, colorscheme), **self.stroke.svg_attrs(colorscheme.lines))
 
 
 def _polyline_bounds(self):
@@ -185,6 +182,10 @@ class Circle:
     fill: OmitDefault(Fill) = None
     uuid: UUID = field(default_factory=UUID)
 
+    def to_svg(self, colorscheme=Colorscheme.KiCad):
+        yield _shape_svg(self, colorscheme, 'circle', cx=f'{self.center.x:.3f}', cy=f'{self.center.y:.3f}',
+                         r=f'{self.radius:.3f}')
+
 
 @sexp_type('rectangle')
 class Rectangle:
@@ -193,6 +194,10 @@ class Rectangle:
     stroke: Stroke = field(default_factory=Stroke)
     fill: OmitDefault(Fill) = None
     uuid: UUID = field(default_factory=UUID)
+
+    def to_svg(self, colorscheme=Colorscheme.KiCad):
+        x1, y1, x2, y2 = self.start.x, self.start.y, self.end.x, self.end.y
+        yield _shape_svg(self, colorscheme, d=f'M {x1:.3f} {y1:.3f} H {x2:.3f} V {y2:.3f} H {x1:.3f} Z')
 
 
 @sexp_type('arc')
@@ -204,6 +209,14 @@ class Arc:
     fill: OmitDefault(Fill) = None
     uuid: UUID = field(default_factory=UUID)
 
+    def to_svg(self, colorscheme=Colorscheme.KiCad):
+        try:
+            _c, r, sweep, large = kicad_arc_svg_flags(self.start, self.mid, self.end)
+            to = f'A {r:.3f} {r:.3f} 0 {int(large)} {int(sweep)}'
+        except ValueError: # start, mid and end on one line
+            to = 'L'
+        yield _shape_svg(self, colorscheme, d=f'M {self.start.x:.3f} {self.start.y:.3f} {to} {self.end.x:.3f} {self.end.y:.3f}')
+
 
 @sexp_type('bezier')
 class Bezier:
@@ -212,9 +225,17 @@ class Bezier:
     fill: OmitDefault(Fill) = None
     uuid: UUID = field(default_factory=UUID)
 
+    def to_svg(self, colorscheme=Colorscheme.KiCad):
+        if len(self.points) != 4:
+            return
+        p0, *rest = self.points
+        yield _shape_svg(self, colorscheme, d=f'M {p0.x:.3f} {p0.y:.3f} C ' + ' '.join(f'{p.x:.3f} {p.y:.3f}' for p in rest))
+
 
 def label_shape_path_d(shape, w, h):
-    l, r = {
+    """ Outline of a global or hierarchical label of the given shape, height `h` and body width `w`, starting at the
+    origin (the connection point) and extending towards +x. Each end is either pointed or square. """
+    left, right = {
         Atom.input: '<]',
         Atom.output: '[>',
         Atom.bidirectional: '<>',
@@ -222,7 +243,7 @@ def label_shape_path_d(shape, w, h):
         Atom.passive: '[]'}.get(shape, '<]')
     r = h/2
 
-    if l == '[':
+    if left == '[':
         d = f'M {r:.3f} {r:.3f} L 0 {r:.3f} L 0 {-r:.3f} L {r:.3f} {-r:.3f}'
     else:
         d = f'M {r:.3f} {r:.3f} L 0 0 L {r:.3f} {-r:.3f}'
@@ -230,10 +251,10 @@ def label_shape_path_d(shape, w, h):
     e = w+r
     d += f' L {e:.3f} {-r:.3f}'
 
-    if l == '[':
-        return d + f'L {e+r:.3f} {-r:.3f} L {e+r:.3f} {r:.3f} L {e:.3f} {r:.3f} Z'
+    if right == ']':
+        return d + f' L {e+r:.3f} {-r:.3f} L {e+r:.3f} {r:.3f} L {e:.3f} {r:.3f} Z'
     else:
-        return d + f'L {e+r:.3f} {0:.3f} L {e:.3f} {r:.3f} Z'
+        return d + f' L {e+r:.3f} {0:.3f} L {e:.3f} {r:.3f} Z'
 
 
 @sexp_type('property')
@@ -256,8 +277,9 @@ class DrawnProperty(TextMixin):
     # Alias value for text mixin
     @property
     def text(self):
-        if self.key == 'Reference' and getattr(self.parent, 'unit', 0) > 0:
-            return f'{self.value}{string.ascii_uppercase[self.parent.unit-1]}'
+        unit = getattr(self.parent, 'unit', 0)
+        if self.key == 'Reference' and unit > 0 and getattr(self.parent, 'unit_count', 1) > 1:
+            return f'{self.value}{string.ascii_uppercase[unit-1]}'
         else:
             return self.value
 
@@ -289,7 +311,7 @@ class DrawnProperty(TextMixin):
         return False, False
 
     def to_svg(self, colorscheme=Colorscheme.KiCad):
-        if not self.hide:
+        if not self.is_hidden:
             yield from TextMixin.to_svg(self, colorscheme.values)
 
 
@@ -321,25 +343,37 @@ class LocalLabel(TextLabel):
         yield from TextMixin.to_svg(self, colorscheme.labels)
 
 
+def _label_svg(label, colorscheme, text_offset, frame_d):
+    """ SVG export shared by global and hierarchical labels. `frame_d` is the label's outline, drawn from the
+    connection point towards +x, and the text starts `text_offset` from the connection point in the same direction.
+    Both are turned the way the label points; the text stays upright. """
+    x, y, rot = label.at.x, label.at.y, round(label.at.rotation or 0) % 360
+    dx, dy = {0: (1, 0), 90: (0, -1), 180: (-1, 0), 270: (0, 1)}.get(rot, (1, 0))
+    text = Newstroke.load().render_svg(label.text,
+                                       size=label.size,
+                                       h_align='left' if rot in (0, 90) else 'right',
+                                       v_align='middle',
+                                       rotation=-90 if rot in (90, 270) else 0,
+                                       scale=(1, 1),
+                                       stroke=colorscheme.labels,
+                                       transform=f'translate({x + dx*text_offset:.3f} {y + dy*text_offset:.3f})')
+    frame = Tag('path', fill='none', stroke_width=0.254, stroke=colorscheme.lines, d=frame_d,
+                transform=f'translate({x:.3f} {y:.3f}) rotate({-rot})')
+    return Tag('g', children=[frame, text])
+
+
 @sexp_type('global_label')
 class GlobalLabel(TextLabel):
     def to_svg(self, colorscheme=Colorscheme.KiCad):
-        text = super(TextMixin, self).to_svg(colorscheme.labels),
-        text.attrs['transform'] = f'translate({self.size*0.6:.3f} 0)'
-        (x1, y1), (x2, y2) = self.bounding_box()
-        frame = Tag('path', fill='none', stroke_width=0.254, stroke=colorscheme.lines,
-            d=label_shape_path_d(self.shape, self.size*0.2 + y2-y1, self.size*1.2 + 0.254))
-        yield Tag('g', children=[frame, text])
+        (_x1, _y1), (w, _y2) = Newstroke.load().bounding_box(self.text, size=self.size)
+        yield _label_svg(self, colorscheme, self.size*0.6,
+                         label_shape_path_d(self.shape, w + self.size*0.2, self.size*1.2 + 0.254))
 
 
 @sexp_type('hierarchical_label')
 class HierarchicalLabel(TextLabel):
     def to_svg(self, colorscheme=Colorscheme.KiCad):
-        text, = TextMixin.to_svg(self, colorscheme.labels),
-        text.attrs['transform'] = f'translate({self.size*1.2:.3f} 0)'
-        frame = Tag('path', fill='none', stroke_width=0.254, stroke=colorscheme.lines,
-            d=label_shape_path_d(self.shape, self.size, self.size))
-        yield Tag('g', children=[frame, text])
+        yield _label_svg(self, colorscheme, self.size*1.2, label_shape_path_d(self.shape, 0, self.size))
 
 
 @sexp_type('netclass_flag')
@@ -422,7 +456,7 @@ class SymbolInstance:
     in_bom: Named(YesNoAtom()) = True
     on_board: Named(YesNoAtom()) = True
     in_pos_files: Named(YesNoAtom()) = None
-    dnp: Named(YesNoAtom()) = True
+    dnp: Named(YesNoAtom()) = False
     fields_autoplaced: Named(YesNoAtom()) = True
     uuid: UUID = field(default_factory=UUID)
     default_instance: DefaultSymbolInstance = None
@@ -470,6 +504,34 @@ class SymbolInstance:
     @property
     def rotation(self):
         return self.at.rotation
+
+    def transform_vector(self, dx, dy):
+        """ Turn a vector in library symbol coordinates (y pointing up) into sheet coordinates (y pointing down),
+        following the symbol's rotation and mirroring. KiCad rotates first, then mirrors. """
+        a = math.radians(self.at.rotation or 0)
+        c, s = math.cos(a), math.sin(a)
+        c, s = (round(c) if abs(c - round(c)) < 1e-9 else c), (round(s) if abs(s - round(s)) < 1e-9 else s)
+        x, y = dx, -dy
+        x, y = x*c + y*s, -x*s + y*c
+        if self.mirror.x:
+            y = -y
+        elif self.mirror.y:
+            x = -x
+        return x, y
+
+    def transform_point(self, x, y):
+        """ Position of a point given in library symbol coordinates on the sheet. """
+        dx, dy = self.transform_vector(x, y)
+        return self.at.x + dx, self.at.y + dy
+
+    @property
+    def unit_count(self):
+        """ Number of units of this symbol's library symbol, or 1 if it can't be found. """
+        try:
+            sym = self.schematic.lookup_symbol(self.lib_name, self.lib_id).resolve()
+        except (AttributeError, KeyError):
+            return 1
+        return len({unit.unit_index for unit in sym.units} - {0}) or 1
 
     def to_svg(self, colorscheme=Colorscheme.KiCad):
         children = []
@@ -634,6 +696,13 @@ class RuleArea:
     dnp: Named(YesNoAtom()) = None
     polyline: Polyline = None
 
+    def to_svg(self, colorscheme=Colorscheme.KiCad):
+        if self.polyline is None or len(self.polyline.points) < 3:
+            return
+        p0, *rest = self.polyline.points
+        d = f'M {p0.x:.3f} {p0.y:.3f} ' + ' '.join(f'L {p.x:.3f} {p.y:.3f}' for p in rest) + ' Z'
+        yield _shape_svg(self.polyline, colorscheme, d=d)
+
 
 @sexp_type('text_box')
 class TextBox(TextMixin):
@@ -706,6 +775,9 @@ class Table:
 @sexp_type('lib_symbols')
 class LocalLibrary:
     symbols: List(Symbol) = field(default_factory=list)
+
+    def __getitem__(self, name):
+        return _lookup_symbol(self.symbols, name)
 
 
 SUPPORTED_FILE_FORMAT_VERSIONS = [20230620]
@@ -787,7 +859,12 @@ class Schematic:
     def elements(self):
         yield from self.subsheets
         yield from self.images
+        yield from self.rule_areas
         yield from self.polylines
+        yield from self.rectangles
+        yield from self.circles
+        yield from self.arcs
+        yield from self.beziers
         yield from self.symbols
         yield from self.junctions
         yield from self.no_connects
@@ -803,7 +880,7 @@ class Schematic:
         children = []
         for elem in self.elements:
             children += elem.to_svg(colorscheme)
-        w, h = KICAD_PAPER_SIZES[self.page_settings.page_format]
+        w, h = self.page_settings.size
         return setup_svg(children, ((0, 0), (w, h)), pagecolor=colorscheme.background)
 
 

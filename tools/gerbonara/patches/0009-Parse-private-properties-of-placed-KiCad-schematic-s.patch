@@ -1,7 +1,7 @@
 From f40d96a6d46712677f9a22fb28ac2a9d00a6277b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:11:38 +0000
-Subject: [PATCH 09/19] Parse private properties of placed KiCad schematic
+Subject: [PATCH 09/41] Parse private properties of placed KiCad schematic
  symbols
 
 Private library properties, such as the KLC_* notes of some library

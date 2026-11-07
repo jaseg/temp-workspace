@@ -1,0 +1,47 @@
+From 78d02e908c08c249f4b7590c61bb4f34c0398a7d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:13:21 +0000
+Subject: [PATCH 31/41] Fix the height of B size paper
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+It was 11 × 15.4 mm instead of 11 inches (11 × 25.4 mm).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 2 +-
+ tests/test_kicad_schematic.py        | 6 ++++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 24a6b63..68d6f84 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -38,7 +38,7 @@ KICAD_PAPER_SIZES = {
+     'A1': (841,   594),
+     'A0': (1189,  841),
+     'A': (11*25.4, 8.5*25.4),
+-    'B': (17*25.4, 11*15.4),
++    'B': (17*25.4, 11*25.4),
+     'C': (22*25.4, 17*25.4),
+     'D': (34*25.4, 22*25.4),
+     'E': (44*25.4, 34*25.4),
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index f8abac9..016ade3 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -319,3 +319,9 @@ def test_image_size_and_svg(ppm, scale, size):
+     assert (w, h) == pytest.approx((size, size / 2))
+     tag, = img.to_svg()
+     assert tag.name == 'image' and float(tag.attrs['x']) == pytest.approx(100 - size / 2)
++
++
++def test_paper_sizes():
++    from gerbonara.cad.kicad.schematic import KICAD_PAPER_SIZES
++    assert KICAD_PAPER_SIZES['B'] == pytest.approx((431.8, 279.4))
++    assert KICAD_PAPER_SIZES['USLedger'] == KICAD_PAPER_SIZES['B']
+-- 
+2.43.0
+

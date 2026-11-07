@@ -21,7 +21,7 @@ from ...utils import rotate_point, Tag, arc_bounds
 from ... import __version__
 from ...newstroke import Newstroke
 from .schematic_colors import *
-from .primitives import kicad_mid_to_center_arc, Margins
+from .primitives import kicad_mid_to_center_arc, kicad_arc_svg_flags, Margins
 
 
 PIN_ETYPE = AtomChoice(Atom.input, Atom.output, Atom.bidirectional, Atom.tri_state, Atom.passive, Atom.free,
@@ -71,30 +71,27 @@ class Pin:
         self.at.rotation = {0: 'R', 90: 'U', 180: 'L', 270: 'D'}[value[0].upper()]
 
     def bounding_box(self, default=None):
+        """ The pin's line and its name, which sits beyond the pin's inner end. """
         font = Newstroke.load()
-        strokes = list(font.render(self.name, size=2.54))
-        min_x = min(x for st in strokes for x, y in st)
-        min_y = min(y for st in strokes for x, y in st)
-        max_x = max(x for st in strokes for x, y in st)
-        max_y = max(y for st in strokes for x, y in st)
-        w, h = max_x - min_x, max_y - min_y
+        (_x1, _y1), (w, _y2) = font.bounding_box(self.name.value or '', size=2.54)
+        h = 2.54
         l = self.length + 0.2 + w
 
         x1, y1 = x2, y2 = self.at.x, self.at.y
         if self.at.rotation == 0:
-            x2 += w
+            x2 += l
             y1 -= h/2
             y2 += h/2
-        if self.at.rotation == 90:
-            y2 += w
+        elif self.at.rotation == 90:
+            y2 += l
             x1 -= h/2
             x2 += h/2
-        if self.at.rotation == 180:
-            x1 -= w
+        elif self.at.rotation == 180:
+            x1 -= l
             y1 -= h/2
             y2 += h/2
-        if self.at.rotation == 270:
-            y1 -= w
+        elif self.at.rotation == 270:
+            y1 -= l
             x1 -= h/2
             x2 += h/2
         else:
@@ -150,7 +147,12 @@ class Pin:
 
         rot = self.at.rotation + p_rotation
         trot = self.at.rotation
-        ax, ay = self.length+0.2, 0
+        # With a positive pin name offset, names go inside the body, that far beyond the pin's inner end. With an
+        # offset of 0, names go above the middle of the pin and numbers below it.
+        spec = self.unit.symbol.pin_names if self.unit is not None and self.unit.symbol is not None else None
+        offset = spec.offset if spec is not None and spec.offset is not None else 0.508
+        names_inside = offset > 0
+        ax, ay = (self.length + offset if names_inside else self.length/2), 0
         ax, ay = rotate_point(ax, ay, math.radians(-self.at.rotation))
 
         #lx, ly = self.at.x, -self.at.y
@@ -195,9 +197,9 @@ class Pin:
             yield font.render_svg(self.name.value,
                                   size=self.name.effects.font.size.y or 1.27,
                                   x0=0,
-                                  y0=0,
-                                  h_align=h_align,
-                                  v_align='middle',
+                                  y0=0 if names_inside else -0.4,
+                                  h_align=h_align if names_inside else 'center',
+                                  v_align='middle' if names_inside else 'bottom',
                                   rotation=-frot,
                                   stroke=colorscheme.pin_names,
                                   transform=f'translate({lx:.3f} {ly:.3f})',
@@ -208,10 +210,10 @@ class Pin:
         if self.number.value != '~' and not self.unit.symbol.pin_numbers.hide:
             yield font.render_svg(self.number.value,
                                   size=self.number.effects.font.size.y or 1.27,
-                                  x0=-0.4 if h_align == 'left' else 0.4,
-                                  y0=-0.4,
-                                  h_align={'left': 'right', 'right': 'left'}[h_align],
-                                  v_align='bottom',
+                                  x0=(-0.4 if h_align == 'left' else 0.4) if names_inside else 0,
+                                  y0=-0.4 if names_inside else 0.4,
+                                  h_align={'left': 'right', 'right': 'left'}[h_align] if names_inside else 'center',
+                                  v_align='bottom' if names_inside else 'top',
                                   rotation=-frot,
                                   stroke=colorscheme.pin_numbers,
                                   scale=(sx, sy),
@@ -267,28 +269,39 @@ class Arc:
     stroke: Stroke = field(default_factory=Stroke)
     fill: Fill = field(default_factory=Fill)
 
-    def bounding_box(self, default=None):
-        (cx, cy), r = kicad_mid_to_center_arc(self.mid, self.start, self.end)
-        x1, y1 = self.start.x, self.start.y
-        x2, y2 = self.mid.x-x1, self.mid.y-x2
-        x3, y3 = (self.end.x - x1)/2, (self.end.y - y1)/2
-        clockwise = math.atan2(x2*y3-x3*y2, x2*x3+y2*y3) > 0
-        return arc_bounds(x1, y1, self.end.x, self.end.y, cx, cy, clockwise)
+    @property
+    def midpoint(self):
+        """ The arc's midpoint. KiCad 6 symbols may give the arc as (radius (at center) (length r) (angles a1 a2))
+        instead, running counter-clockwise from angle a1 to a2. """
+        if self.mid is not None and self.mid.x is not None:
+            return self.mid
+        if self.radius is None:
+            raise ValueError('Arc has neither a midpoint nor a radius')
+        a1, a2 = self.radius.angles.x, self.radius.angles.y
+        if a2 < a1:
+            a2 += 360
+        a = math.radians((a1 + a2) / 2)
+        return XYCoord(self.radius.at.x + self.radius.length*math.cos(a), self.radius.at.y + self.radius.length*math.sin(a))
 
+    def _arc(self):
+        return kicad_arc_svg_flags(self.start, self.midpoint, self.end)
+
+    def bounding_box(self, default=None):
+        try:
+            (cx, cy), _r, sweep, _large = self._arc()
+        except ValueError: # start, mid and end on one line
+            return ((min(self.start.x, self.end.x), min(self.start.y, self.end.y)),
+                    (max(self.start.x, self.end.x), max(self.start.y, self.end.y)))
+        # Symbol coordinates have the y axis pointing up like arc_bounds expects, so increasing angle means counter-
+        # clockwise.
+        return arc_bounds(self.start.x, self.start.y, self.end.x, self.end.y, cx, cy, not sweep)
 
     def to_svg(self, colorscheme=Colorscheme.KiCad):
-        (cx, cy), r = kicad_mid_to_center_arc(self.mid, self.start, self.end)
-
-        x1r = self.start.x - cx
-        y1r = self.start.y - cy
-        x2r = self.end.x - cx
-        y2r = self.end.y - cy
-        a1 = math.atan2(x1r, y1r)
-        a2 = math.atan2(x2r, y2r)
-        da = (a2 - a1 + math.pi) % (2*math.pi) - math.pi
-
-        large_arc = int(da > math.pi)
-        d = f'M {self.start.x:.3f} {self.start.y:.3f} A {r:.3f} {r:.3f} 0 {large_arc} 0 {self.end.x:.3f} {self.end.y:.3f}'
+        try:
+            _c, r, sweep, large = self._arc()
+            d = f'M {self.start.x:.3f} {self.start.y:.3f} A {r:.3f} {r:.3f} 0 {int(large)} {int(sweep)} {self.end.x:.3f} {self.end.y:.3f}'
+        except ValueError: # start, mid and end on one line
+            d = f'M {self.start.x:.3f} {self.start.y:.3f} L {self.end.x:.3f} {self.end.y:.3f}'
         yield Tag('path', d=d, fill=self.fill.svg(colorscheme.lines, colorscheme.fill),
                   **self.stroke.svg_attrs(colorscheme.lines))
 
@@ -317,17 +330,17 @@ class Bezier:
 
 @sexp_type('polyline')
 class Polyline:
-    pts: PointList = field(default_factory=PointList)
+    pts: PointList = field(default_factory=list)
     stroke: Stroke = field(default_factory=Stroke)
     fill: Fill = field(default_factory=Fill)
 
     @property
     def points(self):
-        return self.pts.xy
+        return self.pts
 
     @points.setter
     def points(self, value):
-        self.pts.xy = value
+        self.pts = value
 
     @property
     def closed(self):
@@ -417,7 +430,7 @@ class Rectangle:
     def to_polyline(self):
         x1, y1 = self.start.x, self.start.y
         x2, y2 = self.end.x, self.end.y
-        return Polyline(PointList([XYCoord(x1, y1), XYCoord(x2, y1), XYCoord(x2, y2), XYCoord(x1, y2), XYCoord(x1, y1)]),
+        return Polyline([XYCoord(x1, y1), XYCoord(x2, y1), XYCoord(x2, y2), XYCoord(x1, y2), XYCoord(x1, y1)],
                         self.stroke, self.fill)
 
     def to_svg(self, colorscheme=Colorscheme.KiCad):
@@ -447,7 +460,7 @@ class Property(TextMixin):
         self.value = value
 
     def to_svg(self, colorscheme=Colorscheme.KiCad):
-        if not self.hide:
+        if not self.is_hidden:
             yield from TextMixin.to_svg(self, colorscheme.text)
 
 
@@ -624,10 +637,17 @@ class Symbol:
             self.properties[name] = Property(name=name, value=value, id=i, effects=TextEffect(hide=hide))
 
     def resolve(self):
-        if self.extends:
-            return self.library[self.extends]
-        else:
+        """ The symbol this one is derived from with (extends ...), or this symbol itself. In libraries embedded in
+        schematics, names carry a library prefix, which `extends` leaves out; the parent is looked up in the same
+        library first. """
+        if not self.extends:
             return self
+        if self.library_name:
+            try:
+                return self.library[f'{self.library_name}:{self.extends}']
+            except KeyError:
+                pass
+        return self.library[self.extends]
 
     def is_graphic_symbol(self):
         return self.extends is None and (
@@ -670,6 +690,17 @@ class Symbol:
         return bool(self.get_center_rectangle(range(self.unit_count)))
 
 
+def _lookup_symbol(symbols, name):
+    """ Find a symbol by its full name (with library prefix, if it has one), else by its name alone. """
+    for sym in symbols:
+        if sym.raw_name == name:
+            return sym
+    for sym in symbols:
+        if sym.name == name:
+            return sym
+    raise KeyError(name)
+
+
 SUPPORTED_FILE_FORMAT_VERSIONS = [20211014, 20220914]
 @sexp_type('kicad_symbol_lib')
 class Library:
@@ -688,6 +719,9 @@ class Library:
     def version(self, value):
         if value not in SUPPORTED_FILE_FORMAT_VERSIONS:
             raise FormatError(f'File format version {value} is not supported. Supported versions are {", ".join(map(str, SUPPORTED_FILE_FORMAT_VERSIONS))}.')
+
+    def __getitem__(self, name):
+        return _lookup_symbol(self.symbols, name)
 
     @classmethod
     def open(cls, filename: str):

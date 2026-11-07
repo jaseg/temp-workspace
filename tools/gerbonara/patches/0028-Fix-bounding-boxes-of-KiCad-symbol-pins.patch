@@ -1,0 +1,87 @@
+From 3b11612040b0eda83cc67ed36d0183d7bb8a8153 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:12:00 +0000
+Subject: [PATCH 28/41] Fix bounding boxes of KiCad symbol pins
+
+Pin.bounding_box() checked the rotations with separate ifs whose last
+one raised for anything but 270 degrees, passed the StyledText name
+instead of its text to the font, and left out the pin length.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/symbols.py | 23 ++++++++++-------------
+ tests/test_kicad_symbols.py        | 15 +++++++++++++++
+ 2 files changed, 25 insertions(+), 13 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index ee62294..9745aca 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -71,30 +71,27 @@ class Pin:
+         self.at.rotation = {0: 'R', 90: 'U', 180: 'L', 270: 'D'}[value[0].upper()]
+ 
+     def bounding_box(self, default=None):
++        """ The pin's line and its name, which sits beyond the pin's inner end. """
+         font = Newstroke.load()
+-        strokes = list(font.render(self.name, size=2.54))
+-        min_x = min(x for st in strokes for x, y in st)
+-        min_y = min(y for st in strokes for x, y in st)
+-        max_x = max(x for st in strokes for x, y in st)
+-        max_y = max(y for st in strokes for x, y in st)
+-        w, h = max_x - min_x, max_y - min_y
++        (_x1, _y1), (w, _y2) = font.bounding_box(self.name.value or '', size=2.54)
++        h = 2.54
+         l = self.length + 0.2 + w
+ 
+         x1, y1 = x2, y2 = self.at.x, self.at.y
+         if self.at.rotation == 0:
+-            x2 += w
++            x2 += l
+             y1 -= h/2
+             y2 += h/2
+-        if self.at.rotation == 90:
+-            y2 += w
++        elif self.at.rotation == 90:
++            y2 += l
+             x1 -= h/2
+             x2 += h/2
+-        if self.at.rotation == 180:
+-            x1 -= w
++        elif self.at.rotation == 180:
++            x1 -= l
+             y1 -= h/2
+             y2 += h/2
+-        if self.at.rotation == 270:
+-            y1 -= w
++        elif self.at.rotation == 270:
++            y1 -= l
+             x1 -= h/2
+             x2 += h/2
+         else:
+diff --git a/tests/test_kicad_symbols.py b/tests/test_kicad_symbols.py
+index 4b39df1..a091938 100644
+--- a/tests/test_kicad_symbols.py
++++ b/tests/test_kicad_symbols.py
+@@ -213,3 +213,18 @@ def test_pin_svg_with_default_colorscheme():
+     pin, = lib.symbols[0].units[0].pins
+     tags = list(pin.to_svg(Colorscheme.KiCad, MirrorFlags(), 0))
+     assert [t.name for t in tags[:2]] == ['path', 'circle']
++
++
++@pytest.mark.parametrize('rotation', [0, 90, 180, 270])
++def test_pin_bounding_box(rotation):
++    lib = Library.parse(f'''(kicad_symbol_lib (version 20241209) (generator "kicad_symbol_editor")
++        (symbol "Buf" (in_bom yes) (on_board yes)
++            (symbol "Buf_1_1"
++                (pin input line (at 0 0 {rotation}) (length 2.54)
++                    (name "IN" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27))))))))''')
++    pin, = lib.symbols[0].units[0].pins
++    (x1, y1), (x2, y2) = pin.bounding_box()
++    dx, dy = {0: (1, 0), 90: (0, 1), 180: (-1, 0), 270: (0, -1)}[rotation]
++    # the box reaches past the pin's end, in the pin's direction
++    assert x1 <= 0 <= x2 and y1 <= 0 <= y2
++    assert (x2 if dx > 0 else -x1 if dx < 0 else y2 if dy > 0 else -y1) > 2.54
+-- 
+2.43.0
+

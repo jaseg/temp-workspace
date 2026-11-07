@@ -1,7 +1,7 @@
 From ff446683f5607140f30824464ba974bf1d7a68eb Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:12:57 +0000
-Subject: [PATCH 13/19] =?UTF-8?q?Parse=20arcs=20and=20B=C3=A9zier=20curves?=
+Subject: [PATCH 13/41] =?UTF-8?q?Parse=20arcs=20and=20B=C3=A9zier=20curves?=
  =?UTF-8?q?=20in=20KiCad=20schematics?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

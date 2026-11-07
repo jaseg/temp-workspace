@@ -1,7 +1,7 @@
 From f43204ce49ca26410e39e2037ed186cbd78f32a3 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:14:17 +0000
-Subject: [PATCH 16/19] Parse groups in KiCad schematics
+Subject: [PATCH 16/41] Parse groups in KiCad schematics
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh

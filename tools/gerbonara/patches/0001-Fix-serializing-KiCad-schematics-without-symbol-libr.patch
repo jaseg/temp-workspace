@@ -1,7 +1,7 @@
 From 6e14ef4d2ca1270b214245f48e53e615d25ca9f5 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:08:14 +0000
-Subject: [PATCH 01/19] Fix serializing KiCad schematics without symbol library
+Subject: [PATCH 01/41] Fix serializing KiCad schematics without symbol library
 
 Schematic.lib_symbols defaulted to a plain list instead of a LocalLibrary,
 so a schematic created from scratch or loaded from a file without a

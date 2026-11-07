@@ -1,7 +1,7 @@
 From f91e6effa376c835768e98c6f0865c10cadf1326 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:10:21 +0000
-Subject: [PATCH 07/19] Parse body_style and in_pos_files of placed KiCad
+Subject: [PATCH 07/41] Parse body_style and in_pos_files of placed KiCad
  schematic symbols
 
 KiCad 9 writes the De Morgan body style of placed symbols as

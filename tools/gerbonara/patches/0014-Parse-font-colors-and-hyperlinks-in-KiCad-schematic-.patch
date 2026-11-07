@@ -1,7 +1,7 @@
 From 43f134aec3ca6d388e50148f1326834b480f6e32 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:13:37 +0000
-Subject: [PATCH 14/19] Parse font colors and hyperlinks in KiCad schematic
+Subject: [PATCH 14/41] Parse font colors and hyperlinks in KiCad schematic
  text
 
 Schematic text can have its own color in (font ... (color r g b a)) and

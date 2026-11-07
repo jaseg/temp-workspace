@@ -1,0 +1,47 @@
+From c9ce3ca54e205c08e5a949a2ae844a753f455fa6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:08:35 +0000
+Subject: [PATCH 20/41] Fix truth value of KiCad colors
+
+Color.__bool__ returned the first non-zero channel instead of a bool, so
+bool() raised a TypeError for colors with a non-zero channel, which broke
+the SVG export of anything with a colored stroke.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/base_types.py | 2 +-
+ tests/test_kicad_schematic.py         | 7 +++++++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/gerbonara/cad/kicad/base_types.py b/src/gerbonara/cad/kicad/base_types.py
+index f794ea9..30079e5 100644
+--- a/src/gerbonara/cad/kicad/base_types.py
++++ b/src/gerbonara/cad/kicad/base_types.py
+@@ -82,7 +82,7 @@ class Color:
+     a: float = None
+     
+     def __bool__(self):
+-        return self.r or self.b or self.g or not math.isclose(self.a, 0, abs_tol=1e-3)
++        return bool(self.r or self.b or self.g or not math.isclose(self.a or 0, 0, abs_tol=1e-3))
+ 
+     def svg(self, default=None):
+         if default and not self:
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 1e49769..4659059 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -237,3 +237,10 @@ def test_title_block_comments():
+     assert (tb.comment(1), tb.comment(2), tb.comment(3)) == ('first', '', 'third')
+     tb = Schematic.parse(sch.serialize()).title_block
+     assert [(c.number, c.text) for c in tb.comments] == [(1, 'first'), (3, 'third')]
++
++
++def test_color_truthiness():
++    from gerbonara.cad.kicad.base_types import Color
++    assert bool(Color(0, 0, 0, 0)) is False
++    assert bool(Color(255, 0, 0, 0)) is True
++    assert bool(Color(0, 0, 0, 1)) is True
+-- 
+2.43.0
+

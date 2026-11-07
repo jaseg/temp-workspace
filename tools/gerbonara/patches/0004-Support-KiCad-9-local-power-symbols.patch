@@ -1,7 +1,7 @@
 From d06f3458100c6aaec4be4182cb3f0cf095cb521d Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:09:11 +0000
-Subject: [PATCH 04/19] Support KiCad 9 local power symbols
+Subject: [PATCH 04/41] Support KiCad 9 local power symbols
 
 KiCad 9 writes (power global) or (power local) instead of a bare (power).
 Parse it into a PowerSpec that keeps the scope, so both round trip.

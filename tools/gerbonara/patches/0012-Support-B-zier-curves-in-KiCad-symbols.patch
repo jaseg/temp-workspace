@@ -1,7 +1,7 @@
 From 4d3cc77a05860e3fd5dfc039799069cf12b110be Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:12:57 +0000
-Subject: [PATCH 12/19] =?UTF-8?q?Support=20B=C3=A9zier=20curves=20in=20KiC?=
+Subject: [PATCH 12/41] =?UTF-8?q?Support=20B=C3=A9zier=20curves=20in=20KiC?=
  =?UTF-8?q?ad=20symbols?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

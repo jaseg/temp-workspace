@@ -1,7 +1,7 @@
 From 7987b1ce2240a11d30d04f0bf6409e6966d15250 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:10:21 +0000
-Subject: [PATCH 06/19] Parse KiCad 9/10 jumper and position file attributes of
+Subject: [PATCH 06/41] Parse KiCad 9/10 jumper and position file attributes of
  symbols
 
 KiCad 9 added (duplicate_pin_numbers_are_jumpers ...) and

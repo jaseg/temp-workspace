@@ -82,7 +82,7 @@ class Color:
     a: float = None
     
     def __bool__(self):
-        return self.r or self.b or self.g or not math.isclose(self.a, 0, abs_tol=1e-3)
+        return bool(self.r or self.b or self.g or not math.isclose(self.a or 0, 0, abs_tol=1e-3))
 
     def svg(self, default=None):
         if default and not self:
@@ -104,7 +104,7 @@ class Stroke:
             return default
     
     def svg_attrs(self, default_color=None):
-        w = self.width
+        w = self.width or 0.254
         if not (color := self.color or default_color):
             return {}
 
@@ -117,8 +117,8 @@ class Stroke:
             attrs['stroke_dasharray'] = {
                     Atom.dash: f'{w*5:.3f},{w*5:.3f}',
                     Atom.dot: f'{w*2:.3f},{w*2:.3f}',
-                    Atom.dash_dot: f'{w*5:.3f},{w*3:.3f}{w:.3f},{w*3:.3f}',
-                    Atom.dash_dot_dot: f'{w*5:.3f},{w*3:.3f}{w:.3f},{w*3:.3f}{w:.3f},{w*3:.3f}',
+                    Atom.dash_dot: f'{w*5:.3f},{w*3:.3f},{w:.3f},{w*3:.3f}',
+                    Atom.dash_dot_dot: f'{w*5:.3f},{w*3:.3f},{w:.3f},{w*3:.3f},{w:.3f},{w*3:.3f}',
                     }[self.type]
 
         return attrs
@@ -420,6 +420,12 @@ class TextMixin:
     def line_width(self):
         return self.effects.font.thickness or 0.254
 
+    @property
+    def is_hidden(self):
+        """ Whether the text is hidden: newer KiCad versions put (hide yes) on properties themselves, older ones and
+        other text items in their effects. """
+        return bool(getattr(self, 'hide', False)) or bool(self.effects and self.effects.hide)
+
     @line_width.setter
     def line_width(self, value):
         self.effects.font.thickness = value
@@ -446,14 +452,14 @@ class TextMixin:
 
     @property
     def h_align(self):
-        return 'left' if self.effects.justify.h else 'center'
+        return self.effects.justify.h_str
 
     @property
     def mirrored(self):
         return False, False
 
     def to_svg(self, color='black', variables={}):
-        if not self.effects or self.effects.hide or not self.effects.font:
+        if not self.effects or self.is_hidden or not self.effects.font:
             return
 
         font = Newstroke.load()
@@ -562,12 +568,42 @@ class EditTime:
         self.value = time.time()
 
 
+KICAD_PAPER_SIZES = {
+    'A5': (210,   148),
+    'A4': (297,   210),
+    'A3': (420,   297),
+    'A2': (594,   420),
+    'A1': (841,   594),
+    'A0': (1189,  841),
+    'A': (11*25.4, 8.5*25.4),
+    'B': (17*25.4, 11*25.4),
+    'C': (22*25.4, 17*25.4),
+    'D': (34*25.4, 22*25.4),
+    'E': (44*25.4, 34*25.4),
+    'USLetter': (11*25.4, 8.5*25.4),
+    'USLegal': (14*25.4, 8.5*25.4),
+    'USLedger': (17*25.4, 11*25.4),
+    }
+
+
 @sexp_type('paper')
 class PageSettings:
     page_format: str = 'A4'
     width: float = None
     height: float = None
     portrait: Flag() = False
+
+    @property
+    def size(self):
+        """ (width, height) of the page in mm, taking custom sizes and portrait orientation into account. Unknown
+        formats are treated as A4. """
+        if self.page_format == 'User' and self.width and self.height:
+            w, h = float(self.width), float(self.height)
+        else:
+            w, h = KICAD_PAPER_SIZES.get(str(self.page_format), KICAD_PAPER_SIZES['A4'])
+        if self.portrait:
+            w, h = min(w, h), max(w, h)
+        return w, h
 
 
 @sexp_type('property')

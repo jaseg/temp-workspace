@@ -1,7 +1,7 @@
 From 00526698631f187dbddf9780e33e777b04b50d5e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:07:30 +0000
-Subject: [PATCH 02/19] Fix paper size parsing in KiCad schematics
+Subject: [PATCH 02/41] Fix paper size parsing in KiCad schematics
 
 The legacy_paper field shared its (paper ...) key with page_settings, so
 it shadowed page_settings: every schematic came out as A4 landscape, and

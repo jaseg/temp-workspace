@@ -1,7 +1,7 @@
 From 212232ed0a02de77c6aa49950018f8f08e3e4040 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:15:21 +0000
-Subject: [PATCH 17/19] Parse tables in KiCad schematics
+Subject: [PATCH 17/41] Parse tables in KiCad schematics
 
 KiCad 8 added tables to schematics. Parse them with their cells, borders
 and separators.
