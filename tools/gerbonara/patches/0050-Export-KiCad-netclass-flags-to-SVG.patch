@@ -1,0 +1,72 @@
+From e21467c6a50b3f2ea6e3a15b7d93e6ad06f66d2a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:21:22 +0000
+Subject: [PATCH 50/52] Export KiCad netclass flags to SVG
+
+Netclass flags were drawn as plain text. Draw them like KiCad does: a
+stem with a dot, circle, diamond or rectangle at its end, turned the way
+of the flag's spin style, and the flag's fields. Directive labels, which
+KiCad reads as netclass flags, are drawn the same way.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 35 ++++++++++++++++++++++++++--
+ 1 file changed, 33 insertions(+), 2 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 5b4830e..73a8637 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -535,8 +535,37 @@ class NetclassFlag(TextLabel):
+     length: Named(float) = 2.54
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        # FIXME
+-        yield from TextMixin.to_svg(self, colorscheme.text)
++        """ Like KiCad's SCH_DIRECTIVE_LABEL: a stem of `length` with a dot, circle, diamond or rectangle at its end,
++        pointing the way of the label's spin style (up for the usual horizontal, left-justified label), plus the
++        label's fields. """
++        h_align, _v = _justify(self, default_h='left')
++        right = h_align != 'right'
++        # KiCad draws the flag downwards and turns it by the spin style
++        # (KiCad's RotatePoint() turns (x, y) into (y, -x) for +90 degrees)
++        turn = {(False, True): (-1, 0, 0, -1), (False, False): (1, 0, 0, 1),
++                (True, True): (0, -1, 1, 0), (True, False): (0, 1, -1, 0)}[_is_vertical(self), right]
++        pt = lambda u, v: (self.at.x + turn[0]*u + turn[1]*v, self.at.y + turn[2]*u + turn[3]*v)
++        length, sym = self.length or 2.54, 0.508
++        style = {'fill': 'none', 'stroke': colorscheme.lines, 'stroke_width': 0.254, 'stroke_linejoin': 'round',
++                 'stroke_linecap': 'round'}
++        shape = str(self.shape)
++        if shape in ('dot', 'round'):
++            r = sym * (0.7 if shape == 'dot' else 1)
++            (x1, y1), (cx, cy) = pt(0, length - r), pt(0, length)
++            yield Tag('path', d=f'M {self.at.x:.3f} {self.at.y:.3f} L {x1:.3f} {y1:.3f}', **style)
++            yield Tag('circle', cx=f'{cx:.3f}', cy=f'{cy:.3f}', r=f'{r:.3f}',
++                      **{**style, 'fill': colorscheme.lines if shape == 'dot' else 'none'})
++        else:
++            if shape == 'diamond':
++                pts = [(0, 0), (0, length - sym), (-2*sym, length), (0, length + sym), (2*sym, length), (0, length - sym)]
++            else: # rectangle
++                r = sym * 0.8
++                pts = [(0, 0), (0, length - r), (-2*r, length - r), (-2*r, length + r), (2*r, length + r),
++                       (2*r, length - r), (0, length - r)]
++            d = 'M ' + ' L '.join(f'{x:.3f} {y:.3f}' for x, y in (pt(u, v) for u, v in pts))
++            yield Tag('path', d=d, **style)
++        for prop in self.properties:
++            yield from prop.to_svg(colorscheme)
+ 
+ 
+ @sexp_type('directive_label')
+@@ -1085,6 +1114,8 @@ class Schematic:
+         yield from self.local_labels
+         yield from self.global_labels
+         yield from self.hierarchical_labels
++        yield from self.netclass_flags
++        yield from self.directive_labels
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+         children = []
+-- 
+2.43.0
+

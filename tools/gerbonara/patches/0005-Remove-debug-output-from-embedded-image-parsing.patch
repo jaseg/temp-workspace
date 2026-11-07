@@ -1,0 +1,29 @@
+From f40d61f818d2b0dbe42449ed0ddc0b84e336d6b9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:43:42 +0000
+Subject: [PATCH 05/52] Remove debug output from embedded image parsing
+
+Base64Blob printed the first lines of the data of every embedded image.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/graphical_primitives.py | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/graphical_primitives.py b/src/gerbonara/cad/kicad/graphical_primitives.py
+index bcbd126..3f9241a 100644
+--- a/src/gerbonara/cad/kicad/graphical_primitives.py
++++ b/src/gerbonara/cad/kicad/graphical_primitives.py
+@@ -359,8 +359,6 @@ class Base64Blob:
+     @classmethod
+     def __map__(kls, obj, parent=None, path=''):
+         _data, *content = obj
+-        for x in content[:10]:
+-            print(str(x))
+         return base64.b64decode(''.join(map(str, content)))
+ 
+     @classmethod
+-- 
+2.43.0
+

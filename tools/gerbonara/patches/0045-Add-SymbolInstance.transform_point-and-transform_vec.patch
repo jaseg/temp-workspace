@@ -1,0 +1,49 @@
+From 4e0ae142d23b36a41378ec2636c0985a8d798789 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:18:06 +0000
+Subject: [PATCH 45/52] Add SymbolInstance.transform_point() and
+ transform_vector()
+
+They map library symbol coordinates (y up) to sheet coordinates (y down)
+following the placed symbol's rotation and mirroring, e.g. to find where
+a pin ends up on the sheet.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index dde70e9..d0425d2 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -505,6 +505,25 @@ class SymbolInstance:
+     def rotation(self):
+         return self.at.rotation
+ 
++    def transform_vector(self, dx, dy):
++        """ Turn a vector in library symbol coordinates (y pointing up) into sheet coordinates (y pointing down),
++        following the symbol's rotation and mirroring. KiCad rotates first, then mirrors. """
++        a = math.radians(self.at.rotation or 0)
++        c, s = math.cos(a), math.sin(a)
++        c, s = (round(c) if abs(c - round(c)) < 1e-9 else c), (round(s) if abs(s - round(s)) < 1e-9 else s)
++        x, y = dx, -dy
++        x, y = x*c + y*s, -x*s + y*c
++        if self.mirror.x:
++            y = -y
++        elif self.mirror.y:
++            x = -x
++        return x, y
++
++    def transform_point(self, x, y):
++        """ Position of a point given in library symbol coordinates on the sheet. """
++        dx, dy = self.transform_vector(x, y)
++        return self.at.x + dx, self.at.y + dy
++
+     @property
+     def unit_count(self):
+         """ Number of units of this symbol's library symbol, or 1 if it can't be found. """
+-- 
+2.43.0
+

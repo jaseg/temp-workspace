@@ -1,0 +1,63 @@
+From 34e88201c36d9039bad7a55a04a99f80536143a3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:12:00 +0000
+Subject: [PATCH 33/52] Fix bounding boxes of KiCad symbol pins
+
+Pin.bounding_box() checked the rotations with separate ifs whose last
+one raised for anything but 270 degrees, passed the StyledText name
+instead of its text to the font, and left out the pin length.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/symbols.py | 23 ++++++++++-------------
+ 1 file changed, 10 insertions(+), 13 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index 7725ce4..f661081 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -71,30 +71,27 @@ class Pin:
+         self.at.rotation = {0: 'R', 90: 'U', 180: 'L', 270: 'D'}[value[0].upper()]
+ 
+     def bounding_box(self, default=None):
++        """ The pin's line and its name, which sits beyond the pin's inner end. """
+         font = Newstroke.load()
+-        strokes = list(font.render(self.name, size=2.54))
+-        min_x = min(x for st in strokes for x, y in st)
+-        min_y = min(y for st in strokes for x, y in st)
+-        max_x = max(x for st in strokes for x, y in st)
+-        max_y = max(y for st in strokes for x, y in st)
+-        w, h = max_x - min_x, max_y - min_y
++        (_x1, _y1), (w, _y2) = font.bounding_box(self.name.value or '', size=2.54)
++        h = 2.54
+         l = self.length + 0.2 + w
+ 
+         x1, y1 = x2, y2 = self.at.x, self.at.y
+         if self.at.rotation == 0:
+-            x2 += w
++            x2 += l
+             y1 -= h/2
+             y2 += h/2
+-        if self.at.rotation == 90:
+-            y2 += w
++        elif self.at.rotation == 90:
++            y2 += l
+             x1 -= h/2
+             x2 += h/2
+-        if self.at.rotation == 180:
+-            x1 -= w
++        elif self.at.rotation == 180:
++            x1 -= l
+             y1 -= h/2
+             y2 += h/2
+-        if self.at.rotation == 270:
+-            y1 -= w
++        elif self.at.rotation == 270:
++            y1 -= l
+             x1 -= h/2
+             x2 += h/2
+         else:
+-- 
+2.43.0
+

@@ -1,0 +1,485 @@
+From d0df438c6074b93dcbea1f571208f5c9347a73c1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:21:22 +0000
+Subject: [PATCH 49/52] Place text in KiCad schematic SVG exports like KiCad
+ does
+
+Text went through TextMixin.to_svg(), whose rotation and mirror handling
+differs from KiCad's. It swaps the alignment of text at 180 degrees, so
+labels at (at x y 180) with (justify right), the way KiCad saves every
+label pointing left, were drawn on the wrong side of their wire. Fields
+of mirrored and rotated symbols ended up in the wrong place, and pin
+numbers were drawn at the inner end of the pin instead of its middle.
+
+Instead, follow KiCad's own code for each kind of text:
+
+- Symbol fields: KiCad lays out the field's box in the symbol's
+  untransformed frame, transforms its center with the symbol, and draws
+  the text centered there, horizontal or vertical depending on the
+  field's and the symbol's rotation.
+- Free text, local, global and hierarchical labels: KiCad derives a spin
+  style from the angle and justification, and keeps text upright.
+- Pin names and numbers: inside the body after the pin name offset, or
+  above and below the middle of the pin when the offset is 0.
+- Sheet pins.
+
+Text is drawn with KiCad's metrics: the stroke font's space width, its
+line pitch for multi-line text, KiCad's gap between text and wires and
+its pen widths. KiCad's text escapes, such as {slash} in net names, are
+resolved like KiCad's UnescapeString() does.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/base_types.py |  66 +++++++++++
+ src/gerbonara/cad/kicad/schematic.py  | 153 +++++++++++++++++---------
+ src/gerbonara/cad/kicad/symbols.py    | 132 ++++++++++------------
+ 3 files changed, 222 insertions(+), 129 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/base_types.py b/src/gerbonara/cad/kicad/base_types.py
+index db4d853..d655593 100644
+--- a/src/gerbonara/cad/kicad/base_types.py
++++ b/src/gerbonara/cad/kicad/base_types.py
+@@ -416,6 +416,72 @@ class TextEffect:
+     href: Named(str) = None
+ 
+ 
++_KICAD_ESCAPES = {'dblquote': '"', 'quote': "'", 'lt': '<', 'gt': '>', 'backslash': '\\', 'slash': '/', 'bar': '|',
++                  'comma': ',', 'colon': ':', 'space': ' ', 'dollar': '$', 'tab': '\t', 'return': '\n', 'brace': '{'}
++
++
++def kicad_unescape(text):
++    """ Undo KiCad's escaping of special characters in text, such as {slash} for '/' in net names, the way
++    KiCad's UnescapeString() does: text variables (${...}) and overbar/subscript/superscript markup (~{...}, _{...},
++    ^{...}) stay as they are, and unknown or unterminated tokens are kept. """
++    if text is None or '{' not in text:
++        return text
++    out, i, n = [], 0, len(text)
++    while i < n:
++        ch = text[i]
++        if ch != '{':
++            out.append(ch)
++            i += 1
++            continue
++        prev = text[i-1] if i > 0 else ''
++        depth, j = 1, i + 1
++        while j < n and depth:
++            depth += {'{': 1, '}': -1}.get(text[j], 0)
++            j += 1
++        if depth: # unterminated
++            out.append('{' + kicad_unescape(text[i+1:]))
++            break
++        token = text[i+1:j-1]
++        if prev in '$~^_' and prev:
++            out.append('{' + kicad_unescape(token) + '}')
++        else:
++            out.append(_KICAD_ESCAPES.get(token, '{' + kicad_unescape(token) + '}'))
++        i = j
++    return ''.join(out)
++
++
++# KiCad's stroke font line pitch per text height (font metrics interline pitch times the stroke font's legacy factor)
++KICAD_INTERLINE = 1.68 * 0.9583
++# Width of a space in KiCad's stroke font per text height: the font's space glyph, 16 of its 21 units per height
++KICAD_SPACE_WIDTH = 16/21
++# Gap between schematic text and the wire or pin it belongs to: round(24 mil × KiCad's default text offset ratio of 0.15)
++KICAD_TEXT_OFFSET = 4 * 0.0254
++
++
++def kicad_text_svg(text, x, y, size, h_align='left', v_align='bottom', vertical=False, stroke_width=None, **svg_attrs):
++    """ `text` in KiCad's stroke font, anchored at (x, y), drawn horizontally or vertically (reading bottom to top),
++    aligned like KiCad aligns text: h_align is left/center/right, v_align top/middle/bottom. KiCad's escape sequences
++    are resolved, and multi-line text is laid out with KiCad's line pitch around the anchor. """
++    font = Newstroke.load()
++    lines = kicad_unescape(text).split('\n')
++    pitch = size * KICAD_INTERLINE
++    first = {'top': 0, 'middle': -(len(lines)-1)*pitch/2, 'bottom': -(len(lines)-1)*pitch}[v_align]
++    if stroke_width is None:
++        stroke_width = size / 8
++    children = [font.render_svg(line, size=size, x0=0, y0=first + i*pitch, h_align=h_align, v_align=v_align,
++                                space_width=KICAD_SPACE_WIDTH, scale=(1, 1), stroke_width=f'{stroke_width:.3f}',
++                                **svg_attrs)
++                for i, line in enumerate(lines) if line]
++    return Tag('g', children=children, transform=f'translate({x:.3f} {y:.3f})' + (' rotate(-90)' if vertical else ''))
++
++
++def kicad_text_width(text, size):
++    """ Width of the widest line of `text` in KiCad's stroke font. """
++    font = Newstroke.load()
++    return max(font.bounding_box(line, size=size, space_width=KICAD_SPACE_WIDTH)[1][0]
++               for line in kicad_unescape(text).split('\n'))
++
++
+ class TextMixin:
+     @property
+     def size(self):
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index cb4958c..5b4830e 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -15,7 +15,7 @@ import warnings
+ from .sexp import *
+ from .base_types import *
+ from .primitives import *
+-from .symbols import Symbol, _lookup_symbol
++from .symbols import Symbol, _lookup_symbol, lib_to_sheet_vector
+ from . import graphical_primitives as gr
+ 
+ from .. import primitives as cad_pr
+@@ -314,6 +314,31 @@ class Bezier:
+         yield _shape_svg(self, colorscheme, d=f'M {p0.x:.3f} {p0.y:.3f} C ' + ' '.join(f'{p.x:.3f} {p.y:.3f}' for p in rest))
+ 
+ 
++def _justify(item, default_h='center', default_v='middle'):
++    j = item.effects.justify if item.effects is not None else None
++    h = str(j.h) if j is not None and j.h is not None else default_h
++    v = str(j.v) if j is not None and j.v is not None else default_v
++    return h, ('middle' if v == 'center' else v)
++
++
++def _text_size(item):
++    f = item.effects.font if item.effects is not None else None
++    return (f.size.y or 1.27) if f is not None and f.size is not None else 1.27
++
++
++def _pen_width(item):
++    """ KiCad's pen width for a text item: its thickness, else a fifth of its size for bold and an eighth otherwise. """
++    f = item.effects.font if item.effects is not None else None
++    size = _text_size(item)
++    if f is not None and f.thickness:
++        return f.thickness
++    return size / 5 if f is not None and f.bold else size / 8
++
++
++def _is_vertical(item):
++    return round(item.at.rotation or 0) % 180 == 90
++
++
+ def label_shape_path_d(shape, w, h):
+     """ Outline of a global or hierarchical label of the given shape, height `h` and body width `w`, starting at the
+     origin (the connection point) and extending towards +x. Each end is either pointed or square. """
+@@ -394,8 +419,40 @@ class DrawnProperty(TextMixin):
+         return False, False
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        if not self.is_hidden:
+-            yield from TextMixin.to_svg(self, colorscheme.values)
++        """ Like KiCad: lay out the text box in the symbol's untransformed frame from the field's justification and
++        angle, transform it with the symbol, and draw the text centered on the result, horizontally or vertically.
++        Fields of labels and sheets are not transformed. """
++        if self.is_hidden or not self.value:
++            return
++        size = _text_size(self)
++        lines = kicad_unescape(self.text).split('\n')
++        w, h = kicad_text_width(self.text, size), size * (1 + (len(lines)-1) * KICAD_INTERLINE)
++        h_align, v_align = _justify(self)
++
++        sym = self.parent if isinstance(self.parent, SymbolInstance) else None
++        if sym is not None:
++            ox, oy = sym.at.x, sym.at.y
++            # The symbol's transform of sheet-oriented vectors, and its inverse (it is orthogonal)
++            (a, b), (c, d) = sym.transform_vector(1, 0), sym.transform_vector(0, -1)
++            fwd = lambda x, y: (a*x + c*y, b*x + d*y)
++            inv = lambda x, y: (a*x + b*y, c*x + d*y)
++            swapped = abs(b) > 0.5
++        else:
++            ox, oy, fwd, inv, swapped = 0, 0, (lambda x, y: (x, y)), (lambda x, y: (x, y)), False
++
++        px, py = inv(self.at.x - ox, self.at.y - oy)
++        x0 = px + {'left': 0, 'center': -w/2, 'right': -w}[h_align]
++        y0 = py + {'top': 0, 'middle': -h/2, 'bottom': -h}[v_align]
++        corners = [(x0, y0), (x0 + w, y0 + h)]
++        angle = round(self.at.rotation or 0) % 360
++        for _ in range(angle // 90): # KiCad's RotatePoint() by 90 degrees about the text position
++            corners = [(px + (y - py), py - (x - px)) for x, y in corners]
++        corners = [fwd(x, y) for x, y in corners]
++        cx = ox + (corners[0][0] + corners[1][0]) / 2
++        cy = oy + (corners[0][1] + corners[1][1]) / 2
++        vertical = (angle % 180 == 90) != swapped
++        yield kicad_text_svg(self.text, cx, cy, size, h_align='center', v_align='middle', vertical=vertical,
++                             stroke_width=_pen_width(self), stroke=colorscheme.values)
+ 
+ 
+ @dataclass
+@@ -415,42 +472,54 @@ class TextLabel(TextMixin):
+ @sexp_type('text')
+ class Text(TextLabel):
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        yield from TextMixin.to_svg(self, colorscheme.text)
++        """ Like KiCad: horizontal or vertical (reading bottom to top) depending on the angle, aligned by its
++        justification. Text at 180 or 270 degrees is stored with the justification that keeps it upright. """
++        h_align, v_align = _justify(self)
++        # KiCad moves all schematic text up by 0.25 mm "to match KiCad 6" (SCH_TEXT::GetSchematicTextOffset)
++        yield kicad_text_svg(self.text, self.at.x, self.at.y - 0.25, _text_size(self), h_align=h_align,
++                             v_align=v_align, vertical=_is_vertical(self), stroke_width=_pen_width(self),
++                             stroke=colorscheme.text)
+ 
+ 
+ @sexp_type('label')
+ class LocalLabel(TextLabel):
+-    @property
+-    def _text_offset(self):
+-        return (0, -2*self.line_width)
+-
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        yield from TextMixin.to_svg(self, colorscheme.labels)
++        """ Like KiCad: the text sits on the wire, raised by KiCad's text offset plus the pen width, horizontal or
++        vertical depending on the angle, and extending the way its justification says. """
++        h_align, _v = _justify(self, default_h='left')
++        vertical = _is_vertical(self)
++        size, pen = _text_size(self), _pen_width(self)
++        dist = 0.15*size + pen
++        x, y = (self.at.x - dist, self.at.y) if vertical else (self.at.x, self.at.y - dist)
++        yield kicad_text_svg(self.text, x, y, size, h_align=h_align, v_align='bottom', vertical=vertical,
++                             stroke_width=pen, stroke=colorscheme.labels)
++        for prop in self.properties:
++            yield from prop.to_svg(colorscheme)
+ 
+ 
+ def _label_svg(label, colorscheme, text_offset, frame_d):
+     """ SVG export shared by global and hierarchical labels. `frame_d` is the label's outline, drawn from the
+     connection point towards +x, and the text starts `text_offset` from the connection point in the same direction.
+-    Both are turned the way the label points; the text stays upright. """
+-    x, y, rot = label.at.x, label.at.y, round(label.at.rotation or 0) % 360
+-    dx, dy = {0: (1, 0), 90: (0, -1), 180: (-1, 0), 270: (0, 1)}.get(rot, (1, 0))
+-    text = Newstroke.load().render_svg(label.text,
+-                                       size=label.size,
+-                                       h_align='left' if rot in (0, 90) else 'right',
+-                                       v_align='middle',
+-                                       rotation=-90 if rot in (90, 270) else 0,
+-                                       scale=(1, 1),
+-                                       stroke=colorscheme.labels,
+-                                       transform=f'translate({x + dx*text_offset:.3f} {y + dy*text_offset:.3f})')
++    Like in KiCad, the direction is the label's spin style: horizontal or vertical by its angle, and pointing the
++    way its justification says. The text stays upright. """
++    x, y = label.at.x, label.at.y
++    h_align, _v = _justify(label, default_h='left')
++    vertical = _is_vertical(label)
++    right = h_align != 'right'
++    dx, dy = ((0, -1) if right else (0, 1)) if vertical else ((1, 0) if right else (-1, 0))
++    rot = {(1, 0): 0, (0, -1): 90, (-1, 0): 180, (0, 1): 270}[dx, dy]
++    text = kicad_text_svg(label.text, x + dx*text_offset, y + dy*text_offset, label.size,
++                          h_align='left' if right else 'right', v_align='middle', vertical=vertical,
++                          stroke_width=_pen_width(label), stroke=colorscheme.labels)
+     frame = Tag('path', fill='none', stroke_width=0.254, stroke=colorscheme.lines, d=frame_d,
+                 transform=f'translate({x:.3f} {y:.3f}) rotate({-rot})')
+-    return Tag('g', children=[frame, text])
++    return Tag('g', children=[frame, text, *(t for prop in label.properties for t in prop.to_svg(colorscheme))])
+ 
+ 
+ @sexp_type('global_label')
+ class GlobalLabel(TextLabel):
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        (_x1, _y1), (w, _y2) = Newstroke.load().bounding_box(self.text, size=self.size)
++        w = kicad_text_width(self.text, self.size)
+         yield _label_svg(self, colorscheme, self.size*0.6,
+                          label_shape_path_d(self.shape, w + self.size*0.2, self.size*1.2 + 0.254))
+ 
+@@ -620,16 +689,7 @@ class SymbolInstance:
+     def transform_vector(self, dx, dy):
+         """ Turn a vector in library symbol coordinates (y pointing up) into sheet coordinates (y pointing down),
+         following the symbol's rotation and mirroring. KiCad rotates first, then mirrors. """
+-        a = math.radians(self.at.rotation or 0)
+-        c, s = math.cos(a), math.sin(a)
+-        c, s = (round(c) if abs(c - round(c)) < 1e-9 else c), (round(s) if abs(s - round(s)) < 1e-9 else s)
+-        x, y = dx, -dy
+-        x, y = x*c + y*s, -x*s + y*c
+-        if self.mirror.x:
+-            y = -y
+-        elif self.mirror.y:
+-            x = -x
+-        return x, y
++        return lib_to_sheet_vector(dx, dy, self.at.rotation, self.mirror.x, self.mirror.y)
+ 
+     def transform_point(self, x, y):
+         """ Position of a point given in library symbol coordinates on the sheet. """
+@@ -706,28 +766,13 @@ class SubsheetPin:
+         yield Tag('path', fill='none', d=label_shape_path_d(self.shape, 0, size+0.5),
+                   transform=f'translate({self.at.x:.3f} {self.at.y:.3f}) rotate({180-self.at.rotation})')
+ 
+-        lx, ly = self.at.x, self.at.y
+-        dx, dy = rotate_point(-(size+1), 0, math.radians(self.at.rotation))
+-        lx += dx
+-        ly += dy
+-        frot = self.at.rotation
+-        h_align = 'right'
+-        if frot == 180:
+-            frot = 0
+-            h_align = 'left'
+-
+-        font = Newstroke.load()
+-        yield font.render_svg(self.name,
+-                              size=size,
+-                              x0=0,
+-                              y0=0,
+-                              h_align=h_align,
+-                              v_align='middle',
+-                              rotation=-frot,
+-                              transform=f'translate({lx:.3f} {ly:.3f})',
+-                              scale=(1, 1),
+-                              mirror=(False, False),
+-                              )
++        # pins sit on the sheet's edge, pointing out of it; the text goes inwards
++        rot = round(self.at.rotation or 0) % 360
++        dx, dy = {0: (-1, 0), 180: (1, 0), 90: (0, 1), 270: (0, -1)}.get(rot, (-1, 0))
++        vertical = rot in (90, 270)
++        inward_aligned = (dy < 0) if vertical else (dx > 0)
++        yield kicad_text_svg(self.name, self.at.x + dx*(size+1), self.at.y + dy*(size+1), size,
++                             h_align='left' if inward_aligned else 'right', v_align='middle', vertical=vertical)
+ 
+ @sexp_type('fill')
+ class SubsheetFill:
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index 6f09294..9890d61 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -146,82 +146,49 @@ class Pin:
+         }.get(self.style, []):
+             yield tag
+ 
+-        rot = self.at.rotation + p_rotation
+-        trot = self.at.rotation
+-        # With a positive pin name offset, names go inside the body, that far beyond the pin's inner end. With an
+-        # offset of 0, names go above the middle of the pin and numbers below it.
+-        spec = self.unit.symbol.pin_names if self.unit is not None and self.unit.symbol is not None else None
+-        offset = spec.offset if spec is not None and spec.offset is not None else 0.508
+-        names_inside = offset > 0
+-        ax, ay = (self.length + offset if names_inside else self.length/2), 0
+-        ax, ay = rotate_point(ax, ay, math.radians(-self.at.rotation))
+-
+-        #lx, ly = self.at.x, -self.at.y
+-        #lx, ly = rotate_point(lx, ly, math.radians(p_rotation))
+-        #if p_mirror.y:
+-        #    lx, ly = -lx, ly
+-        #elif p_mirror.x:
+-        #    lx, ly = lx, -ly
+-        #yield Tag('circle', cx=lx, cy=ly, r='0.5', stroke='blue', stroke_width='0.1', fill='none', z_index='100')
+-
+-        lx, ly = self.at.x + ax, -self.at.y - ay
+-        lx, ly = rotate_point(lx, ly, math.radians(p_rotation))
+-        if p_mirror.y:
+-            lx, ly = -lx, ly
+-        elif p_mirror.x:
+-            lx, ly = lx, -ly
+-        #yield Tag('circle', cx=lx, cy=ly, r='0.5', stroke='red', stroke_width='0.1', fill='none', z_index='100')
+-
+-        h_align = 'left'
+-        if p_mirror.y:
+-            if trot in (0, 180):
+-                trot = 180 - trot
+-        elif p_mirror.x:
+-            if p_rotation == 0:
+-                if trot in (90, 270):
+-                    trot = 360-trot
++        yield from self._text_svg(colorscheme, p_mirror, p_rotation)
++
++    def _text_svg(self, colorscheme, p_mirror, p_rotation):
++        """ Pin name and number, placed like KiCad's PIN_LAYOUT_CACHE does it, in coordinates relative to the placed
++        symbol's position. Text is never mirrored; vertical pins get vertical text that reads bottom to top. """
++        symbol = self.unit.symbol if self.unit is not None else None
++        names, numbers = (symbol.pin_names, symbol.pin_numbers) if symbol is not None else (None, None)
++        offset = names.offset if names is not None and names.offset is not None else 0.508
++        name = self.name.value if self.name is not None else ''
++        number = self.number.value if self.number is not None else ''
++        show_name = name not in ('', '~') and not (names is not None and names.hide) and not self.name.effects.hide
++        show_number = number != '' and not (numbers is not None and numbers.hide) and not self.number.effects.hide
++
++        vec = lambda dx, dy: lib_to_sheet_vector(dx, dy, p_rotation, p_mirror.x, p_mirror.y)
++        a = math.radians(self.at.rotation or 0)
++        dx, dy = vec(math.cos(a), math.sin(a))  # direction from the connection point into the body
++        x0, y0 = vec(self.at.x, self.at.y)
++        x1, y1 = x0 + dx*self.length, y0 + dy*self.length
++        mx, my = (x0 + x1)/2, (y0 + y1)/2
++        vertical = abs(dy) > 0.5
++        # "above" the pin: up for horizontal pins, left for vertical ones (above in the frame of vertical text)
++        ux, uy = (-1, 0) if vertical else (0, -1)
++
++        if show_name:
++            size = self.name.effects.font.size.y or 1.27
++            if offset > 0: # inside the body, starting the offset beyond the pin's inner end
++                inward = (dy < 0) if vertical else (dx > 0)
++                yield kicad_text_svg(name, x1 + dx*offset, y1 + dy*offset, size, h_align='left' if inward else 'right',
++                                     v_align='middle', vertical=vertical, stroke=colorscheme.pin_names)
++            else: # above the middle of the pin
++                d = KICAD_TEXT_OFFSET + size/16
++                yield kicad_text_svg(name, mx + ux*d, my + uy*d, size, h_align='center', v_align='bottom',
++                                     vertical=vertical, stroke=colorscheme.pin_names)
++
++        if show_number:
++            size = self.number.effects.font.size.y or 1.27
++            d = 2*KICAD_TEXT_OFFSET + size/8
++            if show_name and offset == 0: # name above, number below
++                yield kicad_text_svg(number, mx - ux*d, my - uy*d, size, h_align='center', v_align='top',
++                                     vertical=vertical, stroke=colorscheme.pin_numbers)
+             else:
+-                if trot in (0, 180):
+-                    trot = 180 - trot
+-        frot = (trot + p_rotation)%360
+-        sx, sy = 1, 1
+-
+-        if frot == 180:
+-            frot = 0
+-            h_align = 'right'
+-        elif frot == 270:
+-            frot = 90
+-            h_align = 'right'
+-
+-        font = Newstroke.load()
+-        if self.name.value != '~' and not self.unit.symbol.pin_names.hide:
+-            yield font.render_svg(self.name.value,
+-                                  size=self.name.effects.font.size.y or 1.27,
+-                                  x0=0,
+-                                  y0=0 if names_inside else -0.4,
+-                                  h_align=h_align if names_inside else 'center',
+-                                  v_align='middle' if names_inside else 'bottom',
+-                                  rotation=-frot,
+-                                  stroke=colorscheme.pin_names,
+-                                  transform=f'translate({lx:.3f} {ly:.3f})',
+-                                  scale=(sx, sy),
+-                                  mirror=(False, False),
+-                                  )
+-
+-        if self.number.value != '~' and not self.unit.symbol.pin_numbers.hide:
+-            yield font.render_svg(self.number.value,
+-                                  size=self.number.effects.font.size.y or 1.27,
+-                                  x0=(-0.4 if h_align == 'left' else 0.4) if names_inside else 0,
+-                                  y0=-0.4 if names_inside else 0.4,
+-                                  h_align={'left': 'right', 'right': 'left'}[h_align] if names_inside else 'center',
+-                                  v_align='bottom' if names_inside else 'top',
+-                                  rotation=-frot,
+-                                  stroke=colorscheme.pin_numbers,
+-                                  scale=(sx, sy),
+-                                  transform=f'translate({lx:.3f} {ly:.3f})',
+-                                  mirror=(False, False),
+-                                  )
+-
++                yield kicad_text_svg(number, mx + ux*d, my + uy*d, size, h_align='center', v_align='bottom',
++                                     vertical=vertical, stroke=colorscheme.pin_numbers)
+ 
+ 
+ @sexp_type('fill')
+@@ -585,6 +552,21 @@ class Unit:
+         return stacks
+ 
+ 
++def lib_to_sheet_vector(dx, dy, rotation=0, mirror_x=False, mirror_y=False):
++    """ Turn a vector in library symbol coordinates (y pointing up) into sheet coordinates (y pointing down) for a
++    symbol placed with the given rotation (degrees) and mirroring. KiCad rotates first, then mirrors. """
++    a = math.radians(rotation or 0)
++    c, s = math.cos(a), math.sin(a)
++    c, s = (round(c) if abs(c - round(c)) < 1e-9 else c), (round(s) if abs(s - round(s)) < 1e-9 else s)
++    x, y = dx, -dy
++    x, y = x*c + y*s, -x*s + y*c
++    if mirror_x:
++        y = -y
++    elif mirror_y:
++        x = -x
++    return x, y
++
++
+ class JumperPinGroups:
+     """ KiCad 9's ``(jumper_pin_groups ("1" "2") ("3" "4"))``: groups of pin numbers that are connected inside the
+     part. Maps to a list of lists of pin numbers. """
+-- 
+2.43.0
+

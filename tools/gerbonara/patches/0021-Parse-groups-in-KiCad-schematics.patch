@@ -1,0 +1,26 @@
+From 65c1af63716afd6e178ab750bf8ac5b125f964df Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:14:17 +0000
+Subject: [PATCH 21/52] Parse groups in KiCad schematics
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 60971ba..a735587 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -693,6 +693,7 @@ class Schematic:
+     hierarchical_labels: List(HierarchicalLabel) = field(default_factory=list)
+     symbols: List(SymbolInstance) = field(default_factory=list)
+     subsheets: List(Subsheet) = field(default_factory=list)
++    groups: List(Group) = field(default_factory=list)
+     sheet_instances: Named(Array(SubsheetCrosslinkSheet)) = field(default_factory=list)
+     symbol_instances: Named(Array(SymbolCrosslinkSheet)) = field(default_factory=list)
+     embedded_fonts: Named(YesNoAtom()) = False
+-- 
+2.43.0
+

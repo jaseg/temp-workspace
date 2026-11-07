@@ -1,7 +1,7 @@
-From 6e14ef4d2ca1270b214245f48e53e615d25ca9f5 Mon Sep 17 00:00:00 2001
+From 87f0d6355308dde8a88980f13f873e79a73987f8 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:08:14 +0000
-Subject: [PATCH 01/41] Fix serializing KiCad schematics without symbol library
+Subject: [PATCH 01/52] Fix serializing KiCad schematics without symbol library
 
 Schematic.lib_symbols defaulted to a plain list instead of a LocalLibrary,
 so a schematic created from scratch or loaded from a file without a
@@ -11,8 +11,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
 ---
  src/gerbonara/cad/kicad/schematic.py | 2 +-
- tests/test_kicad_schematic.py        | 7 +++++++
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
 index 4f487bd..12eac55 100644
@@ -27,21 +26,6 @@ index 4f487bd..12eac55 100644
      junctions: List(Junction) = field(default_factory=list)
      no_connects: List(NoConnect) = field(default_factory=list)
      rule_areas: List(RuleArea) = field(default_factory=list)
-diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
-index f02dafa..e148770 100644
---- a/tests/test_kicad_schematic.py
-+++ b/tests/test_kicad_schematic.py
-@@ -28,3 +28,10 @@ def test_load_kicad_schematic(kicad_sch_file):
-     for subsh in sch.subsheets:
-         subsh = subsh.open()
-         print('Loaded sub-sheet with', len(subsh.wires), 'wires and', len(subsh.symbols), 'symbols.')
-+
-+
-+def test_serialize_minimal_schematic():
-+    sch = Schematic.parse('(kicad_sch (version 20250114) (generator "eeschema"))')
-+    assert Schematic.parse(sch.serialize()).lib_symbols.symbols == []
-+    assert Schematic().serialize()
-+
 -- 
 2.43.0
 

@@ -1,0 +1,32 @@
+From 90efc65e23a81cbf139002875cd6d15d24a04df8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:09:26 +0000
+Subject: [PATCH 28/52] Add pin colors to the default KiCad schematic
+ colorscheme
+
+Pin.to_svg() uses colorscheme.pin_names and colorscheme.pin_numbers,
+which the tmTheme colorschemes have but the default KiCad one lacked, so
+exporting any pin with it failed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic_colors.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic_colors.py b/src/gerbonara/cad/kicad/schematic_colors.py
+index d38a88d..1c84187 100644
+--- a/src/gerbonara/cad/kicad/schematic_colors.py
++++ b/src/gerbonara/cad/kicad/schematic_colors.py
+@@ -8,6 +8,8 @@ class Colorscheme:
+         text = 'black'
+         values = 'black'
+         labels = 'black'
++        pin_names = 'black'
++        pin_numbers = 'black'
+         fill = '#cccccc'
+         background = 'white'
+ 
+-- 
+2.43.0
+

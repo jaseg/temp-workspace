@@ -1,0 +1,131 @@
+From 126fa29ab7e6ff001558814289e956d0768b3cc6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:21:22 +0000
+Subject: [PATCH 51/52] Export KiCad text boxes and tables to SVG
+
+Text boxes and tables were left out of SVG exports. Draw text boxes with
+their border and fill, and their text word-wrapped to fit inside the
+margins and aligned like KiCad aligns it. Draw tables cell by cell, with
+the separators, header line and outer border their settings ask for.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 80 ++++++++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 73a8637..6baeccf 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -339,6 +339,52 @@ def _is_vertical(item):
+     return round(item.at.rotation or 0) % 180 == 90
+ 
+ 
++def _wrap_text(text, size, width):
++    """ Word-wrap text to `width`, like KiCad does in text boxes and table cells. """
++    out = []
++    for para in kicad_unescape(text or '').split('\n'):
++        line = ''
++        for word in para.split(' '):
++            candidate = f'{line} {word}' if line else word
++            if line and kicad_text_width(candidate, size) > width:
++                out.append(line)
++                line = word
++            else:
++                line = candidate
++        out.append(line)
++    return '\n'.join(out)
++
++
++def _text_box_svg(box, colorscheme, border=True):
++    """ A text box or table cell: its frame (unless border is False, or its stroke width is negative, which KiCad
++    uses for no frame), its fill, and its text, wrapped to fit and aligned inside the margins. Text boxes rotated by 90
++    degrees are drawn unrotated. """
++    x, y = box.at.x, box.at.y
++    w, h = (box.size.x, box.size.y) if box.size is not None else (0, 0)
++    if w < 0:
++        x, w = x + w, -w
++    if h < 0:
++        y, h = y + h, -h
++    fill = _fill_svg(box.fill, colorscheme)
++    stroke = getattr(box, 'stroke', None)
++    attrs = {}
++    if border and stroke is not None and (stroke.width or 0) >= 0:
++        attrs = stroke.svg_attrs(colorscheme.lines)
++    if attrs or fill != 'none':
++        yield Tag('rect', x=f'{x:.3f}', y=f'{y:.3f}', width=f'{w:.3f}', height=f'{h:.3f}', fill=fill, **attrs)
++
++    size = _text_size(box)
++    m = box.margins
++    ml, mt, mr, mb = (m.left, m.top, m.right, m.bottom) if m is not None else (size*0.75,)*4
++    h_align, v_align = _justify(box, default_h='left', default_v='top')
++    tx = {'left': x + ml, 'center': x + w/2, 'right': x + w - mr}[h_align]
++    ty = {'top': y + mt, 'middle': y + h/2, 'bottom': y + h - mb}[v_align]
++    text = _wrap_text(box.text, size, w - ml - mr)
++    if text.strip():
++        yield kicad_text_svg(text, tx, ty, size, h_align=h_align, v_align=v_align, stroke_width=_pen_width(box),
++                             stroke=colorscheme.text)
++
++
+ def label_shape_path_d(shape, w, h):
+     """ Outline of a global or hierarchical label of the given shape, height `h` and body width `w`, starting at the
+     origin (the connection point) and extending towards +x. Each end is either pointed or square. """
+@@ -914,6 +960,9 @@ class TextBox(TextMixin):
+     def render(self, variables={}, cache=None):
+         yield from gr.TextBox.render(self, variables=variables)
+ 
++    def to_svg(self, colorscheme=Colorscheme.KiCad):
++        yield from _text_box_svg(self, colorscheme)
++
+ 
+ @sexp_type('border')
+ class TableBorder:
+@@ -968,6 +1017,35 @@ class Table:
+         n = self.column_count
+         return [self.cells[i:i+n] for i in range(0, len(self.cells), n)]
+ 
++    def to_svg(self, colorscheme=Colorscheme.KiCad):
++        """ The cells' fills and text, then the separators and the border. Cells merged by spans still get the
++        separators that would run through them. """
++        if not self.cells:
++            return
++        for cell in self.cells:
++            yield from _text_box_svg(cell, colorscheme, border=False)
++
++        x0, y0 = self.cells[0].at.x, self.cells[0].at.y
++        xs = [x0 + sum(self.column_widths[:i]) for i in range(len(self.column_widths) + 1)]
++        ys = [y0 + sum(self.row_heights[:i]) for i in range(len(self.row_heights) + 1)]
++        if len(xs) < 2 or len(ys) < 2:
++            return
++        line = lambda x1, y1, x2, y2, stroke: Tag('path', d=f'M {x1:.3f} {y1:.3f} L {x2:.3f} {y2:.3f}', fill='none',
++                                                  **(stroke or Stroke()).svg_attrs(colorscheme.lines))
++        sep, border = self.separators, self.border
++        if sep is not None and sep.cols:
++            for x in xs[1:-1]:
++                yield line(x, ys[0], x, ys[-1], sep.stroke)
++        if sep is not None and sep.rows:
++            for y in ys[2 if border is not None and border.header else 1:-1]:
++                yield line(xs[0], y, xs[-1], y, sep.stroke)
++        if border is not None and border.header and len(ys) > 2:
++            yield line(xs[0], ys[1], xs[-1], ys[1], border.stroke)
++        if border is not None and border.external:
++            yield Tag('rect', x=f'{xs[0]:.3f}', y=f'{ys[0]:.3f}', width=f'{xs[-1]-xs[0]:.3f}',
++                      height=f'{ys[-1]-ys[0]:.3f}', fill='none',
++                      **(border.stroke or Stroke()).svg_attrs(colorscheme.lines))
++
+ 
+ @sexp_type('from')
+ class NetChainEnd:
+@@ -1110,6 +1188,8 @@ class Schematic:
+         yield from self.buses
+         yield from self.ellipses
+         yield from self.ellipse_arcs
++        yield from self.text_boxes
++        yield from self.tables
+         yield from self.texts
+         yield from self.local_labels
+         yield from self.global_labels
+-- 
+2.43.0
+

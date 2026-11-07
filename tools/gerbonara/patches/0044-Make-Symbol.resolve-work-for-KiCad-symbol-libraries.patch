@@ -1,0 +1,97 @@
+From faf50dae85e604f1b971568faa0347f674447eba Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:17:27 +0000
+Subject: [PATCH 44/52] Make Symbol.resolve() work for KiCad symbol libraries
+
+Symbol.resolve() looked the parent of a derived symbol up with
+library[name], but neither Library nor the schematic's LocalLibrary
+supported that. Both now look symbols up by their full name or their name
+without library prefix, and resolve() prefers a parent from the same
+library, since (extends ...) names have no prefix.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py |  5 ++++-
+ src/gerbonara/cad/kicad/symbols.py   | 27 ++++++++++++++++++++++++---
+ 2 files changed, 28 insertions(+), 4 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 4c2e168..dde70e9 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -15,7 +15,7 @@ import warnings
+ from .sexp import *
+ from .base_types import *
+ from .primitives import *
+-from .symbols import Symbol
++from .symbols import Symbol, _lookup_symbol
+ from . import graphical_primitives as gr
+ 
+ from .. import primitives as cad_pr
+@@ -758,6 +758,9 @@ class Table:
+ class LocalLibrary:
+     symbols: List(Symbol) = field(default_factory=list)
+ 
++    def __getitem__(self, name):
++        return _lookup_symbol(self.symbols, name)
++
+ 
+ SUPPORTED_FILE_FORMAT_VERSIONS = [20230620]
+ @sexp_type('kicad_sch')
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index 71e6761..96da467 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -640,10 +640,17 @@ class Symbol:
+             self.properties[name] = Property(name=name, value=value, id=i, effects=TextEffect(hide=hide))
+ 
+     def resolve(self):
+-        if self.extends:
+-            return self.library[self.extends]
+-        else:
++        """ The symbol this one is derived from with (extends ...), or this symbol itself. In libraries embedded in
++        schematics, names carry a library prefix, which `extends` leaves out; the parent is looked up in the same
++        library first. """
++        if not self.extends:
+             return self
++        if self.library_name:
++            try:
++                return self.library[f'{self.library_name}:{self.extends}']
++            except KeyError:
++                pass
++        return self.library[self.extends]
+ 
+     def is_graphic_symbol(self):
+         return self.extends is None and (
+@@ -686,6 +693,17 @@ class Symbol:
+         return bool(self.get_center_rectangle(range(self.unit_count)))
+ 
+ 
++def _lookup_symbol(symbols, name):
++    """ Find a symbol by its full name (with library prefix, if it has one), else by its name alone. """
++    for sym in symbols:
++        if sym.raw_name == name:
++            return sym
++    for sym in symbols:
++        if sym.name == name:
++            return sym
++    raise KeyError(name)
++
++
+ SUPPORTED_FILE_FORMAT_VERSIONS = [20211014, 20220914]
+ @sexp_type('kicad_symbol_lib')
+ class Library:
+@@ -705,6 +723,9 @@ class Library:
+         if value not in SUPPORTED_FILE_FORMAT_VERSIONS:
+             raise FormatError(f'File format version {value} is not supported. Supported versions are {", ".join(map(str, SUPPORTED_FILE_FORMAT_VERSIONS))}.')
+ 
++    def __getitem__(self, name):
++        return _lookup_symbol(self.symbols, name)
++
+     @classmethod
+     def open(cls, filename: str):
+         with open(filename) as f:
+-- 
+2.43.0
+

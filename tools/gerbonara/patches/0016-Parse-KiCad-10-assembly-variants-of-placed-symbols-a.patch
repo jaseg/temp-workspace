@@ -1,0 +1,64 @@
+From 257473a55b598bc9b27af102542daac325d31308 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:12:02 +0000
+Subject: [PATCH 16/52] Parse KiCad 10 assembly variants of placed symbols and
+ sheets
+
+KiCad 10 stores per-variant overrides of the DNP, simulation, BOM, board
+and position file attributes, and of field values, in the instance paths
+of placed symbols and sheets.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index b275406..c7cc206 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -340,6 +340,24 @@ class Pin:
+     alternate: Named(str) = None
+ 
+ 
++@sexp_type('field')
++class VariantField:
++    name: Named(str) = ''
++    value: Named(str) = ''
++
++
++@sexp_type('variant')
++class Variant:
++    """ KiCad 10 assembly variant of a placed symbol or sheet. Attributes that are None are inherited. """
++    name: Named(str) = ''
++    dnp: Named(YesNoAtom()) = None
++    exclude_from_sim: Named(YesNoAtom()) = None
++    in_bom: Named(YesNoAtom()) = None
++    on_board: Named(YesNoAtom()) = None
++    in_pos_files: Named(YesNoAtom()) = None
++    fields: List(VariantField) = field(default_factory=list)
++
++
+ # Suddenly, we're doing syntax like this is yaml or something.
+ @sexp_type('path')
+ class SymbolCrosslinkSheet:
+@@ -348,6 +366,7 @@ class SymbolCrosslinkSheet:
+     unit: Named(int) = 1
+     value: OmitDefault(Named(str)) = None
+     footprint: OmitDefault(Named(str)) = None
++    variants: List(Variant) = field(default_factory=list)
+ 
+ 
+ @sexp_type('project')
+@@ -466,6 +485,7 @@ class SymbolInstance:
+ class SubsheetCrosslinkSheet:
+     path: str = ''
+     page: Named(str) = ''
++    variants: List(Variant) = field(default_factory=list)
+ 
+ 
+ @sexp_type('project')
+-- 
+2.43.0
+

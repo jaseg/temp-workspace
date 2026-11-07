@@ -1,0 +1,149 @@
+From daac7047cb83ceeb4ef284b9ddbeecc488e5c662 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:16:28 +0000
+Subject: [PATCH 23/52] Test KiCad schematic support against further KiCad
+ versions
+
+Upstream's schematic tests only use the schematics of one KiCad
+version, 9.0.6. The new kicad_extra_source_revisions setting lists
+further versions, by tag or commit, whose demo and QA schematics are
+tested as well. Of these, only the schematics are fetched, from a
+sparse checkout of KiCad's repository without history. The
+KICAD_EXTRA_SOURCES environment variable overrides them with local
+checkouts.
+
+The first further version is KiCad 10.0.8, with 424 schematics. The
+demo schematics in subdirectories of KiCad's demos directory are tested
+too, in all versions.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ pyproject.toml                |  2 ++
+ tests/conftest.py             | 49 +++++++++++++++++++++++++++++++++--
+ tests/test_kicad_schematic.py |  3 +++
+ 3 files changed, 52 insertions(+), 2 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index c272b3f..afdcc86 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -67,6 +67,8 @@ norecursedirs = ["*"]
+ kicad_symbols_tag = "9.0.6"
+ kicad_footprints_tag = "9.0.6"
+ kicad_source_tag = "9.0.6"
++# Schematics of further KiCad versions: KiCad 10
++kicad_extra_source_revisions = "10.0.8"
+ # Tag to use for container for footprint svg export
+ # For a list of available tags, see https://hub.docker.com/r/kicad/kicad/tags
+ kicad_container_tag = "9.0.6-full"
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 7054ea4..27f3790 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -1,5 +1,6 @@
+ 
+ import os
++import re
+ from pathlib import Path
+ import tqdm
+ import multiprocessing.pool
+@@ -84,11 +85,40 @@ def _update_repo_cache(lib_dir, repo_url, tag):
+             return False
+ 
+ 
++def _update_sparse_repo_cache(lib_dir, repo_url, rev, patterns):
++    """ Like _update_repo_cache, but only check out the files matching `patterns`, without history and without
++    fetching any other files. `rev` can be a tag or a commit hash. """
++    git = lambda *args, check=True, **kwargs: subprocess.run(
++            ['git', '-c', 'advice.detachedHead=false', '-C', str(lib_dir), *args], check=check, **kwargs)
++    if not lib_dir.is_dir():
++        print(f'Checking out KiCad source repo at {rev}')
++        lib_dir.mkdir(parents=True)
++        git('init', '-q')
++        git('remote', 'add', 'origin', repo_url)
++    git('sparse-checkout', 'set', '--no-cone', *patterns)
++
++    head = git('rev-parse', '-q', '--verify', 'HEAD', capture_output=True, text=True, check=False).stdout.strip()
++    wanted = git('rev-parse', '-q', '--verify', f'{rev}^{{commit}}', capture_output=True, text=True,
++                 check=False).stdout.strip()
++    if head and head == wanted:
++        return False
++
++    git('fetch', '-q', '--depth', '1', '--filter=blob:none', 'origin', rev)
++    if not re.fullmatch('[0-9a-f]{40}', rev):
++        git('tag', '-f', rev, 'FETCH_HEAD')
++    git('checkout', '-q', 'FETCH_HEAD')
++    return True
++
++
++KICAD_SOURCE_SCHEMATIC_PATTERNS = ['/demos/**/*.kicad_sch', '/qa/data/**/*.kicad_sch']
++
++
+ def pytest_addoption(parser):
+     parser.addini('kicad_footprints_tag', 'git tag or branch for KiCad footprint library repo used as testdata', default='main')
+     parser.addini('kicad_symbols_tag', 'git tag or branch for KiCad symbol library repo used as testdata', default='main')
+     parser.addini('kicad_container_tag', 'docker hub tag for the KiCad container to use for exporting footprint images', default='main')
+     parser.addini('kicad_source_tag', 'git tag for the KiCad source repo whose demos directory is used as testdata', default='main')
++    parser.addini('kicad_extra_source_revisions', 'git tags or commits of the KiCad source repo whose schematics are used as further testdata', default='')
+     parser.addoption("--use-cached-data", action="store_true", help="Do not re-check git repo caches and podman image")
+ 
+ 
+@@ -113,6 +143,14 @@ def pytest_configure(config):
+     else:
+         config.kicad_source_dir = config.cache.mkdir('kicad-source') / 'repo'
+ 
++    # Schematics of further KiCad versions. KICAD_EXTRA_SOURCES overrides them with a list of checkouts separated by
++    # the path separator.
++    if (lib_dirs := os.environ.get('KICAD_EXTRA_SOURCES')) is not None:
++        config.kicad_extra_source_dirs = [Path(d).expanduser() for d in lib_dirs.split(os.pathsep) if d]
++    else:
++        config.kicad_extra_source_dirs = [config.cache.mkdir(f'kicad-source-{rev}') / 'repo'
++                                          for rev in config.getini('kicad_extra_source_revisions').split()]
++
+     did_updates = False
+     is_pytest_controller = 'PYTEST_XDIST_WORKER' not in os.environ
+     if is_pytest_controller and not config.getoption("--use-cached-data"):
+@@ -129,6 +167,12 @@ def pytest_configure(config):
+             tag = config.getini('kicad_source_tag')
+             did_updates |= _update_repo_cache(config.kicad_source_dir, 'https://gitlab.com/kicad/code/kicad', tag)
+ 
++        if os.environ.get('KICAD_EXTRA_SOURCES') is None:
++            revs = config.getini('kicad_extra_source_revisions').split()
++            for rev, lib_dir in zip(revs, config.kicad_extra_source_dirs):
++                _update_sparse_repo_cache(lib_dir, 'https://gitlab.com/kicad/code/kicad', rev,
++                                          KICAD_SOURCE_SCHEMATIC_PATTERNS)
++
+     tag = config.getini("kicad_container_tag")
+     config.kicad_container = os.environ.get('KICAD_CONTAINER', f'registry.hub.docker.com/kicad/kicad:{tag}')
+ 
+@@ -160,9 +204,10 @@ def pytest_generate_tests(metafunc):
+         mod_files = list(metafunc.config.kicad_footprints_libdir.glob('*.pretty/*.kicad_mod'))
+         metafunc.parametrize('kicad_mod_file', mod_files, ids=list(map(str, mod_files)))
+ 
++    source_dirs = [metafunc.config.kicad_source_dir, *metafunc.config.kicad_extra_source_dirs]
+     if 'kicad_sch_file' in metafunc.fixturenames:
+-        files = list(metafunc.config.kicad_source_dir.glob('demos/*.kicad_sch'))
+-        files += list(metafunc.config.kicad_source_dir.glob('qa/data/**/*.kicad_sch'))
++        files = [f for d in source_dirs for pattern in ('demos/**/*.kicad_sch', 'qa/data/**/*.kicad_sch')
++                 for f in sorted(d.glob(pattern))]
+         metafunc.parametrize('kicad_sch_file', files, ids=list(map(str, files)))
+ 
+     if 'kicad_pcb_file' in metafunc.fixturenames:
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index f02dafa..7633d9d 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -23,6 +23,9 @@ def test_load_kicad_schematic(kicad_sch_file):
+             # contains legacy syntax
+             ]:
+         pytest.skip()
++    # Refers to a sub-sheet that is missing from KiCad's repository
++    if kicad_sch_file.parts[-2:] == ('pcbnew', 'component_classes.kicad_sch'):
++        pytest.skip()
+     sch = Schematic.open(kicad_sch_file)
+     print('Loaded schematic with', len(sch.wires), 'wires and', len(sch.symbols), 'symbols.')
+     for subsh in sch.subsheets:
+-- 
+2.43.0
+

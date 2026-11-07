@@ -1,0 +1,73 @@
+From 1448cdb1fd902a24386b22cfd98aa8788c02ffa0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:08:51 +0000
+Subject: [PATCH 26/52] Fix point lists of KiCad symbol polylines and schematic
+ lines
+
+Point lists are parsed into plain lists, but symbol polylines, their
+rectangle conversion and the SVG export of wires, buses and schematic
+polylines still accessed them through a PointList object, so all of them
+failed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 5 +++--
+ src/gerbonara/cad/kicad/symbols.py   | 8 ++++----
+ 2 files changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index ad475c6..ca243f4 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -116,10 +116,11 @@ class BusEntry:
+ 
+ def _polyline_svg(self, default_color):
+     da = Dasher(self)
+-    if len(self.points.xy) < 2:
++    if len(self.points) < 2:
+         warnings.warn(f'Schematic {type(self)} with less than two points')
++        return Tag('path', d='')
+ 
+-    p0, *rest = self.points.xy
++    p0, *rest = self.points
+     da.move(p0.x, p0.y)
+     for pn in rest:
+         da.line(pn.x, pn.y)
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index 4b47e7c..6823dfc 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -320,17 +320,17 @@ class Bezier:
+ 
+ @sexp_type('polyline')
+ class Polyline:
+-    pts: PointList = field(default_factory=PointList)
++    pts: PointList = field(default_factory=list)
+     stroke: Stroke = field(default_factory=Stroke)
+     fill: Fill = field(default_factory=Fill)
+ 
+     @property
+     def points(self):
+-        return self.pts.xy
++        return self.pts
+ 
+     @points.setter
+     def points(self, value):
+-        self.pts.xy = value
++        self.pts = value
+ 
+     @property
+     def closed(self):
+@@ -420,7 +420,7 @@ class Rectangle:
+     def to_polyline(self):
+         x1, y1 = self.start.x, self.start.y
+         x2, y2 = self.end.x, self.end.y
+-        return Polyline(PointList([XYCoord(x1, y1), XYCoord(x2, y1), XYCoord(x2, y2), XYCoord(x1, y2), XYCoord(x1, y1)]),
++        return Polyline([XYCoord(x1, y1), XYCoord(x2, y1), XYCoord(x2, y2), XYCoord(x1, y2), XYCoord(x1, y1)],
+                         self.stroke, self.fill)
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-- 
+2.43.0
+

@@ -1,0 +1,68 @@
+From ae44cdcb6961ad476fbb26a3ed7d55e738312707 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:17:51 +0000
+Subject: [PATCH 48/52] Test KiCad schematic support against KiCad's 10.99
+ development version
+
+Add the schematics of KiCad's master branch as of 2026-11-07, commit
+9903ced42eb1, to the test corpus, 482 of them. Two of them, in KiCad's
+downgrade tests, are invalid on purpose.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ pyproject.toml                | 4 ++--
+ tests/test_kicad_schematic.py | 8 ++++++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index afdcc86..a385a4d 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -67,8 +67,8 @@ norecursedirs = ["*"]
+ kicad_symbols_tag = "9.0.6"
+ kicad_footprints_tag = "9.0.6"
+ kicad_source_tag = "9.0.6"
+-# Schematics of further KiCad versions: KiCad 10
+-kicad_extra_source_revisions = "10.0.8"
++# Schematics of further KiCad versions: KiCad 10, and KiCad's 10.99 development version (master as of 2026-11-07)
++kicad_extra_source_revisions = "10.0.8 9903ced42eb17697564fa63c48d0346ed1680669"
+ # Tag to use for container for footprint svg export
+ # For a list of available tags, see https://hub.docker.com/r/kicad/kicad/tags
+ kicad_container_tag = "9.0.6-full"
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index f2f2b24..1da259c 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -28,6 +28,9 @@ def test_load_kicad_schematic(kicad_sch_file):
+     # Refers to a sub-sheet that is missing from KiCad's repository
+     if kicad_sch_file.parts[-2:] == ('pcbnew', 'component_classes.kicad_sch'):
+         pytest.skip()
++    # Invalid on purpose
++    if kicad_sch_file.name in ['broken.kicad_sch', 'sibling.kicad_sch']:
++        pytest.skip()
+     sch = Schematic.open(kicad_sch_file)
+     print('Loaded schematic with', len(sch.wires), 'wires and', len(sch.symbols), 'symbols.')
+     for subsh in sch.subsheets:
+@@ -66,6 +69,8 @@ def test_kicad_schematic_round_trip(kicad_sch_file):
+     if kicad_sch_file.name in [
+             # Properties with two (effects ...), the subject of KiCad issue 20173
+             'Kicad 9 - multi channel test.kicad_sch',
++            # Invalid on purpose
++            'broken.kicad_sch',
+             ]:
+         pytest.skip()
+ 
+@@ -81,6 +86,9 @@ def test_kicad_schematic_round_trip(kicad_sch_file):
+ 
+ 
+ def test_kicad_schematic_svg_export(kicad_sch_file):
++    if kicad_sch_file.name in ['broken.kicad_sch']: # Invalid on purpose
++        pytest.skip()
++
+     sch = Schematic.open(kicad_sch_file)
+     root = ET.fromstring(str(sch.to_svg()))
+     w, h = sch.page_settings.size
+-- 
+2.43.0
+

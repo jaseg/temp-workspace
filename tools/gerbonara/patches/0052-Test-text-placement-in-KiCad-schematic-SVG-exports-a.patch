@@ -1,0 +1,170 @@
+From ab85fe895ba3968f828ffe2759d931b045497a93 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:21:39 +0000
+Subject: [PATCH 52/52] Test text placement in KiCad schematic SVG exports
+ against KiCad's
+
+KiCad's command line tests come with KiCad's own SVG export of a
+schematic, qa/data/cli/basic_test, in which KiCad marks every text it
+draws. Every text gerbonara draws has to be within a small tolerance of
+where KiCad draws it, and every text KiCad draws around the schematic's
+contents has to be drawn. This checks the placement, rotation and
+alignment of symbol fields (including those of rotated and mirrored
+symbols), pin names and numbers, labels, free text and text boxes.
+
+KiCad 9.0.6 and KiCad 10 come with different exports of the same
+schematic, so it is checked against both. Copies that are the same in
+several KiCad versions are only tested once.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ tests/conftest.py             | 14 +++++-
+ tests/test_kicad_schematic.py | 95 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+), 1 deletion(-)
+
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 27f3790..67846a4 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -110,7 +110,8 @@ def _update_sparse_repo_cache(lib_dir, repo_url, rev, patterns):
+     return True
+ 
+ 
+-KICAD_SOURCE_SCHEMATIC_PATTERNS = ['/demos/**/*.kicad_sch', '/qa/data/**/*.kicad_sch']
++KICAD_SOURCE_SCHEMATIC_PATTERNS = ['/demos/**/*.kicad_sch', '/qa/data/**/*.kicad_sch',
++                            '/qa/data/cli/**/*.svg']
+ 
+ 
+ def pytest_addoption(parser):
+@@ -210,6 +211,17 @@ def pytest_generate_tests(metafunc):
+                  for f in sorted(d.glob(pattern))]
+         metafunc.parametrize('kicad_sch_file', files, ids=list(map(str, files)))
+ 
++    if 'kicad_sch_reference' in metafunc.fixturenames:
++        # Schematics of KiCad's command line tests, which come with KiCad's own SVG export of them. Copies that are the
++        # same in several KiCad versions are only tested once.
++        refs = {}
++        for d in source_dirs:
++            for svg in sorted(d.glob('qa/data/cli/*/*.svg')):
++                if (sch := svg.with_suffix('.kicad_sch')).is_file():
++                    refs.setdefault((sch.read_bytes(), svg.read_bytes()), (sch, svg))
++        refs = list(refs.values())
++        metafunc.parametrize('kicad_sch_reference', refs, ids=[str(svg) for _sch, svg in refs])
++
+     if 'kicad_pcb_file' in metafunc.fixturenames:
+         files = list(metafunc.config.kicad_source_dir.glob('demos/*.kicad_pcb'))
+         files += list(metafunc.config.kicad_source_dir.glob('qa/data/**/*.kicad_pcb'))
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index 1da259c..e06dfea 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -18,6 +18,7 @@ from gerbonara.cad.kicad.sexp import build_sexp, parse_sexp, Atom
+ from gerbonara.cad.kicad.sexp_mapper import sexp
+ from gerbonara.cad.kicad.tmtheme import *
+ from gerbonara.cad.kicad.schematic import Schematic
++from gerbonara.newstroke import Newstroke
+ 
+ 
+ def test_load_kicad_schematic(kicad_sch_file):
+@@ -93,3 +94,97 @@ def test_kicad_schematic_svg_export(kicad_sch_file):
+     root = ET.fromstring(str(sch.to_svg()))
+     w, h = sch.page_settings.size
+     assert [float(v) for v in root.get('viewBox').split()] == pytest.approx([0, 0, w, h])
++
++
++_NUM = r'-?\d+(?:\.\d+)?(?:e-?\d+)?'
++
++
++def _kicad_svg_texts(svg):
++    """ [(text, bbox)] of the stroked text in an SVG exported by KiCad, which puts each text's strokes into a
++    <g class="stroked-text"><desc>text</desc> ... </g> in absolute coordinates. """
++    out = []
++    for m in re.finditer(r'<g class="stroked-text"><desc>(.*?)</desc>(.*?)</g>', svg, re.S):
++        coords = [float(v) for d in re.findall(r'd="([^"]*)"', m.group(2)) for v in re.findall(_NUM, d)]
++        if coords:
++            text = bs4.BeautifulSoup(m.group(1), 'html.parser').text
++            out.append((text, (min(coords[0::2]), min(coords[1::2]), max(coords[0::2]), max(coords[1::2]))))
++    return out
++
++
++def _svg_transform(transform):
++    """ An SVG transform attribute as an affine matrix (a, b, c, d, e, f) """
++    def mul(m, n):
++        return (m[0]*n[0] + m[2]*n[1], m[1]*n[0] + m[3]*n[1], m[0]*n[2] + m[2]*n[3], m[1]*n[2] + m[3]*n[3],
++                m[0]*n[4] + m[2]*n[5] + m[4], m[1]*n[4] + m[3]*n[5] + m[5])
++    out = (1, 0, 0, 1, 0, 0)
++    for name, args in re.findall(r'(\w+)\s*\(([^)]*)\)', transform or ''):
++        a = [float(v) for v in re.findall(_NUM, args)]
++        if name == 'translate':
++            out = mul(out, (1, 0, 0, 1, a[0], a[1] if len(a) > 1 else 0))
++        elif name == 'scale':
++            out = mul(out, (a[0], 0, 0, a[1] if len(a) > 1 else a[0], 0, 0))
++        elif name == 'rotate':
++            r = math.radians(a[0])
++            m = (math.cos(r), math.sin(r), -math.sin(r), math.cos(r), 0, 0)
++            if len(a) == 3:
++                m = mul(mul((1, 0, 0, 1, a[1], a[2]), m), (1, 0, 0, 1, -a[1], -a[2]))
++            out = mul(out, m)
++    return out, mul
++
++
++def _gerbonara_svg_texts(sch, monkeypatch):
++    """ [(text, size, bbox)] of every text gerbonara's SVG export draws """
++    drawn, render_svg = {}, Newstroke.render_svg
++
++    def recording_render_svg(self, text, *args, **kwargs):
++        tag = render_svg(self, text, *args, **kwargs)
++        drawn[id(tag)] = text, kwargs.get('size', 1.0)
++        return tag
++    monkeypatch.setattr(Newstroke, 'render_svg', recording_render_svg)
++    root = sch.to_svg()
++
++    out = []
++    def walk(tag, matrix):
++        if not hasattr(tag, 'attrs'):
++            return
++        m, mul = _svg_transform(tag.attrs.get('transform'))
++        matrix = mul(matrix, m)
++        if id(tag) in drawn:
++            coords = [float(v) for v in re.findall(_NUM, tag.attrs.get('d', ''))]
++            a, b, c, d, e, f = matrix
++            points = [(a*x + c*y + e, b*x + d*y + f) for x, y in zip(coords[0::2], coords[1::2])]
++            if points:
++                xs, ys = [x for x, y in points], [y for x, y in points]
++                out.append((*drawn[id(tag)], (min(xs), min(ys), max(xs), max(ys))))
++        for child in tag.children:
++            walk(child, matrix)
++    walk(root, (1, 0, 0, 1, 0, 0))
++    return out
++
++
++def test_kicad_schematic_text_placement(kicad_sch_reference, monkeypatch):
++    """ Every text gerbonara draws has to be where KiCad's own SVG export puts it, and every text KiCad draws in the
++    area of the schematic's contents has to be drawn. This checks how text is rotated, flipped and aligned. Small
++    differences in font metrics are tolerated. KiCad's drawing sheet (frame and title block) is not drawn by
++    gerbonara. """
++    sch_file, svg_file = kicad_sch_reference
++    reference = _kicad_svg_texts(svg_file.read_text())
++    if not reference:
++        pytest.skip('Not an SVG export of a schematic')
++    drawn = _gerbonara_svg_texts(Schematic.open(sch_file), monkeypatch)
++    assert drawn
++
++    distance = lambda a, b: max(abs(u - v) for u, v in zip(a, b))
++    for text, size, bbox in drawn:
++        candidates = [ref for ref_text, ref in reference if ref_text == text]
++        assert candidates, f'{text!r} is not in KiCad\'s output'
++        closest = min(candidates, key=lambda ref: distance(bbox, ref))
++        assert distance(bbox, closest) < 0.25 + 0.05*size, f'{text!r} is at {bbox}, KiCad has it at {closest}'
++
++    x1 = min(b[0] for _t, _s, b in drawn) - 5
++    y1 = min(b[1] for _t, _s, b in drawn) - 5
++    x2 = max(b[2] for _t, _s, b in drawn) + 5
++    y2 = max(b[3] for _t, _s, b in drawn) + 5
++    for text, bbox in reference:
++        if x1 < bbox[0] and bbox[2] < x2 and y1 < bbox[1] and bbox[3] < y2:
++            assert any(t == text and distance(b, bbox) < 1 for t, _s, b in drawn), f'{text!r} at {bbox} is missing'
+-- 
+2.43.0
+

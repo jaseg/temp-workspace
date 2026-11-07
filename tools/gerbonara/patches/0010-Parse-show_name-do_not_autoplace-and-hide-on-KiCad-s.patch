@@ -1,0 +1,64 @@
+From 12304110df74f6f04d82b10b8aeb718cfe3a3ca3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:09:55 +0000
+Subject: [PATCH 10/52] Parse show_name, do_not_autoplace and hide on KiCad
+ symbol properties
+
+KiCad 8 and later write (hide yes) on the property itself instead of in
+its effects, KiCad 9 adds (show_name yes/no) and (do_not_autoplace
+yes/no). Symbol library properties rejected all three, schematic
+properties read (hide no) and (show_name no) as true. Library properties
+keep None for absent flags so that files round trip unchanged, and their
+SVG export now skips properties hidden this way.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 4 +++-
+ src/gerbonara/cad/kicad/symbols.py   | 8 ++++++--
+ 2 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index a79346d..5ab827a 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -311,7 +311,9 @@ class DrawnProperty(TextMixin):
+     value: str = None
+     id: Named(int) = None
+     at: AtPos = field(default_factory=AtPos)
+-    hide: Flag() = False
++    show_name: Named(LegacyCompatibleFlag()) = None
++    do_not_autoplace: Named(LegacyCompatibleFlag()) = None
++    hide: OmitDefault(Named(LegacyCompatibleFlag())) = False
+     effects: TextEffect = field(default_factory=TextEffect)
+     _: SEXP_END = None
+     parent: object = None
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index 7b24e3b..4d46bda 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -412,7 +412,10 @@ class Property(TextMixin):
+     value: str = None
+     id: Named(int) = None
+     at: AtPos = field(default_factory=AtPos)
+-    show_name: Flag() = False
++    # These three are None when absent, so files without them round trip unchanged.
++    show_name: Named(LegacyCompatibleFlag()) = None
++    do_not_autoplace: Named(LegacyCompatibleFlag()) = None
++    hide: Named(LegacyCompatibleFlag()) = None
+     effects: TextEffect = field(default_factory=TextEffect)
+ 
+     # Alias value for text mixin
+@@ -425,7 +428,8 @@ class Property(TextMixin):
+         self.value = value
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        yield from TextMixin.to_svg(self, colorscheme.text)
++        if not self.hide:
++            yield from TextMixin.to_svg(self, colorscheme.text)
+ 
+ 
+ @sexp_type('pin_numbers')
+-- 
+2.43.0
+

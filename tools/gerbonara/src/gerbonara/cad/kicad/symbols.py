@@ -52,10 +52,11 @@ class Pin:
     style: PIN_STYLE = Atom.line
     at: AtPos = field(default_factory=AtPos)
     length: Named(float) = 2.54
-    hide: OmitDefault(Named(YesNoAtom())) = False
+    hide: OmitDefault(Named(LegacyCompatibleFlag())) = False
     name: Rename(StyledText) = field(default_factory=StyledText)
     number: Rename(StyledText) = field(default_factory=StyledText)
     alternates: List(AltFunction) = field(default_factory=list)
+    custom_properties: List(CustomProperty) = field(default_factory=list)
     _: SEXP_END = None
     unit: object = None
 
@@ -145,93 +146,65 @@ class Pin:
         }.get(self.style, []):
             yield tag
 
-        rot = self.at.rotation + p_rotation
-        trot = self.at.rotation
-        # With a positive pin name offset, names go inside the body, that far beyond the pin's inner end. With an
-        # offset of 0, names go above the middle of the pin and numbers below it.
-        spec = self.unit.symbol.pin_names if self.unit is not None and self.unit.symbol is not None else None
-        offset = spec.offset if spec is not None and spec.offset is not None else 0.508
-        names_inside = offset > 0
-        ax, ay = (self.length + offset if names_inside else self.length/2), 0
-        ax, ay = rotate_point(ax, ay, math.radians(-self.at.rotation))
+        yield from self._text_svg(colorscheme, p_mirror, p_rotation)
 
-        #lx, ly = self.at.x, -self.at.y
-        #lx, ly = rotate_point(lx, ly, math.radians(p_rotation))
-        #if p_mirror.y:
-        #    lx, ly = -lx, ly
-        #elif p_mirror.x:
-        #    lx, ly = lx, -ly
-        #yield Tag('circle', cx=lx, cy=ly, r='0.5', stroke='blue', stroke_width='0.1', fill='none', z_index='100')
+    def _text_svg(self, colorscheme, p_mirror, p_rotation):
+        """ Pin name and number, placed like KiCad's PIN_LAYOUT_CACHE does it, in coordinates relative to the placed
+        symbol's position. Text is never mirrored; vertical pins get vertical text that reads bottom to top. """
+        symbol = self.unit.symbol if self.unit is not None else None
+        names, numbers = (symbol.pin_names, symbol.pin_numbers) if symbol is not None else (None, None)
+        offset = names.offset if names is not None and names.offset is not None else 0.508
+        name = self.name.value if self.name is not None else ''
+        number = self.number.value if self.number is not None else ''
+        show_name = name not in ('', '~') and not (names is not None and names.hide) and not self.name.effects.hide
+        show_number = number != '' and not (numbers is not None and numbers.hide) and not self.number.effects.hide
 
-        lx, ly = self.at.x + ax, -self.at.y - ay
-        lx, ly = rotate_point(lx, ly, math.radians(p_rotation))
-        if p_mirror.y:
-            lx, ly = -lx, ly
-        elif p_mirror.x:
-            lx, ly = lx, -ly
-        #yield Tag('circle', cx=lx, cy=ly, r='0.5', stroke='red', stroke_width='0.1', fill='none', z_index='100')
+        vec = lambda dx, dy: lib_to_sheet_vector(dx, dy, p_rotation, p_mirror.x, p_mirror.y)
+        a = math.radians(self.at.rotation or 0)
+        dx, dy = vec(math.cos(a), math.sin(a))  # direction from the connection point into the body
+        x0, y0 = vec(self.at.x, self.at.y)
+        x1, y1 = x0 + dx*self.length, y0 + dy*self.length
+        mx, my = (x0 + x1)/2, (y0 + y1)/2
+        vertical = abs(dy) > 0.5
+        # "above" the pin: up for horizontal pins, left for vertical ones (above in the frame of vertical text)
+        ux, uy = (-1, 0) if vertical else (0, -1)
 
-        h_align = 'left'
-        if p_mirror.y:
-            if trot in (0, 180):
-                trot = 180 - trot
-        elif p_mirror.x:
-            if p_rotation == 0:
-                if trot in (90, 270):
-                    trot = 360-trot
+        if show_name:
+            size = self.name.effects.font.size.y or 1.27
+            if offset > 0: # inside the body, starting the offset beyond the pin's inner end
+                inward = (dy < 0) if vertical else (dx > 0)
+                yield kicad_text_svg(name, x1 + dx*offset, y1 + dy*offset, size, h_align='left' if inward else 'right',
+                                     v_align='middle', vertical=vertical, stroke=colorscheme.pin_names)
+            else: # above the middle of the pin
+                d = KICAD_TEXT_OFFSET + size/16
+                yield kicad_text_svg(name, mx + ux*d, my + uy*d, size, h_align='center', v_align='bottom',
+                                     vertical=vertical, stroke=colorscheme.pin_names)
+
+        if show_number:
+            size = self.number.effects.font.size.y or 1.27
+            d = 2*KICAD_TEXT_OFFSET + size/8
+            if show_name and offset == 0: # name above, number below
+                yield kicad_text_svg(number, mx - ux*d, my - uy*d, size, h_align='center', v_align='top',
+                                     vertical=vertical, stroke=colorscheme.pin_numbers)
             else:
-                if trot in (0, 180):
-                    trot = 180 - trot
-        frot = (trot + p_rotation)%360
-        sx, sy = 1, 1
-
-        if frot == 180:
-            frot = 0
-            h_align = 'right'
-        elif frot == 270:
-            frot = 90
-            h_align = 'right'
-
-        font = Newstroke.load()
-        if self.name.value != '~' and not self.unit.symbol.pin_names.hide:
-            yield font.render_svg(self.name.value,
-                                  size=self.name.effects.font.size.y or 1.27,
-                                  x0=0,
-                                  y0=0 if names_inside else -0.4,
-                                  h_align=h_align if names_inside else 'center',
-                                  v_align='middle' if names_inside else 'bottom',
-                                  rotation=-frot,
-                                  stroke=colorscheme.pin_names,
-                                  transform=f'translate({lx:.3f} {ly:.3f})',
-                                  scale=(sx, sy),
-                                  mirror=(False, False),
-                                  )
-
-        if self.number.value != '~' and not self.unit.symbol.pin_numbers.hide:
-            yield font.render_svg(self.number.value,
-                                  size=self.number.effects.font.size.y or 1.27,
-                                  x0=(-0.4 if h_align == 'left' else 0.4) if names_inside else 0,
-                                  y0=-0.4 if names_inside else 0.4,
-                                  h_align={'left': 'right', 'right': 'left'}[h_align] if names_inside else 'center',
-                                  v_align='bottom' if names_inside else 'top',
-                                  rotation=-frot,
-                                  stroke=colorscheme.pin_numbers,
-                                  scale=(sx, sy),
-                                  transform=f'translate({lx:.3f} {ly:.3f})',
-                                  mirror=(False, False),
-                                  )
-
+                yield kicad_text_svg(number, mx + ux*d, my + uy*d, size, h_align='center', v_align='bottom',
+                                     vertical=vertical, stroke=colorscheme.pin_numbers)
 
 
 @sexp_type('fill')
 class Fill:
-    type: Named(AtomChoice(Atom.none, Atom.outline, Atom.background)) = Atom.none
+    # hatch, reverse_hatch and cross_hatch are new in KiCad 10.99
+    type: Named(AtomChoice(Atom.none, Atom.outline, Atom.background, Atom.color, Atom.hatch, Atom.reverse_hatch,
+                           Atom.cross_hatch)) = Atom.none
+    color: Color = None
 
     def svg(self, fg, bg):
         if self.type == 'outline':
             return fg
         elif self.type == 'background':
             return bg
+        elif self.type == 'color' and self.color is not None:
+            return self.color.svg(bg)
         else:
             return 'none'
 
@@ -242,6 +215,7 @@ class Circle:
     radius: Named(float) = 0.0
     stroke: Stroke = field(default_factory=Stroke)
     fill: Fill = field(default_factory=Fill)
+    custom_properties: List(CustomProperty) = field(default_factory=list)
 
     def bounding_box(self, default=None):
         x, y, r = self.center.x, self.center.y, self.radius
@@ -268,6 +242,9 @@ class Arc:
     radius: ArcRadius = None
     stroke: Stroke = field(default_factory=Stroke)
     fill: Fill = field(default_factory=Fill)
+    start_shape: LineStart = None
+    end_shape: LineEnd = None
+    custom_properties: List(CustomProperty) = field(default_factory=list)
 
     @property
     def midpoint(self):
@@ -312,6 +289,9 @@ class Bezier:
     points: PointList = field(default_factory=list)
     stroke: Stroke = field(default_factory=Stroke)
     fill: Fill = field(default_factory=Fill)
+    start_shape: LineStart = None
+    end_shape: LineEnd = None
+    custom_properties: List(CustomProperty) = field(default_factory=list)
 
     def bounding_box(self, default=None):
         # The control polygon contains the curve.
@@ -328,11 +308,40 @@ class Bezier:
         yield Tag('path', d=d, fill=self.fill.svg(colorscheme.lines, colorscheme.fill), **self.stroke.svg_attrs(colorscheme.lines))
 
 
+@sexp_type('ellipse')
+class Ellipse:
+    """ KiCad 10.99 ellipse. Angles are in degrees. """
+    center: Rename(XYCoord) = field(default_factory=XYCoord)
+    major_radius: Named(float) = 0.0
+    minor_radius: Named(float) = 0.0
+    rotation_angle: Named(float) = 0.0
+    stroke: Stroke = field(default_factory=Stroke)
+    fill: Fill = field(default_factory=Fill)
+    custom_properties: List(CustomProperty) = field(default_factory=list)
+
+
+@sexp_type('ellipse_arc')
+class EllipseArc:
+    """ KiCad 10.99 elliptical arc. Angles are in degrees. """
+    center: Rename(XYCoord) = field(default_factory=XYCoord)
+    major_radius: Named(float) = 0.0
+    minor_radius: Named(float) = 0.0
+    rotation_angle: Named(float) = 0.0
+    start_angle: Named(float) = 0.0
+    end_angle: Named(float) = 0.0
+    stroke: Stroke = field(default_factory=Stroke)
+    fill: Fill = field(default_factory=Fill)
+    custom_properties: List(CustomProperty) = field(default_factory=list)
+
+
 @sexp_type('polyline')
 class Polyline:
     pts: PointList = field(default_factory=list)
     stroke: Stroke = field(default_factory=Stroke)
     fill: Fill = field(default_factory=Fill)
+    start_shape: LineStart = None
+    end_shape: LineEnd = None
+    custom_properties: List(CustomProperty) = field(default_factory=list)
 
     @property
     def points(self):
@@ -412,6 +421,7 @@ class Text(TextMixin):
     at: TextPos = field(default_factory=TextPos)
     rotation: float = None
     effects: TextEffect = field(default_factory=TextEffect)
+    custom_properties: List(CustomProperty) = field(default_factory=list)
 
     def to_svg(self, colorscheme=Colorscheme.KiCad):
         yield from TextMixin.to_svg(self, colorscheme.text)
@@ -426,6 +436,7 @@ class Rectangle:
     end: Rename(XYCoord) = None
     stroke: Stroke = field(default_factory=Stroke)
     fill: Fill = field(default_factory=Fill)
+    custom_properties: List(CustomProperty) = field(default_factory=list)
 
     def to_polyline(self):
         x1, y1 = self.start.x, self.start.y
@@ -449,6 +460,7 @@ class Property(TextMixin):
     do_not_autoplace: Named(LegacyCompatibleFlag()) = None
     hide: Named(LegacyCompatibleFlag()) = None
     effects: TextEffect = field(default_factory=TextEffect)
+    custom_properties: List(CustomProperty) = field(default_factory=list)
 
     # Alias value for text mixin
     @property
@@ -466,13 +478,13 @@ class Property(TextMixin):
 
 @sexp_type('pin_numbers')
 class PinNumberSpec:
-    hide: Named(YesNoAtom()) = False
+    hide: Named(LegacyCompatibleFlag()) = False
 
 
 @sexp_type('pin_names')
 class PinNameSpec:
     offset: OmitDefault(Named(float)) = 0.508
-    hide: OmitDefault(Named(YesNoAtom())) = False
+    hide: OmitDefault(Named(LegacyCompatibleFlag())) = False
 
 @sexp_type('text_box')
 class TextBox:
@@ -484,6 +496,7 @@ class TextBox:
     stroke: Stroke = field(default_factory=Stroke)
     fill: Fill = field(default_factory=Fill)
     effects: TextEffect = field(default_factory=TextEffect)
+    custom_properties: List(CustomProperty) = field(default_factory=list)
 
 
 @sexp_type('symbol')
@@ -493,6 +506,8 @@ class Unit:
     arcs: List(Arc) = field(default_factory=list)
     polylines: List(Polyline) = field(default_factory=list)
     beziers: List(Bezier) = field(default_factory=list)
+    ellipses: List(Ellipse) = field(default_factory=list)
+    ellipse_arcs: List(EllipseArc) = field(default_factory=list)
     rectangles: List(Rectangle) = field(default_factory=list)
     texts: List(Text) = field(default_factory=list)
     text_boxes: List(TextBox) = field(default_factory=list)
@@ -537,6 +552,21 @@ class Unit:
         return stacks
 
 
+def lib_to_sheet_vector(dx, dy, rotation=0, mirror_x=False, mirror_y=False):
+    """ Turn a vector in library symbol coordinates (y pointing up) into sheet coordinates (y pointing down) for a
+    symbol placed with the given rotation (degrees) and mirroring. KiCad rotates first, then mirrors. """
+    a = math.radians(rotation or 0)
+    c, s = math.cos(a), math.sin(a)
+    c, s = (round(c) if abs(c - round(c)) < 1e-9 else c), (round(s) if abs(s - round(s)) < 1e-9 else s)
+    x, y = dx, -dy
+    x, y = x*c + y*s, -x*s + y*c
+    if mirror_x:
+        y = -y
+    elif mirror_y:
+        x = -x
+    return x, y
+
+
 class JumperPinGroups:
     """ KiCad 9's ``(jumper_pin_groups ("1" "2") ("3" "4"))``: groups of pin numbers that are connected inside the
     part. Maps to a list of lists of pin numbers. """
@@ -569,6 +599,25 @@ class BodyStyles:
             yield [Atom.body_styles, *value]
 
 
+@sexp_type('footprint')
+class AssociatedFootprint:
+    lib_id: str = ''
+    map: Named(str) = None
+
+
+@sexp_type('entry')
+class PinMapEntry:
+    pin: str = ''
+    pad: str = ''
+
+
+@sexp_type('pin_map')
+class PinMap:
+    """ KiCad 10.99 pin map: which footprint pad each symbol pin goes to. """
+    name: str = ''
+    entries: List(PinMapEntry) = field(default_factory=list)
+
+
 @sexp_type('power')
 class PowerSpec:
     """ Marks a symbol as a power symbol. KiCad 9 added local power symbols, whose net is local to their sheet. Their
@@ -597,8 +646,12 @@ class Symbol:
     duplicate_pin_numbers_are_jumpers: Named(YesNoAtom()) = None
     jumper_pin_groups: JumperPinGroups() = None
     properties: List(Property) = field(default_factory=list)
+    # KiCad 10.99: footprints that fit the symbol, with the pin map each one uses
+    associated_footprints: Named(Array(AssociatedFootprint)) = field(default_factory=list)
+    pin_maps: Named(Array(PinMap)) = field(default_factory=list)
     units: List(Unit) = field(default_factory=list)
     embedded_fonts: Named(YesNoAtom()) = False
+    embedded_files: EmbeddedFiles = None
     _ : SEXP_END = None
     library = None
     name: str = None

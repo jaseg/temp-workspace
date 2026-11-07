@@ -1,0 +1,40 @@
+From 9a53c3422188c5b1803f07a08cbb22d6bb75e22e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:18:44 +0000
+Subject: [PATCH 43/52] Test SVG export of all KiCad demo and QA schematics
+
+Every schematic of the test corpus has to export to well-formed SVG of
+the right page size.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ tests/test_kicad_schematic.py | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/tests/test_kicad_schematic.py b/tests/test_kicad_schematic.py
+index a4fa139..f2f2b24 100644
+--- a/tests/test_kicad_schematic.py
++++ b/tests/test_kicad_schematic.py
+@@ -4,6 +4,7 @@ from collections import Counter
+ import pytest
+ import subprocess
+ import re
++import xml.etree.ElementTree as ET
+ 
+ import bs4
+ 
+@@ -77,3 +78,10 @@ def test_kicad_schematic_round_trip(kicad_sch_file):
+     lost = Counter(_nodes(parse_sexp(original))) - Counter(_nodes(parse_sexp(output)))
+     lost = {'/'.join(path): values for path, values in lost if not {'generator', 'generator_version'} & set(path)}
+     assert not lost
++
++
++def test_kicad_schematic_svg_export(kicad_sch_file):
++    sch = Schematic.open(kicad_sch_file)
++    root = ET.fromstring(str(sch.to_svg()))
++    w, h = sch.page_settings.size
++    assert [float(v) for v in root.get('viewBox').split()] == pytest.approx([0, 0, w, h])
+-- 
+2.43.0
+

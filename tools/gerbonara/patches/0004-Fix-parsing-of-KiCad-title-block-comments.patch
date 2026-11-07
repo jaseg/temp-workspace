@@ -1,0 +1,60 @@
+From 3fcce259c74cf54892e2fcf8d56cf5cf02bc4800 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:43:42 +0000
+Subject: [PATCH 04/52] Fix parsing of KiCad title block comments
+
+TitleComment.__map__ did not return anything, so the comments of every
+title block were dropped, and with several (comment N "...") entries
+only the last one was even looked at. Parse each entry into a
+TitleComment with its line number and text, and add
+TitleBlock.comment(n) to look one up.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/primitives.py | 23 +++++++----------------
+ 1 file changed, 7 insertions(+), 16 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/primitives.py b/src/gerbonara/cad/kicad/primitives.py
+index cc395bf..8554d80 100644
+--- a/src/gerbonara/cad/kicad/primitives.py
++++ b/src/gerbonara/cad/kicad/primitives.py
+@@ -239,21 +239,8 @@ class Margins:
+ 
+ @sexp_type('comment')
+ class TitleComment:
+-    @classmethod
+-    def __map__(kls, obj, parent=None, path=''):
+-        lines = []
+-        for lineno, content in zip(obj[1::2], obj[2::2]):
+-            while lineno > len(lines):
+-                lines.append('')
+-            lines[lineno-1] = content
+-
+-    @classmethod
+-    def __sexp__(kls, value):
+-        l = [Atom.comment]
+-        for i, line in enumerate(value.splitlines(), start=1):
+-            l.append(i)
+-            l.append(line.rstrip('\n'))
+-        return l
++    number: int = 1
++    text: str = ''
+ 
+ 
+ @sexp_type('title_block')
+@@ -262,6 +249,10 @@ class TitleBlock:
+     date: Named(str) = ''
+     rev: Named(str) = ''
+     company: Named(str) = ''
+-    comment: TitleComment = None
++    comments: List(TitleComment) = field(default_factory=list)
++
++    def comment(self, number):
++        """ Text of comment line `number` (1-9), or '' when it is not set. """
++        return next((c.text for c in self.comments if c.number == number), '')
+ 
+ 
+-- 
+2.43.0
+

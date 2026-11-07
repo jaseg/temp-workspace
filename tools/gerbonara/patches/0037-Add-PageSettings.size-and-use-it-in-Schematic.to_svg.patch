@@ -1,0 +1,104 @@
+From 1ea60f65c98333f35151a9ab361e06e70adebe6f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:13:39 +0000
+Subject: [PATCH 37/52] Add PageSettings.size and use it in Schematic.to_svg
+
+Schematic.to_svg() looked the page format up in the paper size table,
+which failed for custom (User) sizes and ignored portrait orientation.
+PageSettings.size handles both; the table moves to base_types next to it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/base_types.py | 30 +++++++++++++++++++++++++++
+ src/gerbonara/cad/kicad/schematic.py  | 19 +----------------
+ 2 files changed, 31 insertions(+), 18 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/base_types.py b/src/gerbonara/cad/kicad/base_types.py
+index 665b93c..3538603 100644
+--- a/src/gerbonara/cad/kicad/base_types.py
++++ b/src/gerbonara/cad/kicad/base_types.py
+@@ -562,6 +562,24 @@ class EditTime:
+         self.value = time.time()
+ 
+ 
++KICAD_PAPER_SIZES = {
++    'A5': (210,   148),
++    'A4': (297,   210),
++    'A3': (420,   297),
++    'A2': (594,   420),
++    'A1': (841,   594),
++    'A0': (1189,  841),
++    'A': (11*25.4, 8.5*25.4),
++    'B': (17*25.4, 11*25.4),
++    'C': (22*25.4, 17*25.4),
++    'D': (34*25.4, 22*25.4),
++    'E': (44*25.4, 34*25.4),
++    'USLetter': (11*25.4, 8.5*25.4),
++    'USLegal': (14*25.4, 8.5*25.4),
++    'USLedger': (17*25.4, 11*25.4),
++    }
++
++
+ @sexp_type('paper')
+ class PageSettings:
+     page_format: str = 'A4'
+@@ -569,6 +587,18 @@ class PageSettings:
+     height: float = None
+     portrait: Flag() = False
+ 
++    @property
++    def size(self):
++        """ (width, height) of the page in mm, taking custom sizes and portrait orientation into account. Unknown
++        formats are treated as A4. """
++        if self.page_format == 'User' and self.width and self.height:
++            w, h = float(self.width), float(self.height)
++        else:
++            w, h = KICAD_PAPER_SIZES.get(str(self.page_format), KICAD_PAPER_SIZES['A4'])
++        if self.portrait:
++            w, h = min(w, h), max(w, h)
++        return w, h
++
+ 
+ @sexp_type('property')
+ class Property:
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 87264fd..51256da 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -30,23 +30,6 @@ from ...utils import MM, rotate_point, Tag, setup_svg
+ from .schematic_colors import *
+ 
+ 
+-KICAD_PAPER_SIZES = {
+-    'A5': (210,   148),
+-    'A4': (297,   210),
+-    'A3': (420,   297),
+-    'A2': (594,   420),
+-    'A1': (841,   594),
+-    'A0': (1189,  841),
+-    'A': (11*25.4, 8.5*25.4),
+-    'B': (17*25.4, 11*25.4),
+-    'C': (22*25.4, 17*25.4),
+-    'D': (34*25.4, 22*25.4),
+-    'E': (44*25.4, 34*25.4),
+-    'USLetter': (11*25.4, 8.5*25.4),
+-    'USLegal': (14*25.4, 8.5*25.4),
+-    'USLedger': (17*25.4, 11*25.4),
+-    }
+-
+ @sexp_type('path')
+ class SheetPath:
+     path: str = '/'
+@@ -818,7 +801,7 @@ class Schematic:
+         children = []
+         for elem in self.elements:
+             children += elem.to_svg(colorscheme)
+-        w, h = KICAD_PAPER_SIZES[self.page_settings.page_format]
++        w, h = self.page_settings.size
+         return setup_svg(children, ((0, 0), (w, h)), pagecolor=colorscheme.background)
+ 
+ 
+-- 
+2.43.0
+

@@ -1,0 +1,39 @@
+From 73a49fc7441e2701e97f8fb002ecc288c49dcaa1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:10:33 +0000
+Subject: [PATCH 08/52] Parse colored fills of KiCad symbol shapes
+
+Shapes in library symbols can be filled with a color of their own,
+(fill (type color) (color r g b a)), since KiCad 7.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/symbols.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index aa54e93..a0244ca 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -223,13 +223,16 @@ class Pin:
+ 
+ @sexp_type('fill')
+ class Fill:
+-    type: Named(AtomChoice(Atom.none, Atom.outline, Atom.background)) = Atom.none
++    type: Named(AtomChoice(Atom.none, Atom.outline, Atom.background, Atom.color)) = Atom.none
++    color: Color = None
+ 
+     def svg(self, fg, bg):
+         if self.type == 'outline':
+             return fg
+         elif self.type == 'background':
+             return bg
++        elif self.type == 'color' and self.color is not None:
++            return self.color.svg(bg)
+         else:
+             return 'none'
+ 
+-- 
+2.43.0
+

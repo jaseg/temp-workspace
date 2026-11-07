@@ -1,0 +1,33 @@
+From 0b7239688e0aa7de3f97f405a381ca33eed4a630 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:13:46 +0000
+Subject: [PATCH 20/52] Parse the symbol attributes of KiCad 10 rule areas
+
+KiCad 10 rule areas can override the DNP, simulation, BOM and board
+attributes of the symbols inside them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 0736ecb..60971ba 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -628,6 +628,11 @@ class Subsheet:
+ 
+ @sexp_type('rule_area')
+ class RuleArea:
++    # KiCad 10 lets rule areas set these attributes of the symbols inside them.
++    exclude_from_sim: Named(YesNoAtom()) = None
++    in_bom: Named(YesNoAtom()) = None
++    on_board: Named(YesNoAtom()) = None
++    dnp: Named(YesNoAtom()) = None
+     polyline: Polyline = None
+ 
+ 
+-- 
+2.43.0
+

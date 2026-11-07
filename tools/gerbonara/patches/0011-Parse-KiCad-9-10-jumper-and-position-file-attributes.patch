@@ -1,0 +1,56 @@
+From 23150c1d048ef53818123d1d36e3d7b6537bb75d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:10:21 +0000
+Subject: [PATCH 11/52] Parse KiCad 9/10 jumper and position file attributes of
+ symbols
+
+KiCad 9 added (duplicate_pin_numbers_are_jumpers ...) and
+(jumper_pin_groups (...) ...) to library symbols, KiCad 10 added
+(in_pos_files ...).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/symbols.py | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index 4d46bda..d0d77e5 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -503,6 +503,22 @@ class Unit:
+         return stacks
+ 
+ 
++class JumperPinGroups:
++    """ KiCad 9's ``(jumper_pin_groups ("1" "2") ("3" "4"))``: groups of pin numbers that are connected inside the
++    part. Maps to a list of lists of pin numbers. """
++
++    def __atoms__(self):
++        return [Atom.jumper_pin_groups]
++
++    def __map__(self, obj, parent=None):
++        _key, *groups = obj
++        return [[str(number) for number in group] for group in groups]
++
++    def __sexp__(self, value):
++        if value:
++            yield [Atom.jumper_pin_groups, *(list(group) for group in value)]
++
++
+ @sexp_type('power')
+ class PowerSpec:
+     """ Marks a symbol as a power symbol. KiCad 9 added local power symbols, whose net is local to their sheet. Their
+@@ -526,6 +542,9 @@ class Symbol:
+     exclude_from_sim: Named(YesNoAtom()) = False
+     in_bom: Named(YesNoAtom()) = True
+     on_board: Named(YesNoAtom()) = True
++    in_pos_files: Named(YesNoAtom()) = None
++    duplicate_pin_numbers_are_jumpers: Named(YesNoAtom()) = None
++    jumper_pin_groups: JumperPinGroups() = None
+     properties: List(Property) = field(default_factory=list)
+     units: List(Unit) = field(default_factory=list)
+     embedded_fonts: Named(YesNoAtom()) = False
+-- 
+2.43.0
+

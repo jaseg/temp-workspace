@@ -1,0 +1,31 @@
+From b24168e3666f0b413f93401b7878f193da4278cb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:13:59 +0000
+Subject: [PATCH 38/52] Do not mark placed KiCad symbols as DNP by default
+
+SymbolInstance.dnp defaulted to True, so every symbol from a KiCad 6
+schematic, which has no (dnp ...) yet, and every newly created symbol
+came out as do-not-populate.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 51256da..f35f6ef 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -419,7 +419,7 @@ class SymbolInstance:
+     in_bom: Named(YesNoAtom()) = True
+     on_board: Named(YesNoAtom()) = True
+     in_pos_files: Named(YesNoAtom()) = None
+-    dnp: Named(YesNoAtom()) = True
++    dnp: Named(YesNoAtom()) = False
+     fields_autoplaced: Named(YesNoAtom()) = True
+     uuid: UUID = field(default_factory=UUID)
+     default_instance: DefaultSymbolInstance = None
+-- 
+2.43.0
+

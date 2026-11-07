@@ -1,0 +1,30 @@
+From 68482223b3dd9b48ae8d757dbd3f32d750c35cd7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:09:34 +0000
+Subject: [PATCH 29/52] Fix horizontal alignment of right-justified KiCad text
+
+TextMixin.h_align returned 'left' for any horizontal justification, so
+right-justified text was exported left-aligned.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/base_types.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gerbonara/cad/kicad/base_types.py b/src/gerbonara/cad/kicad/base_types.py
+index 30079e5..665b93c 100644
+--- a/src/gerbonara/cad/kicad/base_types.py
++++ b/src/gerbonara/cad/kicad/base_types.py
+@@ -446,7 +446,7 @@ class TextMixin:
+ 
+     @property
+     def h_align(self):
+-        return 'left' if self.effects.justify.h else 'center'
++        return self.effects.justify.h_str
+ 
+     @property
+     def mirrored(self):
+-- 
+2.43.0
+

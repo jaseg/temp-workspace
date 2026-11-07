@@ -1,0 +1,89 @@
+From e3c24137b8528138167fc20ee97e200fe394c2cc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:16:11 +0000
+Subject: [PATCH 41/52] Handle KiCad 6 radius arcs and straight arcs
+
+KiCad 6 symbols can give an arc as (radius (at ...) (length ...)
+(angles ...)) instead of a midpoint, which made the arc's bounding box and
+SVG export fail. Arc.midpoint works it out from the radius in that case.
+Arcs whose three points lie on one line are drawn as a straight line
+instead of raising.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py |  9 ++++++---
+ src/gerbonara/cad/kicad/symbols.py   | 29 ++++++++++++++++++++++++----
+ 2 files changed, 31 insertions(+), 7 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index f40a448..e1fa846 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -210,9 +210,12 @@ class Arc:
+     uuid: UUID = field(default_factory=UUID)
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        _c, r, sweep, large = kicad_arc_svg_flags(self.start, self.mid, self.end)
+-        yield _shape_svg(self, colorscheme, d=f'M {self.start.x:.3f} {self.start.y:.3f} '
+-                         f'A {r:.3f} {r:.3f} 0 {int(large)} {int(sweep)} {self.end.x:.3f} {self.end.y:.3f}')
++        try:
++            _c, r, sweep, large = kicad_arc_svg_flags(self.start, self.mid, self.end)
++            to = f'A {r:.3f} {r:.3f} 0 {int(large)} {int(sweep)}'
++        except ValueError: # start, mid and end on one line
++            to = 'L'
++        yield _shape_svg(self, colorscheme, d=f'M {self.start.x:.3f} {self.start.y:.3f} {to} {self.end.x:.3f} {self.end.y:.3f}')
+ 
+ 
+ @sexp_type('bezier')
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index 7d7b74c..71e6761 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -272,18 +272,39 @@ class Arc:
+     stroke: Stroke = field(default_factory=Stroke)
+     fill: Fill = field(default_factory=Fill)
+ 
++    @property
++    def midpoint(self):
++        """ The arc's midpoint. KiCad 6 symbols may give the arc as (radius (at center) (length r) (angles a1 a2))
++        instead, running counter-clockwise from angle a1 to a2. """
++        if self.mid is not None and self.mid.x is not None:
++            return self.mid
++        if self.radius is None:
++            raise ValueError('Arc has neither a midpoint nor a radius')
++        a1, a2 = self.radius.angles.x, self.radius.angles.y
++        if a2 < a1:
++            a2 += 360
++        a = math.radians((a1 + a2) / 2)
++        return XYCoord(self.radius.at.x + self.radius.length*math.cos(a), self.radius.at.y + self.radius.length*math.sin(a))
++
+     def _arc(self):
+-        return kicad_arc_svg_flags(self.start, self.mid, self.end)
++        return kicad_arc_svg_flags(self.start, self.midpoint, self.end)
+ 
+     def bounding_box(self, default=None):
+-        (cx, cy), _r, sweep, _large = self._arc()
++        try:
++            (cx, cy), _r, sweep, _large = self._arc()
++        except ValueError: # start, mid and end on one line
++            return ((min(self.start.x, self.end.x), min(self.start.y, self.end.y)),
++                    (max(self.start.x, self.end.x), max(self.start.y, self.end.y)))
+         # Symbol coordinates have the y axis pointing up like arc_bounds expects, so increasing angle means counter-
+         # clockwise.
+         return arc_bounds(self.start.x, self.start.y, self.end.x, self.end.y, cx, cy, not sweep)
+ 
+     def to_svg(self, colorscheme=Colorscheme.KiCad):
+-        _c, r, sweep, large = self._arc()
+-        d = f'M {self.start.x:.3f} {self.start.y:.3f} A {r:.3f} {r:.3f} 0 {int(large)} {int(sweep)} {self.end.x:.3f} {self.end.y:.3f}'
++        try:
++            _c, r, sweep, large = self._arc()
++            d = f'M {self.start.x:.3f} {self.start.y:.3f} A {r:.3f} {r:.3f} 0 {int(large)} {int(sweep)} {self.end.x:.3f} {self.end.y:.3f}'
++        except ValueError: # start, mid and end on one line
++            d = f'M {self.start.x:.3f} {self.start.y:.3f} L {self.end.x:.3f} {self.end.y:.3f}'
+         yield Tag('path', d=d, fill=self.fill.svg(colorscheme.lines, colorscheme.fill),
+                   **self.stroke.svg_attrs(colorscheme.lines))
+ 
+-- 
+2.43.0
+

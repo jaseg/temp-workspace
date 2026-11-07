@@ -65,6 +65,13 @@ class UUID:
         self.value = uuid.uuid4()
 
 
+@sexp_type('custom_property')
+class CustomProperty:
+    """ KiCad 10.99: a user-defined name/value pair on almost any schematic item. """
+    name: str = ''
+    value: str = ''
+
+
 @sexp_type('group')
 class Group:
     locked: Flag() = False
@@ -126,7 +133,9 @@ class Stroke:
 
 @sexp_type('fill')
 class Fill:
-    type: Named(AtomChoice(Atom.none, Atom.outline, Atom.background, Atom.color)) = Atom.none
+    # hatch, reverse_hatch and cross_hatch are new in KiCad 10.99
+    type: Named(AtomChoice(Atom.none, Atom.outline, Atom.background, Atom.color, Atom.hatch, Atom.reverse_hatch,
+                           Atom.cross_hatch)) = Atom.none
     color: Color = None
 
 
@@ -407,6 +416,72 @@ class TextEffect:
     href: Named(str) = None
 
 
+_KICAD_ESCAPES = {'dblquote': '"', 'quote': "'", 'lt': '<', 'gt': '>', 'backslash': '\\', 'slash': '/', 'bar': '|',
+                  'comma': ',', 'colon': ':', 'space': ' ', 'dollar': '$', 'tab': '\t', 'return': '\n', 'brace': '{'}
+
+
+def kicad_unescape(text):
+    """ Undo KiCad's escaping of special characters in text, such as {slash} for '/' in net names, the way
+    KiCad's UnescapeString() does: text variables (${...}) and overbar/subscript/superscript markup (~{...}, _{...},
+    ^{...}) stay as they are, and unknown or unterminated tokens are kept. """
+    if text is None or '{' not in text:
+        return text
+    out, i, n = [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch != '{':
+            out.append(ch)
+            i += 1
+            continue
+        prev = text[i-1] if i > 0 else ''
+        depth, j = 1, i + 1
+        while j < n and depth:
+            depth += {'{': 1, '}': -1}.get(text[j], 0)
+            j += 1
+        if depth: # unterminated
+            out.append('{' + kicad_unescape(text[i+1:]))
+            break
+        token = text[i+1:j-1]
+        if prev in '$~^_' and prev:
+            out.append('{' + kicad_unescape(token) + '}')
+        else:
+            out.append(_KICAD_ESCAPES.get(token, '{' + kicad_unescape(token) + '}'))
+        i = j
+    return ''.join(out)
+
+
+# KiCad's stroke font line pitch per text height (font metrics interline pitch times the stroke font's legacy factor)
+KICAD_INTERLINE = 1.68 * 0.9583
+# Width of a space in KiCad's stroke font per text height: the font's space glyph, 16 of its 21 units per height
+KICAD_SPACE_WIDTH = 16/21
+# Gap between schematic text and the wire or pin it belongs to: round(24 mil × KiCad's default text offset ratio of 0.15)
+KICAD_TEXT_OFFSET = 4 * 0.0254
+
+
+def kicad_text_svg(text, x, y, size, h_align='left', v_align='bottom', vertical=False, stroke_width=None, **svg_attrs):
+    """ `text` in KiCad's stroke font, anchored at (x, y), drawn horizontally or vertically (reading bottom to top),
+    aligned like KiCad aligns text: h_align is left/center/right, v_align top/middle/bottom. KiCad's escape sequences
+    are resolved, and multi-line text is laid out with KiCad's line pitch around the anchor. """
+    font = Newstroke.load()
+    lines = kicad_unescape(text).split('\n')
+    pitch = size * KICAD_INTERLINE
+    first = {'top': 0, 'middle': -(len(lines)-1)*pitch/2, 'bottom': -(len(lines)-1)*pitch}[v_align]
+    if stroke_width is None:
+        stroke_width = size / 8
+    children = [font.render_svg(line, size=size, x0=0, y0=first + i*pitch, h_align=h_align, v_align=v_align,
+                                space_width=KICAD_SPACE_WIDTH, scale=(1, 1), stroke_width=f'{stroke_width:.3f}',
+                                **svg_attrs)
+                for i, line in enumerate(lines) if line]
+    return Tag('g', children=children, transform=f'translate({x:.3f} {y:.3f})' + (' rotate(-90)' if vertical else ''))
+
+
+def kicad_text_width(text, size):
+    """ Width of the widest line of `text` in KiCad's stroke font. """
+    font = Newstroke.load()
+    return max(font.bounding_box(line, size=size, space_width=KICAD_SPACE_WIDTH)[1][0]
+               for line in kicad_unescape(text).split('\n'))
+
+
 class TextMixin:
     @property
     def size(self):
@@ -584,6 +659,52 @@ KICAD_PAPER_SIZES = {
     'USLegal': (14*25.4, 8.5*25.4),
     'USLedger': (17*25.4, 11*25.4),
     }
+
+
+class VerbatimValues:
+    """ Maps the values of an s-expression to a list as they are, e.g. the data of embedded files, which KiCad splits
+    into |-delimited chunks of base64. """
+
+    def __init__(self, name):
+        self.name_atom = Atom(name)
+
+    def __atoms__(self):
+        return [self.name_atom]
+
+    def __map__(self, obj, parent=None):
+        _key, *values = obj
+        return values
+
+    def __sexp__(self, value):
+        if value:
+            yield [self.name_atom, *value]
+
+
+@sexp_type('start_shape')
+class LineStart:
+    """ KiCad 10.99: decoration at the start of a line, polyline, arc or Bézier curve, e.g. an arrow head. """
+    style: AtomChoice(Atom.arrow, Atom.arrow_open, Atom.circle, Atom.square, Atom.none) = Atom.none
+    length: Named(float) = None
+    width: Named(float) = None
+    stroke: Stroke = None
+
+
+@sexp_type('end_shape')
+class LineEnd(LineStart):
+    """ KiCad 10.99: decoration at the end of a line, polyline, arc or Bézier curve. """
+
+
+@sexp_type('file')
+class EmbeddedFile:
+    name: Named(str) = ''
+    type: Named(AtomChoice(Atom.datasheet, Atom.font, Atom.model, Atom.worksheet, Atom.other)) = Atom.other
+    data: VerbatimValues('data') = field(default_factory=list)
+    checksum: Named(str) = None
+
+
+@sexp_type('embedded_files')
+class EmbeddedFiles:
+    files: List(EmbeddedFile) = field(default_factory=list)
 
 
 @sexp_type('paper')

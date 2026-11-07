@@ -1,0 +1,70 @@
+From 502a1b2adb1cc57faa460e1b42e714277cc851af Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:12:57 +0000
+Subject: [PATCH 17/52] =?UTF-8?q?Support=20B=C3=A9zier=20curves=20in=20KiC?=
+ =?UTF-8?q?ad=20symbols?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+KiCad 9 can draw cubic Bézier curves in symbols. Parse them and export
+them to SVG.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/symbols.py | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index 5ba9405..4b47e7c 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -296,6 +296,28 @@ class Arc:
+                   **self.stroke.svg_attrs(colorscheme.lines))
+ 
+ 
++@sexp_type('bezier')
++class Bezier:
++    """ Cubic Bézier curve, given by its start point, two control points and end point. """
++    points: PointList = field(default_factory=list)
++    stroke: Stroke = field(default_factory=Stroke)
++    fill: Fill = field(default_factory=Fill)
++
++    def bounding_box(self, default=None):
++        # The control polygon contains the curve.
++        if not self.points:
++            return default
++        return (min(p.x for p in self.points), min(p.y for p in self.points)), \
++               (max(p.x for p in self.points), max(p.y for p in self.points))
++
++    def to_svg(self, colorscheme=Colorscheme.KiCad):
++        if len(self.points) != 4:
++            return
++        p0, *rest = self.points
++        d = f'M {p0.x:.3f} {p0.y:.3f} C ' + ' '.join(f'{p.x:.3f} {p.y:.3f}' for p in rest)
++        yield Tag('path', d=d, fill=self.fill.svg(colorscheme.lines, colorscheme.fill), **self.stroke.svg_attrs(colorscheme.lines))
++
++
+ @sexp_type('polyline')
+ class Polyline:
+     pts: PointList = field(default_factory=PointList)
+@@ -460,6 +482,7 @@ class Unit:
+     circles: List(Circle) = field(default_factory=list)
+     arcs: List(Arc) = field(default_factory=list)
+     polylines: List(Polyline) = field(default_factory=list)
++    beziers: List(Bezier) = field(default_factory=list)
+     rectangles: List(Rectangle) = field(default_factory=list)
+     texts: List(Text) = field(default_factory=list)
+     text_boxes: List(TextBox) = field(default_factory=list)
+@@ -491,6 +514,7 @@ class Unit:
+         yield from self.polylines
+         yield from self.circles
+         yield from self.arcs
++        yield from self.beziers
+         yield from self.texts
+ 
+     def __before_sexp__(self):
+-- 
+2.43.0
+

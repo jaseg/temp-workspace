@@ -1,0 +1,39 @@
+From 6ba473242e29d1395f9979c8c7e029555c29d1e7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:10:26 +0000
+Subject: [PATCH 07/52] Keep the extra properties of KiCad sheets
+
+Sheets can have user-defined properties beyond their name and file name.
+They were dropped when parsing, and so lost when saving.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index aa0ce49..a79346d 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -532,14 +532,15 @@ class Subsheet:
+     _ : SEXP_END = None
+     sheet_name: object = field(default_factory=lambda: DrawnProperty('Sheetname', ''))
+     file_name: object = field(default_factory=lambda: DrawnProperty('Sheetfile', ''))
++    extra_properties: list = field(default_factory=list)
+     schematic: object = field(repr=False, default=None)
+ 
+     def __after_parse__(self, parent):
+-        self.sheet_name, self.file_name, *_extra_params = self._properties
++        self.sheet_name, self.file_name, *self.extra_properties = self._properties
+         self.schematic = parent
+ 
+     def __before_sexp__(self):
+-        self._properties = [self.sheet_name, self.file_name]
++        self._properties = [self.sheet_name, self.file_name, *self.extra_properties]
+ 
+     @property
+     def rotation(self):
+-- 
+2.43.0
+

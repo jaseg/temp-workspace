@@ -1,0 +1,87 @@
+From 6c87ee9a862b400b0573e03fc8aa3155e2edc553 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:15:21 +0000
+Subject: [PATCH 22/52] Parse tables in KiCad schematics
+
+KiCad 8 added tables to schematics. Parse them with their cells, borders
+and separators.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 52 ++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index a735587..ad475c6 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -653,6 +653,57 @@ class TextBox(TextMixin):
+         yield from gr.TextBox.render(self, variables=variables)
+ 
+ 
++@sexp_type('border')
++class TableBorder:
++    external: Named(YesNoAtom()) = True
++    header: Named(YesNoAtom()) = True
++    stroke: Stroke = field(default_factory=Stroke)
++
++
++@sexp_type('separators')
++class TableSeparators:
++    rows: Named(YesNoAtom()) = True
++    cols: Named(YesNoAtom()) = True
++    stroke: Stroke = field(default_factory=Stroke)
++
++
++@sexp_type('span')
++class TableCellSpan:
++    columns: int = 1
++    rows: int = 1
++
++
++@sexp_type('table_cell')
++class TableCell:
++    text: str = ''
++    exclude_from_sim: Named(YesNoAtom()) = False
++    at: AtPos = field(default_factory=AtPos)
++    size: Rename(XYCoord) = field(default_factory=XYCoord)
++    margins: Margins = None
++    span: TableCellSpan = field(default_factory=TableCellSpan)
++    fill: OmitDefault(Fill) = None
++    effects: TextEffect = field(default_factory=TextEffect)
++    uuid: UUID = field(default_factory=UUID)
++
++
++@sexp_type('table')
++class Table:
++    """ A table of text cells. Cells are listed row by row, and cells covered by another cell's span are still listed
++    (with empty text). """
++    column_count: Named(int) = 1
++    border: TableBorder = field(default_factory=TableBorder)
++    separators: TableSeparators = field(default_factory=TableSeparators)
++    column_widths: Named(Array(float)) = field(default_factory=list)
++    row_heights: Named(Array(float)) = field(default_factory=list)
++    cells: Named(Array(TableCell)) = field(default_factory=list)
++    uuid: UUID = None
++
++    @property
++    def rows(self):
++        n = self.column_count
++        return [self.cells[i:i+n] for i in range(0, len(self.cells), n)]
++
++
+ @sexp_type('lib_symbols')
+ class LocalLibrary:
+     symbols: List(Symbol) = field(default_factory=list)
+@@ -688,6 +739,7 @@ class Schematic:
+     beziers: List(Bezier) = field(default_factory=list)
+     texts: List(Text) = field(default_factory=list)
+     text_boxes: List(TextBox) = field(default_factory=list)
++    tables: List(Table) = field(default_factory=list)
+     local_labels: List(LocalLabel) = field(default_factory=list)
+     global_labels: List(GlobalLabel) = field(default_factory=list)
+     hierarchical_labels: List(HierarchicalLabel) = field(default_factory=list)
+-- 
+2.43.0
+

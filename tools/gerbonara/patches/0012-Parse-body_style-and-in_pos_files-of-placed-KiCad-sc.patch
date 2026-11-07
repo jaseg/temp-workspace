@@ -1,0 +1,37 @@
+From 1b6ad077ee77a5e4708e34c888e06668efedb865 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:10:21 +0000
+Subject: [PATCH 12/52] Parse body_style and in_pos_files of placed KiCad
+ schematic symbols
+
+KiCad 9 writes the De Morgan body style of placed symbols as
+(body_style ...), earlier versions as (convert ...). KiCad 10 adds
+(in_pos_files ...).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/schematic.py | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index 5ab827a..5115053 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -377,9 +377,13 @@ class SymbolInstance:
+     at: AtPos = field(default_factory=AtPos)
+     mirror: OmitDefault(MirrorFlags) = field(default_factory=MirrorFlags)
+     unit: Named(int) = 1
++    # De Morgan body style. KiCad 9 renamed (convert ...) to (body_style ...).
++    convert: Named(int) = None
++    body_style: Named(int) = None
+     exclude_from_sim: Named(YesNoAtom()) = False
+     in_bom: Named(YesNoAtom()) = True
+     on_board: Named(YesNoAtom()) = True
++    in_pos_files: Named(YesNoAtom()) = None
+     dnp: Named(YesNoAtom()) = True
+     fields_autoplaced: Named(YesNoAtom()) = True
+     uuid: UUID = field(default_factory=UUID)
+-- 
+2.43.0
+

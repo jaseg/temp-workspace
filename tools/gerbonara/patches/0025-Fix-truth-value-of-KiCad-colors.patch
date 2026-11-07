@@ -1,0 +1,31 @@
+From 439f4ce619b0526c97716ead4071395cfee0e367 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:08:35 +0000
+Subject: [PATCH 25/52] Fix truth value of KiCad colors
+
+Color.__bool__ returned the first non-zero channel instead of a bool, so
+bool() raised a TypeError for colors with a non-zero channel, which broke
+the SVG export of anything with a colored stroke.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/base_types.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gerbonara/cad/kicad/base_types.py b/src/gerbonara/cad/kicad/base_types.py
+index f794ea9..30079e5 100644
+--- a/src/gerbonara/cad/kicad/base_types.py
++++ b/src/gerbonara/cad/kicad/base_types.py
+@@ -82,7 +82,7 @@ class Color:
+     a: float = None
+     
+     def __bool__(self):
+-        return self.r or self.b or self.g or not math.isclose(self.a, 0, abs_tol=1e-3)
++        return bool(self.r or self.b or self.g or not math.isclose(self.a or 0, 0, abs_tol=1e-3))
+ 
+     def svg(self, default=None):
+         if default and not self:
+-- 
+2.43.0
+

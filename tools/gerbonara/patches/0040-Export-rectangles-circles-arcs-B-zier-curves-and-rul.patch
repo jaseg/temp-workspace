@@ -1,0 +1,174 @@
+From 69c46c08886fe92025c60ef47a276134679b5c9a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 00:15:01 +0000
+Subject: [PATCH 40/52] =?UTF-8?q?Export=20rectangles,=20circles,=20arcs,?=
+ =?UTF-8?q?=20B=C3=A9zier=20curves=20and=20rule=20areas=20of=20KiCad=20sch?=
+ =?UTF-8?q?ematics=20to=20SVG?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Schematic.to_svg() left these out entirely. The SVG arc flags of KiCad's
+start/mid/end arcs are now worked out by kicad_arc_svg_flags(), which
+symbol arcs use as well.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013wvKon1yvwjNtAdtSuZzZh
+---
+ src/gerbonara/cad/kicad/primitives.py | 10 ++++++
+ src/gerbonara/cad/kicad/schematic.py  | 45 +++++++++++++++++++++++++++
+ src/gerbonara/cad/kicad/symbols.py    | 11 ++-----
+ 3 files changed, 57 insertions(+), 9 deletions(-)
+
+diff --git a/src/gerbonara/cad/kicad/primitives.py b/src/gerbonara/cad/kicad/primitives.py
+index 8554d80..f6f6d95 100644
+--- a/src/gerbonara/cad/kicad/primitives.py
++++ b/src/gerbonara/cad/kicad/primitives.py
+@@ -86,6 +86,16 @@ def kicad_mid_to_center_arc(mid, start, end):
+     return (cx, cy), radius, det < 0
+ 
+ 
++def kicad_arc_svg_flags(start, mid, end):
++    """ (center, radius, sweep flag, large arc flag) for drawing a KiCad start/mid/end arc as an SVG arc. The sweep
++    flag is set when the arc runs from start through mid to end in the direction of increasing angle. """
++    (cx, cy), r, _ = kicad_mid_to_center_arc(mid, start, end)
++    sweep = (mid.x - start.x)*(end.y - start.y) - (mid.y - start.y)*(end.x - start.x) > 0
++    a1, a2 = math.atan2(start.y - cy, start.x - cx), math.atan2(end.y - cy, end.x - cx)
++    span = (a2 - a1) % (2*math.pi) if sweep else (a1 - a2) % (2*math.pi)
++    return (cx, cy), r, sweep, span > math.pi
++
++
+ @sexp_type('hatch')
+ class Hatch:
+     style: AtomChoice(Atom.none, Atom.edge, Atom.full) = Atom.edge
+diff --git a/src/gerbonara/cad/kicad/schematic.py b/src/gerbonara/cad/kicad/schematic.py
+index f35f6ef..f40a448 100644
+--- a/src/gerbonara/cad/kicad/schematic.py
++++ b/src/gerbonara/cad/kicad/schematic.py
+@@ -110,6 +110,20 @@ def _polyline_svg(self, default_color):
+     return da.svg(stroke=self.stroke.svg_color(default_color))
+ 
+ 
++def _fill_svg(fill, colorscheme):
++    if fill is None or fill.type == Atom.none:
++        return 'none'
++    elif fill.type == Atom.outline:
++        return colorscheme.lines
++    elif fill.type == Atom.color and fill.color:
++        return fill.color.svg(colorscheme.fill)
++    return colorscheme.fill
++
++
++def _shape_svg(self, colorscheme, name='path', **attrs):
++    return Tag(name, **attrs, fill=_fill_svg(self.fill, colorscheme), **self.stroke.svg_attrs(colorscheme.lines))
++
++
+ def _polyline_bounds(self):
+     x1 = min(pt.x for pt in self.points)
+     y1 = min(pt.y for pt in self.points)
+@@ -168,6 +182,10 @@ class Circle:
+     fill: OmitDefault(Fill) = None
+     uuid: UUID = field(default_factory=UUID)
+ 
++    def to_svg(self, colorscheme=Colorscheme.KiCad):
++        yield _shape_svg(self, colorscheme, 'circle', cx=f'{self.center.x:.3f}', cy=f'{self.center.y:.3f}',
++                         r=f'{self.radius:.3f}')
++
+ 
+ @sexp_type('rectangle')
+ class Rectangle:
+@@ -177,6 +195,10 @@ class Rectangle:
+     fill: OmitDefault(Fill) = None
+     uuid: UUID = field(default_factory=UUID)
+ 
++    def to_svg(self, colorscheme=Colorscheme.KiCad):
++        x1, y1, x2, y2 = self.start.x, self.start.y, self.end.x, self.end.y
++        yield _shape_svg(self, colorscheme, d=f'M {x1:.3f} {y1:.3f} H {x2:.3f} V {y2:.3f} H {x1:.3f} Z')
++
+ 
+ @sexp_type('arc')
+ class Arc:
+@@ -187,6 +209,11 @@ class Arc:
+     fill: OmitDefault(Fill) = None
+     uuid: UUID = field(default_factory=UUID)
+ 
++    def to_svg(self, colorscheme=Colorscheme.KiCad):
++        _c, r, sweep, large = kicad_arc_svg_flags(self.start, self.mid, self.end)
++        yield _shape_svg(self, colorscheme, d=f'M {self.start.x:.3f} {self.start.y:.3f} '
++                         f'A {r:.3f} {r:.3f} 0 {int(large)} {int(sweep)} {self.end.x:.3f} {self.end.y:.3f}')
++
+ 
+ @sexp_type('bezier')
+ class Bezier:
+@@ -195,6 +222,12 @@ class Bezier:
+     fill: OmitDefault(Fill) = None
+     uuid: UUID = field(default_factory=UUID)
+ 
++    def to_svg(self, colorscheme=Colorscheme.KiCad):
++        if len(self.points) != 4:
++            return
++        p0, *rest = self.points
++        yield _shape_svg(self, colorscheme, d=f'M {p0.x:.3f} {p0.y:.3f} C ' + ' '.join(f'{p.x:.3f} {p.y:.3f}' for p in rest))
++
+ 
+ def label_shape_path_d(shape, w, h):
+     """ Outline of a global or hierarchical label of the given shape, height `h` and body width `w`, starting at the
+@@ -632,6 +665,13 @@ class RuleArea:
+     dnp: Named(YesNoAtom()) = None
+     polyline: Polyline = None
+ 
++    def to_svg(self, colorscheme=Colorscheme.KiCad):
++        if self.polyline is None or len(self.polyline.points) < 3:
++            return
++        p0, *rest = self.polyline.points
++        d = f'M {p0.x:.3f} {p0.y:.3f} ' + ' '.join(f'L {p.x:.3f} {p.y:.3f}' for p in rest) + ' Z'
++        yield _shape_svg(self.polyline, colorscheme, d=d)
++
+ 
+ @sexp_type('text_box')
+ class TextBox(TextMixin):
+@@ -785,7 +825,12 @@ class Schematic:
+     def elements(self):
+         yield from self.subsheets
+         yield from self.images
++        yield from self.rule_areas
+         yield from self.polylines
++        yield from self.rectangles
++        yield from self.circles
++        yield from self.arcs
++        yield from self.beziers
+         yield from self.symbols
+         yield from self.junctions
+         yield from self.no_connects
+diff --git a/src/gerbonara/cad/kicad/symbols.py b/src/gerbonara/cad/kicad/symbols.py
+index ee5589f..7d7b74c 100644
+--- a/src/gerbonara/cad/kicad/symbols.py
++++ b/src/gerbonara/cad/kicad/symbols.py
+@@ -21,7 +21,7 @@ from ...utils import rotate_point, Tag, arc_bounds
+ from ... import __version__
+ from ...newstroke import Newstroke
+ from .schematic_colors import *
+-from .primitives import kicad_mid_to_center_arc, Margins
++from .primitives import kicad_mid_to_center_arc, kicad_arc_svg_flags, Margins
+ 
+ 
+ PIN_ETYPE = AtomChoice(Atom.input, Atom.output, Atom.bidirectional, Atom.tri_state, Atom.passive, Atom.free,
+@@ -273,14 +273,7 @@ class Arc:
+     fill: Fill = field(default_factory=Fill)
+ 
+     def _arc(self):
+-        """ (center, radius, sweep flag, large arc flag): the sweep flag is set when the arc runs from start through
+-        mid to end in the direction of increasing angle. """
+-        (cx, cy), r, _ = kicad_mid_to_center_arc(self.mid, self.start, self.end)
+-        s, m, e = self.start, self.mid, self.end
+-        sweep = (m.x - s.x)*(e.y - s.y) - (m.y - s.y)*(e.x - s.x) > 0
+-        a1, a2 = math.atan2(s.y - cy, s.x - cx), math.atan2(e.y - cy, e.x - cx)
+-        span = (a2 - a1) % (2*math.pi) if sweep else (a1 - a2) % (2*math.pi)
+-        return (cx, cy), r, sweep, span > math.pi
++        return kicad_arc_svg_flags(self.start, self.mid, self.end)
+ 
+     def bounding_box(self, default=None):
+         (cx, cy), _r, sweep, _large = self._arc()
+-- 
+2.43.0
+
