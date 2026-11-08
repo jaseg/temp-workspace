@@ -23,7 +23,7 @@ def build_svg(path, cfg):
     page = Page(world, builder, sch, path, cfg, pack, font)
     page.build()
     drawer = Drawer(world, pack, font, page, px=mc['px_per_block'], dust_width=mc['dust_width'], fpx=builder.fpx,
-                    camera_deg=mc['camera_deg'])
+                    camera_deg=mc['camera_deg'], yaw_deg=mc['yaw_deg'])
     svg = drawer.svg(builder.power, builder.mm, mc['block_mm'], builder.paper, paper_size(sch))
     page.page_mm = drawer.page_mm
     page.image = drawer.image

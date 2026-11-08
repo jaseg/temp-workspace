@@ -23,10 +23,10 @@ PLAQUE_H = 2                # plaques are 2/16 of a block thick
 
 
 class Drawer:
-    def __init__(self, world, pack, font, page, px=16, dust_width=2.0, fpx=20, camera_deg=60):
+    def __init__(self, world, pack, font, page, px=16, dust_width=2.0, fpx=20, camera_deg=60, yaw_deg=20):
         self.w, self.pack, self.font = world, pack, font
         self.td = TopDown(pack, px)                 # flat things, and the frame overlay
-        self.ob = Oblique(pack, px, camera_deg)     # everything that stands up
+        self.ob = Oblique(pack, px, camera_deg, yaw_deg)    # everything that stands up
         self.px = px
         self.page = page
         self.floor_of = page.floor_of               # cell -> floor block name
@@ -35,9 +35,9 @@ class Drawer:
         self.fpx = fpx                              # font pixels per block
         self.glyph_paths = {}
 
-    def lift(self, h):
-        """Pixels by which a height of h blocks shows up on the page."""
-        return h * self.ob.s * self.px
+    def shift(self, h):
+        """(dx, dy) in pixels by which a height of h blocks moves things on the page (up and a little west)."""
+        return round(h * self.ob.h * self.px), -round(h * self.ob.s * self.px)
 
     # -- textures ------------------------------------------------------------------
     def face_texture(self, block, face='up'):
@@ -137,9 +137,10 @@ class Drawer:
         self.shadows(img, [b for _, kind, b in items if kind == 'block'])
         for _, kind, it in items:
             if kind == 'block':
-                spr, up = self.sprite(it)
+                spr, up, left = self.sprite(it)
                 x, y = at(it.i, it.j)
-                blit(img, spr, x, y - up - round(self.lift(it.y)))
+                dx, dy = self.shift(it.y)
+                blit(img, spr, x - left + dx, y - up + dy)
             else:
                 self.plaque(img, it)
 
@@ -197,13 +198,13 @@ class Drawer:
             return
         top, _ = self.face_texture(block)
         side, _ = self.face_texture(block, 'south')
-        spr, up = self.ob.box(top, side, PLAQUE_H)
-        dy = round(self.lift(pq.meta.get('y', 0)))
+        spr, up, left = self.ob.box(top, side, PLAQUE_H)
+        dx, dy = self.shift(pq.meta.get('y', 0))
         for b in range(pq.h):
             for a in range(pq.w):
-                blit(img, spr, x0 + a * px, y0 + b * px - up - dy)
-        lift = up + dy
-        ImageDraw.Draw(img).rectangle((x0, y0 - lift, x0 + pq.w * px - 1, y0 + pq.h * px - 1 - lift),
+                blit(img, spr, x0 + a * px - left + dx, y0 + b * px - up + dy)
+        tx, ty = self.shift(pq.meta.get('y', 0) + PLAQUE_H / 16)
+        ImageDraw.Draw(img).rectangle((x0 + tx, y0 + ty, x0 + pq.w * px - 1 + tx, y0 + pq.h * px - 1 + ty),
                                       outline=(60, 40, 30, 255))
 
     def tiles(self, img):
@@ -277,16 +278,16 @@ class Drawer:
             _, col, shadow = STYLES[pq.style]
             x, y = (pq.i - w.i0) * px, (pq.j - w.j0) * px
             if not pq.meta.get('overlay') and STYLES[pq.style][0]:
-                y -= self.ob.box(*(self.face_texture(STYLES[pq.style][0], f)[0] for f in ('up', 'south')),
-                                 PLAQUE_H)[1] + round(self.lift(pq.meta.get('y', 0)))
+                dx, dy = self.shift(pq.meta.get('y', 0) + PLAQUE_H / 16)
+                x, y = x + dx, y + dy
             out.append(self.text(pq.text, x, y, pq.w * px, pq.h * px, pq.scale, col, shadow, pq.vertical))
         for kind, text, origin, u, v in w.texts:          # pin names painted on bodies
             _, col, shadow = STYLES[kind]
-            lift = self.lift(origin[1]) / px
+            dx, dy = self.shift(origin[1])
             vertical = abs(u[2]) > abs(u[0])
             xs = [origin[0], origin[0] + u[0] + v[0]]
             zs = [origin[2], origin[2] + u[2] + v[2]]
-            x0, z0 = (min(xs) + .5 - w.i0) * px, (min(zs) + .5 - w.j0 - lift) * px
+            x0, z0 = (min(xs) + .5 - w.i0) * px + dx, (min(zs) + .5 - w.j0) * px + dy
             out.append(self.text(text, x0, z0, (max(xs) - min(xs)) * px, (max(zs) - min(zs)) * px, 1, col,
                                  shadow, vertical))
         return out

@@ -1,0 +1,43 @@
+(kicad_sch (version 20231120) (generator "eeschema") (generator_version "8.0")
+  (uuid "00000000-0000-0000-0000-000000000001")
+  (paper "A5")
+  (lib_symbols 
+    (symbol "Device:C_Small" (pin_names (offset 0.254) (hide yes)) (in_bom yes) (on_board yes)
+      (property "Reference" "C" (at 0.254 1.778 0) (effects (font (size 1.27 1.27)) (justify left)))
+      (property "Value" "C_Small" (at 0.254 -2.032 0) (effects (font (size 1.27 1.27)) (justify left)))
+      (symbol "C_Small_0_1"
+        (polyline (pts (xy -1.524 0.508) (xy 1.524 0.508)) (stroke (width 0.3) (type default)) (fill (type none)))
+        (polyline (pts (xy -1.524 -0.508) (xy 1.524 -0.508)) (stroke (width 0.3) (type default)) (fill (type none))))
+      (symbol "C_Small_1_1"
+        (pin passive line (at 0 2.54 270) (length 2.032) (name "" (effects (font (size 1.27 1.27))))
+          (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 0 -2.54 90) (length 2.032) (name "" (effects (font (size 1.27 1.27))))
+          (number "2" (effects (font (size 1.27 1.27)))))))
+    (symbol "Device:D" (pin_names (offset 1.016) (hide yes)) (in_bom yes) (on_board yes)
+      (property "Reference" "D" (at 0 2.54 0) (effects (font (size 1.27 1.27))))
+      (property "Value" "D" (at 0 -2.54 0) (effects (font (size 1.27 1.27))))
+      (symbol "D_0_1"
+        (polyline (pts (xy -1.27 1.27) (xy -1.27 -1.27)) (stroke (width 0.25) (type default)) (fill (type none))))
+      (symbol "D_1_1"
+        (pin passive line (at -3.81 0 0) (length 2.54) (name "K" (effects (font (size 1.27 1.27))))
+          (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 3.81 0 180) (length 2.54) (name "A" (effects (font (size 1.27 1.27))))
+          (number "2" (effects (font (size 1.27 1.27)))))))
+    (symbol "Device:Q_NPN_BCE" (pin_names (offset 0) (hide yes)) (in_bom yes) (on_board yes)
+      (property "Reference" "Q" (at 5.08 1.27 0) (effects (font (size 1.27 1.27)) (justify left)))
+      (property "Value" "Q_NPN_BCE" (at 5.08 -1.27 0) (effects (font (size 1.27 1.27)) (justify left)))
+      (symbol "Q_NPN_BCE_0_1"
+        (polyline (pts (xy 0.635 1.905) (xy 0.635 -1.905)) (stroke (width 0.5) (type default)) (fill (type none))))
+      (symbol "Q_NPN_BCE_1_1"
+        (pin input line (at -5.08 0 0) (length 5.715) (name "B" (effects (font (size 1.27 1.27))))
+          (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 2.54 5.08 270) (length 2.54) (name "C" (effects (font (size 1.27 1.27))))
+          (number "2" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 2.54 -5.08 90) (length 2.54) (name "E" (effects (font (size 1.27 1.27))))
+          (number "3" (effects (font (size 1.27 1.27)))))))
+)
+  
+  (symbol (lib_id "Device:D") (at 22.86 20.32 0) (unit 1) (in_bom yes) (on_board yes) (dnp no)
+    (property "Reference" "D1" (at 25.36 19.32 0) (effects (font (size 1.27 1.27)) (justify left)))
+    (property "Value" "v" (at 25.36 21.32 0) (effects (font (size 1.27 1.27)) (justify left))))
+)

@@ -133,9 +133,10 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
 - **Around it:** the circuit stands on a birch deck in a meadow, with cherry trees, azalea bushes, flower beds,
   ponds, little vegetable gardens, beehives and pumpkins in the empty space. The title block is a cherry wood
   deck with bookshelves, lanterns and a cake. The legend explains the parts.
-- **Camera:** an oblique view from high up in the south (`camera_deg` above the horizon, 60 by default). The
-  ground keeps its place on the page, so the sheet stays a rectangle; every block shows its top and, below it,
-  its south side. Things that stand up cast a short shadow. The page frame (a garden path with a flowering
+- **Camera:** an oblique view from high up in the south-east: `camera_deg` above the horizon (60 by default)
+  and turned `yaw_deg` (20) from due south towards the east. The ground keeps its place on the page, so the sheet
+  stays a rectangle; every block shows its top, its south side and a sliver of its east side, and leans a little
+  to the north-west. Things that stand up cast a short shadow. The page frame (a garden path with a flowering
   hedge, lanterns and zone signs) is drawn flat on top of everything, and so is all text.
 - **Output:** the blocks become one raster image at `px_per_block` pixels per block (16, the pack's texture size),
   cut into tiles and drawn pixelated. Text goes on top as vector paths traced from the pack's font, so it stays
@@ -148,6 +149,7 @@ packs = ["default-pack.zip"]     # relative to the settings file
 block_mm = 2.54
 dust_width = 2.0
 camera_deg = 60
+yaw_deg = 20
 px_per_block = 16
 ```
 
