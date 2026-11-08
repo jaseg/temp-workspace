@@ -18,7 +18,7 @@ import zlib
 
 from ..circuit import UF, prop_value, ref_prefix, shape_points, unit_graphics
 from ..kicad import at, font, hidden, justify, lib_symbols, paper_size, quarter_turned, rotation, xy
-from .world import DIRS, OPP, Block, Plaque, World, cells_on_segment, dir_of, dust_tint
+from .world import DIRS, OPP, Block, Plaque, World, cells_on_segment, dir_of
 
 PX_PER_CELL = 10                        # font pixels per block (8 pixel glyphs plus a pixel above and below)
 

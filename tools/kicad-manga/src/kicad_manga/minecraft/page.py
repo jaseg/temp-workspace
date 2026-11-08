@@ -251,9 +251,8 @@ class Page:
 
     # -- decorations in the empty space ----------------------------------------------------------
     def decorate(self):
-        rng = self.rng
         free = [(i, j) for i in range(self.w.i0, self.w.W) for j in range(self.w.j0, self.w.H)
-                if self.in_frame((i, j)) and (i, j) not in self.platform and (i, j) not in self.taken and (i, j) not in self.w.solid]
+                if self.in_frame((i, j)) and not self.blocked((i, j))]
         self.ponds(free)
         self.trees(free)
         self.props(free)

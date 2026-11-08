@@ -99,6 +99,61 @@ reference as id, and wires are grouped by net.
 5. Fonts: the SVG embeds them as WOFF2 for browsers. resvg, `rsvg-convert` and HarfBuzz use TTF copies with
    clean family names, all cached in `~/.cache/kicad-manga/fonts`.
 
+## Minecraft style
+
+`--style minecraft` builds the schematic as an isometric redstone build out of the blocks of a Minecraft resource
+pack:
+
+```sh
+uv run kicad-manga board.kicad_sch -s minecraft --pack default-pack.zip           # ./board-minecraft.svg/.png/.pdf
+uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.zip  # stacked, the first one wins
+```
+
+- **Packs:** any pack, as a .zip (also with a folder inside) or a folder. Packs stack like in the game. Textures,
+  block models, blockstates, the biome colormaps, the cloud texture and the bitmap font all come from the packs.
+  Texture-only packs work on top of a complete pack, and on their own with simple built-in models.
+- **Grid:** one block per schematic grid step (`block_mm`, 1.27 mm). Pins, wires and labels snap to it.
+- **Parts:**
+  - Wires are redstone dust. Grounds are dim and supplies at full power. Dust is drawn `dust_width` times wider
+    than in the game, so that it reads on paper. Buses are rails.
+  - Diodes are repeaters pointing from anode to cathode, and LEDs are lit repeaters. Dual diodes become two
+    repeaters.
+  - Transistors are comparators: collector or drain at the back, emitter or source in front, base or gate at a
+    side. P-type parts use subtract mode.
+  - Passives are short rows between their pins. Resistors are bricks, capacitors are two rows of pressure plates
+    (the + plate gold), inductors are copper and ferrite beads oxidized copper.
+  - Other parts get a low body with their pin names painted on top. Supplies are torches, grounds hoppers,
+    no-connects cobwebs and mounting holes cauldrons.
+- **Fitting things in:** a passive that collides with a neighbour, a wire or another part is tried one and two
+  blocks to the side, and with slimmer plates or bodies. Its pins are rerouted with dust until everything fits.
+  Repeaters and comparators move up to two blocks the same way. Text sits on plaques of block textures
+  (labels, references, values, notes), and plaques move out of the way of dust, parts and each other. The run
+  prints how many parts and plaques moved.
+- **Around it:** the circuit stands on smooth stone in a meadow. Around it are a stone border with a wall,
+  lanterns and zone signs, a title block platform, a legend, and trees, ponds, props and flowers. Tall things
+  stay where they don't hide the circuit. Parts placed beside the sheet get ground of their own.
+- **Output:** the SVG places each texture with a transform and pixelated rendering, so the PDF stays sharp at any
+  zoom. After conversion, identical images in the PDF are merged with pikepdf.
+
+```toml
+style = "minecraft"
+[minecraft]
+packs = ["default-pack.zip"]     # relative to the settings file
+block_mm = 1.27
+dust_width = 2.0
+```
+
+The code is in `minecraft/`:
+
+- `pack.py`: resource packs.
+- `iso.py`: the projection, and models into SVG.
+- `font.py`: the bitmap font.
+- `world.py`: the block grid, routing and plaque placement.
+- `circuit.py`: the schematic into blocks.
+- `page.py`: the border, title block and decorations.
+- `draw.py`: the world into SVG.
+- `render.py`: the whole pipeline, and the PDF.
+
 ## Development
 
 ```sh
