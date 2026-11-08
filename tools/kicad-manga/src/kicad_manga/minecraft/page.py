@@ -21,7 +21,7 @@ LEGEND = [
     (('state', 'repeater', (('facing', 'west'), ('delay', 2))), 'diode'),
     (('state', 'repeater', (('facing', 'west'), ('delay', 1), ('powered', 'true'))), 'LED'),
     (('state', 'comparator', (('facing', 'west'),)), 'transistor'),
-    (('box', 'bricks'), 'resistor'),
+    (('state', 'furnace', (('facing', 'south'), ('lit', 'false'))), 'resistor'),
     (('plates', (1, 0), ('block/gold_block', 'block/polished_deepslate')), 'capacitor (gold: + plate)'),
     (('box', 'cut_copper'), 'inductor'),
     (('box', 'oxidized_cut_copper'), 'ferrite bead'),

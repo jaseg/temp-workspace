@@ -121,8 +121,8 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
     repeaters.
   - Transistors are comparators: collector or drain at the back, emitter or source in front, base or gate at a
     side. P-type parts use subtract mode.
-  - Passives are short rows between their pins. Resistors are bricks, capacitors are two upright plates across the
-    wire (the + plate gold), inductors are copper and ferrite beads oxidized copper.
+  - Passives sit between their pins. Resistors are a furnace each, capacitors are two upright plates across
+    the wire (the + plate gold), inductors are copper and ferrite beads oxidized copper.
   - Other parts get a wooden or terracotta body with their pin names painted on top. Supplies are torches,
     grounds hoppers, no-connects cobwebs and mounting holes cauldrons.
 - **Fitting things in:** a passive that collides with a neighbour, a wire or another part is tried one and two
@@ -139,7 +139,7 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
   and turned `yaw_deg` (30) from due south towards the east. The ground keeps its place on the page, so the sheet
   stays a rectangle; every block shows its top, its south side and a sliver of its east side, and leans a little
   to the north-west. Faces are shaded like in the game (sides 80 % and 60 %), with ambient occlusion where blocks meet
-  the ground. The page frame (a garden path with a flowering
+  the ground, and everything solid casts a sun shadow to the south-east. The page frame (a garden path with a flowering
   hedge, lanterns and zone signs) is drawn flat on top of everything, and so is all text.
 - **Output:** the blocks become one raster image at `px_per_block` pixels per block (16, the pack's texture size),
   cut into tiles and drawn pixelated. Text goes on top as vector paths traced from the pack's font, so it stays

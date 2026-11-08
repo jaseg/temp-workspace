@@ -162,6 +162,7 @@ class Drawer:
                   for pq in w.plaques if not pq.meta.get('overlay')]
         items += self.occlusion(world)
         items.sort(key=lambda t: t[0])
+        self.shadows(img, [b for b in world if not b.flat])
         for _, kind, it in items:
             if kind == 'block':
                 spr, up, left = self.sprite(it)
@@ -190,6 +191,49 @@ class Drawer:
             if pq.meta.get('overlay'):
                 self.plaque(img, pq)
         return img.convert('RGB')
+
+    SUN = (.45, .65)                # how far a shadow moves (east, south) per block of height
+
+    def shadows(self, img, blocks):
+        """Sun shadows on the ground: each block's outline seen from above, swept from its bottom to its top along
+        the sun's direction (from the north-west, high up). Leaves let light through their holes."""
+        px = self.px
+        layer = Image.new('L', img.size, 0)
+        full = Image.new('L', (px, px), 255)
+        for b in blocks:
+            spr, up, _ = self.sprite(b)
+            top = up / (self.ob.s * px) if self.ob.s else 0
+            if top < .2:
+                continue
+            mask = self.footprint(b)
+            if mask is None:
+                continue
+            x, y = self.at(b.i, b.j)
+            n = max(2, round(top * 4))
+            for k in range(n + 1):
+                t = b.y + top * k / n
+                sx, sy = round(x + t * self.SUN[0] * px), round(y + t * self.SUN[1] * px)
+                if 0 <= sx and 0 <= sy and sx + px <= img.width and sy + px <= img.height:
+                    layer.paste(full, (sx, sy), mask)
+        shade = Image.new('RGBA', img.size, (16, 20, 40, 255))
+        shade.putalpha(layer.point(lambda v: v * 90 // 255))
+        img.alpha_composite(shade)
+
+    def footprint(self, b):
+        """What of a Block the sun can't shine through, seen from above (a mask), or None for plants and other
+        small things, whose shadows would only be noise."""
+        key = ('footprint', b.kind, b.args)
+        if key not in self.td.cache:
+            if b.kind == 'state':
+                name, props = b.args[:2]
+                models = [(self.pack.model(m), xr, yr) for m, xr, yr in self.pack.state_models(name, dict(props))]
+                img = self.td.compose(models, None)[0]      # its real faces, not the icon used for plants
+            else:
+                img = self.flat_sprite(b)
+            a = img.getchannel('A')
+            cov = 1 - a.histogram()[0] / (img.width * img.height)
+            self.td.cache[key] = a.point(lambda v: 255 if v > 0 else 0) if cov >= .2 else None
+        return self.td.cache[key]
 
     def solid(self, b):
         """How high a Block stands as a solid lump (in blocks, from its cell's floor), or 0 for things that

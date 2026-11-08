@@ -4,7 +4,7 @@
 - **Wires** are redstone dust, coloured by net (grounds unpowered, supplies at full power), buses are rails.
 - **Diodes** are repeaters pointing from anode to cathode (LEDs are lit), **transistors** comparators (P-type in
   subtract mode) with collector/drain at the back, emitter/source in front and the base/gate at a side.
-- **Passives** are short rows of blocks between their pins: resistors bricks, capacitors two upright metal
+- **Passives** are short rows of blocks between their pins: resistors a furnace each, capacitors two upright metal
   plates across the wire (the + plate gold), inductors and ferrite beads copper. They often don't fit the grid or each other; they
   are pushed sideways a block or two, and their pins rerouted, until they fit (`Builder.place_line`).
 - **Everything else** (ICs, connectors, ...) gets a low body of block textures with its pin names painted on,
@@ -460,7 +460,7 @@ class Builder:
         d = (di // n, dj // n)
         q = (-d[1], d[0])
         fam = s['family']
-        designs = self.line_designs(fam, n, s, p1)
+        designs = self.line_designs(fam, n, s, p1, d)
         best = None
         for shift_cost, shift in ((0, 0), (2, 1), (2, -1), (4, 2), (4, -2)):
             for dcost, design in designs:
@@ -478,7 +478,7 @@ class Builder:
             self.stats['nudged'] += 1
         self.try_line(s, A, B, d, q, best[1], best[2], commit=True)
 
-    def line_designs(self, fam, n, s, p1):
+    def line_designs(self, fam, n, s, p1, d=(1, 0)):
         """Ways to build a passive between pins n cells apart, best first: (cost, {(k, side): block}), where k
         counts cells from pin 1 and side across. None marks a cell kept empty."""
         out = []
@@ -489,6 +489,9 @@ class Builder:
             for cost, ws in widths:
                 out.append((cost, {(mid, w): ('cap', plates) for w in ws}))
             return out
+        if fam == 'res':            # one furnace, its front to the camera
+            facing = 'south' if d[0] else 'east'
+            return [(0, {(mid if n > 1 else 0, 0): ('state', ('furnace', (('facing', facing), ('lit', 'false'))))})]
         block = {'res': 'bricks', 'ind': 'cut_copper', 'fb': 'oxidized_cut_copper', 'fuse': 'iron_block'}.get(
             fam, 'polished_andesite')
         for cost, L in ((0, 3), (1, 2), (2, 1)):
@@ -536,6 +539,8 @@ class Builder:
             kind, block = v
             if kind == 'cap':
                 w.blocks.append(Block(c[0], 0, c[1], 'plates', (d, block), owner=owner))
+            elif kind == 'state':
+                w.blocks.append(Block(c[0], 0, c[1], 'state', block, owner=owner))
             else:
                 self.box(c, block, 8, owner, side=block)
         w.occupy(cells, owner)
