@@ -4,8 +4,8 @@
 - **Wires** are redstone dust, coloured by net (grounds unpowered, supplies at full power), buses are rails.
 - **Diodes** are repeaters pointing from anode to cathode (LEDs are lit), **transistors** comparators (P-type in
   subtract mode) with collector/drain at the back, emitter/source in front and the base/gate at a side.
-- **Passives** are short rows of blocks between their pins: resistors bricks, capacitors two plates of pressure
-  plates (the + plate gold), inductors and ferrite beads copper. They often don't fit the grid or each other; they
+- **Passives** are short rows of blocks between their pins: resistors bricks, capacitors two upright metal
+  plates across the wire (the + plate gold), inductors and ferrite beads copper. They often don't fit the grid or each other; they
   are pushed sideways a block or two, and their pins rerouted, until they fit (`Builder.place_line`).
 - **Everything else** (ICs, connectors, ...) gets a low body of block textures with its pin names painted on,
   and pins of dust. Power symbols are redstone torches, grounds hoppers, no-connects cobwebs.
@@ -58,22 +58,8 @@ class Builder:
         ox, oy = self.origin
         # cells of the sheet: cell (i, j) covers origin + ((i - .5) b, (j - .5) b) to origin + ((i + .5) b, ...)
         self.paper = (math.ceil((W - ox) / block_mm + .5), math.ceil((H - oy) / block_mm + .5))
-        # the world covers the sheet, and whatever was put beside it
-        xs, ys = [0, W], [0, H]
-        for item in (*sch.symbols, *sch.local_labels, *sch.global_labels, *sch.hierarchical_labels, *sch.texts):
-            x, y = at(item)
-            xs.append(x)
-            ys.append(y)
-        for wire in (*sch.wires, *sch.buses):
-            for p in wire.points:
-                xs.append(float(p.x))
-                ys.append(float(p.y))
-        pad = 8
-        lo_i, lo_j = self.cell(min(xs), min(ys))
-        hi_i, hi_j = self.cell(max(xs), max(ys))
-        self.world = World(lo_i - pad if lo_i < 0 else 0, lo_j - pad if lo_j < 0 else 0,
-                           hi_i + pad if hi_i >= self.paper[0] else self.paper[0],
-                           hi_j + pad if hi_j >= self.paper[1] else self.paper[1])
+        # the world is the sheet: whatever was put beside it is left out
+        self.world = World(0, 0, *self.paper)
         self.libs = lib_symbols(sch)
         self.net_names = {}
         self.net_power = {}
@@ -378,9 +364,9 @@ class Builder:
         i0, i1 = math.ceil(x0 - .01), math.floor(x1 + .01)
         j0, j1 = math.ceil(y0 - .01), math.floor(y1 + .01)
         if i1 < i0:
-            i0 = i1 = round((x0 + x1) / 2)
+            i0 = i1 = math.floor((x0 + x1) / 2 + .5 + 1e-9)
         if j1 < j0:
-            j0 = j1 = round((y0 + y1) / 2)
+            j0 = j1 = math.floor((y0 + y1) / 2 + .5 + 1e-9)
         return {(i, j) for i in range(i0, i1 + 1) for j in range(j0, j1 + 1)}
 
     def poly_cells(self, pts):
@@ -497,17 +483,12 @@ class Builder:
         counts cells from pin 1 and side across. None marks a cell kept empty."""
         out = []
         mid = n // 2
-        if fam == 'cap' and n >= 4:
-            plus = 'light_weighted_pressure_plate' if s['polar'] else 'heavy_weighted_pressure_plate'
-            minus = 'heavy_weighted_pressure_plate'
-            for cost, widths in ((0, (-1, 0, 1)), (1, (0, 1)), (1, (-1, 0)), (2, (0,))):
-                cells = {(mid - 1, w): ('plate', plus) for w in widths}
-                cells.update({(mid + 1, w): ('plate', minus) for w in widths})
-                cells[(mid, 0)] = None
-                out.append((cost, cells))
+        if fam == 'cap':            # two upright plates across the wire, like the symbol (+ plate gold)
+            plates = ('block/gold_block' if s['polar'] else 'block/polished_deepslate', 'block/polished_deepslate')
+            widths = ((0, (-1, 0, 1)), (1, (0, 1)), (1, (-1, 0)), (2, (0,))) if n >= 3 else ((0, (0,)),)
+            for cost, ws in widths:
+                out.append((cost, {(mid, w): ('cap', plates) for w in ws}))
             return out
-        if fam == 'cap':
-            return [(0, {(mid, 0): ('plate', 'heavy_weighted_pressure_plate')})]
         block = {'res': 'bricks', 'ind': 'cut_copper', 'fb': 'oxidized_cut_copper', 'fuse': 'iron_block'}.get(
             fam, 'polished_andesite')
         for cost, L in ((0, 3), (1, 2), (2, 1)):
@@ -553,8 +534,8 @@ class Builder:
                 w.solid[c] = owner
                 continue
             kind, block = v
-            if kind == 'plate':
-                w.blocks.append(Block(c[0], 0, c[1], 'state', (block, ()), flat=True, owner=owner))
+            if kind == 'cap':
+                w.blocks.append(Block(c[0], 0, c[1], 'plates', (d, block), owner=owner))
             else:
                 self.box(c, block, 8, owner, side=block)
         w.occupy(cells, owner)

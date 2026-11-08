@@ -23,7 +23,7 @@ PLAQUE_H = 2                # plaques are 2/16 of a block thick
 
 
 class Drawer:
-    def __init__(self, world, pack, font, page, px=16, dust_width=2.0, fpx=20, camera_deg=60, yaw_deg=20):
+    def __init__(self, world, pack, font, page, px=16, dust_width=2.0, fpx=20, camera_deg=55, yaw_deg=30):
         self.w, self.pack, self.font = world, pack, font
         self.td = TopDown(pack, px)                 # flat things, and the frame overlay
         self.ob = Oblique(pack, px, camera_deg, yaw_deg)    # everything that stands up
@@ -59,48 +59,75 @@ class Drawer:
         return self.td.box(tex, 16, tint)[0]
 
     # -- sprites ---------------------------------------------------------------------
-    def tint_of(self, name):
-        t = self.tints.get(name)
+    def tint_of(self, name, args=()):
+        """Tints for a block state: its own (a third entry of a Block's args), or the page's for its name."""
+        t = args[2] if len(args) > 2 else self.tints.get(name)
         return {0: t} if t else None
+
+    @staticmethod
+    def plates_model(d, textures, h=12):
+        """Two upright plates across direction d (a cell step), the first one nearer the start of d."""
+        els = []
+        for (a, b), t in zip(((2, 6), (10, 14)), textures):
+            if d[0] + d[1] < 0:
+                a, b = 16 - b, 16 - a
+            fr, to = ([a, 0, 1], [b, h, 15]) if d[0] else ([1, 0, a], [15, h, b])
+            els.append({'from': fr, 'to': to, 'faces': {f: {'texture': t} for f in
+                                                        ('up', 'north', 'south', 'east', 'west')}})
+        return {'textures': {}, 'elements': els}
 
     def flat_sprite(self, blk):
         """Top-down image of a Block."""
+        if blk.kind == 'plates':
+            return self.td.compose([(self.plates_model(*blk.args), 0, 0)], None)[0]
         if blk.kind == 'state':
-            name, props = blk.args
-            return self.td.state(name, dict(props), self.tint_of(name))[0]
+            name, props = blk.args[:2]
+            return self.td.state(name, dict(props), self.tint_of(name, blk.args))[0]
         top, side, h, tint = blk.args
         return self.td.box(top, h, tint)[0]
 
     def sprite(self, blk):
-        """(image, up) of a standing Block seen from the camera."""
+        """(image, up, left) of a standing Block seen from the camera."""
+        if blk.kind == 'plates':
+            key = ('plates', blk.args)
+            if key not in self.ob.cache:
+                self.ob.cache[key] = self.ob.compose([(self.plates_model(*blk.args), 0, 0)], None)
+            return self.ob.cache[key]
         if blk.kind == 'state':
-            name, props = blk.args
-            return self.ob.state(name, dict(props), self.tint_of(name))
+            name, props = blk.args[:2]
+            return self.ob.state(name, dict(props), self.tint_of(name, blk.args))
         top, side, h, tint = blk.args
         return self.ob.box(top, side, h, tint)
 
     def dust(self, ds, power):
-        """Redstone dust with connections ds, its line and dot stretched across to `dust_width` times their width
-        so that wires read on a printed page."""
+        """Redstone dust with connections ds. Its lines are stretched across to `dust_width` times their width so
+        that wires read on a printed page; the dot keeps its size and only marks junctions and lone ends, not
+        plain corners."""
         props = {d: ('side' if d in ds else 'none') for d in ('north', 'south', 'east', 'west')}
         props['power'] = power
-        return self.td.state('redstone_wire', props, {0: dust_tint(power)}, model_hook=self.widen)[0]
+        corner = len(ds) == 2 and not ({'north', 'south'} == set(ds) or {'east', 'west'} == set(ds))
+        hook = self.widen_corner if corner else self.widen
+        return self.td.state('redstone_wire', props, {0: dust_tint(power)}, model_hook=hook)[0]
 
-    def widen(self, model):
+    def widen(self, model, dot=True):
         k = self.dust_width
-        if k == 1:
-            return model
         for el in model.get('elements', []):
-            for f in el.get('faces', {}).values():
+            faces = el.get('faces', {})
+            for name, f in list(faces.items()):
                 t = f.get('texture', '')
                 t = model['textures'].get(t[1:], t) if t.startswith('#') else t
                 if 'dust' not in (t or ''):
                     continue
+                if 'dot' in t:
+                    if not dot:
+                        del faces[name]
+                    continue
                 u0, v0, u1, v1 = f.get('uv') or (0, 0, 16, 16)
-                dot = 'dot' in t
-                f['uv'] = [8 + (u0 - 8) / k, 8 + (v0 - 8) / k if dot else v0,
-                           8 + (u1 - 8) / k, 8 + (v1 - 8) / k if dot else v1]
+                f['uv'] = [8 + (u0 - 8) / k, v0, 8 + (u1 - 8) / k, v1]
         return model
+
+    def widen_corner(self, model):
+        return self.widen(model, dot=False)
 
     # -- the raster ------------------------------------------------------------------------
     def at(self, i, j):

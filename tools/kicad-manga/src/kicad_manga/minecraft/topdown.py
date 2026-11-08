@@ -94,11 +94,7 @@ class TopDown:
     def texture(self, rid, tint=None, shade=1.0):
         key = ('tex', rid, tint, round(shade, 3))
         if key not in self.cache:
-            img = self.pack.texture(rid)
-            if 'leaves' in rid:
-                from .oblique import solid_leaves
-                img = solid_leaves(img)
-            self.cache[key] = tint_shade(img, tint, shade)
+            self.cache[key] = tint_shade(self.pack.texture(rid), tint, shade)
         return self.cache[key]
 
     # -- block states -------------------------------------------------------------

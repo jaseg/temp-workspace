@@ -13,7 +13,7 @@ whatever stands up reaches `up` pixels above it and `left` pixels to the west of
 import copy
 import math
 
-from PIL import Image, ImageStat
+from PIL import Image
 
 from .topdown import crop_uv, default_uv, face_quad, rotate_element, rotate_state, tint_shade
 
@@ -23,7 +23,7 @@ def cross(a, b):
 
 
 class Oblique:
-    def __init__(self, pack, px=16, camera_deg=60, yaw_deg=20):
+    def __init__(self, pack, px=16, camera_deg=55, yaw_deg=30):
         self.pack = pack
         self.px = px
         c = 1 / math.tan(math.radians(camera_deg))
@@ -35,10 +35,7 @@ class Oblique:
     def texture(self, rid, tint=None, shade=1.0):
         key = ('tex', rid, tint, round(shade, 3))
         if key not in self.cache:
-            img = self.pack.texture(rid)
-            if 'leaves' in rid:
-                img = solid_leaves(img)
-            self.cache[key] = tint_shade(img, tint, shade)
+            self.cache[key] = tint_shade(self.pack.texture(rid), tint, shade)
         return self.cache[key]
 
     def shade(self, n):
@@ -46,7 +43,7 @@ class Oblique:
         darker, east sides darker still."""
         L = math.sqrt(sum(c * c for c in n)) or 1
         nx, ny, nz = (c / L for c in n)
-        return max(.5, min(1.0, .8 + .2 * ny - .14 * nx - .04 * nz))
+        return max(.45, min(1.0, .72 + .28 * ny - .16 * max(0, nx) - .06 * max(0, nz)))
 
     # -- block states -----------------------------------------------------------------------
     def state(self, name, props=None, tints=None, model_hook=None):
@@ -91,7 +88,10 @@ class Oblique:
                     u = tuple(pts[1][i] - o[i] for i in range(3))
                     v = tuple(pts[2][i] - o[i] for i in range(3))
                     n = tuple(-c for c in cross(u, v))          # outward normal
-                    if sum(n[i] * view[i] for i in range(3)) <= 1e-6:     # faces away from the camera, or edge-on
+                    facing = sum(n[i] * view[i] for i in range(3))
+                    if facing <= 1e-6 and not ('leaves' in t and facing < -1e-6):
+                        # faces away from the camera, or edge-on; leaves show their back faces through their
+                        # holes, as in the game
                         continue
                     c = tuple(o[i] + (u[i] + v[i]) / 2 for i in range(3))
                     depth = sum(c[i] * view[i] for i in range(3))
@@ -112,12 +112,18 @@ class Oblique:
 
         def proj(p):
             return (p[0] + h * p[1]) * k + left, (p[2] - s * p[1]) * k + up
+        # a depth buffer: centre sorting alone gets small faces in front of big ones wrong (the hopper's bowl)
+        zbuf = [[-math.inf] * img.width for _ in range(img.height)]
+        view = self.view
         for _, o, u, v, t, uv, rot, tint, shade in sorted(faces, key=lambda f: f[0]):
             src = crop_uv(self.texture(t, tint, shade), uv, rot)
             O = proj(o)
             U = tuple(a - b for a, b in zip(proj(tuple(o[i] + u[i] for i in range(3))), O))
             V = tuple(a - b for a, b in zip(proj(tuple(o[i] + v[i] for i in range(3))), O))
-            paste_affine(img, src, O, U, V)
+            d0 = sum(o[i] * view[i] for i in range(3))
+            du = sum(u[i] * view[i] for i in range(3))
+            dv = sum(v[i] * view[i] for i in range(3))
+            paste_affine(img, src, O, U, V, depth=(zbuf, d0, du, dv))
         return img, up, left
 
     # -- boxes of block textures (bodies, plaques) --------------------------------------------
@@ -135,8 +141,10 @@ class Oblique:
         return self.cache[key]
 
 
-def paste_affine(dst, src, o, u, v):
-    """Draw src onto dst so that its corners land on o, o + u, o + v (pixels)."""
+def paste_affine(dst, src, o, u, v, depth=None):
+    """Draw src onto dst so that its corners land on o, o + u, o + v (pixels). With `depth` = (buffer, d0, du,
+    dv), a pixel at (a, b) of the texture (0..1 each) lies at depth d0 + a du + b dv, and is drawn only where
+    nothing nearer to the camera was drawn yet."""
     ox, oy = o
     ux, uy = u[0] / src.width, u[1] / src.width
     vx, vy = v[0] / src.height, v[1] / src.height
@@ -151,26 +159,30 @@ def paste_affine(dst, src, o, u, v):
     y0, y1 = max(0, math.floor(min(ys) + 1e-6)), min(dst.height, math.ceil(max(ys) - 1e-6))
     if x1 <= x0 or y1 <= y0:
         return
-    layer = Image.new('RGBA', dst.size, (0, 0, 0, 0))
     src_px = src.load()
-    out = layer.load()
+    out = dst.load()
+    W, H = src.width, src.height
     for yy in range(y0, y1):
         for xx in range(x0, x1):
             dx, dy = xx + .5 - ox, yy + .5 - oy
             sx, sy = ia * dx + ib * dy, ic * dx + id_ * dy
-            if 0 <= sx < src.width and 0 <= sy < src.height:
-                out[xx, yy] = src_px[int(sx), int(sy)]
-    dst.alpha_composite(layer)
-
-
-def solid_leaves(img):
-    """Leaves with their holes filled in a darker shade of their own colour: from above, the game shows more
-    leaves through the holes, not the ground under the tree."""
-    img = img.convert('RGBA')
-    mask = img.getchannel('A').point(lambda v: 255 if v > 128 else 0)
-    if not mask.getbbox():
-        return img
-    r, g, b = (round(v * .55) for v in ImageStat.Stat(img.convert('RGB'), mask=mask).mean)
-    back = Image.new('RGBA', img.size, (r, g, b, 255))
-    back.alpha_composite(img)
-    return back
+            if not (0 <= sx < W and 0 <= sy < H):
+                continue
+            c = src_px[int(sx), int(sy)]
+            if not c[3]:
+                continue
+            if depth is not None:
+                zbuf, d0, du, dv = depth
+                z = d0 + du * sx / W + dv * sy / H
+                if z < zbuf[yy][xx] - 1e-3:
+                    continue
+            if c[3] == 255:
+                out[xx, yy] = c
+                if depth is not None:
+                    zbuf[yy][xx] = z
+            else:
+                b = out[xx, yy]
+                a = c[3] / 255
+                ab = b[3] / 255 * (1 - a)
+                ao = a + ab
+                out[xx, yy] = tuple(round((c[i] * a + b[i] * ab) / ao) for i in range(3)) + (round(ao * 255),)

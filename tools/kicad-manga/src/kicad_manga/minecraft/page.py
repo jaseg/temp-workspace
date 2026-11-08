@@ -22,7 +22,7 @@ LEGEND = [
     (('state', 'repeater', (('facing', 'west'), ('delay', 1), ('powered', 'true'))), 'LED'),
     (('state', 'comparator', (('facing', 'west'),)), 'transistor'),
     (('box', 'bricks'), 'resistor'),
-    (('state', 'heavy_weighted_pressure_plate', ()), 'capacitor (gold: + plate)'),
+    (('plates', (1, 0), ('block/gold_block', 'block/polished_deepslate')), 'capacitor (gold: + plate)'),
     (('box', 'cut_copper'), 'inductor'),
     (('box', 'oxidized_cut_copper'), 'ferrite bead'),
     (('state', 'redstone_torch', (('lit', 'true'),)), 'supply'),
@@ -43,6 +43,7 @@ class Page:
         self.platform = set()
         self.taken = set()          # cells the page's own structures use
         self.overlay_cells = set()  # the frame's cells, drawn flat on top of everything
+        self.height = {}            # cell -> blocks of hill under it
         self.page_mm = None
         self.rng = random.Random(cfg.get('seed', 42))
         PW, PH = builder.paper
@@ -51,8 +52,9 @@ class Page:
         a = builder.fcell(MARGIN_MM, MARGIN_MM)
         e = builder.fcell(W - MARGIN_MM, H - MARGIN_MM)
         # i0, j0, i1, j1 (exclusive): the cells inside the drawing sheet's frame
-        self.inner = (math.ceil(a[0] + .5 - 1e-6), math.ceil(a[1] + .5 - 1e-6),
-                      math.floor(e[0] + .5 + 1e-6), math.floor(e[1] + .5 + 1e-6))
+        # (cells whose centre lies inside the frame, so that things on the grid at the frame line stay inside)
+        self.inner = (math.ceil(a[0] - 1e-6), math.ceil(a[1] - 1e-6),
+                      math.floor(e[0] + 1e-6) + 1, math.floor(e[1] + 1e-6) + 1)
 
     def report(self):
         st = self.b.stats
@@ -93,7 +95,11 @@ class Page:
         on_sheet = 0 <= c[0] < PW and 0 <= c[1] < PH
         return not on_sheet and w.i0 + 2 <= c[0] < w.W - 2 and w.j0 + 2 <= c[1] < w.H - 2
 
-    def put(self, i, y, j, name, props=(), flat=False, overlay=False):
+    def put(self, i, y, j, name, props=(), flat=False, overlay=False, absolute=False):
+        """A block at height y above the ground of its cell (or at y itself, `absolute`)."""
+        if not absolute and not overlay:
+            y += self.height.get((i, j), 0)
+        flat = flat and y == 0
         self.w.blocks.append(Block(i, y, j, 'state', (name, tuple(props)), flat=flat, owner='page', overlay=overlay))
 
     def box(self, i, y, j, block, h=16, owner='page'):
@@ -133,8 +139,12 @@ class Page:
         i0, j0, i1, j1 = self.inner
         rng = self.rng
         w = self.w
+        # parts of the circuit that were drawn into the margin stay visible: the frame leaves them out
+        keep = set(w.circuit)
+        for pq in w.plaques:
+            keep.update((pq.i + a, pq.j + b) for a in range(pq.w) for b in range(pq.h))
         band = {(i, j) for i in range(max(0, w.i0), min(W, w.W)) for j in range(max(0, w.j0), min(H, w.H))
-                if not (i0 <= i < i1 and j0 <= j < j1)}
+                if not (i0 <= i < i1 and j0 <= j < j1)} - keep
         for c in band:
             w.floor[c] = 'dirt_path' if rng.random() < .92 else 'coarse_dirt'
         self.overlay_cells |= band
@@ -150,6 +160,7 @@ class Page:
             posts.update({(i0 - 1, y), (i1, y)})
         ring = set([(i, j0 - 1) for i in range(i0 - 1, i1 + 1)] + [(i, j1) for i in range(i0 - 1, i1 + 1)] +
                    [(i0 - 1, j) for j in range(j0, j1)] + [(i1, j) for j in range(j0, j1)])
+        ring -= keep
         for (i, j) in ring:          # a flowering hedge, with lanterns at the zone boundaries
             leaves = 'flowering_azalea_leaves' if rng.random() < .55 else 'azalea_leaves'
             self.put(i, 0, j, leaves, [('persistent', 'true')], overlay=True)
@@ -203,10 +214,15 @@ class Page:
         scale = 3
         w = min(max(24, tc(title, scale)[0] + 4, tc(fields)[0] + 4, tc(sub)[0] + 4), (i1 - i0) // 2)
         h = 11 if sub else 10
+        if w < 6 or h > j1 - j0 - 2:
+            return
         spot = self.find_spot(w, h, [(i1 - w - 1, j1 - h - 1)], margin=1)
-        if spot is None:
-            spot = (i1 - w - 1, j1 - h - 1)
+        if spot is None:            # no room: no title block rather than one on top of the circuit
+            return
         x, y = spot
+
+        def fits(text, scale=1):
+            return tc(text, scale)[0] <= w - 2
         cells = [(x + a, y + b) for a in range(w) for b in range(h)]
         self.taken.update(cells)
         for (i, j) in cells:
@@ -221,18 +237,23 @@ class Page:
                 self.put(i, 0, y + 1, pots[self.rng.randrange(len(pots))])
         for i, j in ((x, y + h - 1), (x + w - 1, y + h - 1), (x, y), (x + w - 1, y)):
             self.put(i, 0, j, 'lantern', [('hanging', 'false')])
-        self.put(x + 1, 0, y + h - 2, 'cake')
-        self.put(x + w - 2, 0, y + h - 2, 'potted_flowering_azalea_bush')
+        note = 'built from redstone'
+        if tc(note)[0] <= w - 6:
+            self.put(x + 1, 0, y + h - 2, 'cake')
+            self.put(x + w - 2, 0, y + h - 2, 'potted_flowering_azalea_bush')
         while scale > 1 and tc(title, scale)[0] > w - 4:
             scale -= 1
         row = y + 3
-        self.sign(title, 0, 0, 'title', scale, center=(x + w // 2, row + 1))
+        if fits(title, scale):
+            self.sign(title, 0, 0, 'title', scale, center=(x + w // 2, row + 1))
         row += 4
-        if sub:
+        if sub and fits(sub):
             self.sign(sub, 0, 0, 'value', 1, center=(x + w // 2, row))
             row += 1
-        self.sign(fields, 0, 0, 'ref', 1, center=(x + w // 2, row))
-        self.sign('built from redstone', 0, 0, 'note', 1, center=(x + w // 2, y + h - 2))
+        if fits(fields):
+            self.sign(fields, 0, 0, 'ref', 1, center=(x + w // 2, row))
+        if fits(note):
+            self.sign(note, 0, 0, 'note', 1, center=(x + w // 2, y + h - 2))
 
     def find_spot(self, w, h, prefer, margin=2, step=2):
         """Where a w x h block of cells fits inside the frame, clear of everything: the preferred spots first, then
@@ -269,8 +290,10 @@ class Page:
             j = y + 2 + k
             if spec[0] == 'box':
                 self.box(x + 1, 0, j, spec[1], h=8, owner=f'legend{k}')
+            elif spec[0] == 'plates':
+                self.w.blocks.append(Block(x + 1, 0, j, 'plates', (spec[1], spec[2]), owner='page'))
             else:
-                flat = spec[1] in ('heavy_weighted_pressure_plate', 'rail')
+                flat = spec[1] == 'rail'
                 self.put(x + 1, 0, j, spec[1], spec[2], flat=flat)
             self.sign(text, x + 3, j, 'label')
 
@@ -280,6 +303,7 @@ class Page:
                 if self.in_frame((i, j)) and not self.blocked((i, j))]
         self.ponds(free)
         self.gardens(free)
+        self.terrain(free)
         self.trees(free)
         self.bushes(free)
         self.props(free)
@@ -312,6 +336,63 @@ class Page:
                     self.put(x[0], 0, x[1], 'lily_pad', flat=True)
                 elif not wet and rng.random() < .3:
                     self.put(x[0], 0, x[1], rng.choice(['sugar_cane', 'pink_tulip', 'oxeye_daisy', 'fern']))
+
+    def terrain(self, free):
+        """Gentle grassy hills in the open meadow, away from the circuit, and patches of moss, podzol, coarse
+        dirt and gravel on the flat ground."""
+        rng = self.rng
+        fs = {c for c in free if not self.blocked(c)}
+        # how far each free cell is from anything else (circuit, frame, ponds, ...), up to 8
+        dist = {}
+        edge = [c for c in fs if any((c[0] + a, c[1] + b) not in fs for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+        for c in edge:
+            dist[c] = 1
+        todo = list(edge)
+        while todo:
+            nxt = []
+            for (i, j) in todo:
+                for n in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+                    if n in fs and n not in dist and dist[(i, j)] < 8:
+                        dist[n] = dist[(i, j)] + 1
+                        nxt.append(n)
+            todo = nxt
+        lift = {}
+        cand = [c for c in fs if dist.get(c, 9) >= 5]
+        for _ in range(len(fs) // 900):
+            if not cand:
+                break
+            (ci, cj), A, r = rng.choice(cand), rng.uniform(1.6, 3.6), rng.uniform(3, 8)
+            R = int(r * 2.2)
+            for a in range(-R, R + 1):
+                for b in range(-R, R + 1):
+                    c = (ci + a, cj + b)
+                    if c in fs:
+                        lift[c] = lift.get(c, 0) + A * math.exp(-(a * a + b * b) / (r * r))
+        for c, v in lift.items():
+            h = int(min(v, (dist.get(c, 9) - 2) / 1.5, 4))
+            if h > 0:
+                self.height[c] = h
+        H = self.height
+        for (i, j), h in H.items():
+            for y in range(h):
+                # only the blocks that show: the top one, and those with an open south or east side
+                if y == h - 1 or H.get((i, j + 1), 0) <= y or H.get((i + 1, j), 0) <= y:
+                    # higher ground a little sunnier, so that the hills read from above
+                    tint = tuple(min(255, round(c * (1 + .09 * (y + 1)))) for c in GRASS)
+                    self.w.blocks.append(Block(i, y, j, 'state', ('grass_block', (('snowy', 'false'),), tint),
+                                               owner='hill'))
+        # patches on the flat ground
+        patches = ['moss_block', 'podzol', 'coarse_dirt', 'rooted_dirt', 'gravel', 'moss_block']
+        flat = [c for c in fs if c not in H]
+        for _ in range(len(flat) // 700):
+            ci, cj = rng.choice(flat)
+            kind = rng.choice(patches)
+            r = rng.uniform(1.2, 3)
+            for a in range(-3, 4):
+                for b in range(-3, 4):
+                    c = (ci + a, cj + b)
+                    if c in fs and c not in H and (a * a + b * b) <= r * r * rng.uniform(.6, 1.3):
+                        self.w.floor[c] = kind
 
     def gardens(self, free):
         """Little vegetable plots: rows of crops on farmland with a fence around them."""
@@ -357,8 +438,9 @@ class Page:
         rng = self.rng
         log, leaves = f'{kind}_log', f'{kind}_leaves'
         cells = set()
+        base = self.height.get((i, j), 0)
         for y in range(hgt):
-            self.put(i, y, j, log, [('axis', 'y')])
+            self.put(i, base + y, j, log, [('axis', 'y')], absolute=True)
         layers = [(hgt - 2, 2), (hgt - 1, 2), (hgt, 1)] if kind == 'cherry' else \
             [(hgt - 2, 2), (hgt - 1, 1), (hgt, 1)]
         for y, r in layers:
@@ -368,7 +450,7 @@ class Page:
                         continue
                     if a == 0 and b == 0 and y < hgt:
                         continue
-                    self.put(i + a, y, j + b, leaves, [('persistent', 'true')])
+                    self.put(i + a, base + y, j + b, leaves, [('persistent', 'true')], absolute=True)
                     cells.add((i + a, j + b))
         self.taken.update(cells | {(i, j)})
         # fallen petals and a few mushrooms around the trunk

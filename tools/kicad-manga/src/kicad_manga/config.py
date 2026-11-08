@@ -20,8 +20,8 @@
     packs = []               # resource packs (.zip or folders), first wins; e.g. ["my-pack.zip", "default.zip"]
     block_mm = 2.54          # one block per this many mm of the schematic
     dust_width = 2.0         # redstone dust drawn this many times wider than in the game
-    camera_deg = 60          # the camera's angle above the horizon (90: straight down)
-    yaw_deg = 20             # the camera turned this far from due south towards the east
+    camera_deg = 55          # the camera's angle above the horizon (90: straight down)
+    yaw_deg = 30             # the camera turned this far from due south towards the east
     px_per_block = 16        # raster resolution: 16 shows a 16x16 pack's textures pixel for pixel
 """
 
@@ -44,8 +44,8 @@ DEFAULTS = {
         'packs': [],
         'block_mm': 2.54,
         'dust_width': 2.0,
-        'camera_deg': 60.0,
-        'yaw_deg': 20.0,
+        'camera_deg': 55.0,
+        'yaw_deg': 30.0,
         'px_per_block': 16,
     },
 }

@@ -133,7 +133,7 @@ def test_crowded_capacitors_are_nudged(pack, tmp_path):
     body += ''.join(wire(50.8 + 2.54 * k, 48.26, 50.8 + 2.54 * k, 43.18) for k in range(4))
     body += ''.join(wire(50.8 + 2.54 * k, 53.34, 50.8 + 2.54 * k, 58.42) for k in range(4))
     b, _ = build(tmp_path, body, pack[0], 1.27)
-    plates = states(b, 'heavy_weighted_pressure_plate')
+    plates = [blk for blk in b.world.blocks if blk.kind == 'plates']
     cells = [(p.i, p.j) for p in plates]
     assert len(cells) == len(set(cells)), 'plates overlap'
     assert b.stats['unplaced'] == 0 and b.stats['nudged'] >= 2

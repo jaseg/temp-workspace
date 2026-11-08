@@ -121,8 +121,8 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
     repeaters.
   - Transistors are comparators: collector or drain at the back, emitter or source in front, base or gate at a
     side. P-type parts use subtract mode.
-  - Passives are short rows between their pins. Resistors are bricks, capacitors are two rows of pressure plates
-    (the + plate gold), inductors are copper and ferrite beads oxidized copper.
+  - Passives are short rows between their pins. Resistors are bricks, capacitors are two upright plates across the
+    wire (the + plate gold), inductors are copper and ferrite beads oxidized copper.
   - Other parts get a wooden or terracotta body with their pin names painted on top. Supplies are torches,
     grounds hoppers, no-connects cobwebs and mounting holes cauldrons.
 - **Fitting things in:** a passive that collides with a neighbour, a wire or another part is tried one and two
@@ -130,11 +130,13 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
   Repeaters and comparators move up to two blocks the same way. Text sits on plaques of wool, wood and
   terracotta (labels, references, values, notes), and plaques move out of the way of dust, parts and each other.
   Net labels lie on their own wire. The run prints how many parts and plaques moved.
-- **Around it:** the circuit stands on a birch deck in a meadow, with cherry trees, azalea bushes, flower beds,
-  ponds, little vegetable gardens, beehives and pumpkins in the empty space. The title block is a cherry wood
-  deck with bookshelves, lanterns and a cake. The legend explains the parts.
-- **Camera:** an oblique view from high up in the south-east: `camera_deg` above the horizon (60 by default)
-  and turned `yaw_deg` (20) from due south towards the east. The ground keeps its place on the page, so the sheet
+- **Around it:** the circuit stands on a birch deck in a meadow. The empty space gets gentle grassy hills,
+  patches of moss, podzol and gravel, cherry trees (their leaves see-through, as in the game), azalea bushes,
+  flower beds, ponds, little vegetable gardens, beehives and pumpkins. The title block is a cherry wood deck
+  with bookshelves, lanterns and a cake. The legend explains the parts.
+- **Page:** only the sheet is drawn; anything placed beside it in the schematic is left out.
+- **Camera:** an oblique view from high up in the south-east: `camera_deg` above the horizon (55 by default)
+  and turned `yaw_deg` (30) from due south towards the east. The ground keeps its place on the page, so the sheet
   stays a rectangle; every block shows its top, its south side and a sliver of its east side, and leans a little
   to the north-west. Things that stand up cast a short shadow. The page frame (a garden path with a flowering
   hedge, lanterns and zone signs) is drawn flat on top of everything, and so is all text.
@@ -148,8 +150,8 @@ style = "minecraft"
 packs = ["default-pack.zip"]     # relative to the settings file
 block_mm = 2.54
 dust_width = 2.0
-camera_deg = 60
-yaw_deg = 20
+camera_deg = 55
+yaw_deg = 30
 px_per_block = 16
 ```
 
