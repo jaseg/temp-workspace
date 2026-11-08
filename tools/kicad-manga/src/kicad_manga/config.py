@@ -1,6 +1,7 @@
 """Settings: built-in defaults < kicad-manga.toml < command line.
 
     # kicad-manga.toml
+    style = "manga"          # or "minecraft"
     formats = ["svg", "png", "pdf"]
     png_px_per_mm = 10
     seed = 42
@@ -14,6 +15,11 @@
     subtitle = ""            # default: title block comment 1
     kicker = "回路図"         # the line above the title
     bubble = ""              # what the mascot says; default: title block comment 2
+
+    [minecraft]              # the minecraft style
+    packs = []               # resource packs (.zip or folders), first wins; e.g. ["my-pack.zip", "default.zip"]
+    block_mm = 1.27          # schematic grid step that becomes one block
+    dust_width = 2.0         # redstone dust drawn this many times wider than in the game
 """
 
 import copy
@@ -22,6 +28,7 @@ import tomllib
 from pathlib import Path
 
 DEFAULTS = {
+    'style': 'manga',
     'formats': ['svg', 'png', 'pdf'],
     'png_px_per_mm': 10.0,
     'seed': 42,
@@ -30,6 +37,11 @@ DEFAULTS = {
     'sound_effects': True,
     'font_dir': '',
     'title': {'title': '', 'subtitle': '', 'kicker': '回路図', 'bubble': ''},
+    'minecraft': {
+        'packs': [],
+        'block_mm': 1.27,
+        'dust_width': 2.0,
+    },
 }
 
 FILENAME = 'kicad-manga.toml'
@@ -60,4 +72,6 @@ def load(path=None):
     if path:
         with open(path, 'rb') as f:
             merge(cfg, tomllib.load(f))
+        base = Path(path).resolve().parent      # pack paths are relative to the settings file
+        cfg['minecraft']['packs'] = [str(base / p) for p in cfg['minecraft']['packs']]
     return cfg
