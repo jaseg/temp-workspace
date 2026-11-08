@@ -35,16 +35,7 @@ class PaperPage(Page):
         W, H = self.DW, self.DH
         rng = random.Random(4)
         add = self.add
-        add('bg', tag('rect', width=W, height=H, fill=P.CARD))
-        # paper fibres: a sprinkle of short, faint strokes
-        fib = []
-        for _ in range(900):
-            x, y = rng.uniform(0, W), rng.uniform(0, H)
-            a = rng.uniform(0, math.pi)
-            L = rng.uniform(.6, 2.2)
-            fib.append(f'M{f2(x)} {f2(y)}l{f2(math.cos(a) * L)} {f2(math.sin(a) * L)}')
-        add('bg', path(''.join(fib[:450]), fill='none', stroke='#e6d6bd', stroke_width=.22, stroke_linecap='round'))
-        add('bg', path(''.join(fib[450:]), fill='none', stroke='#fffaf0', stroke_width=.3, stroke_linecap='round'))
+        add('bg', tag('rect', width=W, height=H, fill='url(#pc-card)'))
 
         # the mat: an evenodd shape, the outer rectangle minus the scalloped inside
         m = MAT_IN
@@ -66,8 +57,7 @@ class PaperPage(Page):
             y = m + (H - 2 * m) * (i + .5) / nrow
             discs += [(5.4, y, chr(ord('A') + i)), (W - 5.4, y, chr(ord('A') + i))]
         for x, y, s in discs:
-            add('frame', group(P.piece(_circle(x, y, 3.1),
-                                       P.WHITE, edge='#ecc3cf', sh=(.4, .55), edge_w=.25)
+            add('frame', group(P.cut_piece(rng, P.sample_circle(x, y, 3.1, .6), P.WHITE, depth=1.4, amp=.12)
                                + [tag('text', [escape(s)], x=x, y=y + 1.45, cls='pc-coord', text_anchor='middle')]))
         # paper flowers on the corners
         for x, y in ((m, m), (W - m, m), (m, H - m), (W - m, H - m)):
@@ -84,11 +74,10 @@ class PaperPage(Page):
         rng = random.Random(9)
         out = []
         # the backing card (scalloped, pink) and the front card (cream, lined)
-        back_outer = (f'M{f2(tx - 5)} {f2(ty - 5)}H{f2(tx + TW + 5)}V{f2(ty + TH + 5)}H{f2(tx - 5)}Z')
-        out.append(group(P.piece(back_outer, '#bfe3d6', sh=(1, 1.3)), transform=f'rotate(-1.2 {f2(tx + TW / 2)} '
-                                                                                f'{f2(ty + TH / 2)})'))
-        front = f'M{f2(tx)} {f2(ty)}H{f2(tx + TW)}V{f2(ty + TH)}H{f2(tx)}Z'
-        out += P.piece(front, '#fffaf0', sh=(.8, 1))
+        back = P.cut_piece(rng, P.rect_pts(tx - 5, ty - 5, tx + TW + 5, ty + TH + 5), '#bfe3d6', depth=2.6, amp=.25)
+        out.append(group(back, transform=f'rotate(-1.2 {f2(tx + TW / 2)} {f2(ty + TH / 2)})'))
+        front = P.cut_piece(rng, P.rect_pts(tx, ty, tx + TW, ty + TH), '#fffaf0', depth=2, amp=.2)
+        out += front + [path(front[-1].split(' d="')[1].split('"')[0], fill='url(#pc-grain)')]
         lines = ''.join(f'M{f2(tx + 4)} {f2(y)}H{f2(tx + TW - 4)}' for y in P.frange(ty + 9, ty + TH - 3, 6.5))
         out.append(path(lines, fill='none', stroke='#cfe2f2', stroke_width=.3))
         out.append(path(f'M{f2(tx + 12)} {f2(ty)}V{f2(ty + TH)}', fill='none', stroke='#f6b3c3', stroke_width=.35))
@@ -123,7 +112,8 @@ class PaperPage(Page):
         bw = max(40, max(hand_width(line, 5.2) for line in bub) + 12)
         bx, by = tx + 14, ty - 34
         bh = 8 + 6 * len(bub)
-        items = P.piece(_rounded_bubble(bx, by, bw, bh), P.WHITE, edge='#e6cfd8', sh=(.7, .9), edge_w=.3)
+        bubble = _rounded_bubble(bx, by, bw, bh)
+        items = P.soft_shadow(bubble, 2) + [path(bubble, fill=P.WHITE)]
         for i, line in enumerate(bub):
             items.append(tag('text', [escape(line)], x=bx + bw / 2, y=by + 9 + 6 * i - (0 if len(bub) > 1 else -1),
                              cls='pc-bubble-t', text_anchor='middle'))
@@ -175,14 +165,6 @@ class PaperPage(Page):
                 add('deco', S.use(names[i % len(names)], pos[0], pos[1], size, rng.uniform(-18, 18)))
                 placed += 1
 
-        # 3. a few loose strips of washi tape
-        for _ in range(7):
-            L, w = rng.uniform(22, 34), rng.uniform(6, 8)
-            pos = try_place(L, L * .5, 200, pad=2)
-            if pos:
-                add('deco', P.tape_strip(rng, pos[0], pos[1], L, w, rng.uniform(-35, 35), rng.choice(P.PAPERS),
-                                         rng.choice(['dots', 'stripes', 'grid', 'stitch']), sh=(.6, .8)))
-
         # 4. paper confetti
         conf = []
         for _ in range(420):
@@ -196,7 +178,7 @@ class PaperPage(Page):
             d = confetti_d(kind, x, y, sz, rot)
             sh.append(d)
             pieces.append(path(d, fill=c))
-        add('deco', path(''.join(sh), fill=P.SHADOW, fill_opacity=.16, transform='translate(.35 .45)'))
+        add('deco', group(P.soft_shadow(''.join(sh), 1.2)))
         add('deco', group(pieces))
 
     # -- the whole thing ----------------------------------------------------------
@@ -274,14 +256,14 @@ def bunting(rng, x0, x1, y, sag):
         mx, my = at((ta + tb) / 2)
         L = 7.2
         tip = (mx + (ay - by) * .1, my + L)
-        d = P.pts_d([(ax, ay), (bx, by), tip])
+        d = P.cut_outline(rng, [(ax, ay), (bx, by), tip], amp=.12, step=.9)
         sh.append(d)
         col = P.PAPERS[(start + i * 3) % len(P.PAPERS)]
         flags.append(path(d, fill=col))
         flags.append(path(P.pts_d([(ax + (tip[0] - ax) * .2, ay + (tip[1] - ay) * .2),
                                    (bx + (tip[0] - bx) * .2, by + (tip[1] - by) * .2)], close=False),
                           fill='none', stroke=P.WHITE, stroke_width=.3, stroke_dasharray='.8 .6'))
-    out.insert(0, path(''.join(sh), fill=P.SHADOW, fill_opacity=.18, transform='translate(.6 .8)'))
+    out[:0] = P.soft_shadow(''.join(sh), 2)
     return group(out + flags, cls='pc-bunting')
 
 

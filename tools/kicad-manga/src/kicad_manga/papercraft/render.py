@@ -1,6 +1,8 @@
 """Schematic file -> paper craft SVG."""
 
 import base64
+import re
+from importlib import resources
 
 from markupsafe import Markup
 
@@ -10,18 +12,18 @@ from ..svg import all_static_defs, tag
 from . import stickers
 from .circuit import PaperCircuit
 from .page import MAT, MAT_DOT, PaperPage
-from .paper import INK, INK_SOFT, WHITE
+from .paper import INK, INK_SOFT, WHITE, mute
 from .text import FONTS, FREDOKA, HAND  # noqa: F401  (FONTS is what the CLI loads for this style)
 from ..fonts import MPR, POP
 
 STYLE = f"""
-.tape{{fill:none;stroke-linecap:square;stroke-linejoin:miter;stroke-opacity:.88}}
+.tape{{fill-opacity:.82}}
 .tape-dots{{fill:none;stroke:{WHITE};stroke-linecap:round;stroke-opacity:.85}}
 .tape-stitch{{fill:none;stroke:{WHITE};stroke-linecap:butt;stroke-opacity:.9}}
 .tape-stripe{{fill:none;stroke:{WHITE};stroke-opacity:.85}}
 .tape-bus{{fill:none;stroke:{WHITE};stroke-width:.32;stroke-opacity:.8}}
 .pc-strip{{fill:none;stroke-linecap:round;stroke-linejoin:round}}
-.pc-pin{{fill:none;stroke:#7d6a8c;stroke-width:.24;stroke-linecap:round}}
+.pc-pin{{fill:#7d6a8c}}
 .pc-pin-deco{{fill:none;stroke:#7d6a8c;stroke-width:.22;stroke-linecap:round;stroke-linejoin:round}}
 .pc-bubble{{fill:{WHITE};stroke:#7d6a8c;stroke-width:.22}}
 .flag{{fill:none;stroke:#9a86a8;stroke-width:.3;stroke-linecap:round}}
@@ -75,8 +77,35 @@ def defs(fonts):
         else:
             parts.append(tag('ellipse', cx=0, cy=1.1, rx=.5, ry=.6, fill=INK))
         faces.append(tag('g', parts, id=f'pc-face-{i}'))
-    return Markup(f'<defs>\n<style>{face}{STYLE}</style>\n{dots}\n{"".join(faces)}\n{stickers.defs()}\n'
+    textures = (texture_pattern('pc-card', 'card.jpg', 64, 'image/jpeg')
+                + texture_pattern('pc-kraft', 'kraft.jpg', 40, 'image/jpeg')
+                + texture_pattern('pc-grain', 'grain.png', 36, 'image/png'))
+    return Markup(f'<defs>\n<style>{face}{STYLE}</style>\n{dots}\n{textures}\n{"".join(faces)}\n{stickers.defs()}\n'
                   f'{all_static_defs()}\n</defs>')
+
+
+TEXTURES = resources.files('kicad_manga.papercraft').joinpath('textures')
+
+
+def texture_pattern(pid, name, size, mime):
+    data = base64.b64encode(TEXTURES.joinpath(name).read_bytes()).decode()
+    return tag('pattern', [tag('image', href=f'data:{mime};base64,{data}', width=size, height=size,
+                               preserveAspectRatio='none')],
+               id=pid, width=size, height=size, patternUnits='userSpaceOnUse')
+
+
+HEX = re.compile(r'#[0-9a-fA-F]{6}\b')
+
+
+def mute_all(svg):
+    """Every colour on the page, taken down to what real paper and ink look like (see paper.mute)."""
+    cache = {}
+    def sub(m):
+        c = m.group().lower()
+        if c not in cache:
+            cache[c] = mute(c)
+        return cache[c]
+    return HEX.sub(sub, svg)
 
 
 def build_svg(path, cfg, fonts=()):
@@ -85,4 +114,4 @@ def build_svg(path, cfg, fonts=()):
     circuit = PaperCircuit(sch, characters=cfg['characters']).render()
     page = PaperPage(circuit, title_info(sch, path, cfg['title']), cfg)
     svg = page.svg(defs(fonts), decorations=cfg['decorations'], seed=cfg['seed'])
-    return flatten_opacity(svg), page
+    return mute_all(flatten_opacity(svg)), page

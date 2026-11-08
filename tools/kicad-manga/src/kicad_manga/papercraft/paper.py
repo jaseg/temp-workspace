@@ -188,3 +188,158 @@ def spiral_d(cx, cy, r, turns=2.3, rot=0.0, steps=10):
         rr = r * (.12 + .88 * t)
         pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
     return 'M' + 'L'.join(f'{f2(x)} {f2(y)}' for x, y in pts)
+
+
+# ----------------------------------------------------------------------------
+# Hand-made geometry: shapes as point lists, cut out with a slightly unsteady hand
+
+def sample_circle(cx, cy, r, step=.45):
+    n = max(12, int(2 * math.pi * r / step))
+    return [(cx + math.cos(2 * math.pi * i / n) * r, cy + math.sin(2 * math.pi * i / n) * r) for i in range(n)]
+
+
+def sample_arc(s, m, e, step=.4):
+    (x1, y1), (x2, y2), (x3, y3) = s, m, e
+    d = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
+    if abs(d) < 1e-9:
+        return [s, e]
+    ux = ((x1 ** 2 + y1 ** 2) * (y2 - y3) + (x2 ** 2 + y2 ** 2) * (y3 - y1) + (x3 ** 2 + y3 ** 2) * (y1 - y2)) / d
+    uy = ((x1 ** 2 + y1 ** 2) * (x3 - x2) + (x2 ** 2 + y2 ** 2) * (x1 - x3) + (x3 ** 2 + y3 ** 2) * (x2 - x1)) / d
+    r = math.hypot(x1 - ux, y1 - uy)
+    a1, a2, a3 = (math.atan2(y - uy, x - ux) for x, y in (s, m, e))
+    span = (a3 - a1) % (2 * math.pi)
+    if (a2 - a1) % (2 * math.pi) > span:        # the arc goes the other way round, through m
+        span -= 2 * math.pi
+    n = max(3, int(abs(span) * r / step))
+    return [(ux + math.cos(a1 + span * i / n) * r, uy + math.sin(a1 + span * i / n) * r) for i in range(n + 1)]
+
+
+def sample_bezier(p, n=16):
+    (x0, y0), (x1, y1), (x2, y2), (x3, y3) = p[:4]
+    out = []
+    for i in range(n + 1):
+        t = i / n
+        a, b, c, d = (1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t ** 2, t ** 3
+        out.append((a * x0 + b * x1 + c * x2 + d * x3, a * y0 + b * y1 + c * y2 + d * y3))
+    return out
+
+
+def resample(pts, step, closed):
+    """Points along the polyline (or polygon) at most `step` apart, keeping its corners."""
+    if len(pts) < 2:
+        return list(pts)
+    seq = pts + [pts[0]] if closed else pts
+    out = []
+    for (x0, y0), (x1, y1) in zip(seq, seq[1:]):
+        L = math.hypot(x1 - x0, y1 - y0)
+        n = max(1, int(L / step))
+        out += [(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n) for i in range(n)]
+    if not closed:
+        out.append(pts[-1])
+    return out
+
+
+def _normals(pts, closed):
+    out = []
+    n = len(pts)
+    for i in range(n):
+        a = pts[i - 1] if (closed or i > 0) else pts[i]
+        b = pts[(i + 1) % n] if (closed or i < n - 1) else pts[i]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L = math.hypot(dx, dy) or 1
+        out.append((-dy / L, dx / L))
+    return out
+
+
+def _signed_area(pts):
+    return sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1])) / 2
+
+
+def cut_outline(rng, pts, amp=.07, step=.5):
+    """A closed shape as if cut out with scissors: its edge wanders a little in and out, in short straight
+    snips. Returns path data."""
+    if len(pts) < 3:
+        return pts_d(pts)
+    q = resample(pts, step, True)
+    nrm = _normals(q, True)
+    offs = wobble(rng, len(q), amp)
+    return pts_d([(x + nx * o, y + ny * o) for (x, y), (nx, ny), o in zip(q, nrm, offs)])
+
+
+def cut_strip(rng, pts, width, closed=False, amp=.16, step=.45, end_wobble=True):
+    """A strip of paper along the polyline, about `width` wide, its width varying a little as if cut by hand.
+    Closed loops become a ring (two loops; fill it with the nonzero rule, they wind opposite ways). The ends
+    of open strips are cut a little askew. Returns path data."""
+    if len(pts) < 2:
+        return ''
+    q = resample(pts, step, closed)
+    if closed and _signed_area(q) < 0:
+        q = q[::-1]
+    nrm = _normals(q, closed)
+    w = [width / 2 * (1 + o) for o in wobble(rng, len(q), amp)]
+    sk = [rng.uniform(-.25, .25) * width if end_wobble else 0 for _ in range(2)]
+    left, right = [], []
+    for i, ((x, y), (nx, ny), hw) in enumerate(zip(q, nrm, w)):
+        hl = hr = hw * (1 + rng.uniform(-amp, amp) * .4)
+        left.append((x + nx * hl, y + ny * hl))
+        right.append((x - nx * hr, y - ny * hr))
+    if not closed:
+        (x0, y0), (x1, y1) = q[0], q[1]
+        L = math.hypot(x1 - x0, y1 - y0) or 1
+        ux, uy = (x1 - x0) / L, (y1 - y0) / L
+        left[0] = (left[0][0] + ux * sk[0], left[0][1] + uy * sk[0])
+        right[0] = (right[0][0] - ux * sk[0], right[0][1] - uy * sk[0])
+        (x0, y0), (x1, y1) = q[-2], q[-1]
+        L = math.hypot(x1 - x0, y1 - y0) or 1
+        ux, uy = (x1 - x0) / L, (y1 - y0) / L
+        left[-1] = (left[-1][0] + ux * sk[1], left[-1][1] + uy * sk[1])
+        right[-1] = (right[-1][0] - ux * sk[1], right[-1][1] - uy * sk[1])
+        return pts_d(left + right[::-1])
+    return pts_d(left) + pts_d(right[::-1])
+
+
+def soft_shadow(d, depth=1.0, alpha=1.0):
+    """Two stacked translucent copies of the outline, a near dark one and a far faint one: a soft shadow
+    without a blur filter."""
+    return [path(d, transform=f'translate({f2(.16 * depth)} {f2(.22 * depth)})', fill=SHADOW,
+                 fill_opacity=.13 * alpha),
+            path(d, transform=f'translate({f2(.38 * depth)} {f2(.5 * depth)})', fill=SHADOW,
+                 fill_opacity=.08 * alpha)]
+
+
+def mute(c):
+    """Real paper and ink: pastel colours lose most of their saturation and a little lightness, and drift
+    warm."""
+    r, g, b = hex_rgb(c)
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    s *= .52
+    l = .04 + l * .9
+    r, g, b = colorsys.hls_to_rgb(h, l, s)
+    warm = (.78, .70, .58)
+    k = .1
+    return rgb_hex(r * (1 - k) + warm[0] * k, g * (1 - k) + warm[1] * k, b * (1 - k) + warm[2] * k)
+
+
+def rect_pts(x0, y0, x1, y1, r=0.0, n=3):
+    """A rectangle's outline as points, its corners rounded by r (sampled with n points each)."""
+    x0, x1 = sorted((x0, x1))
+    y0, y1 = sorted((y0, y1))
+    r = min(r, (x1 - x0) / 2, (y1 - y0) / 2)
+    if r <= 0:
+        return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    out = []
+    for cx, cy, a0 in ((x1 - r, y0 + r, -90), (x1 - r, y1 - r, 0), (x0 + r, y1 - r, 90), (x0 + r, y0 + r, 180)):
+        for i in range(n + 1):
+            a = math.radians(a0 + 90 * i / n)
+            out.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
+    return out
+
+
+def cut_piece(rng, pts, colour, depth=1.0, amp=.07, **attrs):
+    """A piece of paper cut along `pts`, with its soft shadow."""
+    d = cut_outline(rng, pts, amp=amp, step=max(.5, amp * 7))
+    return soft_shadow(d, depth) + [path(d, fill=colour, **attrs)]
+
+
+def area(pts):
+    return abs(_signed_area(pts))
