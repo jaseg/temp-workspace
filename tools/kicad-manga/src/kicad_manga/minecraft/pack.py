@@ -173,12 +173,16 @@ class ResourcePack:
         bs = self.blockstate(name)
         out = []
         if 'variants' in bs:
+            # the variant agreeing with most given properties; properties not given match anything
             best, best_n = None, -1
             for key, v in bs['variants'].items():
                 conds = dict(kv.split('=', 1) for kv in key.split(',') if '=' in kv)
-                if all(props.get(k, _default(k)) == val for k, val in conds.items()):
-                    if len(conds) > best_n:
-                        best, best_n = v, len(conds)
+                given = {k: props.get(k, _default(k)) for k in conds}
+                if any(given[k] and given[k] != val for k, val in conds.items()):
+                    continue
+                n = sum(1 for k, val in conds.items() if given[k] == val)
+                if n > best_n:
+                    best, best_n = v, n
             if best is None:
                 best = next(iter(bs['variants'].values()))
             out.append(_pick(best))

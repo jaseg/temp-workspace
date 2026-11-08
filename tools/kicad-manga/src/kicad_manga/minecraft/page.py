@@ -1,16 +1,11 @@
 """Around the circuit: the stone platform it is built on, the meadow, the page border, the title block, a legend,
-and trees, flowers and ponds in the empty space. All of it is made of blocks on the schematic's grid, and nothing
-tall stands where it would hide part of the circuit."""
+and trees, flowers and ponds in the empty space. All of it is made of blocks on the schematic's grid."""
 
 import random
 import re
 from pathlib import Path
 
-from PIL import Image
-
 from ..kicad import title_comment
-from ..svg import tag
-from .iso import PIXELATED, png_uri, proj
 from .world import Block, Plaque
 
 MARGIN_MM = 10              # KiCad's drawing sheet frame
@@ -261,17 +256,6 @@ class Page:
     def blocked(self, c):
         return c in self.platform or c in self.taken or c in self.w.solid or not self.in_frame(c)
 
-    def clear_behind(self, i, j, height, r=1):
-        """Whether something `height` blocks tall and r cells wide at (i, j) leaves the circuit in view: the cells
-        it covers on screen (those behind it) must not be part of the circuit."""
-        for a in range(-r - 1, r + 2):
-            for b in range(-r - 1, r + 2):
-                for t in range(0, int(height) + 2):
-                    c = (i + a - t, j + b - t)
-                    if c in self.platform or c in self.taken or not self.in_frame(c):
-                        return False
-        return True
-
     def ponds(self, free):
         rng = self.rng
         area = len(free)
@@ -310,7 +294,7 @@ class Page:
                 continue
             kind = rng.choice(['oak', 'oak', 'birch', 'spruce'])
             hgt = rng.randint(4, 6)
-            if not self.free([(i, j)], 3) or not self.clear_behind(i, j, hgt + 2, 2):
+            if not self.free([(i, j)], 3):
                 continue
             placed.append((i, j))
             self.tree(i, j, kind, hgt)
@@ -346,7 +330,7 @@ class Page:
             if n <= 0:
                 break
             i, j = rng.choice(free)
-            if not self.free([(i, j)], 1) or not self.clear_behind(i, j, 1, 0):
+            if not self.free([(i, j)], 1):
                 continue
             name, props = rng.choice(things)
             self.put(i, 0, j, name, props)
@@ -370,66 +354,7 @@ class Page:
                 continue
             if plant == 'short_grass' and rng.random() < .25:
                 plant = rng.choice(['fern', 'short_grass', 'dandelion', 'poppy'])
-            if not self.clear_behind(i, j, 1, 0):
-                continue
             self.put(i, 0, j, plant)
-
-    # -- the sky ------------------------------------------------------------------------------------
-    def sky(self):
-        """A sky gradient and a few clouds from the pack's cloud texture in the corners of the page."""
-        defs = [tag('linearGradient', [tag('stop', offset=0, stop_color='#7fb2ff'),
-                                       tag('stop', offset=1, stop_color='#cfe4ff')],
-                    id='sky', x1=0, y1=0, x2=0, y2=1)]
-        clouds = []
-        data = self.pack.asset('textures', 'environment/clouds', '.png')
-        if data is not None:
-            import io
-            img = Image.open(io.BytesIO(data)).convert('RGBA')
-            i0, j0, W, H = self.w.i0, self.w.j0, self.w.W, self.w.H
-            left, top = proj(i0 - .5, 0, H - .5)[0], proj(i0 - .5, 0, j0 - .5)[1]
-            right = proj(W - .5, 0, j0 - .5)[0]
-            bottom = proj(W - .5, 0, H - .5)[1]
-            rng = self.rng
-            for k in range(8):
-                for _ in range(30):
-                    cw, ch = rng.randint(12, 28), rng.randint(6, 12)
-                    sx, sy = rng.randint(0, 255 - cw), rng.randint(0, 255 - ch)
-                    crop = img.crop((sx, sy, sx + cw, sy + ch))
-                    if crop.getbbox() is None:
-                        continue
-                    scale = rng.uniform(40, 70)
-                    gw, gh = cw * scale, ch * scale * .5
-                    x = rng.uniform(left - gw / 2, right - gw / 2)
-                    y = rng.uniform(top - 6 * 16, bottom)
-                    if self.over_island(x, y, gw, gh):
-                        continue
-                    white = Image.new('RGBA', crop.size, (255, 255, 255, 0))
-                    white.putalpha(crop.getchannel('A').point(lambda v: 230 if v else 0))
-                    clouds.append(tag('image', x=x, y=y, width=gw, height=gh, preserveAspectRatio='none',
-                                      style=PIXELATED, href=png_uri(white)))
-                    break
-        return {'fill': 'url(#sky)', 'defs': defs, 'background': clouds}
-
-    def over_island(self, x, y, w, h):
-        i0, j0, W, H = self.w.i0, self.w.j0, self.w.W, self.w.H
-        poly = [proj(i0 - .5, 0, j0 - .5), proj(W - .5, 0, j0 - .5), proj(W - .5, 0, H - .5), proj(i0 - .5, 0, H - .5)]
-        for px in (x - 16 * 4, x + w / 2, x + w + 16 * 4):
-            for py in (y - 16 * 4, y + h / 2, y + h + 16 * 4):
-                if inside(px, py, poly):
-                    return True
-        # the island's edges crossing the cloud
-        cx, cy = x + w / 2, y + h / 2
-        return inside(cx, cy, poly)
-
-
-def inside(x, y, poly):
-    res = False
-    n = len(poly)
-    for k in range(n):
-        (x1, y1), (x2, y2) = poly[k], poly[(k + 1) % n]
-        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
-            res = not res
-    return res
 
 
 def dilate(cells, r):

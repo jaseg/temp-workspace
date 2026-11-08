@@ -19,7 +19,8 @@
     [minecraft]              # the minecraft style
     packs = []               # resource packs (.zip or folders), first wins; e.g. ["my-pack.zip", "default.zip"]
     block_mm = 1.27          # schematic grid step that becomes one block
-    dust_width = 2.0         # redstone dust drawn this many times wider than in the game
+    dust_width = 3.0         # redstone dust drawn this many times wider than in the game
+    px_per_block = 16        # raster resolution: 16 shows a 16x16 pack's textures pixel for pixel
 """
 
 import copy
@@ -40,7 +41,8 @@ DEFAULTS = {
     'minecraft': {
         'packs': [],
         'block_mm': 1.27,
-        'dust_width': 2.0,
+        'dust_width': 3.0,
+        'px_per_block': 16,
     },
 }
 

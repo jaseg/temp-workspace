@@ -101,8 +101,8 @@ reference as id, and wires are grouped by net.
 
 ## Minecraft style
 
-`--style minecraft` builds the schematic as an isometric redstone build out of the blocks of a Minecraft resource
-pack:
+`--style minecraft` draws the schematic, seen from straight above, as a redstone build out of the blocks of a
+Minecraft resource pack:
 
 ```sh
 uv run kicad-manga board.kicad_sch -s minecraft --pack default-pack.zip           # ./board-minecraft.svg/.png/.pdf
@@ -110,7 +110,7 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
 ```
 
 - **Packs:** any pack, as a .zip (also with a folder inside) or a folder. Packs stack like in the game. Textures,
-  block models, blockstates, the biome colormaps, the cloud texture and the bitmap font all come from the packs.
+  block models, blockstates, the biome colormaps and the bitmap font all come from the packs.
   Texture-only packs work on top of a complete pack, and on their own with simple built-in models.
 - **Grid:** one block per schematic grid step (`block_mm`, 1.27 mm). Pins, wires and labels snap to it.
 - **Parts:**
@@ -132,21 +132,26 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
 - **Around it:** the circuit stands on smooth stone in a meadow. Around it are a stone border with a wall,
   lanterns and zone signs, a title block platform, a legend, and trees, ponds, props and flowers. Tall things
   stay where they don't hide the circuit. Parts placed beside the sheet get ground of their own.
-- **Output:** the SVG places each texture with a transform and pixelated rendering, so the PDF stays sharp at any
-  zoom. After conversion, identical images in the PDF are merged with pikepdf.
+- **Drawing:** each block is drawn from its model's upward faces, lower faces a little darker. Blocks that show
+  little from above (flowers, torches, lanterns) are drawn as their item icon, like on a map, and standing blocks
+  cast a short shadow.
+- **Output:** the blocks become one raster image at `px_per_block` pixels per block (16, the pack's texture size),
+  cut into tiles and drawn pixelated. Text goes on top as vector paths traced from the pack's font, so it stays
+  sharp at any zoom. An A1 sheet gives a PDF of about 10 MB that opens in a few seconds.
 
 ```toml
 style = "minecraft"
 [minecraft]
 packs = ["default-pack.zip"]     # relative to the settings file
 block_mm = 1.27
-dust_width = 2.0
+dust_width = 3.0
+px_per_block = 16
 ```
 
 The code is in `minecraft/`:
 
 - `pack.py`: resource packs.
-- `iso.py`: the projection, and models into SVG.
+- `topdown.py`: block models into small images seen from above.
 - `font.py`: the bitmap font.
 - `world.py`: the block grid, routing and plaque placement.
 - `circuit.py`: the schematic into blocks.
