@@ -159,6 +159,53 @@ The code is in `minecraft/`:
 - `draw.py`: the world into SVG.
 - `render.py`: the whole pipeline, and the PDF.
 
+## Cross-stitch style
+
+`--style crossstitch` embroiders the schematic on aida cloth, like a sampler:
+
+```sh
+uv run kicad-manga board.kicad_sch -s crossstitch          # ./board-crossstitch.svg/.png/.pdf
+```
+
+- **Cloth:** the holes of the aida sit on the schematic grid (`hole_mm`, 1.27 mm), so wires run from hole to hole.
+- **Stitches:**
+  - Wires are backstitched in their net's thread, one stitch per grid step. Buses are couched: a thick laid thread
+    tied down at every hole.
+  - Junctions are French knots, no-connects one big red cross stitch.
+  - Symbol bodies that KiCad fills are filled with cross stitches, in a pastel per library. Small filled shapes
+    (diode triangles and the like) are satin stitched.
+  - Outlines, pins and all text are backstitched along KiCad's own drawing, text in KiCad's stroke font.
+  - Power symbols are stitched in their rail's thread.
+- **Threads:** a box of named flosses. Nets keep the manga style's hue families, snapped to the nearest floss.
+  Supply rails are coral and grounds slate.
+- **Around it:** a floral sampler border with a rose in each corner, in the margin outside KiCad's frame. A title
+  panel with a row of motifs, the title in a cross-stitched sampler alphabet and the title block details. A floss
+  key lists the threads and what they were used for. The panels go to the free spot nearest the bottom right
+  corner.
+- **Output:** the cloth is one raster image built from a repeated patch, so it compresses to a few hundred kB.
+  The stitches are vector paths, one per thread colour and layer, and backstitch is drawn as dashed lines. Nothing
+  is transparent. An A1 sheet gives a PDF of about 2 MB.
+
+Everything is taken from gerbonara's SVG export: a colour scheme whose colours are role names tells the parts of
+KiCad's drawing apart. Text placement is best with gerbonara at the top of the KiCad schematic pull request stack.
+
+```toml
+style = "crossstitch"
+[crossstitch]
+hole_mm = 1.27
+px_per_cell = 8          # resolution of the cloth's raster
+```
+
+The code is in `crossstitch/`:
+
+- `geometry.py`: gerbonara's SVG `Tag`s into polylines and circles.
+- `chart.py`: the schematic into a stitch chart.
+- `threads.py`: the floss box and the cloth colours.
+- `motifs.py`: the sampler alphabet and motifs.
+- `page.py`: the border, the title panel and the floss key.
+- `draw.py`: the chart into SVG.
+- `render.py`: the whole pipeline, and the PDF.
+
 ## Development
 
 ```sh

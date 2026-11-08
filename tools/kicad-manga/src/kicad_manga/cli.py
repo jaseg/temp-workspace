@@ -29,7 +29,7 @@ from .render import build_svg, write_pdf, write_png
 @click.option('--seed', type=int, help='Random seed for the decorations.')
 @click.option('--no-decorations', is_flag=True, help='No plants, cables, shelves or sparkles.')
 @click.option('--no-characters', is_flag=True, help='Draw passives as plain symbols.')
-@click.option('-s', '--style', type=click.Choice(['manga', 'minecraft']),
+@click.option('-s', '--style', type=click.Choice(['manga', 'minecraft', 'crossstitch']),
               help='Drawing style (default: manga).')
 @click.option('--pack', 'packs', multiple=True, type=click.Path(exists=True, path_type=Path),
               help='Minecraft resource pack (.zip or folder), repeatable; the first one given wins.')
@@ -60,6 +60,8 @@ def main(schematic, output, config_file, formats, dpmm, title, subtitle, kicker,
 
     if cfg['style'] == 'minecraft':
         return minecraft(schematic, output, cfg)
+    if cfg['style'] == 'crossstitch':
+        return crossstitch(schematic, output, cfg)
 
     out = output or Path.cwd() / f'{schematic.stem}-manga'
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -98,6 +100,27 @@ def minecraft(schematic, output, cfg):
     if 'pdf' in cfg['formats']:
         try:
             mc_pdf(svg, out.with_suffix('.pdf'))
+        except RuntimeError as e:
+            raise click.ClickException(str(e))
+        click.echo(f'wrote {out.with_suffix(".pdf")}')
+
+
+def crossstitch(schematic, output, cfg):
+    from .crossstitch.render import build_svg, write_pdf as cs_pdf
+    out = output or Path.cwd() / f'{schematic.stem}-crossstitch'
+    out.parent.mkdir(parents=True, exist_ok=True)
+    svg, page = build_svg(schematic, cfg)
+    for line in page.report():
+        click.echo(line)
+    if 'svg' in cfg['formats']:
+        out.with_suffix('.svg').write_text(svg, encoding='utf-8')
+        click.echo(f'wrote {out.with_suffix(".svg")}')
+    if 'png' in cfg['formats']:
+        write_png(svg, [], cfg['png_px_per_mm'], page.page_mm[0], out.with_suffix('.png'))
+        click.echo(f'wrote {out.with_suffix(".png")}')
+    if 'pdf' in cfg['formats']:
+        try:
+            cs_pdf(svg, out.with_suffix('.pdf'))
         except RuntimeError as e:
             raise click.ClickException(str(e))
         click.echo(f'wrote {out.with_suffix(".pdf")}')

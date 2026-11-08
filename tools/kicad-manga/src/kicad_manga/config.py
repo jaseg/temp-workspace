@@ -1,7 +1,7 @@
 """Settings: built-in defaults < kicad-manga.toml < command line.
 
     # kicad-manga.toml
-    style = "manga"          # or "minecraft"
+    style = "manga"          # or "minecraft", "crossstitch"
     formats = ["svg", "png", "pdf"]
     png_px_per_mm = 10
     seed = 42
@@ -21,6 +21,10 @@
     block_mm = 1.27          # schematic grid step that becomes one block
     dust_width = 3.0         # redstone dust drawn this many times wider than in the game
     px_per_block = 16        # raster resolution: 16 shows a 16x16 pack's textures pixel for pixel
+
+    [crossstitch]            # the cross-stitch sampler style
+    hole_mm = 1.27           # aida hole pitch: the schematic grid, so wires run from hole to hole
+    px_per_cell = 8          # resolution of the cloth's raster
 """
 
 import copy
@@ -43,6 +47,10 @@ DEFAULTS = {
         'block_mm': 1.27,
         'dust_width': 3.0,
         'px_per_block': 16,
+    },
+    'crossstitch': {
+        'hole_mm': 1.27,
+        'px_per_cell': 8,
     },
 }
 

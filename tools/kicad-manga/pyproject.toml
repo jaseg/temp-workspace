@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "kicad-manga"
 version = "0.1.0"
-description = "Render a KiCad schematic as a pastel, manga-styled poster, or as a Minecraft redstone build (SVG, PNG, PDF)."
+description = "Render a KiCad schematic as a pastel, manga-styled poster, a Minecraft redstone build or a cross-stitch sampler (SVG, PNG, PDF)."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"
