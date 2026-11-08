@@ -21,6 +21,16 @@ def paper_name(sch):
     return f'{p.width:g}×{p.height:g} mm' if p.page_format == 'User' and p.width else str(p.page_format)
 
 
+def title_comment(tb, n):
+    """Title block comment n (from 1), with older and newer gerbonara alike."""
+    if tb is None:
+        return ''
+    if hasattr(tb, 'comment'):
+        return tb.comment(n) or ''
+    cs = tb.comments or []
+    return (cs[n - 1] or '') if 0 < n <= len(cs) and isinstance(cs[n - 1], str) else ''
+
+
 def hex_color(c):
     """A gerbonara Color as '#rrggbb', or None when absent or fully transparent."""
     if c is None or c.r is None or not c.a:

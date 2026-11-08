@@ -23,6 +23,8 @@ class Drawer:
 
     # -- floor ---------------------------------------------------------------------
     def top_texture(self, block):
+        if block == 'water':            # liquids have no model
+            return 'block/water_still', True
         m = self.pack.model(f'block/{block}')
         for el in m['elements']:
             f = el.get('faces', {}).get('up')
@@ -54,8 +56,8 @@ class Drawer:
         """The floor, as one parallelogram per run of cells of the same block in a row, filled with a pattern."""
         out = {}
         W, H = self.w.W, self.w.H
-        for j in range(H):
-            i = 0
+        for j in range(self.w.j0, H):
+            i = self.w.i0
             while i < W:
                 b = self.floor_of((i, j))
                 k = i
@@ -72,14 +74,15 @@ class Drawer:
 
     def cliff(self, depth=3):
         """The sides of the ground along the front edges: grass, then dirt, then stone."""
-        W, H = self.w.W, self.w.H
+        i0, j0, W, H = self.w.i0, self.w.j0, self.w.W, self.w.H
         parts = []
         layers = [('block/grass_block_side', 0, 1), ('block/dirt', 1, depth - 1), ('block/stone', depth - 1, depth)]
         for tex, y0, y1 in layers:
-            ps = self.pattern(tex, None, .8, 'south', (-.5, -y0, H - .5))
+            ps = self.pattern(tex, None, .8, 'south', (i0 - .5, -y0, H - .5))
             pe = self.pattern(tex, None, .6, 'east', (W - .5, -y0, H - .5))
-            parts.append(tag('path', d=quad((-.5, -y0, H - .5), (W, 0, 0), (0, -(y1 - y0), 0)), fill=f'url(#{ps})'))
-            parts.append(tag('path', d=quad((W - .5, -y0, H - .5), (0, 0, -H), (0, -(y1 - y0), 0)),
+            parts.append(tag('path', d=quad((i0 - .5, -y0, H - .5), (W - i0, 0, 0), (0, -(y1 - y0), 0)),
+                             fill=f'url(#{ps})'))
+            parts.append(tag('path', d=quad((W - .5, -y0, H - .5), (0, 0, -(H - j0)), (0, -(y1 - y0), 0)),
                              fill=f'url(#{pe})'))
         return parts
 
@@ -160,10 +163,12 @@ class Drawer:
         return tag('use', href=f'#{iid}', transform=matrix(origin, u, v, w, h)), tw, th
 
     def plaques(self):
-        flat, texts = [], []
+        """(flat plaques, their texts, raised plaques and their texts for the standing layer)."""
+        flat, texts, raised = [], [], []
         for pq in self.w.plaques:
             block, col, shadow = STYLES[pq.style]
-            y = PLAQUE_H / 16
+            y0 = pq.meta.get('y', 0)
+            y = y0 + PLAQUE_H / 16
             if block:
                 tex, _ = self.top_texture(block)
                 side = self.side_texture(block)
@@ -172,7 +177,7 @@ class Drawer:
                         cull = tuple(d for d, ok in (('east', a + 1 < pq.w), ('south', b + 1 < pq.h)) if ok)
                         sid = self.sprites.box(tex, side, PLAQUE_H, None, cull)
                         i, j = pq.i + a, pq.j + b
-                        flat.append((i + j, use(sid, i - .5, 0, j - .5)))
+                        (raised if y0 else flat).append((i + j + y0 + .6, use(sid, i - .5, y0, j - .5)))
             x0, z0 = pq.i - .5, pq.j - .5
             img = self.font.render(pq.text, col, shadow)
             tw, th = img.width * pq.scale / PX_PER_CELL, img.height * pq.scale / PX_PER_CELL
@@ -182,8 +187,11 @@ class Drawer:
             else:
                 origin = (x0 + (pq.w - th) / 2, y, z0 + pq.h - (pq.h - tw) / 2)
                 t, _, _ = self.text_use(pq.text, col, shadow, origin, (0, 0, -1), (1, 0, 0), pq.scale)
-            texts.append(t)
-        return flat, texts
+            if y0:
+                raised.append((pq.i + pq.w + pq.j + pq.h + y0, t))
+            else:
+                texts.append(t)
+        return flat, texts, raised
 
     def side_texture(self, block):
         m = self.pack.model(f'block/{block}')
@@ -214,17 +222,17 @@ class Drawer:
         floor = self.floor()
         cliff = self.cliff()
         flat = self.blocks(True) + self.dust_blocks() + list(extra_flat)
-        pflat, ptexts = self.plaques()
+        pflat, ptexts, praised = self.plaques()
         flat += pflat
         flat.sort(key=lambda t: t[0])
-        tall = self.blocks(False) + list(extra_tall)
+        tall = self.blocks(False) + list(extra_tall) + praised
         tall.sort(key=lambda t: t[0])
         texts2 = self.free_texts()
 
-        W, H = self.w.W, self.w.H
-        x0 = proj(-.5, 0, H - .5)[0] - UNIT
-        x1 = proj(W - .5, 0, -.5)[0] + UNIT
-        y0 = proj(-.5, 0, -.5)[1] - UNIT * 8
+        i0, j0, W, H = self.w.i0, self.w.j0, self.w.W, self.w.H
+        x0 = proj(i0 - .5, 0, H - .5)[0] - UNIT
+        x1 = proj(W - .5, 0, j0 - .5)[0] + UNIT
+        y0 = proj(i0 - .5, 0, j0 - .5)[1] - UNIT * 8
         y1 = proj(W - .5, -3, H - .5)[1] + UNIT
         vw, vh = x1 - x0, y1 - y0
         if page_mm:

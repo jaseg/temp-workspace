@@ -72,8 +72,9 @@ class Plaque:
 
 
 class World:
-    def __init__(self, W, H):
-        self.W, self.H = W, H
+    def __init__(self, i0, j0, i1, j1):
+        self.i0, self.j0 = i0, j0           # the world's cells are i0 <= i < W, j0 <= j < H
+        self.W, self.H = i1, j1
         self.dust = {}              # cell -> {net: set of directions}
         self.solid = {}             # cell -> owner, for anything that blocks dust, plaques and other parts
         self.soft = {}              # cell -> owner, kept clear for one owner (pins before they are routed)
@@ -84,7 +85,7 @@ class World:
         self.circuit = set()        # cells that belong to the schematic (for the platform and decorations)
 
     def inside(self, c):
-        return 0 <= c[0] < self.W and 0 <= c[1] < self.H
+        return self.i0 <= c[0] < self.W and self.j0 <= c[1] < self.H
 
     # -- dust -------------------------------------------------------------------
     def link(self, a, b, net):

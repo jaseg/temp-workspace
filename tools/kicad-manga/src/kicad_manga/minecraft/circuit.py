@@ -53,7 +53,23 @@ class Builder:
     def __init__(self, sch, pack, font, block_mm=1.27):
         self.sch, self.pack, self.font, self.b = sch, pack, font, block_mm
         W, H = paper_size(sch)
-        self.world = World(math.ceil(W / block_mm) + 1, math.ceil(H / block_mm) + 1)
+        self.paper = (math.ceil(W / block_mm) + 1, math.ceil(H / block_mm) + 1)
+        # the world covers the sheet, and whatever was put beside it
+        xs, ys = [0, W], [0, H]
+        for item in (*sch.symbols, *sch.local_labels, *sch.global_labels, *sch.hierarchical_labels, *sch.texts):
+            x, y = at(item)
+            xs.append(x)
+            ys.append(y)
+        for wire in (*sch.wires, *sch.buses):
+            for p in wire.points:
+                xs.append(float(p.x))
+                ys.append(float(p.y))
+        pad = 12
+        lo_i, lo_j = math.floor(min(xs) / block_mm), math.floor(min(ys) / block_mm)
+        hi_i, hi_j = math.ceil(max(xs) / block_mm), math.ceil(max(ys) / block_mm)
+        self.world = World(lo_i - pad if lo_i < 0 else 0, lo_j - pad if lo_j < 0 else 0,
+                           hi_i + pad if hi_i > self.paper[0] else self.paper[0],
+                           hi_j + pad if hi_j > self.paper[1] else self.paper[1])
         self.libs = lib_symbols(sch)
         self.net_names = {}
         self.net_power = {}

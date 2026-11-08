@@ -19,7 +19,7 @@ DEFAULT_BUBBLE = "let's build something cute~! ♡"
 def title_info(sch, path, overrides):
     """Title panel text from the title block, with config/command-line overrides."""
     tb = sch.title_block
-    comment = tb.comment if tb is not None else (lambda n: '')
+    comment = lambda n: kicad.title_comment(tb, n)  # noqa: E731
     stem = re.sub(r'^[0-9a-f]{8}-', '', Path(path).stem)
     pages = [p.page for p in sch.sheet_instances]
     rev, date, company = (tb.rev, tb.date, tb.company) if tb is not None else ('', '', '')

@@ -28,7 +28,9 @@ def build_svg(path, cfg):
     drawer = Drawer(world, pack, font, page.floor_of, page.tints)
     drawer.dust_width = mc['dust_width']
     page.page_mm = paper_size(sch)
-    svg = drawer.svg(builder.power, page.sky(), extra_tall=page.extra_tall, page_mm=page.page_mm)
+    sky = page.sky()
+    svg = drawer.svg(builder.power, sky, extra_tall=page.extra_tall, page_mm=page.page_mm,
+                     background=sky.get('background', ()))
     return svg, page
 
 
