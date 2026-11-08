@@ -8,6 +8,7 @@ sharp at any zoom."""
 
 import base64
 import io
+import math
 
 from PIL import Image, ImageDraw
 
@@ -192,11 +193,11 @@ class Drawer:
                 self.plaque(img, pq)
         return img.convert('RGB')
 
-    SUN = (-.45, -.65)              # how far a shadow moves (east, south) per block of height
+    SUN = (-1.0, -1.45)             # how far a shadow moves (east, south) per block of height: a low sun, ~35 deg up
 
     def shadows(self, img, blocks):
         """Sun shadows on the ground: each block's outline seen from above, swept from its bottom to its top along
-        the sun's direction (from the south-east, high up, so shadows fall to the north-west). Leaves let light through their holes."""
+        the sun's direction (from the south-east, low in the sky, so shadows fall to the north-west). Leaves let light through their holes."""
         px = self.px
         layer = Image.new('L', img.size, 0)
         full = Image.new('L', (px, px), 255)
@@ -209,12 +210,11 @@ class Drawer:
             if mask is None:
                 continue
             x, y = self.at(b.i, b.j)
-            n = max(2, round(top * 4))
+            n = max(2, math.ceil(top * math.hypot(*self.SUN) * px / 2))     # a step every 2 px: no gaps
             for k in range(n + 1):
                 t = b.y + top * k / n
                 sx, sy = round(x + t * self.SUN[0] * px), round(y + t * self.SUN[1] * px)
-                if 0 <= sx and 0 <= sy and sx + px <= img.width and sy + px <= img.height:
-                    layer.paste(full, (sx, sy), mask)
+                layer.paste(full, (sx, sy), mask)       # clipped at the page edge
         shade = Image.new('RGBA', img.size, (16, 20, 40, 255))
         shade.putalpha(layer.point(lambda v: v * 90 // 255))
         img.alpha_composite(shade)
