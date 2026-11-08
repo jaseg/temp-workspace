@@ -192,11 +192,11 @@ class Drawer:
                 self.plaque(img, pq)
         return img.convert('RGB')
 
-    SUN = (.45, .65)                # how far a shadow moves (east, south) per block of height
+    SUN = (-.45, -.65)              # how far a shadow moves (east, south) per block of height
 
     def shadows(self, img, blocks):
         """Sun shadows on the ground: each block's outline seen from above, swept from its bottom to its top along
-        the sun's direction (from the north-west, high up). Leaves let light through their holes."""
+        the sun's direction (from the south-east, high up, so shadows fall to the north-west). Leaves let light through their holes."""
         px = self.px
         layer = Image.new('L', img.size, 0)
         full = Image.new('L', (px, px), 255)

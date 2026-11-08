@@ -139,7 +139,7 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
   and turned `yaw_deg` (30) from due south towards the east. The ground keeps its place on the page, so the sheet
   stays a rectangle; every block shows its top, its south side and a sliver of its east side, and leans a little
   to the north-west. Faces are shaded like in the game (sides 80 % and 60 %), with ambient occlusion where blocks meet
-  the ground, and everything solid casts a sun shadow to the south-east. The page frame (a garden path with a flowering
+  the ground, and everything solid casts a sun shadow to the north-west. The page frame (a garden path with a flowering
   hedge, lanterns and zone signs) is drawn flat on top of everything, and so is all text.
 - **Output:** the blocks become one raster image at `px_per_block` pixels per block (16, the pack's texture size),
   cut into tiles and drawn pixelated. Text goes on top as vector paths traced from the pack's font, so it stays
