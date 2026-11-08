@@ -1,6 +1,6 @@
 """The schematic, built from blocks.
 
-- **Grid:** one block per schematic grid step (1.27 mm by default). Wire ends, pins and labels are snapped to it.
+- **Grid:** one block per 2.54 mm (the usual pin pitch) by default. Wire ends, pins and labels are snapped to it.
 - **Wires** are redstone dust, coloured by net (grounds unpowered, supplies at full power), buses are rails.
 - **Diodes** are repeaters pointing from anode to cathode (LEDs are lit), **transistors** comparators (P-type in
   subtract mode) with collector/drain at the back, emitter/source in front and the base/gate at a side.
@@ -20,26 +20,26 @@ from ..circuit import UF, prop_value, ref_prefix, shape_points, unit_graphics
 from ..kicad import at, font, hidden, justify, lib_symbols, paper_size, quarter_turned, rotation, xy
 from .world import DIRS, OPP, Block, Plaque, World, cells_on_segment, dir_of
 
-PX_PER_CELL = 10                        # font pixels per block (8 pixel glyphs plus a pixel above and below)
+FONT_PX_PER_MM = 10 / 1.27              # font pixels per mm on paper: 8 pixel glyphs about 1 mm high
 
 # plaque styles: base block, text colour, text shadow
 STYLES = {
-    'label': ('birch_planks', (32, 24, 16), False),
-    'global': ('cherry_planks', (40, 16, 24), False),
-    'hier': ('warped_planks', (255, 255, 255), True),
-    'ref': ('oak_planks', (24, 16, 8), False),
-    'value': ('spruce_planks', (255, 255, 255), True),
-    'power': ('red_concrete', (255, 255, 255), True),
-    'note': ('white_concrete', (40, 40, 40), False),
-    'heading': ('smooth_quartz', (40, 40, 40), False),
-    'pin': (None, (235, 235, 235), True),
-    'title': ('polished_andesite', (255, 255, 255), True),
-    'sign': ('stripped_dark_oak_wood', (255, 240, 200), True),
+    'label': ('white_wool', (74, 52, 40), False),
+    'global': ('pink_wool', (96, 32, 56), False),
+    'hier': ('light_blue_wool', (28, 52, 96), False),
+    'ref': ('lime_terracotta', (34, 44, 20), False),
+    'value': ('cherry_planks', (84, 36, 40), False),
+    'power': ('red_wool', (255, 245, 235), True),
+    'note': ('calcite', (70, 60, 55), False),
+    'heading': ('yellow_wool', (90, 60, 20), False),
+    'pin': (None, (255, 250, 240), True),
+    'title': ('white_wool', (150, 50, 80), False),
+    'sign': ('stripped_cherry_wood', (80, 30, 40), False),
 }
 
-BODY_BLOCKS = ['polished_blackstone', 'polished_deepslate', 'deepslate_tiles', 'tuff_bricks', 'polished_tuff',
-               'deepslate_bricks', 'mud_bricks', 'polished_blackstone_bricks']
-CONNECTOR_BLOCKS = ['dark_oak_planks', 'stripped_dark_oak_log', 'mangrove_planks']
+BODY_BLOCKS = ['spruce_planks', 'dark_oak_planks', 'mangrove_planks', 'brown_terracotta', 'green_terracotta',
+               'cyan_terracotta', 'purple_terracotta']
+CONNECTOR_BLOCKS = ['stripped_dark_oak_wood', 'stripped_spruce_wood', 'stripped_mangrove_wood']
 
 GROUND = re.compile(r'GND|EARTH|VSS|^0V$|CHASSIS', re.I)
 SUPPLY = re.compile(r'^\+|VCC|VDD|VBUS|VBAT|^V[0-9]|[0-9]V[0-9]*$', re.I)
@@ -50,10 +50,14 @@ def stable_hash(s):
 
 
 class Builder:
-    def __init__(self, sch, pack, font, block_mm=1.27):
+    def __init__(self, sch, pack, font, block_mm=2.54):
         self.sch, self.pack, self.font, self.b = sch, pack, font, block_mm
+        self.fpx = max(8, round(block_mm * FONT_PX_PER_MM))      # font pixels per block
         W, H = paper_size(sch)
-        self.paper = (math.ceil(W / block_mm) + 1, math.ceil(H / block_mm) + 1)
+        self.origin = self.grid_origin()
+        ox, oy = self.origin
+        # cells of the sheet: cell (i, j) covers origin + ((i - .5) b, (j - .5) b) to origin + ((i + .5) b, ...)
+        self.paper = (math.ceil((W - ox) / block_mm + .5), math.ceil((H - oy) / block_mm + .5))
         # the world covers the sheet, and whatever was put beside it
         xs, ys = [0, W], [0, H]
         for item in (*sch.symbols, *sch.local_labels, *sch.global_labels, *sch.hierarchical_labels, *sch.texts):
@@ -64,19 +68,50 @@ class Builder:
             for p in wire.points:
                 xs.append(float(p.x))
                 ys.append(float(p.y))
-        pad = 12
-        lo_i, lo_j = math.floor(min(xs) / block_mm), math.floor(min(ys) / block_mm)
-        hi_i, hi_j = math.ceil(max(xs) / block_mm), math.ceil(max(ys) / block_mm)
+        pad = 8
+        lo_i, lo_j = self.cell(min(xs), min(ys))
+        hi_i, hi_j = self.cell(max(xs), max(ys))
         self.world = World(lo_i - pad if lo_i < 0 else 0, lo_j - pad if lo_j < 0 else 0,
-                           hi_i + pad if hi_i > self.paper[0] else self.paper[0],
-                           hi_j + pad if hi_j > self.paper[1] else self.paper[1])
+                           hi_i + pad if hi_i >= self.paper[0] else self.paper[0],
+                           hi_j + pad if hi_j >= self.paper[1] else self.paper[1])
         self.libs = lib_symbols(sch)
         self.net_names = {}
         self.net_power = {}
+        self.stuck = []
         self.stats = {'nudged': 0, 'unplaced': 0, 'plaques_moved': 0, 'plaques_stuck': 0}
 
+    def grid_origin(self):
+        """Where the block grid starts (mm): on whichever half of the grid most wire ends, pins and labels sit, so
+        that they land in the middle of their blocks."""
+        b = self.b
+        xs, ys = [], []
+        for wire in self.sch.wires:
+            for p in wire.points:
+                xs.append(float(p.x))
+                ys.append(float(p.y))
+        for item in (*self.sch.symbols, *self.sch.local_labels, *self.sch.global_labels,
+                     *self.sch.hierarchical_labels):
+            x, y = at(item)
+            xs.append(x)
+            ys.append(y)
+
+        def best(vs):
+            def on(o):
+                return sum(1 for v in vs if abs((v - o) / b - round((v - o) / b)) < .05)
+            return max((0.0, b / 2), key=on)
+        return best(xs), best(ys)
+
+    def fcell(self, x, y):
+        """Fractional cell coordinates of a point on the sheet (mm)."""
+        return (x - self.origin[0]) / self.b, (y - self.origin[1]) / self.b
+
+    def mm(self, i, j):
+        """The centre of a cell on the sheet (mm)."""
+        return self.origin[0] + i * self.b, self.origin[1] + j * self.b
+
     def cell(self, x, y):
-        return round(x / self.b), round(y / self.b)
+        fx, fy = self.fcell(x, y)
+        return math.floor(fx + .5 + 1e-9), math.floor(fy + .5 + 1e-9)       # halves always round the same way
 
     def lib(self, sym):
         return self.libs.get(sym.lib_name or sym.lib_id) or self.libs.get(sym.lib_id)
@@ -320,7 +355,7 @@ class Builder:
                     r = float(g.radius or 1)
                     (cx, cy), = pts
                     cells |= {c for c in self.rect_cells(cx - r, cy - r, cx + r, cy + r)
-                              if math.hypot(c[0] * self.b - cx, c[1] * self.b - cy) <= r + .2}
+                              if math.hypot(self.mm(*c)[0] - cx, self.mm(*c)[1] - cy) <= r + .2}
         if not cells:      # no filled shapes: the bounding box of the drawing
             xs, ys = [], []
             for sub in s['subs']:
@@ -337,9 +372,9 @@ class Builder:
         return cells
 
     def rect_cells(self, x0, y0, x1, y1):
-        b = self.b
-        x0, x1 = sorted((x0 / b, x1 / b))
-        y0, y1 = sorted((y0 / b, y1 / b))
+        (x0, y0), (x1, y1) = self.fcell(x0, y0), self.fcell(x1, y1)
+        x0, x1 = sorted((x0, x1))
+        y0, y1 = sorted((y0, y1))
         i0, i1 = math.ceil(x0 - .01), math.floor(x1 + .01)
         j0, j1 = math.ceil(y0 - .01), math.floor(y1 + .01)
         if i1 < i0:
@@ -349,11 +384,10 @@ class Builder:
         return {(i, j) for i in range(i0, i1 + 1) for j in range(j0, j1 + 1)}
 
     def poly_cells(self, pts):
-        b = self.b
         xs, ys = [p[0] for p in pts], [p[1] for p in pts]
         out = set()
         for c in self.rect_cells(min(xs), min(ys), max(xs), max(ys)):
-            if point_in_poly((c[0] * b, c[1] * b), pts):
+            if point_in_poly(self.mm(*c), pts):
                 out.add(c)
         return out or self.rect_cells(min(xs), min(ys), max(xs), max(ys))
 
@@ -373,7 +407,7 @@ class Builder:
         if not cells:
             cells = {s['center']}
         block = self.body_block(s)
-        h = 6
+        h = 10
         for c in cells:
             if block == 'cauldron':
                 w.blocks.append(Block(c[0], 0, c[1], 'state', ('cauldron', ()), owner=s['owner']))
@@ -417,7 +451,7 @@ class Builder:
             start = (p['inner'][0] + d[0], p['inner'][1] + d[1])
             if start not in cells:
                 continue
-            n = self.font.width(name) / PX_PER_CELL
+            n = self.font.width(name) / self.fpx
             vertical = d[0] == 0
             if not vertical:
                 y0 = start[1] - .5
@@ -606,10 +640,10 @@ class Builder:
     def text_cells(self, s, scale=1):
         lines = s.split('\n')
         wpx = max(self.font.width(x) for x in lines) + 2
-        hpx = len(lines) * PX_PER_CELL
-        return max(1, math.ceil(wpx * scale / PX_PER_CELL)), max(1, math.ceil(hpx * scale / PX_PER_CELL))
+        hpx = len(lines) * 10
+        return max(1, math.ceil(wpx * scale / self.fpx)), max(1, math.ceil(hpx * scale / self.fpx))
 
-    def plaque(self, text, anchor, h, vertical, style, scale=1, reach=3, owner=None):
+    def plaque(self, text, anchor, h, vertical, style, scale=1, reach=3, owner=None, net=None):
         """A plaque for text at anchor (cell), justified h ('left', 'right', 'center') along its reading
         direction, then nudged into a free spot."""
         wc, hc = self.text_cells(text, scale)
@@ -623,9 +657,10 @@ class Builder:
             i = i - (hc - 1) // 2
         pq = Plaque(text, i, j, L, T, vertical, style, scale)
         home = (pq.i, pq.j)
-        ok = self.world.place_plaque(pq, reach=reach, along='z' if vertical else 'x', owner=owner)
+        ok = self.world.place_plaque(pq, reach=reach, along='z' if vertical else 'x', owner=owner, net=net)
         if not ok:
             self.stats['plaques_stuck'] += 1
+            self.stuck.append((style, text))
         elif (pq.i, pq.j) != home:
             self.stats['plaques_moved'] += 1
         return pq
@@ -636,13 +671,10 @@ class Builder:
             ang = round(rotation(lab)) % 360
             name = lab.text
             vertical = ang in (90, 270)
-            if kind == 'label':
-                if not vertical:
-                    anchor = (a[0], a[1] - 1)
-                    h = 'left' if ang == 0 else 'right'
-                else:
-                    anchor = (a[0] - 1, a[1])
-                    h = 'left' if ang == 90 else 'right'
+            net = self.net_at(a)
+            if kind == 'label':         # a name tag lying on its own wire
+                anchor = a
+                h = 'left' if ang in (0, 90) else 'right'
             else:
                 step_ = {0: (1, 0), 180: (-1, 0), 90: (0, -1), 270: (0, 1)}[ang]
                 anchor = (a[0] + step_[0], a[1] + step_[1])
@@ -651,7 +683,7 @@ class Builder:
                     h = 'left' if step_[0] > 0 else 'right'
                 else:
                     h = 'left' if step_[1] < 0 else 'right'
-            self.plaque(name, anchor, h, vertical, kind)
+            self.plaque(name, anchor, h, vertical, kind, net=net)
 
     def fields(self, s):
         if s.get('skip_fields'):

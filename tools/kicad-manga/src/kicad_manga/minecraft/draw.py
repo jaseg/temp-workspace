@@ -1,4 +1,5 @@
-"""The world -> SVG, seen from straight above.
+"""The world -> SVG, seen from high up in the south (see `oblique`), with the page frame and all text drawn flat
+on top.
 
 The blocks are drawn into one raster image at the pack's texture resolution (16 pixels per block by default), cut
 into tiles: a PDF viewer then decodes a few large images instead of drawing thousands of small ones, and only the
@@ -11,7 +12,8 @@ import io
 from PIL import Image, ImageDraw
 
 from ..svg import Markup, num, tag
-from .circuit import PX_PER_CELL, STYLES
+from .circuit import STYLES
+from .oblique import Oblique
 from .topdown import TopDown
 from .world import dust_tint
 
@@ -21,14 +23,21 @@ PLAQUE_H = 2                # plaques are 2/16 of a block thick
 
 
 class Drawer:
-    def __init__(self, world, pack, font, floor_of, tints, px=16, dust_width=2.0):
+    def __init__(self, world, pack, font, page, px=16, dust_width=2.0, fpx=20, camera_deg=60):
         self.w, self.pack, self.font = world, pack, font
-        self.td = TopDown(pack, px)
+        self.td = TopDown(pack, px)                 # flat things, and the frame overlay
+        self.ob = Oblique(pack, px, camera_deg)     # everything that stands up
         self.px = px
-        self.floor_of = floor_of            # cell -> floor block name
-        self.tints = tints                  # block name -> tint for its tintindex 0
+        self.page = page
+        self.floor_of = page.floor_of               # cell -> floor block name
+        self.tints = page.tints                     # block name -> tint for its tintindex 0
         self.dust_width = dust_width
+        self.fpx = fpx                              # font pixels per block
         self.glyph_paths = {}
+
+    def lift(self, h):
+        """Pixels by which a height of h blocks shows up on the page."""
+        return h * self.ob.s * self.px
 
     # -- textures ------------------------------------------------------------------
     def face_texture(self, block, face='up'):
@@ -50,15 +59,25 @@ class Drawer:
         return self.td.box(tex, 16, tint)[0]
 
     # -- sprites ---------------------------------------------------------------------
-    def sprite(self, blk):
-        """(image, height of its top) of a Block."""
+    def tint_of(self, name):
+        t = self.tints.get(name)
+        return {0: t} if t else None
+
+    def flat_sprite(self, blk):
+        """Top-down image of a Block."""
         if blk.kind == 'state':
             name, props = blk.args
-            props = dict(props)
-            t = self.tints.get(name)
-            return self.td.state(name, props, {0: t} if t else None)
+            return self.td.state(name, dict(props), self.tint_of(name))[0]
         top, side, h, tint = blk.args
-        return self.td.box(top, h, tint)
+        return self.td.box(top, h, tint)[0]
+
+    def sprite(self, blk):
+        """(image, up) of a standing Block seen from the camera."""
+        if blk.kind == 'state':
+            name, props = blk.args
+            return self.ob.state(name, dict(props), self.tint_of(name))
+        top, side, h, tint = blk.args
+        return self.ob.box(top, side, h, tint)
 
     def dust(self, ds, power):
         """Redstone dust with connections ds, its line and dot stretched across to `dust_width` times their width
@@ -84,13 +103,15 @@ class Drawer:
         return model
 
     # -- the raster ------------------------------------------------------------------------
+    def at(self, i, j):
+        w = self.w
+        return (i - w.i0) * self.px, (j - w.j0) * self.px
+
     def raster(self, power):
         w, px = self.w, self.px
         W, H = (w.W - w.i0) * px, (w.H - w.j0) * px
         img = Image.new('RGBA', (W, H), (0, 0, 0, 255))
-
-        def at(i, j):
-            return (i - w.i0) * px, (j - w.j0) * px
+        at = self.at
 
         tiles = {}
         for j in range(w.j0, w.H):
@@ -100,51 +121,90 @@ class Drawer:
                     tiles[b] = self.floor_tile(b).convert('RGBA')
                 img.paste(tiles[b], at(i, j))
 
-        flat = [b for b in w.blocks if b.flat]
-        tall = [b for b in w.blocks if not b.flat]
-        for b in flat:
-            img.alpha_composite(self.sprite(b)[0], at(b.i, b.j))
+        world = [b for b in w.blocks if not b.overlay]
+        for b in world:
+            if b.flat:
+                blit(img, self.flat_sprite(b), *at(b.i, b.j))
         for c, nets in w.dust.items():
             for net, ds in nets.items():
-                img.alpha_composite(self.dust(ds, power(net)), at(*c))
-        low = [pq for pq in w.plaques if not pq.meta.get('y')]
-        high = [pq for pq in w.plaques if pq.meta.get('y')]
-        for pq in low:
-            self.plaque_base(img, pq, at)
-        # standing blocks: lowest tops first, each with a soft shadow to the south-east
-        items = [(b.y + self.sprite(b)[1], b) for b in tall]
+                blit(img, self.dust(ds, power(net)), *at(*c))
+
+        # everything that stands up, and the plaques, from the back (north) to the front, lowest first
+        items = [((b.j, b.y, b.i), 'block', b) for b in world if not b.flat]
+        items += [((pq.j + pq.h - 1, pq.meta.get('y', 0), pq.i), 'plaque', pq)
+                  for pq in w.plaques if not pq.meta.get('overlay')]
         items.sort(key=lambda t: t[0])
-        for top, b in items:
-            spr, h = self.sprite(b)
-            x, y = at(b.i, b.j)
-            if h >= .25 and b.y == 0:
-                off = max(1, round(px * min(h, 1) / 8))
-                sh = Image.new('RGBA', (px, px), (0, 0, 0, 0))
-                sh.putalpha(spr.getchannel('A').point(lambda v: 70 if v else 0))
-                self.composite_clipped(img, sh, x + off, y + off)
-            img.alpha_composite(spr, (x, y))
-        for pq in high:
-            self.plaque_base(img, pq, at)
+        self.shadows(img, [b for _, kind, b in items if kind == 'block'])
+        for _, kind, it in items:
+            if kind == 'block':
+                spr, up = self.sprite(it)
+                x, y = at(it.i, it.j)
+                blit(img, spr, x, y - up - round(self.lift(it.y)))
+            else:
+                self.plaque(img, it)
+
+        # the page frame, flat on top
+        for c in self.page.overlay_cells:
+            if w.inside(c):
+                b = self.floor_of(c)
+                if b not in tiles:
+                    tiles[b] = self.floor_tile(b).convert('RGBA')
+                img.paste(tiles[b], at(*c))
+        for b in sorted((b for b in w.blocks if b.overlay), key=lambda b: b.y):
+            blit(img, self.flat_sprite(b), *at(b.i, b.j))
+        for pq in w.plaques:
+            if pq.meta.get('overlay'):
+                self.plaque(img, pq)
         return img.convert('RGB')
 
-    def composite_clipped(self, img, src, x, y):
-        if x < 0 or y < 0 or x + src.width > img.width or y + src.height > img.height:
-            return
-        img.alpha_composite(src, (x, y))
+    def shadows(self, img, blocks):
+        """A soft shadow to the south-east of whatever stands on the ground, under all of it."""
+        px = self.px
+        layer = Image.new('L', img.size, 0)
+        for b in blocks:
+            if b.y:
+                continue
+            spr = self.flat_sprite(b)
+            h = self.sprite(b)[1] / (self.ob.s * px) if self.ob.s else 0
+            if h < .25:
+                continue
+            off = max(1, round(px * min(h, 1.5) / 6))
+            x, y = self.at(b.i, b.j)
+            a = spr.getchannel('A').point(lambda v: 80 if v else 0)
+            if 0 <= x + off and x + off + px <= img.width and 0 <= y + off // 2 and y + off // 2 + px <= img.height:
+                region = (x + off, y + off // 2, x + off + px, y + off // 2 + px)
+                layer.paste(Image.composite(a, layer.crop(region), a), region)
+        black = Image.new('RGBA', img.size, (20, 16, 10, 255))
+        black.putalpha(layer)
+        img.alpha_composite(black)
 
-    def plaque_base(self, img, pq, at):
+    def plaque(self, img, pq):
+        """A plaque's base: a thin slab of block texture, outlined, raised on top of the blocks under it when it
+        has a height."""
         block = STYLES[pq.style][0]
         if not block:
             return
-        tex, _ = self.face_texture(block)
-        tile, _ = self.td.box(tex, 16)
-        for a in range(pq.w):
-            for b in range(pq.h):
-                img.paste(tile, at(pq.i + a, pq.j + b))
-        x0, y0 = at(pq.i, pq.j)
-        x1, y1 = x0 + pq.w * self.px - 1, y0 + pq.h * self.px - 1
-        d = ImageDraw.Draw(img)
-        d.rectangle((x0, y0, x1, y1), outline=(30, 22, 14, 255))
+        px = self.px
+        x0, y0 = self.at(pq.i, pq.j)
+        if pq.meta.get('overlay'):
+            tex, _ = self.face_texture(block)
+            tile, _ = self.td.box(tex, 16)
+            for a in range(pq.w):
+                for b in range(pq.h):
+                    img.paste(tile, (x0 + a * px, y0 + b * px))
+            ImageDraw.Draw(img).rectangle((x0, y0, x0 + pq.w * px - 1, y0 + pq.h * px - 1),
+                                          outline=(60, 40, 30, 255))
+            return
+        top, _ = self.face_texture(block)
+        side, _ = self.face_texture(block, 'south')
+        spr, up = self.ob.box(top, side, PLAQUE_H)
+        dy = round(self.lift(pq.meta.get('y', 0)))
+        for b in range(pq.h):
+            for a in range(pq.w):
+                blit(img, spr, x0 + a * px, y0 + b * px - up - dy)
+        lift = up + dy
+        ImageDraw.Draw(img).rectangle((x0, y0 - lift, x0 + pq.w * px - 1, y0 + pq.h * px - 1 - lift),
+                                      outline=(60, 40, 30, 255))
 
     def tiles(self, img):
         out = []
@@ -196,8 +256,8 @@ class Drawer:
         return ''.join(parts)
 
     def text(self, text, x, y, w, h, scale, color, shadow, vertical=False):
-        """A text centred in the box (x, y, w, h) (canvas pixels), `scale` font pixels per PX_PER_CELL-th block."""
-        k = self.px / PX_PER_CELL * scale
+        """A text centred in the box (x, y, w, h) (canvas pixels), `scale` font pixels per `fpx`-th block."""
+        k = self.px / self.fpx * scale
         lines = text.split('\n')
         tw = max(self.font.width(s) for s in lines) + (1 if shadow else 0)
         th = 9 * (len(lines) - 1) + 8 + (1 if shadow else 0)
@@ -216,36 +276,40 @@ class Drawer:
         for pq in w.plaques:
             _, col, shadow = STYLES[pq.style]
             x, y = (pq.i - w.i0) * px, (pq.j - w.j0) * px
+            if not pq.meta.get('overlay') and STYLES[pq.style][0]:
+                y -= self.ob.box(*(self.face_texture(STYLES[pq.style][0], f)[0] for f in ('up', 'south')),
+                                 PLAQUE_H)[1] + round(self.lift(pq.meta.get('y', 0)))
             out.append(self.text(pq.text, x, y, pq.w * px, pq.h * px, pq.scale, col, shadow, pq.vertical))
         for kind, text, origin, u, v in w.texts:          # pin names painted on bodies
             _, col, shadow = STYLES[kind]
+            lift = self.lift(origin[1]) / px
             vertical = abs(u[2]) > abs(u[0])
             xs = [origin[0], origin[0] + u[0] + v[0]]
             zs = [origin[2], origin[2] + u[2] + v[2]]
-            x0, z0 = (min(xs) + .5 - w.i0) * px, (min(zs) + .5 - w.j0) * px
+            x0, z0 = (min(xs) + .5 - w.i0) * px, (min(zs) + .5 - w.j0 - lift) * px
             out.append(self.text(text, x0, z0, (max(xs) - min(xs)) * px, (max(zs) - min(zs)) * px, 1, col,
                                  shadow, vertical))
         return out
 
     # -- everything ----------------------------------------------------------------------------
-    def page_box(self, block_mm, paper_cells, paper_mm):
-        """(left, top, right, bottom) of the page in mm: the sheet, grown to take in what lies beside it."""
-        w, b = self.w, block_mm
-        left = 0 if w.i0 == 0 else (w.i0 - .5) * b
-        top = 0 if w.j0 == 0 else (w.j0 - .5) * b
-        right = paper_mm[0] if w.W <= paper_cells[0] else (w.W - .5) * b
-        bottom = paper_mm[1] if w.H <= paper_cells[1] else (w.H - .5) * b
+    def page_box(self, cell_of, paper_cells, paper_mm):
+        """(left, top, right, bottom) of the page in mm: the sheet, grown to take in what lies beside it.
+        `cell_of` maps a cell to its centre in mm."""
+        w = self.w
+        (x0, y0), (x1, y1) = cell_of(w.i0 - .5, w.j0 - .5), cell_of(w.W - .5, w.H - .5)
+        left = 0 if w.i0 >= 0 else x0
+        top = 0 if w.j0 >= 0 else y0
+        right = paper_mm[0] if w.W <= paper_cells[0] else x1
+        bottom = paper_mm[1] if w.H <= paper_cells[1] else y1
         return left, top, right, bottom
 
-    def svg(self, power, block_mm, paper_cells, paper_mm):
+    def svg(self, power, cell_of, block_mm, paper_cells, paper_mm):
         img = self.raster(power)
         self.image = img
-        left, top, right, bottom = self.page_box(block_mm, paper_cells, paper_mm)
+        left, top, right, bottom = self.page_box(cell_of, paper_cells, paper_mm)
         k = self.px / block_mm                  # canvas pixels per mm
-
-        def cx(x_mm, i0):
-            return (x_mm / block_mm + .5 - i0) * self.px
-        vb = (cx(left, self.w.i0), cx(top, self.w.j0), (right - left) * k, (bottom - top) * k)
+        ox, oy = cell_of(self.w.i0 - .5, self.w.j0 - .5)     # mm of the canvas's top-left corner
+        vb = ((left - ox) * k, (top - oy) * k, (right - left) * k, (bottom - top) * k)
         self.page_mm = (right - left, bottom - top)
         body = [tag('g', self.tiles(img), id='blocks'), tag('g', self.texts(), id='text')]
         return Markup('<?xml version="1.0" encoding="UTF-8"?>\n' + str(tag(
@@ -255,3 +319,13 @@ class Drawer:
 
 def rgb(c):
     return '#%02x%02x%02x' % tuple(c[:3])
+
+
+def blit(dst, src, x, y):
+    """alpha_composite that clips at the edges."""
+    if x >= dst.width or y >= dst.height or x + src.width <= 0 or y + src.height <= 0:
+        return
+    cx, cy = max(0, -x), max(0, -y)
+    if cx or cy or x + src.width > dst.width or y + src.height > dst.height:
+        src = src.crop((cx, cy, min(src.width, dst.width - x), min(src.height, dst.height - y)))
+    dst.alpha_composite(src, (x + cx, y + cy))

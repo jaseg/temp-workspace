@@ -18,8 +18,9 @@
 
     [minecraft]              # the minecraft style
     packs = []               # resource packs (.zip or folders), first wins; e.g. ["my-pack.zip", "default.zip"]
-    block_mm = 1.27          # schematic grid step that becomes one block
-    dust_width = 3.0         # redstone dust drawn this many times wider than in the game
+    block_mm = 2.54          # one block per this many mm of the schematic
+    dust_width = 2.0         # redstone dust drawn this many times wider than in the game
+    camera_deg = 60          # the camera's angle above the horizon, looking north (90: straight down)
     px_per_block = 16        # raster resolution: 16 shows a 16x16 pack's textures pixel for pixel
 """
 
@@ -40,8 +41,9 @@ DEFAULTS = {
     'title': {'title': '', 'subtitle': '', 'kicker': '回路図', 'bubble': ''},
     'minecraft': {
         'packs': [],
-        'block_mm': 1.27,
-        'dust_width': 3.0,
+        'block_mm': 2.54,
+        'dust_width': 2.0,
+        'camera_deg': 60.0,
         'px_per_block': 16,
     },
 }

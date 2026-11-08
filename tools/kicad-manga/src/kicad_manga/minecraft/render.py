@@ -1,4 +1,4 @@
-"""Schematic file -> Minecraft-style SVG (seen from above), and the SVG -> PDF."""
+"""Schematic file -> Minecraft-style SVG (seen from high up, see `oblique`), and the SVG -> PDF."""
 
 from ..render import write_pdf as svg_to_pdf
 from ..kicad import load, paper_size
@@ -22,9 +22,9 @@ def build_svg(path, cfg):
     world = builder.build()
     page = Page(world, builder, sch, path, cfg, pack, font)
     page.build()
-    drawer = Drawer(world, pack, font, page.floor_of, page.tints, px=mc['px_per_block'],
-                    dust_width=mc['dust_width'])
-    svg = drawer.svg(builder.power, mc['block_mm'], builder.paper, paper_size(sch))
+    drawer = Drawer(world, pack, font, page, px=mc['px_per_block'], dust_width=mc['dust_width'], fpx=builder.fpx,
+                    camera_deg=mc['camera_deg'])
+    svg = drawer.svg(builder.power, builder.mm, mc['block_mm'], builder.paper, paper_size(sch))
     page.page_mm = drawer.page_mm
     page.image = drawer.image
     return svg, page

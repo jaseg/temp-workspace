@@ -42,6 +42,7 @@ class Block:
     args: tuple
     flat: bool = False          # flat on the floor: drawn before everything that stands up
     owner: object = None
+    overlay: bool = False       # part of the page frame, drawn flat on top of everything
 
 
 @dataclass
@@ -176,14 +177,15 @@ class World:
     def plaque_cells(self, i, j, w, h):
         return [(i + a, j + b) for a in range(w) for b in range(h)]
 
-    def place_plaque(self, pq, reach=3, avoid_dust=True, along=None, owner=None):
+    def place_plaque(self, pq, reach=3, avoid_dust=True, along=None, owner=None, net=None):
         """Put a plaque at its spot, or nudged as little as possible to where it covers nothing. Returns whether it
-        found a clear spot (it is placed at its own spot otherwise)."""
+        found a clear spot (it is placed at its own spot otherwise). A plaque may lie on dust of `net`."""
         best = None
         for di, dj in nudges(reach, along):
             i, j = pq.i + di, pq.j + dj
             cells = self.plaque_cells(i, j, pq.w, pq.h)
-            if all(self.inside(c) and c not in self.solid and (not avoid_dust or c not in self.dust)
+            if all(self.inside(c) and c not in self.solid
+                   and (not avoid_dust or c not in self.dust or (net is not None and set(self.dust[c]) == {net}))
                    and self.soft.get(c) in (None, owner) for c in cells):
                 best = (i, j)
                 break

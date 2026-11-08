@@ -92,11 +92,11 @@ def pack(tmp_path):
     return root, zpath
 
 
-def build(tmp_path, body, pack_path):
+def build(tmp_path, body, pack_path, block_mm=2.54):
     path = tmp_path / 't.kicad_sch'
     path.write_text(schematic(body))
     pk = ResourcePack([pack_path])
-    b = Builder(load(path), pk, BitmapFont(pk))
+    b = Builder(load(path), pk, BitmapFont(pk), block_mm)
     b.build()
     return b, path
 
@@ -127,11 +127,12 @@ def test_stacked_packs(pack, tmp_path):
 
 
 def test_crowded_capacitors_are_nudged(pack, tmp_path):
-    """Capacitors 2.54 mm apart: their three blocks wide plates would overlap, so they are moved or slimmed."""
+    """Capacitors 2.54 mm apart on a 1.27 mm block grid: their three blocks wide plates would overlap, so they are
+    moved or slimmed."""
     body = ''.join(sym('Device:C_Small', f'C{k}', 50.8 + 2.54 * k, 50.8) for k in range(4))
     body += ''.join(wire(50.8 + 2.54 * k, 48.26, 50.8 + 2.54 * k, 43.18) for k in range(4))
     body += ''.join(wire(50.8 + 2.54 * k, 53.34, 50.8 + 2.54 * k, 58.42) for k in range(4))
-    b, _ = build(tmp_path, body, pack[0])
+    b, _ = build(tmp_path, body, pack[0], 1.27)
     plates = states(b, 'heavy_weighted_pressure_plate')
     cells = [(p.i, p.j) for p in plates]
     assert len(cells) == len(set(cells)), 'plates overlap'

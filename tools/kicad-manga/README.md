@@ -101,8 +101,8 @@ reference as id, and wires are grouped by net.
 
 ## Minecraft style
 
-`--style minecraft` draws the schematic, seen from straight above, as a redstone build out of the blocks of a
-Minecraft resource pack:
+`--style minecraft` draws the schematic as a cozy redstone build out of the blocks of a Minecraft resource pack,
+seen from high up:
 
 ```sh
 uv run kicad-manga board.kicad_sch -s minecraft --pack default-pack.zip           # ./board-minecraft.svg/.png/.pdf
@@ -110,9 +110,10 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
 ```
 
 - **Packs:** any pack, as a .zip (also with a folder inside) or a folder. Packs stack like in the game. Textures,
-  block models, blockstates, the biome colormaps and the bitmap font all come from the packs.
-  Texture-only packs work on top of a complete pack, and on their own with simple built-in models.
-- **Grid:** one block per schematic grid step (`block_mm`, 1.27 mm). Pins, wires and labels snap to it.
+  block models, blockstates and the bitmap font all come from the packs. Texture-only packs work on top of a
+  complete pack, and on their own with simple built-in models.
+- **Grid:** one block per `block_mm` (2.54 mm, the usual pin pitch). The block grid sits on whichever half of
+  the 1.27 mm grid most wire ends and pins use, so they land in the middle of their blocks.
 - **Parts:**
   - Wires are redstone dust. Grounds are dim and supplies at full power. Dust is drawn `dust_width` times wider
     than in the game, so that it reads on paper. Buses are rails.
@@ -122,40 +123,43 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
     side. P-type parts use subtract mode.
   - Passives are short rows between their pins. Resistors are bricks, capacitors are two rows of pressure plates
     (the + plate gold), inductors are copper and ferrite beads oxidized copper.
-  - Other parts get a low body with their pin names painted on top. Supplies are torches, grounds hoppers,
-    no-connects cobwebs and mounting holes cauldrons.
+  - Other parts get a wooden or terracotta body with their pin names painted on top. Supplies are torches,
+    grounds hoppers, no-connects cobwebs and mounting holes cauldrons.
 - **Fitting things in:** a passive that collides with a neighbour, a wire or another part is tried one and two
   blocks to the side, and with slimmer plates or bodies. Its pins are rerouted with dust until everything fits.
-  Repeaters and comparators move up to two blocks the same way. Text sits on plaques of block textures
-  (labels, references, values, notes), and plaques move out of the way of dust, parts and each other. The run
-  prints how many parts and plaques moved.
-- **Around it:** the circuit stands on smooth stone in a meadow. Around it are a stone border with a wall,
-  lanterns and zone signs, a title block platform, a legend, and trees, ponds, props and flowers. Tall things
-  stay where they don't hide the circuit. Parts placed beside the sheet get ground of their own.
-- **Drawing:** each block is drawn from its model's upward faces, lower faces a little darker. Blocks that show
-  little from above (flowers, torches, lanterns) are drawn as their item icon, like on a map, and standing blocks
-  cast a short shadow.
+  Repeaters and comparators move up to two blocks the same way. Text sits on plaques of wool, wood and
+  terracotta (labels, references, values, notes), and plaques move out of the way of dust, parts and each other.
+  Net labels lie on their own wire. The run prints how many parts and plaques moved.
+- **Around it:** the circuit stands on a birch deck in a meadow, with cherry trees, azalea bushes, flower beds,
+  ponds, little vegetable gardens, beehives and pumpkins in the empty space. The title block is a cherry wood
+  deck with bookshelves, lanterns and a cake. The legend explains the parts.
+- **Camera:** an oblique view from high up in the south (`camera_deg` above the horizon, 60 by default). The
+  ground keeps its place on the page, so the sheet stays a rectangle; every block shows its top and, below it,
+  its south side. Things that stand up cast a short shadow. The page frame (a garden path with a flowering
+  hedge, lanterns and zone signs) is drawn flat on top of everything, and so is all text.
 - **Output:** the blocks become one raster image at `px_per_block` pixels per block (16, the pack's texture size),
   cut into tiles and drawn pixelated. Text goes on top as vector paths traced from the pack's font, so it stays
-  sharp at any zoom. An A1 sheet gives a PDF of about 10 MB that opens in a few seconds.
+  sharp at any zoom. An A1 sheet gives a PDF of about 5 MB that opens in a few seconds.
 
 ```toml
 style = "minecraft"
 [minecraft]
 packs = ["default-pack.zip"]     # relative to the settings file
-block_mm = 1.27
-dust_width = 3.0
+block_mm = 2.54
+dust_width = 2.0
+camera_deg = 60
 px_per_block = 16
 ```
 
 The code is in `minecraft/`:
 
 - `pack.py`: resource packs.
-- `topdown.py`: block models into small images seen from above.
+- `oblique.py`: block models into small images, seen from the camera.
+- `topdown.py`: block models seen from straight above (flat things, and the frame).
 - `font.py`: the bitmap font.
 - `world.py`: the block grid, routing and plaque placement.
 - `circuit.py`: the schematic into blocks.
-- `page.py`: the border, title block and decorations.
+- `page.py`: the frame, title block, legend and decorations.
 - `draw.py`: the world into SVG.
 - `render.py`: the whole pipeline, and the PDF.
 
