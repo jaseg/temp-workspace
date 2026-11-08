@@ -1,6 +1,7 @@
 """Settings: built-in defaults < kicad-manga.toml < command line.
 
     # kicad-manga.toml
+    style = "manga"          # or "papercraft"
     formats = ["svg", "png", "pdf"]
     png_px_per_mm = 10
     seed = 42
@@ -22,6 +23,7 @@ import tomllib
 from pathlib import Path
 
 DEFAULTS = {
+    'style': 'manga',
     'formats': ['svg', 'png', 'pdf'],
     'png_px_per_mm': 10.0,
     'seed': 42,

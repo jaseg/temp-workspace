@@ -64,12 +64,12 @@ def download(url, path):
     path.write_bytes(r.content)
 
 
-def load(font_dir=None):
-    """The fonts that are available, as `Font`s. Missing fonts are downloaded into the cache unless an explicit
+def load(font_dir=None, fonts=None):
+    """The fonts that are available, as `Font`s: `fonts` (default: the manga style's FONTS). Missing fonts are downloaded into the cache unless an explicit
     `font_dir` is given, which is then used as is (the converted TTFs still go into the cache)."""
     src = Path(font_dir) if font_dir else cache_dir()
     out = []
-    for family, weight, style, rel in FONTS:
+    for family, weight, style, rel in fonts or FONTS:
         woff2 = src / Path(rel).name
         if not woff2.exists() and not font_dir:
             try:

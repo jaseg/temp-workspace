@@ -105,3 +105,26 @@ reference as id, and wires are grouped by net.
 uv sync
 uv run pytest      # a few high-level sanity checks
 ```
+
+## Paper craft style
+
+`--style papercraft` (or `style = "papercraft"` in the settings) draws the schematic as a scrapbook page:
+
+```sh
+uv run kicad-manga board.kicad_sch -s papercraft                # ./board-papercraft.svg/.png/.pdf
+```
+
+- **Parts** are pastel cardstock with a soft cast shadow; symbol lines and pins are thin strips of paper. Resistors
+  are paper bars showing their colour code, capacitors two plates of card (the + plate coral), inductors quilled
+  paper coils and ferrite beads grey bands. Big IC bodies get a little paper face.
+- **Wires** are washi tape in the net's colour: dotted for signals, stitched for supplies, pinstriped for grounds.
+  Buses are wide striped lavender tape. Junctions are brass paper fasteners, no-connects small crosses of tape,
+  DNP parts are crossed out with tape.
+- **Labels** are paper luggage tags with a punched hole; global and hierarchical labels are paper pennants. Big
+  text becomes a paper banner taped down at both ends, long notes torn notepaper.
+- **Around it:** a scalloped, polka-dotted mat with a stitched edge, paper flowers on its corners, bunting along
+  the top, a title card with the title in cut-paper letters, a paper crane with a speech bubble, die-cut stickers,
+  loose washi tape and paper confetti in the free space.
+- Everything is vector, without filters or group opacity, so PDFs stay small and fast (an A1 sheet is about 2 MB).
+
+It uses two more fonts, Fredoka and Patrick Hand (SIL OFL), fetched like the others. The code is in `papercraft/`.

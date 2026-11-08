@@ -29,11 +29,15 @@ from .render import build_svg, write_pdf, write_png
 @click.option('--seed', type=int, help='Random seed for the decorations.')
 @click.option('--no-decorations', is_flag=True, help='No plants, cables, shelves or sparkles.')
 @click.option('--no-characters', is_flag=True, help='Draw passives as plain symbols.')
+@click.option('-s', '--style', type=click.Choice(['manga', 'papercraft']),
+              help='Drawing style (default: manga).')
 @click.option('--font-dir', type=click.Path(file_okay=False, path_type=Path),
               help='Where the fonts are (default: downloaded once into ~/.cache/kicad-manga/fonts).')
 def main(schematic, output, config_file, formats, dpmm, title, subtitle, kicker, bubble, seed, no_decorations,
-         no_characters, font_dir):
+         no_characters, style, font_dir):
     cfg = config.load(config.find(schematic, config_file))
+    if style:
+        cfg['style'] = style
     if formats:
         cfg['formats'] = list(formats)
     if dpmm:
@@ -50,10 +54,16 @@ def main(schematic, output, config_file, formats, dpmm, title, subtitle, kicker,
         if v is not None:
             cfg['title'][k] = v
 
-    out = output or Path.cwd() / f'{schematic.stem}-manga'
+    if cfg['style'] == 'papercraft':
+        from .papercraft import render as paper
+        font_list = fonts.load(cfg['font_dir'] or None, paper.FONTS)
+        build = paper.build_svg
+    else:
+        font_list = fonts.load(cfg['font_dir'] or None)
+        build = build_svg
+    out = output or Path.cwd() / f'{schematic.stem}-{cfg["style"]}'
     out.parent.mkdir(parents=True, exist_ok=True)
-    font_list = fonts.load(cfg['font_dir'] or None)
-    svg, page = build_svg(schematic, cfg, font_list)
+    svg, page = build(schematic, cfg, font_list)
     if 'svg' in cfg['formats']:
         out.with_suffix('.svg').write_text(svg, encoding='utf-8')
         click.echo(f'wrote {out.with_suffix(".svg")}')
