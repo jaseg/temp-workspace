@@ -157,17 +157,23 @@ class Drawer:
                 blit(img, self.dust(ds, power(net)), *at(*c))
 
         # everything that stands up, and the plaques, from the back (north) to the front, lowest first
-        items = [((b.j, b.y, b.i), 'block', b) for b in world if not b.flat]
-        items += [((pq.j + pq.h - 1, pq.meta.get('y', 0), pq.i), 'plaque', pq)
+        items = [((b.j, b.y, b.i, 0), 'block', b) for b in world if not b.flat]
+        items += [((pq.j + pq.h - 1, pq.meta.get('y', 0), pq.i, 0), 'plaque', pq)
                   for pq in w.plaques if not pq.meta.get('overlay')]
+        items += self.occlusion(world)
         items.sort(key=lambda t: t[0])
-        self.shadows(img, [b for _, kind, b in items if kind == 'block'])
         for _, kind, it in items:
             if kind == 'block':
                 spr, up, left = self.sprite(it)
                 x, y = at(it.i, it.j)
                 dx, dy = self.shift(it.y)
                 blit(img, spr, x - left + dx, y - up + dy)
+            elif kind == 'ao':
+                (i, j), h, sides = it
+                x, y = at(i, j)
+                dx, dy = self.shift(h)
+                for side in sides:
+                    blit(img, self.ao_strip(side), x + dx, y + dy)
             else:
                 self.plaque(img, it)
 
@@ -185,26 +191,59 @@ class Drawer:
                 self.plaque(img, pq)
         return img.convert('RGB')
 
-    def shadows(self, img, blocks):
-        """A soft shadow to the south-east of whatever stands on the ground, under all of it."""
-        px = self.px
-        layer = Image.new('L', img.size, 0)
-        for b in blocks:
-            if b.y:
-                continue
+    def solid(self, b):
+        """How high a Block stands as a solid lump (in blocks, from its cell's floor), or 0 for things that
+        hardly cover their cell (plants, torches, fences)."""
+        key = ('solid', b.kind, b.args)
+        if key not in self.td.cache:
             spr = self.flat_sprite(b)
-            h = self.sprite(b)[1] / (self.ob.s * px) if self.ob.s else 0
-            if h < .25:
+            cov = 1 - spr.getchannel('A').histogram()[0] / (spr.width * spr.height)
+            up = self.sprite(b)[1]
+            self.td.cache[key] = up / (self.ob.s * self.px) if cov > .7 and self.ob.s else 0
+        return self.td.cache[key]
+
+    def occlusion(self, blocks):
+        """Ambient occlusion like the game's smooth lighting: the ground (or a hill top) gets darker along the
+        sides where a block stands next to it. Returns draw items: ((row, height, column, 1), 'ao', ...), each
+        drawn just after the surface it darkens."""
+        ground, top = {}, {}
+        for b in blocks:
+            c = (b.i, b.j)
+            if b.owner == 'hill':
+                ground[c] = max(ground.get(c, 0), b.y + 1)
+        for b in blocks:
+            if b.flat:
                 continue
-            off = max(1, round(px * min(h, 1.5) / 6))
-            x, y = self.at(b.i, b.j)
-            a = spr.getchannel('A').point(lambda v: 80 if v else 0)
-            if 0 <= x + off and x + off + px <= img.width and 0 <= y + off // 2 and y + off // 2 + px <= img.height:
-                region = (x + off, y + off // 2, x + off + px, y + off // 2 + px)
-                layer.paste(Image.composite(a, layer.crop(region), a), region)
-        black = Image.new('RGBA', img.size, (20, 16, 10, 255))
-        black.putalpha(layer)
-        img.alpha_composite(black)
+            h = self.solid(b)
+            if h >= .4:
+                c = (b.i, b.j)
+                top[c] = max(top.get(c, 0), b.y + h)
+        out = []
+        cells = set(ground) | {(i + a, j + b) for (i, j) in top for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))}
+        for (i, j) in cells:
+            g = ground.get((i, j), 0)
+            if top.get((i, j), 0) > g + .4 or not self.w.inside((i, j)):
+                continue            # something stands on it: nothing to darken
+            sides = tuple(d for d, (a, b) in (('north', (0, -1)), ('south', (0, 1)), ('west', (-1, 0)),
+                                              ('east', (1, 0)))
+                          if max(top.get((i + a, j + b), 0), ground.get((i + a, j + b), 0)) > g + .4)
+            if sides:
+                out.append(((j, g - 1 if g else -1, i, 1), 'ao', ((i, j), g, sides)))
+        return out
+
+    def ao_strip(self, side):
+        key = ('ao', side)
+        if key not in self.td.cache:
+            px = self.px
+            n = max(3, px * 3 // 8)
+            strip = Image.new('RGBA', (px, px), (0, 0, 0, 0))
+            for k in range(n):
+                a = round(120 * (1 - k / n) ** 1.3)
+                box = {'north': (0, k, px, k + 1), 'south': (0, px - 1 - k, px, px - k),
+                       'west': (k, 0, k + 1, px), 'east': (px - 1 - k, 0, px - k, px)}[side]
+                strip.paste((10, 10, 20, a), box)
+            self.td.cache[key] = strip
+        return self.td.cache[key]
 
     def plaque(self, img, pq):
         """A plaque's base: a thin slab of block texture, outlined, raised on top of the blocks under it when it

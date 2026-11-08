@@ -338,8 +338,7 @@ class Page:
                     self.put(x[0], 0, x[1], rng.choice(['sugar_cane', 'pink_tulip', 'oxeye_daisy', 'fern']))
 
     def terrain(self, free):
-        """Gentle grassy hills in the open meadow, away from the circuit, and patches of moss, podzol, coarse
-        dirt and gravel on the flat ground."""
+        """Gentle grassy hills in the open meadow, away from the circuit."""
         rng = self.rng
         fs = {c for c in free if not self.blocked(c)}
         # how far each free cell is from anything else (circuit, frame, ponds, ...), up to 8
@@ -377,22 +376,8 @@ class Page:
             for y in range(h):
                 # only the blocks that show: the top one, and those with an open south or east side
                 if y == h - 1 or H.get((i, j + 1), 0) <= y or H.get((i + 1, j), 0) <= y:
-                    # higher ground a little sunnier, so that the hills read from above
-                    tint = tuple(min(255, round(c * (1 + .09 * (y + 1)))) for c in GRASS)
-                    self.w.blocks.append(Block(i, y, j, 'state', ('grass_block', (('snowy', 'false'),), tint),
+                    self.w.blocks.append(Block(i, y, j, 'state', ('grass_block', (('snowy', 'false'),)),
                                                owner='hill'))
-        # patches on the flat ground
-        patches = ['moss_block', 'podzol', 'coarse_dirt', 'rooted_dirt', 'gravel', 'moss_block']
-        flat = [c for c in fs if c not in H]
-        for _ in range(len(flat) // 700):
-            ci, cj = rng.choice(flat)
-            kind = rng.choice(patches)
-            r = rng.uniform(1.2, 3)
-            for a in range(-3, 4):
-                for b in range(-3, 4):
-                    c = (ci + a, cj + b)
-                    if c in fs and c not in H and (a * a + b * b) <= r * r * rng.uniform(.6, 1.3):
-                        self.w.floor[c] = kind
 
     def gardens(self, free):
         """Little vegetable plots: rows of crops on farmland with a fence around them."""
@@ -432,34 +417,52 @@ class Page:
             if not self.free([(i, j)], 3):
                 continue
             placed.append((i, j))
-            self.tree(i, j, rng.choice(['cherry', 'cherry', 'oak', 'birch']), rng.randint(3, 5))
+            kind = rng.choice(['cherry', 'cherry', 'oak', 'oak', 'birch'])
+            self.tree(i, j, kind, rng.randint(5, 7) if kind == 'cherry' else rng.randint(4, 6))
 
     def tree(self, i, j, kind, hgt):
+        """A tree grown the way the game grows it: a trunk `hgt` tall with the canopy at its top. Oak and birch get
+        two wide layers and two narrow ones (the top one a plus), the corners left out at random; cherry trees
+        a wide, flat crown with leaves hanging from its rim."""
         rng = self.rng
         log, leaves = f'{kind}_log', f'{kind}_leaves'
         cells = set()
         base = self.height.get((i, j), 0)
-        for y in range(hgt):
-            self.put(i, base + y, j, log, [('axis', 'y')], absolute=True)
-        layers = [(hgt - 2, 2), (hgt - 1, 2), (hgt, 1)] if kind == 'cherry' else \
-            [(hgt - 2, 2), (hgt - 1, 1), (hgt, 1)]
-        for y, r in layers:
+        top = base + hgt                    # the trunk's last block is top - 1
+        if kind == 'cherry':
+            top -= 1
+            layers = [(top - 1, 3, 4), (top, 2, 3), (top + 1, 1, 1)]
+        else:
+            layers = [(top - 3, 2, None), (top - 2, 2, None), (top - 1, 1, None), (top, 1, 1)]
+        for y in range(base, top):
+            self.put(i, y, j, log, [('axis', 'y')], absolute=True)
+        leaf = set()
+        for y, r, manhattan in layers:
             for a in range(-r, r + 1):
                 for b in range(-r, r + 1):
-                    if r and abs(a) == r and abs(b) == r and rng.random() < .7:
+                    if manhattan is not None and abs(a) + abs(b) > manhattan:
                         continue
-                    if a == 0 and b == 0 and y < hgt:
+                    if manhattan is None and abs(a) == r and abs(b) == r and (y == top or rng.random() < .5):
                         continue
-                    self.put(i + a, base + y, j + b, leaves, [('persistent', 'true')], absolute=True)
-                    cells.add((i + a, j + b))
+                    if a == 0 and b == 0 and y < top:
+                        continue            # the trunk
+                    leaf.add((i + a, y, j + b))
+        if kind == 'cherry':                # leaves hanging down from the rim of the crown
+            y0 = top - 1
+            for (x, y, z) in list(leaf):
+                if y == y0 and abs(x - i) + abs(z - j) >= 3 and rng.random() < .4:
+                    leaf.add((x, y - 1, z))
+        for (x, y, z) in sorted(leaf, key=lambda t: (t[2], t[1], t[0])):
+            self.put(x, y, z, leaves, [('persistent', 'true')], absolute=True)
+            cells.add((x, z))
         self.taken.update(cells | {(i, j)})
-        # fallen petals and a few mushrooms around the trunk
+        # fallen petals under cherry trees, and now and then a mushroom in the shade
         for a in range(-3, 4):
-            for b in range(-2, 4):
+            for b in range(-3, 4):
                 c = (i + a, j + b)
                 if not self.free([c]):
                     continue
-                if kind == 'cherry' and rng.random() < .3:
+                if kind == 'cherry' and rng.random() < .35:
                     self.petals(c)
                     self.taken.add(c)
                 elif rng.random() < .03:
@@ -501,26 +504,30 @@ class Page:
             n -= 1
 
     def flowers(self, free):
+        """Grass all over the meadow, some of it tall, and flowers in patches of one kind each, as the game
+        scatters them."""
         rng = self.rng
-        patches = [(rng.choice(free), rng.choice(PASTEL_FLOWERS), rng.uniform(2, 4)) for _ in range(len(free) // 150)]
+        patches = [(rng.choice(free), rng.choice(PASTEL_FLOWERS + ['dandelion', 'poppy']), rng.uniform(2, 3.5))
+                   for _ in range(len(free) // 250)]
+        near = {}
+        for (pi, pj), fl, r in patches:
+            R = int(r) + 1
+            for a in range(-R, R + 1):
+                for b in range(-R, R + 1):
+                    if a * a + b * b <= r * r:
+                        near.setdefault((pi + a, pj + b), fl)
         for (i, j) in free:
             if (i, j) in self.taken or (i, j) in self.w.solid:
                 continue
-            p = .04
-            plant = 'short_grass'
-            for (pi, pj), fl, r in patches:
-                d = abs(i - pi) + abs(j - pj)
-                if d < r:
-                    p, plant = .5 * (1 - d / r) + .05, fl
-                    break
-            if rng.random() >= p:
-                continue
-            if plant == 'short_grass' and rng.random() < .4:
-                plant = rng.choice(['pink_petals', 'dandelion', 'poppy', 'azure_bluet', 'fern'])
-            if plant == 'pink_petals':
-                self.petals((i, j))
-            else:
-                self.put(i, 0, j, plant)
+            x = rng.random()
+            if (i, j) in near and x < .35:
+                self.put(i, 0, j, near[(i, j)])
+            elif x < .14:
+                if rng.random() < .12 and self.free([(i, j)]):
+                    self.put(i, 0, j, 'tall_grass', [('half', 'lower')])
+                    self.put(i, 1, j, 'tall_grass', [('half', 'upper')])
+                else:
+                    self.put(i, 0, j, rng.choice(['short_grass'] * 6 + ['fern']))
 
 
 def dilate(cells, r):

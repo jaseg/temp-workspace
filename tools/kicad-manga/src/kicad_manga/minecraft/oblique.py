@@ -39,11 +39,11 @@ class Oblique:
         return self.cache[key]
 
     def shade(self, n):
-        """Light from above and the north-west (shadows fall to the south-east): tops bright, south sides
-        darker, east sides darker still."""
+        """The game's flat face shading: tops full, north and south sides 80 %, east and west 60 %, bottoms 50 %
+        (in between for faces that are turned)."""
         L = math.sqrt(sum(c * c for c in n)) or 1
         nx, ny, nz = (c / L for c in n)
-        return max(.45, min(1.0, .72 + .28 * ny - .16 * max(0, nx) - .06 * max(0, nz)))
+        return nx * nx * .6 + ny * ny * (1.0 if ny > 0 else .5) + nz * nz * .8
 
     # -- block states -----------------------------------------------------------------------
     def state(self, name, props=None, tints=None, model_hook=None):
@@ -70,9 +70,6 @@ class Oblique:
             for el in model.get('elements', []):
                 er = el.get('rotation')
                 fr, to = el['from'], el['to']
-                billboard = er and er.get('axis', 'y') == 'y' and abs(er.get('angle', 0)) == 45
-                if billboard and fr[0] == to[0]:
-                    continue            # crossed planes of plants: only one, standing straight up to the camera
                 for face, f in el.get('faces', {}).items():
                     t = f.get('texture', '')
                     t = tex.get(t[1:]) if t.startswith('#') else t
@@ -80,7 +77,7 @@ class Oblique:
                         continue
                     o, u, v = face_quad(face, fr, to)
                     pts = [o, tuple(o[i] + u[i] for i in range(3)), tuple(o[i] + v[i] for i in range(3))]
-                    if er and er.get('angle', 0) and not billboard:
+                    if er and er.get('angle', 0):
                         pts = [rotate_element(p, er.get('axis', 'y'), er['angle'], er.get('origin', (8, 8, 8)))
                                for p in pts]
                     pts = [rotate_state(p, xr, yr) for p in pts]
