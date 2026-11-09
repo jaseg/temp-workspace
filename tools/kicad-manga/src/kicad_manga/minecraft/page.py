@@ -1,5 +1,5 @@
 """Around the circuit: the wooden deck it is built on, the meadow, the page frame, the title block, a legend, and
-cherry trees, bushes, flower beds, ponds and little gardens in the empty space. All of it is made of blocks on
+cherry trees, bushes, flower beds, ponds, little gardens and animals in the empty space. All of it is made of blocks on
 the schematic's grid. The frame is drawn flat on top of everything (`overlay`), like a picture frame."""
 
 import math
@@ -308,6 +308,7 @@ class Page:
         self.bushes(free)
         self.props(free)
         self.flowers(free)
+        self.animals(free)
 
     def blocked(self, c):
         return c in self.platform or c in self.taken or c in self.w.solid or not self.in_frame(c)
@@ -484,6 +485,42 @@ class Page:
                                                     'flowering_azalea_leaves']), [('persistent', 'true')])
             self.taken.update(cells)
             n -= 1
+
+    def animals(self, free):
+        """Herds of pigs, sheep and chickens on the meadow, and the odd enderman (one of them carrying off a
+        resistor)."""
+        rng = self.rng
+        herds = ['pig', 'pig_warm', 'pig_cold', 'sheep', 'sheep', 'chicken', 'chicken_warm']
+        n = max(1, len(free) // 1100)
+        for _ in range(n * 4):
+            if n <= 0:
+                break
+            i, j = rng.choice(free)
+            if not self.free([(i, j)], 2):
+                continue
+            kind = rng.choice(herds)
+            k = rng.randint(2, 4)
+            for _ in range(k * 4):
+                if k <= 0:
+                    break
+                c = (i + rng.randint(-3, 3), j + rng.randint(-2, 2))
+                if self.free([c], 1) and self.w.floor.get(c) is None:
+                    self.mob(c, kind)
+                    k -= 1
+            n -= 1
+        endermen = 2 if len(free) > 3000 else 1
+        for e in range(endermen * 30):
+            if endermen <= 0:
+                break
+            c = rng.choice(free)
+            if self.free([c], 1):
+                self.mob(c, 'enderman' if endermen == 1 or rng.random() < .3 else 'enderman_empty')
+                endermen -= 1
+
+    def mob(self, c, species):
+        self.w.blocks.append(Block(c[0], self.height.get(c, 0), c[1], 'mob',
+                                   (species, self.rng.choice((0, 90, 180, 270))), owner='page'))
+        self.taken.add(c)
 
     def props(self, free):
         rng = self.rng

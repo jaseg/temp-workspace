@@ -13,6 +13,7 @@ import math
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from ..svg import Markup, num, tag
+from . import mobs
 from .circuit import STYLES
 from .oblique import Oblique
 from .topdown import TopDown
@@ -84,6 +85,11 @@ class Drawer:
         if blk.kind == 'state':
             name, props = blk.args[:2]
             return self.td.state(name, dict(props), self.tint_of(name, blk.args))[0]
+        if blk.kind == 'mob':
+            key = ('mob', blk.args)
+            if key not in self.td.cache:
+                self.td.cache[key] = self.td.compose([(mobs.model(blk.args[0]), 0, blk.args[1])], None)
+            return self.td.cache[key][0]
         top, side, h, tint = blk.args
         return self.td.box(top, h, tint)[0]
 
@@ -97,6 +103,11 @@ class Drawer:
         if blk.kind == 'state':
             name, props = blk.args[:2]
             return self.ob.state(name, dict(props), self.tint_of(name, blk.args))
+        if blk.kind == 'mob':
+            key = ('mob', blk.args)
+            if key not in self.ob.cache:
+                self.ob.cache[key] = self.ob.compose([(mobs.model(blk.args[0]), 0, blk.args[1])], None)
+            return self.ob.cache[key]
         top, side, h, tint = blk.args
         return self.ob.box(top, side, h, tint)
 
@@ -236,6 +247,11 @@ class Drawer:
         """What of a Block the sun can't shine through, seen from above (a mask), or None for plants and other
         small things, whose shadows would only be noise."""
         key = ('footprint', b.kind, b.args)
+        if key not in self.td.cache and b.kind == 'mob':        # mobs cast the game's round blob shadow
+            m = Image.new('L', (self.px, self.px), 0)
+            r = self.px * .45
+            ImageDraw.Draw(m).ellipse((self.px / 2 - r, self.px / 2 - r, self.px / 2 + r, self.px / 2 + r), fill=255)
+            self.td.cache[key] = m
         if key not in self.td.cache:
             if b.kind == 'state':
                 name, props = b.args[:2]

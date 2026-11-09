@@ -7,8 +7,9 @@ sin(yaw_deg): things lean a little to the north-west, away from the camera, and 
 south side and a sliver of its east side. Nothing is turned 45 degrees, and the floor plan lines up with the
 sheet.
 
-A sprite is `left + px` wide and `up + px` tall: its floor cell is the bottom right `px` x `px` square, and
-whatever stands up reaches `up` pixels above it and `left` pixels to the west of it."""
+A sprite's floor cell starts `left` pixels from its left and `up` pixels from its top: whatever stands up reaches
+that far above and to the west of the cell. For blocks the cell is the sprite's bottom right `px` x `px` square;
+mobs may reach out of their cell on every side."""
 
 import copy
 import math
@@ -101,11 +102,16 @@ class Oblique:
     def compose(self, models, tints):
         px, s, h = self.px, self.s, self.h
         faces = self.faces(models, tints)
-        top = max([max(o[1], o[1] + u[1], o[1] + v[1], o[1] + u[1] + v[1]) for _, o, u, v, *_ in faces] or [0])
-        up = math.ceil(max(0, top) * s * px / 16)
-        left = math.ceil(max(0, top) * -h * px / 16)
-        img = Image.new('RGBA', (left + px, up + px), (0, 0, 0, 0))
         k = px / 16
+        # the canvas: the floor cell, and whatever reaches out of it (up, or beyond its sides for mobs)
+        xs, ys = [0, px], [0, px]
+        for _, o, u, v, *_ in faces:
+            for p in (o, [o[i] + u[i] for i in range(3)], [o[i] + v[i] for i in range(3)],
+                      [o[i] + u[i] + v[i] for i in range(3)]):
+                xs.append((p[0] + h * p[1]) * k)
+                ys.append((p[2] - s * p[1]) * k)
+        left, up = math.ceil(-min(xs) - 1e-6), math.ceil(-min(ys) - 1e-6)
+        img = Image.new('RGBA', (left + math.ceil(max(xs) - 1e-6), up + math.ceil(max(ys) - 1e-6)), (0, 0, 0, 0))
 
         def proj(p):
             return (p[0] + h * p[1]) * k + left, (p[2] - s * p[1]) * k + up
