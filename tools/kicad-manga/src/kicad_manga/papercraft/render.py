@@ -79,7 +79,6 @@ def defs(fonts):
             parts.append(tag('ellipse', cx=0, cy=1.1, rx=.5, ry=.6, fill=INK))
         faces.append(tag('g', parts, id=f'pc-face-{i}'))
     textures = (texture_pattern('pc-card', 'card.jpg', 64, 'image/jpeg')
-                + texture_pattern('pc-kraft', 'kraft.jpg', 40, 'image/jpeg')
                 + texture_pattern('pc-grain', 'grain.png', 36, 'image/png'))
     return Markup(f'<defs>\n<style>{face}{STYLE}</style>\n{dots}\n{textures}\n{"".join(faces)}\n{stickers.defs()}\n'
                   f'{all_static_defs()}\n</defs>')

@@ -93,8 +93,6 @@ def main():
     rng_u = type('R', (), {'uniform': staticmethod(prng.uniform), 'random': rng.random})
     blur(cardstock(768, rng_u, (247, 240, 226)), .4).save(
         OUT / 'card.jpg', quality=82, optimize=True)
-    blur(cardstock(512, rng_u, (199, 160, 116), mottle=.08, grain=.07, fib=.12), .3).save(
-        OUT / 'kraft.jpg', quality=82, optimize=True)
     grain_overlay(512, rng_u).save(OUT / 'grain.png', optimize=True)
     for p in sorted(OUT.iterdir()):
         print(p.name, p.stat().st_size)

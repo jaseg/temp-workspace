@@ -1,5 +1,5 @@
 """The scrapbook page around the circuit: cream cardstock inside a scalloped, polka-dotted mat with a stitched
-edge, a bunting along the top, a title card with cut-paper letters and a paper crane, and stickers and paper
+edge, a bunting along the top, a title card with cut-paper letters and a chip sticker, and stickers and paper
 confetti in the free space.
 
 Like the manga page, everything is drawn in design units (the short side is 594 units, so an A1 sheet is drawn
