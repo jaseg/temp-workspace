@@ -133,7 +133,10 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
     sandstone, banded terracotta mesas, with a cave here and there. GND hoppers are let into the ground.
   - Connectors are portals: a nether portal of obsidian for row connectors (pins on one side), an end portal
     (frames around the void, with an eye of ender where a pin comes out) for those with pins on several sides;
-    their pin names sit on dark bands so they read over the frames.
+    their pin names sit on dark bands so they read over the frames. Memory card sockets are a thin dark slab
+    with gold contacts along the pin side.
+  - Op amps are a stepped triangle of amethyst pointing at the output, the same for every unit; supply units
+    drawn over them just bring their wires.
   - Other parts get a wooden or terracotta body with their pin names painted on top. Supplies are torches,
     grounds hoppers, no-connects cobwebs and mounting holes cauldrons.
 - **Fitting things in:** a passive that collides with a neighbour, a wire or another part is tried one and two

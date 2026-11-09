@@ -118,7 +118,7 @@ class Builder:
                 for c in p['line']:
                     if c not in self.world.dust or c == p['outer']:
                         self.world.soft.setdefault(c, s['owner'])
-        for s in sorted(self.symbols, key=lambda s: s['order']):
+        for s in sorted(self.symbols, key=lambda s: (s['order'], self.opamp_pins(s) is None)):
             getattr(self, 'place_' + s['kind'])(s)
         self.world.soft.clear()
         self.no_connects()
@@ -430,7 +430,25 @@ class Builder:
 
     def place_body(self, s):
         w = self.world
+        if self.place_opamp(s):
+            return
         cells = self.body_cells(s)
+        amp = [o for o in self.symbols if o is not s and o['ref'] == s['ref'] and o.get('building') == 'opamp'
+               and o['body'] & cells]
+        if amp:                     # the supply pins of an op amp drawn over one of its units: wires only
+            body = amp[0]['body']
+            for p in s['pins']:
+                line = []
+                for c in p['line']:
+                    if c in body:
+                        break
+                    line.append(c)
+                if line:
+                    w.path(line, p['net'])
+                    nxt = (line[-1][0] + DIRS[p['dir']][0], line[-1][1] + DIRS[p['dir']][1]) if p['dir'] else None
+                    if nxt in body:
+                        w.dust[line[-1]][p['net']].add(p['dir'])
+            return
         pin_ends = {p['outer'] for p in s['pins']}
         cells -= pin_ends
         if not cells:
@@ -439,6 +457,22 @@ class Builder:
             return self.body_pins(s, cells)
         block = self.body_block(s)
         h = 10
+        if self.is_card(s):         # a card socket: a thin dark slab, gold contacts along the pin side
+            h = 3
+            sides = {p['dir'] for p in s['pins'] if p['dir']}
+            I0, I1 = min(c[0] for c in cells), max(c[0] for c in cells)
+            J0, J1 = min(c[1] for c in cells), max(c[1] for c in cells)
+            edge = {'east': lambda c: c[0] == I0, 'west': lambda c: c[0] == I1,
+                    'south': lambda c: c[1] == J0, 'north': lambda c: c[1] == J1}
+            for c in cells:
+                gold = any(edge[d](c) for d in sides)
+                tex = 'block/gold_block' if gold else 'block/polished_deepslate'
+                w.blocks.append(Block(c[0], 0, c[1], 'box', (tex, 'block/polished_deepslate', h, None),
+                                      owner=s['owner']))
+            cells = set(cells)
+            w.occupy(cells, s['owner'])
+            s['body'], s['body_h'] = cells, h / 16
+            return self.body_pins(s, cells)
         for c in cells:
             if block == 'cauldron':
                 w.blocks.append(Block(c[0], 0, c[1], 'state', ('cauldron', ()), owner=s['owner']))
@@ -448,6 +482,57 @@ class Builder:
         s['body'] = cells
         s['body_h'] = h / 16
         self.body_pins(s, cells)
+
+    @staticmethod
+    def opamp_pins(s):
+        """(+, -, out) pins of an op amp (or comparator) unit, or None."""
+        if len(s['pins']) != 3:
+            return None
+        by = {p['name']: p for p in s['pins']}
+        if '+' not in by or '-' not in by:
+            return None
+        (out,) = [p for p in s['pins'] if p['name'] not in ('+', '-')]
+        return by['+'], by['-'], out
+
+    def place_opamp(self, s):
+        """Op amps are a stepped triangle of amethyst (it rings, it amplifies) pointing from the inputs to the
+        output, with a cluster growing on top and budding amethyst at the tip. Its shape comes from the pins only,
+        so every unit looks the same however its outline happens to fall on the grid."""
+        pins = self.opamp_pins(s)
+        if pins is None:
+            return False
+        pp, pm, out = pins
+        if not (pp['dir'] and pp['dir'] == pm['dir'] and out['dir'] == OPP[pp['dir']]):
+            return False
+        u = DIRS[pp['dir']]                     # from the inputs towards the output
+        q = (-u[1], u[0])
+        O = out['inner']
+        dot = lambda c, v: (c[0] - O[0]) * v[0] + (c[1] - O[1]) * v[1]
+        W = -dot(pp['inner'], u) + 1            # columns, from the inputs' edge to the tip
+        if W < 2:
+            return False
+        H = max(abs(dot(pp['inner'], q)), abs(dot(pm['inner'], q))) + 1
+        cells, tip, core = {}, O, None
+        for k in range(W):
+            hk = round(H * (1 - k / (W - 1)))
+            for r in range(-hk, hk + 1):
+                back = W - 1 - k
+                c = (O[0] - back * u[0] + r * q[0], O[1] - back * u[1] + r * q[1])
+                cells[c] = k
+        if any(c in self.world.solid and self.world.solid[c] != s['owner'] for c in cells):
+            return False        # (another part in the way)
+        core = (O[0] - (W - 2) * u[0], O[1] - (W - 2) * u[1]) if W > 2 else O
+        for c in cells:
+            self.box(c, 'budding_amethyst' if c == tip else 'amethyst_block', 16, s['owner'])
+        self.world.blocks.append(Block(core[0], 1, core[1], 'state', ('amethyst_cluster', (('facing', 'up'),)),
+                                       owner=s['owner']))
+        cells = set(cells)
+        self.world.occupy(cells, s['owner'])
+        s['body'] = cells
+        s['body_h'] = 1.0
+        s['building'] = 'opamp'
+        self.body_pins(s, cells)
+        return True
 
     def body_pins(self, s, cells):
         w = self.world
@@ -462,6 +547,18 @@ class Builder:
                     break
                 out.append(c)
             line = out or line[:1]
+            if p['dir'] and len(out) == len(p['line']):
+                # the pin stops short of the body (its outline drawn inside the pin ends): carry the wire on
+                d = DIRS[p['dir']]
+                extra, c = [], line[-1]
+                for _ in range(6):
+                    c = (c[0] + d[0], c[1] + d[1])
+                    if c in cells:
+                        line = line + extra
+                        break
+                    if not w.free_for(c, s['owner'], p['net']):
+                        break
+                    extra.append(c)
             w.path(line, p['net'])
             if p['dir'] and len(line) >= 1:
                 nxt = (line[-1][0] + DIRS[p['dir']][0], line[-1][1] + DIRS[p['dir']][1])
@@ -472,7 +569,14 @@ class Builder:
     def is_ic(self, s):
         return ref_prefix(s['ref']) in ('U', 'IC', 'MODULE', 'TR')
 
+    @staticmethod
+    def is_card(s):
+        """Memory card and SIM sockets: flat, so not portals."""
+        return bool(re.search(r'micro_?sd|sd_?card|\bsim|card', s['lib_id'], re.I))
+
     def is_connector(self, s):
+        if self.is_card(s):
+            return False
         return ref_prefix(s['ref']) in ('J', 'P', 'CN', 'X') or s['lib_id'].lower().startswith('connector')
 
     def place_building(self, s, cells):
