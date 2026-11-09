@@ -719,9 +719,14 @@ class Drawer:
                 dx, dy = self.shift(pq.meta.get('y', 0) + PLAQUE_H / 16)
                 x, y = x + dx, y + dy
             out.append(self.text(pq.text, x, y, pq.w * px, pq.h * px, pq.scale, col, shadow, pq.vertical))
-        for kind, text, origin, u, v in w.texts:          # pin names painted on bodies
+        for kind, text, origin, u, v, side in w.texts:    # pin names painted on bodies
             _, col, shadow = STYLES[kind]
+            # a name keeps its wire's row (or column) and is only moved across, to keep the same distance from
+            # the body's outline as seen from the camera: on the sides the body leans towards, that is its top
+            # edge, lifted to its height; on the others, the foot of its walls
             dx, dy = self.shift(origin[1])
+            dx = dx if (side == 'west' and dx < 0) or (side == 'east' and dx > 0) else 0
+            dy = dy if (side == 'north' and dy < 0) or (side == 'south' and dy > 0) else 0
             vertical = abs(u[2]) > abs(u[0])
             xs = [origin[0], origin[0] + u[0] + v[0]]
             zs = [origin[2], origin[2] + u[2] + v[2]]

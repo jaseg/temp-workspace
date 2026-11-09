@@ -517,18 +517,22 @@ class Builder:
                 continue
             n = self.font.width(name) / self.fpx
             vertical = d[0] == 0
-            # names on buildings are drawn where the ground is, in line with their wires: lifted to the height of
-            # the walls they would drift off up and to the side of their pins, by up to a few blocks
-            h = .001 if s.get('building') else s['body_h'] + .001
+            # each name starts a fixed inset from the body's edge on its side (not from where its pin happens to
+            # end, which rounding moves by a block either way)
+            h = s['body_h'] + .001
+            I0, I1 = min(c[0] for c in cells), max(c[0] for c in cells)
+            J0, J1 = min(c[1] for c in cells), max(c[1] for c in cells)
+            inset = .2
             if not vertical:
                 y0 = start[1] - .5
-                x0 = start[0] - .5 + (.2 if d[0] > 0 else -n + .8)
+                x0 = I0 - .5 + inset if d[0] > 0 else I1 + .5 - inset - n
                 origin, u, v = (x0, h, y0), (n, 0, 0), (0, 0, 1)
             else:
                 x0 = start[0] - .5
-                z0 = start[1] - .5 + (n + .2 if d[1] > 0 else .8)
+                z0 = J0 - .5 + inset + n if d[1] > 0 else J1 + .5 - inset
                 origin, u, v = (x0, h, z0), (0, 0, -n), (1, 0, 0)
-            self.world.texts.append(('pin_backed' if s.get('building') == 'portal' else 'pin', name, origin, u, v))
+            side = {(1, 0): 'west', (-1, 0): 'east', (0, 1): 'north', (0, -1): 'south'}[d]
+            self.world.texts.append(('pin_backed' if s.get('building') == 'portal' else 'pin', name, origin, u, v, side))
 
     # -- passives: rows of blocks between two pins, nudged until they fit ----------
     def place_line(self, s):
