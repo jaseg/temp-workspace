@@ -140,16 +140,18 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
   Repeaters and comparators move up to two blocks the same way. Text sits on plaques of wool, wood and
   terracotta (labels, references, values, notes), and plaques move out of the way of dust, parts and each other.
   Net labels lie on their own wire. The run prints how many parts and plaques moved.
-- **Around it:** the circuit stands on a birch deck in a meadow. The empty space gets gentle grassy hills,
+- **Around it:** the circuit's wires stand on a birch deck in a meadow (labels and part outlines sit on the grass). The empty space gets gentle grassy hills,
   patches of moss, podzol and gravel, oak, birch and cherry trees grown like the game's (their leaves see-through), azalea bushes,
-  flower beds, ponds, little vegetable gardens, beehives and pumpkins. The title block is a cherry wood deck
+  flower beds, ponds (clear water over a sunken bed), little vegetable gardens, beehives and pumpkins. The title block is a cherry wood deck
   with bookshelves, lanterns and a cake. The legend explains the parts.
 - **Page:** only the sheet is drawn; anything placed beside it in the schematic is left out.
 - **Camera:** an oblique view from high up in the south-east: `camera_deg` above the horizon (65 by default)
   and turned `yaw_deg` (30) from due south towards the east. The ground keeps its place on the page, so the sheet
   stays a rectangle; every block shows its top, its south side and a sliver of its east side, and leans a little
   to the north-west. Faces are shaded like in the game (sides 80 % and 60 %), with ambient occlusion where blocks meet
-  the ground, and everything solid casts a long, soft-edged shadow to the north-west from a low sun. The page frame (a garden path with a flowering
+  the ground, and everything solid casts a long, soft-edged shadow to the north-west from a low sun, onto the ground and onto lower hills alike;
+  edges facing the shadow get a dark rim. Where two wires cross, the east-west one hops over the other in a little
+  arc, like on old schematics. Snow and snowy tree tops are given extra contrast so they don't print as plain white. The page frame (a garden path with a flowering
   hedge, lanterns and zone signs) is drawn flat on top of everything, and so is all text.
 - **Output:** the blocks become one raster image at `px_per_block` pixels per block (16, the pack's texture size),
   cut into tiles and drawn pixelated. Text goes on top as vector paths traced from the pack's font, so it stays

@@ -49,6 +49,7 @@ class Page:
                       'mangrove_leaves': FOLIAGE, 'vine': FOLIAGE, 'birch_leaves': (150, 190, 100),
                       'spruce_leaves': (97, 153, 97), 'lily_pad': (60, 150, 60), 'water': (63, 118, 228)}
         self.platform = set()
+        self.keepout = set()
         self.taken = set()          # cells the page's own structures use
         self.overlay_cells = set()  # the frame's cells, drawn flat on top of everything
         self.height = {}            # cell -> blocks of hill under it
@@ -72,7 +73,10 @@ class Page:
 
     # -------------------------------------------------------------------------
     def build(self):
-        self.platform = dilate(self.w.circuit, 1)
+        # the wooden deck: under the wires and right around them (parts sit on their wires); labels and the big
+        # bodies stand on the land itself, which is only kept clear of decorations around them
+        self.platform = dilate(set(self.w.dust), 1)
+        self.keepout = dilate(self.w.circuit, 1)
         self.frame()
         self.title_block()
         self.legend()
@@ -90,7 +94,7 @@ class Page:
             for a in range(-margin, margin + 1):
                 for b in range(-margin, margin + 1):
                     c = (i + a, j + b)
-                    if c in self.platform or c in self.taken or c in self.w.solid or not self.in_frame(c):
+                    if c in self.keepout or c in self.taken or c in self.w.solid or not self.in_frame(c):
                         return False
         return True
 
@@ -327,7 +331,7 @@ class Page:
         self.animals(free)
 
     def blocked(self, c):
-        return c in self.platform or c in self.taken or c in self.w.solid or not self.in_frame(c)
+        return c in self.keepout or c in self.taken or c in self.w.solid or not self.in_frame(c)
 
     def biome(self, c):
         return BIOMES[self.biomes(c)]
@@ -335,8 +339,9 @@ class Page:
     def ground(self, free):
         """Each biome's ground: grass (in the biome's colour), podzol, sand, snow, red sand..."""
         rng = self.rng
-        for c in free:
-            if c in self.taken or c in self.w.floor:
+        around = [c for c in sorted(self.keepout - self.platform) if self.in_frame(c)]
+        for c in list(free) + around:
+            if c in self.taken or c in self.w.floor or c in self.platform:
                 continue
             name = self.biomes(c)
             g = pick(rng, BIOMES[name]['ground'])
@@ -371,7 +376,7 @@ class Page:
                     deep = (a / r) ** 2 + (b / (r * .7)) ** 2 < .45
                     bed = pick(rng, [('gravel', 3), ('clay', 3), ('dirt', 1), ('sand', 1)] if deep else
                                [('sand', 5), ('gravel', 1), ('dirt', 1)])
-                    self.w.floor[x] = B.get('pond', f'water|{bed}')
+                    self.w.floor[x] = B.get('pond', f'water|{bed}|{2 if deep else 1}')
                 else:
                     self.w.floor[x] = B.get('pond_rim', 'moss_block')
                 self.taken.add(x)
@@ -524,8 +529,11 @@ class Page:
 
     def leaves_at(self, leaf, kind, center):
         tint = BIOMES[self.biomes(center)]['foliage'] if kind in ('oak', 'acacia') else None
+        snowy = self.biomes(center) == 'snowy'
         for (x, y, z) in sorted(leaf, key=lambda t: (t[2], t[1], t[0])):
             self.put(x, y, z, f'{kind}_leaves', [('persistent', 'true')], absolute=True, tint=tint)
+            if snowy and (x, y + 1, z) not in leaf:         # snow lies on every leaf open to the sky
+                self.put(x, y + 1, z, 'snow', [('layers', '1')], absolute=True)
         self.taken.update({(x, z) for x, _, z in leaf} | {center})
 
     def spruce(self, i, j, hgt):

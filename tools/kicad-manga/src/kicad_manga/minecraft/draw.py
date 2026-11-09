@@ -27,6 +27,15 @@ PLAQUE_H = 2                # plaques are 2/16 of a block thick
 class Drawer:
     def __init__(self, world, pack, font, page, px=16, dust_width=2.0, fpx=20, camera_deg=65, yaw_deg=30):
         self.w, self.pack, self.font = world, pack, font
+        if not getattr(pack, 'print_ready', False):         # see `printable`
+            raw, done = pack.texture, {}
+
+            def texture(rid):
+                if rid not in done:
+                    done[rid] = printable(rid, raw(rid))
+                return done[rid]
+            pack.texture = texture
+            pack.print_ready = True
         self.td = TopDown(pack, px)                 # flat things, and the frame overlay
         self.ob = Oblique(pack, px, camera_deg, yaw_deg)    # everything that stands up
         self.px = px
@@ -58,6 +67,7 @@ class Drawer:
     def floor_tile(self, block):
         """A floor tile; 'name|tag' is block `name` in the tint registered for the whole key (a biome's grass)."""
         name, _, tag = block.partition('|')
+        tag = tag.split('|')[0]
         if name == 'water' and tag:         # clear water: the lake bed (`tag`) seen through it
             bed = self.floor_tile(tag).convert('RGBA')
             tex, _ = self.face_texture('water')
@@ -132,6 +142,112 @@ class Drawer:
         hook = self.widen_corner if corner else self.widen
         return self.td.state('redstone_wire', props, {0: dust_tint(power)}, model_hook=hook)[0]
 
+    def ponds(self, img, pond):
+        """Ponds as pits seen through clear water: a bed of sand, gravel, clay or dirt one or two blocks down, the
+        dirt walls around it where they face the camera, all of it seen only through the pond's surface."""
+        px = self.px
+        depth = {c: int(b.split('|')[2]) for c, b in pond.items()}
+        xs = [self.at(*c)[0] for c in pond]
+        ys = [self.at(*c)[1] for c in pond]
+        x0, y0 = min(xs) - 2 * px, min(ys) - 2 * px
+        pit = Image.new('RGBA', (max(xs) + 3 * px - x0, max(ys) + 3 * px - y0), (0, 0, 0, 0))
+        opening = Image.new('L', pit.size, 0)
+        for (i, j), b in sorted(pond.items(), key=lambda t: (t[0][1], t[0][0])):
+            x, y = self.at(i, j)
+            x, y = x - x0, y - y0
+            D = depth[(i, j)]
+            bed = self.floor_tile(b.split('|')[1]).convert('RGBA')
+            bed = Image.merge('RGBA', [c.point(lambda v, k=D: v * (10 - 2 * k) // 10) for c in bed.split()[:3]] +
+                              [bed.getchannel('A')])
+            dx, dy = self.shift(-D)
+            blit(pit, bed, x + dx, y + dy)
+            opening.paste(255, (x, y, x + px, y + px))
+        # then the walls behind each cell (the south face of the cell north of it, the east face of the one west
+        # of it), over the beds, which never reach up the walls
+        for (i, j) in sorted(pond, key=lambda c: (c[1], c[0])):
+            x, y = self.at(i, j)
+            x, y = x - x0, y - y0
+            D = depth[(i, j)]
+            for (a, bb), face in (((0, -1), 'south'), ((-1, 0), 'east')):
+                top = depth.get((i + a, j + bb), 0)
+                if top < D:
+                    spr, up, left = self.wall(face, D - top, top == 0)
+                    dx, dy = self.shift(-D)
+                    blit(pit, spr, x + a * px - left + dx, y + bb * px - up + dy)
+        water = self.td.box(self.face_texture('water')[0], 16, self.tints.get('water'))[0].convert('RGBA')
+        water.putalpha(water.getchannel('A').point(lambda v: min(255, v * 170 // 255 + 30)))
+        for (i, j) in pond:
+            x, y = self.at(i, j)
+            pit.alpha_composite(water, (x - x0, y - y0))
+        clear = Image.new('RGBA', pit.size, (0, 0, 0, 0))
+        img.paste(Image.composite(pit, clear, opening), (x0, y0), opening)
+
+    def wall(self, face, h, top):
+        """A pit wall facing `face`, h blocks high: dirt, with the grass's side under the rim."""
+        key = ('wall', face, h, top)
+        if key not in self.ob.cache:
+            els = []
+            for k in range(h):
+                tex = 'block/dirt'
+                els.append({'from': [0, 16 * k, 0], 'to': [16, 16 * (k + 1), 16],
+                            'faces': {face: {'texture': tex, 'uv': [0, 0, 16, 16]}}})
+            self.ob.cache[key] = self.ob.compose([({'textures': {}, 'elements': els}, 0, 0)], None)
+        return self.ob.cache[key]
+
+    @staticmethod
+    def crossing(nets):
+        """Where two wires cross without joining (one straight east-west, the other straight north-south), the
+        east-west one jumps over the other: returns that net, or None."""
+        if len(nets) != 2:
+            return None
+        (a, da), (b, db) = nets.items()
+        ew, ns = {'east', 'west'}, {'north', 'south'}
+        if set(da) == ew and set(db) == ns:
+            return a
+        if set(db) == ew and set(da) == ns:
+            return b
+        return None
+
+    HOP_H = .5          # how high (blocks) a wire jumps over another
+
+    def hop(self, east_west, power):
+        """A wire jumping over a crossing one, like the little arcs on old schematics, here lifted into the
+        third dimension: it rises from the ground at the cell's edges to HOP_H in the middle, with its shadow
+        on the ground below. Returns (image, x, y) with (x, y) the cell's top-left corner in the image."""
+        key = ('hop', east_west, power)
+        if key in self.td.cache:
+            return self.td.cache[key]
+        px, S = self.px, 4                      # drawn 4x larger, then scaled down for smooth edges
+        m = px // 2
+        size = (px + 2 * m) * S
+        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        a = .1                                  # flat bit at each end, where it meets the wire next to it
+
+        def lift(t):
+            u = min(1, max(0, (t - a) / (1 - 2 * a)))
+            return self.HOP_H * math.sin(math.pi * u)
+
+        def at(t, h, sun=False):
+            g = (t * px, px / 2) if east_west else (px / 2, t * px)
+            if sun:
+                dx, dy = self.SUN[0] * h * px, self.SUN[1] * h * px
+            else:
+                dx, dy = h * self.ob.h * px, -h * self.ob.s * px
+            return ((g[0] + dx + m) * S, (g[1] + dy + m) * S)
+        ts = [k / 40 for k in range(41)]
+        shadow = [at(t, lift(t), sun=True) for t in ts if lift(t) > .02]
+        line = [at(t, lift(t)) for t in ts]
+        w = max(2, round(px * .22))
+        if len(shadow) > 1:
+            d.line(shadow, fill=(10, 10, 25, 90), width=w * S, joint='curve')
+        r, g, b = dust_tint(power)
+        d.line(line, fill=(40, 6, 6, 255), width=(w + 2) * S, joint='curve')
+        d.line(line, fill=(min(255, r + 40), min(255, g + 20), min(255, b + 20), 255), width=w * S, joint='curve')
+        img = img.resize((px + 2 * m, px + 2 * m), Image.LANCZOS)
+        self.td.cache[key] = (img, m, m)
+        return self.td.cache[key]
+
     def widen(self, model, dot=True):
         k = self.dust_width
         for el in model.get('elements', []):
@@ -164,21 +280,36 @@ class Drawer:
         at = self.at
 
         tiles = {}
+        pond = {}
         for j in range(w.j0, w.H):
             for i in range(w.i0, w.W):
                 b = self.floor_of((i, j))
+                if b.startswith('water|') and b.count('|') == 2:
+                    pond[(i, j)] = b
+                    continue
                 if b not in tiles:
                     tiles[b] = self.floor_tile(b).convert('RGBA')
                 img.paste(tiles[b], at(i, j))
+        if pond:
+            self.ponds(img, pond)
 
         world = [b for b in w.blocks if not b.overlay]
         self.lift_hidden_plaques(world)
         for b in world:
             if b.flat:
                 blit(img, self.flat_sprite(b), *at(b.i, b.j))
+        hops = []
         for c, nets in w.dust.items():
+            over = self.crossing(nets)
             for net, ds in nets.items():
-                blit(img, self.dust(ds, power(net)), *at(*c))
+                if net == over:
+                    hops.append((c, net, ds))
+                else:
+                    blit(img, self.dust(ds, power(net)), *at(*c))
+        for c, net, ds in hops:         # after all the flat dust, so nothing is drawn over a bridge
+            spr, ox, oy = self.hop('east' in ds, power(net))
+            x, y = at(*c)
+            blit(img, spr, x - ox, y - oy)
 
         # everything that stands up, and the plaques, from the back (north) to the front, lowest first
         items = [((b.j, b.y, b.i, 0), 'block', b) for b in world if not b.flat]
@@ -186,13 +317,28 @@ class Drawer:
                   for pq in w.plaques if not pq.meta.get('overlay')]
         items += self.occlusion(world)
         items.sort(key=lambda t: t[0])
-        self.shadows(img, [b for b in world if not b.flat])
+        items += self.edges(world)
+        items.sort(key=lambda t: t[0])
+        top_shadow = self.shadows(img, [b for b in world if not b.flat])
+        dark = Image.new('RGBA', (self.px, self.px), (16, 20, 40, 255))
         for _, kind, it in items:
             if kind == 'block':
                 spr, up, left = self.sprite(it)
                 x, y = at(it.i, it.j)
                 dx, dy = self.shift(it.y)
                 blit(img, spr, x - left + dx, y - up + dy)
+                m = top_shadow.get((it.i, it.j)) if it.owner == 'hill' else None
+                if m is not None and it.y + 1 == self.column_top.get((it.i, it.j)):
+                    ddx, ddy = self.shift(it.y + 1)
+                    sh = dark.copy()
+                    sh.putalpha(m)
+                    blit(img, sh, x + ddx, y + ddy)
+            elif kind == 'edge':
+                (i, j), h, sides = it
+                x, y = at(i, j)
+                dx, dy = self.shift(h)
+                for side in sides:
+                    blit(img, self.edge_strip(side), x + dx, y + dy)
             elif kind == 'ao':
                 (i, j), h, sides = it
                 x, y = at(i, j)
@@ -253,36 +399,84 @@ class Drawer:
     SHADOW_BANDS = ((0, .5, .12), (.5, 1.5, .3), (1.5, 3, .55), (3, math.inf, .85))
     SHADOW_ALPHA = 64
 
-    def shadows(self, img, blocks):
-        """Sun shadows on the ground: each block's outline seen from above, swept from its bottom to its top along
-        the sun's direction (from the south-east, low in the sky, so shadows fall to the north-west), with soft
-        edges that widen with distance. Leaves let light through their holes."""
+    def casters(self, blocks):
+        """What throws shadows: (x, y, bottom, top, mask) with (x, y) the cell's corner on the page. Hills throw
+        theirs as whole columns from the ground up (only their outer blocks are drawn)."""
         px = self.px
-        bands = [Image.new('L', img.size, 0) for _ in self.SHADOW_BANDS]
         full = Image.new('L', (px, px), 255)
+        out, cols = [], {}
         for b in blocks:
-            spr, up, _ = self.sprite(b)
+            if b.owner == 'hill':
+                c = (b.i, b.j)
+                cols[c] = max(cols.get(c, 0), b.y + 1)
+                continue
+            up = self.sprite(b)[1]
             top = up / (self.ob.s * px) if self.ob.s else 0
             if top < .2:
                 continue
             mask = self.footprint(b)
             if mask is None:
                 continue
-            x, y = self.at(b.i, b.j)
-            n = max(2, math.ceil(top * math.hypot(*self.SUN) * px / 2))     # a step every 2 px: no gaps
+            out.append((*self.at(b.i, b.j), b.y, b.y + top, mask))
+        for c, h in cols.items():
+            out.append((*self.at(*c), 0, h, full))
+        return out, cols
+
+    def shadow_layer(self, casters, g, box):
+        """The shadow (an 'L' mask) on a surface at height g, over the page area box = (x0, y0, x1, y1): each
+        caster's outline swept from where it rises above g to its top, along the sun, softer the farther it
+        falls."""
+        px = self.px
+        x0, y0, x1, y1 = box
+        bands = [Image.new('L', (x1 - x0, y1 - y0), 0) for _ in self.SHADOW_BANDS]
+        reach = 12 * px
+        for x, y, bot, top, mask in casters:
+            if top <= g + .05:
+                continue
+            if x + px < x0 - reach or x > x1 + reach or y + px < y0 - reach or y > y1 + reach:
+                continue
+            lo = max(bot, g)
+            n = max(2, math.ceil((top - lo) * math.hypot(*self.SUN) * px / 2))  # a step every 2 px: no gaps
             for k in range(n + 1):
-                d = top * k / n                                             # height of the casting part
-                t = b.y + d
-                sx, sy = round(x + t * self.SUN[0] * px), round(y + t * self.SUN[1] * px)
-                band = next(i for i, (lo, hi, _) in enumerate(self.SHADOW_BANDS) if d < hi)
-                bands[band].paste(full, (sx, sy), mask)                     # clipped at the page edge
-        layer = Image.new('L', img.size, 0)
+                t = lo + (top - lo) * k / n
+                d = t - g                                                   # how far above the surface
+                sx, sy = round(x + d * self.SUN[0] * px) - x0, round(y + d * self.SUN[1] * px) - y0
+                if sx > x1 - x0 or sy > y1 - y0 or sx + px < 0 or sy + px < 0:
+                    continue
+                band = next(i for i, (_, hi, _) in enumerate(self.SHADOW_BANDS) if t - bot < hi)
+                bands[band].paste(255, (sx, sy, sx + px, sy + px), mask)
+        layer = Image.new('L', bands[0].size, 0)
         for band, (_, _, r) in zip(bands, self.SHADOW_BANDS):
             if band.getbbox():
                 layer = ImageChops.lighter(layer, band.filter(ImageFilter.GaussianBlur(r * px)))
+        return layer.point(lambda v: v * self.SHADOW_ALPHA // 255)
+
+    def shadows(self, img, blocks):
+        """Sun shadows (from the south-east, low in the sky, so they fall to the north-west), with soft edges
+        that widen with distance, on the ground and on the hill tops. Leaves let light through their holes.
+        The ground's are laid on the page now; the hill tops' are returned, {cell: mask}, to lay on each top
+        as it is drawn."""
+        px = self.px
+        casters, cols = self.casters(blocks)
+        alpha = self.shadow_layer(casters, 0, (0, 0) + img.size)
         shade = Image.new('RGBA', img.size, (16, 20, 40, 255))
-        shade.putalpha(layer.point(lambda v: v * self.SHADOW_ALPHA // 255))
+        shade.putalpha(alpha)
         img.alpha_composite(shade)
+        tops = {}
+        levels = {}
+        for c, h in cols.items():
+            levels.setdefault(h, []).append(c)
+        for g, cells in levels.items():
+            xs = [self.at(*c)[0] for c in cells]
+            ys = [self.at(*c)[1] for c in cells]
+            box = (min(xs), min(ys), max(xs) + px, max(ys) + px)
+            layer = self.shadow_layer(casters, g, box)
+            for c in cells:
+                x, y = self.at(*c)
+                m = layer.crop((x - box[0], y - box[1], x - box[0] + px, y - box[1] + px))
+                if m.getbbox():
+                    tops[c] = m
+        return tops
 
     def footprint(self, b):
         """What of a Block the sun can't shine through, seen from above (a mask), or None for plants and other
@@ -345,6 +539,45 @@ class Drawer:
             if sides:
                 out.append(((j, g - 1 if g else -1, i, 1), 'ao', ((i, j), g, sides)))
         return out
+
+    def edges(self, blocks):
+        """Thin dark rims along the north and west edges of block tops where the land drops away behind them, so
+        a block's top doesn't run straight into the shadow behind it. Returns draw items, each drawn just after
+        the top it rims."""
+        top, key = {}, {}
+        cols = {}
+        for b in blocks:
+            if b.flat:
+                continue
+            h = self.solid(b)
+            if h < .4:
+                continue
+            c = (b.i, b.j)
+            if b.y + h > top.get(c, 0):
+                top[c] = b.y + h
+                key[c] = (b.j, b.y, b.i, 0.5)
+            if b.owner == 'hill':
+                cols[c] = max(cols.get(c, 0), b.y + 1)
+        self.column_top = cols
+        out = []
+        for (i, j), h in top.items():
+            sides = tuple(d for d, (a, b) in (('north', (0, -1)), ('west', (-1, 0)))
+                          if top.get((i + a, j + b), 0) < h - .3)
+            if sides:
+                out.append((key[(i, j)], 'edge', ((i, j), h, sides)))
+        return out
+
+    def edge_strip(self, side):
+        key = ('edge', side)
+        if key not in self.td.cache:
+            px = self.px
+            strip = Image.new('RGBA', (px, px), (0, 0, 0, 0))
+            w = max(1, px // 16)
+            for k, a in ((0, 150), (w, 60)):
+                box = {'north': (0, k, px, k + w), 'west': (k, 0, k + w, px)}[side]
+                strip.paste((30, 24, 20, a), box)
+            self.td.cache[key] = strip
+        return self.td.cache[key]
 
     def ao_strip(self, side):
         key = ('ao', side)
@@ -497,6 +730,22 @@ class Drawer:
         return Markup('<?xml version="1.0" encoding="UTF-8"?>\n' + str(tag(
             'svg', body, xmlns='http://www.w3.org/2000/svg', viewBox=' '.join(num(v) for v in vb),
             width=f'{num(right - left)}mm', height=f'{num(bottom - top)}mm')))
+
+
+SNOWY = ('block/snow', 'block/powder_snow')
+
+
+def printable(rid, img):
+    """Textures as they should look on paper. Snow is nearly white with a faint pattern that shows in the game's
+    lighting but vanishes in print: it gets more contrast and a cool tint."""
+    if rid.split(':')[-1] not in SNOWY:
+        return img
+    from PIL import ImageEnhance
+    rgb = ImageEnhance.Contrast(img.convert('RGB')).enhance(3.2)
+    rgb = Image.merge('RGB', [c.point(lambda v, k=k: round(v * k)) for c, k in zip(rgb.split(), (.9, .93, 1.0))])
+    out = rgb.convert('RGBA')
+    out.putalpha(img.getchannel('A'))
+    return out
 
 
 def sink_hopper(model):
