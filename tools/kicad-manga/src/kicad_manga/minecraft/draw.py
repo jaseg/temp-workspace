@@ -10,7 +10,7 @@ import base64
 import io
 import math
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from ..svg import Markup, num, tag
 from .circuit import STYLES
@@ -195,11 +195,18 @@ class Drawer:
 
     SUN = (-1.0, -1.45)             # how far a shadow moves (east, south) per block of height: a low sun, ~35 deg up
 
+    # Soft shadows: the sun is a disc, not a point, so a shadow's edge blurs the more, the farther it falls from
+    # what casts it. The sweep is cut into bands by the height of the casting part, each blurred by its own radius
+    # (in blocks).
+    SHADOW_BANDS = ((0, .5, .12), (.5, 1.5, .3), (1.5, 3, .55), (3, math.inf, .85))
+    SHADOW_ALPHA = 90
+
     def shadows(self, img, blocks):
         """Sun shadows on the ground: each block's outline seen from above, swept from its bottom to its top along
-        the sun's direction (from the south-east, low in the sky, so shadows fall to the north-west). Leaves let light through their holes."""
+        the sun's direction (from the south-east, low in the sky, so shadows fall to the north-west), with soft
+        edges that widen with distance. Leaves let light through their holes."""
         px = self.px
-        layer = Image.new('L', img.size, 0)
+        bands = [Image.new('L', img.size, 0) for _ in self.SHADOW_BANDS]
         full = Image.new('L', (px, px), 255)
         for b in blocks:
             spr, up, _ = self.sprite(b)
@@ -212,11 +219,17 @@ class Drawer:
             x, y = self.at(b.i, b.j)
             n = max(2, math.ceil(top * math.hypot(*self.SUN) * px / 2))     # a step every 2 px: no gaps
             for k in range(n + 1):
-                t = b.y + top * k / n
+                d = top * k / n                                             # height of the casting part
+                t = b.y + d
                 sx, sy = round(x + t * self.SUN[0] * px), round(y + t * self.SUN[1] * px)
-                layer.paste(full, (sx, sy), mask)       # clipped at the page edge
+                band = next(i for i, (lo, hi, _) in enumerate(self.SHADOW_BANDS) if d < hi)
+                bands[band].paste(full, (sx, sy), mask)                     # clipped at the page edge
+        layer = Image.new('L', img.size, 0)
+        for band, (_, _, r) in zip(bands, self.SHADOW_BANDS):
+            if band.getbbox():
+                layer = ImageChops.lighter(layer, band.filter(ImageFilter.GaussianBlur(r * px)))
         shade = Image.new('RGBA', img.size, (16, 20, 40, 255))
-        shade.putalpha(layer.point(lambda v: v * 90 // 255))
+        shade.putalpha(layer.point(lambda v: v * self.SHADOW_ALPHA // 255))
         img.alpha_composite(shade)
 
     def footprint(self, b):
