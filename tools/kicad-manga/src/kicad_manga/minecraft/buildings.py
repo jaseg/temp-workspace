@@ -25,6 +25,13 @@ ROOFS = {    # material -> (stairs, slab, full block)
     'mud_brick': ('mud_brick_stairs', 'mud_brick_slab', 'mud_bricks'),
 }
 
+TURN = ['north', 'east', 'south', 'west']
+
+
+def turn(d, r):
+    return TURN[(TURN.index(d) + r) % 4]
+
+
 SMALL, LARGE = 40, 200          # body area (cells) up to which an IC is a small house, above which a castle
 PLINTH_H = 2                    # 16ths of a block: floors inside buildings
 
@@ -57,6 +64,30 @@ class Site:
         h = zlib.crc32(repr((self.seed,) + k).encode())
         h = (h ^ (h >> 16)) * 0x45d9f3b & 0xffffffff
         return ((h ^ (h >> 16)) & 0xffff) / 0x10000
+
+    def turned(self, r, I0, J0, W, D):
+        """The site built in a W x D frame at (0, 0), turned r quarter turns clockwise (seen from above) and
+        moved to (I0, J0)."""
+        def at(x, z):
+            return [(x, z), (D - 1 - z, x), (W - 1 - x, D - 1 - z), (z, W - 1 - x)][r]
+
+        def props(ps):
+            out = []
+            for k, v in ps:
+                if k in TURN:
+                    k = turn(k, r)
+                elif k == 'facing' and v in TURN:
+                    v = turn(v, r)
+                elif k == 'axis' and r % 2 and v in ('x', 'z'):
+                    v = 'z' if v == 'x' else 'x'
+                out.append((k, v))
+            return tuple(sorted(out))
+        blocks = {}
+        for (x, y, z), (name, ps) in self.blocks.items():
+            i, j = at(x, z)
+            blocks[(I0 + i, y, J0 + j)] = (name, props(ps))
+        self.blocks = blocks
+        self.floor = {(I0 + at(x, z)[0], J0 + at(x, z)[1]): b for (x, z), b in self.floor.items()}
 
     def emit(self):
         return [Block(i, y, j, 'state', args, owner=self.owner) for (i, y, j), args in sorted(self.blocks.items())]
@@ -150,7 +181,7 @@ def castle(site, R, max_top, keep_pal):
     for i in range(i0, i1 + 1):
         for j in range(j0, j1 + 1):
             if i not in (i0, i1) and j not in (j0, j1):
-                site.floor[(i, j)] = 'moss_block' if site.rnd(i, j) < .85 else 'coarse_dirt'
+                site.floor[(i, j)] = 'moss_block' if site.rnd(i, j) < .95 else 'coarse_dirt'
                 continue
             for y in range(wall_h):
                 site.put(i, y, j, stone(i, y, j))
@@ -182,12 +213,121 @@ def castle(site, R, max_top, keep_pal):
     inner = (i0 + tower, j0 + tower, i1 - tower, j1 - tower)
     kw, kd = inner[2] - inner[0] + 1, inner[3] - inner[1] + 1
     top = tower_h + 1
+    K = None
     if kw >= 5 and kd >= 5:
         kh = min(4, kd - 2)
         K = (inner[0] + 1, inner[1], inner[2] - 1, inner[1] + kh - 1)
         if K[2] - K[0] >= 2:
             top = max(top, house(site, K, wall_h + 1, max_top, keep_pal, keep=True))
+        else:
+            K = None
+    furnish(site, R, tower, K, (gi - gw // 2, gi + gw // 2))
     return top
+
+
+FLOWERS = ['poppy', 'dandelion', 'cornflower', 'allium', 'oxeye_daisy', 'azure_bluet', 'lily_of_the_valley',
+           'red_tulip', 'orange_tulip', 'pink_tulip', 'white_tulip']
+CROPS = [('wheat', 'age', '7'), ('carrots', 'age', '7'), ('potatoes', 'age', '7'), ('beetroots', 'age', '3')]
+
+
+def furnish(site, R, tower, K, path):
+    """Life in a castle's courtyard: cottages and vegetable gardens along the walls, a well on the square in the
+    middle, lanterns on posts along the path, beehives, hay, barrels and flowers everywhere else."""
+    i0, j0, i1, j1 = R
+    F = PLINTH_H / 16                                   # the courtyard's floor
+    used = set()
+    if K:
+        used |= {(i, j) for i in range(K[0] - 1, K[2] + 2) for j in range(K[1], K[3] + 2)}
+    used |= {(i, j) for i in range(path[0], path[1] + 1) for j in range(j0, j1 + 1)}
+
+    def free(cells):
+        return all(i0 < i < i1 and j0 < j < j1 and (i, j) not in used and (i, j) in site.floor for i, j in cells)
+
+    def take(cells):
+        used.update(cells)
+
+    def rect(a, b, c, d):
+        return [(i, j) for i in range(a, c + 1) for j in range(b, d + 1)]
+
+    # the square with the well, halfway down the path
+    jt = (K[3] + 2) if K else j0 + tower
+    jm = (jt + j1 - tower) // 2
+    pc = (path[0] + path[1]) // 2
+    sq = rect(pc - 2, jm - 2, pc + 2, jm + 2)
+    if all(i0 < i < i1 and j0 + tower <= j < j1 - tower for i, j in sq):
+        for c in sq:
+            site.floor[c] = 'dirt_path' if c[0] in range(path[0], path[1] + 1) else 'gravel'
+            used.add(c)
+        for c in rect(pc - 1, jm - 1, pc + 1, jm + 1):
+            site.floor[c] = 'cobblestone'
+        site.put(pc, F, jm, 'water_cauldron', level='3')
+        for a, b in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+            site.put(pc + a, F, jm + b, 'oak_fence')
+            site.put(pc + a, F + 1, jm + b, 'oak_fence')
+        for c in rect(pc - 1, jm - 1, pc + 1, jm + 1):
+            site.put(c[0], F + 2, c[1], 'spruce_slab', type='bottom')
+        for a in (-1, 1):
+            site.put(pc + a, F, jm, 'cobblestone_slab', type='bottom')
+        site.put(pc, F, jm - 1, 'cobblestone_slab', type='bottom')
+        site.put(pc + 2, F, jm + 2, 'campfire', lit='true', facing='south')
+
+    # lanterns on posts along the path
+    for j in range(jt + 1, j1 - 1, 4):
+        for i in (path[0] - 1, path[1] + 1):
+            if free([(i, j)]):
+                site.put(i, F, j, 'oak_fence')
+                site.put(i, F + 1, j, 'lantern', hanging='false')
+                take([(i, j)])
+
+    # along both walls, from the north down: cottages, gardens and little stores
+    houses = [h for h in HOUSES if h[3] != 'deepslate_tile']
+    for side in ('west', 'east'):
+        room = (path[0] - 2 - i0) if side == 'west' else (i1 - 2 - path[1])
+        cw = min(3, room)
+        if cw < 2:
+            continue
+        a = i0 + 1 if side == 'west' else i1 - cw
+        j = j0 + tower if not K else j0 + 1
+        k = 0
+        while j < j1 - 1:
+            r = site.rnd(side, j, 'what')
+            if r < .4 and free(rect(a, j, a + cw - 1, j + 2)):
+                # a cottage
+                take(rect(a, j, a + cw - 1, j + 3))
+                house(site, (a, j, a + cw - 1, j + 2), 2, 4, houses[int(site.rnd(side, j) * len(houses))])
+                j += 4
+            elif r < .7 and free(rect(a, j, a + cw - 1, j + 1)):
+                # a vegetable garden
+                crop = CROPS[int(site.rnd(j, side, 'crop') * len(CROPS))]
+                for c in rect(a, j, a + cw - 1, j + 1):
+                    site.floor[c] = 'farmland'
+                    site.put(c[0], F, c[1], crop[0], **{crop[1]: crop[2]})
+                take(rect(a, j, a + cw - 1, j + 2))
+                j += 3
+            elif free([(a, j)]):
+                # a little store: barrels, hay, a beehive, a crafting table
+                stuff = [('barrel', {'facing': 'up', 'open': 'false'}), ('hay_block', {'axis': 'y'}),
+                         ('beehive', {'facing': 'south', 'honey_level': '5'}), ('crafting_table', {}),
+                         ('flowering_azalea', {}), ('composter', {'level': '6'}), ('smoker', {'facing': 'south'})]
+                for n, c in enumerate(rect(a, j, a + cw - 1, j)):
+                    if free([c]) and site.rnd(*c, 'stuff') < .8:
+                        name, props = stuff[int(site.rnd(c[1], c[0], 'stuff') * len(stuff))]
+                        site.put(c[0], F, c[1], name, **props)
+                take(rect(a, j, a + cw - 1, j + 1))
+                j += 2
+            else:
+                j += 1
+            k += 1
+
+    # flowers on the grass that is left
+    for c in sorted(site.floor):
+        i, j = c
+        if site.floor[c] == 'moss_block' and c not in used and (i, F, j) not in site.blocks:
+            r = site.rnd(i, j, 'flower')
+            if r < .22:
+                site.put(i, F, j, FLOWERS[int(site.rnd(j, i, 'f') * len(FLOWERS))])
+            elif r < .25:
+                site.put(i, F, j, 'flowering_azalea' if r < .24 else 'azalea')
 
 
 def plan(cells, pins, owner, seed, box, area_class=None):
@@ -209,10 +349,15 @@ def plan(cells, pins, owner, seed, box, area_class=None):
     pal = HOUSES[seed % len(HOUSES)]
     wall_h = {'small': 2, 'medium': 3, 'large': 3}[kind]
     max_top = wall_h + {'small': 3, 'medium': 4, 'large': 4}[kind]
+    # built facing south in its own frame, then turned to face a random way
+    r = int(site.rnd('turn') * 4)
+    W, D = (w, d) if r % 2 == 0 else (d, w)
+    local = (0, 0, W - 1, D - 1)
     if kind == 'large':
-        castle(site, R, max_top + 2, ('stone_bricks', 'stone_bricks', 'dark_oak', 'deepslate_tile', None))
+        castle(site, local, max_top + 2, ('stone_bricks', 'stone_bricks', 'dark_oak', 'deepslate_tile', None))
     else:
-        house(site, R, wall_h, max_top, pal)
+        house(site, local, wall_h, max_top, pal)
+    site.turned(r, I0, J0, W, D)
 
     # floors inside (under the roof, the courtyard), where nothing else stands on the ground
     plinth = 'stone_bricks' if kind == 'large' else pal[4]
