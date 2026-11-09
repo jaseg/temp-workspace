@@ -98,10 +98,11 @@ def _plan_curves(cfg: Config) -> dict[str, list[Point]]:
 
 def main_plan(cfg: Config) -> list[Point]:
     """Plan outline of the main space, between the inner end walls; the bottom end mirrors
-    the top (two pieces: turned, the other piece's inner wall)."""
+    the top (two pieces: turned, the other piece's inner wall; turning keeps the order)."""
     top = _plan_curves(cfg)["inner_in"]
-    k = -1.0 if cfg.two_piece else 1.0
-    return [*top, *((k * x, -y) for x, y in reversed(top))]
+    if cfg.two_piece:
+        return [*top, *((-x, -y) for x, y in top)]
+    return [*top, *((x, -y) for x, y in reversed(top))]
 
 
 def _front_inner(cfg: Config, x: float) -> float:
