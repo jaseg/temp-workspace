@@ -1,13 +1,13 @@
 """ICs as buildings: small and medium ICs become timber houses with gable roofs, large ones castles with corner
 towers, a gate and a keep in the courtyard.
 
-A building stands on a low plinth that covers the whole body. Its walls keep clear of the plinth's edges where
-the pin names are painted, and of the strip to the north and west that it leans over when seen from the camera
-(`lean`), so it hides nothing outside its own body. Every block is a plain block state of the resource pack."""
+A building fills its whole body, and the pin names are painted over its walls and roof. Connectors become
+picnics (`picnic`). Every block is a plain block state of the resource pack."""
 
 import math
+import zlib
 
-from .world import Block
+from .world import DIRS, Block
 
 # (pillar log, wall planks, door wood, roof material, plinth)
 HOUSES = [
@@ -26,7 +26,7 @@ ROOFS = {    # material -> (stairs, slab, full block)
 }
 
 SMALL, LARGE = 40, 200          # body area (cells) up to which an IC is a small house, above which a castle
-PLINTH_H = 2                    # 16ths of a block
+PLINTH_H = 2                    # 16ths of a block: floors inside buildings
 
 
 def roof_blocks(m):
@@ -54,7 +54,7 @@ class Site:
 
     def rnd(self, *k):
         """A stable pseudo-random number in [0, 1) for a position."""
-        h = hash((self.seed,) + k) & 0xffffffff
+        h = zlib.crc32(repr((self.seed,) + k).encode())
         h = (h ^ (h >> 16)) * 0x45d9f3b & 0xffffffff
         return ((h ^ (h >> 16)) & 0xffff) / 0x10000
 
@@ -190,54 +190,75 @@ def castle(site, R, max_top, keep_pal):
     return top
 
 
-def plan(cells, pins, names, owner, seed, lean, box, area_class=None):
-    """The blocks of the building for an IC body (a set of cells): ([Block], plinth height in blocks, size class),
-    or None when the body is no rectangle. `box(cell, block, h)` makes a low box of block textures (the plinth). `names` maps a side of the body to how far (cells) pin names reach in from it;
-    `lean` = (north, west): how far (cells) a block of height leans over to the north and west."""
+def plan(cells, pins, owner, seed, box, area_class=None):
+    """The building for an IC body (a set of cells): ([Block], height in blocks to paint the pin names at, size
+    class), or None when the body is no rectangle. The building fills the whole body: its pin names lie on its
+    walls and roof. `box(cell, block, h)` makes a low box of block textures (the floors inside)."""
     I0, I1 = min(c[0] for c in cells), max(c[0] for c in cells)
     J0, J1 = min(c[1] for c in cells), max(c[1] for c in cells)
     if len(cells) < (I1 - I0 + 1) * (J1 - J0 + 1) - len(pins):
         return None
-    kind = area_class or size_class((I1 - I0 + 1) * (J1 - J0 + 1))
+    R = (I0, J0, I1, J1)
+    w, d = I1 - I0 + 1, J1 - J0 + 1
+    kind = area_class or size_class(w * d)
+    if kind == 'large' and min(w, d) < 5:
+        kind = 'medium'
+    if min(w, d) < 2:
+        return None
     site = Site(owner, seed)
     pal = HOUSES[seed % len(HOUSES)]
-
-    # the building's rectangle: clear of the pin names, else of a one block yard, else the whole body
-    ins = {k: max(1, math.ceil(names.get(k, 0))) for k in ('north', 'south', 'east', 'west')}
-    R = (I0 + ins['west'], J0 + ins['north'], I1 - ins['east'], J1 - ins['south'])
-    need = 5 if kind == 'large' else 3
-    if R[2] - R[0] + 1 < need or R[3] - R[1] + 1 < need:
-        R = (I0 + 1, J0 + 1, I1 - 1, J1 - 1)
-        if R[2] - R[0] + 1 < need or R[3] - R[1] + 1 < need:
-            R = (I0, J0, I1, J1)
-    if kind == 'large' and (R[2] - R[0] + 1 < 5 or R[3] - R[1] + 1 < 5):
-        kind = 'medium'
-
-    # how high it may grow without leaning out of its body
     wall_h = {'small': 2, 'medium': 3, 'large': 3}[kind]
-    lim = []
-    if lean[0] > 0:
-        lim.append((R[1] - J0 + .6) / lean[0])
-    if lean[1] > 0:
-        lim.append((R[0] - I0 + .6) / lean[1])
-    # a roof of at least a few steps, even where that leans a little over the neighbours: flat roofs make boxes
-    span = min(R[2] - R[0], R[3] - R[1]) + 1
-    max_top = max(wall_h + min(3, math.ceil(span / 2)) + (kind != 'small'), min(lim + [9]))
+    max_top = wall_h + {'small': 3, 'medium': 4, 'large': 4}[kind]
     if kind == 'large':
-        castle(site, R, max_top, ('stone_bricks', 'stone_bricks', 'dark_oak', 'deepslate_tile', None))
+        castle(site, R, max_top + 2, ('stone_bricks', 'stone_bricks', 'dark_oak', 'deepslate_tile', None))
     else:
         house(site, R, wall_h, max_top, pal)
 
-    # the plinth under all of it, where nothing else stands on the ground
-    # the plinth under all of it, where nothing else stands on the ground: a paved yard, a little worn
+    # floors inside (under the roof, the courtyard), where nothing else stands on the ground
     plinth = 'stone_bricks' if kind == 'large' else pal[4]
-    worn = {'stone_bricks': ('mossy_stone_bricks', 'cracked_stone_bricks'), 'cobblestone': ('mossy_cobblestone',),
-            'mossy_cobblestone': ('cobblestone',), 'packed_mud': ('mud_bricks',)}.get(plinth, ())
     out = site.emit()
     ground = {(b.i, b.j) for b in out if b.y == 0}
     for c in sorted(cells):
         if c not in ground:
-            r = site.rnd(*c, 'yard')
-            block = worn[int(r * 8)] if worn and r * 8 < len(worn) else plinth
-            out.append(box(c, site.floor.get(c, block), PLINTH_H))
-    return out, PLINTH_H / 16, kind
+            out.append(box(c, site.floor.get(c, plinth), PLINTH_H))
+    return out, wall_h, kind
+
+
+CANDLES = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'cyan', 'purple', 'blue', 'red']
+TREATS = [('cake', {}), ('melon', {}), ('pumpkin', {}), ('hay_block', {'axis': 'y'}), ('jukebox', {}),
+          ('barrel', {'facing': 'up', 'open': 'false'}), ('beehive', {'facing': 'south', 'honey_level': '5'}),
+          ('lantern', {'hanging': 'false'}), ('flower_pot', {}), ('composter', {'level': '0'})]
+
+
+def picnic(cells, pins, owner, seed, box):
+    """A connector as a picnic: a red and white checkered blanket over its body, a birthday cake with a candle
+    wherever a pin plugs in (the candle's colour by net, so pins of one net match), and treats spread around
+    the middle. Returns [Block] and the height to paint the pin names at."""
+    site = Site(owner, seed)
+    inner = {}
+    for p in pins:
+        path = list(p['line'])
+        if p['dir']:
+            d = DIRS[p['dir']]
+            path += [(p['inner'][0] + d[0] * k, p['inner'][1] + d[1] * k) for k in range(1, 8)]
+        for c in path:
+            if c in cells:
+                inner[c] = p['net']
+                break
+    for (i, j) in sorted(cells):
+        if (i, j) in inner:
+            net = inner[(i, j)]
+            colour = CANDLES[zlib.crc32(repr(net).encode()) % len(CANDLES)]
+            site.put(i, 0, j, f'{colour}_candle_cake', lit='true')
+            continue
+        edge = any((i + a, j + b) not in cells for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+        r = site.rnd(i, j)
+        if not edge and r < .12:
+            name, props = TREATS[int(site.rnd(j, i) * len(TREATS))]
+            site.put(i, 0, j, name, **props)
+    out = site.emit()
+    ground = {(b.i, b.j) for b in out}
+    for (i, j) in sorted(cells):
+        if (i, j) not in ground:
+            out.append(box((i, j), 'red_wool' if (i + j) % 2 else 'white_wool', 1))
+    return out, 1 / 16

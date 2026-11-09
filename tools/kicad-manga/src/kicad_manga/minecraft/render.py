@@ -18,7 +18,7 @@ def build_svg(path, cfg):
     pack = ResourcePack(mc['packs'])
     font = BitmapFont(pack)
     sch = load(path)
-    builder = Builder(sch, pack, font, mc['block_mm'], mc['camera_deg'], mc['yaw_deg'])
+    builder = Builder(sch, pack, font, mc['block_mm'])
     world = builder.build()
     page = Page(world, builder, sch, path, cfg, pack, font)
     page.build()

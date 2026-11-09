@@ -123,10 +123,11 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
     side. P-type parts use subtract mode.
   - Passives sit between their pins. Resistors are a furnace each, capacitors are two upright plates across
     the wire (the + plate gold), inductors are copper and ferrite beads oxidized copper.
-  - ICs (U...) are buildings on a paved yard with their pin names painted around the edge: small and medium ones
-    timber houses with gable roofs, windows and a door, large ones castles with corner towers, a gate and a keep.
-    They keep clear of the pin names and, where there is room, of the strip they lean over (small houses may
-    lean a little over their neighbours rather than get a flat roof).
+  - ICs (U..., and transformers) are buildings filling their whole body, with the pin names painted over the
+    walls and roofs: small and medium ones timber houses with gable roofs, windows and a door, large ones castles
+    with corner towers, a gate and a keep.
+  - Connectors are picnics: a red and white checkered blanket with a candle cake wherever a pin plugs in (the
+    candle's colour by net) and melons, cakes, beehives and barrels spread around.
   - Other parts get a wooden or terracotta body with their pin names painted on top. Supplies are torches,
     grounds hoppers, no-connects cobwebs and mounting holes cauldrons.
 - **Fitting things in:** a passive that collides with a neighbour, a wire or another part is tried one and two
