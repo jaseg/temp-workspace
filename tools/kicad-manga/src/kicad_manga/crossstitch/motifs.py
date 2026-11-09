@@ -79,8 +79,8 @@ def text_width(text):
 # Motifs, each with its key. R rose, P petal, Y yellow centre, G leaf green, L light green, B bird blue,
 # H heart red, S strawberry red.
 KEY = {
-    'R': '#a8414f', 'r': '#c9787a', 'P': '#6f5a8f', 'p': '#a08fb6', 'Y': '#c49a2c', 'G': '#4d6b36', 'L': '#879a5a',
-    'B': '#476f93', 'b': '#8ea9bf', 'H': '#a83a36', 'S': '#a93c35', 'W': '#efe3c8', 'O': '#b8692c',
+    'R': '#c94a6a', 'r': '#e9849c', 'P': '#9b6fcf', 'p': '#c8a8ec', 'Y': '#e8b830', 'G': '#4f8f3e', 'L': '#8cc06a',
+    'B': '#4f86c6', 'b': '#9cc3ea', 'H': '#d23f4f', 'S': '#d8434a', 'W': '#fbf6ea', 'O': '#e5833a',
 }
 
 HEART = ['.HH.HH.',

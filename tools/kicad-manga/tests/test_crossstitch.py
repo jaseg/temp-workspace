@@ -24,8 +24,7 @@ def test_chart_has_every_kind_of_stitch():
 def test_svg_has_cloth_border_and_title():
     cfg = config.load()
     svg, page = build_svg(DEMO, cfg)
-    assert svg.count('<image') == 1               # the cloth is one bitmap tile
-    assert '<pattern' in svg
+    assert svg.count('<image') == 1               # the cloth is one raster
     assert 'stroke-dasharray' in svg              # backstitch
     assert '<path' in svg
     assert not any('title panel' in n for n in page.report())

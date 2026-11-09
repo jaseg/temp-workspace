@@ -1,21 +1,22 @@
 """Embroidery floss: the colours the sampler is stitched in, and the cloth.
 
-Rustic, plant-dyed looking colours on natural linen. Nets keep the manga style's hue families (names sharing a
-prefix share a hue), snapped to the nearest floss; supply rails are stitched in madder red and grounds in pewter."""
+Thread colours are deeper than the manga style's pastels, so that they read on cream aida. Nets keep the manga
+style's hue families (names sharing a prefix share a hue), supply rails are stitched in coral and grounds in
+slate."""
 
 import colorsys
 
 from ..palette import NetColors
 
-CLOTH = (216, 199, 164)          # natural, unbleached linen
-CLOTH_HOLE = (128, 104, 72)
-INK = '#3b2826'                  # dark umber: symbol outlines, pins and references
-VALUE = '#2c4f4a'                # dark verdigris: values and other fields
-PIN_TEXT = '#4f3f3a'             # pin names and numbers
-NOTE = '#45352a'                 # free text
-NO_CONNECT = '#9c2f25'
-SUPPLY = '#a8382c'
-GROUND = '#585c5c'
+CLOTH = (241, 233, 214)          # ecru aida
+CLOTH_HOLE = (196, 182, 156)
+INK = '#4a3150'                  # dark plum: symbol outlines, pins and references
+VALUE = '#2f6a6a'                # deep teal: values and other fields
+PIN_TEXT = '#6d5a73'             # pin names and numbers, one strand
+NOTE = '#5b4a3a'                 # free text
+NO_CONNECT = '#c8323c'
+SUPPLY = '#d9534f'
+GROUND = '#5f6b7a'
 
 
 def hex_rgb(h):
@@ -45,19 +46,19 @@ def floss(col, light=.5, sat=.62):
 
 # the floss box: (name, colour). Nets are stitched in the mid tones, part bodies in the pastels.
 NET_FLOSS = [
-    ('madder', '#a3402f'), ('rosehip', '#a85458'), ('rust', '#ad5e28'), ('ochre', '#b3831f'),
-    ('olive', '#737529'), ('sage', '#587645'), ('juniper', '#3d6a4c'), ('verdigris', '#3a7569'),
-    ('woad', '#456c8c'), ('indigo', '#334d78'), ('heather', '#64527f'), ('elderberry', '#74476f'),
-    ('plum', '#844a63'), ('walnut', '#664631'),
+    ('cherry', '#c23b4e'), ('rose', '#d6608a'), ('tangerine', '#e07f35'), ('marigold', '#d9a020'),
+    ('olive', '#8a962c'), ('moss', '#5a9642'), ('fern', '#2c8c68'), ('teal', '#268a93'), ('sky', '#3a8ccc'),
+    ('cornflower', '#5568cc'), ('iris', '#7656c2'), ('lavender', '#a068c0'), ('orchid', '#c25aac'),
+    ('cocoa', '#8a5a3c'),
 ]
-SUPPLY_FLOSS = ('madder red', SUPPLY)
-GROUND_FLOSS = ('pewter', GROUND)
+SUPPLY_FLOSS = ('coral', SUPPLY)
+GROUND_FLOSS = ('slate', GROUND)
 BODY_FLOSS = [
-    ('faded rose', '#d9ad9c'), ('straw', '#dcbd8e'), ('wheat', '#d3c487'), ('lichen', '#b3c296'),
-    ('sea glass', '#9fbab2'), ('faded blue', '#a9b6cb'), ('thistle', '#bdadc6'), ('blush', '#d3abad'),
+    ('blush', '#f2c2cd'), ('peach', '#f5cfab'), ('butter', '#f1df98'), ('mint', '#c4e3b9'), ('aqua', '#b8e0e0'),
+    ('powder', '#c2d3ef'), ('lilac', '#d8c8ee'), ('petal', '#efc8e3'),
 ]
-INK_FLOSS = [('umber', INK), ('dark verdigris', VALUE), ('bark', PIN_TEXT), ('peat', NOTE),
-             ('madder', NO_CONNECT)]
+INK_FLOSS = [('plum', INK), ('deep teal', VALUE), ('heather', PIN_TEXT), ('walnut', NOTE),
+             ('poppy', NO_CONNECT)]
 
 
 def hue_of(col):

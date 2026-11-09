@@ -24,7 +24,7 @@
 
     [crossstitch]            # the cross-stitch sampler style
     hole_mm = 1.27           # aida hole pitch: the schematic grid, so wires run from hole to hole
-    px_per_cell = 8          # resolution of the cloth's bitmap tile
+    px_per_cell = 8          # resolution of the cloth's raster
 """
 
 import copy

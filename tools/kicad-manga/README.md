@@ -167,8 +167,7 @@ The code is in `minecraft/`:
 uv run kicad-manga board.kicad_sch -s crossstitch          # ./board-crossstitch.svg/.png/.pdf
 ```
 
-- **Cloth:** natural, unbleached linen aida with slubby threads, tea stains and flax specks. Its holes sit on the
-  schematic grid (`hole_mm`, 1.27 mm), so wires run from hole to hole.
+- **Cloth:** the holes of the aida sit on the schematic grid (`hole_mm`, 1.27 mm), so wires run from hole to hole.
 - **Stitches:**
   - Wires are backstitched in their net's thread, one stitch per grid step. Buses are couched: a thick laid thread
     tied down at every hole.
@@ -177,17 +176,16 @@ uv run kicad-manga board.kicad_sch -s crossstitch          # ./board-crossstitch
     (diode triangles and the like) are satin stitched.
   - Outlines, pins and all text are backstitched along KiCad's own drawing, text in KiCad's stroke font.
   - Power symbols are stitched in their rail's thread.
-- **Threads:** a box of rustic, plant-dyed looking flosses. Nets keep the manga style's hue families, snapped to
-  the nearest floss. Supply rails are madder red and grounds pewter. Cross stitches are a little uneven, as if
-  stitched by hand.
+- **Threads:** a box of named flosses. Nets keep the manga style's hue families, snapped to the nearest floss.
+  Supply rails are coral and grounds slate.
 - **One thread weight:** every stitch is made of strands of the same thickness. Heavier lines are strands laid side
   by side: wires and bold text are doubled, buses four strands couched down, cross stitches two strands per leg.
 - **Around it:** a floral sampler border with a rose in each corner, in the margin outside KiCad's frame. A title
   panel with a row of motifs, the title in a cross-stitched sampler alphabet and the title block details, in the
   free spot nearest the bottom right corner.
-- **Output:** the cloth is one seamless bitmap tile, 96 cells square, repeated as a pattern. The stitches are
-  vector paths, one per thread colour and layer, and backstitch is drawn as dashed lines. Nothing is transparent.
-  An A1 sheet gives a PDF of about 4.5 MB.
+- **Output:** the cloth is one raster image built from a repeated patch, so it compresses to a few hundred kB.
+  The stitches are vector paths, one per thread colour and layer, and backstitch is drawn as dashed lines. Nothing
+  is transparent. An A1 sheet gives a PDF of about 2 MB.
 
 Everything is taken from gerbonara's SVG export: a colour scheme whose colours are role names tells the parts of
 KiCad's drawing apart. Text placement is best with gerbonara at the top of the KiCad schematic pull request stack.
@@ -196,7 +194,7 @@ KiCad's drawing apart. Text placement is best with gerbonara at the top of the K
 style = "crossstitch"
 [crossstitch]
 hole_mm = 1.27
-px_per_cell = 8          # resolution of the cloth's bitmap tile
+px_per_cell = 8          # resolution of the cloth's raster
 ```
 
 The code is in `crossstitch/`:
