@@ -116,7 +116,7 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
   the 1.27 mm grid most wire ends and pins use, so they land in the middle of their blocks.
 - **Parts:**
   - Wires are redstone dust. Grounds are dim and supplies at full power. Dust is drawn `dust_width` times wider
-    than in the game, so that it reads on paper. Buses are rails.
+    than in the game, so that it reads on paper. Buses are rails, with activator rails where wires join them.
   - Diodes are repeaters pointing from anode to cathode, and LEDs are lit repeaters. Dual diodes become two
     repeaters.
   - Transistors are comparators: collector or drain at the back, emitter or source in front, base or gate at a
@@ -132,7 +132,8 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
     colours). Hills reach up to eleven blocks: grass over dirt over stone with ores, snow-capped peaks, sand over
     sandstone, banded terracotta mesas, with a cave here and there. GND hoppers are let into the ground.
   - Connectors are portals: a nether portal of obsidian for row connectors (pins on one side), an end portal
-    (frames with eyes around the void) for those with pins on several sides.
+    (frames around the void, with an eye of ender where a pin comes out) for those with pins on several sides;
+    their pin names sit on dark bands so they read over the frames.
   - Other parts get a wooden or terracotta body with their pin names painted on top. Supplies are torches,
     grounds hoppers, no-connects cobwebs and mounting holes cauldrons.
 - **Fitting things in:** a passive that collides with a neighbour, a wire or another part is tried one and two
@@ -151,7 +152,7 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
   to the north-west. Faces are shaded like in the game (sides 80 % and 60 %), with ambient occlusion where blocks meet
   the ground, and everything solid casts a long, soft-edged shadow to the north-west from a low sun, onto the ground and onto lower hills alike;
   edges facing the shadow get a dark rim. Where two wires cross, the east-west one hops over the other in a little
-  arc, like on old schematics. Snow and snowy tree tops are given extra contrast so they don't print as plain white. The page frame (a garden path with a flowering
+  arc of redstone dust, like on old schematics. Snow and snowy tree tops are given extra contrast so they don't print as plain white. The page frame (a garden path with a flowering
   hedge, lanterns and zone signs) is drawn flat on top of everything, and so is all text.
 - **Output:** the blocks become one raster image at `px_per_block` pixels per block (16, the pack's texture size),
   cut into tiles and drawn pixelated. Text goes on top as vector paths traced from the pack's font, so it stays

@@ -37,6 +37,7 @@ STYLES = {
     'note': ('calcite', (70, 60, 55), False),
     'heading': ('yellow_wool', (90, 60, 20), False),
     'pin': (None, (255, 250, 240), True),
+    'pin_backed': (None, (255, 250, 240), True),
     'title': ('white_wool', (150, 50, 80), False),
     'sign': ('stripped_cherry_wood', (80, 30, 40), False),
 }
@@ -199,6 +200,29 @@ class Builder:
                     d = dir_of(q[0] - p[0], q[1] - p[1])
                     rails.setdefault(p, set()).add(d)
                     rails.setdefault(q, set()).add(OPP[d])
+        # bus entries: the wire runs straight up to the bus, onto the rail next to it (laid there if the bus
+        # stops short of it), which becomes an activator rail where the signal enters or leaves the bus
+        activators = set()
+        entries = []
+        for be in self.sch.bus_entries:
+            (x, y), (sx, sy) = at(be), xy(be.size)
+            a, b = self.cell(x, y), self.cell(x + sx, y + sy)
+            if b not in rails and a in rails:
+                a, b = b, a
+            entries.append((a, b, cells_on_segment(a, b)))
+        for a, b, cells in entries:
+            if b not in rails or a in rails:
+                continue
+            ds = rails[b]
+            along_z = 'north' in ds or 'south' in ds or not ds
+            n = (b[0], a[1]) if along_z else (a[0], b[1])
+            if n != b and n not in rails:
+                d = dir_of(b[0] - n[0], b[1] - n[1])
+                if abs(b[0] - n[0]) + abs(b[1] - n[1]) == 1:
+                    rails.setdefault(n, set()).add(d)
+                    rails[b].add(OPP[d])
+            if n in rails:
+                activators.add(n)
         for c, ds in rails.items():
             if 'north' in ds or 'south' in ds:
                 if 'east' in ds and len(ds) == 2:
@@ -209,16 +233,26 @@ class Builder:
                     shape = 'north_south'
             else:
                 shape = 'east_west'
-            w.blocks.append(Block(c[0], 0, c[1], 'state', ('rail', (('shape', shape),)), flat=True))
+            if c in activators and '_' in shape and shape not in ('north_south', 'east_west'):
+                activators.discard(c)
+            if c in activators:
+                state = ('activator_rail', (('powered', 'true'), ('shape', shape)))
+            else:
+                state = ('rail', (('shape', shape),))
+            w.blocks.append(Block(c[0], 0, c[1], 'state', state, flat=True))
             w.solid[c] = 'bus'
             w.circuit.add(c)
-        for be in self.sch.bus_entries:
-            (x, y), (sx, sy) = at(be), xy(be.size)
-            a, b = self.cell(x, y), self.cell(x + sx, y + sy)
+        for a, b, _ in entries:
             net = next(iter(self.cell_nets.get(a, ()) or self.cell_nets.get(b, ()) or [self.new_net()]))
             cells = [c for c in cells_on_segment(a, b) if c not in rails]
-            if cells:
-                w.path(cells, net)
+            if not cells:
+                continue
+            w.path(cells, net)
+            last = cells[-1]
+            for d, (di, dj) in DIRS.items():
+                if (last[0] + di, last[1] + dj) in rails and (last[0] + di, last[1] + dj) in activators:
+                    w.dust[last][net].add(d)
+                    break
 
     # -- symbols -----------------------------------------------------------------
     def symbol_info(self, sym):
@@ -483,15 +517,18 @@ class Builder:
                 continue
             n = self.font.width(name) / self.fpx
             vertical = d[0] == 0
+            # names on buildings are drawn where the ground is, in line with their wires: lifted to the height of
+            # the walls they would drift off up and to the side of their pins, by up to a few blocks
+            h = .001 if s.get('building') else s['body_h'] + .001
             if not vertical:
                 y0 = start[1] - .5
                 x0 = start[0] - .5 + (.2 if d[0] > 0 else -n + .8)
-                origin, u, v = (x0, s['body_h'] + .001, y0), (n, 0, 0), (0, 0, 1)
+                origin, u, v = (x0, h, y0), (n, 0, 0), (0, 0, 1)
             else:
                 x0 = start[0] - .5
                 z0 = start[1] - .5 + (n + .2 if d[1] > 0 else .8)
-                origin, u, v = (x0, s['body_h'] + .001, z0), (0, 0, -n), (1, 0, 0)
-            self.world.texts.append(('pin', name, origin, u, v))
+                origin, u, v = (x0, h, z0), (0, 0, -n), (1, 0, 0)
+            self.world.texts.append(('pin_backed' if s.get('building') == 'portal' else 'pin', name, origin, u, v))
 
     # -- passives: rows of blocks between two pins, nudged until they fit ----------
     def place_line(self, s):

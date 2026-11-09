@@ -217,34 +217,54 @@ class Drawer:
         key = ('hop', east_west, power)
         if key in self.td.cache:
             return self.td.cache[key]
-        px, S = self.px, 4                      # drawn 4x larger, then scaled down for smooth edges
+        px = self.px
         m = px // 2
-        size = (px + 2 * m) * S
-        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-        d = ImageDraw.Draw(img)
+        size = px + 2 * m
         a = .1                                  # flat bit at each end, where it meets the wire next to it
 
         def lift(t):
             u = min(1, max(0, (t - a) / (1 - 2 * a)))
             return self.HOP_H * math.sin(math.pi * u)
 
-        def at(t, h, sun=False):
-            g = (t * px, px / 2) if east_west else (px / 2, t * px)
-            if sun:
-                dx, dy = self.SUN[0] * h * px, self.SUN[1] * h * px
-            else:
-                dx, dy = h * self.ob.h * px, -h * self.ob.s * px
-            return ((g[0] + dx + m) * S, (g[1] + dy + m) * S)
-        ts = [k / 40 for k in range(41)]
-        shadow = [at(t, lift(t), sun=True) for t in ts if lift(t) > .02]
-        line = [at(t, lift(t)) for t in ts]
-        w = max(2, round(px * .22))
-        if len(shadow) > 1:
-            d.line(shadow, fill=(10, 10, 25, 90), width=w * S, joint='curve')
-        r, g, b = dust_tint(power)
-        d.line(line, fill=(40, 6, 6, 255), width=(w + 2) * S, joint='curve')
-        d.line(line, fill=(min(255, r + 40), min(255, g + 20), min(255, b + 20), 255), width=w * S, joint='curve')
-        img = img.resize((px + 2 * m, px + 2 * m), Image.LANCZOS)
+        # the dust's line texture (its stripe only), tinted like the dust, as wide as the dust on the ground
+        tex = self.pack.texture('block/redstone_dust_line0').convert('RGBA')
+        alpha = tex.getchannel('A')
+        cols = [x for x in range(tex.width) if alpha.crop((x, 0, x + 1, tex.height)).getextrema()[1] > 0]
+        if cols:
+            tex = tex.crop((cols[0], 0, cols[-1] + 1, tex.height))
+        w = max(2, round(px * tex.width * self.dust_width / 16))
+        tex = tex.resize((w, px), Image.NEAREST)
+        tr, tg, tb = dust_tint(power)
+        lum = tex.convert('L')
+        tex = Image.merge('RGBA', [lum.point(lambda v, c=c: v * c // 255) for c in (tr, tg, tb)] +
+                          [tex.getchannel('A')])
+
+        # drawn pixel by pixel: walk along the wire finely, and put each texture pixel where the lifted ribbon
+        # (or its shadow) passes; texture rows run along the wire, columns across it
+        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        shade = Image.new('L', (size, size), 0)
+        n = px * 6
+        for k in range(n):
+            t = (k + .5) / n
+            h = lift(t)
+            row = min(px - 1, int(t * px))
+            for c in range(w):
+                o = c + .5 - w / 2                      # across the wire, in pixels
+                g = (t * px, px / 2 + o) if east_west else (px / 2 + o, t * px)
+                x = g[0] + h * self.ob.h * px + m
+                y = g[1] - h * self.ob.s * px + m
+                if 0 <= x < size and 0 <= y < size:
+                    pix = tex.getpixel((c, row))
+                    if pix[3]:
+                        img.putpixel((int(x), int(y)), pix)
+                if h > .02:
+                    sx, sy = g[0] + self.SUN[0] * h * px + m, g[1] + self.SUN[1] * h * px + m
+                    if 0 <= sx < size and 0 <= sy < size:
+                        shade.putpixel((int(sx), int(sy)), 55)
+        shadow = Image.new('RGBA', (size, size), (10, 10, 25, 0))
+        shadow.putalpha(shade)
+        shadow.alpha_composite(img)
+        img = shadow
         self.td.cache[key] = (img, m, m)
         return self.td.cache[key]
 
@@ -573,7 +593,7 @@ class Drawer:
             px = self.px
             strip = Image.new('RGBA', (px, px), (0, 0, 0, 0))
             w = max(1, px // 16)
-            for k, a in ((0, 150), (w, 60)):
+            for k, a in ((0, 70), (w, 25)):
                 box = {'north': (0, k, px, k + w), 'west': (k, 0, k + w, px)}[side]
                 strip.paste((30, 24, 20, a), box)
             self.td.cache[key] = strip
@@ -670,13 +690,17 @@ class Drawer:
                 x += adv
         return ''.join(parts)
 
-    def text(self, text, x, y, w, h, scale, color, shadow, vertical=False):
-        """A text centred in the box (x, y, w, h) (canvas pixels), `scale` font pixels per `fpx`-th block."""
+    def text(self, text, x, y, w, h, scale, color, shadow, vertical=False, backing=False):
+        """A text centred in the box (x, y, w, h) (canvas pixels), `scale` font pixels per `fpx`-th block;
+        `backing` puts a dark see-through band behind it, for text over busy blocks."""
         k = self.px / self.fpx * scale
         lines = text.split('\n')
         tw = max(self.font.width(s) for s in lines) + (1 if shadow else 0)
         th = 9 * (len(lines) - 1) + 8 + (1 if shadow else 0)
         parts = []
+        if backing:
+            parts.append(tag('rect', x=-2, y=-2, width=num(tw + 3), height=num(th + 3), fill='#140c1c',
+                             **{'fill-opacity': '0.62'}))
         if shadow:
             parts.append(tag('path', d=self.text_d(text, 1, 1), fill=rgb(tuple(c // 4 for c in color))))
         parts.append(tag('path', d=self.text_d(text), fill=rgb(color)))
@@ -703,7 +727,7 @@ class Drawer:
             zs = [origin[2], origin[2] + u[2] + v[2]]
             x0, z0 = (min(xs) + .5 - w.i0) * px + dx, (min(zs) + .5 - w.j0) * px + dy
             out.append(self.text(text, x0, z0, (max(xs) - min(xs)) * px, (max(zs) - min(zs)) * px, 1, col,
-                                 shadow, vertical))
+                                 shadow, vertical, backing=(kind == 'pin_backed')))
         return out
 
     # -- everything ----------------------------------------------------------------------------

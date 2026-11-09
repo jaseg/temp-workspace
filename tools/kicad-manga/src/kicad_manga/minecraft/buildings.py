@@ -411,13 +411,17 @@ def portal(cells, pins, owner, seed, box):
             if c not in wall and c in cells:
                 out.append(box(c, 'obsidian', 3))
         return out, 1
-    # an end portal: frames around the edge (none on the corners, as in the game), looking inwards
+    # an end portal: frames around the edge (none on the corners, as in the game), looking inwards, with an eye
+    # of ender in each frame a pin comes out of
+    DIRS = {'north': (0, -1), 'south': (0, 1), 'west': (-1, 0), 'east': (1, 0)}
+    pinned = {c for p in pins for c in p['line'] if c in cells}
+    pinned |= {(p['inner'][0] + DIRS[p['dir']][0], p['inner'][1] + DIRS[p['dir']][1]) for p in pins if p.get('dir')}
     for (i, j) in sorted(cells):
         edge = {'north': j == J0, 'south': j == J1, 'west': i == I0, 'east': i == I1}
         on = [k for k, v in edge.items() if v]
         if len(on) == 1:
             facing = {'north': 'south', 'south': 'north', 'west': 'east', 'east': 'west'}[on[0]]
-            site.put(i, 0, j, 'end_portal_frame', facing=facing, eye='true' if site.rnd(i, j) < .7 else 'false')
+            site.put(i, 0, j, 'end_portal_frame', facing=facing, eye='true' if (i, j) in pinned else 'false')
         elif not on:
             site.floor[(i, j)] = 'void'
     out = site.emit()
