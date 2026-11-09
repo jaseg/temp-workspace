@@ -7,7 +7,9 @@
 - **Passives** are short rows of blocks between their pins: resistors a furnace each, capacitors two upright metal
   plates across the wire (the + plate gold), inductors and ferrite beads copper. They often don't fit the grid or each other; they
   are pushed sideways a block or two, and their pins rerouted, until they fit (`Builder.place_line`).
-- **Everything else** (ICs, connectors, ...) gets a low body of block textures with its pin names painted on,
+- **ICs** are buildings: small and medium ones timber houses, large ones castles (`buildings`), on a low plinth
+  with the pin names painted around the edge.
+- **Everything else** (connectors, ...) gets a low body of block textures with its pin names painted on,
   and pins of dust. Power symbols are redstone torches, grounds hoppers, no-connects cobwebs.
 - **Text** (labels, fields, notes) goes onto plaques: thin slabs of block textures with the pack's font painted on
   top. Plaques move out of the way of dust, parts and each other."""
@@ -18,6 +20,7 @@ import zlib
 
 from ..circuit import UF, prop_value, ref_prefix, shape_points, unit_graphics
 from ..kicad import at, font, hidden, justify, lib_symbols, paper_size, quarter_turned, rotation, xy
+from . import buildings
 from .world import DIRS, OPP, Block, Plaque, World, cells_on_segment, dir_of
 
 FONT_PX_PER_MM = 10 / 1.27              # font pixels per mm on paper: 8 pixel glyphs about 1 mm high
@@ -50,7 +53,7 @@ def stable_hash(s):
 
 
 class Builder:
-    def __init__(self, sch, pack, font, block_mm=2.54):
+    def __init__(self, sch, pack, font, block_mm=2.54, camera_deg=55, yaw_deg=30):
         self.sch, self.pack, self.font, self.b = sch, pack, font, block_mm
         self.fpx = max(8, round(block_mm * FONT_PX_PER_MM))      # font pixels per block
         W, H = paper_size(sch)
@@ -65,6 +68,9 @@ class Builder:
         self.net_power = {}
         self.stuck = []
         self.stats = {'nudged': 0, 'unplaced': 0, 'plaques_moved': 0, 'plaques_stuck': 0}
+        # how far (cells) a block of height leans over to the north and to the west, seen from the camera
+        c = 1 / math.tan(math.radians(camera_deg))
+        self.lean = (c * math.cos(math.radians(yaw_deg)), c * math.sin(math.radians(yaw_deg)))
 
     def grid_origin(self):
         """Where the block grid starts (mm): on whichever half of the grid most wire ends, pins and labels sit, so
@@ -392,6 +398,8 @@ class Builder:
         cells -= pin_ends
         if not cells:
             cells = {s['center']}
+        if self.place_building(s, cells):
+            return self.body_pins(s, cells)
         block = self.body_block(s)
         h = 10
         for c in cells:
@@ -402,6 +410,10 @@ class Builder:
         w.occupy(cells, s['owner'])
         s['body'] = cells
         s['body_h'] = h / 16
+        self.body_pins(s, cells)
+
+    def body_pins(self, s, cells):
+        w = self.world
         for p in s['pins']:
             line = [c for c in p['line'] if c not in cells]
             if not line:
@@ -419,6 +431,42 @@ class Builder:
                 if nxt in cells:
                     w.dust[line[-1]][p['net']].add(p['dir'])
         self.pin_names(s, cells)
+
+    def is_ic(self, s):
+        return ref_prefix(s['ref']) in ('U', 'IC', 'MODULE')
+
+    def name_reach(self, s):
+        """How far (cells) the painted pin names reach into the body from each side."""
+        out = {}
+        pn = s['lib'].pin_names
+        if pn is not None and pn.hide:
+            return out
+        for p in s['pins']:
+            name = re.sub(r'~\{([^}]*)\}', r'\1', p['name'])
+            if name in ('', '~') or not p['dir'] or hidden(p['pin'].name):
+                continue
+            side = OPP[p['dir']]
+            out[side] = max(out.get(side, 0), self.font.width(name) / self.fpx + .4)
+        return out
+
+    def place_building(self, s, cells):
+        """ICs: a house (small and medium ones) or a castle (large ones) on a plinth, see `buildings`."""
+        if not self.is_ic(s) or len(cells) < 4:
+            return False
+        def box(c, block, h):
+            return Block(c[0], 0, c[1], 'box', (self.tex(block, 'up'), self.tex(block, 'south'), h, None),
+                         owner=s['owner'])
+        res = buildings.plan(cells, s['pins'], self.name_reach(s), s['owner'], stable_hash(s['ref'] or s['lib_id']),
+                             self.lean, box)
+        if res is None:
+            return False
+        blocks, h, kind = res
+        self.world.blocks.extend(blocks)
+        self.world.occupy(cells, s['owner'])
+        s['body'] = cells
+        s['body_h'] = h
+        s['building'] = kind
+        return True
 
     def pin_names(self, s, cells):
         lib = s['lib']
