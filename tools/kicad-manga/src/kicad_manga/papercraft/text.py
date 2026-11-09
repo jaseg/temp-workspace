@@ -1,26 +1,43 @@
 """Fonts and text for the paper craft style.
 
-Fredoka (rounded, like letters cut from card) for headings and labels, Patrick Hand for handwritten notes, and the
-manga style's M PLUS Rounded for the small print (pin names, references, values), which needs to stay legible."""
+Mali (a rounded, childlike hand that stays legible down to pin names) for all the text on the sheet, and Sniglet
+(bubbly, like letters cut from card) for headings and the title."""
+
+import contextlib
 
 from .. import text as T
-from ..fonts import FONTS as BASE_FONTS
+from ..fonts import FONTS as BASE_FONTS, POP
 from ..svg import Markup, num, tag
 
-FREDOKA = 'Fredoka'
-HAND = 'Patrick Hand'
+MALI = 'Mali'
+BUBBLE = 'Sniglet'
 
-FONTS = BASE_FONTS + [
-    (FREDOKA, 500, 'Medium', 'fredoka/files/fredoka-latin-500-normal.woff2'),
-    (FREDOKA, 600, 'SemiBold', 'fredoka/files/fredoka-latin-600-normal.woff2'),
-    (HAND, 400, 'Regular', 'patrick-hand/files/patrick-hand-latin-400-normal.woff2'),
+FONTS = [f for f in BASE_FONTS if f[0] == POP] + [     # Mochiy Pop One stays, for the Japanese kicker
+    (MALI, 500, 'Medium', 'mali/files/mali-latin-500-normal.woff2'),
+    (MALI, 700, 'Bold', 'mali/files/mali-latin-700-normal.woff2'),
+    (BUBBLE, 800, 'ExtraBold', 'sniglet/files/sniglet-latin-800-normal.woff2'),
 ]
 
-# text classes of this style, for measuring (see text.CLASSES)
-T.CLASSES.update({
-    'pc-lbl': (FREDOKA, 600, False), 'pc-title': (FREDOKA, 600, False), 'pc-hand': (HAND, 400, False),
-    'pc-caption': (FREDOKA, 500, False), 'pc-card': (FREDOKA, 600, False),
+# The font of each text class in this style, for measuring (see text.CLASSES)
+CLASSES = {cls: (MALI, 500, False) for cls in T.CLASSES}
+CLASSES.update({
+    'ref': (MALI, 700, False), 'value': (MALI, 700, False), 'pwr': (MALI, 700, False), 'lbl': (MALI, 700, False),
+    'sheetname': (BUBBLE, 800, False), 'pc-lbl': (MALI, 700, False), 'pc-title': (BUBBLE, 800, False),
+    'pc-hand': (MALI, 500, False), 'pc-caption': (MALI, 700, False), 'pc-card': (BUBBLE, 800, False),
 })
+
+
+@contextlib.contextmanager
+def measuring():
+    """Measure text in this style's fonts while the page is built."""
+    saved = dict(T.CLASSES)
+    T.CLASSES.clear()
+    T.CLASSES.update(saved, **CLASSES)
+    try:
+        yield
+    finally:
+        T.CLASSES.clear()
+        T.CLASSES.update(saved)
 
 
 def ptext(x, y, s, size, ang, h, v, cls, bg=None, style='', **attrs):

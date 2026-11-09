@@ -13,7 +13,7 @@ from ..svg import Markup, escape, group, num as f2, path, render, tag
 from ..text import FS, metrics
 from . import paper as P
 from . import stickers as S
-from .text import FREDOKA, HAND
+from .text import BUBBLE, MALI
 
 MAT = '#f6c3cf'
 MAT_DOT = '#fde6ec'
@@ -22,11 +22,11 @@ MAT_IN = FM + 3       # inner edge of the mat (the scallops bulge in from here)
 
 
 def hand_width(s, size):
-    return metrics().advance(s, HAND, 400) * size
+    return metrics().advance(s, MALI, 500) * size
 
 
-def fred_width(s, size, weight=600):
-    return metrics().advance(s, FREDOKA, weight) * size
+def bubble_width(s, size):
+    return metrics().advance(s, BUBBLE, 800) * size
 
 
 class PaperPage(Page):
@@ -35,6 +35,7 @@ class PaperPage(Page):
         W, H = self.DW, self.DH
         rng = random.Random(4)
         add = self.add
+        add('bg', tag('rect', width=W, height=H, fill='rgb(246,238,225)'))   # the texture's mean colour (not muted), for any seams between tiles
         add('bg', tag('rect', width=W, height=H, fill='url(#pc-card)'))
 
         # the mat: an evenodd shape, the outer rectangle minus the scalloped inside
@@ -106,8 +107,8 @@ class PaperPage(Page):
             size = min(4.4, (TW - 60) / max(1e-6, hand_width(fr, 1)))
             out.append(tag('text', [escape(fr)], x=tx + TW - 5, y=fy, cls='pc-foot', font_size=size, text_anchor='end'))
         self.add('titlepanel', group(out, id='title-card'))
-        # the paper crane mascot and its speech bubble, above the card
-        self.add('titlepanel', crane(tx - 16, ty - 14, 42, rng))
+        # a chip sticker says hello from above the card
+        self.add('titlepanel', S.use('chip', tx - 12, ty - 22, 26, -12))
         bub = split_two(t['bubble'])
         bw = max(40, max(hand_width(line, 5.2) for line in bub) + 12)
         bx, by = tx + 14, ty - 34
@@ -267,28 +268,6 @@ def bunting(rng, x0, x1, y, sag):
     return group(out + flags, cls='pc-bunting')
 
 
-def crane(x, y, s, rng):
-    """An origami crane, `s` units wide, its body centred near (x, y): folded facets in two shades of paper."""
-    k = s / 30
-    light, mid, dark = '#ffc2d1', '#f79ab4', '#e27798'
-    def p(*pts):
-        return P.pts_d([(x + a * k, y + b * k) for a, b in pts])
-    facets = [
-        (p((-2, 2), (12, -12), (6, 4)), mid),           # far wing
-        (p((-15, -9), (-6, 3), (-3, 4)), light),        # neck
-        (p((-15, -9), (-17, -6), (-13, -6.5)), dark),    # head
-        (p((14, -1), (4, 4), (2, 6)), light),           # tail
-        (p((-6, 3), (2, 6), (4, 4), (0, -1)), mid),     # body
-        (p((-2, 2), (-12, -14), (2, 4)), light),        # near wing
-        (p((-2, 2), (-6, -6), (2, 4)), dark),           # near wing fold
-        (p((-6, 3), (0, 9), (2, 6)), dark),             # belly
-    ]
-    out = [path(''.join(d for d, _ in facets), fill=P.SHADOW, fill_opacity=.16, transform='translate(1.6 2.4)')]
-    out += [path(d, fill=c, stroke=P.shade(c, -.12), stroke_width=.25, stroke_linejoin='round') for d, c in facets]
-    out.append(tag('circle', cx=x - 14.6 * k, cy=y - 7.5 * k, r=.35 * k * 1.5, fill=P.INK))
-    return group(out, cls='pc-crane')
-
-
 def cut_letters(rng, s, cx, cy, width, size):
     """`s` spelled in letters on little squares of coloured paper, each a bit askew, centred on (cx, cy)."""
     if not s:
@@ -296,7 +275,7 @@ def cut_letters(rng, s, cx, cy, width, size):
     fs = size
     gap = .12
     def widths(fs):
-        return [max(fs * .62, fred_width(ch, fs) + fs * .32) if ch != ' ' else fs * .45 for ch in s]
+        return [max(fs * .62, bubble_width(ch, fs) + fs * .32) if ch != ' ' else fs * .45 for ch in s]
     ws = widths(fs)
     total = sum(ws) + gap * fs * (len(s) - 1)
     if total > width:

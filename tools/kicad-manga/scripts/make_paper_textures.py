@@ -75,15 +75,25 @@ def grain_overlay(n, rng):
     return Image.fromarray(np.clip(rgba, 0, 255).astype(np.uint8), 'RGBA')
 
 
+def blur(im, r):
+    """Gaussian blur that wraps around the edges, so the tile stays seamless."""
+    w, h = im.size
+    big = Image.new(im.mode, (w * 3, h * 3))
+    for i in range(3):
+        for j in range(3):
+            big.paste(im, (i * w, j * h))
+    return big.filter(ImageFilter.GaussianBlur(r)).crop((w, h, 2 * w, 2 * h))
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(7)
     import random
     prng = random.Random(7)
     rng_u = type('R', (), {'uniform': staticmethod(prng.uniform), 'random': rng.random})
-    cardstock(768, rng_u, (247, 240, 226)).filter(ImageFilter.GaussianBlur(.4)).save(
+    blur(cardstock(768, rng_u, (247, 240, 226)), .4).save(
         OUT / 'card.jpg', quality=82, optimize=True)
-    cardstock(512, rng_u, (199, 160, 116), mottle=.08, grain=.07, fib=.12).filter(ImageFilter.GaussianBlur(.3)).save(
+    blur(cardstock(512, rng_u, (199, 160, 116), mottle=.08, grain=.07, fib=.12), .3).save(
         OUT / 'kraft.jpg', quality=82, optimize=True)
     grain_overlay(512, rng_u).save(OUT / 'grain.png', optimize=True)
     for p in sorted(OUT.iterdir()):

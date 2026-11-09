@@ -328,17 +328,13 @@ class PaperCircuit(Circuit):
 
     @staticmethod
     def banner(x, y, w, h, colour, rng):
-        """A strip of kraft paper torn from a sheet, glued down behind a heading, with a narrower strip of
-        coloured paper under it."""
-        px, py = 2.4, .8
-        x0, x1 = x - px, x + w + px
-        y0, y1 = y + h * .1 - py, y + h * .9 + py
-        tilt = rng.uniform(-1.4, 1.4)
-        under = P.torn_rect(rng, x0 - 1.4, y0 + .9, x1 + 1.4, y1 + .5, step=.6, amp=.25, sides='lr')
-        top = P.torn_rect(rng, x0, y0, x1, y1, step=.55, amp=.22, sides='tblr')
-        out = P.soft_shadow(under, 1.1) + [path(under, fill=colour)]
-        out += P.soft_shadow(top, 1.1) + [path(top, fill='url(#pc-kraft)')]
-        return group(out, transform=f'rotate({f2(tilt)} {f2((x0 + x1) / 2)} {f2((y0 + y1) / 2)})')
+        """A strip of printed washi tape behind a heading, torn off at both ends; the heading is outlined in
+        white so it reads on the print."""
+        cx, cy = x + w / 2, y + h * .52
+        width = h * 1.3
+        pattern = ('dots', 'stripes', 'grid', 'stitch')[int(rng.random() * 4)]
+        return P.tape_strip(rng, cx, cy, w + width * 1.6, width, rng.uniform(-1.5, 1.5), colour, pattern,
+                            alpha=.86, sh=(.3, .4))
 
     @staticmethod
     def note_paper(x, y, w, h, rng):

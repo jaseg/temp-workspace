@@ -13,10 +13,11 @@ from . import stickers
 from .circuit import PaperCircuit
 from .page import MAT, MAT_DOT, PaperPage
 from .paper import INK, INK_SOFT, WHITE, mute
-from .text import FONTS, FREDOKA, HAND  # noqa: F401  (FONTS is what the CLI loads for this style)
-from ..fonts import MPR, POP
+from .text import BUBBLE, FONTS, MALI, measuring  # noqa: F401  (FONTS is what the CLI loads for this style)
+from ..fonts import POP
 
 STYLE = f"""
+text{{font-family:'{MALI}';font-weight:500}}
 .tape{{fill-opacity:.82}}
 .tape-dots{{fill:none;stroke:{WHITE};stroke-linecap:round;stroke-opacity:.85}}
 .tape-stitch{{fill:none;stroke:{WHITE};stroke-linecap:butt;stroke-opacity:.9}}
@@ -29,28 +30,28 @@ STYLE = f"""
 .flag{{fill:none;stroke:#9a86a8;stroke-width:.3;stroke-linecap:round}}
 .pinname{{font-weight:500;fill:{INK}}}
 .pinnum{{fill:#b0709d;font-weight:500}}
-.ref{{font-family:'{MPR}';font-weight:800;fill:#c94f7c}}
-.value{{font-family:'{MPR}';font-weight:800;fill:#2f8578}}
+.ref{{font-family:'{MALI}';font-weight:700;fill:#c94f7c}}
+.value{{font-family:'{MALI}';font-weight:700;fill:#2f8578}}
 .ref,.value{{paint-order:stroke;stroke:#fffaf0;stroke-width:.3;stroke-linejoin:round}}
-.pwr{{font-family:'{FREDOKA}';font-weight:600;fill:{INK};paint-order:stroke;stroke:#fffaf0;stroke-width:.35}}
+.pwr{{font-family:'{MALI}';font-weight:700;fill:{INK};paint-order:stroke;stroke:#fffaf0;stroke-width:.35}}
 .symtxt{{font-weight:500}}
 .field{{font-weight:500;fill:{INK_SOFT}}}
-.remark{{font-family:'{HAND}';fill:#7b5b94}}
-.boxtext{{font-family:'{HAND}'}}
-.sheetname{{font-family:'{FREDOKA}';font-weight:600;fill:{INK}}}
-.sheetfile{{font-family:'{HAND}';fill:{INK_SOFT}}}
+.remark{{font-family:'{MALI}';fill:#7b5b94}}
+.boxtext{{font-family:'{MALI}'}}
+.sheetname{{font-family:'{BUBBLE}';font-weight:800;fill:{INK}}}
+.sheetfile{{font-family:'{MALI}';fill:{INK_SOFT}}}
 .ovl{{text-decoration:overline}}
-.pc-lbl{{font-family:'{FREDOKA}';font-weight:600;fill:{INK}}}
-.pc-title{{font-family:'{FREDOKA}';font-weight:600;fill:{INK}}}
-.pc-caption{{font-family:'{FREDOKA}';font-weight:500;fill:#7b5b94}}
-.pc-hand{{font-family:'{HAND}';fill:#6b5a7a}}
-.pc-coord{{font-family:'{FREDOKA}';font-weight:600;font-size:3.8px;fill:#c9708e}}
+.pc-lbl{{font-family:'{MALI}';font-weight:700;fill:{INK}}}
+.pc-title{{font-family:'{BUBBLE}';font-weight:800;fill:{INK};paint-order:stroke;stroke:#fffdf8;stroke-width:.55;stroke-linejoin:round}}
+.pc-caption{{font-family:'{MALI}';font-weight:700;fill:#7b5b94}}
+.pc-hand{{font-family:'{MALI}';fill:#6b5a7a}}
+.pc-coord{{font-family:'{BUBBLE}';font-weight:800;font-size:3.8px;fill:#c9708e}}
 .pc-kicker{{font-family:'{POP}';font-size:5px;fill:#e27798;letter-spacing:.6px}}
-.pc-cut-letter{{font-family:'{FREDOKA}';font-weight:600;fill:{INK}}}
-.pc-sub{{font-family:'{HAND}';fill:#6b5a7a}}
-.pc-foot{{font-family:'{HAND}';font-size:4.4px;fill:#8a7499}}
-.pc-bubble-t{{font-family:'{HAND}';font-size:5.2px;fill:{INK}}}
-.pc-card{{font-family:'{FREDOKA}';font-weight:600;fill:{INK}}}
+.pc-cut-letter{{font-family:'{BUBBLE}';font-weight:800;fill:{INK}}}
+.pc-sub{{font-family:'{MALI}';fill:#6b5a7a}}
+.pc-foot{{font-family:'{MALI}';font-size:4.4px;fill:#8a7499}}
+.pc-bubble-t{{font-family:'{MALI}';font-size:5.2px;fill:{INK}}}
+.pc-card{{font-family:'{BUBBLE}';font-weight:800;fill:{INK}}}
 """
 
 
@@ -89,7 +90,11 @@ TEXTURES = resources.files('kicad_manga.papercraft').joinpath('textures')
 
 def texture_pattern(pid, name, size, mime):
     data = base64.b64encode(TEXTURES.joinpath(name).read_bytes()).decode()
-    return tag('pattern', [tag('image', href=f'data:{mime};base64,{data}', width=size, height=size,
+    # the image runs a hair past the tile on every side: renderers smooth an image's edges, which would show
+    # as faint seams between the tiles
+    o = size * .004
+    return tag('pattern', [tag('image', href=f'data:{mime};base64,{data}', x=-o, y=-o, width=size + 2 * o,
+                               height=size + 2 * o,
                                preserveAspectRatio='none')],
                id=pid, width=size, height=size, patternUnits='userSpaceOnUse')
 
@@ -111,7 +116,8 @@ def mute_all(svg):
 def build_svg(path, cfg, fonts=()):
     sch = kicad.load(path)
     text.use_fonts(fonts)
-    circuit = PaperCircuit(sch, characters=cfg['characters']).render()
-    page = PaperPage(circuit, title_info(sch, path, cfg['title']), cfg)
-    svg = page.svg(defs(fonts), decorations=cfg['decorations'], seed=cfg['seed'])
+    with measuring():
+        circuit = PaperCircuit(sch, characters=cfg['characters']).render()
+        page = PaperPage(circuit, title_info(sch, path, cfg['title']), cfg)
+        svg = page.svg(defs(fonts), decorations=cfg['decorations'], seed=cfg['seed'])
     return mute_all(flatten_opacity(svg)), page
