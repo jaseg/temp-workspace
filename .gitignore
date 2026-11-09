@@ -1,0 +1,6 @@
+# Large or third-party trees, fetched by setup.sh and corpus/fetch.sh (symlinks in a working copy)
+/src
+/tools
+/corpus/nist
+/corpus/abc
+__pycache__/
