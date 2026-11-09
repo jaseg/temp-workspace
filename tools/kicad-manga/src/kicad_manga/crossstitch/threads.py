@@ -78,7 +78,7 @@ class Threads:
         from ..palette import LibColors
         self.nets = NetColors(labels)
         self.libs = LibColors(lib_ids)
-        self.used = {}           # colour -> what it was used for, for the floss key
+        self.used = {}           # colour -> [floss name, what it was used for]
 
     def net(self, name, key=None):
         if not name:

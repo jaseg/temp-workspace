@@ -80,12 +80,54 @@ class Paths:
 SHADOW = th.rgb_hex(tuple(c - 38 for c in th.CLOTH))
 LAYERS = ['shadow', 'satin', 'under', 'over', 'sheen', 'back', 'back_sheen', 'text', 'knot', 'knot_sheen']
 
-WEIGHTS = {            # thread width in mm, sheen width
-    'wire': (.42, .12),
-    'bus': (.8, .2),
-    'line': (.30, .09),
-    'fine': (.22, 0),
+THREAD = .24           # one strand of floss, in mm: every stitch is made of these
+STRANDS = {            # strands laid side by side, for lines that should look heavier
+    'wire': 2,
+    'bus': 4,
+    'line': 1,
+    'fine': 1,
+    'text': 1,
+    'bold': 2,
 }
+PITCH = THREAD * .95   # strands laid side by side, just touching
+
+
+def offset_polyline(pts, off):
+    """A polyline moved sideways by `off` (to the left of its direction), with mitred corners."""
+    if not off:
+        return pts
+    out = []
+    n = len(pts)
+    normals = []
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        L = math.hypot(x1 - x0, y1 - y0) or 1
+        normals.append(((y1 - y0) / L, -(x1 - x0) / L))
+    for k, (x, y) in enumerate(pts):
+        if k == 0:
+            nx, ny = normals[0]
+        elif k == n - 1:
+            nx, ny = normals[-1]
+        else:
+            (ax, ay), (bx, by) = normals[k - 1], normals[k]
+            mx, my = ax + bx, ay + by
+            m = math.hypot(mx, my)
+            if m < 1e-6:
+                nx, ny = bx, by
+            else:
+                mx, my = mx / m, my / m
+                cos = mx * ax + my * ay
+                scale = 1 / max(cos, .35)
+                nx, ny = mx * scale, my * scale
+        out.append((x + nx * off, y + ny * off))
+    return out
+
+
+def strand_offsets(n):
+    return [(k - (n - 1) / 2) * PITCH for k in range(n)]
+
+
+def poly_d(pts):
+    return 'M' + 'L'.join(f'{fmt(x)} {fmt(y)}' for x, y in pts)
 
 
 class Drawer:
@@ -95,94 +137,101 @@ class Drawer:
         self.paths = Paths()
 
     # -- stitches ----------------------------------------------------------------------
-    def cross(self, i, j, col, inset=.08, w=.6):
+    def cross(self, i, j, col, inset=.2):
         b = self.c.hole
         x0, y0, x1, y1 = i * b + inset, j * b + inset, (i + 1) * b - inset, (j + 1) * b - inset
-        self.cross_at(x0, y0, x1, y1, col, w)
+        self.cross_at(x0, y0, x1, y1, col, 2)
 
-    def cross_at(self, x0, y0, x1, y1, col, w):
-        """A cross stitch: the under leg (/) a shade darker, the over leg (\\) with a sliver of sheen."""
+    def cross_at(self, x0, y0, x1, y1, col, strands):
+        """A cross stitch, each leg `strands` strands of floss that share the holes at its ends and lie side by side
+        in between: the under leg (/) a shade darker, the over leg (\\) on top with a little sheen."""
         p = self.paths
-        p.add('under', th.shade(col, -.2), 0, rhomb(x0, y1, x1, y0, w))
-        p.add('over', col, 0, rhomb(x0, y0, x1, y1, w))
-        mx, my = (x1 - x0) * .25, (y1 - y0) * .25
-        o = w * .13
-        p.add('sheen', th.shade(col, .45), w * .2, f'M{fmt(x0 + mx + o)} {fmt(y0 + my - o)}'
-                                                   f'L{fmt(x1 - mx + o)} {fmt(y1 - my - o)}')
+        sh = .06
+        for (ax, ay, bx, by), layer, c in (((x0, y1, x1, y0), 'under', th.shade(col, -.2)),
+                                           ((x0, y0, x1, y1), 'over', col)):
+            L = math.hypot(bx - ax, by - ay)
+            nx, ny = (by - ay) / L, -(bx - ax) / L
+            mx, my = (ax + bx) / 2, (ay + by) / 2
+            if layer == 'over':
+                p.add('shadow', SHADOW, strands * PITCH + .04,
+                      f'M{fmt(ax + sh)} {fmt(ay + sh)}L{fmt(bx + sh)} {fmt(by + sh)}')
+            for off in strand_offsets(strands):
+                cx, cy = mx + nx * off * 1.3, my + ny * off * 1.3
+                p.add(layer, c, THREAD, f'M{fmt(ax)} {fmt(ay)}L{fmt(cx)} {fmt(cy)}L{fmt(bx)} {fmt(by)}')
+                if layer == 'over':
+                    o = THREAD * .15
+                    p.add('sheen', th.shade(col, .45), THREAD * .3,
+                          f'M{fmt((ax + cx) / 2 + o)} {fmt((ay + cy) / 2 - o)}L{fmt(cx + o)} {fmt(cy - o)}')
 
     def backstitch(self, s):
-        """Backstitch as a dashed thread: each dash one stitch, the gaps where the needle goes through the cloth.
-        Wires start on a hole and run in whole grid steps, so their stitches end on the holes."""
-        if s.weight == 'text':
-            return self.text(s)
-        w, sheen = WEIGHTS.get(s.weight, WEIGHTS['line'])
+        """Backstitch as dashed strands of floss: each dash one stitch, the gaps where the needle goes through the
+        cloth. Wires start on a hole and run in whole grid steps, so their stitches end on the holes. Heavier lines
+        are several strands side by side, never a thicker thread."""
+        weight = s.weight
+        if weight == 'text' and s.width > .3:
+            weight = 'bold'
+        n = STRANDS.get(weight, 1)
         p = self.paths
-        d = 'M' + 'L'.join(f'{fmt(x)} {fmt(y)}' for x, y in s.pts)
-        sh = .06
-        if s.weight == 'bus':          # couched: a thick laid thread, tied down at every hole
-            p.add('shadow', SHADOW, w + .04, d, transform=f'translate({sh} {sh})')
-            p.add('back', s.color, w, d)
-            p.add('back_sheen', th.shade(s.color, .35), w * .25, d, transform=f'translate({-w * .18:.2f} '
-                                                                               f'{-w * .18:.2f})')
-            t = .16
-            p.add('back_sheen', th.shade(s.color, .6), w + .3, d, stroke_linecap='butt',
-                  stroke_dasharray=f'{fmt(t)} {fmt(s.length - t)}', stroke_dashoffset=fmt(t / 2))
-            return
-        if not s.length:
-            dash = {}
-            sheen_dash = {}
+        w = THREAD
+        if weight in ('text', 'bold'):
+            dash = dict(stroke_dasharray=f'{fmt(.3)} {fmt(.3)}')
+            sheen_dash = None
+        elif not s.length:
+            dash, sheen_dash = {}, {}
         else:
-            L, g = s.length, .1
+            L, g = s.length, .12
             dl = max(.05, L - g - w)
             start = g / 2 + w / 2
             dash = dict(stroke_dasharray=f'{fmt(dl)} {fmt(L - dl)}', stroke_dashoffset=fmt(L - start))
             sl = dl * .55
             sheen_dash = dict(stroke_dasharray=f'{fmt(sl)} {fmt(L - sl)}',
                               stroke_dashoffset=fmt(L - start - (dl - sl) / 2))
-        p.add('shadow', SHADOW, w + .04, d, transform=f'translate({sh} {sh})', **dash)
-        p.add('back', s.color, w, d, **dash)
-        if sheen:
-            o = w * .17
-            p.add('back_sheen', th.shade(s.color, .42), sheen, d, transform=f'translate({-o:.2f} {-o:.2f})',
-                  **sheen_dash)
-
-    def text(self, s):
-        """Backstitched lettering: the stroke font's lines, as a dashed thread."""
-        w = max(.17, min(.5, s.width * 1.35 if s.width else .2))
-        d = 'M' + 'L'.join(f'{fmt(x)} {fmt(y)}' for x, y in s.pts)
-        dash = f'{fmt(max(.18, w * 1.1))} {fmt(w * 1.25)}'
-        self.paths.add('text', s.color, w, d, stroke_dasharray=dash)
+        if weight == 'bus':            # couched: four laid strands, tied down at every hole
+            dash, sheen_dash = {}, {}
+        sh = .05
+        layer = 'text' if weight in ('text', 'bold') else 'back'
+        for off in strand_offsets(n):
+            d = poly_d(offset_polyline(s.pts, off))
+            if layer == 'back':
+                p.add('shadow', SHADOW, w + .04, d, transform=f'translate({sh} {sh})', **dash)
+            p.add(layer, s.color, w, d, **dash)
+            if sheen_dash is not None:
+                o = w * .18
+                p.add('back_sheen', th.shade(s.color, .42), w * .3, d, transform=f'translate({-o:.2f} {-o:.2f})',
+                      **sheen_dash)
+        if weight == 'bus':
+            # the couching: single-strand tie-down stitches across the laid strands, one per hole
+            span = n * PITCH + .3
+            t = THREAD
+            p.add('back_sheen', th.shade(s.color, .5), span, poly_d(s.pts), stroke_linecap='butt',
+                  stroke_dasharray=f'{fmt(t)} {fmt(s.length - t)}', stroke_dashoffset=fmt(t / 2))
 
     def knot(self, x, y, r, col):
         p = self.paths
         p.add('shadow', SHADOW, 0, circle(x + .07, y + .08, r * 1.02))
         p.add('knot', th.shade(col, -.12), 0, circle(x, y, r))
         # the wraps of the knot: a little swirl of sheen
-        p.add('knot_sheen', th.shade(col, .35), r * .22,
+        p.add('knot_sheen', th.shade(col, .35), THREAD * .45,
               f'M{fmt(x - r * .55)} {fmt(y - r * .05)}A{fmt(r * .55)} {fmt(r * .55)} 0 0 1 {fmt(x + r * .3)} '
               f'{fmt(y - r * .45)}')
-        p.add('knot_sheen', th.shade(col, .15), r * .18,
+        p.add('knot_sheen', th.shade(col, .15), THREAD * .35,
               f'M{fmt(x + r * .5)} {fmt(y + r * .1)}A{fmt(r * .5)} {fmt(r * .5)} 0 0 1 {fmt(x - r * .2)} '
               f'{fmt(y + r * .48)}')
 
     def satin(self, pts, col):
-        """A small filled shape: flat thread colour, its outline a shade darker."""
-        d = 'M' + 'L'.join(f'{fmt(x)} {fmt(y)}' for x, y in pts) + 'Z'
-        self.paths.add('satin', col, 0, d)
-        # satin stitches run across the shape: a few parallel sheen lines
+        """A small filled shape, satin stitched: single strands laid side by side across it."""
         xs = [q[0] for q in pts]
         x0, x1 = min(xs), max(xs)
         lines = []
-        step = .3
-        k = x0 + step / 2
+        k = x0 + PITCH / 2
         while k < x1:
-            seg = clip_vertical(pts, k)
-            for a, b in seg:
-                if b - a > .15:
-                    lines.append(f'M{fmt(k)} {fmt(a + .05)}L{fmt(k)} {fmt(b - .05)}')
-            k += step
+            for a, b in clip_vertical(pts, k):
+                if b - a > .05:
+                    lines.append(f'M{fmt(k)} {fmt(a + THREAD / 2)}L{fmt(k)} {fmt(max(a + THREAD / 2, b - THREAD / 2))}')
+            k += PITCH
         if lines:
-            self.paths.add('satin', th.shade(col, .3), .07, ''.join(lines))
+            self.paths.add('satin', col, THREAD, ''.join(lines))
+            self.paths.add('shadow', SHADOW, THREAD + .04, ''.join(lines), transform='translate(.05 .05)')
 
     # -- page --------------------------------------------------------------------------------
     def svg(self, W, H, extra=''):
@@ -194,10 +243,10 @@ class Drawer:
         for s in c.stitches:
             self.backstitch(s)
         for x, y, sz, col in c.petite:
-            ins = sz * .08
-            self.cross_at(x + ins, y + ins, x + sz - ins, y + sz - ins, col, sz * .42)
+            ins = THREAD * .7
+            self.cross_at(x + ins, y + ins, x + sz - ins, y + sz - ins, col, 1)
         for x, y, h, col in c.big_crosses:
-            self.cross_at(x - h, y - h, x + h, y + h, col, .4)
+            self.cross_at(x - h, y - h, x + h, y + h, col, 2)
         for x, y, r, col in c.knots:
             self.knot(x, y, r, col)
         b = c.hole
@@ -211,34 +260,6 @@ class Drawer:
                 f'<image x="0" y="0" width="{fmt(cols * b)}" height="{fmt(rows * b)}" preserveAspectRatio="none" '
                 f'xlink:href="{href}"/>\n'
                 f'<g id="stitches">\n{self.paths.svg(LAYERS)}\n</g>\n{extra}</svg>\n')
-
-
-def rhomb(ax, ay, bx, by, w):
-    """A thread from a to b as a narrow rhombus: w wide in the middle, pointed at the holes."""
-    L = math.hypot(bx - ax, by - ay) or 1
-    nx, ny = -(by - ay) / L * w / 2, (bx - ax) / L * w / 2
-    mx, my = (ax + bx) / 2, (ay + by) / 2
-    return f'M{fmt(ax)} {fmt(ay)}L{fmt(mx + nx)} {fmt(my + ny)}L{fmt(bx)} {fmt(by)}L{fmt(mx - nx)} {fmt(my - ny)}Z'
-
-
-def lens(ax, ay, bx, by, w, tip=0.):
-    """A thread lying from a to b: widest (w) in the middle, pinched to `tip` at the holes."""
-    L = math.hypot(bx - ax, by - ay) or 1
-    nx, ny = -(by - ay) / L, (bx - ax) / L
-    mx, my = (ax + bx) / 2, (ay + by) / 2
-    if tip:
-        h, t = w / 2, tip / 2
-        ux, uy = (bx - ax) / L, (by - ay) / L
-        c = min(L * .3, w)
-        return (f'M{fmt(ax + nx * t)} {fmt(ay + ny * t)}'
-                f'C{fmt(ax + ux * c + nx * h)} {fmt(ay + uy * c + ny * h)} {fmt(bx - ux * c + nx * h)} '
-                f'{fmt(by - uy * c + ny * h)} {fmt(bx + nx * t)} {fmt(by + ny * t)}'
-                f'A{fmt(t)} {fmt(t)} 0 0 0 {fmt(bx - nx * t)} {fmt(by - ny * t)}'
-                f'C{fmt(bx - ux * c - nx * h)} {fmt(by - uy * c - ny * h)} {fmt(ax + ux * c - nx * h)} '
-                f'{fmt(ay + uy * c - ny * h)} {fmt(ax - nx * t)} {fmt(ay - ny * t)}'
-                f'A{fmt(t)} {fmt(t)} 0 0 0 {fmt(ax + nx * t)} {fmt(ay + ny * t)}Z')
-    return (f'M{fmt(ax)} {fmt(ay)}Q{fmt(mx + nx * w)} {fmt(my + ny * w)} {fmt(bx)} {fmt(by)}'
-            f'Q{fmt(mx - nx * w)} {fmt(my - ny * w)} {fmt(ax)} {fmt(ay)}Z')
 
 
 def circle(x, y, r):

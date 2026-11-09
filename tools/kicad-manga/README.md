@@ -178,10 +178,11 @@ uv run kicad-manga board.kicad_sch -s crossstitch          # ./board-crossstitch
   - Power symbols are stitched in their rail's thread.
 - **Threads:** a box of named flosses. Nets keep the manga style's hue families, snapped to the nearest floss.
   Supply rails are coral and grounds slate.
+- **One thread weight:** every stitch is made of strands of the same thickness. Heavier lines are strands laid side
+  by side: wires and bold text are doubled, buses four strands couched down, cross stitches two strands per leg.
 - **Around it:** a floral sampler border with a rose in each corner, in the margin outside KiCad's frame. A title
-  panel with a row of motifs, the title in a cross-stitched sampler alphabet and the title block details. A floss
-  key lists the threads and what they were used for. The panels go to the free spot nearest the bottom right
-  corner.
+  panel with a row of motifs, the title in a cross-stitched sampler alphabet and the title block details, in the
+  free spot nearest the bottom right corner.
 - **Output:** the cloth is one raster image built from a repeated patch, so it compresses to a few hundred kB.
   The stitches are vector paths, one per thread colour and layer, and backstitch is drawn as dashed lines. Nothing
   is transparent. An A1 sheet gives a PDF of about 2 MB.
@@ -202,7 +203,7 @@ The code is in `crossstitch/`:
 - `chart.py`: the schematic into a stitch chart.
 - `threads.py`: the floss box and the cloth colours.
 - `motifs.py`: the sampler alphabet and motifs.
-- `page.py`: the border, the title panel and the floss key.
+- `page.py`: the border and the title panel.
 - `draw.py`: the chart into SVG.
 - `render.py`: the whole pipeline, and the PDF.
 

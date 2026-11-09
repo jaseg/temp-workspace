@@ -14,7 +14,7 @@ def build_svg(path, cfg):
     emb = Embroiderer(sch, cs['hole_mm'])
     chart = emb.build()
     page = Page(chart, sch, path, cfg, title_info(sch, path, cfg['title']))
-    page.build(emb.threads)
+    page.build()
     W, H = paper_size(sch)
     svg = Drawer(chart, cs['px_per_cell']).svg(W, H)
     page.page_mm = (W, H)

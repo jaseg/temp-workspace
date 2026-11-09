@@ -1,4 +1,4 @@
-"""Around the circuit: the sampler's floral border, its title panel and the floss key.
+"""Around the circuit: the sampler's floral border, and its title panel.
 
 All of it is charted on the same cloth as the schematic. The border runs in the margin outside KiCad's drawing
 frame. The title panel goes where KiCad's title block would be, the bottom right corner, and moves along the
@@ -27,9 +27,9 @@ class Page:
         self.cols, self.rows = math.floor(W / self.b), math.floor(H / self.b)
         self.notes = []
 
-    def build(self, threads):
+    def build(self):
         self.border(self.c.occupied(pad=0))
-        self.panel(self.c.occupied(pad=3), threads)
+        self.panel(self.c.occupied(pad=3))
 
     def report(self):
         return self.notes
@@ -93,8 +93,8 @@ class Page:
                 self.c.motif(unit, i, j + off + k * size, mo.KEY)
 
     # -- the title panel ------------------------------------------------------------------------
-    def panel(self, busy, threads):
-        """The title panel, as near the bottom right corner as it fits, then the floss key next to it."""
+    def panel(self, busy):
+        """The title panel, as near the bottom right corner as it fits."""
         n = EDGE + mo.BAND_ROWS + 6                      # inside the border's inner frame
         area = (n, n, self.cols - n, self.rows - n)
         self.sat = self.summed(busy)
@@ -117,21 +117,6 @@ class Page:
             self.notes.append('cross-stitch: no free spot for the title panel; it overlaps the schematic')
         L, (pi, pj) = found
         self.draw_title(L, pi, pj)
-        w, h = L['size']
-        busy |= {(i, j) for i in range(pi - 2, pi + w + 2) for j in range(pj - 2, pj + h + 2)}
-        self.sat = self.summed(busy)
-
-        key = self.floss_key(threads)
-        if not key:
-            return
-        near = (pi + w // 2, pj + h // 2)
-        for ncols in (1, 2, 3, 4, 5, 6):
-            K = self.key_layout(key, ncols)
-            spot = self.find_spot(*K['size'], area, near, centre=True)
-            if spot:
-                self.draw_key(K, *spot)
-                return
-        self.notes.append('cross-stitch: no free spot for the floss key; left it out')
 
     def summed(self, busy):
         cols, rows = self.cols + 1, self.rows + 1
@@ -161,14 +146,6 @@ class Page:
                     best = (d, (ci, cj))
         return best[1] if best else None
 
-    def floss_key(self, threads):
-        out = []
-        for col, (name, what) in sorted(threads.used.items(), key=lambda kv: kv[1][0]):
-            what = sorted(what)
-            desc = ', '.join(what[:4]) + (f' +{len(what) - 4}' if len(what) > 4 else '')
-            out.append((col, name, desc))
-        return out
-
     def title_layout(self, lines, scale):
         pad = 3
         title_w = math.ceil(max(mo.text_width(line) for line in lines) * scale)
@@ -180,14 +157,6 @@ class Page:
         w = width + 2 * pad
         h = pad + 6 + 2 + title_h + 2 + info_h + pad
         return {'lines': lines, 'scale': scale, 'size': (w, h), 'pad': pad, 'title_h': title_h}
-
-    def key_layout(self, key, ncols):
-        col_w = max(math.ceil(kicad_text_width(f'{name} · {desc}', 1.27) / self.b) + 3 for _, name, desc in key)
-        nrows = math.ceil(len(key) / ncols)
-        pad = 3
-        w = ncols * col_w + (ncols - 1) * 2 + 2 * pad
-        h = pad + 3 + nrows * 2 + pad - 1
-        return {'key': key, 'size': (w, h), 'pad': pad, 'col_w': col_w, 'nrows': nrows}
 
     def draw_title(self, L, pi, pj):
         b, c = self.b, self.c
@@ -229,19 +198,6 @@ class Page:
         if t.get('subtitle'):
             self.backstitch_text(t['subtitle'], (pi + w / 2) * b, (y + 2) * b, 2.2, th.VALUE, h='center')
         self.backstitch_text(t['footer'], (pi + w / 2) * b, (y + 4.6) * b, 1.6, th.NOTE, h='center')
-
-    def draw_key(self, K, pi, pj):
-        b, c = self.b, self.c
-        w, h = K['size']
-        pad = K['pad']
-        self.frame(pi, pj, pi + w, pj + h, th.INK, double=False)
-        self.backstitch_text('FLOSS KEY', (pi + pad) * b, (pj + pad + 1) * b, 1.8, th.INK, bold=True)
-        y = pj + pad + 3
-        for n, (col, name, desc) in enumerate(K['key']):
-            ci = pi + pad + (n // K['nrows']) * (K['col_w'] + 2)
-            cj = y + (n % K['nrows']) * 2
-            c.crosses[(ci, cj)] = col
-            self.backstitch_text(f'{name} · {desc}', (ci + 1.7) * b, (cj + .5) * b, 1.27, th.NOTE, v='middle')
 
 
 def wraps(title):
