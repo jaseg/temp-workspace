@@ -107,12 +107,34 @@ def enderman(holding=True):
     return t, els, {}
 
 
+def chest(variant='normal'):
+    """A chest (the game draws them like mobs): a base and a lid with the lock on the front. Chest textures are
+    stored upside down, so tops come from the bottom's place and the sides are flipped."""
+    t = f'entity/chest/{variant}'
+
+    def box(x0, y0, z0, x1, y1, z1, u, v, w, h, d):
+        el = cube(x0, y0, z0, x1, y1, z1, None, u, v, w, h, d)
+        f = el['faces']
+        f['up']['uv'], f['down']['uv'] = uv(u + d + w, v, u + d + 2 * w, v + d), uv(u + d, v, u + d + w, v + d)
+        for k in ('north', 'south', 'east', 'west'):
+            a, b, c, e = f[k]['uv']
+            f[k]['uv'] = [a, e, c, b]
+        return el
+    return t, [
+        box(-7, 0, -7, 7, 10, 7, 0, 19, 14, 10, 14),
+        box(-7, 9, -7, 7, 14, 7, 0, 0, 14, 5, 14),
+        box(-1, 7, -8, 1, 11, -7, 0, 0, 2, 4, 1),
+    ], {}
+
+
 SPECIES = {
     'pig': (pig, 1), 'pig_warm': (lambda: pig('warm'), 1), 'pig_cold': (lambda: pig('cold'), 1),
     'sheep': (sheep, 1),
     'chicken': (chicken, 1), 'chicken_warm': (lambda: chicken('warm'), 1),
     'chicken_cold': (lambda: chicken('cold'), 1),
-    'enderman': (enderman, 1), 'enderman_empty': (lambda: enderman(False), 1),
+    'enderman': (enderman, 1),
+    'chest': (chest, 1), 'chest_copper': (lambda: chest('copper'), 1), 'chest_ender': (lambda: chest('ender'), 1),
+    'chest_trapped': (lambda: chest('trapped'), 1), 'enderman_empty': (lambda: enderman(False), 1),
 }
 
 

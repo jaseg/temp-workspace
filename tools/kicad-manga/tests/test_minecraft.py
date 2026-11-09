@@ -126,19 +126,18 @@ def test_stacked_packs(pack, tmp_path):
     assert pk.texture('block/repeater').getpixel((0, 0))[:3] == (180, 180, 180)
 
 
-def test_crowded_capacitors_are_nudged(pack, tmp_path):
-    """Capacitors 2.54 mm apart on a 1.27 mm block grid: their three blocks wide plates would overlap, so they are
-    moved or slimmed."""
+def test_capacitors_are_chests(pack, tmp_path):
+    """Capacitors 2.54 mm apart on a 1.27 mm block grid: one (wooden) chest each, side by side, wired to both
+    pins."""
     body = ''.join(sym('Device:C_Small', f'C{k}', 50.8 + 2.54 * k, 50.8) for k in range(4))
     body += ''.join(wire(50.8 + 2.54 * k, 48.26, 50.8 + 2.54 * k, 43.18) for k in range(4))
     body += ''.join(wire(50.8 + 2.54 * k, 53.34, 50.8 + 2.54 * k, 58.42) for k in range(4))
     b, _ = build(tmp_path, body, pack[0], 1.27)
-    plates = [blk for blk in b.world.blocks if blk.kind == 'plates']
-    cells = [(p.i, p.j) for p in plates]
-    assert len(cells) == len(set(cells)), 'plates overlap'
-    assert b.stats['unplaced'] == 0 and b.stats['nudged'] >= 2
-    assert len({p.owner for p in plates}) == 4
-    # every capacitor still has both pins connected to its plates: dust runs from each wire end
+    chests = [blk for blk in b.world.blocks if blk.kind == 'mob' and blk.args[0].startswith('chest')]
+    cells = [(p.i, p.j) for p in chests]
+    assert len(cells) == 4 and len(set(cells)) == 4
+    assert b.stats['unplaced'] == 0
+    assert {c.args[0] for c in chests} == {'chest'}
     for k in range(4):
         x = round((50.8 + 2.54 * k) / 1.27)
         assert (x, round(48.26 / 1.27)) in b.world.dust and (x, round(53.34 / 1.27)) in b.world.dust

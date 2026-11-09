@@ -121,8 +121,8 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
     repeaters.
   - Transistors are comparators: collector or drain at the back, emitter or source in front, base or gate at a
     side. P-type parts use subtract mode.
-  - Passives sit between their pins. Resistors are a furnace each, capacitors are two upright plates across
-    the wire (the + plate gold), inductors are copper and ferrite beads oxidized copper.
+  - Passives sit between their pins. Resistors are a furnace each, capacitors a chest each (copper for
+    electrolytics, the latch towards +, wooden for the rest), inductors are copper and ferrite beads oxidized copper.
   - ICs (U..., and transformers) are buildings filling their whole body, with the pin names painted over the
     walls and roofs: small and medium ones timber houses with gable roofs, windows and a door, large ones castles
     with corner towers, a gate and a keep.
@@ -131,8 +131,8 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
     with its own ground, grass and leaf colours, trees, plants and animals (in the game's warm and cold
     colours). Hills reach up to eleven blocks: grass over dirt over stone with ores, snow-capped peaks, sand over
     sandstone, banded terracotta mesas, with a cave here and there. GND hoppers are let into the ground.
-  - Connectors are picnics: a red and white checkered blanket with a candle cake wherever a pin plugs in (the
-    candle's colour by net) and melons, cakes, beehives and barrels spread around.
+  - Connectors are portals: a nether portal of obsidian for row connectors (pins on one side), an end portal
+    (frames with eyes around the void) for those with pins on several sides.
   - Other parts get a wooden or terracotta body with their pin names painted on top. Supplies are torches,
     grounds hoppers, no-connects cobwebs and mounting holes cauldrons.
 - **Fitting things in:** a passive that collides with a neighbour, a wire or another part is tried one and two

@@ -57,7 +57,16 @@ class Drawer:
 
     def floor_tile(self, block):
         """A floor tile; 'name|tag' is block `name` in the tint registered for the whole key (a biome's grass)."""
-        name = block.split('|')[0]
+        name, _, tag = block.partition('|')
+        if name == 'water' and tag:         # clear water: the lake bed (`tag`) seen through it
+            bed = self.floor_tile(tag).convert('RGBA')
+            tex, _ = self.face_texture('water')
+            water = self.td.box(tex, 16, self.tints.get('water'))[0].convert('RGBA')
+            water.putalpha(water.getchannel('A').point(lambda v: min(255, v * 215 // 255 + 40)))
+            bed = Image.merge('RGBA', [c.point(lambda v: v * 3 // 4) for c in bed.split()[:3]] +
+                              [bed.getchannel('A')])                    # dimmer under water
+            bed.alpha_composite(water)
+            return bed
         tex, tinted = self.face_texture(name)
         tint = self.tints.get(block, self.tints.get(name)) if tinted else None
         return self.td.box(tex, 16, tint)[0]
@@ -163,6 +172,7 @@ class Drawer:
                 img.paste(tiles[b], at(i, j))
 
         world = [b for b in w.blocks if not b.overlay]
+        self.lift_hidden_plaques(world)
         for b in world:
             if b.flat:
                 blit(img, self.flat_sprite(b), *at(b.i, b.j))
@@ -206,13 +216,42 @@ class Drawer:
                 self.plaque(img, pq)
         return img.convert('RGB')
 
+    def lift_hidden_plaques(self, blocks):
+        """Plaques that something standing south or east of them leans over (a house, a tree, a hill) would be
+        hidden or have their text land on a busy roof: those are drawn flat on top of everything instead."""
+        covered = {}
+        s, h, px = self.ob.s, self.ob.h, self.px
+        if not s:
+            return
+        for b in blocks:
+            if b.flat:
+                continue
+            up = self.sprite(b)[1]
+            top = b.y + up / (s * px)
+            if top <= .3:
+                continue
+            t = max(b.y, .3)
+            while t <= top + 1e-6:
+                x, z = b.i + h * t, b.j - s * t
+                for i in {math.floor(x), math.ceil(x)}:
+                    for j in {math.floor(z), math.ceil(z)}:
+                        covered[(i, j)] = max(covered.get((i, j), 0), t)
+                t += .5
+        for pq in self.w.plaques:
+            if pq.meta.get('overlay'):
+                continue
+            y = pq.meta.get('y', 0) + PLAQUE_H / 16
+            if any(covered.get((pq.i + a, pq.j + b), 0) > y for a in range(pq.w) for b in range(pq.h)):
+                pq.meta['overlay'] = True
+                pq.meta['lifted'] = True
+
     SUN = (-1.0, -1.45)             # how far a shadow moves (east, south) per block of height: a low sun, ~35 deg up
 
     # Soft shadows: the sun is a disc, not a point, so a shadow's edge blurs the more, the farther it falls from
     # what casts it. The sweep is cut into bands by the height of the casting part, each blurred by its own radius
     # (in blocks).
     SHADOW_BANDS = ((0, .5, .12), (.5, 1.5, .3), (1.5, 3, .55), (3, math.inf, .85))
-    SHADOW_ALPHA = 90
+    SHADOW_ALPHA = 64
 
     def shadows(self, img, blocks):
         """Sun shadows on the ground: each block's outline seen from above, swept from its bottom to its top along
@@ -299,8 +338,9 @@ class Drawer:
             g = ground.get((i, j), 0)
             if top.get((i, j), 0) > g + .4 or not self.w.inside((i, j)):
                 continue            # something stands on it: nothing to darken
-            sides = tuple(d for d, (a, b) in (('north', (0, -1)), ('south', (0, 1)), ('west', (-1, 0)),
-                                              ('east', (1, 0)))
+            # only on the sides away from the sun (south and east of the cell): a dark seam on the sunny side
+            # of a block reads as a shadow cast the wrong way, and makes hills look like they float
+            sides = tuple(d for d, (a, b) in (('south', (0, 1)), ('east', (1, 0)))
                           if max(top.get((i + a, j + b), 0), ground.get((i + a, j + b), 0)) > g + .4)
             if sides:
                 out.append(((j, g - 1 if g else -1, i, 1), 'ao', ((i, j), g, sides)))

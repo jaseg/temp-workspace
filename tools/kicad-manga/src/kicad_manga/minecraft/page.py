@@ -29,7 +29,8 @@ LEGEND = [
     (('state', 'repeater', (('facing', 'west'), ('delay', 1), ('powered', 'true'))), 'LED'),
     (('state', 'comparator', (('facing', 'west'),)), 'transistor'),
     (('state', 'furnace', (('facing', 'south'), ('lit', 'false'))), 'resistor'),
-    (('plates', (1, 0), ('block/gold_block', 'block/polished_deepslate')), 'capacitor (gold: + plate)'),
+    (('mob', 'chest', 180), 'capacitor'),
+    (('mob', 'chest_copper', 90), 'electrolytic (latch: +)'),
     (('box', 'cut_copper'), 'inductor'),
     (('box', 'oxidized_cut_copper'), 'ferrite bead'),
     (('state', 'redstone_torch', (('lit', 'true'),)), 'supply'),
@@ -46,7 +47,7 @@ class Page:
                       'large_fern': GRASS, 'sugar_cane': GRASS, 'pink_petals': GRASS, 'oak_leaves': FOLIAGE,
                       'jungle_leaves': FOLIAGE, 'acacia_leaves': FOLIAGE, 'dark_oak_leaves': FOLIAGE,
                       'mangrove_leaves': FOLIAGE, 'vine': FOLIAGE, 'birch_leaves': (150, 190, 100),
-                      'spruce_leaves': (97, 153, 97), 'lily_pad': (60, 150, 60), 'water': (80, 150, 230)}
+                      'spruce_leaves': (97, 153, 97), 'lily_pad': (60, 150, 60), 'water': (63, 118, 228)}
         self.platform = set()
         self.taken = set()          # cells the page's own structures use
         self.overlay_cells = set()  # the frame's cells, drawn flat on top of everything
@@ -302,6 +303,8 @@ class Page:
             j = y + 2 + k
             if spec[0] == 'box':
                 self.box(x + 1, 0, j, spec[1], h=8, owner=f'legend{k}')
+            elif spec[0] == 'mob':
+                self.w.blocks.append(Block(x + 1, 0, j, 'mob', (spec[1], spec[2]), owner='page'))
             elif spec[0] == 'plates':
                 self.w.blocks.append(Block(x + 1, 0, j, 'plates', (spec[1], spec[2]), owner='page'))
             else:
@@ -364,7 +367,13 @@ class Page:
                 a, b = x[0] - c[0], x[1] - c[1]
                 wet = (a / r) ** 2 + (b / (r * .7)) ** 2 <= 1
                 B = self.biome(x)
-                self.w.floor[x] = B.get('pond', 'water') if wet else B.get('pond_rim', 'moss_block')
+                if wet:
+                    deep = (a / r) ** 2 + (b / (r * .7)) ** 2 < .45
+                    bed = pick(rng, [('gravel', 3), ('clay', 3), ('dirt', 1), ('sand', 1)] if deep else
+                               [('sand', 5), ('gravel', 1), ('dirt', 1)])
+                    self.w.floor[x] = B.get('pond', f'water|{bed}')
+                else:
+                    self.w.floor[x] = B.get('pond_rim', 'moss_block')
                 self.taken.add(x)
                 if not self.green(x):
                     continue
@@ -698,6 +707,8 @@ class Page:
                 continue
             B = self.biome((i, j))
             x = rng.random()
+            if self.height.get((i, j), 0) >= 7:
+                continue                        # bare rock and snow up on the peaks
             if (i, j) in near and x < .35 and B['flowers']:
                 self.put(i, 0, j, near[(i, j)])
             elif B.get('petals') and rng.random() < B['petals']:

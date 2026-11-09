@@ -4,12 +4,12 @@
 - **Wires** are redstone dust, coloured by net (grounds unpowered, supplies at full power), buses are rails.
 - **Diodes** are repeaters pointing from anode to cathode (LEDs are lit), **transistors** comparators (P-type in
   subtract mode) with collector/drain at the back, emitter/source in front and the base/gate at a side.
-- **Passives** are short rows of blocks between their pins: resistors a furnace each, capacitors two upright metal
-  plates across the wire (the + plate gold), inductors and ferrite beads copper. They often don't fit the grid or each other; they
+- **Passives** are short rows of blocks between their pins: resistors a furnace each, capacitors a chest each
+  (copper for electrolytics, its latch towards the + pin; wooden for the rest), inductors and ferrite beads copper. They often don't fit the grid or each other; they
   are pushed sideways a block or two, and their pins rerouted, until they fit (`Builder.place_line`).
 - **ICs** are buildings filling their body: small and medium ones timber houses, large ones castles
-  (`buildings`), with the pin names painted over walls and roofs. **Connectors** are picnics: a checkered blanket
-  with a candle cake where each pin plugs in.
+  (`buildings`), with the pin names painted over walls and roofs. **Connectors** are portals: nether portals for
+  row connectors, end portals for those with pins on several sides.
 - **Everything else** gets a low body of block textures with its pin names painted on,
   and pins of dust. Power symbols are redstone torches, grounds hoppers, no-connects cobwebs.
 - **Text** (labels, fields, notes) goes onto plaques: thin slabs of block textures with the pack's font painted on
@@ -45,6 +45,7 @@ BODY_BLOCKS = ['spruce_planks', 'dark_oak_planks', 'mangrove_planks', 'brown_ter
                'cyan_terracotta', 'purple_terracotta']
 CONNECTOR_BLOCKS = ['stripped_dark_oak_wood', 'stripped_spruce_wood', 'stripped_mangrove_wood']
 
+YROT = {'north': 0, 'east': 90, 'south': 180, 'west': 270}     # model y rotation that turns a front from north
 GROUND = re.compile(r'GND|EARTH|VSS|^0V$|CHASSIS', re.I)
 SUPPLY = re.compile(r'^\+|VCC|VDD|VBUS|VBAT|^V[0-9]|[0-9]V[0-9]*$', re.I)
 
@@ -120,9 +121,13 @@ class Builder:
             getattr(self, 'place_' + s['kind'])(s)
         self.world.soft.clear()
         self.no_connects()
+        for s in self.symbols:             # supply names first: they must sit right next to their torch
+            if s['kind'] == 'power':
+                self.fields(s)
         self.labels()
         for s in self.symbols:
-            self.fields(s)
+            if s['kind'] != 'power':
+                self.fields(s)
         self.free_texts()
         self.graphics()
         return self.world
@@ -437,10 +442,10 @@ class Builder:
         return ref_prefix(s['ref']) in ('J', 'P', 'CN', 'X') or s['lib_id'].lower().startswith('connector')
 
     def place_building(self, s, cells):
-        """ICs: a house (small and medium ones) or a castle (large ones); connectors: a picnic. See `buildings`."""
+        """ICs: a house (small and medium ones) or a castle (large ones); connectors: a portal. See `buildings`."""
         def box(c, block, h):
-            return Block(c[0], 0, c[1], 'box', (self.tex(block, 'up'), self.tex(block, 'south'), h, None),
-                         owner=s['owner'])
+            tex = (block, block) if '/' in block else (self.tex(block, 'up'), self.tex(block, 'south'))
+            return Block(c[0], 0, c[1], 'box', tex + (h, None), owner=s['owner'])
         seed = stable_hash(s['ref'] or s['lib_id'])
         if self.is_ic(s) and len(cells) >= 4:
             res = buildings.plan(cells, s['pins'], s['owner'], seed, box)
@@ -448,8 +453,8 @@ class Builder:
                 return False
             blocks, h, kind = res
         elif self.is_connector(s):
-            blocks, h = buildings.picnic(cells, s['pins'], s['owner'], seed, box)
-            kind = 'picnic'
+            blocks, h = buildings.portal(cells, s['pins'], s['owner'], seed, box)
+            kind = 'portal'
         else:
             return False
         self.world.blocks.extend(blocks)
@@ -522,12 +527,13 @@ class Builder:
         counts cells from pin 1 and side across. None marks a cell kept empty."""
         out = []
         mid = n // 2
-        if fam == 'cap':            # two upright plates across the wire, like the symbol (+ plate gold)
-            plates = ('block/gold_block' if s['polar'] else 'block/polished_deepslate', 'block/polished_deepslate')
-            widths = ((0, (-1, 0, 1)), (1, (0, 1)), (1, (-1, 0)), (2, (0,))) if n >= 3 else ((0, (0,)),)
-            for cost, ws in widths:
-                out.append((cost, {(mid, w): ('cap', plates) for w in ws}))
-            return out
+        if fam == 'cap':            # a chest: copper for electrolytics (latch to the + pin), wooden for the rest
+            if s['polar']:
+                face = dir_of(-d[0], -d[1])         # pin 1, the + pin
+                chest = ('chest_copper', YROT[face])
+            else:
+                chest = ('chest', YROT['south' if d[0] else 'east'])
+            return [(0, {(mid if n > 1 else 0, 0): ('mob', chest)})]
         if fam == 'res':            # one furnace, its front to the camera
             facing = 'south' if d[0] else 'east'
             return [(0, {(mid if n > 1 else 0, 0): ('state', ('furnace', (('facing', facing), ('lit', 'false'))))})]
@@ -576,8 +582,8 @@ class Builder:
                 w.solid[c] = owner
                 continue
             kind, block = v
-            if kind == 'cap':
-                w.blocks.append(Block(c[0], 0, c[1], 'plates', (d, block), owner=owner))
+            if kind == 'mob':
+                w.blocks.append(Block(c[0], 0, c[1], 'mob', block, owner=owner))
             elif kind == 'state':
                 w.blocks.append(Block(c[0], 0, c[1], 'state', block, owner=owner))
             else:
@@ -742,7 +748,45 @@ class Builder:
                 elif not vertical and abs(tx_) > 0.5:
                     h = 'left' if tx_ > 0 else 'right'
             style = s.get('field_style') or ('ref' if pname == 'Reference' else 'value')
+            if s['kind'] == 'power' and s['pins']:
+                self.power_label(s, txt, self.cell(fx, fy), style)
+                continue
             self.plaque(txt, self.cell(fx, fy), h, vertical, style, owner=s['owner'])
+
+    def power_label(self, s, text, want, style):
+        """A supply's or ground's name on a plaque right next to its torch or hopper: on whichever side has room
+        (nearest to where the schematic put the text first), or on the nearest side when none has."""
+        w = self.world
+        c = s['pins'][0]['outer']
+        net = s['pins'][0]['net']
+        wc, hc = self.text_cells(text)
+        spots = []
+        for k in range(wc):                     # above and below, the torch under any of its cells
+            spots += [(c[0] - k, c[1] - hc), (c[0] - k, c[1] + 1)]
+        for k in range(hc):                     # left and right
+            spots += [(c[0] + 1, c[1] - k), (c[0] - wc, c[1] - k)]
+
+        def cost(sp):
+            cx, cy = sp[0] + (wc - 1) / 2, sp[1] + (hc - 1) / 2
+            return abs(cx - want[0]) + abs(cy - want[1])
+
+        def clashes(sp):
+            n = 0
+            for cc in w.plaque_cells(sp[0], sp[1], wc, hc):
+                if (not w.inside(cc) or cc in w.solid or w.soft.get(cc) not in (None, s['owner'])
+                        or (cc in w.dust and set(w.dust[cc]) != {net})):
+                    n += 1
+            return n
+        spots.sort(key=lambda sp: (clashes(sp) > 0, cost(sp), clashes(sp)))
+        i, j = spots[0]
+        pq = Plaque(text, i, j, wc, hc, False, style)
+        if clashes((i, j)):
+            self.stats['plaques_stuck'] += 1
+            self.stuck.append((style, text))
+        w.plaques.append(pq)
+        for cc in w.plaque_cells(i, j, wc, hc):
+            w.solid.setdefault(cc, pq)
+        w.circuit.update(w.plaque_cells(i, j, wc, hc))
 
     def free_texts(self):
         for t in self.sch.texts:

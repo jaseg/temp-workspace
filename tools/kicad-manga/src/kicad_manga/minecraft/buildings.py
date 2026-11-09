@@ -369,6 +369,63 @@ def plan(cells, pins, owner, seed, box, area_class=None):
     return out, wall_h, kind
 
 
+def pin_sides(pins):
+    """The sides of a body its pins come in from (a side counts with at least two pins, or a tenth of them, so
+    a lone mounting pin doesn't make a row connector two-sided)."""
+    n = {}
+    for p in pins:
+        if p['dir']:
+            n[p['dir']] = n.get(p['dir'], 0) + 1
+    return {d for d, k in n.items() if k >= max(2, len(pins) / 10)} or set(n)
+
+
+def portal(cells, pins, owner, seed, box):
+    """A connector as a portal, its pins leading off to another world: a nether portal of obsidian for a row
+    connector (pins on one side), an end portal (a ring of frames with eyes around the starry void) for one with
+    pins on several sides. Returns [Block] and the height to paint the pin names at."""
+    site = Site(owner, seed)
+    I0, I1 = min(c[0] for c in cells), max(c[0] for c in cells)
+    J0, J1 = min(c[1] for c in cells), max(c[1] for c in cells)
+    sides = pin_sides(pins)
+    out = []
+    if len(sides) <= 1:
+        side = next(iter(sides), 'east')
+        along_z = (J1 - J0) >= (I1 - I0)
+        # the portal stands in the row next to the pins, the rest of the body is a low obsidian ledge
+        if along_z:
+            col = I0 if side == 'east' else I1          # pins coming in eastwards sit on the west side
+            wall = [(col, j) for j in range(J0, J1 + 1)]
+        else:
+            row = J0 if side == 'south' else J1
+            wall = [(i, row) for i in range(I0, I1 + 1)]
+        H = 4
+        for k, (i, j) in enumerate(wall):
+            end = k in (0, len(wall) - 1)
+            for y in range(H):
+                if end or y in (0, H - 1):
+                    site.put(i, y, j, 'crying_obsidian' if site.rnd(i, y, j) < .12 else 'obsidian')
+                else:
+                    site.put(i, y, j, 'nether_portal', axis='z' if along_z else 'x')
+        out = site.emit()
+        for c in sorted(cells):
+            if c not in wall and c in cells:
+                out.append(box(c, 'obsidian', 3))
+        return out, 1
+    # an end portal: frames around the edge (none on the corners, as in the game), looking inwards
+    for (i, j) in sorted(cells):
+        edge = {'north': j == J0, 'south': j == J1, 'west': i == I0, 'east': i == I1}
+        on = [k for k, v in edge.items() if v]
+        if len(on) == 1:
+            facing = {'north': 'south', 'south': 'north', 'west': 'east', 'east': 'west'}[on[0]]
+            site.put(i, 0, j, 'end_portal_frame', facing=facing, eye='true' if site.rnd(i, j) < .7 else 'false')
+        elif not on:
+            site.floor[(i, j)] = 'void'
+    out = site.emit()
+    for c in sorted(site.floor):
+        out.append(box(c, 'entity/end_portal/end_portal', 12))
+    return out, 13 / 16
+
+
 CANDLES = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'cyan', 'purple', 'blue', 'red']
 TREATS = [('cake', {}), ('melon', {}), ('pumpkin', {}), ('hay_block', {'axis': 'y'}), ('jukebox', {}),
           ('barrel', {'facing': 'up', 'open': 'false'}), ('beehive', {'facing': 'south', 'honey_level': '5'}),
