@@ -111,6 +111,7 @@ SPECIES = {
     'pig': (pig, 1), 'pig_warm': (lambda: pig('warm'), 1), 'pig_cold': (lambda: pig('cold'), 1),
     'sheep': (sheep, 1),
     'chicken': (chicken, 1), 'chicken_warm': (lambda: chicken('warm'), 1),
+    'chicken_cold': (lambda: chicken('cold'), 1),
     'enderman': (enderman, 1), 'enderman_empty': (lambda: enderman(False), 1),
 }
 

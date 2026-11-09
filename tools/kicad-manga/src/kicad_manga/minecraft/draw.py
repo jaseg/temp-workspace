@@ -16,7 +16,7 @@ from ..svg import Markup, num, tag
 from . import mobs
 from .circuit import STYLES
 from .oblique import Oblique
-from .topdown import TopDown
+from .topdown import TopDown, default_uv
 from .world import dust_tint
 
 PIXELATED = 'image-rendering:pixelated;image-rendering:crisp-edges'
@@ -25,7 +25,7 @@ PLAQUE_H = 2                # plaques are 2/16 of a block thick
 
 
 class Drawer:
-    def __init__(self, world, pack, font, page, px=16, dust_width=2.0, fpx=20, camera_deg=55, yaw_deg=30):
+    def __init__(self, world, pack, font, page, px=16, dust_width=2.0, fpx=20, camera_deg=65, yaw_deg=30):
         self.w, self.pack, self.font = world, pack, font
         self.td = TopDown(pack, px)                 # flat things, and the frame overlay
         self.ob = Oblique(pack, px, camera_deg, yaw_deg)    # everything that stands up
@@ -56,8 +56,10 @@ class Drawer:
         return f'block/{block}', False
 
     def floor_tile(self, block):
-        tex, tinted = self.face_texture(block)
-        tint = self.tints.get(block) if tinted else None
+        """A floor tile; 'name|tag' is block `name` in the tint registered for the whole key (a biome's grass)."""
+        name = block.split('|')[0]
+        tex, tinted = self.face_texture(name)
+        tint = self.tints.get(block, self.tints.get(name)) if tinted else None
         return self.td.box(tex, 16, tint)[0]
 
     # -- sprites ---------------------------------------------------------------------
@@ -102,7 +104,7 @@ class Drawer:
             return self.ob.cache[key]
         if blk.kind == 'state':
             name, props = blk.args[:2]
-            return self.ob.state(name, dict(props), self.tint_of(name, blk.args))
+            return self.ob.state(name, dict(props), self.tint_of(name, blk.args), model_hook=SUNK.get(name))
         if blk.kind == 'mob':
             key = ('mob', blk.args)
             if key not in self.ob.cache:
@@ -455,6 +457,26 @@ class Drawer:
         return Markup('<?xml version="1.0" encoding="UTF-8"?>\n' + str(tag(
             'svg', body, xmlns='http://www.w3.org/2000/svg', viewBox=' '.join(num(v) for v in vb),
             width=f'{num(right - left)}mm', height=f'{num(bottom - top)}mm')))
+
+
+def sink_hopper(model):
+    """A hopper let into the ground: its funnel (below 10/16) is buried, and its bowl rests on the ground, so it
+    doesn't seem to float when seen from above."""
+    els = []
+    for el in model.get('elements', []):
+        if el['to'][1] <= 10:
+            continue
+        for face, f in el.get('faces', {}).items():
+            if not f.get('uv'):         # keep the texture where it was before the move
+                f['uv'] = list(default_uv(face, el['from'], el['to']))
+        el['from'] = [el['from'][0], el['from'][1] - 10, el['from'][2]]
+        el['to'] = [el['to'][0], el['to'][1] - 10, el['to'][2]]
+        els.append(el)
+    model['elements'] = els
+    return model
+
+
+SUNK = {'hopper': sink_hopper}      # blocks drawn partly let into the ground
 
 
 def rgb(c):

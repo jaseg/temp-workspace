@@ -24,7 +24,7 @@ def cross(a, b):
 
 
 class Oblique:
-    def __init__(self, pack, px=16, camera_deg=55, yaw_deg=30):
+    def __init__(self, pack, px=16, camera_deg=65, yaw_deg=30):
         self.pack = pack
         self.px = px
         c = 1 / math.tan(math.radians(camera_deg))

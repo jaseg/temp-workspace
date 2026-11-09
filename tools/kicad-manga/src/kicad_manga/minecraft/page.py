@@ -1,13 +1,16 @@
 """Around the circuit: the wooden deck it is built on, the meadow, the page frame, the title block, a legend, and
-cherry trees, bushes, flower beds, ponds, little gardens and animals in the empty space. All of it is made of blocks on
+biomes (meadows, forests, cherry groves, taiga, snow, savanna, desert, badlands) with hills, caves, trees, plants,
+ponds, little gardens and animals in the empty space. All of it is made of blocks on
 the schematic's grid. The frame is drawn flat on top of everything (`overlay`), like a picture frame."""
 
 import math
 import random
 import re
+import zlib
 from pathlib import Path
 
 from ..kicad import paper_size, title_comment
+from .biomes import BIOMES, Biomes, column, pick
 from .world import Block, Plaque
 
 MARGIN_MM = 10              # KiCad's drawing sheet frame
@@ -15,6 +18,10 @@ PASTEL_FLOWERS = ['pink_tulip', 'allium', 'azure_bluet', 'oxeye_daisy', 'cornflo
                   'white_tulip']
 GRASS = (132, 196, 92)      # a soft, sunny meadow green instead of the biome colormap's
 FOLIAGE = (110, 178, 72)
+# blocks coloured by their biome: which of its colours
+TINTED = {'grass_block': 'grass', 'short_grass': 'grass', 'tall_grass': 'grass', 'fern': 'grass',
+          'large_fern': 'grass', 'sugar_cane': 'grass', 'pink_petals': 'grass', 'oak_leaves': 'foliage',
+          'acacia_leaves': 'foliage', 'jungle_leaves': 'foliage', 'dark_oak_leaves': 'foliage', 'vine': 'foliage'}
 DIRS4 = (('north', (0, -1)), ('south', (0, 1)), ('east', (1, 0)), ('west', (-1, 0)))
 
 LEGEND = [
@@ -46,6 +53,7 @@ class Page:
         self.height = {}            # cell -> blocks of hill under it
         self.page_mm = None
         self.rng = random.Random(cfg.get('seed', 42))
+        self.biomes = Biomes(cfg.get('seed', 42))
         PW, PH = builder.paper
         self.paper = (PW, PH)
         W, H = paper_size(sch)
@@ -95,12 +103,16 @@ class Page:
         on_sheet = 0 <= c[0] < PW and 0 <= c[1] < PH
         return not on_sheet and w.i0 + 2 <= c[0] < w.W - 2 and w.j0 + 2 <= c[1] < w.H - 2
 
-    def put(self, i, y, j, name, props=(), flat=False, overlay=False, absolute=False):
-        """A block at height y above the ground of its cell (or at y itself, `absolute`)."""
+    def put(self, i, y, j, name, props=(), flat=False, overlay=False, absolute=False, tint=None):
+        """A block at height y above the ground of its cell (or at y itself, `absolute`), tinted `tint` (or, for
+        grass and leaves, in its biome's colour)."""
         if not absolute and not overlay:
             y += self.height.get((i, j), 0)
         flat = flat and y == 0
-        self.w.blocks.append(Block(i, y, j, 'state', (name, tuple(props)), flat=flat, owner='page', overlay=overlay))
+        if tint is None and not overlay and name in TINTED:
+            tint = BIOMES[self.biomes((i, j))][TINTED[name]]
+        args = (name, tuple(props)) + ((tint,) if tint else ())
+        self.w.blocks.append(Block(i, y, j, 'state', args, flat=flat, owner='page', overlay=overlay))
 
     def box(self, i, y, j, block, h=16, owner='page'):
         self.w.blocks.append(Block(i, y, j, 'box', (self.b.tex(block, 'up'), self.b.tex(block, 'south'), h, None),
@@ -301,6 +313,7 @@ class Page:
     def decorate(self):
         free = [(i, j) for i in range(self.w.i0, self.w.W) for j in range(self.w.j0, self.w.H)
                 if self.in_frame((i, j)) and not self.blocked((i, j))]
+        self.ground(free)
         self.ponds(free)
         self.gardens(free)
         self.terrain(free)
@@ -312,6 +325,25 @@ class Page:
 
     def blocked(self, c):
         return c in self.platform or c in self.taken or c in self.w.solid or not self.in_frame(c)
+
+    def biome(self, c):
+        return BIOMES[self.biomes(c)]
+
+    def ground(self, free):
+        """Each biome's ground: grass (in the biome's colour), podzol, sand, snow, red sand..."""
+        rng = self.rng
+        for c in free:
+            if c in self.taken or c in self.w.floor:
+                continue
+            name = self.biomes(c)
+            g = pick(rng, BIOMES[name]['ground'])
+            if g == 'grass_block':
+                g = f'grass_block|{name}'
+                self.tints.setdefault(g, BIOMES[name]['grass'])
+            self.w.floor[c] = g
+
+    def green(self, c):
+        return self.biomes(c) not in ('desert', 'badlands', 'snowy')
 
     def ponds(self, free):
         rng = self.rng
@@ -331,18 +363,23 @@ class Page:
             for x in cells:
                 a, b = x[0] - c[0], x[1] - c[1]
                 wet = (a / r) ** 2 + (b / (r * .7)) ** 2 <= 1
-                self.w.floor[x] = 'water' if wet else 'moss_block'
+                B = self.biome(x)
+                self.w.floor[x] = B.get('pond', 'water') if wet else B.get('pond_rim', 'moss_block')
                 self.taken.add(x)
+                if not self.green(x):
+                    continue
                 if wet and rng.random() < .12:
                     self.put(x[0], 0, x[1], 'lily_pad', flat=True)
                 elif not wet and rng.random() < .3:
                     self.put(x[0], 0, x[1], rng.choice(['sugar_cane', 'pink_tulip', 'oxeye_daisy', 'fern']))
 
     def terrain(self, free):
-        """Gentle grassy hills in the open meadow, away from the circuit."""
+        """Hills and mountains in the open land, away from the circuit, made of their biome's blocks: grass over
+        dirt over stone (with ores) in green land, snow-capped peaks, sand over sandstone in the desert, banded
+        terracotta mesas in the badlands. Some hillsides have a cave in them."""
         rng = self.rng
         fs = {c for c in free if not self.blocked(c)}
-        # how far each free cell is from anything else (circuit, frame, ponds, ...), up to 8
+        # how far each free cell is from anything else (circuit, frame, ponds, ...), up to 14
         dist = {}
         edge = [c for c in fs if any((c[0] + a, c[1] + b) not in fs for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
         for c in edge:
@@ -352,16 +389,20 @@ class Page:
             nxt = []
             for (i, j) in todo:
                 for n in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
-                    if n in fs and n not in dist and dist[(i, j)] < 8:
+                    if n in fs and n not in dist and dist[(i, j)] < 14:
                         dist[n] = dist[(i, j)] + 1
                         nxt.append(n)
             todo = nxt
         lift = {}
-        cand = [c for c in fs if dist.get(c, 9) >= 5]
-        for _ in range(len(fs) // 900):
+        cand = [c for c in fs if dist.get(c, 15) >= 4]
+        for _ in range(len(fs) // 420):
             if not cand:
                 break
-            (ci, cj), A, r = rng.choice(cand), rng.uniform(1.6, 3.6), rng.uniform(3, 8)
+            (ci, cj) = rng.choice(cand)
+            k = self.biome((ci, cj))['hills']
+            A, r = rng.uniform(1.2, 4.2) * k, rng.uniform(2.5, 8)
+            if rng.random() < .15:                  # now and then a mountain
+                A, r = A * 2.2, r * 1.3
             R = int(r * 2.2)
             for a in range(-R, R + 1):
                 for b in range(-R, R + 1):
@@ -369,16 +410,53 @@ class Page:
                     if c in fs:
                         lift[c] = lift.get(c, 0) + A * math.exp(-(a * a + b * b) / (r * r))
         for c, v in lift.items():
-            h = int(min(v, (dist.get(c, 9) - 2) / 1.5, 4))
+            h = int(min(v, (dist.get(c, 15) - 1.5) / 1.1, 11))
+            step = self.biome(c).get('terraces')
+            if step and h > step:
+                h = h // step * step                # flat-topped mesas
             if h > 0:
                 self.height[c] = h
         H = self.height
+
+        # caves: openings two blocks high in hillsides that face the camera, a couple of blocks deep
+        carved = set()
+        mouths = [c for c, h in H.items() if h >= 3 and H.get((c[0], c[1] + 1), 0) == 0
+                  and H.get((c[0], c[1] - 1), 0) >= 3 and H.get((c[0], c[1] - 2), 0) >= 2]
+        rng.shuffle(mouths)
+        made = []
+        for (i, j) in mouths[:max(1, len(mouths) // 25)]:
+            if any(abs(i - a) + abs(j - b) < 12 for a, b in made):
+                continue
+            made.append((i, j))
+            wide = [(i, j)] + ([(i + 1, j)] if H.get((i + 1, j), 0) >= 3 and H.get((i + 1, j + 1), 0) == 0 else [])
+            cave = []
+            for (a, b) in wide:
+                cave += [(a, b), (a, b - 1)]
+            for (a, b) in cave:
+                for y in (0, 1):
+                    carved.add((a, y, b))
+                self.w.floor[(a, b)] = rng.choice(['gravel', 'stone', 'cobblestone'])
+                self.taken.add((a, b))
+            back = (i, 0, j - 1)
+            self.put(back[0], 0, back[2], rng.choice(['torch', 'torch', 'lantern', 'cobweb']), absolute=True)
+            if rng.random() < .5:
+                self.put(i, 0, j, rng.choice(['chest', 'barrel', 'cobweb', 'brown_mushroom']),
+                         [('facing', 'south')] if rng.random() < .5 else [], absolute=True)
+
+        def solid(i, y, j):
+            return y < H.get((i, j), 0) and (i, y, j) not in carved
+
         for (i, j), h in H.items():
+            biome = self.biomes((i, j))
             for y in range(h):
+                if not solid(i, y, j):
+                    continue
                 # only the blocks that show: the top one, and those with an open south or east side
-                if y == h - 1 or H.get((i, j + 1), 0) <= y or H.get((i + 1, j), 0) <= y:
-                    self.w.blocks.append(Block(i, y, j, 'state', ('grass_block', (('snowy', 'false'),)),
-                                               owner='hill'))
+                if y == h - 1 or not solid(i, y, j + 1) or not solid(i + 1, y, j):
+                    rnd = random.Random(zlib.crc32(f'{i},{y},{j}'.encode())).random()
+                    name, props, tint = column(biome, h, y, i, j, rnd)
+                    args = (name, props) + ((tint,) if tint else ())
+                    self.w.blocks.append(Block(i, y, j, 'state', args, owner='hill'))
 
     def gardens(self, free):
         """Little vegetable plots: rows of crops on farmland with a fence around them."""
@@ -391,7 +469,7 @@ class Page:
             i, j = rng.choice(free)
             w, h = rng.randint(5, 8), rng.randint(4, 6)
             cells = [(i + a, j + b) for a in range(w) for b in range(h)]
-            if not self.free(cells, 1):
+            if not self.free(cells, 1) or not self.green((i, j)):
                 continue
             made += 1
             self.taken.update(cells)
@@ -406,20 +484,81 @@ class Page:
                 self.put(ci, 0, cj, block, props)
 
     def trees(self, free):
+        """Trees as each biome grows them: woods of oak, birch, spruce or cherry, lone acacias on the savanna,
+        cacti in the desert."""
         rng = self.rng
-        n = len(free) // 600
         placed = []
-        for _ in range(n * 6):
-            if len(placed) >= n:
-                break
+        for _ in range(len(free) // 25):
             i, j = rng.choice(free)
-            if any(abs(i - a) + abs(j - b) < 7 for a, b in placed):
+            B = self.biome((i, j))
+            if rng.random() > B['tree_density'] * .45:
                 continue
-            if not self.free([(i, j)], 3):
+            kind = pick(rng, B['trees'])
+            gap = {'cactus': 3, 'spruce': 4, 'birch': 4, 'oak': 5}.get(kind, 7)
+            if B['tree_density'] < .5:
+                gap += 2
+            if any(abs(i - a) + abs(j - b) < gap for a, b in placed):
+                continue
+            if not self.free([(i, j)], 1 if kind == 'cactus' else 2):
                 continue
             placed.append((i, j))
-            kind = rng.choice(['cherry', 'cherry', 'oak', 'oak', 'birch'])
-            self.tree(i, j, kind, rng.randint(5, 7) if kind == 'cherry' else rng.randint(4, 6))
+            if kind == 'cactus':
+                for y in range(rng.randint(1, 3)):
+                    self.put(i, y, j, 'cactus', [('age', '0')])
+                self.taken.add((i, j))
+            elif kind == 'spruce':
+                self.spruce(i, j, rng.randint(6, 10))
+            elif kind == 'acacia':
+                self.acacia(i, j)
+            else:
+                self.tree(i, j, kind, rng.randint(5, 7) if kind in ('cherry', 'birch') else rng.randint(4, 6))
+
+    def leaves_at(self, leaf, kind, center):
+        tint = BIOMES[self.biomes(center)]['foliage'] if kind in ('oak', 'acacia') else None
+        for (x, y, z) in sorted(leaf, key=lambda t: (t[2], t[1], t[0])):
+            self.put(x, y, z, f'{kind}_leaves', [('persistent', 'true')], absolute=True, tint=tint)
+        self.taken.update({(x, z) for x, _, z in leaf} | {center})
+
+    def spruce(self, i, j, hgt):
+        """A spruce: a tall trunk in a cone of leaves, wide and narrow rings by turns."""
+        rng = self.rng
+        base = self.height.get((i, j), 0)
+        top = base + hgt
+        for y in range(base, top - 1):
+            self.put(i, y, j, 'spruce_log', [('axis', 'y')], absolute=True)
+        leaf = {(i, top, j), (i, top - 1, j)}
+        radii = [1, 0, 1, 2, 1, 2, 3, 2, 3]
+        for k, y in enumerate(range(top - 1, base + 1, -1)):
+            r = radii[min(k, len(radii) - 1)]
+            r = min(r, 1 + (y - base) // 2)
+            for a in range(-r, r + 1):
+                for b in range(-r, r + 1):
+                    if abs(a) + abs(b) > r + (r > 1) or (a == 0 and b == 0):
+                        continue
+                    if abs(a) == r and abs(b) == r and rng.random() < .5:
+                        continue
+                    leaf.add((i + a, y, j + b))
+        self.leaves_at(leaf, 'spruce', (i, j))
+
+    def acacia(self, i, j):
+        """An acacia: a trunk that leans off to one side, under a flat, wide crown."""
+        rng = self.rng
+        base = self.height.get((i, j), 0)
+        da, db = rng.choice([(1, 0), (-1, 0), (0, -1), (1, -1)])
+        x, z = i, j
+        for y in range(base, base + 5):
+            if y >= base + 2:
+                x, z = x + da * (y - base - 1 < 3), z + db * (y - base - 1 < 3)
+            self.put(x, y, z, 'acacia_log', [('axis', 'y')], absolute=True)
+        top = base + 5
+        leaf = set()
+        for y, r in ((top, 2), (top + 1, 1)):
+            for a in range(-r - (y == top), r + 1 + (y == top)):
+                for b in range(-r, r + 1):
+                    if abs(a) + abs(b) > r + 1:
+                        continue
+                    leaf.add((x + a, y, z + b))
+        self.leaves_at(leaf, 'acacia', (i, j))
 
     def tree(self, i, j, kind, hgt):
         """A tree grown the way the game grows it: a trunk `hgt` tall with the canopy at its top. Oak and birch get
@@ -453,10 +592,7 @@ class Page:
             for (x, y, z) in list(leaf):
                 if y == y0 and abs(x - i) + abs(z - j) >= 3 and rng.random() < .4:
                     leaf.add((x, y - 1, z))
-        for (x, y, z) in sorted(leaf, key=lambda t: (t[2], t[1], t[0])):
-            self.put(x, y, z, leaves, [('persistent', 'true')], absolute=True)
-            cells.add((x, z))
-        self.taken.update(cells | {(i, j)})
+        self.leaves_at(leaf, kind, (i, j))
         # fallen petals under cherry trees, and now and then a mushroom in the shade
         for a in range(-3, 4):
             for b in range(-3, 4):
@@ -478,7 +614,7 @@ class Page:
                 break
             i, j = rng.choice(free)
             cells = [(i, j), (i + 1, j)] if rng.random() < .5 else [(i, j)]
-            if not self.free(cells, 1):
+            if not self.free(cells, 1) or not self.green((i, j)):
                 continue
             for c in cells:
                 self.put(c[0], 0, c[1], rng.choice(['azalea_leaves', 'flowering_azalea_leaves',
@@ -490,13 +626,13 @@ class Page:
         """Herds of pigs, sheep and chickens on the meadow, and the odd enderman (one of them carrying off a
         resistor)."""
         rng = self.rng
-        herds = ['pig', 'pig_warm', 'pig_cold', 'sheep', 'sheep', 'chicken', 'chicken_warm']
         n = max(1, len(free) // 1100)
         for _ in range(n * 4):
             if n <= 0:
                 break
             i, j = rng.choice(free)
-            if not self.free([(i, j)], 2):
+            herds = self.biome((i, j))['animals']       # with the colours the game gives them in that climate
+            if not self.free([(i, j)], 2) or not herds:
                 continue
             kind = rng.choice(herds)
             k = rng.randint(2, 4)
@@ -504,7 +640,8 @@ class Page:
                 if k <= 0:
                     break
                 c = (i + rng.randint(-3, 3), j + rng.randint(-2, 2))
-                if self.free([c], 1) and self.w.floor.get(c) is None:
+                if self.free([c], 1) and self.w.floor.get(c, '').split('|')[0] in ('grass_block', 'podzol',
+                                                                                   'snow_block', 'coarse_dirt'):
                     self.mob(c, kind)
                     k -= 1
             n -= 1
@@ -533,7 +670,7 @@ class Page:
             if n <= 0:
                 break
             i, j = rng.choice(free)
-            if not self.free([(i, j)], 1):
+            if not self.free([(i, j)], 1) or not self.green((i, j)):
                 continue
             name, props = rng.choice(things)
             self.put(i, 0, j, name, props)
@@ -541,13 +678,16 @@ class Page:
             n -= 1
 
     def flowers(self, free):
-        """Grass all over the meadow, some of it tall, and flowers in patches of one kind each, as the game
-        scatters them."""
+        """Plants as each biome has them: grass all over the meadow, some of it tall, flowers in patches of one
+        kind each (as the game scatters them), ferns and berry bushes in the taiga, petals in cherry groves, dead
+        bushes in the desert and the badlands, nothing on the snow."""
         rng = self.rng
         patches = [(rng.choice(free), rng.choice(PASTEL_FLOWERS + ['dandelion', 'poppy']), rng.uniform(2, 3.5))
-                   for _ in range(len(free) // 250)]
+                   for _ in range(len(free) // 180)]
         near = {}
         for (pi, pj), fl, r in patches:
+            if rng.random() > self.biome((pi, pj))['flowers'] / 2.2:
+                continue
             R = int(r) + 1
             for a in range(-R, R + 1):
                 for b in range(-R, R + 1):
@@ -556,16 +696,26 @@ class Page:
         for (i, j) in free:
             if (i, j) in self.taken or (i, j) in self.w.solid:
                 continue
+            B = self.biome((i, j))
             x = rng.random()
-            if (i, j) in near and x < .35:
+            if (i, j) in near and x < .35 and B['flowers']:
                 self.put(i, 0, j, near[(i, j)])
-            elif x < .14:
-                if rng.random() < .12 and self.free([(i, j)]):
+            elif B.get('petals') and rng.random() < B['petals']:
+                self.petals((i, j))
+            elif x < B['plants']:
+                kinds = B.get('plant_kinds')
+                if kinds:
+                    k = rng.choice(kinds)
+                    if k == 'large_fern':
+                        self.put(i, 0, j, 'large_fern', [('half', 'lower')])
+                        self.put(i, 1, j, 'large_fern', [('half', 'upper')])
+                    else:
+                        self.put(i, 0, j, k, [('age', '3')] if k == 'sweet_berry_bush' else [])
+                elif rng.random() < .12 and self.free([(i, j)]):
                     self.put(i, 0, j, 'tall_grass', [('half', 'lower')])
                     self.put(i, 1, j, 'tall_grass', [('half', 'upper')])
                 else:
                     self.put(i, 0, j, rng.choice(['short_grass'] * 6 + ['fern']))
-
 
 def dilate(cells, r):
     out = set(cells)

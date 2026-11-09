@@ -126,6 +126,11 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
   - ICs (U..., and transformers) are buildings filling their whole body, with the pin names painted over the
     walls and roofs: small and medium ones timber houses with gable roofs, windows and a door, large ones castles
     with corner towers, a gate and a keep.
+  - The land around the circuit has biomes, picked from temperature and humidity noise like in the game:
+    plains, flower meadows, oak, birch and cherry woods, taiga, snowy land, savanna, desert and badlands, each
+    with its own ground, grass and leaf colours, trees, plants and animals (in the game's warm and cold
+    colours). Hills reach up to eleven blocks: grass over dirt over stone with ores, snow-capped peaks, sand over
+    sandstone, banded terracotta mesas, with a cave here and there. GND hoppers are let into the ground.
   - Connectors are picnics: a red and white checkered blanket with a candle cake wherever a pin plugs in (the
     candle's colour by net) and melons, cakes, beehives and barrels spread around.
   - Other parts get a wooden or terracotta body with their pin names painted on top. Supplies are torches,
@@ -140,7 +145,7 @@ uv run kicad-manga board.kicad_sch -s minecraft --pack mine.zip --pack default.z
   flower beds, ponds, little vegetable gardens, beehives and pumpkins. The title block is a cherry wood deck
   with bookshelves, lanterns and a cake. The legend explains the parts.
 - **Page:** only the sheet is drawn; anything placed beside it in the schematic is left out.
-- **Camera:** an oblique view from high up in the south-east: `camera_deg` above the horizon (55 by default)
+- **Camera:** an oblique view from high up in the south-east: `camera_deg` above the horizon (65 by default)
   and turned `yaw_deg` (30) from due south towards the east. The ground keeps its place on the page, so the sheet
   stays a rectangle; every block shows its top, its south side and a sliver of its east side, and leans a little
   to the north-west. Faces are shaded like in the game (sides 80 % and 60 %), with ambient occlusion where blocks meet
@@ -156,7 +161,7 @@ style = "minecraft"
 packs = ["default-pack.zip"]     # relative to the settings file
 block_mm = 2.54
 dust_width = 2.0
-camera_deg = 55
+camera_deg = 65
 yaw_deg = 30
 px_per_block = 16
 ```
