@@ -1,9 +1,10 @@
-"""The chart as an SVG: the cloth as one raster, the stitches as vector paths.
+"""The chart as an SVG: the cloth as a tiled bitmap, the stitches as vector paths.
 
 Kept quick to open in a PDF viewer:
 
-- The aida cloth is a single image of the whole page. It is built from one patch of cloth repeated, in a few dozen
-  colours, so it compresses to a few hundred kB.
+- The linen is one bitmap tile, 96 cells square, with slubby threads, mottling, tea stains and flax specks that
+  wrap around its edges. It fills the page as a pattern of about a hundred tiles, and is stored once (a JPEG of
+  about 200 kB).
 - Stitches are grouped into one path per thread colour and layer (under leg, over leg, sheen), so a sheet with
   tens of thousands of stitches is a few hundred paths. Nothing is transparent: no soft masks or groups."""
 
@@ -12,43 +13,78 @@ import io
 import math
 import random
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from . import threads as th
+
+TILE_CELLS = 96
 
 def fmt(v):
     s = f'{v:.2f}'.rstrip('0').rstrip('.')
     return '0' if s in ('-0', '') else s
 
 
-def cloth_png(cols, rows, px, seed=1):
-    """Aida cloth, `px` pixels per cell, as PNG bytes. Holes sit on the cell corners."""
+def wrapped_noise(size, cell, seed, blur):
+    """Smooth noise that tiles seamlessly: a coarse random grid, enlarged on a 3x3 repeat and cut from the middle."""
     rng = random.Random(seed)
-    n = 24                                  # the patch that is repeated, in cells
+    n = max(2, size // cell)
+    small = Image.new('L', (n, n))
+    small.putdata([rng.randrange(256) for _ in range(n * n)])
+    big = Image.new('L', (3 * n, 3 * n))
+    for dx in range(3):
+        for dy in range(3):
+            big.paste(small, (dx * n, dy * n))
+    big = big.resize((3 * size, 3 * size), Image.BICUBIC).filter(ImageFilter.GaussianBlur(blur))
+    return big.crop((size, size, 2 * size, 2 * size))
+
+
+def linen_tile(px, cells=TILE_CELLS, seed=3):
+    """A seamless tile of rustic linen, `px` pixels per cell, as JPEG bytes. Holes sit on the cell corners."""
+    rng = random.Random(seed)
     cloth, hole = th.CLOTH, th.CLOTH_HOLE
-    gap = tuple((a * 2 + b) // 3 for a, b in zip(cloth, hole))
-    patch = Image.new('RGB', (n * px, n * px), gap)
-    d = ImageDraw.Draw(patch)
-    for i in range(n):
-        for j in range(n):
-            v = rng.uniform(-4, 4) + 3 * math.sin((i + j * .7) / n * 2 * math.pi)
+    T = cells * px
+    gap = tuple(round(a * .6 + b * .4) for a, b in zip(cloth, hole))
+    img = Image.new('RGB', (T, T), gap)
+    d = ImageDraw.Draw(img)
+    rowv = [rng.gauss(0, 4) for _ in range(cells)]          # slubby, uneven weft and warp threads
+    colv = [rng.gauss(0, 4) for _ in range(cells)]
+    for k in rng.sample(range(cells), cells // 12):
+        rowv[k] += rng.choice((-1, 1)) * 6
+    for k in rng.sample(range(cells), cells // 12):
+        colv[k] += rng.choice((-1, 1)) * 6
+    for i in range(cells):
+        for j in range(cells):
+            v = rowv[j] + colv[i] + rng.gauss(0, 2.5)
             base = tuple(round(c + v) for c in cloth)
-            hi = tuple(min(255, c + 6) for c in base)
-            lo = tuple(c - 9 for c in base)
+            hi = tuple(min(255, c + 8) for c in base)
+            lo = tuple(c - 10 for c in base)
             x, y = i * px, j * px
             d.rectangle([x + 1, y + 1, x + px - 1, y + px - 1], fill=base)
             d.line([x + 2, y + 1, x + px - 2, y + 1], fill=hi)
             d.line([x + 1, y + 2, x + 1, y + px - 2], fill=hi)
             d.line([x + 2, y + px - 1, x + px - 1, y + px - 1], fill=lo)
             d.line([x + px - 1, y + 2, x + px - 1, y + px - 1], fill=lo)
-            d.rectangle([x, y, x, y], fill=hole)          # the hole at the cell's top-left corner
-    img = Image.new('RGB', (cols * px, rows * px))
-    for x in range(0, img.width, patch.width):
-        for y in range(0, img.height, patch.height):
-            img.paste(patch, (x, y))
-    img = img.quantize(64, dither=Image.Dither.NONE)
+            for k in (px * 3 // 8, px * 5 // 8):            # fibres, alternating direction like a weave
+                c2 = tuple(c + rng.choice((-6, -3, 4)) for c in base)
+                if (i + j) % 2:
+                    d.line([x + 2, y + k, x + px - 2, y + k], fill=c2)
+                else:
+                    d.line([x + k, y + 2, x + k, y + px - 2], fill=c2)
+            hs = rng.choice((1, 1, 2))
+            d.rectangle([x, y, x + hs - 1, y + hs - 1], fill=hole)
+    # mottling and tea stains
+    dark = Image.new('RGB', (T, T), (118, 88, 48))
+    mott = wrapped_noise(T, 4 * px, seed + 1, px)
+    stain = wrapped_noise(T, 12 * px, seed + 2, 3 * px).point(lambda v: 0 if v < 140 else min(255, (v - 140) * 3))
+    img = Image.composite(dark, img, mott.point(lambda v: v * 40 // 255))
+    img = Image.composite(dark, img, stain.point(lambda v: v * 40 // 255))
+    d = ImageDraw.Draw(img)
+    for _ in range(cells * cells // 64):                     # specks of flax
+        x, y = rng.randrange(T), rng.randrange(T)
+        L, a = rng.randrange(2, px), rng.random() * math.pi
+        d.line([x, y, x + L * math.cos(a), y + L * math.sin(a)], fill=(104, 80, 50))
     buf = io.BytesIO()
-    img.save(buf, 'PNG', compress_level=9)
+    img.save(buf, 'JPEG', quality=85)
     return buf.getvalue()
 
 
@@ -77,7 +113,7 @@ class Paths:
         return '\n'.join(out)
 
 
-SHADOW = th.rgb_hex(tuple(c - 38 for c in th.CLOTH))
+SHADOW = th.rgb_hex(tuple(c - 50 for c in th.CLOTH))
 LAYERS = ['shadow', 'satin', 'under', 'over', 'sheen', 'back', 'back_sheen', 'text', 'knot', 'knot_sheen']
 
 THREAD = .24           # one strand of floss, in mm: every stitch is made of these
@@ -138,9 +174,12 @@ class Drawer:
 
     # -- stitches ----------------------------------------------------------------------
     def cross(self, i, j, col, inset=.2):
+        """A cross stitch in cell (i, j), a little uneven, as if stitched by hand."""
         b = self.c.hole
+        h = (i * 73856093) ^ (j * 19349663)
+        jx = [((h >> (5 * k)) % 9 - 4) * .012 for k in range(4)]
         x0, y0, x1, y1 = i * b + inset, j * b + inset, (i + 1) * b - inset, (j + 1) * b - inset
-        self.cross_at(x0, y0, x1, y1, col, 2)
+        self.cross_at(x0 + jx[0], y0 + jx[1], x1 + jx[2], y1 + jx[3], col, 2)
 
     def cross_at(self, x0, y0, x1, y1, col, strands):
         """A cross stitch, each leg `strands` strands of floss that share the holes at its ends and lie side by side
@@ -160,7 +199,7 @@ class Drawer:
                 p.add(layer, c, THREAD, f'M{fmt(ax)} {fmt(ay)}L{fmt(cx)} {fmt(cy)}L{fmt(bx)} {fmt(by)}')
                 if layer == 'over':
                     o = THREAD * .15
-                    p.add('sheen', th.shade(col, .45), THREAD * .3,
+                    p.add('sheen', th.shade(col, .28), THREAD * .3,
                           f'M{fmt((ax + cx) / 2 + o)} {fmt((ay + cy) / 2 - o)}L{fmt(cx + o)} {fmt(cy - o)}')
 
     def backstitch(self, s):
@@ -197,7 +236,7 @@ class Drawer:
             p.add(layer, s.color, w, d, **dash)
             if sheen_dash is not None:
                 o = w * .18
-                p.add('back_sheen', th.shade(s.color, .42), w * .3, d, transform=f'translate({-o:.2f} {-o:.2f})',
+                p.add('back_sheen', th.shade(s.color, .26), w * .3, d, transform=f'translate({-o:.2f} {-o:.2f})',
                       **sheen_dash)
         if weight == 'bus':
             # the couching: single-strand tie-down stitches across the laid strands, one per hole
@@ -250,15 +289,15 @@ class Drawer:
         for x, y, r, col in c.knots:
             self.knot(x, y, r, col)
         b = c.hole
-        cols, rows = math.ceil(W / b), math.ceil(H / b)
-        png = cloth_png(cols, rows, self.px)
-        href = 'data:image/png;base64,' + base64.b64encode(png).decode()
+        tile = TILE_CELLS * b
+        href = 'data:image/jpeg;base64,' + base64.b64encode(linen_tile(self.px)).decode()
         return (f'<?xml version="1.0" encoding="utf-8"?>\n'
                 f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
                 f'width="{fmt(W)}mm" height="{fmt(H)}mm" viewBox="0 0 {fmt(W)} {fmt(H)}">\n'
-                f'<rect width="{fmt(W)}" height="{fmt(H)}" fill="{th.rgb_hex(th.CLOTH)}"/>\n'
-                f'<image x="0" y="0" width="{fmt(cols * b)}" height="{fmt(rows * b)}" preserveAspectRatio="none" '
-                f'xlink:href="{href}"/>\n'
+                f'<defs><pattern id="linen" patternUnits="userSpaceOnUse" width="{fmt(tile)}" height="{fmt(tile)}">'
+                f'<image width="{fmt(tile)}" height="{fmt(tile)}" preserveAspectRatio="none" xlink:href="{href}"/>'
+                f'</pattern></defs>\n'
+                f'<rect width="{fmt(W)}" height="{fmt(H)}" fill="url(#linen)"/>\n'
                 f'<g id="stitches">\n{self.paths.svg(LAYERS)}\n</g>\n{extra}</svg>\n')
 
 
