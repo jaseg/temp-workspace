@@ -15,8 +15,10 @@
 # Nightlies have no SWIG `pcbnew` Python module, so the MCP server runs IPC-only:
 # KiCad must be running with the API enabled (kicad-mcp below starts it).
 #
-# The container serves MCP on /run/mcp/kicad.sock, one server per connection,
-# so an MCP client in another container only needs that socket.
+# The container serves MCP, one server per connection, on /run/mcp/kicad.sock
+# and, when certificates are mounted at /run/tls, over mutual TLS on TCP port
+# $MCP_TLS_PORT (for clients that can't share a Unix socket, such as a krun
+# microVM).
 FROM docker.io/library/ubuntu:26.04
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -118,5 +120,16 @@ done
 exec node /opt/kicad-mcp/dist/index.js
 EOF
 
+# MCP listeners. TLS: the server presents server.pem and only accepts a client
+# presenting exactly the certificate in client.crt.
+COPY --chmod=0755 <<'EOF' /usr/local/bin/serve
+#!/bin/sh
+if [ -r /run/tls/server.pem ] && [ -r /run/tls/client.crt ]; then
+    socat "OPENSSL-LISTEN:${MCP_TLS_PORT:-8765},reuseaddr,fork,cert=/run/tls/server.pem,cafile=/run/tls/client.crt,verify=1,openssl-min-proto-version=TLS1.3" \
+        EXEC:/usr/local/bin/kicad-mcp &
+fi
+exec socat UNIX-LISTEN:/run/mcp/kicad.sock,fork,unlink-early,mode=0600 EXEC:/usr/local/bin/kicad-mcp
+EOF
+
 ENTRYPOINT ["/usr/local/bin/entry"]
-CMD ["socat", "UNIX-LISTEN:/run/mcp/kicad.sock,fork,unlink-early,mode=0600", "EXEC:/usr/local/bin/kicad-mcp"]
+CMD ["/usr/local/bin/serve"]

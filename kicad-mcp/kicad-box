@@ -7,16 +7,24 @@
 #                          (KICAD_X11=1: via XWayland; KICAD_BOX_GTK_THEME=Adwaita:dark
 #                          or =Adwaita: force a theme)
 #   kicad-box mcp          the MCP server on stdio, for an MCP client on the host
+#   kicad-box client       how to connect an MCP client in another container
 #   kicad-box shell        a shell inside
 #   kicad-box stop | rm
 #
-# An MCP client in another container uses $SOCKDIR/kicad.sock instead (see below).
+# An MCP client in another container uses $SOCKDIR/kicad.sock, or, where a Unix
+# socket can't reach it (a krun microVM), mutual TLS on 127.0.0.1:$TLS_PORT.
 set -euo pipefail
 
 NAME=${KICAD_BOX_NAME:-kicad}
 IMAGE=${KICAD_BOX_IMAGE:-localhost/kicad-mcp}
-STATE=${KICAD_BOX_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/kicad-box/home}
+DATA=${XDG_DATA_HOME:-$HOME/.local/share}/kicad-box
+STATE=${KICAD_BOX_HOME:-$DATA/home}
 SOCKDIR=${KICAD_BOX_SOCKDIR:-$XDG_RUNTIME_DIR/kicad-mcp}
+TLS=${KICAD_BOX_TLS:-$DATA/tls}
+TLS_PORT=${KICAD_BOX_TLS_PORT:-8765}
+# The address a pasta-networked client container reaches the host's loopback
+# on, given `--network pasta:--map-host-loopback=$HOST_LO`.
+HOST_LO=169.254.1.3
 # Projects, as a host path, and where they appear inside. Make the inside path
 # the one your Claude Code container sees, so file paths mean the same thing.
 PROJECTS=${KICAD_BOX_PROJECTS:-$HOME/pcb}
@@ -56,13 +64,36 @@ gtk_theme() {
     fi
 }
 
+# One self-signed certificate for each end; each side trusts exactly the
+# other's. $TLS/server goes into the KiCad container, $TLS/client into the
+# client's.
+ensure_tls() {
+    [[ -r $TLS/server/server.pem && -r $TLS/client/client.pem ]] && return
+    command -v openssl >/dev/null || { echo "kicad-box: openssl is needed to make TLS certificates" >&2; exit 1; }
+    (
+        umask 077
+        mkdir -p "$TLS/server" "$TLS/client"
+        tmp=$(mktemp -d)
+        trap 'rm -rf "$tmp"' EXIT
+        for cn in kicad-mcp kicad-mcp-client; do
+            openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+                -days 3650 -subj "/CN=$cn" -addext "subjectAltName=DNS:$cn" \
+                -keyout "$tmp/$cn.key" -out "$tmp/$cn.crt" 2>/dev/null
+        done
+        cat "$tmp/kicad-mcp.key" "$tmp/kicad-mcp.crt" > "$TLS/server/server.pem"
+        cp "$tmp/kicad-mcp-client.crt" "$TLS/server/client.crt"
+        cat "$tmp/kicad-mcp-client.key" "$tmp/kicad-mcp-client.crt" > "$TLS/client/client.pem"
+        cp "$tmp/kicad-mcp.crt" "$TLS/client/server.crt"
+    )
+}
+
 start() {
     # Image and mounts are fixed when the container is created. If it exists
     # with other settings, or the image was rebuilt since, say so rather than
     # silently reusing the old ones.
     local image_id
     image_id=$(podman image inspect -f '{{.Id}}' "$IMAGE" | cut -c1-12)
-    local config="image=$IMAGE@$image_id projects=$PROJECTS:$PROJECTS_AT home=$STATE sockdir=$SOCKDIR"
+    local config="image=$IMAGE@$image_id projects=$PROJECTS:$PROJECTS_AT home=$STATE sockdir=$SOCKDIR tls=$TLS:$TLS_PORT"
     if podman container exists "$NAME"; then
         local had
         had=$(podman container inspect -f '{{index .Config.Labels "kicad-box.config"}}' "$NAME")
@@ -81,6 +112,7 @@ start() {
     [[ $sock == /* ]] || sock=$XDG_RUNTIME_DIR/$sock
     mkdir -p "$STATE" "$PROJECTS"
     mkdir -p -m 0700 "$SOCKDIR"
+    ensure_tls
 
     local args=(
         -d --name "$NAME" --init
@@ -91,6 +123,8 @@ start() {
         -e HOME=/home/kicad -v "$STATE:/home/kicad" # KiCad config, lib tables, caches
         -v "$PROJECTS:$PROJECTS_AT"
         -v "$SOCKDIR:/run/mcp"                      # MCP socket for other containers
+        -v "$TLS/server:/run/tls:ro"                # MCP over mutual TLS, host loopback only
+        -e "MCP_TLS_PORT=$TLS_PORT" -p "127.0.0.1:$TLS_PORT:$TLS_PORT"
         -e XDG_RUNTIME_DIR=/tmp/xdg
         -v "$sock:/run/host/wayland.sock"           # only the Wayland socket, nothing else
         -e WAYLAND_DISPLAY=/run/host/wayland.sock
@@ -133,8 +167,26 @@ gui)
     podman exec -d "${env[@]}" "$NAME" kicad "$@" >/dev/null
     ;;
 mcp) start; exec podman exec -i "$NAME" kicad-mcp ;;
+client)
+    ensure_tls
+    cat <<EOF
+For an MCP client in another rootless podman container, add to its podman run:
+
+  On the same kernel (crun), over the Unix socket:
+    --userns=keep-id -v $SOCKDIR:/run/kicad-mcp
+  and register the server inside it with:
+    claude mcp add kicad -- socat STDIO UNIX-CONNECT:/run/kicad-mcp/kicad.sock
+
+  In a microVM (--runtime krun) or otherwise, over mutual TLS:
+    --userns=keep-id --network pasta:--map-host-loopback=$HOST_LO -v $TLS/client:/run/kicad-mcp-tls:ro
+  and register the server inside it with:
+    claude mcp add kicad -- socat STDIO OPENSSL:$HOST_LO:$TLS_PORT,cert=/run/kicad-mcp-tls/client.pem,cafile=/run/kicad-mcp-tls/server.crt,commonname=kicad-mcp
+
+Both need socat in the client container (with OpenSSL support for TLS).
+EOF
+    ;;
 shell) start; exec podman exec -it "$NAME" bash ;;
 stop) podman stop -t 2 "$NAME" ;;
 rm) podman rm -f "$NAME" ;;
-*) sed -n '2,13p' "$0" >&2; exit 2 ;;
+*) awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" >&2; exit 2 ;;
 esac
