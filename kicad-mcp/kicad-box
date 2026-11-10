@@ -3,7 +3,9 @@
 # with the KiCad GUI drawn by the host's Wayland compositor.
 #
 #   kicad-box start        create/start the container (other commands do this too)
-#   kicad-box gui [args]   start KiCad (KICAD_X11=1 kicad-box gui: via XWayland)
+#   kicad-box gui [args]   start KiCad, light or dark like your desktop
+#                          (KICAD_X11=1: via XWayland; KICAD_BOX_GTK_THEME=Adwaita:dark
+#                          or =Adwaita: force a theme)
 #   kicad-box mcp          the MCP server on stdio, for an MCP client on the host
 #   kicad-box shell        a shell inside
 #   kicad-box stop | rm
@@ -19,6 +21,40 @@ SOCKDIR=${KICAD_BOX_SOCKDIR:-$XDG_RUNTIME_DIR/kicad-mcp}
 # the one your Claude Code container sees, so file paths mean the same thing.
 PROJECTS=${KICAD_BOX_PROJECTS:-$HOME/pcb}
 PROJECTS_AT=${KICAD_BOX_PROJECTS_AT:-$PROJECTS}
+
+# The GTK_THEME for KiCad that matches the host's light/dark preference, or
+# nothing if that can't be told. The container has no D-Bus, so GTK inside
+# can't ask itself. KICAD_BOX_GTK_THEME overrides this (empty: leave it to GTK).
+gtk_theme() {
+    if [[ -n ${KICAD_BOX_GTK_THEME+set} ]]; then
+        printf '%s\n' "$KICAD_BOX_GTK_THEME"
+        return
+    fi
+    # The desktop portal's color-scheme: 0 no preference, 1 dark, 2 light.
+    # Works with GNOME, KDE and others that run xdg-desktop-portal.
+    local scheme="" method
+    if command -v busctl >/dev/null; then
+        for method in ReadOne Read; do
+            scheme=$(busctl --user --timeout=2 call org.freedesktop.portal.Desktop \
+                /org/freedesktop/portal/desktop org.freedesktop.portal.Settings \
+                "$method" ss org.freedesktop.appearance color-scheme 2>/dev/null) && break
+        done
+        scheme=${scheme##* }
+    fi
+    case $scheme in
+        1) echo Adwaita:dark; return ;;
+        2) echo Adwaita; return ;;
+    esac
+    if command -v gsettings >/dev/null; then
+        case $(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null) in
+            *prefer-dark*) echo Adwaita:dark; return ;;
+            *prefer-light*) echo Adwaita; return ;;
+        esac
+        case $(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null) in
+            *[Dd]ark*) echo Adwaita:dark; return ;;
+        esac
+    fi
+}
 
 start() {
     # Image and mounts are fixed when the container is created. If it exists
@@ -73,6 +109,10 @@ start() {
              JLCPCB_APP_ID JLCPCB_API_KEY JLCPCB_API_SECRET; do
         [[ -n ${!v:-} ]] && args+=(-e "$v")
     done
+    # For a KiCad the MCP server starts. `kicad-box gui` checks again each time.
+    local theme
+    theme=$(gtk_theme)
+    [[ -n $theme ]] && args+=(-e "GTK_THEME=$theme")
     # stdout must stay clean: `kicad-box mcp` speaks MCP on it.
     podman run "${args[@]}" "$IMAGE" >/dev/null
 }
@@ -83,7 +123,13 @@ start) start ;;
 gui)
     start
     env=()
-    [[ ${KICAD_X11:-0} == 1 ]] && env=(-e GDK_BACKEND=x11)
+    [[ ${KICAD_X11:-0} == 1 ]] && env+=(-e GDK_BACKEND=x11)
+    theme=$(gtk_theme)
+    # An empty GTK_THEME counts as unset to GTK, so an empty override also
+    # clears the one the container was created with.
+    if [[ -n $theme || -n ${KICAD_BOX_GTK_THEME+set} ]]; then
+        env+=(-e "GTK_THEME=$theme")
+    fi
     podman exec -d "${env[@]}" "$NAME" kicad "$@" >/dev/null
     ;;
 mcp) start; exec podman exec -i "$NAME" kicad-mcp ;;
