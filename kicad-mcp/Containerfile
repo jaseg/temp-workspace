@@ -1,0 +1,90 @@
+# KiCad nightly + KiCAD-MCP-Server in one image.
+#
+#   podman build -t kicad-mcp .
+#   podman build -t kicad-mcp --build-arg NIGHTLY=$(date +%F) .   # pull a newer nightly
+#   podman build -t kicad-mcp --build-arg WITH_3D=1 .             # + 3D models (~3 GB)
+#
+# Nightlies come from KiCad's own PPA (ppa:kicad/kicad-dev-nightly), rebuilt daily.
+# They have no SWIG `pcbnew` Python module, so the MCP server runs IPC-only:
+# KiCad must be running with the API enabled (kicad-mcp below starts it).
+#
+# The container serves MCP on /run/mcp/kicad.sock, one server per connection,
+# so an MCP client in another container only needs that socket.
+FROM docker.io/library/ubuntu:26.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+
+RUN userdel -r ubuntu 2>/dev/null || true \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+        ca-certificates curl git procps socat \
+        python3 python3-venv nodejs npm \
+        libegl-mesa0 libgl1-mesa-dri libwayland-egl1 \
+        adwaita-icon-theme fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
+
+# MCP server, before KiCad, so a new nightly doesn't rebuild this layer.
+ARG MCP_REF=stable
+RUN git clone --depth 1 -b "$MCP_REF" https://github.com/mixelpixx/KiCAD-MCP-Server /opt/kicad-mcp \
+ && cd /opt/kicad-mcp \
+ # The server refuses to start unless `import pcbnew` works. It already runs
+ # IPC-only when pcbnew is missing and IPC is up, so drop that start-up check.
+ && grep -q "import pcbnew; print('OK')" src/server.ts \
+ && sed -i "s/import pcbnew; print('OK')/print('OK')/" src/server.ts \
+ && python3 -m venv .venv \
+ && .venv/bin/pip install --no-cache-dir -r requirements.txt \
+ && npm ci \
+ && npm prune --omit=dev \
+ && npm cache clean --force
+
+ARG NIGHTLY=unset
+ARG WITH_3D=0
+RUN echo "nightly: $NIGHTLY" \
+ && mkdir -p /etc/apt/keyrings \
+ && curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xFDA854F61C4D0D9572BB95E5245D5502FAD7A805" \
+        -o /etc/apt/keyrings/kicad-nightly.asc \
+ && printf '%s\n' \
+        'Types: deb' \
+        'URIs: https://ppa.launchpadcontent.net/kicad/kicad-dev-nightly/ubuntu' \
+        'Suites: resolute' \
+        'Components: main' \
+        'Signed-By: /etc/apt/keyrings/kicad-nightly.asc' \
+        > /etc/apt/sources.list.d/kicad-nightly.sources \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+        kicad-nightly kicad-nightly-symbols kicad-nightly-footprints \
+        $( [ "$WITH_3D" = 1 ] && echo kicad-nightly-packages3d ) \
+ && rm -rf /var/lib/apt/lists/* \
+ # Nightly installs as kicad-nightly, pcbnew-nightly, ... and /usr/share/kicad-nightly.
+ # The MCP server looks for the plain names and paths.
+ && for b in kicad pcbnew eeschema kicad-cli; do ln -sf "/usr/bin/$b-nightly" "/usr/local/bin/$b"; done \
+ && { [ -e /usr/share/kicad ] || ln -s kicad-nightly /usr/share/kicad; }
+
+# GTK wants a private, writable XDG_RUNTIME_DIR.
+COPY --chmod=0755 <<'EOF' /usr/local/bin/entry
+#!/bin/sh
+mkdir -p -m 0700 "$XDG_RUNTIME_DIR"
+exec "$@"
+EOF
+
+# The MCP server on stdio. Without SWIG pcbnew it needs KiCad's IPC socket at
+# start-up, so start KiCad if it isn't running and wait for the socket.
+COPY --chmod=0755 <<'EOF' /usr/local/bin/kicad-mcp
+#!/bin/sh
+pgrep -f /usr/lib/kicad-nightly/bin/ >/dev/null || setsid -f kicad >/dev/null 2>&1
+i=0
+until ls /tmp/kicad/*.sock >/dev/null 2>&1; do
+    i=$((i + 1))
+    if [ "$i" -gt 60 ]; then
+        echo "kicad-mcp: no KiCad API socket after 60 s." \
+             "In KiCad: Preferences > Plugins > Enable KiCad API, then restart KiCad." >&2
+        exit 1
+    fi
+    sleep 1
+done
+exec node /opt/kicad-mcp/dist/index.js
+EOF
+
+ENTRYPOINT ["/usr/local/bin/entry"]
+CMD ["socat", "UNIX-LISTEN:/run/mcp/kicad.sock,fork,unlink-early,mode=0600", "EXEC:/usr/local/bin/kicad-mcp"]

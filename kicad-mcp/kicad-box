@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# kicad-box: KiCad nightly and KiCAD-MCP-Server in one rootless podman container,
+# with the KiCad GUI drawn by the host's Wayland compositor.
+#
+#   kicad-box start        create/start the container (other commands do this too)
+#   kicad-box gui [args]   start KiCad (KICAD_X11=1 kicad-box gui: via XWayland)
+#   kicad-box mcp          the MCP server on stdio, for an MCP client on the host
+#   kicad-box shell        a shell inside
+#   kicad-box stop | rm
+#
+# An MCP client in another container uses $SOCKDIR/kicad.sock instead (see below).
+set -euo pipefail
+
+NAME=${KICAD_BOX_NAME:-kicad}
+IMAGE=${KICAD_BOX_IMAGE:-localhost/kicad-mcp}
+STATE=${KICAD_BOX_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/kicad-box/home}
+SOCKDIR=${KICAD_BOX_SOCKDIR:-$XDG_RUNTIME_DIR/kicad-mcp}
+# Projects, as a host path, and where they appear inside. Make the inside path
+# the one your Claude Code container sees, so file paths mean the same thing.
+PROJECTS=${KICAD_BOX_PROJECTS:-$HOME/pcb}
+PROJECTS_AT=${KICAD_BOX_PROJECTS_AT:-$PROJECTS}
+
+start() {
+    if podman container exists "$NAME"; then
+        podman start "$NAME" >/dev/null
+        return
+    fi
+    : "${WAYLAND_DISPLAY:?not in a Wayland session}"
+    local sock=$WAYLAND_DISPLAY
+    [[ $sock == /* ]] || sock=$XDG_RUNTIME_DIR/$sock
+    mkdir -p "$STATE" "$PROJECTS"
+    mkdir -p -m 0700 "$SOCKDIR"
+
+    local args=(
+        -d --name "$NAME" --init
+        --userns=keep-id                            # you inside == you outside
+        --security-opt label=disable
+        --device /dev/dri --group-add keep-groups   # GPU (keep-groups needs crun)
+        -e HOME=/home/kicad -v "$STATE:/home/kicad" # KiCad config, lib tables, caches
+        -v "$PROJECTS:$PROJECTS_AT"
+        -v "$SOCKDIR:/run/mcp"                      # MCP socket for other containers
+        -e XDG_RUNTIME_DIR=/tmp/xdg
+        -v "$sock:/run/host/wayland.sock"           # only the Wayland socket, nothing else
+        -e WAYLAND_DISPLAY=/run/host/wayland.sock
+        -e GDK_BACKEND=wayland
+    )
+    # XWayland as fallback (KiCad upstream still recommends X11 over Wayland).
+    if [[ -n ${DISPLAY:-} ]]; then
+        args+=(-v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY)
+        if [[ -n ${XAUTHORITY:-} && -r $XAUTHORITY ]]; then
+            args+=(-v "$XAUTHORITY:/run/host/Xauthority:ro" -e XAUTHORITY=/run/host/Xauthority)
+        fi
+    fi
+    # Display tweaks, and MCP server settings (these apply to every MCP session).
+    for v in XCURSOR_THEME XCURSOR_SIZE GDK_SCALE GDK_DPI_SCALE \
+             KICAD_MCP_TOOLBOXES KICAD_BACKEND LOG_LEVEL \
+             JLCPCB_APP_ID JLCPCB_API_KEY JLCPCB_API_SECRET; do
+        [[ -n ${!v:-} ]] && args+=(-e "$v")
+    done
+    # stdout must stay clean: `kicad-box mcp` speaks MCP on it.
+    podman run "${args[@]}" "$IMAGE" >/dev/null
+}
+
+cmd=${1:-start}; shift || true
+case $cmd in
+start) start ;;
+gui)
+    start
+    env=()
+    [[ ${KICAD_X11:-0} == 1 ]] && env=(-e GDK_BACKEND=x11)
+    podman exec -d "${env[@]}" "$NAME" kicad "$@" >/dev/null
+    ;;
+mcp) start; exec podman exec -i "$NAME" kicad-mcp ;;
+shell) start; exec podman exec -it "$NAME" bash ;;
+stop) podman stop -t 2 "$NAME" ;;
+rm) podman rm -f "$NAME" ;;
+*) sed -n '2,13p' "$0" >&2; exit 2 ;;
+esac
