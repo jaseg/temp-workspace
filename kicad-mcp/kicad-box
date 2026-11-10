@@ -21,7 +21,19 @@ PROJECTS=${KICAD_BOX_PROJECTS:-$HOME/pcb}
 PROJECTS_AT=${KICAD_BOX_PROJECTS_AT:-$PROJECTS}
 
 start() {
+    # Mounts are fixed when the container is created. If it exists with other
+    # settings, say so rather than silently reusing the old ones.
+    local config="image=$IMAGE projects=$PROJECTS:$PROJECTS_AT home=$STATE sockdir=$SOCKDIR"
     if podman container exists "$NAME"; then
+        local had
+        had=$(podman container inspect -f '{{index .Config.Labels "kicad-box.config"}}' "$NAME")
+        if [[ $had != "$config" ]]; then
+            echo "kicad-box: container '$NAME' exists with other settings:" >&2
+            echo "  has:    ${had:-unknown}" >&2
+            echo "  wanted: $config" >&2
+            echo "Save your work in KiCad, then run 'kicad-box rm' and try again." >&2
+            exit 1
+        fi
         podman start "$NAME" >/dev/null
         return
     fi
@@ -33,6 +45,7 @@ start() {
 
     local args=(
         -d --name "$NAME" --init
+        --label "kicad-box.config=$config"
         --userns=keep-id                            # you inside == you outside
         --security-opt label=disable
         --device /dev/dri --group-add keep-groups   # GPU (keep-groups needs crun)
