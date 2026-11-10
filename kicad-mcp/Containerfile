@@ -12,8 +12,11 @@
 # AppImage brings its own libraries (GTK, Wayland, Mesa, ...), symbols and
 # footprints.
 #
-# Nightlies have no SWIG `pcbnew` Python module, so the MCP server runs IPC-only:
-# KiCad must be running with the API enabled (kicad-mcp below starts it).
+# Nightlies have no SWIG `pcbnew` Python module, which the MCP server cannot
+# even start without. A stand-in module (below) lets it start; board tools then
+# work through KiCad's IPC API (KiCad running with the API enabled and the board
+# open in the PCB editor), schematic tools on the files, exports via kicad-cli.
+# Anything that needs SWIG fails with an error saying so.
 #
 # The container serves MCP, one server per connection, on /run/mcp/kicad.sock
 # and, when certificates are mounted at /run/tls, over mutual TLS on TCP port
@@ -36,15 +39,57 @@ RUN userdel -r ubuntu 2>/dev/null || true \
 ARG MCP_REF=stable
 RUN git clone --depth 1 -b "$MCP_REF" https://github.com/mixelpixx/KiCAD-MCP-Server /opt/kicad-mcp \
  && cd /opt/kicad-mcp \
- # The server refuses to start unless `import pcbnew` works. It already runs
- # IPC-only when pcbnew is missing and IPC is up, so drop that start-up check.
- && grep -q "import pcbnew; print('OK')" src/server.ts \
- && sed -i "s/import pcbnew; print('OK')/print('OK')/" src/server.ts \
  && python3 -m venv .venv \
  && .venv/bin/pip install --no-cache-dir -r requirements.txt \
  && npm ci \
  && npm prune --omit=dev \
  && npm cache clean --force
+
+# Stand-in for the SWIG pcbnew module. The server imports pcbnew in a dozen
+# modules at start-up and its Python worker exits without it, closing the MCP
+# connection right after the handshake. With this the imports succeed; any
+# actual use raises an error that the tool call reports.
+COPY <<'EOF' /opt/pcbnew-stub/pcbnew.py
+"""Stand-in for KiCad's SWIG `pcbnew` module, which KiCad nightly no longer ships.
+
+KiCAD-MCP-Server imports pcbnew throughout and its Python worker cannot start
+without it. With this module the imports succeed; anything that really calls
+into SWIG fails with an explanatory error instead. Tools that work through the
+KiCad IPC API, on schematic files or through kicad-cli are unaffected.
+"""
+
+MESSAGE = (
+    "pcbnew.{} is not available: KiCad nightly has no SWIG Python bindings. "
+    "Tools that work through the KiCad IPC API (with the board open in the PCB "
+    "editor), on schematic files or through kicad-cli still work."
+)
+
+
+class _Missing:
+    """Any pcbnew name: attribute access gives more of these, using one raises."""
+
+    def __init__(self, name):
+        self._name = name
+
+    def __getattr__(self, attr):
+        if attr.startswith("__"):
+            raise AttributeError(attr)
+        return _Missing(f"{self._name}.{attr}")
+
+    def __call__(self, *args, **kwargs):
+        raise RuntimeError(MESSAGE.format(self._name))
+
+    def __repr__(self):
+        return f"<unavailable pcbnew.{self._name}>"
+
+
+def __getattr__(name):
+    if name.startswith("__"):
+        raise AttributeError(name)
+    return _Missing(name)
+EOF
+# The server hands PYTHONPATH on to its Python worker.
+ENV PYTHONPATH=/opt/pcbnew-stub
 
 # KICAD_BUILD: "latest", or a build's name as on the downloads page, without
 # ".AppImage" and without "-lite".
@@ -93,8 +138,9 @@ mkdir -p -m 0700 "$XDG_RUNTIME_DIR"
 exec "$@"
 EOF
 
-# The MCP server on stdio. Without SWIG pcbnew it needs KiCad's IPC socket at
-# start-up, so start KiCad if it isn't running and wait for the socket.
+# The MCP server on stdio. Starts KiCad if it isn't running, without waiting
+# for it: the server answers the MCP handshake at once and connects to KiCad's
+# API whenever a tool needs it.
 COPY --chmod=0755 <<'EOF' /usr/local/bin/kicad-mcp
 #!/bin/sh
 kicad_running() {
@@ -107,16 +153,6 @@ kicad_running() {
     return 1
 }
 kicad_running || setsid -f kicad >/dev/null 2>&1
-i=0
-until ls /tmp/kicad/*.sock >/dev/null 2>&1; do
-    i=$((i + 1))
-    if [ "$i" -gt 60 ]; then
-        echo "kicad-mcp: no KiCad API socket after 60 s." \
-             "In KiCad: Preferences > Plugins > Enable KiCad API, then restart KiCad." >&2
-        exit 1
-    fi
-    sleep 1
-done
 exec node /opt/kicad-mcp/dist/index.js
 EOF
 
