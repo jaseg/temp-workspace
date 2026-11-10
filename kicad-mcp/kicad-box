@@ -21,9 +21,12 @@ PROJECTS=${KICAD_BOX_PROJECTS:-$HOME/pcb}
 PROJECTS_AT=${KICAD_BOX_PROJECTS_AT:-$PROJECTS}
 
 start() {
-    # Mounts are fixed when the container is created. If it exists with other
-    # settings, say so rather than silently reusing the old ones.
-    local config="image=$IMAGE projects=$PROJECTS:$PROJECTS_AT home=$STATE sockdir=$SOCKDIR"
+    # Image and mounts are fixed when the container is created. If it exists
+    # with other settings, or the image was rebuilt since, say so rather than
+    # silently reusing the old ones.
+    local image_id
+    image_id=$(podman image inspect -f '{{.Id}}' "$IMAGE" | cut -c1-12)
+    local config="image=$IMAGE@$image_id projects=$PROJECTS:$PROJECTS_AT home=$STATE sockdir=$SOCKDIR"
     if podman container exists "$NAME"; then
         local had
         had=$(podman container inspect -f '{{index .Config.Labels "kicad-box.config"}}' "$NAME")

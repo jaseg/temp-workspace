@@ -1,11 +1,18 @@
 # KiCad nightly + KiCAD-MCP-Server in one image.
 #
-#   podman build -t kicad-mcp .
-#   podman build -t kicad-mcp --build-arg NIGHTLY=$(date +%F) .   # pull a newer nightly
-#   podman build -t kicad-mcp --build-arg WITH_3D=1 .             # + 3D models (~3 GB)
+#   podman build -t kicad-mcp .                                   # latest nightly
+#   podman build -t kicad-mcp --build-arg NIGHTLY=$(date +%F) .   # pull a newer one
+#   podman build -t kicad-mcp --build-arg WITH_3D=1 .             # + 3D models (2.1 GB)
+#   podman build -t kicad-mcp \
+#       --build-arg KICAD_BUILD=kicad-nightly-10.99.0.6365.g0e9822b635-x86_64 .  # pin one
 #
-# Nightlies come from KiCad's own PPA (ppa:kicad/kicad-dev-nightly), rebuilt daily.
-# They have no SWIG `pcbnew` Python module, so the MCP server runs IPC-only:
+# KiCad comes from KiCad's official nightly AppImage (rebuilt daily, see
+# https://downloads.kicad.org/kicad/linux/explore/nightlies), checked against
+# its minisign signature and extracted, so no FUSE is needed at run time. The
+# AppImage brings its own libraries (GTK, Wayland, Mesa, ...), symbols and
+# footprints.
+#
+# Nightlies have no SWIG `pcbnew` Python module, so the MCP server runs IPC-only:
 # KiCad must be running with the API enabled (kicad-mcp below starts it).
 #
 # The container serves MCP on /run/mcp/kicad.sock, one server per connection,
@@ -18,9 +25,8 @@ ENV LANG=C.UTF-8
 RUN userdel -r ubuntu 2>/dev/null || true \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
-        ca-certificates curl git procps socat \
+        ca-certificates curl git procps socat minisign \
         python3 python3-venv nodejs npm \
-        libegl-mesa0 libgl1-mesa-dri libwayland-egl1 \
         adwaita-icon-theme fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 
@@ -38,28 +44,45 @@ RUN git clone --depth 1 -b "$MCP_REF" https://github.com/mixelpixx/KiCAD-MCP-Ser
  && npm prune --omit=dev \
  && npm cache clean --force
 
-ARG NIGHTLY=unset
+# KICAD_BUILD: "latest", or a build's name as on the downloads page, without
+# ".AppImage" and without "-lite".
+ARG KICAD_BUILD=latest
 ARG WITH_3D=0
-RUN echo "nightly: $NIGHTLY" \
- && mkdir -p /etc/apt/keyrings \
- && curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xFDA854F61C4D0D9572BB95E5245D5502FAD7A805" \
-        -o /etc/apt/keyrings/kicad-nightly.asc \
- && printf '%s\n' \
-        'Types: deb' \
-        'URIs: https://ppa.launchpadcontent.net/kicad/kicad-dev-nightly/ubuntu' \
-        'Suites: resolute' \
-        'Components: main' \
-        'Signed-By: /etc/apt/keyrings/kicad-nightly.asc' \
-        > /etc/apt/sources.list.d/kicad-nightly.sources \
- && apt-get update \
- && apt-get install -y --no-install-recommends \
-        kicad-nightly kicad-nightly-symbols kicad-nightly-footprints \
-        $( [ "$WITH_3D" = 1 ] && echo kicad-nightly-packages3d ) \
- && rm -rf /var/lib/apt/lists/* \
- # Nightly installs as kicad-nightly, pcbnew-nightly, ... and /usr/share/kicad-nightly.
- # The MCP server looks for the plain names and paths.
- && for b in kicad pcbnew eeschema kicad-cli; do ln -sf "/usr/bin/$b-nightly" "/usr/local/bin/$b"; done \
- && { [ -e /usr/share/kicad ] || ln -s kicad-nightly /usr/share/kicad; }
+ARG NIGHTLY=unset
+# The key KiCad signs its AppImages with, as published in
+# https://kicad-downloads.s3.cern.ch/appimage/latest.json (November 2026).
+ARG KICAD_PUBKEY=RWSyix0AVvjWQGZChX64ywBpE5XqV1Eg+ZXYHR3Y27md9EoZ0AtVr9i9
+RUN <<'EOF'
+set -eu
+echo "nightly: $NIGHTLY"
+url=https://kicad-downloads.s3.cern.ch/appimage
+name=$KICAD_BUILD
+if [ "$name" = latest ]; then
+    name=$(curl -fsSL "$url/latest.json" | python3 -c \
+        'import json, sys; print(json.load(sys.stdin)["variants"]["nightly"]["filename"])')
+    name=${name%.AppImage}
+fi
+[ "$WITH_3D" = 1 ] || name=$name-lite
+echo "KiCad: $name"
+cd /tmp
+curl -fL --no-progress-meter "$url/nightly/$name.AppImage.tar" | tar x
+curl -fsSL -o "$name.AppImage.minisig" "$url/nightly/$name.AppImage.minisig"
+minisign -V -P "$KICAD_PUBKEY" -m "$name.AppImage" -x "$name.AppImage.minisig"
+chmod +x "$name.AppImage"
+"./$name.AppImage" --appimage-extract >/dev/null
+# Newer runtimes extract to AppDir/ and leave squashfs-root as a link to it.
+mv "$(realpath squashfs-root)" /opt/kicad
+rm -f squashfs-root
+echo "$name" > /opt/kicad/BUILD
+rm -f "$name.AppImage" "$name.AppImage.minisig"
+# The MCP server runs `kicad`, `pcbnew`, `kicad-cli`, ... and reads
+# /usr/share/kicad.
+for b in kicad pcbnew eeschema kicad-cli; do
+    printf '#!/bin/sh\nexec /opt/kicad/AppRun %s "$@"\n' "$b" > "/usr/local/bin/$b"
+    chmod 0755 "/usr/local/bin/$b"
+done
+ln -s /opt/kicad/share/kicad /usr/share/kicad
+EOF
 
 # GTK wants a private, writable XDG_RUNTIME_DIR.
 COPY --chmod=0755 <<'EOF' /usr/local/bin/entry
@@ -72,7 +95,16 @@ EOF
 # start-up, so start KiCad if it isn't running and wait for the socket.
 COPY --chmod=0755 <<'EOF' /usr/local/bin/kicad-mcp
 #!/bin/sh
-pgrep -f /usr/lib/kicad-nightly/bin/ >/dev/null || setsid -f kicad >/dev/null 2>&1
+kicad_running() {
+    for exe in /proc/[0-9]*/exe; do
+        case $(readlink "$exe" 2>/dev/null) in
+            */kicad-cli) ;;
+            /opt/kicad/*) return 0 ;;
+        esac
+    done
+    return 1
+}
+kicad_running || setsid -f kicad >/dev/null 2>&1
 i=0
 until ls /tmp/kicad/*.sock >/dev/null 2>&1; do
     i=$((i + 1))
