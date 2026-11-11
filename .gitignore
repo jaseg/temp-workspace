@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.cache/
+dist/
+.pytest_cache/
+# Development textures (e.g. the game's own sprites) - never commit these.
+dev-textures/
+# KiCad backups / locks
+*.lck
+*-backups/
+fp-info-cache
+*.kicad_prl

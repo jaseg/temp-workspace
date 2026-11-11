@@ -1,0 +1,40 @@
+{
+  "$schema": "https://go.kicad.org/api/schemas/v1",
+  "identifier": "org.jaseg.factorio-poles",
+  "name": "Factorio Power Poles",
+  "description": "Power symbols that wire themselves to nearby poles on the same net, with drooping power lines.",
+  "runtime": {
+    "type": "python",
+    "min_version": "3.10"
+  },
+  "actions": [
+    {
+      "identifier": "update",
+      "name": "Update power lines",
+      "description": "Wire up every Factorio power pole in the schematic and redraw its power lines",
+      "show-button": true,
+      "scopes": ["schematic"],
+      "entrypoint": "update.py",
+      "icons-light": ["icons/pole-light-24.png", "icons/pole-light-48.png"],
+      "icons-dark": ["icons/pole-dark-24.png", "icons/pole-dark-48.png"]
+    },
+    {
+      "identifier": "live",
+      "name": "Live power lines (toggle)",
+      "description": "Keep power lines up to date while you edit; run again to stop",
+      "show-button": true,
+      "scopes": ["schematic"],
+      "entrypoint": "live.py",
+      "icons-light": ["icons/pole-light-24.png", "icons/pole-light-48.png"],
+      "icons-dark": ["icons/pole-dark-24.png", "icons/pole-dark-48.png"]
+    },
+    {
+      "identifier": "clear",
+      "name": "Remove power lines",
+      "description": "Delete all pole sprites and power lines drawn by this plugin (the poles stay)",
+      "show-button": false,
+      "scopes": ["schematic"],
+      "entrypoint": "clear.py"
+    }
+  ]
+}

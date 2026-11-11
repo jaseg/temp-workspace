@@ -1,0 +1,5 @@
+# kicad-python gains the schematic API in 0.9.0 (KiCad 11).  Until that is on PyPI, the
+# venv KiCad creates for this plugin gets 0.8.x and tools/install-dev-plugin.sh points it
+# at a kicad-python built from source instead; the plugin explains this if it is missing.
+kicad-python>=0.8.0
+Pillow>=10

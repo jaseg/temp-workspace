@@ -1,0 +1,13 @@
+[project]
+name = "kicad-factorio-poles"
+version = "0.1.0"
+description = "Factorio power poles for KiCad schematics"
+requires-python = ">=3.10"
+dependencies = ["kicad-python>=0.8.0", "Pillow>=10"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
