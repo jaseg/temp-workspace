@@ -3,8 +3,11 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+here = os.path.dirname(os.path.abspath(__file__))
+# Packaged builds bundle a kicad-python with the schematic API in vendor/ (see
+# tools/build_pcm.py); it must win over the older release KiCad installs from PyPI.
+sys.path[:0] = [p for p in (os.path.join(here, "vendor"), here) if os.path.isdir(p)]
 
-from factorio_poles.actions import main
+from factorio_poles.actions import main  # noqa: E402
 
 sys.exit(main(["live", *sys.argv[1:]]))

@@ -35,13 +35,15 @@ the way they do in the game.
 * **Drooping power lines.** Each wire is a real catenary between the two poles' copper
   connection points. It is 1.5 % longer than the straight line, so long big-pole spans
   sag much more than short small-pole hops.
-* **Shadows.** Poles and wires cast light shadows (opacity 0.2) diagonally down-right at
-  45°. The sprite sheets have the game's shadows baked in, falling almost straight to the
+* **Shadows.** Poles and wires cast light shadows (opacity 0.2) backwards, away from the
+  viewer: diagonally up-right at 45° on the sheet. The sprite sheets have the game's shadows baked in, falling almost straight to the
   right, so the plugin re-casts them for the new sun direction. Shadow length scales with
   height and the pole's foot stays put, and the wire shadows go through the same
   transform, so they start exactly where the pole shadows end. A sagging wire's shadow
-  bends back towards the poles. Set `shadow_angle` to `null` to keep the game's
-  direction.
+  bends back towards the poles. `shadow_angle` is in degrees clockwise from "to the
+  right": `-45` (default) falls backwards, `45` towards the viewer, and `null` keeps the
+  game's direction. eeschema always draws lines above images, so where a wire's shadow
+  crosses another pole it passes over that pole's sprite.
 * **Stranded poles.** If a net's poles fall apart into several separate networks, the
   plugin draws the reach of each pole cut off from the main network as a dashed red
   circle, and prints a warning.
@@ -77,7 +79,7 @@ Put a `factorio-poles.json` next to the `.kicad_pro` to override the defaults:
   "wire_width_mm": 0.2,
   "wire_color": [0.80, 0.42, 0.18, 1.0],
   "shadows": true,
-  "shadow_angle": 45,
+  "shadow_angle": -45,
   "shadow_opacity": 0.2,
   "mark_islands": true,
   "textures": ["../art/poles"],
@@ -123,28 +125,54 @@ release art, keeping file names and sizes, and build the package.
 ## Installing (KiCad nightly)
 
 The plugin uses KiCad's IPC API. The schematic half of that API exists only in KiCad
-nightly (10.99, the future 11) and in kicad-python 0.9, which is not on PyPI yet. Until
-it is, a development install looks like this (Linux, x86-64):
+nightly (10.99, the future 11).
+
+1. Get the package: `dist/factorio-poles-<version>.zip` from `tools/build_pcm.py`
+   (see below).
+2. In KiCad's project window: *Plugin and Content Manager → Install from File…* → pick
+   the zip.
+3. Enable *Preferences → Plugins → Enable KiCad API*, if it isn't on already.
+4. **Restart KiCad.** The nightly loads newly installed schematic plugins and PCM
+   libraries only at startup. Afterwards the library shows up as `PCM_factorio_poles`,
+   and the schematic editor's top toolbar has two pole buttons, Update and Live. On
+   narrow windows they may be in the toolbar's overflow menu (▾).
+
+On first start KiCad creates the plugin's Python environment
+(`~/.cache/kicad/10.99/python-environments/org.jaseg.factorio-poles` on Linux) and pip
+installs its dependencies from PyPI. This needs network access and takes a moment.
+
+kicad-python with the schematic API (0.9) is not on PyPI yet, so the package bundles a
+build of it, made against the nightly's API, in `plugins/vendor/kipy` (MIT, license
+included). The entry scripts put it ahead of any kicad-python installed in the
+environment. Rebuild the package when you move to a newer nightly, so the bundled
+bindings match its API.
+
+### Building the package
 
 ```bash
 tools/kicad-nightly.sh fetch          # newest official nightly AppImage -> .cache/kicad-nightly
 tools/dev-setup.sh                    # .venv + kicad-python built against that nightly's API
+.venv/bin/python tools/build_pcm.py   # -> dist/factorio-poles-<version>.zip
+```
+
+`--no-vendor` leaves kicad-python out and lists it in `requirements.txt` instead, for
+when kicad-python 0.9 is on PyPI.
+
+### Working on the plugin
+
+Instead of reinstalling the package after every change, link the checkout into KiCad:
+
+```bash
 tools/install-dev-plugin.sh           # link plugin/ into KiCad's plugin directory
-tools/kicad-nightly.sh kicad          # start KiCad; enable Preferences → Plugins → API server
+tools/kicad-nightly.sh kicad          # start KiCad once (API server enabled)
 tools/install-dev-plugin.sh           # again: point the plugin's Python env at our kicad-python
 ```
 
-The second `install-dev-plugin.sh` run is needed because KiCad creates the plugin's
-Python environment (`~/.cache/kicad/10.99/python-environments/org.jaseg.factorio-poles`)
-from `requirements.txt` the first time it loads the plugin. That environment gets
-kicad-python 0.8 from PyPI, which has no schematic API. The script puts the source build
-in front of it. Then add `symbols/factorio_poles.kicad_sym` to your symbol library table,
-or open `demo/demo.kicad_pro`, which already has it.
-
-`tools/build_pcm.py` builds a Plugin and Content Manager package
-(`dist/factorio-poles-<version>.zip`, *Install from File…*) with the plugin, the symbol
-library and an icon. Once kicad-python 0.9 is released, that package is all an end
-user needs.
+The second run is needed because KiCad creates the plugin's Python environment from
+`plugin/requirements.txt` the first time it loads the plugin. That environment gets
+kicad-python 0.8 from PyPI, which has no schematic API; the script puts the source build
+in front of it. For a linked checkout, add `symbols/factorio_poles.kicad_sym` to your
+symbol library table, or open `demo/demo.kicad_pro`, which already has it.
 
 ## Development
 

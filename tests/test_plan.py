@@ -90,6 +90,8 @@ def test_wire_shadow_starts_where_the_pole_shadow_ends():
     plan = make_plan(poles()[:2], s, None)
     shadow = next(i for i in plan.items if i.key == "wire-shadow:a:b")
     cp = SMALL.connection_points[plan.frames["a"]]
-    end = geometry.apply(geometry.shadow_matrix(cp.wire.copper, cp.shadow.copper, 45), cp.shadow.copper)
+    end = geometry.apply(geometry.shadow_matrix(cp.wire.copper, cp.shadow.copper, s.shadow_angle), cp.shadow.copper)
     assert shadow.points[0] == pytest.approx(((10 + end[0]) * s.tile_nm, (10 + end[1]) * s.tile_nm), abs=IU_NM)
     assert shadow.color[3] == s.shadow_opacity
+    # By default shadows fall away from the viewer: up and to the right on the sheet.
+    assert end[0] > 0 and end[1] < 0 and end[0] == pytest.approx(-end[1], rel=1e-6)

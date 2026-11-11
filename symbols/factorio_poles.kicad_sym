@@ -19,7 +19,7 @@
 		(property "Reference" "#PWR"
 			(at 0 -4.826 0)
 			(show_name no)
-			(do_not_autoplace no)
+			(do_not_autoplace yes)
 			(hide yes)
 			(effects
 				(font
@@ -30,7 +30,7 @@
 		(property "Value" "VCC"
 			(at 0 -2.54 0)
 			(show_name no)
-			(do_not_autoplace no)
+			(do_not_autoplace yes)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -181,7 +181,7 @@
 		(property "Reference" "#PWR"
 			(at 0 -5.08 0)
 			(show_name no)
-			(do_not_autoplace no)
+			(do_not_autoplace yes)
 			(hide yes)
 			(effects
 				(font
@@ -192,7 +192,7 @@
 		(property "Value" "VCC"
 			(at 0 -2.794 0)
 			(show_name no)
-			(do_not_autoplace no)
+			(do_not_autoplace yes)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -343,7 +343,7 @@
 		(property "Reference" "#PWR"
 			(at 0 -6.35 0)
 			(show_name no)
-			(do_not_autoplace no)
+			(do_not_autoplace yes)
 			(hide yes)
 			(effects
 				(font
@@ -354,7 +354,7 @@
 		(property "Value" "VCC"
 			(at 0 -4.064 0)
 			(show_name no)
-			(do_not_autoplace no)
+			(do_not_autoplace yes)
 			(effects
 				(font
 					(size 1.27 1.27)

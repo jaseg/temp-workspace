@@ -31,9 +31,10 @@ class Settings:
     use_factorio_install: bool = True
     #: Draw the pole shadows and wire shadows.
     shadows: bool = True
-    #: Direction shadows fall in, degrees clockwise from "to the right" (45 = down-right).
+    #: Direction shadows fall in, degrees clockwise from "to the right" on the sheet:
+    #: -45 = up-right, i.e. away from the viewer; 45 = down-right, towards the viewer.
     #: null keeps the game's direction (almost straight to the right).
-    shadow_angle: float | None = 45.0
+    shadow_angle: float | None = -45.0
     #: Opacity of pole and wire shadows (Factorio itself uses about 0.5).
     shadow_opacity: float = 0.2
     #: "tree" (fewest wires) or "mesh" (every pole in reach, up to max_connections).

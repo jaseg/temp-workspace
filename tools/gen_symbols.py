@@ -33,7 +33,9 @@ def fmt(v: float) -> str:
     return "0" if s in ("-0", "") else s
 
 
-def field(name: str, value: str, at: tuple[float, float], hide: bool, justify: str | None = None) -> str:
+def field(
+    name: str, value: str, at: tuple[float, float], hide: bool, justify: str | None = None, autoplace: bool = True
+) -> str:
     eff = "\t\t\t(effects\n\t\t\t\t(font\n\t\t\t\t\t(size 1.27 1.27)\n\t\t\t\t)\n"
     if justify:
         eff += f"\t\t\t\t(justify {justify})\n"
@@ -42,7 +44,10 @@ def field(name: str, value: str, at: tuple[float, float], hide: bool, justify: s
         f"\t\t(property {q(name)} {q(value)}\n"
         f"\t\t\t(at {fmt(at[0])} {fmt(at[1])} 0)\n"
         "\t\t\t(show_name no)\n"
-        "\t\t\t(do_not_autoplace no)\n" + ("\t\t\t(hide yes)\n" if hide else "") + eff + "\t\t)\n"
+        f"\t\t\t(do_not_autoplace {'no' if autoplace else 'yes'})\n"
+        + ("\t\t\t(hide yes)\n" if hide else "")
+        + eff
+        + "\t\t)\n"
     )
 
 
@@ -85,8 +90,10 @@ def symbol(pole: PoleType) -> str:
     s += "\t\t(pin_names\n\t\t\t(offset 0)\n\t\t\t(hide yes)\n\t\t)\n"
     s += "\t\t(exclude_from_sim no)\n\t\t(in_bom yes)\n\t\t(on_board yes)\n\t\t(in_pos_files yes)\n"
     s += "\t\t(duplicate_pin_numbers_are_jumpers no)\n"
-    s += field("Reference", "#PWR", (0, -half - 3.81), hide=True)
-    s += field("Value", DEFAULT_NET, (0, -half - 1.524), hide=False)
+    # Keep the net name below the pole: eeschema's field autoplacement would move it above
+    # the base, like VCC's, right into the pole sprite.
+    s += field("Reference", "#PWR", (0, -half - 3.81), hide=True, autoplace=False)
+    s += field("Value", DEFAULT_NET, (0, -half - 1.524), hide=False, autoplace=False)
     s += field("Footprint", "", (0, 0), hide=True)
     s += field("Datasheet", "", (0, 0), hide=True)
     s += field("Description", desc, (0, 0), hide=True)
