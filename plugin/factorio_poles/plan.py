@@ -104,7 +104,9 @@ def make_plan(poles: Sequence[Pole], settings: Settings, pack: TexturePack | Non
     if pack is not None:
         for p in sorted(poles, key=lambda p: p.id):
             try:
-                sprite = pack.sprite(p.type, frames[p.id], settings.shadows)
+                sprite = pack.sprite(
+                    p.type, frames[p.id], settings.shadows, settings.shadow_angle, settings.shadow_opacity
+                )
             except Exception as e:  # noqa: BLE001 - one bad texture must not stop the rest
                 warnings.append(f"{p.type.name}: {e}")
                 continue
@@ -129,9 +131,16 @@ def make_plan(poles: Sequence[Pole], settings: Settings, pack: TexturePack | Non
             w.a.position, cp_a.wire.copper, w.b.position, cp_b.wire.copper, settings.wire_slack, n
         )
         if settings.shadows:
+            # Cast the wire's shadow the same way as the poles' (see geometry.shadow_matrix).
+            sh_a = geometry.apply(
+                geometry.shadow_matrix(cp_a.wire.copper, cp_a.shadow.copper, settings.shadow_angle), cp_a.shadow.copper
+            )
+            sh_b = geometry.apply(
+                geometry.shadow_matrix(cp_b.wire.copper, cp_b.shadow.copper, settings.shadow_angle), cp_b.shadow.copper
+            )
             spts = geometry.shadow_polyline(
-                w.a.position, cp_a.wire.copper, cp_a.shadow.copper,
-                w.b.position, cp_b.wire.copper, cp_b.shadow.copper,
+                w.a.position, cp_a.wire.copper, sh_a,
+                w.b.position, cp_b.wire.copper, sh_b,
                 settings.wire_slack, n,
             )  # fmt: skip
             items.append(
@@ -139,7 +148,7 @@ def make_plan(poles: Sequence[Pole], settings: Settings, pack: TexturePack | Non
                     key=f"wire-shadow:{w.a.id}:{w.b.id}",
                     points=tuple(_nm(settings, q) for q in spts),
                     width=width,
-                    color=settings.wire_shadow_color,
+                    color=(0.0, 0.0, 0.0, settings.shadow_opacity),
                 )
             )
         items.append(

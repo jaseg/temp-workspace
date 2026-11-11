@@ -6,19 +6,19 @@ A texture pack is any directory laid out like Factorio's ``base/graphics/entity`
     <root>/small-electric-pole/small-electric-pole-shadow.png  1024 x 52 (4 frames of 256 x 52)
     <root>/medium-electric-pole/...
     <root>/big-electric-pole/...
-    <root>/substation/...
 
 Sheet sizes, frame layout, sprite shifts and wire connection points all follow the game
 (see :mod:`prototypes`), so the pack can be swapped for any other with the same layout:
-the release art, a Factorio installation for development, or the placeholder art that
-ships with the plugin.  Missing or wrongly sized sheets fall back to the next pack on
-the search path, one sheet at a time.
+the art that ships with the plugin, a Factorio installation, or the release art.
+Missing or wrongly sized sheets fall back to the next pack on the search path, one
+sheet at a time.
 """
 
 from __future__ import annotations
 
 import hashlib
 import io
+import math
 import os
 import sys
 from collections.abc import Iterable, Sequence
@@ -28,16 +28,17 @@ from pathlib import Path
 
 from PIL import Image
 
+from . import geometry
 from .prototypes import POLE_TYPES, PoleType, SpriteSheet
 
-#: The placeholder art bundled with the plugin; always last on the search path.
+#: The art bundled with the plugin; always last on the search path.
 BUNDLED = Path(__file__).resolve().parent / "textures"
 
 #: Resolution written into generated PNGs.  KiCad sizes images by their pHYs chunk.
 PNG_PPI = 300
 
-#: Factorio draws ``draw_as_shadow`` layers as a translucent black.
-SHADOW_OPACITY = 0.5
+#: Factorio draws ``draw_as_shadow`` layers as about 50 % black.
+DEFAULT_SHADOW_OPACITY = 0.5
 
 
 def factorio_install_candidates() -> list[Path]:
@@ -65,7 +66,7 @@ def factorio_install_candidates() -> list[Path]:
 
 def search_path(configured: Iterable[str | os.PathLike] = (), use_factorio: bool = True) -> list[Path]:
     """Texture roots in priority order: configured, ``$FACTORIO_POLES_TEXTURES``,
-    a local Factorio installation, then the bundled placeholders."""
+    a local Factorio installation, then the bundled art."""
     roots: list[Path] = [Path(p).expanduser() for p in configured if p]
     env = os.environ.get("FACTORIO_POLES_TEXTURES")
     if env:
@@ -125,7 +126,7 @@ class TexturePack:
         self.roots = list(roots)
         self.warnings: list[str] = []
         self._resolved: dict[str, Path] = {}
-        self._sprites: dict[tuple[str, int, bool], Sprite] = {}
+        self._sprites: dict[tuple, Sprite] = {}
 
     def resolve(self, sheet: SpriteSheet) -> Path:
         if sheet.filename in self._resolved:
@@ -156,36 +157,47 @@ class TexturePack:
         path = self.resolve(sheet)
         return _load_rgba(str(path), path.stat().st_mtime).crop(sheet.frame_box(frame))
 
-    def sprite(self, pole: PoleType, frame: int, shadow: bool = True) -> Sprite:
-        key = (pole.name, frame, shadow)
+    def sprite(
+        self,
+        pole: PoleType,
+        frame: int,
+        shadow: bool = True,
+        shadow_angle: float | None = None,
+        shadow_opacity: float = DEFAULT_SHADOW_OPACITY,
+    ) -> Sprite:
+        """One frame of ``pole`` with its shadow underneath, cast towards ``shadow_angle``
+        (see :func:`geometry.shadow_matrix`; None keeps the art's own direction)."""
+        key = (pole.name, frame, shadow, shadow_angle, shadow_opacity)
         if key not in self._sprites:
-            self._sprites[key] = _compose(self, pole, frame, shadow)
+            self._sprites[key] = _compose(self, pole, frame, shadow, shadow_angle, shadow_opacity)
         return self._sprites[key]
 
 
-def _compose(pack: TexturePack, pole: PoleType, frame: int, shadow: bool) -> Sprite:
-    layers: list[tuple[SpriteSheet, Image.Image]] = []
+def _compose(
+    pack: TexturePack, pole: PoleType, frame: int, shadow: bool, angle: float | None, opacity: float
+) -> Sprite:
+    tpp = pole.picture.tiles_per_pixel
+    # (image, (left, top, right, bottom) in tiles relative to the pole position)
+    layers: list[tuple[Image.Image, tuple[float, float, float, float]]] = []
     if shadow:
+        if abs(pole.shadow.tiles_per_pixel - tpp) > 1e-12:
+            raise TextureError("layers with different scales are not supported")
         img = pack._frame(pole.shadow, frame)
-        alpha = img.getchannel("A").point(lambda v: round(v * SHADOW_OPACITY))
+        alpha = img.getchannel("A").point(lambda v: round(v * opacity))
         black = Image.new("RGBA", img.size, (0, 0, 0, 0))
         black.putalpha(alpha)
-        layers.append((pole.shadow, black))
-    layers.append((pole.picture, pack._frame(pole.picture, frame)))
+        cp = pole.connection_points[frame]
+        m = geometry.shadow_matrix(cp.wire.copper, cp.shadow.copper, angle)
+        layers.append(_transform(black, pole.shadow.frame_rect_tiles(), m, tpp))
+    layers.append((pack._frame(pole.picture, frame), pole.picture.frame_rect_tiles()))
 
     # All layers share one pixel density; lay them out on a common canvas.
-    tpp = pole.picture.tiles_per_pixel
-    rects = [s.frame_rect_tiles() for s, _ in layers]
-    left = min(r[0] for r in rects)
-    top = min(r[1] for r in rects)
-    right = max(r[2] for r in rects)
-    bottom = max(r[3] for r in rects)
-    w = round((right - left) / tpp)
-    h = round((bottom - top) / tpp)
-    canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    for (sheet, img), r in zip(layers, rects):
-        if abs(sheet.tiles_per_pixel - tpp) > 1e-12:
-            raise TextureError("layers with different scales are not supported")
+    left = min(r[0] for _, r in layers)
+    top = min(r[1] for _, r in layers)
+    right = max(r[2] for _, r in layers)
+    bottom = max(r[3] for _, r in layers)
+    canvas = Image.new("RGBA", (round((right - left) / tpp), round((bottom - top) / tpp)), (0, 0, 0, 0))
+    for img, r in layers:
         canvas.alpha_composite(img, (round((r[0] - left) / tpp), round((r[1] - top) / tpp)))
 
     # Trim fully transparent margins to keep the schematic file small.
@@ -207,6 +219,29 @@ def _compose(pack: TexturePack, pole: PoleType, frame: int, shadow: bool) -> Spr
         tiles_per_pixel=tpp,
         digest=hashlib.sha1(png).hexdigest()[:12],
     )
+
+
+def _transform(
+    img: Image.Image, rect: tuple[float, float, float, float], m: geometry.Matrix, tpp: float
+) -> tuple[Image.Image, tuple[float, float, float, float]]:
+    """Apply the linear map ``m`` (tiles, about the pole position) to a layer."""
+    if m == geometry.IDENTITY:
+        return img, rect
+    corners = [geometry.apply(m, (x, y)) for x in (rect[0], rect[2]) for y in (rect[1], rect[3])]
+    left = min(c[0] for c in corners)
+    top = min(c[1] for c in corners)
+    w = max(1, math.ceil((max(c[0] for c in corners) - left) / tpp))
+    h = max(1, math.ceil((max(c[1] for c in corners) - top) / tpp))
+    # PIL wants the inverse: output pixel -> input pixel.
+    (a, b), (c, d) = m
+    det = a * d - b * c
+    ia, ib, ic, id_ = d / det, -b / det, -c / det, a / det
+    coeffs = (
+        ia, ib, (ia * left + ib * top - rect[0]) / tpp,
+        ic, id_, (ic * left + id_ * top - rect[1]) / tpp,
+    )  # fmt: skip
+    out = img.transform((w, h), Image.Transform.AFFINE, coeffs, resample=Image.Resampling.BICUBIC)
+    return out, (left, top, left + w * tpp, top + h * tpp)
 
 
 def kicad_image_scale(tiles_per_pixel: float, tile_mm: float) -> float:

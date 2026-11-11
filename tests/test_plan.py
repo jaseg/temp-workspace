@@ -81,3 +81,15 @@ def test_settings_file_rejects_typos(tmp_path):
     (tmp_path / config.SETTINGS_FILE).write_text(json.dumps({"tile_size": 1}))
     with pytest.raises(ValueError, match="unknown setting"):
         config.load(tmp_path)
+
+
+def test_wire_shadow_starts_where_the_pole_shadow_ends():
+    from factorio_poles import geometry
+
+    s = Settings()
+    plan = make_plan(poles()[:2], s, None)
+    shadow = next(i for i in plan.items if i.key == "wire-shadow:a:b")
+    cp = SMALL.connection_points[plan.frames["a"]]
+    end = geometry.apply(geometry.shadow_matrix(cp.wire.copper, cp.shadow.copper, 45), cp.shadow.copper)
+    assert shadow.points[0] == pytest.approx(((10 + end[0]) * s.tile_nm, (10 + end[1]) * s.tile_nm), abs=IU_NM)
+    assert shadow.color[3] == s.shadow_opacity

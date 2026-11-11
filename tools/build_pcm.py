@@ -36,7 +36,7 @@ def metadata(version: str) -> dict:
         "description_full": (
             "Adds Factorio-style electric poles to the schematic editor.  Each pole is a power "
             "symbol: its Value names the net, like VCC or GND.  Poles on the same net that are "
-            "within reach of each other (small 7.5, medium 9, big 32 tiles, substation 18) are "
+            "within reach of each other (small 7.5, medium 9, big 32 tiles) are "
             "joined by drooping power lines, drawn as a real catenary with shadows.  Run "
             "'Update power lines' after editing, or toggle 'Live power lines' to keep them "
             "up to date while you work.  Requires KiCad 11 (nightly) with the IPC API enabled."

@@ -3,7 +3,7 @@ import random
 
 import pytest
 from factorio_poles.network import Pole, connect, islands, orientations
-from factorio_poles.prototypes import BIG, MEDIUM, SMALL, SUBSTATION, wire_reach
+from factorio_poles.prototypes import BIG, MEDIUM, SMALL, wire_reach
 
 
 def pole(i, t, x, y, net="VCC"):
@@ -17,7 +17,7 @@ def keys(wires):
 def test_reach_is_the_shorter_of_the_two():
     assert wire_reach(SMALL, BIG) == 7.5
     assert wire_reach(BIG, BIG) == 32
-    assert wire_reach(MEDIUM, SUBSTATION) == 9
+    assert wire_reach(MEDIUM, BIG) == 9
     assert keys(connect([pole(1, SMALL, 0, 0), pole(2, BIG, 7.5, 0)])) == [("p01", "p02")]
     assert connect([pole(1, SMALL, 0, 0), pole(2, BIG, 7.6, 0)]) == []
     assert len(connect([pole(1, BIG, 0, 0), pole(2, BIG, 32, 0)])) == 1

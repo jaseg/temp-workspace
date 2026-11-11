@@ -145,6 +145,39 @@ def shadow_polyline(
     return pts
 
 
+Matrix = tuple[tuple[float, float], tuple[float, float]]
+IDENTITY: Matrix = ((1.0, 0.0), (0.0, 1.0))
+
+
+def shadow_matrix(copper: Vec, shadow_copper: Vec, angle_deg: float | None) -> Matrix:
+    """Linear map that re-casts the game's shadows in another sun direction.
+
+    A point at ground offset ``g`` and height ``z`` casts its shadow at ``g + z*v``, and
+    the game's shadows all fall nearly horizontally to the right.  Writing shadow offsets
+    in the basis (``v``, ground y) and swapping ``v`` for a vector of the same length at
+    ``angle_deg`` (screen angle, clockwise from +x since y points down; 45 = down-right)
+    moves every shadow, sprite or wire, as if the sun had moved, with the pole's foot
+    staying where it is.  ``None`` keeps the game's direction.
+    """
+    if angle_deg is None:
+        return IDENTITY
+    h = -copper[1]
+    if h <= 0:
+        return IDENTITY
+    vx, vy = shadow_copper[0] / h, shadow_copper[1] / h
+    if abs(vx) < 1e-9:
+        return IDENTITY
+    length = math.hypot(vx, vy)
+    a = math.radians(angle_deg)
+    wx, wy = length * math.cos(a), length * math.sin(a)
+    # M = [w e_y] @ inv([v e_y]),  inv([[vx, 0], [vy, 1]]) = [[1/vx, 0], [-vy/vx, 1]]
+    return ((wx / vx, 0.0), (wy / vx - vy / vx, 1.0))
+
+
+def apply(m: Matrix, p: Vec) -> Vec:
+    return (m[0][0] * p[0] + m[0][1] * p[1], m[1][0] * p[0] + m[1][1] * p[1])
+
+
 def samples_for_span(span_tiles: float) -> int:
     """Enough polyline points for the curve to look smooth at any zoom we care about."""
     return max(8, min(64, math.ceil(span_tiles * 2) + 1))

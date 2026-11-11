@@ -3,7 +3,15 @@ import math
 
 import pytest
 from factorio_poles import geometry
-from factorio_poles.geometry import catenary_constant, orientation_frame, sag_profile, shadow_polyline, wire_polyline
+from factorio_poles.geometry import (
+    apply,
+    catenary_constant,
+    orientation_frame,
+    sag_profile,
+    shadow_matrix,
+    shadow_polyline,
+    wire_polyline,
+)
 
 
 def arc_length(span, h1, h2, sag):
@@ -92,3 +100,22 @@ def test_orientation_frame(neighbours, frame):
 def test_samples_for_span_bounds():
     assert geometry.samples_for_span(0.5) == 8
     assert geometry.samples_for_span(100) == 64
+
+
+@pytest.mark.parametrize("angle", [0, 45, 90, 30])
+def test_shadow_matrix_turns_the_sun(angle):
+    copper, shadow = (0.0, -2.5), (3.0, 0.1)
+    m = shadow_matrix(copper, shadow, angle)
+    v = (shadow[0] / 2.5, shadow[1] / 2.5)
+    w = apply(m, v)
+    assert math.hypot(*w) == pytest.approx(math.hypot(*v))
+    assert math.degrees(math.atan2(w[1], w[0])) == pytest.approx(angle)
+    # The pole's foot (ground offsets across the shadow) does not move.
+    assert apply(m, (0.0, 0.3)) == pytest.approx((0.0, 0.3))
+    # The shadow of the copper point lands at the same distance in the new direction.
+    s = apply(m, shadow)
+    assert math.hypot(*s) == pytest.approx(math.hypot(*shadow))
+
+
+def test_shadow_matrix_none_keeps_game_direction():
+    assert shadow_matrix((0, -2.5), (3, 0.1), None) == geometry.IDENTITY

@@ -153,23 +153,7 @@ BIG = PoleType(
     ),
 )
 
-SUBSTATION = PoleType(
-    "substation",
-    "Substation",
-    "Substation",
-    maximum_wire_distance=18.0,
-    supply_area_distance=9.0,
-    selection_box=((-1.0, -1.0), (1.0, 1.0)),
-    **_sheets("substation", (138, 270, px(0, 1 - 32)), (370, 104, px(62, 42 - 32))),
-    connection_points=(
-        _cp((px(0, -86), px(22, -81), px(-21, -82)), (px(136, 8), px(151, 9), px(124, 8))),
-        _cp((px(0, -85), px(15, -70), px(-15, -92)), (px(133, 9), px(144, 21), px(110, -3))),
-        _cp((px(0, -85), px(0, -66), px(0, -97)), (px(133, 9), px(127, 26), px(127, -8))),
-        _cp((px(0, -86), px(-15, -71), px(15, -92)), (px(133, 9), px(111, 20), px(144, -3))),
-    ),
-)
-
-POLE_TYPES: tuple[PoleType, ...] = (SMALL, MEDIUM, BIG, SUBSTATION)
+POLE_TYPES: tuple[PoleType, ...] = (SMALL, MEDIUM, BIG)
 BY_NAME: dict[str, PoleType] = {p.name: p for p in POLE_TYPES}
 BY_SYMBOL: dict[str, PoleType] = {p.symbol_name: p for p in POLE_TYPES}
 

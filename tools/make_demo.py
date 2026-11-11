@@ -35,12 +35,12 @@ POLES = [
     ("Small_Electric_Pole", "+5V", 23, 24),
     # ... and one pole that is out of reach of the rest (gets its reach drawn).
     ("Small_Electric_Pole", "+5V", 50, 22),
-    # VBUS: big poles spanning the sheet, ending in a substation.
+    # VBUS: big poles spanning the sheet.
     ("Big_Electric_Pole", "VBUS", 12, 40),
     ("Big_Electric_Pole", "VBUS", 42, 36),
     ("Big_Electric_Pole", "VBUS", 72, 42),
     ("Big_Electric_Pole", "VBUS", 100, 36),
-    ("Substation", "VBUS", 100, 52),
+    ("Big_Electric_Pole", "VBUS", 100, 60),
     # GND: medium poles with a small pole at the end.
     ("Medium_Electric_Pole", "GND", 14, 66),
     ("Medium_Electric_Pole", "GND", 22, 66),
@@ -57,7 +57,7 @@ def main() -> int:
     ap.add_argument("--schematic", default=str(ROOT / "demo" / "demo.kicad_sch"))
     args = ap.parse_args()
 
-    kicad = KiCad(socket_path=args.socket)
+    kicad = KiCad(socket_path=args.socket, timeout_ms=60000)
     try:
         kicad.open_document(str(Path(args.schematic).resolve()), DocumentType.DOCTYPE_SCHEMATIC)
     except Exception as e:  # noqa: BLE001 - already open

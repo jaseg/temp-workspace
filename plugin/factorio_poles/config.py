@@ -31,6 +31,11 @@ class Settings:
     use_factorio_install: bool = True
     #: Draw the pole shadows and wire shadows.
     shadows: bool = True
+    #: Direction shadows fall in, degrees clockwise from "to the right" (45 = down-right).
+    #: null keeps the game's direction (almost straight to the right).
+    shadow_angle: float | None = 45.0
+    #: Opacity of pole and wire shadows (Factorio itself uses about 0.5).
+    shadow_opacity: float = 0.2
     #: "tree" (fewest wires) or "mesh" (every pole in reach, up to max_connections).
     connection_mode: str = "tree"
     #: Copper wire connections per pole (Factorio: 5).
@@ -39,7 +44,6 @@ class Settings:
     wire_slack: float = 0.015
     wire_width_mm: float = 0.2
     wire_color: tuple[float, float, float, float] = (0.80, 0.42, 0.18, 1.0)
-    wire_shadow_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.35)
     #: Draw each stranded pole's wire reach when a net falls apart into several islands.
     mark_islands: bool = True
     island_color: tuple[float, float, float, float] = (0.85, 0.15, 0.10, 1.0)
@@ -61,6 +65,8 @@ class Settings:
             raise ValueError('connection_mode must be "tree" or "mesh"')
         if self.max_connections < 1:
             raise ValueError("max_connections must be at least 1")
+        if not 0 <= self.shadow_opacity <= 1:
+            raise ValueError("shadow_opacity must be between 0 and 1")
         if not 0 <= self.wire_slack <= 0.5:
             raise ValueError("wire_slack must be between 0 and 0.5")
         return self

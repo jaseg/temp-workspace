@@ -62,7 +62,14 @@ def sch(project, tmp_path_factory):
             if proc.poll() is not None:
                 pytest.fail(f"api-server exited: {proc.stdout.read().decode(errors='replace')}")
             time.sleep(0.1)
-        kicad = KiCad(socket_path=f"ipc://{sock}")
+        # A fresh config directory makes the server's first requests slow; wait until it answers.
+        kicad = KiCad(socket_path=f"ipc://{sock}", timeout_ms=60000)
+        for _ in range(30):
+            try:
+                kicad.ping()
+                break
+            except Exception:  # noqa: BLE001
+                time.sleep(1)
         kicad.open_document(str(project / "demo.kicad_sch"), DocumentType.DOCTYPE_SCHEMATIC)
         yield kicad.get_schematic()
     finally:
@@ -85,12 +92,7 @@ def test_reads_all_demo_poles(sch):
     poles = kicad_io.read_poles(sch, SETTINGS)
     assert len(poles) == 18
     assert {p.net for p in poles} == {"+5V", "VBUS", "GND"}
-    assert {p.type.name for p in poles} == {
-        "small-electric-pole",
-        "medium-electric-pole",
-        "big-electric-pole",
-        "substation",
-    }
+    assert {p.type.name for p in poles} == {"small-electric-pole", "medium-electric-pole", "big-electric-pole"}
 
 
 def test_clear_then_update_then_idempotent(sch):
