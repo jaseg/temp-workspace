@@ -607,3 +607,195 @@ def test_spacing_measurement_dense_outline_few_turns():
     tracemalloc.stop()
     assert best == pytest.approx(19.662, abs=1e-3)
     assert peak < 400e6 and elapsed < 10 # about 0.1 GB and 0.5 s
+
+
+# ---- Dense and smooth outlines ----
+
+def _smooth_blob(d, n, seed, order=5, amp=0.15, decimals=None):
+    """ Star-shaped smooth blob with n vertices (low order Fourier radius); with decimals, the coordinates are rounded
+    like those of an SVG or DXF import """
+    import random
+    rng = random.Random(seed)
+    coef = [(rng.uniform(-amp, amp) / k, rng.uniform(0, 2*math.pi)) for k in range(2, order+1)]
+    pts = []
+    for i in range(n):
+        t = 2*math.pi*i/n
+        r = d/2 * (1 + sum(a*math.cos(k*t + ph) for k, (a, ph) in zip(range(2, order+1), coef)))
+        p = (r*math.cos(t), r*math.sin(t))
+        if decimals is not None:
+            p = (round(p[0], decimals), round(p[1], decimals))
+        if not pts or p != pts[-1]:
+            pts.append(p)
+    if pts[-1] == pts[0]:
+        pts.pop()
+    return pts
+
+
+ANGLE_REFERENCE_CASES = ['ellipse3to1_a0.90_n16k5', 'sector180_a0.30_n8k3', 'star5_a0.30_n8k3', 'neck_a0.30_n5k2',
+                         'chamfer_tiny_a0.30_n8k3', 'sector90_a0.30_n5k2', 'narrow_tshape_w5.0_n7k3',
+                         'narrow_stepped_w4.0_n4k1', 'narrow_branch_w3.0_n7k3', 'narrow_lfinger_w3.0_n9k4',
+                         'narrow_slot_w10.0_n4k1']
+
+
+@pytest.mark.parametrize('name', ANGLE_REFERENCE_CASES)
+def test_edge_lengths_match_brute_force(name):
+    # set_angle_reference evaluated every edge at every node time of all tracks (quadratic, 35 s for a 2500 vertex
+    # outline). The fast version only looks at the edge's own tracks until they meet; it must give the same lengths,
+    # also on tracks cut at protrusions.
+    from kicoil import skeletonator
+    s = spec(name)
+    sk = skeletonator.Skeletonator(s['polygon'])
+    pitch = s['annular_width'] / (s['turns'] / s['layers'])
+    for limit in (0.0, pitch / 2):
+        sk.set_fold_limit(limit)
+        for depth in (s['annular_width'], sk.max_depth, 0.5 * s['annular_width']):
+            fast = sk._min_edge_lengths(depth)
+            brute = sk._min_edge_lengths_bruteforce(depth)
+            assert max(abs(a - b) for a, b in zip(fast, brute)) <= 1e-15 * sk.circumference
+
+
+def test_angle_reference_is_linear_on_smooth_outlines(monkeypatch):
+    # On a smooth outline all vertex tracks run to the center, so the old set_angle_reference called track_position
+    # n times for each of about n node times (6.3 million calls for 2500 vertices). It also ran again for every call
+    # of set_fold_limit, although nothing was cut.
+    from kicoil import skeletonator
+    poly = _smooth_blob(40, 1000, 7)
+    calls = {'track_position': 0, 'min_edge_lengths': 0}
+    track_position = skeletonator.Skeletonator.track_position
+    min_edge_lengths = skeletonator.Skeletonator._min_edge_lengths
+    def counting_track_position(self, i, depth):
+        calls['track_position'] += 1
+        return track_position(self, i, depth)
+    def counting_min_edge_lengths(self, depth):
+        calls['min_edge_lengths'] += 1
+        return min_edge_lengths(self, depth)
+    monkeypatch.setattr(skeletonator.Skeletonator, 'track_position', counting_track_position)
+    monkeypatch.setattr(skeletonator.Skeletonator, '_min_edge_lengths', counting_min_edge_lengths)
+    sk = skeletonator.Skeletonator(poly)
+    assert sum(len(t) for t in sk.tracks) > 100 * len(poly) # long tracks
+    assert calls['track_position'] < 30 * len(poly)
+    angles = list(sk.vertex_angles)
+    sk.set_fold_limit(1.0) # nothing to cut
+    sk.set_angle_reference(sk.max_depth) # same depth
+    assert calls['min_edge_lengths'] == 1 and sk.vertex_angles == angles
+    sk.set_angle_reference(0.5 * sk.max_depth)
+    assert calls['min_edge_lengths'] == 2
+
+
+def test_dense_rounded_outline_is_simplified_for_the_skeleton():
+    # A dense smooth outline with coordinates rounded to 1 µm (3000 vertices, 1261 of them tiny reflex corners): the
+    # straight skeleton ran out of memory (bad_alloc in skeleton.wasm after 7 to 11 minutes at 1.9 GB) and
+    # PlanarInductor raised a wasmtime Trap. The rounding noise is removed for the skeleton.
+    import time
+    from shapely.geometry import Polygon
+    from kicoil import skeletonator
+    poly = _smooth_blob(40, 3000, 4242, decimals=3)
+    outline = skeletonator.clean_polygon(poly)
+    assert len(skeletonator.reflex_vertices(outline)) > 1000
+    t0 = time.perf_counter()
+    sk = skeletonator.Skeletonator(poly)
+    assert time.perf_counter() - t0 < 60 # about 3 s
+    assert sk.outline == outline and len(sk.poly) < len(outline)
+    assert sk.poly[0] == outline[0] and set(sk.poly) <= set(outline)
+    assert len(skeletonator.reflex_vertices(sk.poly)) < 10
+    # The simplified outline contains the original one and stays within 1 µm of it
+    orig, simple = Polygon(outline), Polygon(sk.poly)
+    assert simple.is_valid and simple.buffer(1e-9).contains(orig)
+    assert orig.hausdorff_distance(simple) <= sk.JITTER_TOLERANCE + 1e-9
+
+
+def test_dense_rounded_outline_layout():
+    # Same for 1500 vertices (195 reflex): the copper follows the simplified outline, the shape and the checker keep
+    # the original outline.
+    s = poly_spec(_smooth_blob(40, 1500, 4243, decimals=3), 9.0, 8, 3)
+    model, intent, rep = layout(s)
+    assert len(model.shape.polygon) == len(s['polygon']) > len(model.shape.sk.poly)
+    assert rep.failure_kinds(intent.clearance, intent.trace_width) == []
+    assert rep.overshoot == 0
+
+
+def test_nearly_collinear_vertices_are_kept():
+    # Outlines with few reflex vertices keep all of them, also nearly collinear ones (they carry the angle reference:
+    # removing the 0.1 µm jitter of a 24-gon split into runs of 8 edges loses 1.4 % of coverage at 90 % annular width)
+    import random
+    from kicoil import skeletonator
+    rng = random.Random(1)
+    base = corpus.regular(24, 40)
+    poly = []
+    for (x1, y1), (x2, y2) in zip(base, base[1:] + base[:1]):
+        nx, ny = -(y2 - y1), x2 - x1
+        ln = math.hypot(nx, ny)
+        for k in range(8):
+            j = rng.uniform(-1e-4, 1e-4) if k else 0.0
+            poly.append((x1 + k/8*(x2 - x1) + j*nx/ln, y1 + k/8*(y2 - y1) + j*ny/ln))
+    sk = skeletonator.Skeletonator(poly)
+    assert len(skeletonator.reflex_vertices(sk.poly)) > 50
+    assert sk.poly == sk.outline
+
+
+def test_too_complex_outline_fails_fast():
+    # A noisy outline whose reflex corners are not rounding noise: its skeleton would need minutes and gigabytes
+    import random
+    import time
+    from kicoil import skeletonator
+    rng = random.Random(1)
+    n = 1500
+    poly = [((20 + rng.uniform(-0.005, 0.005))*math.cos(2*math.pi*i/n),
+             (20 + rng.uniform(-0.005, 0.005))*math.sin(2*math.pi*i/n)) for i in range(n)]
+    t0 = time.perf_counter()
+    with pytest.raises(ValueError, match='too complex'):
+        skeletonator.Skeletonator(poly)
+    assert time.perf_counter() - t0 < 5
+
+
+@pytest.mark.parametrize('poly', [[(0, 0), (20, 0), (0, 10), (0, -5)],
+                                  [(0, 0), (10, 0), (10, 10), (5, 0), (0, 10)],
+                                  [(0, 0), (10, 0), (10, 10), (5, 5), (10, 10), (0, 10)]])
+def test_self_intersecting_outline_is_a_value_error(poly):
+    # skeleton.wasm aborts on a CGAL precondition, which surfaced as a wasmtime Trap
+    from kicoil import skeletonator
+    with pytest.raises(ValueError, match='not a simple polygon'):
+        skeletonator.Skeletonator(poly)
+
+
+def test_fold_at_thin_inner_tip_is_a_same_turn_fold():
+    # 60 x 20 ellipse, 90 % annular width: the innermost turn runs around the thin tip of the inner contour and comes
+    # back 3.56 mm away on the other side (0.045 turns further in winding angle, 14.5 mm along the conductor). The
+    # generator warns about this fold; the checker counts it as a self overlap. Before the checker decided by winding
+    # angle alone, the 14.5 mm path distance (more than 4 x (trace width + clearance) = 14.36 mm) made it a clearance
+    # violation between different turns.
+    poly = corpus.ellipse(60, 20, 512)
+    caught = []
+    model, intent, rep = layout(poly_spec(poly, round(0.9 * corpus.max_depth(poly), 4), 5, 1), caught)
+    folds = [m for m in caught if FOLD_WARNING in m or 'comes within' in m]
+    assert any('(12.445, -1.820)' in m for m in folds)
+    assert rep.clearance_violations == 0 and rep.self_overlaps > 0 and rep.self_shorts == 0
+    assert rep.failure_kinds(intent.clearance, intent.trace_width) == []
+
+
+def test_real_reflex_corners_are_not_simplified(monkeypatch):
+    # A noisy circle (200 µm radial noise, 256 vertices, 118 reflex) is above the cost at which the outline is
+    # simplified, but only a few of its reflex corners are shallower than 1 µm: removing them would change the layout
+    # without making the skeleton cheaper, so the outline is used as it is.
+    import random
+    from kicoil import skeletonator
+    rng = random.Random(4242)
+    for _ in range(4): # the rng state the round corpus' noisy_l outline starts from does not matter here
+        rng.random()
+    n = 256
+    poly = [((20 + rng.uniform(-0.2, 0.2))*math.cos(2*math.pi*i/n), (20 + rng.uniform(-0.2, 0.2))*math.sin(2*math.pi*i/n))
+            for i in range(n)]
+    poly = skeletonator.clean_polygon(poly)
+    r = len(skeletonator.reflex_vertices(poly))
+    assert n * r > skeletonator.Skeletonator.SIMPLIFY_COST
+    assert len(skeletonator.remove_reflex_jitter(poly, 0.001)) > n - 10
+    seen = []
+    class Stop(Exception):
+        pass
+    def fake_compute_skeleton(exterior):
+        seen.append(list(exterior))
+        raise Stop()
+    monkeypatch.setattr(skeletonator, 'compute_skeleton', fake_compute_skeleton)
+    with pytest.raises(Stop):
+        skeletonator.Skeletonator(poly)
+    assert seen == [poly]

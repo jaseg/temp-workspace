@@ -543,7 +543,7 @@ class OffsetShape(geometry.OffsetShape):
             return self._edge_limits[key]
         A = self.annular_width
         sk = self.sk
-        n = len(self.polygon)
+        n = len(self.sk.poly)
         out = []
         self._edge_limits[key] = out
         if n < 3:
@@ -684,7 +684,7 @@ class OffsetShape(geometry.OffsetShape):
         """ Allocate k jog sites to edges (and, with runs=True, runs of edges), greedily maximizing the worst jog spacing
         ratio. Returns a list of JogSite or None """
         A = self.annular_width
-        n = len(self.polygon)
+        n = len(self.sk.poly)
         if margin is None:
             margin = 0.02 * step
         if gap is None:
@@ -737,7 +737,7 @@ class OffsetShape(geometry.OffsetShape):
         arms with a pitch of pitch/m (the arms start at multiples of 1/k = m/(k*m) revolutions). Smaller steps fit
         shorter edges. """
         A = self.annular_width
-        n = len(self.polygon)
+        n = len(self.sk.poly)
         s0 = next(iter(sigmas)) if len(sigmas) == 1 else 0
         planned = []
         for m in range(1, self.MAX_M + 1):

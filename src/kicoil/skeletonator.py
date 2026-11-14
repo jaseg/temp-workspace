@@ -10,6 +10,7 @@ import lzma
 import sys
 import hashlib
 import bisect
+import logging
 
 import platformdirs
 import wasmtime
@@ -279,6 +280,80 @@ def offset_polygon_outward(poly, margin, miter_limit=2.0):
     return _remove_collinear(out, tol)
 
 
+def reflex_vertices(points):
+    """ Indices of the reflex (concave) vertices of a counter-clockwise polygon """
+    n = len(points)
+    out = []
+    for i in range(n):
+        (x0, y0), (x1, y1), (x2, y2) = points[i-1], points[i], points[(i+1) % n]
+        if (x1 - x0)*(y2 - y1) - (y1 - y0)*(x2 - x1) < 0:
+            out.append(i)
+    return out
+
+
+def _point_segment_distance(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    l2 = dx*dx + dy*dy
+    t = 0.0 if l2 == 0 else max(0.0, min(1.0, ((p[0] - a[0])*dx + (p[1] - a[1])*dy) / l2))
+    return math.hypot(p[0] - a[0] - t*dx, p[1] - a[1] - t*dy)
+
+
+def remove_reflex_jitter(points, tol):
+    """ Remove reflex vertices of a counter-clockwise polygon that lie within tol of the chord between their
+    neighbors, e.g. the tiny concave corners that rounding the coordinates of a densely sampled smooth outline
+    produces. A vertex is only removed while it is reflex, and only if all input vertices between its two neighbors
+    (itself and those removed before) are within tol of the chord that replaces them. Removing a reflex vertex adds
+    the triangle between it and the chord to the polygon, so the result contains the input and lies within tol of it.
+    Its neighbors become less convex and may be removed in turn. Vertex 0 is kept, and so are all vertices that stay
+    convex, nearly collinear ones included. Vertices are removed in order of increasing deviation. """
+    import heapq
+
+    n = len(points)
+    prev = [(i - 1) % n for i in range(n)]
+    nxt = [(i + 1) % n for i in range(n)]
+    alive = [True] * n
+
+    def is_reflex(i):
+        (x0, y0), (x1, y1), (x2, y2) = points[prev[i]], points[i], points[nxt[i]]
+        return (x1 - x0)*(y2 - y1) - (y1 - y0)*(x2 - x1) < 0
+
+    def deviation(i):
+        """ Largest distance of the original vertices between prev[i] and nxt[i] from the chord between them """
+        a, b = points[prev[i]], points[nxt[i]]
+        d, k = 0.0, (prev[i] + 1) % n
+        while k != nxt[i]:
+            d = max(d, _point_segment_distance(points[k], a, b))
+            if d > tol:
+                break
+            k = (k + 1) % n
+        return d
+
+    heap = [(deviation(i), i) for i in range(1, n) if is_reflex(i)]
+    heap = [h for h in heap if h[0] <= tol]
+    heapq.heapify(heap)
+    count = n
+    while heap and count > 3:
+        d, i = heapq.heappop(heap)
+        if not alive[i] or not is_reflex(i):
+            continue
+        current = deviation(i)
+        if current != d:
+            # A neighbor was removed since: requeue with the new deviation
+            if current <= tol:
+                heapq.heappush(heap, (current, i))
+            continue
+        alive[i] = False
+        count -= 1
+        p, q = prev[i], nxt[i]
+        nxt[p], prev[q] = q, p
+        for k in (p, q):
+            if k != 0 and is_reflex(k):
+                dk = deviation(k)
+                if dk <= tol:
+                    heapq.heappush(heap, (dk, k))
+    return [points[i] for i in range(n) if alive[i]]
+
+
 def _track_point(track, depth, time_eps, times=None):
     """ Position on a vertex track (a list of skeleton nodes with non-decreasing time) at the given depth, see
     Skeletonator.track_position. """
@@ -297,6 +372,40 @@ def _track_point(track, depth, time_eps, times=None):
     if n1.time - n0.time <= time_eps:
         return n1.pos if depth >= n1.time else n0.pos
     return interpolate(n0.pos, n1.pos, depth, n0.time, n1.time)
+
+
+def _tracks_meet(ti, tj, until):
+    """ Walk two vertex tracks forward in depth, up to depth `until`. Returns (times, merge): the node times of both
+    tracks that were passed, and the depth from which the two tracks continue on the same nodes (so that the two
+    vertices coincide at every greater depth), or None if they do not meet up to `until`. """
+    a = b = 0
+    la, lb = len(ti), len(tj)
+    times = []
+    while a < la and b < lb:
+        ta, tb = ti[a].time, tj[b].time
+        if min(ta, tb) > until:
+            return times, None
+        if ta < tb:
+            times.append(ta)
+            a += 1
+        elif tb < ta:
+            times.append(tb)
+            b += 1
+        else:
+            # Nodes at the same time: the tracks meet if they share one of them and continue identically from there
+            a2, b2 = a, b
+            while a2 < la and ti[a2].time == ta:
+                a2 += 1
+            while b2 < lb and tj[b2].time == tb:
+                b2 += 1
+            for x in range(a, a2):
+                for y in range(b, b2):
+                    if ti[x] is tj[y] and ti[x:] == tj[y:]:
+                        return times, ta
+            times.append(ta)
+            a, b = a2, b2
+    times.extend(n.time for n in itertools.chain(ti[a:], tj[b:]) if n.time <= until)
+    return times, None
 
 
 def polygon_center_of_mass(polygon):
@@ -336,7 +445,11 @@ class WasmApp:
                 cache_file.write(lzma.compress(self.module.serialize(), preset=0))
 
     def run(self, stdin='', argv=[]):
-        with NamedTemporaryFile('r') as stdout_f, NamedTemporaryFile('w') as stdin_f:
+        """ Run the module's main function. Returns (0, stdout). If the module exits with an error or aborts (a
+        failed CGAL precondition, an exception such as bad_alloc), raises WasmAppError with what it wrote to
+        stderr. """
+        with NamedTemporaryFile('r') as stdout_f, NamedTemporaryFile('w') as stdin_f, \
+                NamedTemporaryFile('r') as stderr_f:
             stdin_f.write(stdin)
             stdin_f.flush()
 
@@ -344,7 +457,7 @@ class WasmApp:
             wasi_cfg.argv = argv
             wasi_cfg.stdin_file = stdin_f.name
             wasi_cfg.stdout_file = stdout_f.name
-            wasi_cfg.inherit_stderr()
+            wasi_cfg.stderr_file = stderr_f.name
 
             linker = wasmtime.Linker(self.engine)
             linker.define_wasi()
@@ -353,15 +466,32 @@ class WasmApp:
             self.app = linker.instantiate(store, self.module)
             linker.define_instance(store, "app", self.app)
 
+            failed = None
             try:
                 self.app.exports(store)["_start"](store)
             except wasmtime.ExitTrap as trap:
                 if trap.code != 0:
-                    raise RuntimeError('Error computing straight skeleton.')
+                    failed = f'exit code {trap.code}'
+            except wasmtime.Trap as trap:
+                failed = str(trap).splitlines()[0] # e.g. abort() after an uncaught exception
+            stderr = stderr_f.read()
+            if failed is not None:
+                raise WasmAppError(failed, stderr)
+            if stderr:
+                sys.stderr.write(stderr)
             return 0, stdout_f.read()
 
 
-@dataclass(frozen=True)
+class WasmAppError(RuntimeError):
+    def __init__(self, reason, stderr):
+        self.reason, self.stderr = reason, stderr
+        detail = ' '.join(stderr.split())
+        super().__init__(f'{reason}: {detail}' if detail else reason)
+
+
+# Nodes compare and hash by identity: compute_skeleton makes one object per distinct (x, y, time), and the vertex tracks
+# hold millions of references to them on dense outlines, where a hash of the coordinates on every lookup is slow.
+@dataclass(frozen=True, eq=False)
 class SkeletonNode:
     x: float
     y: float
@@ -381,7 +511,15 @@ def compute_skeleton(exterior):
             points_deduplicated.append(p1)
     input_data = '\n'.join(f'{float(x)!r} {float(y)!r}' for x, y in points_deduplicated)
 
-    rc, data = skeleton_wasm.run(input_data)
+    try:
+        rc, data = skeleton_wasm.run(input_data)
+    except WasmAppError as e:
+        if 'is_simple' in e.stderr:
+            raise ValueError('The outline is not a simple polygon: it crosses or touches itself.') from e
+        if 'bad_alloc' in e.stderr:
+            raise ValueError(f'The straight skeleton of the outline ({len(points_deduplicated)} vertices) ran out of '
+                             f'memory. Simplify the outline (fewer vertices, fewer concave corners).') from e
+        raise RuntimeError(f'Error computing straight skeleton ({e})') from e
 
     # Parse output: each line is "x1 y1 x2 y2 t1 t2"
     node_map = {}  # Map (x, y, t) to SkeletonNode
@@ -423,6 +561,11 @@ class Skeletonator:
     works up to the first split event, where the offset outline falls apart into multiple pieces; `self.min_radius`
     holds that depth limit (the name is historical, it is a depth, not a radius).
 
+    `self.outline` is the polygon as given (normalized by `clean_polygon`), `self.poly` the polygon the skeleton and
+    the vertex indices refer to. They are the same unless the outline has so many reflex vertices that its skeleton
+    would be expensive; then `self.poly` lacks the reflex vertices that are within JITTER_TOLERANCE (1 µm) of the chord
+    between their neighbors (see `_skeleton_of`).
+
     The angle coordinate is fixed for the whole shape: vertex i always sits at angle `self.vertex_angles[i]`, no matter
     the depth. This makes consecutive turns of a spiral, and the arms of a multi-arm spiral, line up with each other
     exactly at every vertex.
@@ -433,10 +576,11 @@ class Skeletonator:
     def __init__(self, poly, ref_depth=None):
         # Normalize the input: CGAL needs a counter-clockwise polygon without repeated points. Vertex 0 stays vertex 0.
         poly = clean_polygon(poly)
-        self.poly = poly
+        self.outline = poly # the outline as given, normalized
+        poly, self.skeleton_nodes, self.skeleton_edges = self._skeleton_of(poly)
+        self.poly = poly # the outline the skeleton was computed for; equal to self.outline unless it was simplified
         self.poly_edges = list(zip(poly, poly[1:] + poly[:1]))
         self.circumference = sum(math.dist(a, b) for a, b in self.poly_edges)
-        self.skeleton_nodes, self.skeleton_edges = compute_skeleton(exterior=poly)
         self.debug_arms = []
 
         # Tolerances. They scale with the polygon's extent (bounding box diagonal), not with its distance from the
@@ -523,6 +667,10 @@ class Skeletonator:
         match_tol = 1e-6 * extent + float_floor
         self.node_map = {}
         self.tracks = []
+        # How a track goes on from a node depends only on the node. On smooth outlines all tracks run to the center
+        # (their total length is quadratic in the number of vertices), so a track that reaches a node some earlier
+        # track has passed copies the rest of that track.
+        seen = {} # node -> (track, index) of its first occurrence
         for x, y in poly:
             lo = bisect.bisect_left(contour_x, x - match_tol)
             hi = bisect.bisect_right(contour_x, x + match_tol)
@@ -531,22 +679,81 @@ class Skeletonator:
                 raise RuntimeError(f'Straight skeleton has no node at polygon vertex ({x}, {y})')
             self.node_map[(x, y)] = start
             track = [start]
-            while track[-1] in self.arc_map and track[-1] not in self.divergent:
-                exit_node = self._arc_exit[track[-1]]
-                if exit_node is not track[-1]:
+            while True:
+                node = track[-1]
+                prev = seen.get(node)
+                if prev is not None:
+                    other, k = prev
+                    track.extend(other[k+1:])
+                    break
+                seen[node] = (track, len(track) - 1)
+                if node not in self.arc_map or node in self.divergent:
+                    break
+                exit_node = self._arc_exit[node]
+                if exit_node is not node:
                     track.append(exit_node) # move along the constant-time group to where the way up leaves
-                track.append(self.arc_map[track[-1]])
+                    seen.setdefault(exit_node, (track, len(track) - 1))
+                track.append(self.arc_map[exit_node])
             self.tracks.append(track)
         if self.max_depth <= 0 or any(len(track) < 2 or track[-1].time <= 0 for track in self.tracks):
             raise ValueError('Degenerate straight skeleton: the polygon is too small, or too far away from the origin '
                              'for its size, to be represented with floating point precision.')
-        self._raw_tracks = [list(track) for track in self.tracks]
+        self._raw_tracks = list(self.tracks) # the track lists are never modified in place
+        self._track_nodes = list(seen) # every node on a track, once
         self._track_times = [[n.time for n in track] for track in self.tracks]
+        self._tracks_version = 0 # changes whenever self.tracks changes
         self.fold_limit = 0.0
         self.uncut_protrusions = []
         self.cut_protrusions = []
 
         self.set_angle_reference(ref_depth)
+
+    # Straight skeletons of outlines with many reflex vertices are slow and need a lot of memory: CGAL looks for split
+    # events of every reflex vertex with every edge, and a nearly degenerate input (e.g. coordinates rounded to a grid)
+    # makes it fall back to exact arithmetic. The cost grows with (number of vertices) x (number of reflex vertices),
+    # about 0.2 to 0.7 ms and 0.5 to 2.5 kB per unit: a 1000 vertex outline with 184 reflex vertices takes 30 s, one
+    # with 3000 vertices and 1261 reflex vertices runs out of memory (bad_alloc) after 6 to 11 minutes.
+    JITTER_TOLERANCE = 0.001 # mm; reflex vertices this close to the chord of their neighbors are rounding noise
+    SIMPLIFY_COST = 25_000 # above this cost, the outline is simplified for the skeleton (remove_reflex_jitter)
+    MAX_COST = 500_000 # above this cost (after simplifying), the outline is rejected (about 2 minutes and 1 GB)
+
+    def _skeleton_of(self, poly):
+        """ Straight skeleton of the outline, simplified first if its skeleton would be expensive. Returns (outline
+        used, nodes, edges). Outlines whose skeleton would still be too expensive raise a ValueError. """
+        n, r = len(poly), len(reflex_vertices(poly))
+        what = f'{n} vertices, {r} of them reflex (concave) corners'
+        if n * r > self.SIMPLIFY_COST:
+            # Tiny reflex corners from rounding noise (e.g. coordinates exported with 1 µm resolution) make up most
+            # reflex vertices of a dense smooth outline. Without them, the outline moves outward by at most
+            # JITTER_TOLERANCE, far below any useful clearance. Convex vertices are kept, also nearly collinear ones:
+            # they carry the angle reference. This is only done where it makes the skeleton much cheaper (or possible
+            # at all): outlines whose reflex corners are real, with a few shallow ones among them, are left alone.
+            simple = remove_reflex_jitter(poly, self.JITTER_TOLERANCE)
+            rs = len(reflex_vertices(simple))
+            if len(simple) < n and (len(simple) * rs <= n * r / 2 or n * r > self.MAX_COST):
+                what = (f'{len(simple)} vertices, {rs} of them reflex (concave) corners deeper than '
+                        f'{self.JITTER_TOLERANCE * 1000:.0f} µm, after removing {n - len(simple)} shallower ones')
+                if len(simple) * rs <= self.MAX_COST:
+                    try:
+                        nodes, edges = compute_skeleton(exterior=simple)
+                    except ValueError:
+                        # E.g. a chord that touches another part of the outline: use the outline as it is
+                        what = f'{n} vertices, {r} of them reflex (concave) corners'
+                    else:
+                        logging.getLogger('kicoil').info(
+                            f'Outline simplified for the straight skeleton: {n - len(simple)} reflex vertices within '
+                            f'{self.JITTER_TOLERANCE * 1000:.0f} µm of the chord between their neighbors were '
+                            f'removed ({n} vertices, {r} of them reflex, before; {len(simple)} and {rs} after).')
+                        return simple, nodes, edges
+                else:
+                    n, r = len(simple), rs # for the error below
+        if n * r > self.MAX_COST:
+            raise ValueError(f'The outline is too complex for the straight skeleton: it has {what}. The skeleton would '
+                             f'take minutes and gigabytes of memory (vertices x reflex corners = {n * r}, the limit is '
+                             f'{self.MAX_COST}). Simplify the outline: fewer vertices, or fewer concave corners (e.g. '
+                             f'smooth out noise from the import).')
+        nodes, edges = compute_skeleton(exterior=poly)
+        return poly, nodes, edges
 
     def set_fold_limit(self, limit):
         """ Cut off narrow protrusions of the offset outline.
@@ -580,13 +787,17 @@ class Skeletonator:
             return
         self.fold_limit = limit
         raw = self._raw_tracks
-        tracks = [list(t) for t in raw]
+        tracks = list(raw)
         self.uncut_protrusions = []
         cut = {}
-        if limit > 0:
-            exit_of = self._arc_exit
-            def in_group(n, exit_node):
-                return exit_of.get(n) is exit_node and abs(n.time - exit_node.time) <= self.teps
+        exit_of = self._arc_exit
+        def in_group(n, exit_node):
+            return exit_of.get(n) is exit_node and abs(n.time - exit_node.time) <= self.teps
+        # A track that passes a member of a constant-time group other than its exit node goes on to the exit node.
+        # Without such groups there is nothing to cut (this is the common case for smooth outlines, whose tracks are
+        # too long to scan).
+        has_groups = any(exit_of.get(m, m) is not m and in_group(m, exit_of[m]) for m in self._track_nodes)
+        if limit > 0 and has_groups:
             def entry(t, e):
                 """ Index j where track t enters the group of exit e at a member other than e (t[j+1] is e), or None """
                 for j in range(1, len(t) - 1):
@@ -667,8 +878,10 @@ class Skeletonator:
                         tracks[i] = head + [SkeletonNode(tx, ty, tc), SkeletonNode(qx, qy, tc)] + t[j+1:]
                 cut[e] = (e.x, e.y, T, tc)
         self.cut_protrusions = list(cut.values())
-        self.tracks = tracks
-        self._track_times = [[n.time for n in track] for track in tracks]
+        if tracks != self.tracks:
+            self.tracks = tracks
+            self._track_times = [[n.time for n in track] for track in tracks]
+            self._tracks_version = getattr(self, '_tracks_version', 0) + 1
         self.set_angle_reference(getattr(self, 'ref_depth', None))
 
     def set_angle_reference(self, max_depth=None):
@@ -682,16 +895,107 @@ class Skeletonator:
         if max_depth is None:
             max_depth = self.max_depth
         max_depth = max(0, min(max_depth, self.max_depth))
-        depths = {0.0, max_depth}
-        for times in self._track_times:
-            depths.update(t for t in times if 0 < t < max_depth)
-        depths = sorted(depths)
+        key = (getattr(self, '_tracks_version', None), max_depth)
+        if getattr(self, '_angle_reference_key', None) == key:
+            return # same tracks, same depth range: nothing changed
+        min_len = self._min_edge_lengths(max_depth)
+        self._apply_edge_lengths(min_len, max_depth)
+        self._angle_reference_key = key
+
+    def _sample_depths(self, max_depth):
+        """ Depths at which the edge lengths are sampled: 0, max_depth and every track node time in between """
+        cached = getattr(self, '_all_times', None)
+        version = getattr(self, '_tracks_version', None)
+        if cached is None or cached[0] != version or version is None:
+            cached = self._all_times = (version, sorted(set(itertools.chain.from_iterable(self._track_times))))
+        times = cached[1]
+        inner = times[bisect.bisect_right(times, 0):bisect.bisect_left(times, max_depth)]
+        return sorted({0.0, max_depth}.union(inner))
+
+    def _min_edge_lengths_bruteforce(self, max_depth):
+        """ Reference implementation of `_min_edge_lengths`: every edge at every sample depth, O(n * depths). """
+        depths = self._sample_depths(max_depth)
         n = len(self.poly)
         min_len = [math.inf] * n
         for d in depths:
             pts = [self.track_position(i, d) for i in range(n)]
             for i in range(n):
                 min_len[i] = min(min_len[i], math.dist(pts[i], pts[(i+1) % n]))
+        return min_len
+
+    def _min_edge_lengths(self, max_depth):
+        """ Shortest length of every edge (vertex i to vertex i+1) over the sample depths (`_sample_depths`).
+
+        Same result as evaluating every edge at every sample depth (`_min_edge_lengths_bruteforce`), which is quadratic
+        in the number of vertices, but only looks at the parts of the edge's own two tracks before they meet:
+
+        - Once the two tracks have met (they continue on the same nodes), the two vertices have the same position at
+          every greater depth, so the edge's shortest length is exactly 0 if that happens within max_depth. On a
+          smooth outline the tracks are long (all of them run to the center), but neighboring tracks meet soon.
+        - Before that, between two consecutive node times of the two tracks (a "piece"), the edge vector is an affine
+          function of the depth, so its length is convex there and its smallest value over the sample depths in the
+          piece is at one of the two sample depths around the piece's continuous minimum.
+
+        The candidate depths (and their neighbors, against rounding) are evaluated with the same `track_position`
+        calls as in the brute force version, so the values are identical. """
+        depths = self._sample_depths(max_depth)
+        nd = len(depths)
+        n = len(self.poly)
+        teps = self.TIME_EPS
+
+        def velocity(i, d):
+            """ d(position)/d(depth) of track i on the piece of its track that starts at depth d """
+            track, times = self.tracks[i], self._track_times[i]
+            if len(track) == 1 or d >= times[-1]:
+                return 0.0, 0.0
+            k = 0 if d <= times[0] else max(0, min(len(track) - 2, bisect.bisect_right(times, d) - 1))
+            n0, n1 = track[k], track[k+1]
+            dt = n1.time - n0.time
+            if dt <= teps or math.isclose(n0.time, n1.time): # constant there, see _track_point and interpolate
+                return 0.0, 0.0
+            return (n1.x - n0.x) / dt, (n1.y - n0.y) / dt
+
+        def dist_at(i, j, d):
+            return math.dist(self.track_position(i, d), self.track_position(j, d))
+
+        min_len = [math.inf] * n
+        for i in range(n):
+            j = (i + 1) % n
+            times, merge = _tracks_meet(self.tracks[i], self.tracks[j], max_depth)
+            end = max_depth if merge is None else max(0.0, merge)
+            bounds = sorted({0.0, end}.union(t for t in times if 0 < t < end))
+            best = math.inf
+            if merge is not None:
+                # The vertices coincide from depth `merge` on
+                best = min(dist_at(i, j, end), dist_at(i, j, max_depth))
+                pieces = itertools.pairwise(bounds)
+            else:
+                pieces = itertools.pairwise(bounds + [math.inf]) # the last piece is max_depth alone
+            for b0, b1 in pieces:
+                # Sample depths in [b0, b1)
+                lo = bisect.bisect_left(depths, b0)
+                hi = nd if b1 == math.inf else bisect.bisect_left(depths, b1)
+                if hi <= lo:
+                    continue
+                cand = {lo}
+                if hi - lo > 1:
+                    pi, pj = self.track_position(i, b0), self.track_position(j, b0)
+                    vix, viy = velocity(i, b0)
+                    vjx, vjy = velocity(j, b0)
+                    ex, ey = pj[0] - pi[0], pj[1] - pi[1]
+                    wx, wy = vjx - vix, vjy - viy
+                    ww = wx*wx + wy*wy
+                    d_min = b0 if ww <= 0 else b0 - (ex*wx + ey*wy) / ww
+                    k = bisect.bisect_left(depths, d_min, lo, hi)
+                    cand.update(m for m in range(k - 2, k + 2) if lo <= m < hi)
+                    cand.add(hi - 1)
+                for m in cand:
+                    best = min(best, dist_at(i, j, depths[m]))
+            min_len[i] = best
+        return min_len
+
+    def _apply_edge_lengths(self, min_len, max_depth):
+        """ Vertex angles from the edges' shortest lengths, see set_angle_reference """
         # Edges that (nearly) collapse within the depth range get a span of exactly zero, so that all vertices of a
         # collapsing group share exactly the same angle. Tiny non-zero spans would break the tie resolution in _locate.
         min_len = [l if l > 1e-9 * self.circumference else 0.0 for l in min_len]

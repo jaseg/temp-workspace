@@ -525,3 +525,83 @@ the same rectangle measures 1.885 mm at the corners, and trace width 1.75 mm is 
 the clearance or increase the size of the coil") and, when the measured spacing is below the nominal pitch, give it,
 the nominal pitch and the location, with the likely cause (corners and steep spirals, or a collapsing narrow part of the
 outline).
+
+---
+
+## Found on round and dense outlines
+
+Found with the `round` corpus family (polygonal circles, ellipses, smooth blobs and dense SVG-like outlines with up to
+2500 vertices).
+
+### D30. Straight skeleton runs out of memory on outlines with many tiny reflex corners
+
+**Defect.** A dense smooth outline whose coordinates are rounded to 1 µm (as an SVG or DXF export writes them) has
+thousands of tiny reflex corners: the rounding noise turns up to 40 % of the vertices concave. CGAL's straight skeleton
+looks for split events of every reflex vertex against every edge, and the nearly degenerate input makes it fall back to
+exact rational arithmetic, so time and memory grow with (vertices × reflex vertices), about 0.2–0.7 ms and 0.5–2.5 kB
+per unit. Nothing limited this, and when skeleton.wasm aborted, the error surfaced as a bare `wasmtime.Trap` (the same
+for a self-intersecting outline, which fails CGAL's `is_simple_2` precondition).
+
+**Symptom.** `svg_like(40, 3000, Random(4242))` from the round corpus (3000 vertices, 1261 reflex): "libc++abi:
+bad_alloc" after 349 s here (400–650 s reported), then a `Trap` from `PlanarInductor`. With 1000 vertices (184 reflex,
+`round_svg1000r_a0.60_n8k3`) the skeleton takes 31 s and the case 197 s. The original code passes the outline to the
+same skeleton.wasm unchanged: the 3000-vertex outline fails the same way there (bad_alloc after 349 s at 4 GB RSS).
+
+**Fix.** `Skeletonator._skeleton_of`: when vertices × reflex vertices exceeds 25 000 (the main corpus stays below 1
+600), the skeleton is computed for the outline without its rounding noise (`remove_reflex_jitter`), if that at least
+halves the cost: reflex vertices are removed, shallowest first, as long as every input vertex they cover is within 1 µm
+of the replacing chord (outlines with real reflex corners, such as `round_noisy_l`, 256 × 118 with one shallow corner,
+are left alone). Removing a reflex vertex only adds area, so the simplified outline contains the input and stays within
+1 µm of it; vertex 0 and all vertices that stay convex are kept, nearly collinear ones included (unlike the
+Douglas–Peucker simplification of the cornerflat layout, which removes them and costs coverage: forced on
+`round_collinear_a0.90_n16k5`, either simplification raises the uncovered fraction from 15.6 % to 16.9–17.0 %; that
+outline, 192 × 84, is not simplified). `Skeletonator.poly` is the simplified outline, `Skeletonator.outline` and
+`OffsetShape.polygon` (keepout zone, checker) the original one. If the cost stays above 500 000 (about 2 minutes and 1
+GB) the outline is rejected at once with a `ValueError` that gives the counts (e.g. a 1500-vertex circle with 5 µm
+noise). skeleton.wasm's stderr is captured: a non-simple outline is a `ValueError` ("not a simple polygon"), a bad_alloc
+a `ValueError` asking to simplify the outline, other aborts a `RuntimeError` with the message. The 3000-vertex outline
+is simplified to 1216 vertices (1 reflex) in 2.3 s; `round_svg1000r_a0.60_n8k3` takes 785 vertices (14 reflex) and 4.7 s
+instead of 115 s (layout and footprint, without the checker), passes, with trace width 2.6111 instead of 2.6098 mm, 0.59
+% instead of 0.65 % uncovered and no overshoot. No other case of the main or round corpus changes its layout.
+(`geometry_alt_jog` now takes the vertex count from `sk.poly`.)
+
+### D31. Angle reference quadratic in the number of vertices
+
+**Defect.** `Skeletonator.set_angle_reference` (not in the original, which has no fixed angle reference and lays out a
+1000-vertex blob in 1.9 s) evaluates every edge at every distinct node time of all tracks, O(n²) `track_position` calls
+on smooth outlines, where every event time is distinct. It ran three times per coil: in `Skeletonator.__init__` (for the
+whole depth, the most expensive), in `OffsetShape.__post_init__` and from `set_fold_limit`, also when nothing was cut.
+On smooth outlines all tracks run to the center, so the tracks themselves hold O(n²) nodes (1.1 million for 2500
+vertices), and building them, `set_fold_limit`'s scan of all track pairs and the coordinate hash of every `SkeletonNode`
+lookup were quadratic too.
+
+**Symptom.** `round_dense2500_a0.30_n5k1` (2500 vertices): 10.9 s for layout and footprint, 48 s under the profiler, of
+it 34.7 s in `set_angle_reference` (6.3 million `track_position` calls) and 5.4 s in `set_fold_limit`. Smooth blobs (8
+turns, 3 twists, 60 % annular width) with 2500 and 5000 vertices take 10.9 s and 38.3 s.
+
+**Fix.** The shortest length of edge i over the same sample depths is computed from its own two tracks only: once they
+meet (continue on the same nodes) the two vertices coincide at every greater depth, so the length is exactly 0; before
+that, between consecutive node times of the two tracks the edge vector is affine in the depth, so the length is convex
+and its minimum over the sample depths there is at a sample next to the continuous minimum, which is evaluated with the
+same `track_position` calls (`_min_edge_lengths`; the old version is kept as `_min_edge_lengths_bruteforce`).
+Neighboring tracks meet soon (summed over all edges, the parts before the meeting point visit each skeleton edge about
+twice), so this is close to linear. The result is cached by (tracks, depth), and `set_fold_limit` keeps the tracks (and
+the angles) when nothing is cut and skips the protrusion search when the skeleton has no constant-time groups. Tracks
+copy the rest of an earlier track at the first shared node, and nodes hash by identity (one object per distinct node).
+On all 93 corpus outlines (main and round) at the annular width, at the full depth, with and without the protrusion cut,
+the edge lengths are bit for bit those of the brute force version (2.9 s instead of 57 s in total), and the trace widths
+of the main corpus are unchanged. `round_dense2500_a0.30_n5k1` takes 3.7 s (3.1 s of it the skeleton itself), the 2500-
+and 5000-vertex blobs 3.7 s and 8.0 s (about 6 s of it the skeleton).
+
+### D32. Clearance violation at the thin inner tip of an ellipse (checker, already fixed)
+
+`round_ellipse3to1_a0.90_n5k1` (60 × 20 mm ellipse, 512 vertices, 90 % annular width) was reported with a clearance
+deficit of 0.0275 mm at (12.45, −1.82). The flagged pieces are the innermost turn on each layer running along the bottom
+of the thin inner contour (y = −1.785 at x = 12.59), around its right tip and back along the top (y = +1.778): 3.56 mm
+apart, 0.045 turns apart in winding angle, 14.54 mm apart along the conductor. The checker the report was made with
+(`8ab123c`) also counted copper more than s_far = 4 × (w + c) = 14.36 mm apart along the conductor as different turns,
+so this fold of one turn became a clearance violation. The generator agrees that it is one turn: the spacing measurement
+leaves it out (0.045 < 0.5 turns), and the fold warning (D28) reports exactly this spot ("Near (12.445, -1.820) the
+copper of one turn comes within 0.122 mm of itself"). Since `33a665a` the checker decides by winding angle alone; it
+counts the 856 close pairs as self overlaps (no self short), and the case passes. No change to the generator; a test
+pins the classification and the warning.
