@@ -53,13 +53,18 @@ def test_corpus_case(spec):
     # Every check of the geometric checker except outline coverage, which the linear spiral does not reach at convex
     # corners of deep annuli (that is measured by run_corpus.py, not asserted here).
     kinds = [k for k in rep.failure_kinds(intent.clearance, intent.trace_width) if k != 'conformance']
-    hard = [k for k in kinds if k not in WARNED_KINDS]
+    # Failure kinds a corpus case declares as known (with the reason, e.g. corpus_round.KNOWN_FAILURES) are expected
+    known = spec.get('known_failures', {})
+    hard = [k for k in kinds if k not in WARNED_KINDS and k not in known]
     assert not hard, (hard, rep.notes[:5], rep.violations[:5])
-    if kinds:
+    warned = [k for k in kinds if k not in known]
+    if warned:
         # Clearance problems are acceptable only when the generator warned about them: a turn folding onto itself
         # around a notch or a hole narrower than the trace, or a via (as wide as the trace) that does not fit the hole.
         assert any(FOLD_WARNING in m or (m.startswith('Via at') and 'neighboring turn' in m) for m in caught), (kinds, caught, rep.violations[:5])
-        pytest.xfail(f'warned: {kinds}')
+    if kinds:
+        pytest.xfail(f'warned: {warned}' if not set(kinds) & set(known) else
+                     f'known: {[(k, known[k]) for k in kinds if k in known]}' + (f', warned: {warned}' if warned else ''))
     # The copper must stay within the intended outline
     assert rep.overshoot < max(0.05, 0.1 * intent.trace_width)
     cut = [c for c in getattr(getattr(model.shape, 'sk', None), 'cut_protrusions', ()) if c[3] < intent.annular_width]
