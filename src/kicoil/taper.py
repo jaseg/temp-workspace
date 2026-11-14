@@ -184,6 +184,13 @@ class TaperResult:
         verification. """
         prims = []
         lim = math.radians(self.options.joint_angle)
+        vertex_cells = set() # center line vertices and via/pad centers per layer, on a 10 nm grid
+        for c in self.conductors:
+            for x, y in c.pts:
+                vertex_cells.add((c.layer, round(x / 1e-5), round(y / 1e-5)))
+        for b in self.bodies:
+            for l in b.layers:
+                vertex_cells.add((l, round(b.x / 1e-5), round(b.y / 1e-5)))
         for ci, (c, spans) in enumerate(zip(self.conductors, self.spans())):
             pts = [_round_pt(p) for p in c.pts]
             kinds = []
@@ -195,7 +202,8 @@ class TaperResult:
                     prims.append(dict(kind='line', layer=c.layer, a=p, b=q, width=_round_down(min(wp, wq)), owner=own))
                     kinds.append('line')
                 elif style == 'v':
-                    prims.extend(_v_taper(p, q, wp, wq, c.layer, own, self.options.max_v_ratio))
+                    prims.extend(_v_taper(p, q, wp, wq, c.layer, own, self.options.max_v_ratio,
+                                          lambda x, l=c.layer: _near(vertex_cells, l, x)))
                     kinds.append('v')
                 else:
                     prims.append(_trapezoid(p, q, wp, wq, c.layer, own))
@@ -369,6 +377,11 @@ def _round_pt(p):
     return (_rnd(p[0]), _rnd(p[1]))
 
 
+def _near(cells, layer, p):
+    gx, gy = round(p[0] / 1e-5), round(p[1] / 1e-5)
+    return any((layer, gx + dx, gy + dy) in cells for dx in (-1, 0, 1) for dy in (-1, 0, 1))
+
+
 def _round_down(w):
     return math.floor(float(w) / NM + 1e-6) * NM
 
@@ -394,7 +407,7 @@ def _normal(p, q):
     return (-dy/l, dx/l)
 
 
-def _v_taper(p, q, wp, wq, layer, own, max_ratio=2.0):
+def _v_taper(p, q, wp, wq, layer, own, max_ratio=2.0, occupied=None):
     """ Tracks of a V taper from p (width wp) to q (width wq), split so that each V widens by at most max_ratio """
     if wp > wq:
         p, q, wp, wq = q, p, wq, wp
@@ -414,6 +427,12 @@ def _v_taper(p, q, wp, wq, layer, own, max_ratio=2.0):
         h = (ww - wn) / 2
         # offsets rounded towards zero: the round caps stay inside the circle of radius ww/2 around the wide end
         o = (math.trunc(nx*h/NM)*NM, math.trunc(ny*h/NM)*NM)
+        # a far end must not land on a vertex of the center line (it would look connected there): pull it in a little
+        for _try in range(5):
+            if occupied is None or not (occupied(_round_pt((end[0] + o[0], end[1] + o[1])))
+                                        or occupied(_round_pt((end[0] - o[0], end[1] - o[1])))):
+                break
+            o = (math.trunc(nx*(math.hypot(*o) - 20*NM)/NM)*NM, math.trunc(ny*(math.hypot(*o) - 20*NM)/NM)*NM)
         e1 = (end[0] + o[0], end[1] + o[1])
         e2 = (end[0] - o[0], end[1] - o[1])
         out.append(dict(kind='line', layer=layer, a=prev, b=_round_pt(e1), width=wn, owner=own))
