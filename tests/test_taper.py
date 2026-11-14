@@ -24,7 +24,10 @@ from kicoil import taper
 
 CASES = [('kicoil', 'square40_a0.30_n8k3'), ('kicoil', 'l_shape_a0.30_n8k3'), ('kicoil', 'circle30x6_n2k1'),
          ('kicoil', 'hexagon_a0.60_n6_1layer'), ('geometry_alt_cornerflat', 'square40_a0.30_n8k3'),
-         ('geometry_alt_cornerflat', 'l_shape_a0.30_n8k3')]
+         ('geometry_alt_cornerflat', 'l_shape_a0.30_n8k3'),
+         # few wide turns in a deep annulus: tapering must not merge copper of the same turn about half a turn apart
+         ('kicoil', 'rstar0_a0.90_n3k1'), ('kicoil', 'ellipse3to2_a0.90_n3k1'),
+         ('geometry_alt_cornerflat', 'd_shape_a0.90_n3k1')]
 
 _cache = {}
 
@@ -231,3 +234,61 @@ def test_footprint_round_trip_and_gerber(tmp_path):
         cu = geomcheck.extract_copper(fp2, layers=model.layer_pair, shapes=True)
         rep, kinds = check(cu, variable_intent(model, res))
         assert not set(kinds) - {'conformance'}, rep.notes
+
+
+def test_polygon_joints_are_closed_on_curves():
+    """ On a finely segmented curve, every trapezoid joint gets a circle: the polygon copper covers what the V copper
+    covers (no comb of wedge slits on the outer edge of the bends) """
+    import shapely
+    model, res = tapered('kicoil', 'circle30x6_n2k1')
+    av = sum(g.area for g in res.copper_union('v'))
+    ap = sum(g.area for g in res.copper_union('poly'))
+    assert abs(ap / av - 1) < 0.005, (av, ap)
+    v, p = res.copper_union('v')[0], res.copper_union('poly')[0]
+    # no slit of V copper missing from the polygon copper wider than a few nm
+    assert v.difference(p.buffer(1e-4)).area < 1e-3 * v.area
+
+
+def test_same_turn_merge_is_reported_by_verify():
+    """ verify() reports same-turn copper that comes closer than the constant layout (and the clearance) about half a
+    turn apart along the conductor """
+    model, res = tapered('kicoil', 'circle30x6_n2k1')
+    w = res.widths.copy()
+    try:
+        res.widths = w * 1.5
+        res._spans = None
+        gap, _where = res.verify('v')
+        assert gap < -0.5
+    finally:
+        res.widths = w
+        res._spans = None
+    assert res.verify('v')[0] >= -1e-5
+
+
+def _split_tracks(fp, n=3):
+    """ The footprint with every track cut into n collinear pieces """
+    from kicoil import kicad
+    fp = copy.deepcopy(fp)
+    out = []
+    for l in fp.lines:
+        a, b = (l.start.x, l.start.y), (l.end.x, l.end.y)
+        for k in range(n):
+            p = (a[0] + (b[0]-a[0])*k/n, a[1] + (b[1]-a[1])*k/n)
+            q = (a[0] + (b[0]-a[0])*(k+1)/n, a[1] + (b[1]-a[1])*(k+1)/n)
+            out.append(kicad.make_line(*p, *q, geomcheck._stroke_width(l), l.layer))
+    fp.lines = out
+    return fp
+
+
+@pytest.mark.parametrize('impl,name', [('kicoil', '24gon_a0.90_n3k1'), ('kicoil', 'octagon_a0.90_n3k1'),
+                                       ('geometry_alt_cornerflat', 'sector180_a0.90_n3k1')])
+def test_checker_verdict_does_not_depend_on_segmentation(impl, name):
+    """ Path distances are measured at the closest points, so cutting the tracks into pieces changes nothing """
+    model, _res = tapered(impl, name)
+    fp = model.render_footprint(circle_segments=64)
+    intent = geomcheck.intent_from_model(model)
+    r1, k1 = check(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
+    r2, k2 = check(geomcheck.extract_copper(_split_tracks(fp), layers=model.layer_pair), intent)
+    assert k1 == k2
+    for attr in ('worst_clearance_deficit', 'worst_via_deficit', 'worst_self_short'):
+        assert getattr(r1, attr) == pytest.approx(getattr(r2, attr), abs=1e-6), attr

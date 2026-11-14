@@ -759,15 +759,25 @@ def _merge_tapers(segs, copper, layers):
             unrecognized.append(f'polygon on {layer}, outside the layer pair')
             continue
         found = []
+        attached = []
         if len(ppts) == 4 and Polygon(ppts).is_valid:
             for e1, e2 in ((3, 1), (0, 2)):
                 q1, q2 = find_node(layer, mids[e1], ('poly', k)), find_node(layer, mids[e2], ('poly', k))
+                attached += [e for e, q in ((e1, q1), (e2, q2)) if q is not None]
                 if q1 is not None and q2 is not None:
                     found.append((e1, e2, q1, q2))
         if len(found) != 1:
             x, y = ppts[0]
+            if len(ppts) != 4:
+                why = 'not 4 points'
+            elif not Polygon(ppts).is_valid:
+                why = 'invalid polygon'
+            elif not found:
+                why = f'edge midpoints attached to other copper: {sorted(attached) or "none"}, need two opposite'
+            else:
+                why = 'both pairs of opposite edge midpoints are attached'
             unrecognized.append(f'copper polygon with {len(ppts)} points at ({x:.3f}, {y:.3f}) is not a tapered piece '
-                                f'between two copper nodes')
+                                f'between two copper nodes ({why})')
             continue
         e1, e2, q1, q2 = found[0]
         w1 = math.dist(ppts[e1], ppts[(e1+1) % 4])
@@ -1120,6 +1130,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
 
     rep.reaches_pad2 = any(n in dist for n in end)
     seg_s = np.full(len(segs), np.nan)
+    seg_span = np.zeros(len(segs)) # path length covered by the segment (its length on the path, ~0 for stubs)
     for i, s in enumerate(segs):
         if i in duplicate:
             continue
@@ -1128,6 +1139,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             rep.orphans += 1
             continue
         seg_s[i] = (d1 + d2) / 2
+        seg_span[i] = min(abs(d2 - d1), s.length)
 
     # The path from pad 1 to pad 2 uses every segment exactly once when the degree checks above pass: pads 1 and 2
     # have one track connection, every other node two (stubs and track inside a via or pad aside), so the component
@@ -1197,6 +1209,17 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         for i in internal:
             if i in oriented:
                 theta_a[i] = node_theta.get(oriented[i][2], math.nan)
+
+    def s_at(i, p):
+        """ Path position at the point of segment i closest to p. Path distances between pieces are measured between the
+        closest points, so that they do not depend on how the conductor is cut into segments. """
+        s = segs[i]
+        if i not in oriented or seg_span[i] == 0.0:
+            return seg_s[i]
+        a = oriented[i][0]
+        l2 = (s.b[0]-s.a[0])**2 + (s.b[1]-s.a[1])**2
+        t = 0.0 if l2 == 0 else max(0.0, min(1.0, math.dist(a, p) / math.sqrt(l2)))
+        return seg_s[i] + (t - 0.5) * seg_span[i]
 
     def theta_at(i, p):
         """ Cumulative winding angle at point p of segment i """
@@ -1271,7 +1294,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         crossing = d == 0.0 and _segments_intersect(si.a, si.b, sj.a, sj.b)
         if deficit <= 1e-4 and not crossing:
             continue
-        ds = abs(seg_s[i] - seg_s[j]) - (si.length + sj.length)/2
+        ds = abs(s_at(i, p) - s_at(j, q))
         far = other_turn(ds, theta_at(i, p), theta_at(j, q))
         if not far and ds < s_near:
             continue
@@ -1302,7 +1325,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         if s_body is None or np.isnan(seg_s[i]):
             return True, math.inf, math.nan
         th = theta_at(i, p)
-        ds = abs(seg_s[i] - s_body) - segs[i].length/2
+        ds = abs(s_at(i, p) - s_body)
         return other_turn(ds, th, th_body), ds, th
 
     # vias vs tracks and vias vs vias
@@ -1391,7 +1414,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             if i not in oriented:
                 return None, math.nan
             a = oriented[i][0]
-            return seg_s[i] - segs[i].length/2 + math.dist(a, q), theta_at(i, q)
+            return s_at(i, q), theta_at(i, q)
         return body_pos(att[1])
 
     def track_violation(deficit, pos):
@@ -1415,7 +1438,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             if s.layer != dt.layer:
                 continue
             q = _closest_on_seg(c, s.a, s.b)
-            if not np.isnan(seg_s[i]) and not dot_far(seg_s[i], theta_at(i, q), s.length/2):
+            if not np.isnan(seg_s[i]) and not dot_far(s_at(i, q), theta_at(i, q)):
                 continue
             deficit = r + clr - _copper_gap_point(s, c)
             if deficit > 1e-4:
@@ -1468,7 +1491,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
                 gap = math.dist(p, q) - (s.width_at(p) + segs[j].width_at(q))/2
                 if gap >= best:
                     continue
-                if not other_turn(abs(seg_s[j] - sp) - segs[j].length/2, th_p, theta_at(j, q)):
+                if not other_turn(abs(s_at(j, q) - sp), th_p, theta_at(j, q)):
                     continue
                 best = gap
             if best < math.inf:

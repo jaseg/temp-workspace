@@ -97,6 +97,8 @@ def run_case(args):
         res['t_min_width'] = r.min_width
         res['t_max_width'] = float(r.widths.max())
         res['forced'] = r.forced
+        res['necks'] = r.necks
+        res['taper_warnings'] = r.warnings
         res['unresolved'] = r.unresolved
         res['n_vertices'] = len(r.widths)
         res['fill_const'] = r.fill_fraction()

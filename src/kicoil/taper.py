@@ -61,6 +61,12 @@ NM = 1e-6 # mm, coordinate resolution of the emitted footprint
 MIN_TAPER = 1e-4 # mm, pieces whose end widths differ less than this are emitted with constant width (the smaller)
 MAX_PIECE_TURN = 0.04 # revolutions of winding angle per piece at most
 TURN_SEP = 0.5 # revolutions; copper this far apart in winding angle belongs to different turns
+# Copper of the same conductor must not merge where that would bypass part of a turn (a self short): pieces at least
+# SELF_SEP revolutions apart in winding angle (geomcheck's SELF_SHORT_SEP), or whose distance along the path is more than
+# SELF_PATH_RATIO times their distance plus the constant trace width (independent of the center the winding angle is
+# measured around), keep at least the smaller of the clearance and the gap the constant width layout has there.
+SELF_SEP = 0.18
+SELF_PATH_RATIO = 2.0
 
 
 @dataclass
@@ -70,7 +76,9 @@ class TaperOptions:
     piece_length: float = None # mm; default: half the nominal pitch
     quantum: float = 0.005 # mm, widths are rounded down to multiples of this
     balance: bool = True # grow widths into room left over by the symmetric split
-    joint_angle: float = 2.0 # degrees; trapezoid joints bent more than this get a circle (polygon representation)
+    joint_angle: float = 0.0 # degrees; trapezoid joints bent more than this get a circle (polygon representation).
+    # 0: every bend whose notch on the outside would be wider than 1 nm (a curve cut into many trapezoids otherwise
+    # leaves a comb of wedge slits on its outer edge)
     max_v_ratio: float = 2.0 # wide / narrow width of one V; longer tapers are split
     width_tol: float = 0.03 # relative undercut allowed when merging pieces of a straight run into one taper
     arm_angle_turns: bool = False # also separate turns by the arm angle parameter (stricter than geomcheck)
@@ -211,7 +219,10 @@ class TaperResult:
             if style == 'poly':
                 # Close the notch on the outside of bends between two trapezoids
                 for (a0, k, _w0, wk), (_k, b1, _w2, _w3), ka, kb in zip(spans, spans[1:], kinds, kinds[1:]):
-                    if ka == 'poly' and kb == 'poly' and _bend(pts[a0], pts[k], pts[b1]) > lim:
+                    if ka != 'poly' or kb != 'poly':
+                        continue
+                    bend = _bend(pts[a0], pts[k], pts[b1])
+                    if bend > lim and wk/2 * bend > NM:
                         own = (ci, pts[k], pts[k], c.theta[k], c.theta[k], c.phi[k], c.phi[k], c.s[k], c.s[k])
                         prims.append(dict(kind='circle', layer=c.layer, center=pts[k], diameter=_round_down(wk),
                                           owner=own))
@@ -294,15 +305,27 @@ class TaperResult:
         ia, ib = tree.query(cores, predicate='dwithin', distance=2*reach + self.clearance)
         sel = (ia < ib) & (layers[ia] == layers[ib])
         ia, ib = ia[sel], ib[sel]
+        s_near = pi/2 * (self.w0 + self.clearance)
         if len(ia):
             d = shapely.distance(cores[ia], cores[ib]) - radii[ia] - radii[ib]
             close = d < 2 * self.clearance
             for i, j, g in zip(ia[close], ib[close], d[close]):
                 x, y = shapely.get_coordinates(shapely.shortest_line(cores[i], cores[j]))
-                if not _different_turn_at(_owner_at(owners[i], x), _owner_at(owners[j], y), s_far, arm):
-                    continue
-                if g - self.clearance < worst:
-                    worst, where = g - self.clearance, tuple(x)
+                oi, oj = _owner_at(owners[i], x, self.center), _owner_at(owners[j], y, self.center)
+                need = self.clearance
+                if not _different_turn_at(oi, oj, s_far, arm):
+                    # same turn: must not come closer than the constant layout or the clearance where merging would
+                    # short part of the turn
+                    ci, cj = owners[i], owners[j]
+                    dc = _seg_dist(ci[1], ci[2], cj[1], cj[2])
+                    ds = abs(oi[4] - oj[4]) # (at the closest points, like geomcheck)
+                    if not (oi[0] == oj[0] and ds >= s_near and
+                            (abs(oi[2] - oj[2]) >= SELF_SEP or ds >= SELF_PATH_RATIO * (dc + self.w0))):
+                        continue
+                    need = min(self.clearance, dc - self.w0)
+                if g - need < worst:
+                    worst, where = g - need, tuple(x)
+                    self.verify_detail = (prims[i], prims[j], float(g), need)
         for b in self.bodies:
             bp = Point(b.x, b.y)
             for i in tree.query(bp, predicate='dwithin', distance=b.diameter/2 + reach + self.clearance):
@@ -312,12 +335,18 @@ class TaperResult:
                 if g >= 2 * self.clearance:
                     continue
                 x = shapely.get_coordinates(shapely.shortest_line(cores[i], bp))[0]
-                o = _owner_at(owners[i], x)
+                o = _owner_at(owners[i], x, self.center)
+                need = self.clearance
                 if not all(_different_turn_at(o, (bo[0], bo[1], bo[2], (bo[3], bo[3])), s_far, arm)
                            for bo in b.owners):
-                    continue
-                if g - self.clearance < worst:
-                    worst, where = g - self.clearance, (b.x, b.y)
+                    dc = _seg_dist(owners[i][1], owners[i][2], (b.x, b.y), (b.x, b.y)) - b.diameter/2
+                    if not any(o[0] == bo[0] and abs(o[4] - bo[3]) >= s_near + b.diameter/2 and
+                               (abs(o[2] - bo[2]) >= SELF_SEP or abs(o[4] - bo[3]) >= SELF_PATH_RATIO * (dc + self.w0))
+                               for bo in b.owners):
+                        continue
+                    need = min(self.clearance, dc - self.w0/2)
+                if g - need < worst:
+                    worst, where = g - need, (b.x, b.y)
         return worst, where
 
     def _s_far(self):
@@ -450,7 +479,7 @@ def _trapezoid(p, q, wp, wq, layer, own):
     return dict(kind='poly', layer=layer, pts=[_round_pt(x) for x in pts], owner=own)
 
 
-def _owner_at(o, x):
+def _owner_at(o, x, center=None):
     """ (conductor, theta, phi, s interval) of owner range o = (conductor, a, b, theta range, phi range, s range) at
     the point of its center line a-b closest to x. The path position is kept as the piece's interval: geomcheck measures
     path distances between pieces as the gap between their intervals. """
@@ -458,7 +487,21 @@ def _owner_at(o, x):
     dx, dy = b[0] - a[0], b[1] - a[1]
     l2 = dx*dx + dy*dy
     t = 0.0 if l2 == 0 else min(1.0, max(0.0, ((x[0] - a[0])*dx + (x[1] - a[1])*dy) / l2))
-    return (ci, o[3] + t*(o[4] - o[3]), o[5] + t*(o[6] - o[5]), (min(o[7], o[8]), max(o[7], o[8])))
+    if center is None:
+        phi = o[5] + t*(o[6] - o[5])
+    else:
+        # exact winding angle of the closest point (a long straight span sweeps its angle nonlinearly)
+        cx, cy = center
+        px, py = a[0] + t*dx, a[1] + t*dy
+        da = math.atan2(py - cy, px - cx) - math.atan2(a[1] - cy, a[0] - cx)
+        phi = o[5] + ((da + pi) % (2*pi) - pi) / (2*pi)
+    return (ci, o[3] + t*(o[4] - o[3]), phi, (min(o[7], o[8]), max(o[7], o[8])), o[7] + t*(o[8] - o[7]))
+
+
+def _seg_dist(a, b, c, d):
+    """ Distance between the segments a-b and c-d """
+    return float(_seg_seg_distance_np(np.array([a], float), np.array([b], float), np.array([c], float),
+                                      np.array([d], float))[0])
 
 
 def _interval_gap(a, b):
@@ -483,6 +526,18 @@ def _different_turn(o1, o2, s_far, arm=False):
     ph = max(abs(o1[3] - o2[3]), abs(o1[3] - o2[4]), abs(o1[4] - o2[3]), abs(o1[4] - o2[4]))
     ds = _interval_gap((min(o1[5], o1[6]), max(o1[5], o1[6])), (min(o2[5], o2[6]), max(o2[5], o2[6])))
     return (arm and th >= TURN_SEP) or ph >= TURN_SEP or ds >= s_far
+
+
+def _self_relevant(o1, o2, gap, w0, s_near):
+    """ Owners (conductor, theta range, phi range, s range) of the same turn whose copper must not merge: at least
+    s_near apart along the path somewhere, and at least SELF_SEP revolutions apart in winding angle or further apart
+    along the path than SELF_PATH_RATIO times their center line distance `gap` plus w0 (largest differences between the
+    pieces' ends, so that every pair geomcheck could see as a self short is included) """
+    if o1[0] != o2[0]:
+        return False
+    ph = max(abs(o1[3] - o2[3]), abs(o1[3] - o2[4]), abs(o1[4] - o2[3]), abs(o1[4] - o2[4]))
+    ds = max(abs(o1[5] - o2[5]), abs(o1[5] - o2[6]), abs(o1[6] - o2[5]), abs(o1[6] - o2[6])) # largest path distance
+    return ds >= s_near and (ph >= SELF_SEP or ds >= SELF_PATH_RATIO * (gap + w0))
 
 
 def _douglas_peucker(P, tol):
@@ -680,6 +735,7 @@ def taper_layout(model, options=None, **kw):
 
     s_far = 0.9 * max(4 * (w0 + clr), 0.25 * _inset(contour, annular).length if not _inset(contour, annular).is_empty
                       else contour.length)
+    s_near = pi/2 * (w0 + clr) # pieces of the same conductor closer than this along the path may always merge
     tree = shapely.STRtree(lines)
     for b in bodies:
         bp = Point(b.x, b.y)
@@ -688,17 +744,23 @@ def taper_layout(model, options=None, **kw):
             if LY[i] not in b.layers:
                 continue
             own = (CI[i], TH[i, 0], TH[i, 1], PH[i, 0], PH[i, 1], SS[i, 0], SS[i, 1])
-            if not all(_different_turn(own, (ci, th, th, ph, ph, s, s), s_far, opt.arm_angle_turns)
-                       for ci, th, ph, s in b.owners):
-                continue
             d = float(_point_seg_distance_np(np.array([[b.x, b.y]]), PA[i:i+1], PB[i:i+1])[0])
-            cap[i] = min(cap[i], 2 * (d - b.diameter/2 - clr))
+            if all(_different_turn(own, (ci, th, th, ph, ph, s, s), s_far, opt.arm_angle_turns)
+                   for ci, th, ph, s in b.owners):
+                cap[i] = min(cap[i], 2 * (d - b.diameter/2 - clr))
+            elif any(_self_relevant(own, (ci, th, th, ph, ph, s, s), d - b.diameter/2, w0, s_near + b.diameter/2)
+                     for ci, th, ph, s in b.owners):
+                # the conductor's own via or pad further along the path: no closer than the constant layout or the
+                # clearance
+                cap[i] = min(cap[i], max(2 * (d - b.diameter/2 - clr), w0))
 
     # pairs of pieces of different turns on the same layer. A pair can only limit the widths when its distance is below
     # (W_i + W_j)/2 + clearance, where W is an upper bound of the width: the cap, and twice the distance to the nearest
     # piece of another turn (less the clearance and the narrowest partner). Find that nearest distance first with a
     # radius of a few pitches, then query each piece with its own radius.
-    def other_turn_pairs(ia, ib):
+    def other_turn_pairs(ia, ib, with_self=False):
+        """ Pairs of pieces of different turns (with_self: also pairs of the same turn that must not merge, see
+        SELF_SEP), their distance and the bound on the sum of their end widths """
         sel = (ia != ib) & (LY[ia] == LY[ib])
         ia, ib = ia[sel], ib[sel]
         same = CI[ia] == CI[ib]
@@ -706,26 +768,37 @@ def taper_layout(model, options=None, **kw):
         ph = np.max(np.abs(PH[ia][:, :, None] - PH[ib][:, None, :]), axis=(1, 2))
         ds = np.maximum(0, np.maximum(SS[ia].min(1) - SS[ib].max(1), SS[ib].min(1) - SS[ia].max(1)))
         diff = ~same | ((th >= TURN_SEP) & opt.arm_angle_turns) | (ph >= TURN_SEP) | (ds >= s_far)
-        ia, ib = ia[diff], ib[diff]
-        return ia, ib, _seg_seg_distance_np(PA[ia], PB[ia], PA[ib], PB[ib])
+        d = _seg_seg_distance_np(PA[ia], PB[ia], PA[ib], PB[ib])
+        bound = 2 * (d - clr)
+        if with_self:
+            # same turn, but far enough apart (in winding angle, or along the path compared with the distance) that
+            # merging would short part of the turn: keep min(clearance, constant layout gap)
+            # (largest path distance between the pieces: constrain every pair that could be far apart somewhere)
+            dsx = np.max(np.abs(SS[ia][:, :, None] - SS[ib][:, None, :]), axis=(1, 2))
+            selfp = ~diff & (dsx >= s_near) & ((ph >= SELF_SEP) | (dsx >= SELF_PATH_RATIO * (d + w0)))
+            diff = diff | selfp
+            bound = np.where(selfp, np.maximum(bound, 2 * w0), bound)
+        return ia[diff], ib[diff], d[diff], bound[diff]
 
     cap = np.minimum(cap, hi)
     r1 = 2 * pitch + clr
-    ia, ib = tree.query(lines, predicate='dwithin', distance=r1)
-    ia, ib, d = other_turn_pairs(ia, ib)
+    ia0, ib0 = tree.query(lines, predicate='dwithin', distance=r1)
+    ia, ib, d, bound = other_turn_pairs(ia0, ib0)
     dmin = np.full(npieces, inf)
     np.minimum.at(dmin, ia, d)
     W = np.maximum(np.minimum(cap, 2 * (dmin - clr) - lo), lo)
+    # (same turn pairs that must not merge only lower the widths further, W stays an upper bound)
+    ia, ib, d, bound = other_turn_pairs(ia0, ib0, with_self=True)
     big = W + clr > r1
     if np.any(big):
         ja, jb = tree.query(lines[big], predicate='dwithin', distance=W[big] + clr)
         ja = np.flatnonzero(big)[ja]
-        ja, jb, dj = other_turn_pairs(ja, jb)
-        ia, ib, d = np.concatenate([ia, ja]), np.concatenate([ib, jb]), np.concatenate([d, dj])
+        ja, jb, dj, bj = other_turn_pairs(ja, jb, with_self=True)
+        ia, ib = np.concatenate([ia, ja]), np.concatenate([ib, jb])
+        d, bound = np.concatenate([d, dj]), np.concatenate([bound, bj])
     # (<=: the pair with the nearest partner, which W is derived from, must stay even at equality)
-    keep = d <= (W[ia] + W[ib]) / 2 + clr + 1e-9
-    ia, ib, d = ia[keep], ib[keep], d[keep]
-    bound = 2 * (d - clr)
+    keep = bound <= W[ia] + W[ib] + 1e-9
+    ia, ib, d, bound = ia[keep], ib[keep], d[keep], bound[keep]
 
     # vertex level: cap, and pair constraints w_x + w_y <= bound for the ends x of one piece and y of the other
     vcap = np.full(nv, hi)
@@ -797,7 +870,22 @@ def taper_layout(model, options=None, **kw):
                       allowed=allowed, lo=lo, hi=hi, forced=forced, unresolved=unresolved, r_const=r_const,
                       r_taper=r_taper, length=float(L.sum()), time=time.perf_counter() - t0, base_footprint=fp,
                       envelope=env, ring=ring, _layers=tuple(layer_names))
+    res.center = center # winding angles are measured around this point
     res.vcap = vcap # per vertex upper bound from vias, pads and the envelope (diagnostics)
+    # Necks: vertices narrower than the constant trace width. They occur where the constant layout itself breaks the
+    # clearance (typically a conductor running over its own end via, or another turn's via, about half a turn earlier in
+    # a deep annulus with few, wide turns); tapering narrows the trace there instead of copying the defect.
+    neck = w < 0.99 * w0
+    res.necks = int(neck.sum())
+    res.warnings = []
+    if res.necks:
+        k = int(np.argmin(w))
+        ci = next(i for i, c in enumerate(conductors) if k in c.vidx)
+        c = conductors[ci]
+        kk = int(np.flatnonzero(c.vidx == k)[0])
+        res.warnings.append(f'{res.necks} vertices narrower than the constant trace width {w0:.3f} mm, down to '
+                            f'{w[k]:.3f} mm ({w[k] / w0:.2f}x) at ({c.pts[kk][0]:.3f}, {c.pts[kk][1]:.3f}): the '
+                            f'constant width layout does not keep the clearance there')
     res.pairs = (X, Y, B)
     inner_c = _inset(contour, annular)
     res.ring_inner_length = inner_c.length if not inner_c.is_empty else contour.length
