@@ -27,10 +27,17 @@ def metrics(results):
         'rejected': sum(r['status'] == 'rejected' for r in results),
         'error': sum(r['status'] in ('error', 'checker-error') for r in results),
         'conn broken': sum(not r['ok_connectivity'] for r in checked),
+        'shorts/stray via': sum(r.get('shorts', 0) + r.get('stray_vias', 0) > 0 for r in checked),
+        'stray copper': sum(r.get('stray_copper', 0) > 0 for r in checked),
+        'width wrong': sum(not r.get('width_ok', True) for r in checked),
+        'backtracks': sum(r.get('backtracks', 0) > 0 for r in checked),
         'crossings': sum(r['crossings'] > 0 for r in checked),
         'winding wrong': sum(not abs(r['winding_error']) < 0.05 for r in checked),
         'clear. def>5%': sum(r['rel_deficit'] > 0.05 for r in checked),
         'via def>5%': sum(r.get('rel_via_deficit', 0) > 0.05 for r in checked),
+        'pad def>5%': sum(r.get('rel_pad_deficit', 0) > 0.05 for r in checked),
+        'via offset': sum(r.get('via_misplacement', 0) > 0.05 for r in checked),
+        'conformance bad': sum(not r.get('conformance_ok', True) for r in checked),
         'tracks ok': sum(bool(r.get('tracks_ok')) for r in checked),
         'pitch p10': pct([r.get('pitch_ratio', float('nan')) for r in checked], 0.1),
         'pitch med': pct([r.get('pitch_ratio', float('nan')) for r in checked], 0.5),
@@ -88,7 +95,8 @@ def main():
             print(f'\nWorst {args.worst} by score in {name}:')
             for r in sorted([r for r in res if 'score' in r], key=lambda r: -r['score'])[:args.worst]:
                 print(f"  {r['name']:45s} score={r['score']:.2f} deficit={r['rel_deficit']:.2f} "
-                      f"pitch={r.get('pitch_ratio', float('nan')):.3f} uncovered={r['uncovered_fraction']:.3f}")
+                      f"pitch={r.get('pitch_ratio', float('nan')):.3f} uncovered={r['uncovered_fraction']:.3f} "
+                      f"failures={','.join(r.get('failures', []))}")
 
 
 if __name__ == '__main__':

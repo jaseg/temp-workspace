@@ -20,7 +20,7 @@ import logging
 import traceback
 import dataclasses
 from pathlib import Path
-from multiprocessing import Pool
+import multiprocessing
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -92,18 +92,24 @@ def run_case(args):
         res['traceback'] = traceback.format_exc()[-1500:]
         return res
 
-    res['status'] = 'pass' if rep.passed(intent.clearance, intent.trace_width) else 'fail'
+    kinds = rep.failure_kinds(intent.clearance, intent.trace_width)
+    res['status'] = 'fail' if kinds else 'pass'
+    res['failures'] = kinds
     res['conformance_ok'] = rep.conformance_ok(intent.trace_width)
+    res['width_ok'] = rep.width_ok(intent.trace_width)
     d = dataclasses.asdict(rep)
     viol, cross, samples = d.pop('violations'), d.pop('crossing_points'), d.pop('spacing_samples')
+    d.pop('self_overlap_points')
     res.update(d)
     res['score'] = rep.score(intent.clearance)
     res['clearance'] = intent.clearance
     res['trace_width'] = intent.trace_width
     res['rel_deficit'] = rep.worst_clearance_deficit / intent.clearance
-    # How much of the nominal pitch survives as trace width + clearance (1.0 is ideal)
-    res['pitch_ratio'] = (intent.trace_width + intent.clearance) / res['nominal_pitch']
+    # How much of the nominal pitch survives as trace width + clearance (1.0 is ideal). Uses the narrowest track that
+    # was actually emitted, not the width the generator reports.
+    res['pitch_ratio'] = (rep.min_width + intent.clearance) / res['nominal_pitch']
     res['rel_via_deficit'] = rep.worst_via_deficit / intent.clearance
+    res['rel_pad_deficit'] = rep.worst_pad_deficit / intent.clearance
     res['tracks_ok'] = rep.passed(intent.clearance, intent.trace_width, vias=False)
     res['time'] = time.perf_counter() - t0
     if svg_dir and (res['status'] != 'pass' or os.environ.get('RENDER_ALL')):
@@ -157,12 +163,19 @@ def summarize(results, file=sys.stdout):
         return
     def cnt(pred):
         return sum(1 for r in checked if pred(r))
-    print(f'  connectivity broken: {cnt(lambda r: not r["ok_connectivity"])}', file=file)
+    print(f'  connectivity broken: {cnt(lambda r: not r["ok_connectivity"])}   '
+          f'shorts: {cnt(lambda r: r.get("shorts", 0) > 0)}   stray vias: {cnt(lambda r: r.get("stray_vias", 0) > 0)}   '
+          f'duplicates: {cnt(lambda r: r.get("duplicate_segments", 0) > 0)}', file=file)
+    print(f'  stray copper: {cnt(lambda r: r.get("stray_copper", 0) > 0)}   '
+          f'track width wrong: {cnt(lambda r: not r.get("width_ok", True))}', file=file)
     print(f'  winding wrong (>0.05 turns): {cnt(lambda r: not abs(r["winding_error"]) < 0.05)}', file=file)
     print(f'  with crossings: {cnt(lambda r: r["crossings"] > 0)}', file=file)
     print(f'  clearance deficit >5%: {cnt(lambda r: r["rel_deficit"] > 0.05)}   >50%: {cnt(lambda r: r["rel_deficit"] > 0.5)}', file=file)
-    print(f'  via deficit >5%: {cnt(lambda r: r["rel_via_deficit"] > 0.05)}', file=file)
-    print(f'  backtracks: {cnt(lambda r: r["backtracks"] > 0)}   stubs: {cnt(lambda r: r["stubs"] > 0)}', file=file)
+    print(f'  via deficit >5%: {cnt(lambda r: r["rel_via_deficit"] > 0.05)}   '
+          f'pad deficit >5%: {cnt(lambda r: r.get("rel_pad_deficit", 0) > 0.05)}   '
+          f'via offset exceeded: {cnt(lambda r: r.get("via_misplacement", 0) > geomcheck.OVERSHOOT_TOL)}', file=file)
+    print(f'  backtracks: {cnt(lambda r: r["backtracks"] > 0)}   stubs: {cnt(lambda r: r["stubs"] > 0)}   '
+          f'self overlaps: {cnt(lambda r: r["self_overlaps"] > 0)}', file=file)
     print(f'  tracks ok (ignoring via issues): {cnt(lambda r: r["tracks_ok"])}', file=file)
     unc = sorted(r['uncovered_fraction'] for r in checked if not math.isnan(r['uncovered_fraction']))
     exc = sorted(r['excess_fraction'] for r in checked if not math.isnan(r['excess_fraction']))
@@ -176,7 +189,11 @@ def summarize(results, file=sys.stdout):
     print(f'  conformance bad: {cnt(lambda r: not r["conformance_ok"])}', file=file)
     pr = sorted(r['pitch_ratio'] for r in checked if not math.isnan(r.get('pitch_ratio', float('nan'))))
     if pr:
-        print(f'  pitch ratio (w+c)/nominal: p10 {pr[len(pr)//10]:.3f} median {med(pr):.3f} min {pr[0]:.3f}', file=file)
+        print(f'  pitch ratio (emitted w+c)/nominal: p10 {pr[len(pr)//10]:.3f} median {med(pr):.3f} min {pr[0]:.3f}',
+              file=file)
+    kinds = Counter(k for r in checked for k in r.get('failures', []))
+    if kinds:
+        print('  failure kinds: ' + ', '.join(f'{k}={v}' for k, v in kinds.most_common()), file=file)
     print(f'  total score: {sum(r["score"] for r in checked):.1f}', file=file)
 
 
@@ -195,14 +212,22 @@ def main():
     if args.filter:
         cases = [c for c in cases if any(f in c['name'] for f in args.filter)]
 
-    # warm up the wasm module cache once before forking
+    # Compile the wasm module once so that its on-disk cache exists before the workers start. The workers do not fork
+    # from this process: wasmtime starts threads when a module runs, and forking a process with running threads can
+    # deadlock the children (this used to hang with --impl MODULE). 'forkserver' starts them from a clean process; they
+    # re-import this script (which puts tests/ on sys.path) and the kicoil package.
     import kicoil.geometry  # noqa
-    if args.impl != 'kicoil':
-        build_model(cases[0], args.impl) if cases else None
+    if args.impl != 'kicoil' and cases:
+        build_model(cases[0], args.impl)
 
     t0 = time.perf_counter()
-    with Pool(args.j) as pool:
-        results = pool.map(run_case, [(c, args.impl, args.svg_dir) for c in cases], chunksize=1)
+    jobs = [(c, args.impl, args.svg_dir) for c in cases]
+    if args.j <= 1:
+        results = [run_case(job) for job in jobs]
+    else:
+        ctx = multiprocessing.get_context('forkserver')
+        with ctx.Pool(args.j) as pool:
+            results = pool.map(run_case, jobs, chunksize=1)
     elapsed = time.perf_counter() - t0
 
     if args.v:
@@ -210,7 +235,8 @@ def main():
             if r['status'] == 'pass':
                 continue
             if r['status'] in ('fail',):
-                print(f"{r['status']:8s} {r['name']:45s} conn={r['ok_connectivity']!s:5s} open={r['open_ends']} "
+                print(f"{r['status']:8s} {r['name']:45s} [{','.join(r.get('failures', []))}] "
+                      f"conn={r['ok_connectivity']!s:5s} open={r['open_ends']} "
                       f"branch={r['branches']} wind={r['winding_error']:+.3f} cross={r['crossings']} "
                       f"deficit={r['rel_deficit']:.2f} via={r['rel_via_deficit']:.2f} unc={r['uncovered_fraction']:.3f} under={r['contour_hausdorff']:.2f} "
                       f"over={r['overshoot']:.3f}")

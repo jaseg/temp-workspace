@@ -11,29 +11,42 @@ Prerequisite: `src/kicoil/skeleton.wasm` (built from `cgal_skeleton_core`, or co
 ## Files
 
 - `geomcheck.py`: the checker. `extract_copper(footprint)` flattens a footprint into straight segments (arcs are
-  discretized to 0.5 µm), vias and pads; `intent_from_model(model)` derives the intended geometry;
-  `check_layout(copper, intent)` returns a `Report`.
+  discretized to 0.5 µm), vias and pads, and lists copper items it cannot interpret; `intent_from_model(model)` derives
+  the intended geometry; `check_layout(copper, intent)` returns a `Report`. `Report.failure_kinds(clearance, w)` names
+  the failed checks, `Report.passed(...)` is true when there are none.
 - `corpus.py`: about 600 deterministic test cases (`corpus('full')`, or `corpus('quick')` for every 7th case).
 - `run_corpus.py`: runs the corpus in parallel, prints a summary, writes per-case JSON and renders SVGs of failing cases.
+- `compare_results.py`: compares the JSON of several runs (e.g. two implementations, or before/after a change).
 - `test_layout.py`: pytest suite. Runs the quick corpus plus regression tests for specific bugs. `--full-corpus` runs
   everything.
+- `test_geomcheck.py`: mutation tests for the checker. Takes clean layouts of a few corpus cases, injects one defect
+  at a time (gaps, deleted or duplicated segments, pushed vertices, shorted turns, vias moved outside, narrow tracks,
+  oversized or displaced pads, copper on an inner layer, a via shorting pad 1 to pad 2, stray vias, hairpins, mirrored
+  copper) and asserts that the checker reports the right kind of failure. It also asserts that legitimate variations
+  (a track end inside a via or pad, a track drawn as two overlapping collinear pieces, split, reversed or shuffled
+  segments, rotated rectangular pads) pass.
 
 ## What is checked
 
 | Property | Check |
 |---|---|
-| Connectivity | Centerline graph (endpoints joined within 1 nm, vias join layers) must be a simple path from pad 1 to pad 2: no open ends, no branches, no orphaned segments. Dangling stubs next to pads are counted separately. |
+| Stray copper | Tracks on copper layers other than the coil's layer pair, pads other than 1 and 2, and copper the checker does not interpret (copper rectangles, circles, polygons, curves, text, filled zones, custom pads) are errors. |
+| Track width | Every emitted track must have the intended trace width (within 1 % or 1 µm). `min_width`/`max_width` are reported. |
+| Connectivity | Copper must form a simple path from pad 1 to pad 2 that uses every segment exactly once. Track ends are joined when they coincide (1 nm), when a dangling end lies inside a via's or pad's copper, or when two collinear pieces of track on one layer overlap and each one's dangling end lies on the other (1 µm). Vias join the layers. Reports open ends, branches, orphaned segments, duplicate segments (an exact copy, or a loose piece lying on another track), stray vias (fewer than two track connections), and shorts (pad 1 and pad 2 joined by via or pad copper, or a path that bypasses segments). Dangling stubs at a pad that are no longer than the pad plus the via offset are counted separately. |
 | Winding | Total angle swept by the path around a point in the coil's hole must equal the number of turns (sign by direction). Catches lost, doubled or reversed turns. |
-| Backtracking | Consecutive segments on one layer that reverse direction (> 170°). |
-| Crossings | Same-layer centerlines of segments that are far apart along the conductor must not intersect. |
-| Clearance | Edge-to-edge distance between copper of *different turns* (more than max(4·(w+c), ¼ inner perimeter) apart along the conductor path) must be at least the clearance. Track-to-track and via-related violations are reported separately (worst deficit in mm and relative to the clearance). |
-| Spacing uniformity | Sampled edge-to-edge distance to the neighboring turn, relative to the clearance (min, 5th and 95th percentile), and `pitch_ratio` = (w + c) / nominal pitch, i.e. how much of the available pitch the layout turns into copper. |
-| Outline conformance | *Core coverage*: every spiral layer, inflated by half a pitch, must cover the band from ½ pitch to annular width − ½ pitch inside the outline (uncovered area means wasted space or a missing turn). *Overshoot*: no copper outside the envelope from −w/2 to annular width + w/2 (allowing via stubs). *Undershoot*: every point of the outline within one pitch of copper. |
+| Backtracking | Consecutive segments on one layer that reverse direction (> 170°), e.g. a hairpin inside the track's own lane. |
+| Crossings | Same-layer centerlines of segments that are not neighbors along the conductor must not intersect (strict crossing; touching shows up as zero clearance). |
+| Clearance | Edge-to-edge distance between copper of *different turns* must be at least the clearance. Copper belongs to different turns when it is at least half a turn apart in cumulative winding angle around the coil's center (measured at the closest points), or more than max(4·(w+c), ¼ inner perimeter) apart along the conductor. Track-track, via-track/via-via and pad-track/pad-via/pad-pad violations are reported separately (worst deficit in mm and relative to the clearance). Deficits between parts of the same turn (the conductor folding onto itself at a tight tip) are counted as `self_overlaps` and do not fail a case. |
+| Spacing uniformity | Sampled edge-to-edge distance to the neighboring turn, relative to the clearance (min, 5th and 95th percentile), and `pitch_ratio` = (narrowest emitted track width + c) / nominal pitch, i.e. how much of the available pitch the layout turns into copper. |
+| Outline conformance | *Core coverage*: every spiral layer, inflated by half a pitch, must cover the band from ½ pitch to annular width − ½ pitch inside the outline (uncovered area means wasted space or a missing turn). *Overshoot*: no copper (tracks, vias, pads) outside the envelope from −w/2 to annular width + w/2. Near a via, copper may extend as far as a via at the intended via offset reaches (offset + via radius, three times the offset with staggered vias). *Via offset*: every via center must lie within the intended via offset of the band between outline and inner outline. *Undershoot*: every point of the outline within one pitch of copper. |
 
-A case passes when connectivity is intact, there are no crossings, track and via clearance deficits are at most 5 % of
-the clearance, the winding is within 0.05 turns, and conformance holds (uncovered < 5 %, undershoot < 1.25 pitches,
-overshoot < max(0.05 mm, w/10)). Requests that the generator rejects with a `ValueError` are reported as `rejected`; a
-clear rejection of an infeasible request is acceptable, a crash (`error`) is not.
+A case passes when none of the checks fails: connectivity intact, no stray copper, track widths as intended, no
+crossings, no backtracks, track, pad and via clearance deficits at most 5 % of the clearance, via centers within
+0.05 mm of the intended via offset, the winding within 0.05 turns, and conformance holds (uncovered < 5 %,
+undershoot < 1.25 pitches, overshoot < 0.05 mm). `run_corpus.py` stores the names of the failed checks per case in
+`failures` and prints a count per kind. Requests that the generator rejects with a `ValueError` are reported as
+`rejected`; a clear rejection of an infeasible request is acceptable, a crash (`error`) is not. (`test_corpus_case` in
+`test_layout.py` still asserts its own, shorter list of conditions.)
 
 ## Corpus
 
@@ -63,7 +76,8 @@ PYTHONPATH=/path/to/other/checkout/src uv run python tests/run_corpus.py --out o
 uv run python tests/run_corpus.py --impl geometry_alt_cornerflat
 ```
 
-`--impl MODULE` loads `kicoil.MODULE` instead of `kicoil.geometry`. `--filter SUBSTR` selects cases by name. With
+`--impl MODULE` loads `kicoil.MODULE` instead of `kicoil.geometry`. Workers are started with the `forkserver` method
+(wasmtime runs threads, and forking a process that has run the wasm module can deadlock), `-j 1` runs in-process. `--filter SUBSTR` selects cases by name. With
 `RENDER_ALL=1` every case is rendered, not only failures. The SVGs show both copper layers, the outline, violations
 (orange), crossings and the location of the minimum turn spacing (magenta) and a heat map of the spacing on the first
 layer (green: spacing matches w+c, blue: looser, red: tighter).
