@@ -53,3 +53,15 @@ def test_svg_import_independent_of_orientation(tmp_path, reverse, repeat_start):
     ref = affinity.translate(ref, -cr.x, -cr.y)
     assert got.symmetric_difference(ref).area < 1e-3
     assert abs(shape.sk.max_depth - corpus_concave.split_depth(corpus_concave.shark())) < 1e-3
+
+
+def test_probe_rounds_the_heart_cusp_inside_the_outline():
+    # Prototype (geometry_alt_concave_probe): rounding the heart's cusp lifts the split depth from 1.6 to about 10 mm,
+    # with the laid-out outline inside the intended one and an arc small enough to keep the copper within the envelope.
+    from kicoil import geometry_alt_concave_probe as probe
+    radii = []
+    poly, history = probe.lift_split_depth(corpus_concave.heart(), radii=radii)
+    assert history[0] < 1.7 and history[-1] > 10
+    assert radii and max(radii) <= probe.REFLEX_RADIUS <= 0.05
+    design = Polygon(corpus_concave.heart())
+    assert design.buffer(1e-9).contains(Polygon(poly))
