@@ -59,6 +59,7 @@ from .geometry import _seg_seg_distance_np, _point_seg_distance_np
 
 NM = 1e-6 # mm, coordinate resolution of the emitted footprint
 MIN_TAPER = 1e-4 # mm, pieces whose end widths differ less than this are emitted with constant width (the smaller)
+MAX_PIECE_TURN = 0.04 # revolutions of winding angle per piece at most
 TURN_SEP = 0.5 # revolutions; copper this far apart in winding angle belongs to different turns
 
 
@@ -235,11 +236,11 @@ class TaperResult:
                 fp.lines.append(kicad.make_line(*p['a'], *p['b'], p['width'], layer))
             elif p['kind'] == 'poly':
                 fp.polygons.append(FpPolygon(pts=[XYCoord(x=x, y=y) for x, y in p['pts']],
-                                             layer=layer, width=0.0, stroke=None, fill=True))
+                                             layer=layer, width=0.0, stroke=None, fill=Atom.solid))
             else:
                 x, y = p['center']
                 fp.circles.append(FpCircle(center=XYCoord(x=x, y=y), end=XYCoord(x=_rnd(x + p['diameter']/2), y=y),
-                                           layer=layer, width=0.0, stroke=None, fill=True))
+                                           layer=layer, width=0.0, stroke=None, fill=Atom.solid))
         fp.descr = (fp.descr or '') + f' Tapered traces ({style}), {self.min_width:.3f} to {float(self.widths.max()):.3f} mm.'
         return fp
 
@@ -570,7 +571,12 @@ def _conductors(model, fp, piece_length, simplify_tol=0.0):
         out_p, out_t = [P[0]], [T[0]]
         for k in range(len(P) - 1):
             L = dist(P[k], P[k+1])
-            m = max(1, ceil(L / piece_length - 1e-9))
+            # at most piece_length long, and at most MAX_PIECE_TURN revolutions of winding angle (the turn separation
+            # uses the largest winding angle difference between two pieces, so long pieces would be over-constrained)
+            a0 = math.atan2(P[k][1] - center[1], P[k][0] - center[0])
+            a1 = math.atan2(P[k+1][1] - center[1], P[k+1][0] - center[0])
+            sweep = abs((a1 - a0 + pi) % (2*pi) - pi) / (2*pi)
+            m = max(1, ceil(L / piece_length - 1e-9), ceil(sweep / MAX_PIECE_TURN - 1e-9))
             for q in range(1, m + 1):
                 f = q / m
                 out_p.append(P[k] + f * (P[k+1] - P[k]))
@@ -772,6 +778,8 @@ def taper_layout(model, options=None, **kw):
                       allowed=allowed, lo=lo, hi=hi, forced=forced, unresolved=unresolved, r_const=r_const,
                       r_taper=r_taper, length=float(L.sum()), time=time.perf_counter() - t0, base_footprint=fp,
                       envelope=env, ring=ring, _layers=tuple(layer_names))
+    res.vcap = vcap # per vertex upper bound from vias, pads and the envelope (diagnostics)
+    res.pairs = (X, Y, B)
     inner_c = _inset(contour, annular)
     res.ring_inner_length = inner_c.length if not inner_c.is_empty else contour.length
     return res
