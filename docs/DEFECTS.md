@@ -33,14 +33,14 @@ Entries from the second review:
 | D27 | circles rendered without arcs lose clearance to the chords | yes |
 | D28 | turns fold onto themselves in narrow protrusions and notches | yes |
 | D29 | trace width + clearance branch: 2-decimal rounding, wrong advice, no hint | yes |
-| D1, D4, D7, D8, D10 | `spiral()` argument order / NaN; merge tolerance from the distance to the origin; slow spacing measurement; silently tightened render settings; via offset through the center of circles | no, first version of the fixes |
+| D1, D4, D7, D8, D10, D22 | `spiral()` argument order / NaN; merge tolerance from the distance to the origin; slow spacing measurement; silently tightened render settings; via offset through the center of circles; kicad-pcb export still failing in gerbonara | no, first version of the fixes |
 
 Every entry was checked by an independent reviewer against the original code (reproduction where practical) and
 corrected where it overstated or misdescribed something. Where a corpus case is given as the symptom, it fails with the
 original code and passes the corresponding check with the fixed code. Entries marked *latent* have no visible symptom
 in the corpus. Three bugs in the first version of the fixes were found the same way and are described with the fix they
-belong to (D2, D3, D10). A second review found more problems in the fixes (D1, D4, D7, D8, D10, described with those
-entries) and six more defects of the original code (D24–D29). The remaining 17 rejections are annular widths beyond the straight-skeleton collapse depth
+belong to (D2, D3, D10). A second review found more problems in the fixes (D1, D4, D7, D8, D10, D22, described with
+those entries) and six more defects of the original code (D24–D29). The remaining 17 rejections are annular widths beyond the straight-skeleton collapse depth
 (stars, L/U shapes, the neck) and one circle whose pitch is smaller than the requested clearance.
 
 ---
