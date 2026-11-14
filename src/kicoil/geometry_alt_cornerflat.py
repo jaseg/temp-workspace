@@ -77,6 +77,16 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, min_path_sepa
     return best, where, folds
 
 
+def _record_folds(model):
+    """ Measure where a turn comes close to itself (e.g. around a sharp tip or a narrow notch) on the chosen layout, with
+    the measurement of `kicoil.geometry`, so that PlanarInductor.__post_init__ warns about it as the base layout does.
+    Only sets min_fold_spacing/min_fold_location, the trace width is not affected. """
+    arms = model.spiral_center_lines()
+    res = [geometry.min_turn_spacing(a, model.spiral_pitch * (1 + 1e-9), folds=True) for a in arms if a]
+    if res:
+        model.min_fold_spacing, model.min_fold_location = min(((r[2], r[3]) for r in res), key=lambda r: r[0])
+
+
 class OffsetShape(geometry.OffsetShape):
     """ Polygon shape laid out with flat corners and ramps (see `CornerFlatSkeletonator`). Angles passed to and
     returned from the spiral methods are *warped* angles, in which the depth of an arm is linear.
@@ -341,6 +351,7 @@ class PlanarInductor(geometry.PlanarInductor):
                         under[key] = self._contour_undershoot(key, results[key][0])
                 bk = min(under, key=lambda k: (under[k] > self.UNDERSHOOT_LIMIT, -results[k][0] if under[k] <= self.UNDERSHOOT_LIMIT else under[k]))
         self._set_layout(bk)
+        _record_folds(self)
         return results[bk]
 
     UNDERSHOOT_LIMIT = 1.15 # largest distance from the outline to the copper, in trace pitches, before trying to improve

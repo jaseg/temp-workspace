@@ -55,6 +55,16 @@ from .geometry import *  # noqa: F401,F403  re-export helpers
 from .geometry import CircleShape, Shape, min_turn_spacing  # noqa: F401
 
 
+def _record_folds(model):
+    """ Measure where a turn comes close to itself (e.g. around a sharp tip or a narrow notch) on the chosen layout, with
+    the measurement of `kicoil.geometry`, so that PlanarInductor.__post_init__ warns about it as the base layout does.
+    Only sets min_fold_spacing/min_fold_location, the trace width is not affected. """
+    arms = model.spiral_center_lines()
+    res = [geometry.min_turn_spacing(a, model.spiral_pitch * (1 + 1e-9), folds=True) for a in arms if a]
+    if res:
+        model.min_fold_spacing, model.min_fold_location = min(((r[2], r[3]) for r in res), key=lambda r: r[0])
+
+
 def _snap(w, k):
     """ Snap w (revolutions) to the nearest multiple of 1/(2k) if it is within floating point error of it """
     g = 2*k
@@ -971,6 +981,7 @@ class PlanarInductor(geometry.PlanarInductor):
         if getattr(self.shape, 'layout', None) is None and not isinstance(self.shape, OffsetShape):
             return super().measure_turn_spacing()
         best, where = self._measure(self.spiral_center_lines(), self.spiral_pitch)
+        _record_folds(self)
         if where is None:
             return self.spiral_pitch, None
         return min(best, self.spiral_pitch), where

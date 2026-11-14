@@ -67,6 +67,16 @@ __all__ = ['CircleShape', 'OffsetShape', 'Shape', 'TrapezoidShape', 'RectangleSh
 
 ANGLE_QUANTUM = 2.0**-40
 
+def _record_folds(model):
+    """ Measure where a turn comes close to itself (e.g. around a sharp tip or a narrow notch) on the chosen layout, with
+    the measurement of `kicoil.geometry`, so that PlanarInductor.__post_init__ warns about it as the base layout does.
+    Only sets min_fold_spacing/min_fold_location, the trace width is not affected. """
+    arms = model.spiral_center_lines()
+    res = [_geometry.min_turn_spacing(a, model.spiral_pitch * (1 + 1e-9), folds=True) for a in arms if a]
+    if res:
+        model.min_fold_spacing, model.min_fold_location = min(((r[2], r[3]) for r in res), key=lambda r: r[0])
+
+
 def set_spans(sk, spans):
     """ Set the angle coordinate of all vertices of Skeletonator sk from a list of edge spans (one per polygon edge,
     edge i runs from vertex i to vertex i+1). Spans are normalized to add up to one revolution. Zero spans stay exactly
@@ -381,6 +391,7 @@ class PlanarInductor(_geometry.PlanarInductor):
                     if self._reference_config is not None:
                         self._set_config(self._reference_config)
         best, where, _per_edge = self._measure()
+        _record_folds(self)
         if where is None:
             return self.spiral_pitch, None
         return min(best, self.spiral_pitch), where
