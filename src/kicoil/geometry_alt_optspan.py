@@ -70,11 +70,15 @@ ANGLE_QUANTUM = 2.0**-40
 def _record_folds(model):
     """ Measure where a turn comes close to itself (e.g. around a sharp tip or a narrow notch) on the chosen layout, with
     the measurement of `kicoil.geometry`, so that PlanarInductor.__post_init__ warns about it as the base layout does.
-    Only sets min_fold_spacing/min_fold_location, the trace width is not affected. """
+    Only sets min_fold_spacing/min_fold_location and fold_candidates, the trace width is not affected. """
     arms = model.spiral_center_lines()
     res = [_geometry.min_turn_spacing(a, model.spiral_pitch * (1 + 1e-9), folds=True) for a in arms if a]
     if res:
         model.min_fold_spacing, model.min_fold_location = min(((r[2], r[3]) for r in res), key=lambda r: r[0])
+        # Pairs that converge into a tapered tip, which the base layout also warns about (see PlanarInductor)
+        model.fold_candidates = _geometry.FoldCandidates()
+        for r in res:
+            model.fold_candidates.merge(r[4])
 
 
 def set_spans(sk, spans):

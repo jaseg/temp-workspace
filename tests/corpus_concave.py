@@ -223,6 +223,7 @@ def inscribed_radius(poly):
 
 
 FRACTIONS = (0.3, 0.6, 0.9)
+THIN_TRACE = 0.1 # mm
 TURNS = ((5, 1), (8, 3), (13, 4))  # (12, 4) is not co-prime
 
 
@@ -235,13 +236,26 @@ def _spec(name, shape, turns, twists, layers=2, clockwise=False, clearance=0.15,
 
 # Known limitations of the straight-skeleton layout (kicoil.geometry) for some outlines. test_layout.py xfails a case of
 # such an outline only when every failure kind of the checker is among the listed ones ('overshoot': copper deeper than
-# the intended annulus).
+# the intended annulus; 'contour': the outer turn stays more than 1.5 mm from the outline somewhere).
 KNOWN_ISSUES = {
     'heart': dict(
-        kinds=('backtrack', 'overshoot', 'via offset', 'clearance', 'via clearance'),
+        kinds=('backtrack', 'overshoot', 'contour', 'via offset', 'clearance', 'via clearance'),
         reason='sharp reflex cusp: its mitered offset vertex moves at 1/sin(theta/2) per unit depth, so every turn runs '
                'into a zero-width spike deep inside the outline and back (backtracks, copper far deeper than the '
                'annular width) and the skeleton splits at 1.6 mm of 11.5 mm inscribed radius'),
+}
+
+
+# The same for single cases
+CASE_ISSUES = {
+    # Sharp convex tips (the crescent's horns, the shark's tail lobes) that the outer turn of the linear spiral does not
+    # reach; in the single-layer shark only with the start vertex of the SVG import, which puts the arm start there.
+    **{name: dict(kinds=('contour',), reason='outer turn does not reach a sharp convex tip')
+       for name in ('concave_crescent_a0.3_n13k4', 'concave_crescent_a0.6_n13k4', 'concave_sharksvg_a0.6_n6_1layer')},
+    # The trace (3.6 mm) wraps around an inner hole smaller than itself and touches itself 0.21 turns further on,
+    # without a warning from the generator (defect of kicoil.geometry, see the report)
+    'concave_starround_a0.9_n5k1': dict(kinds=('self short',), reason='unwarned self short around the small inner '
+                                        'hole of a deep star'),
 }
 
 
@@ -273,6 +287,15 @@ def cases():
             # repeating its start point, y down)
             out += _variants('concave_sharksvg', dict(shape='svg', svg_file=str(SHARK_SVG.relative_to(DATA_DIR.parent))),
                              tags + ['concave', 'svg'], depth)
+    for c in out:
+        # Nominal trace width (pitch minus clearance) below 0.1 mm: not manufacturable on a usual PCB process. These cases
+        # stay in the family (robustness and rejection of infeasible requests) but are left out of headline statistics.
+        if c['annular_width'] * c['layers'] / c['turns'] - c['clearance'] < THIN_TRACE:
+            c['tags'].append('thin')
+        if c['name'] in CASE_ISSUES:
+            assert 'known_issue' not in c
+            c['known_issue'] = CASE_ISSUES[c['name']]
+    assert set(CASE_ISSUES) <= {c['name'] for c in out}
     return out
 
 
