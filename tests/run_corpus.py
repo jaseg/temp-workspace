@@ -34,6 +34,10 @@ def build_model(spec, impl='kicoil'):
 
     if spec['shape'] == 'circle':
         shape = geometry.CircleShape(spec['outer_diameter'], spec['inner_diameter'])
+    elif spec['shape'] == 'svg':
+        # Outline from an SVG file (path relative to tests/), loaded through the implementation's SVG import
+        shape = geometry.SVGShape(filename=str(Path(__file__).parent / spec['svg_file']),
+                                  annular_width=spec['annular_width'])
     else:
         poly = [tuple(p) for p in spec['polygon']]
         base = getattr(geometry, 'PolygonShape', None)

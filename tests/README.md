@@ -54,6 +54,14 @@ Shapes: square, rectangles (2:1, 5:1), trapezoid, regular 3/5/6/8/24-gons, ellip
 tiny and small chamfers, rectangles with nearly collinear extra vertices (with and without jitter), stars, circular
 sectors (45°, 90°, 180°), L, U and D shapes, random convex and random star-shaped polygons, and circles.
 
+Concave family (`corpus_concave.py`, `--kind concave`, 132 cases): a plush-shark silhouette (91 vertices, as a polygon
+and as `data/shark.svg` loaded through `SVGShape`: a clockwise path in SVG coordinates that repeats its start point),
+bean, heart, crescent, C, rounded L and U, cross, comb, star with rounded tips and a dumbbell. For non-convex outlines
+the straight skeleton's first split event limits the annular width (`Skeletonator.max_depth`), often far below the
+inscribed radius, so the annular widths are 30/60/90 % of each shape's split depth. Turns/twists n5k1, n8k3, n13k4,
+single layer, clockwise. Cases with a documented limitation of the layout carry `known_issue` (xfailed in
+`test_layout.py`).
+
 Parameters: annular width at 30 %, 60 % and 90 % of the outline's maximum inscribed radius; turns/twists from 2/1 to
 21/8 (only co-prime pairs); single layer; clockwise. Sweeps vary the annular width in 3 % steps and the outline scale by
 ±1–3 % on seven base shapes, which exposes layouts that break under small tweaks. Dense cases use 30–31 turns.
