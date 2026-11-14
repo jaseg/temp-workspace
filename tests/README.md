@@ -51,8 +51,11 @@ crossings, no backtracks, no self shorts, track, pad and via clearance deficits 
 0.05 mm of the intended via offset, the winding within 0.05 turns, and conformance holds (uncovered < 5 %,
 undershoot < 1.25 pitches, overshoot < 0.05 mm). `run_corpus.py` stores the names of the failed checks per case in
 `failures` and prints a count per kind. Requests that the generator rejects with a `ValueError` are reported as
-`rejected`; a clear rejection of an infeasible request is acceptable, a crash (`error`) is not. (`test_corpus_case` in
-`test_layout.py` still asserts its own, shorter list of conditions.)
+`rejected`; a clear rejection of an infeasible request is acceptable, a crash (`error`) is not. `test_corpus_case` in
+`test_layout.py` asserts the same checks except outline coverage. Clearance, via clearance and self short
+failures are expected failures there only when the generator warned about them (a turn folding onto itself, a via that
+does not fit next to the neighboring turn); on the full corpus that is `octagon_a0.90_n3k1`, `24gon_a0.90_n3k1` and
+`sector180_a0.90_n3k1`, where three turns in 90 % of the inscribed radius make the trace (and the via) about 4-10 mm wide.
 
 ### Same turn or different turn
 
