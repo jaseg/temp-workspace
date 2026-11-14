@@ -349,8 +349,12 @@ still failed inside gerbonara (1.6.0): `Board.empty_board()` cannot serialize ev
 the empty `legacy_footprints` list), and the SMD terminal pads were dropped, since only through-hole pads become vias.
 `footprint_to_board` now sets `legacy_footprints` to `None` (which the serializer skips, as for a parsed board without
 legacy footprints) and puts the two terminal pads on the board in a small footprint of their own (`<name>-terminals`).
-A test runs `kicoil --format kicad-pcb` for a circle and a rectangle and parses the result back with gerbonara; it has
-not been opened in KiCad here.
+The second version still wrote every straight track segment (all tracks of polygon shapes, via connections and the
+single-layer bridge) with `(layer "False")` and a stray `locked`: gerbonara's `TrackSegment.from_footprint_line` passes
+layer and locked positionally in the wrong order. The segments and arcs are now built with keyword arguments.
+A test runs `kicoil --format kicad-pcb` for a circle, a rectangle and a single-layer circle, parses the result back
+with gerbonara and checks that every segment, arc and via is on the coil's copper layers; the board has not been opened
+in KiCad here.
 
 ### D23. Keepout zone outline closes on a duplicate point
 

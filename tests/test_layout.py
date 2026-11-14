@@ -396,10 +396,24 @@ def test_kicad_pcb_export(tmp_path):
     assert len(board.vias) == 2 + 3 # inner ring 3, outer ring 2 (the third outer position holds the pads)
     pads = [p for fp in board.footprints for p in fp.pads]
     assert sorted(p.number for p in pads) == ['1', '2']
+    copper = {'F.Cu', 'B.Cu'}
+    assert {a.layer for a in board.track_arcs} <= copper and {s.layer for s in board.track_segments} <= copper
+    assert all(set(v.layers) == copper for v in board.vias)
     res = CliRunner().invoke(cli, ['--format', 'kicad-pcb', '--twists', '2', '--turns', '5', '--clearance', '0.2',
                                    'rectangle', str(out)])
     assert res.exit_code == 0, res.output
-    assert len(Board.open(out).track_segments) > 0
+    board = Board.open(out)
+    assert len(board.track_segments) > 0
+    # gerbonara's TrackSegment.from_footprint_line swaps layer and locked: every segment was written on layer "False".
+    assert {s.layer for s in board.track_segments} == copper
+    assert not any(s.locked for s in board.track_segments)
+    # Single layer: the bridge is the only straight segment, on the back layer.
+    res = CliRunner().invoke(cli, ['--format', 'kicad-pcb', '--single-layer', '--turns', '5', '--clearance', '0.2',
+                                   'circle', str(out)])
+    assert res.exit_code == 0, res.output
+    board = Board.open(out)
+    assert [s.layer for s in board.track_segments] == ['B.Cu']
+    assert {a.layer for a in board.track_arcs} == {'F.Cu'}
 
 
 def test_error_messages_give_the_measured_spacing():
