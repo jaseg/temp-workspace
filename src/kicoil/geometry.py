@@ -392,7 +392,6 @@ class OffsetShape(Shape):
         """ Turns closer than `limit` to the collapse depth of a narrow protrusion of the outline cut across the
         protrusion's mouth instead of running into it and folding onto themselves. See Skeletonator.set_fold_limit. """
         self.sk.set_fold_limit(limit)
-        self.sk.set_angle_reference(self.annular_width)
 
     @property
     def slug(self):
@@ -715,10 +714,11 @@ class PlanarInductor():
                                  f'width to at most {floor((pp - self.clearance) * 1000) / 1000:.3f} mm, reduce the '
                                  f'clearance or increase the size of the coil.' + pitch_hint)
 
-        if self.min_fold_location is not None and \
-                self.min_fold_spacing < self.trace_width + self.clearance - 1e-6:
-            x, y = self.min_fold_location
-            gap = self.min_fold_spacing - self.trace_width
+        # (subclasses with their own measure_turn_spacing may not measure folds)
+        fold_location, fold_spacing = getattr(self, 'min_fold_location', None), getattr(self, 'min_fold_spacing', inf)
+        if fold_location is not None and fold_spacing < self.trace_width + self.clearance - 1e-6:
+            x, y = fold_location
+            gap = fold_spacing - self.trace_width
             what = f'overlaps itself by {-gap:.3f} mm' if gap < 0 else f'comes within {gap:.3f} mm of itself'
             warnings.warn(f'Near ({x:.3f}, {y:.3f}) the copper of one turn {what}: the turn runs around a part of '
                           f'the outline that is narrower than the turn pitch (a narrow notch or slot, or a narrow tip the '
@@ -826,6 +826,11 @@ class PlanarInductor():
         if sk is None or getattr(self, '_fold_reported', False):
             return
         self._fold_reported = True
+        for x, y, depth, cut_depth in getattr(sk, 'cut_protrusions', ()):
+            if cut_depth < self.shape.annular_width:
+                self.logger.info(f'The outline has a narrow part that collapses at a depth of {depth:.3f} mm near '
+                                 f'({x:.3f}, {y:.3f}). Turns deeper than {cut_depth:.3f} mm cut across its base instead '
+                                 f'of running into it, since its sides would be less than one pitch apart.')
         for x, y, depth in getattr(sk, 'uncut_protrusions', ()):
             if depth < self.shape.annular_width:
                 warnings.warn(f'The outline has a narrow part that collapses at a depth of {depth:.3f} mm near '

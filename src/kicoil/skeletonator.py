@@ -523,6 +523,7 @@ class Skeletonator:
         self._track_times = [[n.time for n in track] for track in self.tracks]
         self.fold_limit = 0.0
         self.uncut_protrusions = []
+        self.cut_protrusions = []
 
         self.set_angle_reference(ref_depth)
 
@@ -543,11 +544,13 @@ class Skeletonator:
         keyhole's tab), the offset outline at depths just below T has a sliver of width about 2*(T - depth). A spiral
         turn at such a depth runs into the sliver and back out, so its copper folds onto itself. With a limit > 0, the
         vertices inside the protrusion ("tips") jump to the protrusion's mouth at depth T - limit and follow the mouth
-        from there, i.e. turns deeper than T - limit cut straight across the protrusion's mouth. Use half the turn pitch,
-        so that every turn that runs into a protrusion has its two sides at least one pitch apart.
+        from there, i.e. turns deeper than T - limit cut straight across the protrusion's mouth. Each tip moves along
+        the protrusion's axis onto the mouth line (through the mean position of the tracks that reach the protrusion's
+        exit node from outside, perpendicular to the axis), so it stays on its own side. Use half the turn pitch, so
+        that every turn that runs into a protrusion has its two sides at least one pitch apart.
 
         Protrusions whose mouth cannot be determined are left as they are and listed in `uncut_protrusions` as
-        (x, y, T) of the collapse point.
+        (x, y, T) of the collapse point. Cut protrusions are listed in `cut_protrusions` as (x, y, T, cut depth).
         """
         limit = max(0.0, float(limit))
         if limit == self.fold_limit:
@@ -556,6 +559,7 @@ class Skeletonator:
         raw = self._raw_tracks
         tracks = [list(t) for t in raw]
         self.uncut_protrusions = []
+        cut = {}
         if limit > 0:
             exit_of = self._arc_exit
             def in_group(n, exit_node):
@@ -578,13 +582,25 @@ class Skeletonator:
                     if not mouths.get(e):
                         self.uncut_protrusions.append((e.x, e.y, T))
                         break
+                    # The collapsed protrusion is a straight segment from the exit node e along the axis u (the
+                    # parallel sides collapse onto it). The tip moves along u onto the mouth line, the line through
+                    # the mean position of the mouth tracks perpendicular to u. Since the sides are parallel to u, the
+                    # tip stays on its side of the protrusion.
+                    ux, uy = m.x - e.x, m.y - e.y
+                    ul = math.hypot(ux, uy)
+                    if ul <= self.merge_tol:
+                        break
+                    ux, uy = ux / ul, uy / ul
                     tc = max(0.0, T - limit)
                     tx, ty = self._raw_position(i, tc)
                     mp = [self._raw_position(k, tc) for k in mouths[e]]
                     mx, my = sum(x for x, _y in mp) / len(mp), sum(y for _x, y in mp) / len(mp)
+                    a = (tx - mx)*ux + (ty - my)*uy
                     head = [n for n in t[:j] if n.time < tc]
-                    tracks[i] = head + [SkeletonNode(tx, ty, tc), SkeletonNode(mx, my, tc)] + t[j+1:]
+                    tracks[i] = head + [SkeletonNode(tx, ty, tc), SkeletonNode(tx - a*ux, ty - a*uy, tc)] + t[j+1:]
+                    cut[e] = (e.x, e.y, T, tc)
                     break
+        self.cut_protrusions = list(cut.values())
         self.tracks = tracks
         self._track_times = [[n.time for n in track] for track in tracks]
         self.set_angle_reference(getattr(self, 'ref_depth', None))
