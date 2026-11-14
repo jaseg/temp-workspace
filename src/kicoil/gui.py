@@ -695,7 +695,7 @@ class KiCoilGUI:
         ttk.Label(parent, text="Circle Segments:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.circle_segments_entry = EntryWithPlaceholder(parent, placeholder="automatic", width=15)
         self.circle_segments_entry.grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Label(parent, text="Points per 360° for circles. Raised if needed\nto keep the error below clearance/40",
+        ttk.Label(parent, text="Points per 360° for circles. Raised if needed\nto keep the error below clearance/80",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
 
@@ -703,7 +703,7 @@ class KiCoilGUI:
         ttk.Label(parent, text="Arc Tolerance (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.arc_tolerance_entry = EntryWithPlaceholder(parent, placeholder="automatic", width=15)
         self.arc_tolerance_entry.grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Label(parent, text="Circles with arcs. Effective value is at most\nclearance/40 (default 0.02 mm)",
+        ttk.Label(parent, text="Circles with arcs. Effective value is at most\nclearance/80 (default 0.02 mm)",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
 

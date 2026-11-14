@@ -175,12 +175,12 @@ def _seg_seg_distance_np(a, b, c, d):
     return np.where(crossing, 0.0, dist)
 
 
-def _candidate_pairs(lo, hi, radius, max_pairs=2_000_000):
+def _candidate_pairs(lo, hi, radius, max_pairs=1_000_000):
     """ Yield arrays (i, j), i < j, of all pairs of boxes [lo, hi] (arrays of shape (n, 2)) that come closer than radius,
-    plus some pairs that do not, in batches. Each pair is yielded once. Uses a uniform grid with cell size radius: every
-    box, grown by radius/2, is entered into all cells it touches. Two boxes closer than radius share at least one cell,
-    and a pair is only reported in the cell that contains the lower left corner of the intersection of the grown
-    boxes. """
+    plus some pairs that do not, in batches of at most about max_pairs pairs (a crowded cell is split over several
+    batches). Each pair is yielded once. Uses a uniform grid with cell size radius: every box, grown by radius/2, is
+    entered into all cells it touches. Two boxes closer than radius share at least one cell, and a pair is only reported
+    in the cell that contains the lower left corner of the intersection of the grown boxes. """
     n = len(lo)
     if n < 2:
         return
@@ -201,18 +201,18 @@ def _candidate_pairs(lo, hi, radius, max_pairs=2_000_000):
     order = np.argsort(keys, kind='stable')
     keys, seg = keys[order], seg[order]
     _uniq, starts, sizes = np.unique(keys, return_index=True, return_counts=True)
-    # Process groups (cells) in batches of at most about max_pairs pairs
-    pairs_per_group = sizes * (sizes - 1) // 2
-    cum = np.cumsum(pairs_per_group)
-    bounds = [0]
-    while bounds[-1] < len(sizes):
-        base = cum[bounds[-1] - 1] if bounds[-1] else 0
-        bounds.append(max(bounds[-1] + 1, int(np.searchsorted(cum, base + max_pairs, side='right'))))
+    # Every entry is paired with the entries after it in its cell. Process the entries in ranges of at most about
+    # max_pairs pairs.
+    partners_all = np.repeat(starts + sizes, sizes) - np.arange(len(keys)) - 1
+    cum = np.cumsum(partners_all)
     gx, gy = glo[:, 0], glo[:, 1]
-    for g0, g1 in itertools.pairwise(bounds):
-        st, sz = starts[g0:g1], sizes[g0:g1]
-        pos = np.arange(st[0], st[-1] + sz[-1])
-        partners = np.repeat(st + sz, sz) - pos - 1
+    p0 = 0
+    while p0 < len(keys):
+        base = cum[p0 - 1] if p0 else 0
+        p1 = max(p0 + 1, int(np.searchsorted(cum, base + max_pairs, side='right')))
+        partners = partners_all[p0:p1]
+        pos = np.arange(p0, p1)
+        p0 = p1
         total = int(partners.sum())
         if total == 0:
             continue
@@ -227,7 +227,47 @@ def _candidate_pairs(lo, hi, radius, max_pairs=2_000_000):
         yield np.minimum(si, sj), np.maximum(si, sj)
 
 
-def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False):
+def _box_gap(lox, loy, hix, hiy, i, j):
+    """ Lower bound of the distance between the contents of boxes i and j (index arrays) """
+    gx = np.maximum(0, np.maximum(lox[i] - hix[j], lox[j] - hix[i]))
+    gy = np.maximum(0, np.maximum(loy[i] - hiy[j], loy[j] - hiy[i]))
+    return np.hypot(gx, gy)
+
+
+class FoldCandidates:
+    """ Pairs of pieces of the same spiral turn that come close to each other although they are far apart along the
+    conductor (see min_turn_spacing), kept as the Pareto front of (distance small, path separation large): for every
+    path separation, the closest pair that is at least that far apart along the conductor. """
+
+    def __init__(self):
+        self.d = np.empty(0)
+        self.path = np.empty(0)
+        self.loc = np.empty((0, 2))
+
+    def add(self, d, path, loc):
+        d = np.concatenate([self.d, d])
+        path = np.concatenate([self.path, path])
+        loc = np.concatenate([self.loc, loc])
+        order = np.lexsort((d, -path)) # path descending, then distance ascending
+        d, path, loc = d[order], path[order], loc[order]
+        # Keep entries whose distance is smaller than that of every entry with a larger path separation
+        prev_min = np.concatenate([[inf], np.minimum.accumulate(d)[:-1]])
+        keep = d < prev_min
+        self.d, self.path, self.loc = d[keep], path[keep], loc[keep]
+
+    def merge(self, other):
+        self.add(other.d, other.path, other.loc)
+
+    def closest(self, min_path):
+        """ (distance, location) of the closest pair at least min_path apart along the conductor, or (inf, None) """
+        sel = self.path > min_path
+        if not sel.any():
+            return inf, None
+        k = int(np.flatnonzero(sel)[-1]) # path descending, distance descending along the front: the last one
+        return float(self.d[k]), tuple(float(c) for c in self.loc[k])
+
+
+def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False, max_pairs=1_000_000):
     """ Find the smallest centerline distance between neighboring turns of a set of spiral arms on one layer.
 
     arms is a list of (points, angles) tuples, with angles in revolutions. Segments of different arms are always
@@ -238,14 +278,23 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False):
     Returns (distance, location). Distances above search_radius are not reported, (search_radius, None) is returned if
     nothing closer was found.
 
-    With folds=True, also returns the smallest distance between two pieces of the *same* turn (less than
-    min_turn_separation apart) that are far apart along the conductor, more than pi times their distance plus
-    search_radius, and its location, i.e. (distance, location, fold distance, fold location). That happens where the
-    turn runs around a narrow notch of the outline and comes back along the other side.
+    With folds=True, also looks at pairs of pieces of the *same* turn (less than min_turn_separation apart) that are far
+    apart along the conductor compared to their distance d: more than pi*d along the conductor (a U-turn of diameter d
+    is (pi/2)*d long, a corner of angle a gives d/sin(a/2)). That happens where the turn runs around a narrow notch of
+    the outline, or into a narrow tip, and comes back along the other side. Returns (distance, location, fold distance,
+    fold location, fold candidates), where the fold distance and location are those of the closest pair that is more
+    than pi*d + search_radius apart along the conductor, and the fold candidates (a `FoldCandidates`) allow asking for
+    the closest pair more than a given distance apart along the conductor.
+
+    The pieces are grouped into chunks of consecutive pieces of one arm (about search_radius/4 long), which are paired
+    first, so that the pairs of pieces of one turn, which make up most of the pairs closer than search_radius on a
+    finely subdivided outline, are skipped chunk by chunk. Memory use is bounded by max_pairs.
     """
+    R = search_radius
     pieces = [_split_by_angle_np(points, angles, min_turn_separation / 10) for points, angles in arms]
-    if not pieces:
-        return (search_radius, None, search_radius, None) if folds else (search_radius, None)
+    fold_front = FoldCandidates()
+    if not pieces or not sum(len(q1) for q1, _q2, _u1, _u2 in pieces):
+        return (R, None, R, None, fold_front) if folds else (R, None)
     P = np.concatenate([q1 for q1, _q2, _u1, _u2 in pieces])
     Q = np.concatenate([q2 for _q1, q2, _u1, _u2 in pieces])
     U1 = np.concatenate([u1 for _q1, _q2, u1, _u2 in pieces])
@@ -258,7 +307,7 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False):
     S0 = S1 - seg_len
     # Cut pieces that are long compared to the search radius into shorter pieces for the spatial grid. The short pieces
     # keep the angle interval of the piece they belong to, so the same-turn test does not change.
-    n_sub = np.maximum(1, np.ceil(seg_len / (4 * search_radius))).astype(np.int64)
+    n_sub = np.maximum(1, np.ceil(seg_len / (4 * R))).astype(np.int64)
     if n_sub.max() > 1:
         idx = np.repeat(np.arange(len(P)), n_sub)
         k = (np.arange(len(idx)) - np.repeat(np.cumsum(n_sub) - n_sub, n_sub))[:, None]
@@ -268,41 +317,103 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False):
         tlo, thi, arm = tlo[idx], thi[idx], arm[idx]
     lo, hi = np.minimum(P, Q), np.maximum(P, Q)
     lox, loy, hix, hiy = lo[:, 0], lo[:, 1], hi[:, 0], hi[:, 1]
+    n = len(P)
 
-    best, where = search_radius, None
-    fold_best, fold_where = search_radius, None
-    for i, j in _candidate_pairs(lo, hi, search_radius):
-        # Lower bound of the distance from the bounding boxes
-        gx = np.maximum(0, np.maximum(lox[i] - hix[j], lox[j] - hix[i]))
-        gy = np.maximum(0, np.maximum(loy[i] - hiy[j], loy[j] - hiy[i]))
-        gap = np.hypot(gx, gy)
-        sel = gap < max(best, fold_best if folds else 0)
-        i, j, gap = i[sel], j[sel], gap[sel]
+    # Chunks: runs of at most CHUNK consecutive pieces of one arm, about R/4 long
+    CHUNK = 64
+    local = np.arange(n) - np.searchsorted(arm, arm) # index within the arm (pieces are ordered by arm)
+    new_chunk = np.ones(n, dtype=bool)
+    new_chunk[1:] = ((arm[1:] != arm[:-1]) | (np.floor(S0[1:] / (R / 4)) != np.floor(S0[:-1] / (R / 4)))
+                     | (local[1:] // CHUNK != local[:-1] // CHUNK))
+    c_start = np.flatnonzero(new_chunk)
+    c_size = np.diff(np.append(c_start, n))
+    c_lox, c_loy = np.minimum.reduceat(lox, c_start), np.minimum.reduceat(loy, c_start)
+    c_hix, c_hiy = np.maximum.reduceat(hix, c_start), np.maximum.reduceat(hiy, c_start)
+    c_tlo, c_thi = np.minimum.reduceat(tlo, c_start), np.maximum.reduceat(thi, c_start)
+    c_s0, c_s1 = np.minimum.reduceat(S0, c_start), np.maximum.reduceat(S1, c_start)
+    c_arm = arm[c_start]
+    nc = len(c_start)
+
+    # Chunk pairs closer than R (plus every chunk with itself)
+    ca_list, cb_list = [np.arange(nc)], [np.arange(nc)]
+    for a, b in _candidate_pairs(np.stack([c_lox, c_loy], axis=1), np.stack([c_hix, c_hiy], axis=1), R):
+        ca_list.append(a)
+        cb_list.append(b)
+    ca, cb = np.concatenate(ca_list), np.concatenate(cb_list)
+    cgap = _box_gap(c_lox, c_loy, c_hix, c_hiy, ca, cb)
+    same_arm = c_arm[ca] == c_arm[cb]
+    # Every pair of pieces of the two chunks is less than min_turn_separation apart: all of them are the same turn
+    all_same_turn = same_arm & (np.maximum(c_thi[cb] - c_tlo[ca], c_thi[ca] - c_tlo[cb]) < min_turn_separation)
+    need_diff = ~all_same_turn & (cgap < R)
+    if folds:
+        # Fold candidates are more than pi*d apart along the conductor
+        max_path = np.maximum(c_s1[cb] - c_s0[ca], c_s1[ca] - c_s0[cb])
+        need_fold = same_arm & (cgap < R) & (max_path > pi * cgap)
+    else:
+        need_fold = np.zeros(len(ca), dtype=bool)
+    keep = need_diff | need_fold
+    order = np.argsort(cgap[keep], kind='stable') # closest first, so that the best distance drops quickly
+    ca, cb, cgap = ca[keep][order], cb[keep][order], cgap[keep][order]
+    need_diff, need_fold = need_diff[keep][order], need_fold[keep][order]
+
+    best, where = R, None
+    fold_best, fold_where = R, None
+    npairs = c_size[ca] * c_size[cb]
+    cum = np.cumsum(npairs)
+    p0 = 0
+    while p0 < len(ca):
+        base = cum[p0 - 1] if p0 else 0
+        p1 = max(p0 + 1, int(np.searchsorted(cum, base + max_pairs, side='right')))
+        sl = slice(p0, p1)
+        p0 = p1
+        # Skip chunk pairs that cannot improve the result any more
+        sel = (need_diff[sl] & (cgap[sl] < best)) | need_fold[sl]
+        a, b = ca[sl][sel], cb[sl][sel]
+        if not len(a):
+            continue
+        # Expand into pairs of pieces
+        sa, sb = c_size[a], c_size[b]
+        cnt = sa * sb
+        rep = np.repeat(np.arange(len(a)), cnt)
+        k = np.arange(len(rep)) - np.repeat(np.cumsum(cnt) - cnt, cnt)
+        i = c_start[a][rep] + k // sb[rep]
+        j = c_start[b][rep] + k % sb[rep]
+        pair_ok = (a[rep] != b[rep]) | (i < j)
+        diff_ok = need_diff[sl][sel][rep]
+        fold_ok = need_fold[sl][sel][rep]
+        i, j, diff_ok, fold_ok = i[pair_ok], j[pair_ok], diff_ok[pair_ok], fold_ok[pair_ok]
+        gap = _box_gap(lox, loy, hix, hiy, i, j)
         # Pieces of the same arm less than min_turn_separation apart belong to the same turn
         same_turn = (arm[i] == arm[j]) & (np.maximum(tlo[j] - thi[i], tlo[i] - thi[j]) < min_turn_separation)
-        if folds and same_turn.any():
-            fi, fj, fgap = i[same_turn], j[same_turn], gap[same_turn]
+        if folds:
+            fsel = same_turn & fold_ok & (gap < R)
+            fi, fj, fgap = i[fsel], j[fsel], gap[fsel]
             path = np.maximum(S0[fj] - S1[fi], S0[fi] - S1[fj])
-            sel = (fgap < fold_best) & (path > pi * fgap + search_radius)
-            fi, fj, path = fi[sel], fj[sel], path[sel]
+            fsel = path > pi * fgap
+            fi, fj, path = fi[fsel], fj[fsel], path[fsel]
             if len(fi):
                 d = _seg_seg_distance_np(P[fi], Q[fi], P[fj], Q[fj])
-                d = np.where(path > pi * d + search_radius, d, inf)
-                k = int(np.argmin(d))
-                if d[k] < fold_best:
-                    fold_best = float(d[k])
-                    fold_where = tuple(float(c) for c in (P[fi[k]] + Q[fi[k]]) / 2)
-        sel = ~same_turn & (gap < best)
-        i, j = i[sel], j[sel]
+                fsel = (path > pi * d + 1e-9 * R) & (d < R)
+                fi, d, path = fi[fsel], d[fsel], path[fsel]
+                if len(fi):
+                    loc = (P[fi] + Q[fi]) / 2
+                    fold_front.add(d, path, loc)
+                    far = np.where(path > pi * d + R, d, inf)
+                    kk = int(np.argmin(far))
+                    if far[kk] < fold_best:
+                        fold_best = float(far[kk])
+                        fold_where = tuple(float(c) for c in loc[kk])
+        dsel = ~same_turn & diff_ok & (gap < best)
+        i, j = i[dsel], j[dsel]
         if not len(i):
             continue
         d = _seg_seg_distance_np(P[i], Q[i], P[j], Q[j])
-        k = int(np.argmin(d))
-        if d[k] < best:
-            best = float(d[k])
-            where = tuple(float(c) for c in (P[i[k]] + Q[i[k]]) / 2)
+        kk = int(np.argmin(d))
+        if d[kk] < best:
+            best = float(d[kk])
+            where = tuple(float(c) for c in (P[i[kk]] + Q[i[kk]]) / 2)
     if folds:
-        return best, where, fold_best, fold_where
+        return best, where, fold_best, fold_where, fold_front
     return best, where
 
 
@@ -714,8 +825,17 @@ class PlanarInductor():
                                  f'width to at most {floor((pp - self.clearance) * 1000) / 1000:.3f} mm, reduce the '
                                  f'clearance or increase the size of the coil.' + pitch_hint)
 
-        # (subclasses with their own measure_turn_spacing may not measure folds)
+        # Copper of one turn folding onto itself: two pieces of the same turn closer than trace width plus clearance
+        # that are more than pi*d plus the pitch apart along the conductor (folds around notches), or more than
+        # 4*(trace width + clearance) (converging sides of a tapered tip; the geometric checker counts pieces of copper
+        # that far apart along the conductor as different turns). Subclasses with their own measure_turn_spacing may
+        # not measure folds.
         fold_location, fold_spacing = getattr(self, 'min_fold_location', None), getattr(self, 'min_fold_spacing', inf)
+        candidates = getattr(self, 'fold_candidates', None)
+        if candidates is not None:
+            d, loc = candidates.closest(4 * (self.trace_width + self.clearance))
+            if loc is not None and d < fold_spacing:
+                fold_spacing, fold_location = d, loc
         if fold_location is not None and fold_spacing < self.trace_width + self.clearance - 1e-6:
             x, y = fold_location
             gap = fold_spacing - self.trace_width
@@ -764,11 +884,12 @@ class PlanarInductor():
             self.logger.info(f'Increased via offset to {self.via_offset:.2f} mm to keep vias clear of neighboring turns')
         if gap < self.clearance - 1e-6:
             if gap < 0:
-                problem = f'overlaps a neighboring turn by {-gap:.3f} mm'
+                problem = (f'overlaps a neighboring turn by {-gap:.3f} mm (a clearance of {self.clearance:.3f} mm is '
+                           f'required)')
             else:
-                problem = f'is only {gap:.3f} mm away from a neighboring turn'
-            warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {problem}, which is less than the clearance of '
-                          f'{self.clearance:.3f} mm. ' +
+                problem = (f'is only {gap:.3f} mm away from a neighboring turn, which is less than the clearance of '
+                           f'{self.clearance:.3f} mm')
+            warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {problem}. ' +
                           ('Reduce the via diameter or the annular width.' if auto_via_offset else
                            'Increase the via offset or reduce the via diameter.'))
         if self.via_offset * inner_reach > self.shape.max_via_offset + 1e-9:
@@ -919,6 +1040,9 @@ class PlanarInductor():
         # Same turn folding onto itself, e.g. around a notch of the outline narrower than the pitch. This does not
         # short different turns, so it does not limit the trace width, but it is reported as a warning.
         self.min_fold_spacing, self.min_fold_location = min(((r[2], r[3]) for r in results), key=lambda r: r[0])
+        self.fold_candidates = FoldCandidates()
+        for r in results:
+            self.fold_candidates.merge(r[4])
         if where is None:
             # Nothing closer than the search radius: e.g. less than a single turn per layer. Fall back to the nominal
             # pitch.
@@ -948,34 +1072,48 @@ class PlanarInductor():
     DEFAULT_ARC_TOLERANCE = 0.02 # mm
     DEFAULT_CIRCLE_SEGMENTS = 64 # per revolution
     MIN_ARC_FIT_SEGMENTS = 256 # points per revolution the arc approximation of circles is fitted to
+    RENDER_TOLERANCE_FLOOR = 0.0005 # mm, smallest arc tolerance / chord error, used when the clearance is (nearly) 0
 
     def effective_render_options(self, arc_tolerance=None, circle_segments=None):
         """ Arc tolerance and number of segments per revolution that render_footprint actually uses for circles, given
         the user's values (None: automatic). The trace width is sized from the exact spiral center lines, so the
-        approximation must not eat up a noticeable part of the clearance: the arc tolerance is at most clearance/40,
-        arcs are fitted to at least 256 points per revolution, and polylines (approximate_arcs=False) get enough
-        segments for a chord error of at most clearance/40. Returns (arc_tolerance, circle_segments, notes), where notes
-        lists the user values that were overridden. """
+        approximation must not eat up a noticeable part of the clearance. Both neighboring turns may deviate by the
+        tolerance towards each other, so the tolerance is at most clearance/80 (at least RENDER_TOLERANCE_FLOOR), which
+        bounds the loss to clearance/40: the arc tolerance is capped at that value, arcs are fitted to at least 256
+        points per revolution, and polylines (approximate_arcs=False) get enough segments for a chord error within it.
+        Returns (arc_tolerance, circle_segments, notes), where notes lists the user values that were overridden. Only
+        circles use these settings; other shapes get no notes. """
         notes = []
-        tol_limit = self.clearance / 40
+        tol_limit = self.render_tolerance_limit()
         user_tol, user_segs = arc_tolerance, circle_segments
         arc_tolerance = min(self.DEFAULT_ARC_TOLERANCE if user_tol is None else user_tol, tol_limit)
-        if user_tol is not None and user_tol > tol_limit:
-            notes.append(f'arc tolerance reduced from {user_tol:.4f} mm to {tol_limit:.4f} mm (clearance/40)')
-
         circle_segments = self.DEFAULT_CIRCLE_SEGMENTS if user_segs is None else user_segs
-        if isinstance(self.shape, CircleShape):
-            if self.approximate_arcs:
-                needed = self.MIN_ARC_FIT_SEGMENTS
-            else:
-                # Chord error r*(1 - cos(pi/n)) <= clearance/40 on the outer radius
-                needed = ceil(pi / acos(max(-1.0, 1 - tol_limit / self.shape.outer_radius)))
-            if circle_segments < needed:
-                if user_segs is not None:
-                    notes.append(f'circle segments raised from {user_segs} to {needed} per revolution to keep the '
-                                 f'{"arc fit" if self.approximate_arcs else "chord error"} within clearance/40')
-                circle_segments = needed
+        if not isinstance(self.shape, CircleShape):
+            return arc_tolerance, circle_segments, notes
+
+        if self.approximate_arcs:
+            if user_tol is not None and user_tol > tol_limit:
+                notes.append(f'arc tolerance reduced from {user_tol:.4f} mm to {tol_limit:.4f} mm '
+                             f'({self.render_tolerance_desc()})')
+            needed = self.MIN_ARC_FIT_SEGMENTS
+        else:
+            # Chord error r*(1 - cos(pi/n)) <= tol_limit on the outer radius
+            needed = ceil(pi / acos(max(-1.0, 1 - tol_limit / self.shape.outer_radius)))
+        if circle_segments < needed:
+            if user_segs is not None:
+                notes.append(f'circle segments raised from {user_segs} to {needed} per revolution to keep the '
+                             f'{"arc fit" if self.approximate_arcs else "chord error"} within '
+                             f'{tol_limit:.4f} mm ({self.render_tolerance_desc()})')
+            circle_segments = needed
         return arc_tolerance, circle_segments, notes
+
+    def render_tolerance_limit(self):
+        """ Largest deviation of the rendered circle tracks from the exact spiral: clearance/80, at least
+        RENDER_TOLERANCE_FLOOR (so that clearance 0 still gives a finite number of segments). """
+        return max(self.clearance / 80, self.RENDER_TOLERANCE_FLOOR)
+
+    def render_tolerance_desc(self):
+        return 'clearance/80' if self.clearance / 80 >= self.RENDER_TOLERANCE_FLOOR else 'minimum tolerance'
 
     def render_footprint(self, name=None, arc_tolerance=None, circle_segments=None, geometry_debug_file=None):
         """ Render the coil as a KiCad footprint. arc_tolerance and circle_segments only apply to circles; None means

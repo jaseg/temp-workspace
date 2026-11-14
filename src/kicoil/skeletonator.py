@@ -279,6 +279,26 @@ def offset_polygon_outward(poly, margin, miter_limit=2.0):
     return _remove_collinear(out, tol)
 
 
+def _track_point(track, depth, time_eps, times=None):
+    """ Position on a vertex track (a list of skeleton nodes with non-decreasing time) at the given depth, see
+    Skeletonator.track_position. """
+    if times is None:
+        times = [n.time for n in track]
+    if len(track) == 1:
+        return track[0].pos
+    if depth <= times[0]:
+        j = 0
+    elif depth >= times[-1]:
+        # Beyond the end of the track the outline has collapsed, there is nothing to extrapolate.
+        return track[-1].pos
+    else:
+        j = max(0, min(len(track) - 2, bisect.bisect_right(times, depth) - 1))
+    n0, n1 = track[j], track[j+1]
+    if n1.time - n0.time <= time_eps:
+        return n1.pos if depth >= n1.time else n0.pos
+    return interpolate(n0.pos, n1.pos, depth, n0.time, n1.time)
+
+
 def polygon_center_of_mass(polygon):
     # https://en.wikipedia.org/wiki/Centroid
     total_x, total_y = 0, 0
@@ -494,6 +514,7 @@ class Skeletonator:
                     self._arc_exit[n] = exit_node
         self.min_radius = split_time
         self.max_depth = split_time
+        self._adjacency = adjacency
 
         # Match the polygon vertices to the skeleton's contour nodes (time 0). The coordinates CGAL prints are rounded
         # to 12 significant digits, so they are matched to the nearest contour node instead of by value.
@@ -527,15 +548,6 @@ class Skeletonator:
 
         self.set_angle_reference(ref_depth)
 
-    def _raw_position(self, i, depth):
-        """ Position of vertex i at the given depth on its unmodified skeleton track """
-        tracks, times = self.tracks, self._track_times
-        self.tracks, self._track_times = self._raw_tracks, [[n.time for n in t] for t in self._raw_tracks]
-        try:
-            return self.track_position(i, depth)
-        finally:
-            self.tracks, self._track_times = tracks, times
-
     def set_fold_limit(self, limit):
         """ Cut off narrow protrusions of the offset outline.
 
@@ -544,10 +556,21 @@ class Skeletonator:
         keyhole's tab), the offset outline at depths just below T has a sliver of width about 2*(T - depth). A spiral
         turn at such a depth runs into the sliver and back out, so its copper folds onto itself. With a limit > 0, the
         vertices inside the protrusion ("tips") jump to the protrusion's mouth at depth T - limit and follow the mouth
-        from there, i.e. turns deeper than T - limit cut straight across the protrusion's mouth. Each tip moves along
-        the protrusion's axis onto the mouth line (through the mean position of the tracks that reach the protrusion's
-        exit node from outside, perpendicular to the axis), so it stays on its own side. Use half the turn pitch, so
-        that every turn that runs into a protrusion has its two sides at least one pitch apart.
+        from there, i.e. turns deeper than T - limit cut straight across the protrusion's mouth. Use half the turn
+        pitch, so that every turn that runs into a protrusion has its two sides at least one pitch apart.
+
+        The mouth is spanned by the tracks that reach the protrusion's exit node from outside it (usually the two
+        reflex corners where the protrusion meets the rest of the outline). Each tip lands on the mouth chord between
+        the mouth vertices before and after it in outline order: at the orthogonal projection of its position at
+        T - limit, clamped to the chord and kept in outline order. For a straight protrusion this is the projection
+        along its axis, so each tip stays on its own side; for a bent one (an L) the tips still land on the chord
+        instead of inside the outline. Where the mouth has a single vertex (its other side is an edge, e.g. the part
+        of a square beside a slot), the tips move along the protrusion's axis at the mouth onto the line through that
+        vertex perpendicular to the axis, so they stay on their side.
+
+        Protrusions are cut in order of increasing T, each on the tracks as already cut by the shallower ones, so the
+        vertices of a protrusion nested in a wider one (a stepped finger, a side branch) are cut at the inner mouth
+        first and then again at the outer mouth.
 
         Protrusions whose mouth cannot be determined are left as they are and listed in `uncut_protrusions` as
         (x, y, T) of the collapse point. Cut protrusions are listed in `cut_protrusions` as (x, y, T, cut depth).
@@ -564,42 +587,85 @@ class Skeletonator:
             exit_of = self._arc_exit
             def in_group(n, exit_node):
                 return exit_of.get(n) is exit_node and abs(n.time - exit_node.time) <= self.teps
+            def entry(t, e):
+                """ Index j where track t enters the group of exit e at a member other than e (t[j+1] is e), or None """
+                for j in range(1, len(t) - 1):
+                    m = t[j]
+                    if t[j+1] is e and m is not e and exit_of.get(m) is e and in_group(m, e) \
+                            and not in_group(t[j-1], e):
+                        return j
+                return None
             # Mouth of a protrusion: the tracks that reach the group's exit node from outside the group
             mouths = {}
+            exits = set()
             for i, t in enumerate(raw):
                 for a, b in itertools.pairwise(t):
                     if exit_of.get(b) is b and not in_group(a, b):
                         mouths.setdefault(b, []).append(i)
-            for i, t in enumerate(raw):
-                for j in range(1, len(t) - 1):
-                    m, e = t[j], t[j+1]
-                    # The track enters a group at a member other than the exit, then moves along the group to the exit
-                    if e is m or exit_of.get(m) is not e or not in_group(m, e) or in_group(t[j-1], e):
-                        continue
-                    T = e.time
-                    if T <= limit * 1e-6:
-                        break
-                    if not mouths.get(e):
-                        self.uncut_protrusions.append((e.x, e.y, T))
-                        break
-                    # The collapsed protrusion is a straight segment from the exit node e along the axis u (the
-                    # parallel sides collapse onto it). The tip moves along u onto the mouth line, the line through
-                    # the mean position of the mouth tracks perpendicular to u. Since the sides are parallel to u, the
-                    # tip stays on its side of the protrusion.
-                    ux, uy = m.x - e.x, m.y - e.y
+                    if b is not a and exit_of.get(a) is b and in_group(a, b):
+                        exits.add(b)
+            n = len(raw)
+            for e in sorted(exits, key=lambda e: (e.time, e.x, e.y)):
+                T = e.time
+                if T <= limit * 1e-6:
+                    continue
+                tips = {}
+                for i, t in enumerate(tracks):
+                    j = entry(t, e)
+                    if j is not None:
+                        tips[i] = j
+                if not tips:
+                    continue
+                mouth = sorted(set(mouths.get(e, ())))
+                if not mouth:
+                    self.uncut_protrusions.append((e.x, e.y, T))
+                    continue
+                tc = max(0.0, T - limit)
+                mpos = {k: _track_point(tracks[k], tc, self.TIME_EPS) for k in mouth}
+                # Tips between the same two mouth vertices (in outline order) land on the same chord, in outline order.
+                runs = {}
+                for i in tips:
+                    a = next(((i - d) % n for d in range(1, n) if (i - d) % n in mpos), None)
+                    b = next(((i + d) % n for d in range(1, n) if (i + d) % n in mpos), None)
+                    runs.setdefault((a, b), []).append(i)
+                # Axis of the protrusion at its mouth: from the exit node along the group's last edge
+                near = [m for m in self._adjacency.get(e, ()) if in_group(m, e) and m is not e]
+                axis = None
+                if len(near) == 1:
+                    ux, uy = near[0].x - e.x, near[0].y - e.y
                     ul = math.hypot(ux, uy)
-                    if ul <= self.merge_tol:
-                        break
-                    ux, uy = ux / ul, uy / ul
-                    tc = max(0.0, T - limit)
-                    tx, ty = self._raw_position(i, tc)
-                    mp = [self._raw_position(k, tc) for k in mouths[e]]
-                    mx, my = sum(x for x, _y in mp) / len(mp), sum(y for _x, y in mp) / len(mp)
-                    a = (tx - mx)*ux + (ty - my)*uy
-                    head = [n for n in t[:j] if n.time < tc]
-                    tracks[i] = head + [SkeletonNode(tx, ty, tc), SkeletonNode(tx - a*ux, ty - a*uy, tc)] + t[j+1:]
-                    cut[e] = (e.x, e.y, T, tc)
-                    break
+                    if ul > self.merge_tol:
+                        axis = (ux / ul, uy / ul)
+                for (a, b), run in runs.items():
+                    run.sort(key=lambda i: (i - a) % n)
+                    (ax, ay), (bx, by) = mpos[a], mpos[b]
+                    dx, dy = bx - ax, by - ay
+                    dd = dx*dx + dy*dy
+                    s_prev = 0.0
+                    for i in run:
+                        t, j = tracks[i], tips[i]
+                        tx, ty = _track_point(t, tc, self.TIME_EPS)
+                        if dd > self.merge_tol**2:
+                            # Onto the chord between the two mouth vertices, in outline order
+                            s = min(1.0, max(0.0, ((tx - ax)*dx + (ty - ay)*dy) / dd))
+                            s = s_prev = max(s, s_prev)
+                            qx, qy = ax + s*dx, ay + s*dy
+                        else:
+                            # A single mouth vertex: the other side of the mouth is an edge of the outline. Move along
+                            # the axis onto the line through the mouth vertex perpendicular to it, which keeps the tip
+                            # on its own side (on that edge).
+                            m = t[j]
+                            ux, uy = axis if axis is not None else (m.x - e.x, m.y - e.y)
+                            ul = math.hypot(ux, uy)
+                            if ul <= self.merge_tol:
+                                qx, qy = ax, ay
+                            else:
+                                ux, uy = ux / ul, uy / ul
+                                d = (tx - ax)*ux + (ty - ay)*uy
+                                qx, qy = tx - d*ux, ty - d*uy
+                        head = [p for p in t[:j] if p.time < tc]
+                        tracks[i] = head + [SkeletonNode(tx, ty, tc), SkeletonNode(qx, qy, tc)] + t[j+1:]
+                cut[e] = (e.x, e.y, T, tc)
         self.cut_protrusions = list(cut.values())
         self.tracks = tracks
         self._track_times = [[n.time for n in track] for track in tracks]
@@ -654,21 +720,7 @@ class Skeletonator:
         outward offset only until the first event of the *exterior* skeleton. Further out, short edges between reflex
         vertices invert and convex tips give unbounded miters. Use `offset_polygon_outward` for a real outward offset.
         """
-        track = self.tracks[i]
-        times = self._track_times[i]
-        if len(track) == 1:
-            return track[0].pos
-        if depth <= times[0]:
-            j = 0
-        elif depth >= times[-1]:
-            # Beyond the end of the track the outline has collapsed, there is nothing to extrapolate.
-            return track[-1].pos
-        else:
-            j = max(0, min(len(track) - 2, bisect.bisect_right(times, depth) - 1))
-        n0, n1 = track[j], track[j+1]
-        if n1.time - n0.time <= self.TIME_EPS:
-            return n1.pos if depth >= n1.time else n0.pos
-        return interpolate(n0.pos, n1.pos, depth, n0.time, n1.time)
+        return _track_point(self.tracks[i], depth, self.TIME_EPS, self._track_times[i])
 
     def iter_arcs(self, p):
         track = self.tracks[self.poly.index(p)]
