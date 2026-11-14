@@ -348,7 +348,8 @@ def test_circle_inner_vias_stay_on_their_side_of_the_center():
     assert model.inner_via_ring_radius >= -1e-9
     assert model.via_offset <= model.shape.max_via_offset + 1e-9
     assert any('Overlapping vias' in str(x.message) for x in w)
-    assert any('overlaps a neighboring turn by' in str(x.message) for x in w)
+    overlap = [str(x.message) for x in w if 'overlaps a neighboring turn by' in str(x.message)]
+    assert overlap and not any('less than the clearance' in m for m in overlap) # the overlap is larger than it
 
 
 def test_polyline_circle_respects_clearance():
@@ -379,6 +380,46 @@ def test_tightened_render_settings_are_reported(caplog):
         model.render_footprint(arc_tolerance=0.1, circle_segments=32)
     msgs = [r.getMessage() for r in caplog.records if 'Overriding' in r.getMessage()]
     assert any('arc tolerance' in m for m in msgs) and any('circle segments' in m for m in msgs)
+    # The arc tolerance and the segment count only apply to circles drawn with arcs / as polylines respectively.
+    caplog.clear()
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        rect = geometry.PlanarInductor(shape=geometry.RectangleShape(width=50, height=40, annular_width=10), turns=5,
+                                       twists=1, clearance=0.2)
+        polyline = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=5, twists=1, clearance=0.15,
+                                           approximate_arcs=False)
+    with caplog.at_level(logging.WARNING, logger='kicoil'):
+        rect.render_footprint(arc_tolerance=0.1, circle_segments=32)
+        polyline.render_footprint(arc_tolerance=0.1)
+    assert not [r for r in caplog.records if 'Overriding' in r.getMessage()]
+
+
+@pytest.mark.parametrize('arcs', [False, True])
+def test_zero_clearance_renders(arcs):
+    # The chord error limit clearance/40 was 0 for clearance 0: ZeroDivisionError in effective_render_options.
+    from kicoil import geometry
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        model = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=7, twists=4, clearance=0.0,
+                                        approximate_arcs=arcs)
+        fp = model.render_footprint()
+    assert len(fp.arcs if arcs else fp.lines) > 0
+
+
+@pytest.mark.parametrize('od,idd,n,k,c,arcs', [(200, 190, 11, 3, 0.5, True), (4, 3, 11, 3, 0.05, True),
+                                               (50, 25, 11, 3, 0.15, False)])
+def test_circle_render_loses_at_most_clearance_over_40(od, idd, n, k, c, arcs):
+    # Both neighboring turns may deviate by the arc tolerance / chord error towards each other. With a tolerance of
+    # clearance/40 the rendered copper lost up to 4.4 % (arcs, 200/190 mm) and 5.1 % (4/3 mm) of the clearance.
+    from kicoil import geometry
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        model = geometry.PlanarInductor(shape=geometry.CircleShape(od, idd), turns=n, twists=k, clearance=c,
+                                        approximate_arcs=arcs)
+        fp = model.render_footprint()
+    intent = geomcheck.intent_from_model(model)
+    rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent, do_conformance=False)
+    assert rep.worst_clearance_deficit <= c / 40 + 1e-6
 
 
 def test_kicad_pcb_export(tmp_path):
@@ -396,10 +437,24 @@ def test_kicad_pcb_export(tmp_path):
     assert len(board.vias) == 2 + 3 # inner ring 3, outer ring 2 (the third outer position holds the pads)
     pads = [p for fp in board.footprints for p in fp.pads]
     assert sorted(p.number for p in pads) == ['1', '2']
+    copper = {'F.Cu', 'B.Cu'}
+    assert {a.layer for a in board.track_arcs} <= copper and {s.layer for s in board.track_segments} <= copper
+    assert all(set(v.layers) == copper for v in board.vias)
     res = CliRunner().invoke(cli, ['--format', 'kicad-pcb', '--twists', '2', '--turns', '5', '--clearance', '0.2',
                                    'rectangle', str(out)])
     assert res.exit_code == 0, res.output
-    assert len(Board.open(out).track_segments) > 0
+    board = Board.open(out)
+    assert len(board.track_segments) > 0
+    # gerbonara's TrackSegment.from_footprint_line swaps layer and locked: every segment was written on layer "False".
+    assert {s.layer for s in board.track_segments} == copper
+    assert not any(s.locked for s in board.track_segments)
+    # Single layer: the bridge is the only straight segment, on the back layer.
+    res = CliRunner().invoke(cli, ['--format', 'kicad-pcb', '--single-layer', '--turns', '5', '--clearance', '0.2',
+                                   'circle', str(out)])
+    assert res.exit_code == 0, res.output
+    board = Board.open(out)
+    assert [s.layer for s in board.track_segments] == ['B.Cu']
+    assert {a.layer for a in board.track_arcs} == {'F.Cu'}
 
 
 def test_error_messages_give_the_measured_spacing():
@@ -435,3 +490,118 @@ def test_fold_around_narrow_notch_is_reported():
     model, intent, rep = layout(spec('narrow_slot_w10.0_n4k1'), caught)
     assert rep.ok_connectivity and rep.crossings == 0
     assert any(FOLD_WARNING in m for m in caught)
+
+
+@pytest.mark.parametrize('name', ['narrow_stepped_w4.0_n4k1', 'narrow_stepped_w6.0_n4k1', 'narrow_branch_w3.0_n7k3',
+                                  'narrow_branch_w6.0_n4k1'])
+def test_nested_protrusions_are_cut_at_every_mouth(name):
+    # The protrusion cut stopped after the first protrusion a track passes through: the tips of a narrow finger on top
+    # of a wider one (or of a side branch) were cut at the inner mouth only and still ran up the outer protrusion's
+    # axis, while the other vertices of the outer protrusion were cut at its mouth. One turn then ran up the axis and
+    # straight back, a zero-width hairpin (connectivity broken, reported as a branch).
+    model, intent, rep = layout(spec(name))
+    assert rep.ok_connectivity and rep.branches == 0 and rep.crossings == 0 and rep.backtracks == 0
+    assert rep.worst_clearance_deficit <= 0.05 * intent.clearance + 1e-4
+
+
+def test_bent_protrusion_is_cut_on_its_mouth():
+    # The tips of a protrusion moved along the direction from their own entry into the collapsed group to its exit,
+    # which is oblique for an L-shaped protrusion: they landed 0.6 mm inside the outline, the measured spacing dropped
+    # to 61 % of the pitch and the whole coil got a 45 % thinner trace than with a straight finger of the same width.
+    sq = [(-20, -20), (20, -20), (20, 20)]
+    straight = sq + [(2, 20), (2, 32), (-2, 32), (-2, 20), (-20, 20)]
+    bent = sq + [(2, 20), (2, 28), (12, 28), (12, 32), (-2, 32), (-2, 20), (-20, 20)]
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        w_straight = build_model(poly_spec(straight, 6, 13, 3)).trace_width
+        model, intent, rep = layout(poly_spec(bent, 6, 13, 3))
+    assert model.trace_width >= 0.98 * w_straight
+    assert rep.ok_connectivity and rep.crossings == 0 and rep.worst_clearance_deficit <= 1e-4
+
+
+def test_fold_at_tapered_finger_is_reported():
+    # A turn running into a tapered finger and back: its copper overlapped itself (0.04 mm) at pieces 18.2 mm apart
+    # along the conductor, which the checker counts as a clearance violation. The fold test only looked at pieces more
+    # than pi*d + pitch = 19.3 mm apart and did not warn.
+    poly = [(-20.0, -20.0), (20.0, -20.0), (20.0, 20.0), (-4.487019801766503, 20.0), (-6.0495799658954175, 28.436328047481098),
+            (-9.675310650842189, 28.436328047481098), (-11.237870814971103, 20.0), (-20.0, 20.0)]
+    caught = []
+    model, intent, rep = layout(poly_spec(poly, 15.87099714894963, 5, 3), caught)
+    assert rep.ok_connectivity and rep.crossings == 0
+    assert any(FOLD_WARNING in m for m in caught)
+
+
+def _naive_folds(arms, search_radius, min_turn_separation=0.5):
+    """ Brute force fold candidates: pairs of pieces of the same turn with their distance d and their separation along
+    the conductor, if that is more than pi*d. Pieces are split like in min_turn_spacing. """
+    from kicoil.geometry import _split_by_angle, _seg_seg_distance
+    out = []
+    for points, angles in arms:
+        pieces, s = [], 0.0
+        for q1, q2, u1, u2 in _split_by_angle(points, angles, min_turn_separation / 10):
+            l = math.dist(q1, q2)
+            n = max(1, math.ceil(l / (4 * search_radius)))
+            for k in range(n):
+                a = (q1[0] + (q2[0]-q1[0])*k/n, q1[1] + (q2[1]-q1[1])*k/n)
+                b = (q1[0] + (q2[0]-q1[0])*(k+1)/n, q1[1] + (q2[1]-q1[1])*(k+1)/n)
+                pieces.append((a, b, min(u1, u2), max(u1, u2), s + l*k/n, s + l*(k+1)/n))
+            s += l
+        for i, (a, b, tlo, thi, s0, s1) in enumerate(pieces):
+            for c, d_, ulo, uhi, r0, r1 in pieces[i+1:]:
+                if max(ulo - thi, tlo - uhi) >= min_turn_separation:
+                    continue
+                d = _seg_seg_distance(a, b, c, d_)
+                path = max(r0 - s1, s0 - r1)
+                if d < search_radius and path > math.pi * d + 1e-9 * search_radius:
+                    out.append((d, path))
+    return out
+
+
+@pytest.mark.parametrize('name', ['narrow_slot_w10.0_n4k1', 'narrow_taper_w15.9_n5k2', 'sector180_a0.90_n3k1',
+                                  'ellipse3to1_a0.90_n16k5'])
+def test_fold_candidates_match_brute_force(name):
+    # The chunked search skips pairs of chunks that cannot hold a fold candidate; it must find the same ones.
+    from kicoil.geometry import min_turn_spacing
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        try:
+            model = build_model(spec(name))
+        except ValueError:
+            pytest.skip('rejected')
+    R = model.spiral_pitch
+    found = 0
+    for layer_arms in model.spiral_center_lines():
+        if not layer_arms:
+            continue
+        _best, _where, fold_best, _fold_where, front = min_turn_spacing(layer_arms, R, folds=True)
+        naive = _naive_folds(layer_arms, R)
+        found += len(naive)
+        assert fold_best == pytest.approx(min([d for d, p in naive if p > math.pi*d + R], default=R), abs=1e-12)
+        for min_path in (0.5*R, R, 2*R, 4*R, 8*R):
+            assert front.closest(min_path)[0] == pytest.approx(
+                    min([d for d, p in naive if p > min_path], default=math.inf), abs=1e-12)
+    assert found # every one of these cases has turns that come back close to themselves
+
+
+def test_spacing_measurement_dense_outline_few_turns():
+    # A finely subdivided outline with few turns (an SVG import) puts thousands of pieces of one turn into each grid
+    # cell of the spacing search: all pairs of a cell were built at once (2.4 GB and 20 s for 16000 points). The pieces
+    # are now paired chunk by chunk and pairs of one turn are skipped per chunk.
+    import time
+    import tracemalloc
+    from kicoil.geometry import min_turn_spacing
+    N = 16000
+    pts, ang = [], []
+    for i in range(N + 1):
+        t = i / N
+        r = 30 - 20 * t
+        pts.append((r * math.cos(2 * math.pi * t), r * math.sin(2 * math.pi * t)))
+        ang.append(t)
+    tracemalloc.start()
+    t0 = time.perf_counter()
+    best, _where = min_turn_spacing([(pts, ang)], 20.0)
+    elapsed = time.perf_counter() - t0
+    _cur, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert best == pytest.approx(19.662, abs=1e-3)
+    assert peak < 400e6 and elapsed < 10 # about 0.1 GB and 0.5 s

@@ -50,8 +50,12 @@ def footprint_to_board(footprint):
     board in a footprint of their own (named after the coil footprint with a "-terminals" suffix). """
     board = Board.empty_board(
             zones=list(footprint.zones),
-            track_segments=[TrackSegment.from_footprint_line(line) for line in footprint.lines],
-            track_arcs=[TrackArc(arc.start, arc.mid, arc.end, arc.stroke.width, arc.layer) for arc in footprint.arcs],
+            # Built with keywords: gerbonara's TrackSegment.from_footprint_line passes layer and locked positionally in
+            # the wrong order, which wrote every straight segment with layer "False".
+            track_segments=[TrackSegment(start=line.start, end=line.end, width=line.width or line.stroke.width,
+                                         layer=line.layer) for line in footprint.lines],
+            track_arcs=[TrackArc(start=arc.start, mid=arc.mid, end=arc.end, width=arc.stroke.width, layer=arc.layer)
+                        for arc in footprint.arcs],
             vias=[Via.from_pad(pad) for pad in footprint.pads if pad.type == Atom.thru_hole])
 
     terminal_pads = [copy.deepcopy(pad) for pad in footprint.pads if pad.type != Atom.thru_hole]
