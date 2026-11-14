@@ -72,7 +72,10 @@ are less than 0.14 turns apart, while a trace several mm wide that wraps around 
 cases: sector 90/180, square, D shape, random convex, star6, triangle) touches itself 0.22 to 0.5 turns further on; 0.18
 lies in the middle of that gap. Before, with half a turn as the only threshold, the same wrap passed in one case
 (`sector180_a0.90_n3k1`, contacts of 9-15 c at 0.26-0.46 turns) and failed in another (`octagon_a0.90_n3k1`, 2.4 c at
-about 0.5 turns). Remaining edges: the base implementation's `sector90_a0.90_n3k1` has a contact of 11 c at 0.14 turns
+about 0.5 turns). Self shorts are also checked between a via or pad and track of its own turn. On the full corpus they fail
+`sector180_a0.90_n3k1` with every implementation, and with `geometry_alt_jog` also `rect40x20_a0.90_n3k1` and
+`roundrect_a0.90_n3k1`, where the inner via (as wide as the 5.9-7.3 mm trace) sits in a hole 2-2.5 mm tall and touches the
+track 0.38-0.43 turns before it. Remaining edges: the base implementation's `sector90_a0.90_n3k1` has a contact of 11 c at 0.14 turns
 (at the sector's apex), which passes as a fold; contacts of wraps closer than π/2·(w+c) along the conductor are not
 checked.
 
