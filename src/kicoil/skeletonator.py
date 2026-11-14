@@ -9,6 +9,7 @@ import importlib.resources
 import lzma
 import sys
 import hashlib
+import bisect
 
 import platformdirs
 import wasmtime
@@ -131,9 +132,8 @@ def compute_skeleton(exterior):
     for p1, p2 in edge_cycle(exterior):
         if p2 != p1:
             points_deduplicated.append(p1)
-    input_data = '\n'.join(f'{x} {y}' for x, y in points_deduplicated)
-    Path('/tmp/debug.txt').write_text(input_data)
-    
+    input_data = '\n'.join(f'{x!r} {y!r}' for x, y in points_deduplicated)
+
     rc, data = skeleton_wasm.run(input_data)
 
     # Parse output: each line is "x1 y1 x2 y2 t1 t2"
@@ -165,88 +165,270 @@ def compute_skeleton(exterior):
 
 
 class Skeletonator:
-    def __init__(self, poly):
+    """ Maps a polygon's straight skeleton to a coordinate system for spiral layout.
+
+    Coordinates are an "angle" t (one revolution per unit, polygon vertex 0 at t=0) and a "radius" r, which is
+    `self.radius - depth`, where depth is the inward offset distance from the polygon outline. A point (t, r) lies on
+    the polygon's inward offset at that depth (i.e. on the straight skeleton wavefront at time=depth).
+
+    Every polygon vertex moves along a chain of skeleton arcs ("track") as the outline is offset inwards. The offset
+    outline at a given depth is the polygon formed by the positions of all vertices on their tracks at that depth. This
+    works up to the first split event, where the offset outline falls apart into multiple pieces; `self.min_radius`
+    holds that depth limit (the name is historical, it is a depth, not a radius).
+
+    The angle coordinate is fixed for the whole shape: vertex i always sits at angle `self.vertex_angles[i]`, no matter
+    the depth. This makes consecutive turns of a spiral, and the arms of a multi-arm spiral, line up with each other
+    exactly at every vertex.
+    """
+
+    TIME_EPS = 1e-9
+
+    def __init__(self, poly, ref_depth=None):
         self.poly = poly
         self.poly_edges = list(zip(poly, poly[1:] + poly[:1]))
         self.circumference = sum(math.dist(a, b) for a, b in self.poly_edges)
         self.skeleton_nodes, self.skeleton_edges = compute_skeleton(exterior=poly)
-        self.arc_map = {}
-        self.divergent = set()
-        self.radius = max(n.time for n in self.skeleton_nodes)
-        self.min_radius = self.radius
-        for n1, n2 in self.skeleton_edges:
-            if n1 in self.arc_map:
-                self.divergent.add(n1)
-                self.min_radius = min(n1.time, self.radius)
-            self.arc_map[n1] = n2
-        coord_map = {}
-        for n in self.skeleton_nodes:
-            p = (round(n.x, 6), round(n.y, 6))
-            coord_map[p] = n
-        self.node_map = {}
-        for x, y in poly:
-            p = (round(x, 6), round(y, 6))
-            self.node_map[(x, y)] = coord_map[p]
         self.debug_arms = []
 
+        # Merge skeleton nodes that coincide (CGAL emits clusters of nodes connected by zero-length edges at degenerate
+        # events, e.g. at the center of regular polygons).
+        scale = max(1.0, max(abs(c) for p in poly for c in p))
+        eps = 1e-9 * scale
+        canon = {}
+        buckets = {}
+        for n in sorted(self.skeleton_nodes, key=lambda n: n.time):
+            key = (round(n.x / eps / 1e3), round(n.y / eps / 1e3))
+            match = None
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for m in buckets.get((key[0]+dx, key[1]+dy), ()):
+                        if abs(m.x - n.x) <= 1e3*eps and abs(m.y - n.y) <= 1e3*eps and abs(m.time - n.time) <= 1e3*eps:
+                            match = m
+            if match is None:
+                buckets.setdefault(key, []).append(n)
+                canon[n] = n
+            else:
+                canon[n] = match
+
+        adjacency = {}
+        for n1, n2 in self.skeleton_edges:
+            c1, c2 = canon[n1], canon[n2]
+            if c1 is c2:
+                continue
+            adjacency.setdefault(c1, set()).add(c2)
+            adjacency.setdefault(c2, set()).add(c1)
+
+        # Vertex tracks follow the skeleton towards strictly increasing time. A node with more than one way up is a
+        # split event (or a vertex event), beyond which the offset outline is no longer a single polygon.
+        self.radius = max(n.time for n in self.skeleton_nodes)
+        self.divergent = set()
+        self.arc_map = {}
+        split_time = self.radius
+        for n, nbrs in adjacency.items():
+            up = [m for m in nbrs if m.time > n.time + self.TIME_EPS]
+            if len(up) > 1:
+                self.divergent.add(n)
+                split_time = min(split_time, n.time)
+            elif len(up) == 1:
+                self.arc_map[n] = up[0]
+        self.min_radius = split_time
+        self.max_depth = split_time
+
+        contour_nodes = {}
+        for n in self.skeleton_nodes:
+            if n.time <= self.TIME_EPS:
+                contour_nodes[(round(n.x, 6), round(n.y, 6))] = canon[n]
+        self.node_map = {}
+        self.tracks = []
+        for x, y in poly:
+            start = contour_nodes[(round(x, 6), round(y, 6))]
+            self.node_map[(x, y)] = start
+            track = [start]
+            while track[-1] in self.arc_map and track[-1] not in self.divergent:
+                track.append(self.arc_map[track[-1]])
+            self.tracks.append(track)
+        self._track_times = [[n.time for n in track] for track in self.tracks]
+
+        self.set_angle_reference(ref_depth)
+
+    def set_angle_reference(self, max_depth=None):
+        """ Fix the angle coordinate of every vertex.
+
+        Each edge gets an angle span proportional to its *shortest* length over the depth range [0, max_depth] that the
+        spiral uses. The depth difference a spiral arm covers along an edge is proportional to the edge's angle span, so
+        this choice bounds the slope of the spiral relative to the edge (and thus the loss of clearance between turns
+        caused by that slope) at every depth, including edges that shrink (convex corners) or grow (reflex corners).
+        """
+        if max_depth is None:
+            max_depth = self.max_depth
+        max_depth = max(0, min(max_depth, self.max_depth))
+        depths = {0.0, max_depth}
+        for times in self._track_times:
+            depths.update(t for t in times if 0 < t < max_depth)
+        depths = sorted(depths)
+        n = len(self.poly)
+        min_len = [math.inf] * n
+        for d in depths:
+            pts = [self.track_position(i, d) for i in range(n)]
+            for i in range(n):
+                min_len[i] = min(min_len[i], math.dist(pts[i], pts[(i+1) % n]))
+        total = sum(min_len)
+        if total <= 1e-9 * self.circumference:
+            # Everything collapses at max_depth: fall back to outline edge lengths
+            min_len = [math.dist(a, b) for a, b in self.poly_edges]
+            total = sum(min_len)
+        self.ref_depth = max_depth
+        self.vertex_angles = [0.0]
+        for l in min_len[:-1]:
+            self.vertex_angles.append(self.vertex_angles[-1] + l / total)
+        # Vertices at the end that share their angle with vertex 0 (i.e. a run of collapsing edges across vertex 0)
+        # must have an angle of exactly 1 so that angle comparisons are exact.
+        self.vertex_angles = [1.0 if 1.0 - a < 1e-12 else a for a in self.vertex_angles]
+        self.edge_spans = [b - a for a, b in itertools.pairwise(self.vertex_angles + [1.0])]
+
+    def track_position(self, i, depth):
+        """ Position of polygon vertex i on the offset outline at the given depth. Negative depths are extrapolated
+        linearly along the first arc (this yields a mitered outward offset). Depths beyond the end of the track are
+        clamped to the track's end. """
+        track = self.tracks[i]
+        times = self._track_times[i]
+        if len(track) == 1:
+            return track[0].pos
+        if depth <= times[0]:
+            j = 0
+        elif depth >= times[-1]:
+            # Beyond the end of the track the outline has collapsed, there is nothing to extrapolate.
+            return track[-1].pos
+        else:
+            j = max(0, min(len(track) - 2, bisect.bisect_right(times, depth) - 1))
+        n0, n1 = track[j], track[j+1]
+        if n1.time - n0.time <= self.TIME_EPS:
+            return n1.pos if depth >= n1.time else n0.pos
+        return interpolate(n0.pos, n1.pos, depth, n0.time, n1.time)
+
     def iter_arcs(self, p):
-        i = 0
-        start = self.node_map[p]
-        while start in self.arc_map and not start in self.divergent:
-            end = self.arc_map[start]
-            i += 1
-            yield start, end
-            start = end
+        track = self.tracks[self.poly.index(p)]
+        yield from itertools.pairwise(track)
 
     def project_arc(self, p, r):
-        t = self.radius - r
-
-        for n0, n1 in self.iter_arcs(p):
-            if t < 0 or approx_in_range(t, n0.time, n1.time):
-                return (n0, n1), interpolate(n0.pos, n1.pos, t, n0.time, n1.time)
-        else:
-            raise ValueError(f'{r=:.3f} is out of bounds [0, {self.radius - self.min_radius:.4f}]')
+        i = self.poly.index(p)
+        depth = self.radius - r
+        if depth > self.max_depth + 1e-9:
+            raise ValueError(f'{r=:.3f} is out of bounds [{self.radius - self.max_depth:.4f}, {self.radius:.4f}]')
+        track = self.tracks[i]
+        arc = (track[0], track[min(1, len(track)-1)])
+        return arc, self.track_position(i, depth)
 
     def calc_circumference(self, r):
-        projected = [self.project_arc(p, r)[1] for p in self.poly]
-        return sum(math.dist(p1, p2) for p1, p2 in zip(projected, projected[1:] + projected[:1]))
-
-    def project_point(self, t, r=None, r_ref=None):
-        t %= 1
-        if r is None:
-            r = self.radius
-
-        if r_ref is None:
-            r_ref = r
-        
-        t_start = 0
-        p_cur = None
-        _arcs, points_at_r = self.map_circumference(r_ref)
-        circumference_at_r = sum(math.dist(p1, p2) for p1, p2 in edge_cycle(points_at_r))
-        for (p1, p2), (p1r, p2r) in zip(self.poly_edges, edge_cycle(points_at_r)):
-            edge_frac = math.dist(p1r, p2r) / circumference_at_r
-            t_end = t_start + edge_frac
-    
-            if approx_in_range(t, t_start, t_end):
-                p1, p2 = self.project_arc(p1, r)[1], self.project_arc(p2, r)[1]
-                p_cur = interpolate(p1, p2, t, t_start, t_end)
-                return p_cur
-
-            t_start = t_end
+        projected = self.map_circumference(r)[1]
+        return sum(math.dist(p1, p2) for p1, p2 in edge_cycle(projected))
 
     def map_circumference(self, r):
-        points, arcs = [], []
-        for p in self.poly:
-            arc, pt = self.project_arc(p, r)
-            arcs.append(arc)
-            points.append(pt)
+        depth = self.radius - r
+        points = [self.track_position(i, depth) for i in range(len(self.poly))]
+        arcs = [(t[0], t[min(1, len(t)-1)]) for t in self.tracks]
         return arcs, points
-    
+
+    ANGLE_EPS = 1e-9
+
+    def snap_angle(self, t):
+        """ Snap an angle to the nearest vertex angle if it is within ANGLE_EPS of it. Angles of arm ends are computed
+        with floating point arithmetic, and several vertices can share the same angle (when edges collapse before the
+        spiral's reference depth). Snapping makes the comparisons with vertex angles exact. """
+        k = math.floor(t)
+        frac = t - k
+        i = bisect.bisect_left(self.vertex_angles, frac)
+        for j in (i-1, i):
+            if 0 <= j < len(self.vertex_angles) and abs(self.vertex_angles[j] - frac) < self.ANGLE_EPS:
+                return k + self.vertex_angles[j]
+        if 1.0 - frac < self.ANGLE_EPS:
+            return k + 1.0
+        return t
+
+    def _locate(self, t):
+        """ For angle t, return (k, i, f): t lies in revolution k on the edge from vertex i to vertex i+1 at fraction f.
+
+        When several vertices share angle t, this returns the *first* of them (as the end of the edge leading to it,
+        f=1). Spiral arms start and end there and include the other vertices of the group in their first turn. """
+        k = math.floor(t)
+        frac = t - k
+        if frac <= 0:
+            k, frac = k-1, 1.0
+        i = bisect.bisect_left(self.vertex_angles, frac) # first vertex with angle >= frac, n if there is none
+        i -= 1 # the edge leading there
+        span = self.edge_spans[i]
+        f = 1.0 if span <= 0 else (frac - self.vertex_angles[i]) / span
+        return k, i, max(0.0, min(1.0, f))
+
+    def _vertex_angle(self, k, i):
+        if i >= len(self.poly):
+            return k + 1 + self.vertex_angles[i - len(self.poly)]
+        return k + self.vertex_angles[i]
+
+    def _point_on_spiral(self, t, depth_fn):
+        """ Point at angle t on the polyline through all vertices v at depth depth_fn(angle of v) """
+        k, i, f = self._locate(t)
+        n = len(self.poly)
+        a0, a1 = self._vertex_angle(k, i), self._vertex_angle(k, i+1)
+        p0 = self.track_position(i, depth_fn(a0))
+        p1 = self.track_position((i+1) % n, depth_fn(a1))
+        return interpolate(p0, p1, f)
+
+    def project_point(self, t, r=None, r_ref=None):
+        """ Point at angle t on the offset outline at radius r. r_ref is accepted for API compatibility and ignored, the
+        angle mapping is fixed. """
+        if r is None:
+            r = self.radius
+        depth = self.radius - r
+        return self._point_on_spiral(self.snap_angle(t), lambda a: depth)
+
+    def iter_vertex_angles(self, t1, t2):
+        """ Yield (angle, vertex index) for all vertices with t1 <= angle < t2, in order """
+        n = len(self.poly)
+        k = math.floor(t1) - 1
+        while True:
+            for i in range(n):
+                a = k + self.vertex_angles[i]
+                if a >= t2:
+                    return
+                if a >= t1:
+                    yield a, i
+            k += 1
+
+    def spiral(self, t1, t2, d1, d2):
+        """ Return the points and angles of a spiral arm from angle t1 at depth d1 to angle t2 at depth d2 (t1 < t2).
+        The depth changes linearly with the angle. """
+        t1, t2 = self.snap_angle(t1), self.snap_angle(t2)
+        if math.isclose(t1, t2):
+            depth_fn = lambda t: d1
+        else:
+            depth_fn = lambda t: d1 + (d2 - d1) * (t - t1) / (t2 - t1)
+
+        # The end points are placed on the offset outline at constant depth, so that they do not depend on the
+        # direction of the spiral. This way, the end points of inward and outward spirals meet exactly.
+        points = [self._point_on_spiral(t1, lambda a: d1)]
+        angles = [t1]
+        for a, i in self.iter_vertex_angles(t1, t2):
+            p = self.track_position(i, d1 if a == t1 else depth_fn(a))
+            if math.dist(p, points[-1]) > 1e-12:
+                points.append(p)
+                angles.append(a)
+        p = self._point_on_spiral(t2, lambda a: d2)
+        if math.dist(p, points[-1]) > 1e-12 or len(points) == 1:
+            points.append(p)
+            angles.append(t2)
+        else:
+            points[-1], angles[-1] = p, t2
+        return points, angles
+
     def do_spiral(self, t1, t2, r1=None, r2=None, debug=False):
+        """ Yield the points of a spiral arm from angle t1 at radius r1 to angle t2 at radius r2. The radius changes
+        linearly with the angle. Points are yielded in order of increasing angle as (point, r_ref) tuples; r_ref is
+        kept for API compatibility. """
         if r1 is None:
             r1 = self.radius
         if r2 is None:
-            r2 = self.min_radius
+            r2 = self.radius - self.max_depth
 
         direction = True
         if t2 < t1:
@@ -254,60 +436,12 @@ class Skeletonator:
             t1, t2 = t2, t1
             r1, r2 = r2, r1
 
-        def r_interpolate(t):
-            t = max(t1, min(t2, t)) # Clip to start/end of spiral
-            f = (t - t1) / (t2 - t1)
-            return r1 + (r2 - r1) * f
-        
-        debug_arm = []
-        for t_start in range(math.ceil(t2-t1)):
-            t_start += t1
-            t_end = t_start + 1
-            r_outer = r_interpolate(t_start)
-            r_inner = r_interpolate(t_end)
-            r_ref = min(r_inner, r_outer) # Handle outward spirals where the radii are swapped
-            _ic_arcs, inner_circumference = self.map_circumference(r_ref)
-
-            angle = math.floor(t_start)
-            circumference_angles = []
-            inner_circumference_sum = sum(math.dist(p1, p2) for p1, p2 in edge_cycle(inner_circumference))
-            point_angles = []
-            for p1, p2 in edge_cycle(inner_circumference):
-                edge_angle = math.dist(p1, p2) / inner_circumference_sum
-                point_angles.append(angle)
-                angle += edge_angle
-            point_angles += [a+1 for a in point_angles]
-            point_angles += [point_angles[0] + 2]
-
-            i = 0
-            for (p1, p2), (tp1, tp2) in zip(self.poly_edges * 3, itertools.pairwise(point_angles)):
-                i += 1
-                rp1 = r_interpolate(tp1)
-                rp2 = r_interpolate(tp2)
-                _arc, p1_proj = self.project_arc(p1, rp1)
-                _arc, p2_proj = self.project_arc(p2, rp2)
-                if tp2 < t_start and not math.isclose(tp2, t_start):
-                    continue
-                if tp1 > t_end and not math.isclose(tp1, t_end):
-                    continue
-                
-                if approx_in_range(t1, tp1, tp2):
-                    _arc, p2_proj_r1 = self.project_arc(p2, r1)
-                    p_out = interpolate(p1_proj, p2_proj_r1, t1, tp1, tp2)
-                    debug_arm.append(p_out)
-                    yield p_out, r_ref
-
-                if approx_in_range(t2, tp1, tp2):
-                    _arc, p1_proj_r2 = self.project_arc(p1, r2)
-                    p_out = interpolate(p1_proj_r2, p2_proj, t2, tp1, tp2)
-                    debug_arm.append(p_out)
-                    yield p_out, r_ref
-
-                elif approx_in_range(tp2, t1, t2):
-                    debug_arm.append(p2_proj)
-                    yield p2_proj, r_ref
+        r_ref = min(r1, r2)
+        arm, _angles = self.spiral(t1, t2, self.radius - r1, self.radius - r2)
         if debug:
-            self.debug_arms.append((debug_arm, direction, t1, t2))
+            self.debug_arms.append((arm, direction, t1, t2))
+        for p in arm:
+            yield p, r_ref
 
     def dump_to_pdf(self, filename):
         import matplotlib.pyplot as plt

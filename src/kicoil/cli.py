@@ -29,7 +29,7 @@ import click
 from gerbonara.layers import LayerStack
 from gerbonara.cad.kicad.primitives import kicad_mid_to_center_arc
 
-from .geometry import PlanarInductor, divisors, CircleShape, SectorShape, StarShape, SVGShape, RectangleShape, RegularPolygonShape
+from .geometry import PlanarInductor, divisors, CircleShape, SectorShape, StarShape, SVGShape, RectangleShape, RegularPolygonShape, TrapezoidShape
 from .kicad import footprint_to_board
 from .svg import make_transparent_svg
 

@@ -49,6 +49,8 @@ kicoil-gui = "kicoil.gui:main"
 dev = [
     "ipykernel>=7.1.0",
     "matplotlib>=3.10.8",
+    "pytest>=8",
+    "shapely>=2.1",
 ]
 gui = ["cairosvg", "pillow"]
 gds = ["gdstk"]
@@ -60,3 +62,4 @@ build-backend = "uv_build"
 [tool.pytest]
 testpaths = ["tests"]
 norecursedirs = ["*"]
+python_files = ["test_*.py"]

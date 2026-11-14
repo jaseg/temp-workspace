@@ -1,5 +1,5 @@
 
-from gerbonara.cad.kicad.pcb import Board, TrackSegment, Via
+from gerbonara.cad.kicad.pcb import Board, TrackSegment, TrackArc, Via
 from gerbonara.cad.kicad.footprints import Atom, AtPos, XYCoord, Pad, Line, Arc, Stroke, Drill
 
 def make_pad(num, layer, x, y, diameter, clearance):
@@ -43,7 +43,7 @@ def make_via(x, y, diameter, drill, clearance, layers):
 
 def footprint_to_board(footprint):
     return Board.empty_board(
-            zones=zones,
-            track_segments=[TrackSegment.from_footprint_line(line) for line in lines],
-            vias=[Via.from_pad(pad) for pad in pads if pad.type == Atom.thru_hole])
-
+            zones=list(footprint.zones),
+            track_segments=[TrackSegment.from_footprint_line(line) for line in footprint.lines],
+            track_arcs=[TrackArc(arc.start, arc.mid, arc.end, arc.stroke.width, arc.layer) for arc in footprint.arcs],
+            vias=[Via.from_pad(pad) for pad in footprint.pads if pad.type == Atom.thru_hole])
