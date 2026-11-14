@@ -693,20 +693,18 @@ class KiCoilGUI:
 
         # Circle Segments
         ttk.Label(parent, text="Circle Segments:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.circle_segments_var = tk.IntVar(value=64)
-        ttk.Spinbox(parent, from_=8, to=360, textvariable=self.circle_segments_var,
-                   width=15,
-                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Label(parent, text="Points per 360° for arc interpolation",
+        self.circle_segments_entry = EntryWithPlaceholder(parent, placeholder="automatic", width=15)
+        self.circle_segments_entry.grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Points per 360° for circles. Raised if needed\nto keep the error below clearance/40",
                  foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
 
         # Arc Tolerance
         ttk.Label(parent, text="Arc Tolerance (mm):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.arc_tolerance_var = tk.DoubleVar(value=0.02)
-        ttk.Spinbox(parent, from_=0.001, to=1.0, increment=0.001, format="%.3f",
-                   textvariable=self.arc_tolerance_var, width=15,
-                   validate='key', validatecommand=(self.validate_nonneg_cmd, '%P')).grid(row=row, column=1, sticky=tk.W, pady=5)
+        self.arc_tolerance_entry = EntryWithPlaceholder(parent, placeholder="automatic", width=15)
+        self.arc_tolerance_entry.grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="Circles with arcs. Effective value is at most\nclearance/40 (default 0.02 mm)",
+                 foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=(10, 0))
         row += 1
 
         # Keepout Zone
@@ -805,6 +803,13 @@ class KiCoilGUI:
             params['via_offset'] = float(via_offset_value)
 
         return params
+
+    def get_render_options(self):
+        """ Arc tolerance and circle segment count for render_footprint. Empty fields (None) mean automatic. """
+        arc_tolerance = self.arc_tolerance_entry.get()
+        circle_segments = self.circle_segments_entry.get()
+        return (float(arc_tolerance) if arc_tolerance else None,
+                int(circle_segments) if circle_segments else None)
     
     def setup_logging(self):
         """Set up logging handler to capture kicoil logger output for display in the output text widget"""
@@ -880,7 +885,7 @@ class KiCoilGUI:
 
         for entry in [self.trace_width_entry, self.clearance_entry,
                       self.via_drill_entry, self.via_offset_entry,
-                      self.footprint_name_entry]:
+                      self.footprint_name_entry, self.circle_segments_entry, self.arc_tolerance_entry]:
             entry.bind('<KeyRelease>', lambda e: self._on_parameter_change())
 
         # SVG filename entry needs special handling
@@ -971,8 +976,7 @@ class KiCoilGUI:
             self.preview_image = None
             return
 
-        arc_tolerance = self.arc_tolerance_var.get()
-        circle_segments = self.circle_segments_var.get()
+        arc_tolerance, circle_segments = self.get_render_options()
 
         footprint = self.current_model.render_footprint(None, arc_tolerance, circle_segments)
         svg_tag = make_transparent_svg(footprint)
@@ -1028,8 +1032,7 @@ class KiCoilGUI:
         selected_footprint, = selected
 
         footprint_name = self.footprint_name_entry.get() or None
-        arc_tolerance = self.arc_tolerance_var.get()
-        circle_segments = self.circle_segments_var.get()
+        arc_tolerance, circle_segments = self.get_render_options()
 
         self.output_text['state'] = 'normal'
         self.output_text.insert(tk.END, "Rendering footprint...\n", 'info')
@@ -1090,8 +1093,7 @@ class KiCoilGUI:
         
         try:
             footprint_name = self.footprint_name_entry.get() or None
-            arc_tolerance = self.arc_tolerance_var.get()
-            circle_segments = self.circle_segments_var.get()
+            arc_tolerance, circle_segments = self.get_render_options()
 
             self.output_text['state'] = 'normal'
             self.output_text.insert(tk.END, "Rendering footprint...\n\n", 'info')

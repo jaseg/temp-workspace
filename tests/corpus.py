@@ -145,6 +145,44 @@ def neck(w, h, neck_width, notch=2.0):
     return _ccw(pts)
 
 
+def t_shape(w, h, stem_w, stem_l):
+    """ Bar of w x h with a stem of stem_w x stem_l below it. The stem's parallel sides collapse at depth stem_w/2, which
+    lies inside the annulus for deeper annular widths. """
+    pts = [(-stem_w/2, -stem_l), (stem_w/2, -stem_l), (stem_w/2, 0), (w/2, 0), (w/2, h), (-w/2, h), (-w/2, 0),
+           (-stem_w/2, 0)]
+    c = Polygon(pts).centroid
+    return _ccw([(x-c.x, y-c.y) for x, y in pts])
+
+
+def keyhole(d, slot_w, slot_l, n=32):
+    """ Circle of diameter d with a narrow rectangular tab of slot_w x slot_l sticking out at the bottom """
+    r = d/2
+    a0 = math.asin(slot_w/2/r)
+    pts = []
+    for i in range(n+1):
+        a = -math.pi/2 + a0 + (2*math.pi - 2*a0) * i/n
+        pts.append((r*math.cos(a), r*math.sin(a)))
+    y0 = -r*math.cos(a0)
+    pts += [(-slot_w/2, y0 - slot_l), (slot_w/2, y0 - slot_l)]
+    return _ccw(pts)
+
+
+def slotted_square(s, slot_w, slot_depth):
+    """ Square with a narrow slot (two reflex corners) cut in from the top """
+    h = s/2
+    return _ccw([(-h, -h), (h, -h), (h, h), (slot_w/2, h), (slot_w/2, h-slot_depth), (-slot_w/2, h-slot_depth),
+                 (-slot_w/2, h), (-h, h)])
+
+
+def finger_square(s, finger_w, finger_l):
+    """ Square with a narrow finger sticking out at the top. The finger's sides collapse at depth finger_w/2. """
+    h = s/2
+    pts = [(-h, -h), (h, -h), (h, h), (finger_w/2, h), (finger_w/2, h+finger_l), (-finger_w/2, h+finger_l),
+           (-finger_w/2, h), (-h, h)]
+    c = Polygon(pts).centroid
+    return _ccw([(x-c.x, y-c.y) for x, y in pts])
+
+
 def max_depth(poly):
     """ Radius of the maximum inscribed circle """
     p = Polygon(poly)
@@ -253,6 +291,21 @@ def corpus(kind='full'):
         for turns, twists in ((30, 1), (31, 7)):
             cases.append(_spec(f'dense_{sname}_n{turns}k{twists}', 'polygon', turns, twists,
                                polygon=poly, annular_width=round(0.7*depth, 4), tags=tags + ['dense']))
+
+    # Narrow features: protrusions whose parallel sides collapse inside the annulus (T stem, keyhole tab, finger) and a
+    # narrow slot (reflex notch). Annular widths are absolute here, chosen below and above the collapse depth of the
+    # narrow feature.
+    narrow = {
+        'tshape': (t_shape(40, 20, 6, 10), ['reflex', 'narrow'], (2.0, 5.0, 8.0)),
+        'keyhole': (keyhole(30, 4, 8), ['reflex', 'narrow', 'many'], (1.5, 4.0, 7.0)),
+        'finger': (finger_square(40, 4, 15), ['reflex', 'narrow'], (1.5, 3.0, 6.0)),
+        'slot': (slotted_square(40, 2, 15), ['reflex', 'narrow'], (2.0, 6.0, 10.0)),
+    }
+    for sname, (poly, tags, widths) in narrow.items():
+        for aw in widths:
+            for turns, twists in ((4, 1), (5, 2), (7, 3), (9, 4)):
+                cases.append(_spec(f'narrow_{sname}_w{aw:.1f}_n{turns}k{twists}', 'polygon', turns, twists,
+                                   polygon=poly, annular_width=aw, tags=tags))
 
     assert len({c['name'] for c in cases}) == len(cases)
     if kind == 'quick':

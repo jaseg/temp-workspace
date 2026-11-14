@@ -519,9 +519,75 @@ class Skeletonator:
         if self.max_depth <= 0 or any(len(track) < 2 or track[-1].time <= 0 for track in self.tracks):
             raise ValueError('Degenerate straight skeleton: the polygon is too small, or too far away from the origin '
                              'for its size, to be represented with floating point precision.')
+        self._raw_tracks = [list(track) for track in self.tracks]
         self._track_times = [[n.time for n in track] for track in self.tracks]
+        self.fold_limit = 0.0
+        self.uncut_protrusions = []
 
         self.set_angle_reference(ref_depth)
+
+    def _raw_position(self, i, depth):
+        """ Position of vertex i at the given depth on its unmodified skeleton track """
+        tracks, times = self.tracks, self._track_times
+        self.tracks, self._track_times = self._raw_tracks, [[n.time for n in t] for t in self._raw_tracks]
+        try:
+            return self.track_position(i, depth)
+        finally:
+            self.tracks, self._track_times = tracks, times
+
+    def set_fold_limit(self, limit):
+        """ Cut off narrow protrusions of the offset outline.
+
+        Where two parallel (or converging) edges of the outline collapse onto each other at depth T while the outline
+        goes on beyond T (a constant-time group of skeleton nodes with one way up, e.g. the stem of a T, a finger, a
+        keyhole's tab), the offset outline at depths just below T has a sliver of width about 2*(T - depth). A spiral
+        turn at such a depth runs into the sliver and back out, so its copper folds onto itself. With a limit > 0, the
+        vertices inside the protrusion ("tips") jump to the protrusion's mouth at depth T - limit and follow the mouth
+        from there, i.e. turns deeper than T - limit cut straight across the protrusion's mouth. Use half the turn pitch,
+        so that every turn that runs into a protrusion has its two sides at least one pitch apart.
+
+        Protrusions whose mouth cannot be determined are left as they are and listed in `uncut_protrusions` as
+        (x, y, T) of the collapse point.
+        """
+        limit = max(0.0, float(limit))
+        if limit == self.fold_limit:
+            return
+        self.fold_limit = limit
+        raw = self._raw_tracks
+        tracks = [list(t) for t in raw]
+        self.uncut_protrusions = []
+        if limit > 0:
+            exit_of = self._arc_exit
+            def in_group(n, exit_node):
+                return exit_of.get(n) is exit_node and abs(n.time - exit_node.time) <= self.teps
+            # Mouth of a protrusion: the tracks that reach the group's exit node from outside the group
+            mouths = {}
+            for i, t in enumerate(raw):
+                for a, b in itertools.pairwise(t):
+                    if exit_of.get(b) is b and not in_group(a, b):
+                        mouths.setdefault(b, []).append(i)
+            for i, t in enumerate(raw):
+                for j in range(1, len(t) - 1):
+                    m, e = t[j], t[j+1]
+                    # The track enters a group at a member other than the exit, then moves along the group to the exit
+                    if e is m or exit_of.get(m) is not e or not in_group(m, e) or in_group(t[j-1], e):
+                        continue
+                    T = e.time
+                    if T <= limit * 1e-6:
+                        break
+                    if not mouths.get(e):
+                        self.uncut_protrusions.append((e.x, e.y, T))
+                        break
+                    tc = max(0.0, T - limit)
+                    tx, ty = self._raw_position(i, tc)
+                    mp = [self._raw_position(k, tc) for k in mouths[e]]
+                    mx, my = sum(x for x, _y in mp) / len(mp), sum(y for _x, y in mp) / len(mp)
+                    head = [n for n in t[:j] if n.time < tc]
+                    tracks[i] = head + [SkeletonNode(tx, ty, tc), SkeletonNode(mx, my, tc)] + t[j+1:]
+                    break
+        self.tracks = tracks
+        self._track_times = [[n.time for n in track] for track in tracks]
+        self.set_angle_reference(getattr(self, 'ref_depth', None))
 
     def set_angle_reference(self, max_depth=None):
         """ Fix the angle coordinate of every vertex.

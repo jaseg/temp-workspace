@@ -227,7 +227,7 @@ def _candidate_pairs(lo, hi, radius, max_pairs=2_000_000):
         yield np.minimum(si, sj), np.maximum(si, sj)
 
 
-def min_turn_spacing(arms, search_radius, min_turn_separation=0.5):
+def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False):
     """ Find the smallest centerline distance between neighboring turns of a set of spiral arms on one layer.
 
     arms is a list of (points, angles) tuples, with angles in revolutions. Segments of different arms are always
@@ -237,38 +237,63 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5):
 
     Returns (distance, location). Distances above search_radius are not reported, (search_radius, None) is returned if
     nothing closer was found.
+
+    With folds=True, also returns the smallest distance between two pieces of the *same* turn (less than
+    min_turn_separation apart) that are far apart along the conductor, more than pi times their distance plus
+    search_radius, and its location, i.e. (distance, location, fold distance, fold location). That happens where the
+    turn runs around a narrow notch of the outline and comes back along the other side.
     """
     pieces = [_split_by_angle_np(points, angles, min_turn_separation / 10) for points, angles in arms]
     if not pieces:
-        return search_radius, None
+        return (search_radius, None, search_radius, None) if folds else (search_radius, None)
     P = np.concatenate([q1 for q1, _q2, _u1, _u2 in pieces])
     Q = np.concatenate([q2 for _q1, q2, _u1, _u2 in pieces])
     U1 = np.concatenate([u1 for _q1, _q2, u1, _u2 in pieces])
     U2 = np.concatenate([u2 for _q1, _q2, _u1, u2 in pieces])
     arm = np.concatenate([np.full(len(q1), i) for i, (q1, _q2, _u1, _u2) in enumerate(pieces)])
     tlo, thi = np.minimum(U1, U2), np.maximum(U1, U2)
+    # Position along the conductor (per arm) at the start and end of every piece
+    seg_len = np.hypot(*(Q - P).T)
+    S1 = np.concatenate([np.cumsum(seg_len[arm == i]) for i in range(len(pieces))])
+    S0 = S1 - seg_len
     # Cut pieces that are long compared to the search radius into shorter pieces for the spatial grid. The short pieces
     # keep the angle interval of the piece they belong to, so the same-turn test does not change.
-    n_sub = np.maximum(1, np.ceil(np.hypot(*(Q - P).T) / (4 * search_radius))).astype(np.int64)
+    n_sub = np.maximum(1, np.ceil(seg_len / (4 * search_radius))).astype(np.int64)
     if n_sub.max() > 1:
         idx = np.repeat(np.arange(len(P)), n_sub)
         k = (np.arange(len(idx)) - np.repeat(np.cumsum(n_sub) - n_sub, n_sub))[:, None]
         nn = n_sub[idx][:, None]
         P, Q = P[idx] + (Q[idx] - P[idx]) * (k / nn), P[idx] + (Q[idx] - P[idx]) * ((k + 1) / nn)
+        S0, S1 = S0[idx] + (S1[idx] - S0[idx]) * (k / nn)[:, 0], S0[idx] + (S1[idx] - S0[idx]) * ((k + 1) / nn)[:, 0]
         tlo, thi, arm = tlo[idx], thi[idx], arm[idx]
     lo, hi = np.minimum(P, Q), np.maximum(P, Q)
     lox, loy, hix, hiy = lo[:, 0], lo[:, 1], hi[:, 0], hi[:, 1]
 
     best, where = search_radius, None
+    fold_best, fold_where = search_radius, None
     for i, j in _candidate_pairs(lo, hi, search_radius):
         # Lower bound of the distance from the bounding boxes
         gx = np.maximum(0, np.maximum(lox[i] - hix[j], lox[j] - hix[i]))
         gy = np.maximum(0, np.maximum(loy[i] - hiy[j], loy[j] - hiy[i]))
-        sel = gx*gx + gy*gy < best*best
-        i, j = i[sel], j[sel]
+        gap = np.hypot(gx, gy)
+        sel = gap < max(best, fold_best if folds else 0)
+        i, j, gap = i[sel], j[sel], gap[sel]
         # Pieces of the same arm less than min_turn_separation apart belong to the same turn
         same_turn = (arm[i] == arm[j]) & (np.maximum(tlo[j] - thi[i], tlo[i] - thi[j]) < min_turn_separation)
-        i, j = i[~same_turn], j[~same_turn]
+        if folds and same_turn.any():
+            fi, fj, fgap = i[same_turn], j[same_turn], gap[same_turn]
+            path = np.maximum(S0[fj] - S1[fi], S0[fi] - S1[fj])
+            sel = (fgap < fold_best) & (path > pi * fgap + search_radius)
+            fi, fj, path = fi[sel], fj[sel], path[sel]
+            if len(fi):
+                d = _seg_seg_distance_np(P[fi], Q[fi], P[fj], Q[fj])
+                d = np.where(path > pi * d + search_radius, d, inf)
+                k = int(np.argmin(d))
+                if d[k] < fold_best:
+                    fold_best = float(d[k])
+                    fold_where = tuple(float(c) for c in (P[fi[k]] + Q[fi[k]]) / 2)
+        sel = ~same_turn & (gap < best)
+        i, j = i[sel], j[sel]
         if not len(i):
             continue
         d = _seg_seg_distance_np(P[i], Q[i], P[j], Q[j])
@@ -276,11 +301,14 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5):
         if d[k] < best:
             best = float(d[k])
             where = tuple(float(c) for c in (P[i[k]] + Q[i[k]]) / 2)
+    if folds:
+        return best, where, fold_best, fold_where
     return best, where
 
 
 class Shape:
-    pass
+    # How far the inner via ring may be moved inwards from the innermost turn
+    max_via_offset = inf
 
 
 @dataclass
@@ -292,6 +320,8 @@ class CircleShape(Shape):
     def __post_init__(self):
         self.outer_radius = self.outer_diameter / 2
         self.inner_radius = self.inner_diameter / 2
+        # The inner via ring must not pass the center (it would end up on the opposite side)
+        self.max_via_offset = self.inner_radius
 
 
     @property
@@ -357,6 +387,12 @@ class OffsetShape(Shape):
         self.max_via_offset = self.sk.max_depth - self.annular_width
         self.outer_radius = self.sk.radius
         self.inner_radius = self.sk.radius - self.annular_width
+
+    def set_fold_limit(self, limit):
+        """ Turns closer than `limit` to the collapse depth of a narrow protrusion of the outline cut across the
+        protrusion's mouth instead of running into it and folding onto themselves. See Skeletonator.set_fold_limit. """
+        self.sk.set_fold_limit(limit)
+        self.sk.set_angle_reference(self.annular_width)
 
     @property
     def slug(self):
@@ -626,6 +662,8 @@ class PlanarInductor():
         if (self.stagger_inner_vias or self.stagger_outer_vias) and self.twists%2 != 0:
             raise ValueError('For via staggering to work, twists must be even and turns must be odd.')
 
+        self._prepare_shape()
+
         # The distance between neighboring turns is less than the nominal spiral pitch, since the turns run at an angle
         # to the outline, and since at corners the spiral's bends do not line up exactly between turns. Instead of
         # estimating this, measure the actual spiral center lines.
@@ -633,37 +671,60 @@ class PlanarInductor():
         self.logger.info(f'Nominal spiral pitch {self.spiral_pitch:.3f} mm, '
                          f'smallest distance between turns {self.projected_spiral_pitch:.3f} mm.')
 
-        if self.projected_spiral_pitch < 0.5 * self.spiral_pitch and self.min_pitch_location is not None:
+        pp = self.projected_spiral_pitch
+        if self.min_pitch_location is not None and round(pp, 3) < round(self.spiral_pitch, 3):
             x, y = self.min_pitch_location
-            pitch_hint = (f' Neighboring turns come as close as {self.projected_spiral_pitch:.2f} mm (nominal pitch '
-                          f'{self.spiral_pitch:.2f} mm) near ({x:.2f}, {y:.2f}). This happens when the annular width '
-                          f'reaches into a narrow part of the outline that collapses before the innermost turn; a '
-                          f'smaller annular width or fewer twists avoid it.')
+            pitch_hint = (f' The projected pitch is the smallest distance between the center lines of neighboring '
+                          f'turns, {pp:.3f} mm (nominal pitch {self.spiral_pitch:.3f} mm), measured near '
+                          f'({x:.3f}, {y:.3f}).')
+            if pp < 0.5 * self.spiral_pitch:
+                pitch_hint += (' This happens when the annular width reaches into a narrow part of the outline that '
+                               'collapses before the innermost turn; a smaller annular width or fewer twists avoid it.')
+            else:
+                pitch_hint += (' Turns come closer than the nominal pitch at corners and where the spiral runs at a '
+                               'steep angle (many twists).')
         else:
             pitch_hint = ''
 
         if self.trace_width is None and self.clearance is None:
             self.clearance = 0.15
-            warnings.warn(f'Warning: Neither trace width nor clearance given. Defaulting to {self.clearance:.2f} mm clearance.')
+            warnings.warn(f'Warning: Neither trace width nor clearance given. Defaulting to {self.clearance:.3f} mm clearance.')
 
         if self.trace_width is None:
-            if round(self.clearance, 3) >= round(self.projected_spiral_pitch, 3):
-                raise ValueError(f'Given clearance of {self.clearance:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.' + pitch_hint)
-            self.trace_width = self.projected_spiral_pitch - self.clearance
-            self.logger.info(f'Calculated trace width for {self.clearance:.2f} mm clearance is {self.trace_width:.2f} mm.')
+            if round(self.clearance, 3) >= round(pp, 3):
+                raise ValueError(f'Given clearance of {self.clearance:.3f} mm is larger than the projected spiral pitch '
+                                 f'of {pp:.3f} mm. Reduce clearance or increase the size of the coil.' + pitch_hint)
+            self.trace_width = pp - self.clearance
+            self.logger.info(f'Calculated trace width for {self.clearance:.3f} mm clearance is {self.trace_width:.3f} mm.')
 
         elif self.clearance is None:
-            if round(self.trace_width, 3) >= round(self.projected_spiral_pitch, 3):
-                raise ValueError(f'Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce trace width or increase the size of the coil.' + pitch_hint)
-            self.clearance = self.projected_spiral_pitch - self.trace_width
-            self.logger.info(f'Calculated clearance for {self.trace_width:.2f} mm trace width is {self.clearance:.2f} mm.')
+            if round(self.trace_width, 3) >= round(pp, 3):
+                raise ValueError(f'Given trace width of {self.trace_width:.3f} mm is larger than the projected spiral '
+                                 f'pitch of {pp:.3f} mm. Reduce trace width or increase the size of the coil.' + pitch_hint)
+            self.clearance = pp - self.trace_width
+            self.logger.info(f'Calculated clearance for {self.trace_width:.3f} mm trace width is {self.clearance:.3f} mm.')
 
         else:
-            if round(self.trace_width, 2) > round(self.projected_spiral_pitch, 2):
-                raise ValueError(f'Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
-            clearance_actual = self.projected_spiral_pitch - self.trace_width
+            if round(self.trace_width, 3) >= round(pp, 3):
+                raise ValueError(f'Given trace width of {self.trace_width:.3f} mm is larger than the projected spiral '
+                                 f'pitch of {pp:.3f} mm. Reduce trace width or increase the size of the coil.' + pitch_hint)
+            clearance_actual = pp - self.trace_width
             if round(clearance_actual, 3) < round(self.clearance, 3):
-                raise ValueError(f'Actual clearance for {self.trace_width:.2f} mm trace is {clearance_actual:.2f} mm, which is lower than the given clearance of {self.clearance:.2f} mm.')
+                raise ValueError(f'Actual clearance for {self.trace_width:.3f} mm trace width is {clearance_actual:.3f} '
+                                 f'mm, which is lower than the given clearance of {self.clearance:.3f} mm. Reduce trace '
+                                 f'width to at most {floor((pp - self.clearance) * 1000) / 1000:.3f} mm, reduce the '
+                                 f'clearance or increase the size of the coil.' + pitch_hint)
+
+        if self.min_fold_location is not None and \
+                self.min_fold_spacing < self.trace_width + self.clearance - 1e-6:
+            x, y = self.min_fold_location
+            gap = self.min_fold_spacing - self.trace_width
+            what = f'overlaps itself by {-gap:.3f} mm' if gap < 0 else f'comes within {gap:.3f} mm of itself'
+            warnings.warn(f'Near ({x:.3f}, {y:.3f}) the copper of one turn {what}: the turn runs around a part of '
+                          f'the outline that is narrower than the turn pitch (a narrow notch or slot, or a narrow tip the '
+                          f'annulus reaches deep into) and comes back along its other side. This does not short '
+                          f'different turns, but the copper of that turn folds onto itself. Widen that part of the '
+                          f'outline, reduce the annular width, or use fewer turns or a smaller trace width.')
 
         if round(self.via_diameter, 2) < round(self.trace_width, 2):
             self.logger.warning(f'Clipping via diameter from {self.via_diameter:.2f} mm to trace width of {self.trace_width:.2f} mm.')
@@ -673,9 +734,14 @@ class PlanarInductor():
             self.via_drill = max(self.via_diameter / 2, self.via_diameter - 1.2)
             self.logger.warning(f'No via drill given, defaulting to {self.via_drill:.2f} mm based on via diameter.')
 
+        # The inner via ring must not go past the center of a circle or the collapse depth of a polygon outline. A
+        # staggered inner ring reaches three times the via offset inwards.
+        inner_reach = 3 if self.stagger_inner_vias else 1
+        max_offset = self.shape.max_via_offset / inner_reach
+
         auto_via_offset = self.via_offset is None
         if auto_via_offset:
-            self.via_offset = max(0, (self.via_diameter - self.trace_width)/2)
+            self.via_offset = min(max(0, (self.via_diameter - self.trace_width)/2), max_offset)
             self.logger.info(f'Autocalculated via offset {self.via_offset:.2f} mm')
 
         if isclose(self.via_offset, 0, abs_tol=1e-6):
@@ -684,7 +750,6 @@ class PlanarInductor():
         # Vias that are wider than the trace can come too close to a neighboring turn when that turn runs at an angle.
         # When the via offset is calculated automatically, move the vias further away from the turns until they clear.
         # Moving the inner vias inwards also moves them closer together, so stop when that would make them overlap.
-        max_offset = getattr(self.shape, 'max_via_offset', inf)
         gap, where = self.via_track_clearance()
         for _ in range(10):
             if gap >= self.clearance - 1e-6 or not auto_via_offset:
@@ -698,10 +763,18 @@ class PlanarInductor():
             gap, where = new_gap, new_where
             self.logger.info(f'Increased via offset to {self.via_offset:.2f} mm to keep vias clear of neighboring turns')
         if gap < self.clearance - 1e-6:
-            warnings.warn(f'Via at ({where[0]:.2f}, {where[1]:.2f}) is only {gap:.3f} mm away from a neighboring turn, '
-                          f'which is less than the clearance of {self.clearance:.3f} mm. ' +
+            if gap < 0:
+                problem = f'overlaps a neighboring turn by {-gap:.3f} mm'
+            else:
+                problem = f'is only {gap:.3f} mm away from a neighboring turn'
+            warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {problem}, which is less than the clearance of '
+                          f'{self.clearance:.3f} mm. ' +
                           ('Reduce the via diameter or the annular width.' if auto_via_offset else
                            'Increase the via offset or reduce the via diameter.'))
+        if self.via_offset * inner_reach > self.shape.max_via_offset + 1e-9:
+            warnings.warn(f'The inner vias are {self.via_offset * inner_reach:.3f} mm inside the innermost turn, which '
+                          f'is beyond the center of the shape ({self.shape.max_via_offset:.3f} mm). Reduce the via '
+                          f'offset or the annular width.')
 
         self.inner_via_ring_radius = self.shape.inner_radius - self.via_offset
         self.outer_via_ring_radius = self.shape.outer_radius + self.via_offset
@@ -740,6 +813,25 @@ class PlanarInductor():
         rho = 1.68e-8 # specific resistivity of copper
         self.R = self.track_length/1e3 * rho / A
         self.logger.info(f'Approximate resistance: {self.R:g} Ω')
+
+    def _prepare_shape(self):
+        """ Configure the shape for this coil's pitch: turns that would run into a protrusion of the outline narrower
+        than one pitch cut across it instead. Called again before rendering, in case the shape object was used for
+        another coil in between. """
+        set_fold_limit = getattr(self.shape, 'set_fold_limit', None)
+        if set_fold_limit is None:
+            return
+        set_fold_limit(self.spiral_pitch / 2)
+        sk = getattr(self.shape, 'sk', None)
+        if sk is None or getattr(self, '_fold_reported', False):
+            return
+        self._fold_reported = True
+        for x, y, depth in getattr(sk, 'uncut_protrusions', ()):
+            if depth < self.shape.annular_width:
+                warnings.warn(f'The outline has a narrow part that collapses at a depth of {depth:.3f} mm near '
+                              f'({x:.3f}, {y:.3f}), inside the annular width. Turns running into it fold onto '
+                              f'themselves (copper of the same turn overlaps). Reduce the annular width below '
+                              f'{depth:.3f} mm or widen that part of the outline.')
 
     def arm_angles(self, i):
         """ Start, fold and end angle of the i'th arm pair. The arm on the first layer runs inwards from the start to the
@@ -817,7 +909,11 @@ class PlanarInductor():
         arms = self.spiral_center_lines()
         # The result is capped at the nominal pitch, so nothing further away needs to be looked at
         search_radius = self.spiral_pitch * (1 + 1e-9)
-        best, where = min(min_turn_spacing(layer_arms, search_radius) for layer_arms in arms if layer_arms)
+        results = [min_turn_spacing(layer_arms, search_radius, folds=True) for layer_arms in arms if layer_arms]
+        best, where = min(((r[0], r[1]) for r in results), key=lambda r: r[0])
+        # Same turn folding onto itself, e.g. around a notch of the outline narrower than the pitch. This does not
+        # short different turns, so it does not limit the trace width, but it is reported as a warning.
+        self.min_fold_spacing, self.min_fold_location = min(((r[2], r[3]) for r in results), key=lambda r: r[0])
         if where is None:
             # Nothing closer than the search radius: e.g. less than a single turn per layer. Fall back to the nominal
             # pitch.
@@ -844,7 +940,41 @@ class PlanarInductor():
     def default_footprint_name(self):
         return f'planar-coil-{self.shape.slug}-n{self.turns}-k{self.twists}'
 
-    def render_footprint(self, name=None, arc_tolerance=0.02, circle_segments=64, geometry_debug_file=None):
+    DEFAULT_ARC_TOLERANCE = 0.02 # mm
+    DEFAULT_CIRCLE_SEGMENTS = 64 # per revolution
+    MIN_ARC_FIT_SEGMENTS = 256 # points per revolution the arc approximation of circles is fitted to
+
+    def effective_render_options(self, arc_tolerance=None, circle_segments=None):
+        """ Arc tolerance and number of segments per revolution that render_footprint actually uses for circles, given
+        the user's values (None: automatic). The trace width is sized from the exact spiral center lines, so the
+        approximation must not eat up a noticeable part of the clearance: the arc tolerance is at most clearance/40,
+        arcs are fitted to at least 256 points per revolution, and polylines (approximate_arcs=False) get enough
+        segments for a chord error of at most clearance/40. Returns (arc_tolerance, circle_segments, notes), where notes
+        lists the user values that were overridden. """
+        notes = []
+        tol_limit = self.clearance / 40
+        user_tol, user_segs = arc_tolerance, circle_segments
+        arc_tolerance = min(self.DEFAULT_ARC_TOLERANCE if user_tol is None else user_tol, tol_limit)
+        if user_tol is not None and user_tol > tol_limit:
+            notes.append(f'arc tolerance reduced from {user_tol:.4f} mm to {tol_limit:.4f} mm (clearance/40)')
+
+        circle_segments = self.DEFAULT_CIRCLE_SEGMENTS if user_segs is None else user_segs
+        if isinstance(self.shape, CircleShape):
+            if self.approximate_arcs:
+                needed = self.MIN_ARC_FIT_SEGMENTS
+            else:
+                # Chord error r*(1 - cos(pi/n)) <= clearance/40 on the outer radius
+                needed = ceil(pi / acos(max(-1.0, 1 - tol_limit / self.shape.outer_radius)))
+            if circle_segments < needed:
+                if user_segs is not None:
+                    notes.append(f'circle segments raised from {user_segs} to {needed} per revolution to keep the '
+                                 f'{"arc fit" if self.approximate_arcs else "chord error"} within clearance/40')
+                circle_segments = needed
+        return arc_tolerance, circle_segments, notes
+
+    def render_footprint(self, name=None, arc_tolerance=None, circle_segments=None, geometry_debug_file=None):
+        """ Render the coil as a KiCad footprint. arc_tolerance and circle_segments only apply to circles; None means
+        automatic. Values that would eat into the clearance are tightened, see `effective_render_options`. """
         if name is None:
             name = self.default_footprint_name
 
@@ -858,12 +988,10 @@ class PlanarInductor():
                 clearance=self.clearance,
                 zone_connect=0)
 
-        # The trace width was sized from the exact spiral center lines. The arc approximation must not eat up a noticeable
-        # part of the clearance, so limit its tolerance to a small fraction of the clearance and give it enough points to
-        # check against.
-        arc_tolerance = min(arc_tolerance, self.clearance / 40)
-        if self.approximate_arcs and isinstance(self.shape, CircleShape):
-            circle_segments = max(circle_segments, 256)
+        self._prepare_shape()
+        arc_tolerance, circle_segments, notes = self.effective_render_options(arc_tolerance, circle_segments)
+        for note in notes:
+            self.logger.warning(f'Overriding render setting: {note}.')
 
         def add_track(points, layer):
             if self.approximate_arcs and isinstance(self.shape, CircleShape) and len(points) >= 3:
