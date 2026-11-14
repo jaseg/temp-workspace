@@ -230,11 +230,15 @@ def _spec(name, shape, turns, twists, layers=2, clockwise=False, clearance=0.15,
     return d
 
 
-# Known limitations of the straight-skeleton layout (kicoil.geometry) for some outlines; test_layout.py xfails them.
+# Known limitations of the straight-skeleton layout (kicoil.geometry) for some outlines. test_layout.py xfails a case of
+# such an outline only when every failure kind of the checker is among the listed ones ('overshoot': copper deeper than
+# the intended annulus).
 KNOWN_ISSUES = {
-    'heart': 'sharp reflex cusp: its mitered offset vertex moves at 1/sin(theta/2) per unit depth, so every turn runs '
-             'into a zero-width spike deep inside the outline and back (backtracks, copper far deeper than the annular '
-             'width) and the skeleton splits at 1.6 mm of 11.5 mm inscribed radius',
+    'heart': dict(
+        kinds=('backtrack', 'overshoot', 'via offset', 'clearance', 'via clearance'),
+        reason='sharp reflex cusp: its mitered offset vertex moves at 1/sin(theta/2) per unit depth, so every turn runs '
+               'into a zero-width spike deep inside the outline and back (backtracks, copper far deeper than the '
+               'annular width) and the skeleton splits at 1.6 mm of 11.5 mm inscribed radius'),
 }
 
 

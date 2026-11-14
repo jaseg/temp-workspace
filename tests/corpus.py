@@ -183,6 +183,48 @@ def finger_square(s, finger_w, finger_l):
     return _ccw([(x-c.x, y-c.y) for x, y in pts])
 
 
+def _centered(pts):
+    c = Polygon(pts).centroid
+    return _ccw([(x-c.x, y-c.y) for x, y in pts])
+
+
+def stepped_finger_square(s, widths, lengths):
+    """ Square with a finger at the top that narrows in steps: widths[i] wide for lengths[i]. Each step is a protrusion
+    nested in the one below it (the narrow part collapses first). """
+    h = s/2
+    right, y = [], h
+    for w, l in zip(widths, lengths):
+        right += [(w/2, y), (w/2, y + l)]
+        y += l
+    left = [(-x, y) for x, y in reversed(right)]
+    return _centered([(-h, -h), (h, -h), (h, h)] + right + left + [(-h, h)])
+
+
+def l_finger_square(s, finger_w, up, side):
+    """ Square with an L-shaped finger at the top: finger_w wide, going up by `up` and then right by `side` (a bent
+    protrusion, whose collapsed axis is an L) """
+    h = s/2
+    return _centered([(-h, -h), (h, -h), (h, h), (finger_w/2, h), (finger_w/2, h + up), (finger_w/2 + side, h + up),
+                      (finger_w/2 + side, h + up + finger_w), (-finger_w/2, h + up + finger_w), (-finger_w/2, h),
+                      (-h, h)])
+
+
+def branched_finger_square(s, finger_w, finger_l, branch_w, branch_l, branch_at):
+    """ Square with a finger at the top that has a narrower side branch to the right """
+    h = s/2
+    fw = finger_w/2
+    return _centered([(-h, -h), (h, -h), (h, h), (fw, h), (fw, h + branch_at), (fw + branch_l, h + branch_at),
+                      (fw + branch_l, h + branch_at + branch_w), (fw, h + branch_at + branch_w), (fw, h + finger_l),
+                      (-fw, h + finger_l), (-fw, h), (-h, h)])
+
+
+def tapered_finger_square(s, base_w, tip_w, finger_l, off=0.0):
+    """ Square with a finger whose sides converge towards its tip """
+    h = s/2
+    return _centered([(-h, -h), (h, -h), (h, h), (off + base_w/2, h), (off + tip_w/2, h + finger_l),
+                      (off - tip_w/2, h + finger_l), (off - base_w/2, h), (-h, h)])
+
+
 def max_depth(poly):
     """ Radius of the maximum inscribed circle """
     p = Polygon(poly)
@@ -300,6 +342,12 @@ def corpus(kind='full'):
         'keyhole': (keyhole(30, 4, 8), ['reflex', 'narrow', 'many'], (1.5, 4.0, 7.0)),
         'finger': (finger_square(40, 4, 15), ['reflex', 'narrow'], (1.5, 3.0, 6.0)),
         'slot': (slotted_square(40, 2, 15), ['reflex', 'narrow'], (2.0, 6.0, 10.0)),
+        # Nested and bent protrusions (third review): a finger narrowing in two steps, an L-shaped finger, a finger
+        # with a narrower side branch, and a finger with converging sides
+        'stepped': (stepped_finger_square(40, (6, 2), (5, 8)), ['reflex', 'narrow'], (2.0, 4.0, 6.0)),
+        'lfinger': (l_finger_square(40, 4, 8, 10), ['reflex', 'narrow'], (1.5, 3.0, 6.0)),
+        'branch': (branched_finger_square(40, 4, 14, 2, 6, 6), ['reflex', 'narrow'], (1.5, 3.0, 6.0)),
+        'taper': (tapered_finger_square(40, 6.75, 3.6, 8.4, off=-7.86), ['reflex', 'narrow'], (3.0, 8.0, 15.9)),
     }
     for sname, (poly, tags, widths) in narrow.items():
         for aw in widths:
