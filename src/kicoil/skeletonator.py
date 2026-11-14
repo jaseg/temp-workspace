@@ -304,8 +304,9 @@ def remove_reflex_jitter(points, tol):
     produces. A vertex is only removed while it is reflex, and only if all input vertices between its two neighbors
     (itself and those removed before) are within tol of the chord that replaces them. Removing a reflex vertex adds
     the triangle between it and the chord to the polygon, so the result contains the input and lies within tol of it.
-    Its neighbors become less convex and may be removed in turn. Vertex 0 is kept, and so are all vertices that stay
-    convex, nearly collinear ones included. Vertices are removed in order of increasing deviation. """
+    Its neighbors become less convex: those that become reflex may be removed in turn, so the result also lacks some
+    vertices that were convex in the input (nearly collinear ones next to removed reflex corners). Vertex 0 is always
+    kept. Vertices are removed in order of increasing deviation. """
     import heapq
 
     n = len(points)
@@ -406,6 +407,69 @@ def _tracks_meet(ti, tj, until):
             a, b = a2, b2
     times.extend(n.time for n in itertools.chain(ti[a:], tj[b:]) if n.time <= until)
     return times, None
+
+
+def _chord_track(ta, tb, f, time_eps):
+    """ Track of a vertex that was removed from the outline for the skeleton (see Skeletonator._spiral_vertices), at
+    fraction f of the chord from vertex A (track ta) to vertex B (track tb) that replaced it.
+
+    It moves like a vertex between two collinear edges in the skeleton of the full outline: it keeps its position
+    along the chord, at the point of the offset edge A(d) B(d) with the same component along the chord's direction,
+    until A or B reaches it. From there on it is absorbed into that vertex and continues on its track (on the same
+    nodes). The track has a node at every node time of either track up to there, and where it is absorbed. """
+    (ax, ay), (bx, by) = ta[0].pos, tb[0].pos
+    length = math.hypot(bx - ax, by - ay)
+    ex, ey = (bx - ax) / length, (by - ay) / length
+    u = f * length
+    def along(p):
+        return (p[0] - ax)*ex + (p[1] - ay)*ey - u
+
+    out = []
+    times_a, times_b = [n.time for n in ta], [n.time for n in tb]
+    a = b = 0
+    la, lb = len(ta), len(tb)
+    prev = None # (t, pa, pb, ga, gb) at the previous node
+    while a < la or b < lb:
+        t = min(times_a[a] if a < la else math.inf, times_b[b] if b < lb else math.inf)
+        a2, b2 = a, b
+        while a2 < la and times_a[a2] == t:
+            a2 += 1
+        while b2 < lb and times_b[b2] == t:
+            b2 += 1
+        # The value at depth t of a track without a node there
+        mid_a = None if a2 > a else _track_point(ta, t, time_eps, times_a)
+        mid_b = None if b2 > b else _track_point(tb, t, time_eps, times_b)
+        # Several nodes at the same time are a jump (see _track_point): step through them together
+        for s in range(max(a2 - a, b2 - b)):
+            pa = ta[min(a + s, a2 - 1)].pos if mid_a is None else mid_a
+            pb = tb[min(b + s, b2 - 1)].pos if mid_b is None else mid_b
+            ga, gb = along(pa), along(pb)
+            if ga >= 0 or gb <= 0:
+                # Absorbed by A or B: at the depth where it reaches the vertex, linear in between
+                cand = []
+                for g, g0, track, i, i2, p, k in ((ga, 0 if prev is None else prev[3], ta, a, a2, pa, 1),
+                                                  (-gb, 0 if prev is None else -prev[4], tb, b, b2, pb, 2)):
+                    if g >= 0:
+                        if prev is None or prev[0] >= t or g == g0:
+                            cand.append((t, k, track, i, i2, p, None))
+                        else:
+                            ts = prev[0] + (t - prev[0]) * (-g0) / (g - g0)
+                            p0 = prev[k]
+                            w = (ts - prev[0]) / (t - prev[0])
+                            q = (p0[0] + w*(p[0] - p0[0]), p0[1] + w*(p[1] - p0[1]))
+                            cand.append((ts, k, track, i, i2, q, ts))
+                ts, _k, track, i, i2, q, synthetic = min(cand, key=lambda c: (c[0], c[1]))
+                if synthetic is None and i2 > i:
+                    out.extend(track[min(i + s, i2 - 1):])
+                else:
+                    out.append(SkeletonNode(q[0], q[1], ts))
+                    out.extend(track[i:])
+                return out
+            w = -ga / (gb - ga)
+            out.append(SkeletonNode(pa[0] + w*(pb[0] - pa[0]), pa[1] + w*(pb[1] - pa[1]), t))
+            prev = (t, pa, pb, ga, gb)
+        a, b = a2, b2
+    return out
 
 
 def polygon_center_of_mass(polygon):
@@ -561,10 +625,11 @@ class Skeletonator:
     works up to the first split event, where the offset outline falls apart into multiple pieces; `self.min_radius`
     holds that depth limit (the name is historical, it is a depth, not a radius).
 
-    `self.outline` is the polygon as given (normalized by `clean_polygon`), `self.poly` the polygon the skeleton and
-    the vertex indices refer to. They are the same unless the outline has so many reflex vertices that its skeleton
-    would be expensive; then `self.poly` lacks the reflex vertices that are within JITTER_TOLERANCE (1 µm) of the chord
-    between their neighbors (see `_skeleton_of`).
+    `self.outline` is the polygon as given (normalized by `clean_polygon`), `self.poly` the polygon the vertex indices
+    refer to and `self.skeleton_poly` the one the skeleton was computed for. All three are the same unless the outline
+    has so many reflex vertices that its skeleton would be expensive: then `self.skeleton_poly` lacks the vertices that
+    `remove_reflex_jitter` removes (within JITTER_TOLERANCE, 1 µm, of the chord that replaces them, see
+    `_skeleton_of`), and `self.poly` has them projected onto that chord, with tracks along it (`_chord_track`).
 
     The angle coordinate is fixed for the whole shape: vertex i always sits at angle `self.vertex_angles[i]`, no matter
     the depth. This makes consecutive turns of a spiral, and the arms of a multi-arm spiral, line up with each other
@@ -578,9 +643,7 @@ class Skeletonator:
         poly = clean_polygon(poly)
         self.outline = poly # the outline as given, normalized
         poly, self.skeleton_nodes, self.skeleton_edges = self._skeleton_of(poly)
-        self.poly = poly # the outline the skeleton was computed for; equal to self.outline unless it was simplified
-        self.poly_edges = list(zip(poly, poly[1:] + poly[:1]))
-        self.circumference = sum(math.dist(a, b) for a, b in self.poly_edges)
+        self.skeleton_poly = poly # the outline the skeleton was computed for; self.outline unless it was simplified
         self.debug_arms = []
 
         # Tolerances. They scale with the polygon's extent (bounding box diagonal), not with its distance from the
@@ -698,7 +761,15 @@ class Skeletonator:
         if self.max_depth <= 0 or any(len(track) < 2 or track[-1].time <= 0 for track in self.tracks):
             raise ValueError('Degenerate straight skeleton: the polygon is too small, or too far away from the origin '
                              'for its size, to be represented with floating point precision.')
-        self._raw_tracks = list(self.tracks) # the track lists are never modified in place
+        # The tracks of the skeleton's vertices; the vertices that were removed for the skeleton get tracks along the
+        # chord that replaced them (see _spiral_vertices).
+        self._skeleton_tracks = self.tracks
+        self._raw_skeleton_tracks = list(self.tracks) # the track lists are never modified in place
+        self.poly, self._vertex_source = self._spiral_vertices(poly, merge_tol)
+        self.poly_edges = list(zip(self.poly, self.poly[1:] + self.poly[:1]))
+        self.circumference = sum(math.dist(a, b) for a, b in self.poly_edges)
+        self.tracks = self._expand_tracks(self._skeleton_tracks)
+        self._raw_tracks = list(self.tracks)
         self._track_nodes = list(seen) # every node on a track, once
         self._track_times = [[n.time for n in track] for track in self.tracks]
         self._tracks_version = 0 # changes whenever self.tracks changes
@@ -710,24 +781,28 @@ class Skeletonator:
 
     # Straight skeletons of outlines with many reflex vertices are slow and need a lot of memory: CGAL looks for split
     # events of every reflex vertex with every edge, and a nearly degenerate input (e.g. coordinates rounded to a grid)
-    # makes it fall back to exact arithmetic. The cost grows with (number of vertices) x (number of reflex vertices),
-    # about 0.2 to 0.7 ms and 0.5 to 2.5 kB per unit: a 1000 vertex outline with 184 reflex vertices takes 30 s, one
-    # with 3000 vertices and 1261 reflex vertices runs out of memory (bad_alloc) after 6 to 11 minutes.
+    # makes it fall back to exact arithmetic. Time and memory grow with (number of vertices) x (number of reflex
+    # vertices): about 0.1 ms and 1.2 kB per unit for clean outlines (stars, gears), 0.2 ms and 2.4 kB for outlines
+    # with coordinates rounded to 1 µm. A 1000 vertex outline with 146 reflex vertices takes 30 s, one with 3000
+    # vertices and 1261 reflex vertices runs out of memory (bad_alloc) after 6 to 11 minutes. skeleton.wasm can use
+    # at most 4 GB of memory (32 bit WebAssembly).
     JITTER_TOLERANCE = 0.001 # mm; reflex vertices this close to the chord of their neighbors are rounding noise
     SIMPLIFY_COST = 25_000 # above this cost, the outline is simplified for the skeleton (remove_reflex_jitter)
-    MAX_COST = 500_000 # above this cost (after simplifying), the outline is rejected (about 2 minutes and 1 GB)
+    MAX_COST = 3_500_000 # above this cost (after simplifying), the skeleton cannot fit into 4 GB even at 1.2 kB/unit
 
     def _skeleton_of(self, poly):
         """ Straight skeleton of the outline, simplified first if its skeleton would be expensive. Returns (outline
-        used, nodes, edges). Outlines whose skeleton would still be too expensive raise a ValueError. """
+        used, nodes, edges). Outlines whose skeleton certainly does not fit into skeleton.wasm's memory raise a
+        ValueError. """
         n, r = len(poly), len(reflex_vertices(poly))
         what = f'{n} vertices, {r} of them reflex (concave) corners'
         if n * r > self.SIMPLIFY_COST:
             # Tiny reflex corners from rounding noise (e.g. coordinates exported with 1 µm resolution) make up most
             # reflex vertices of a dense smooth outline. Without them, the outline moves outward by at most
-            # JITTER_TOLERANCE, far below any useful clearance. Convex vertices are kept, also nearly collinear ones:
-            # they carry the angle reference. This is only done where it makes the skeleton much cheaper (or possible
-            # at all): outlines whose reflex corners are real, with a few shallow ones among them, are left alone.
+            # JITTER_TOLERANCE, far below any useful clearance. The removed vertices stay vertices of the spiral, on
+            # the chord that replaced them (_spiral_vertices), so the angle reference stays as fine as the outline.
+            # This is only done where it makes the skeleton much cheaper (or possible at all): outlines whose reflex
+            # corners are real, with a few shallow ones among them, are left alone.
             simple = remove_reflex_jitter(poly, self.JITTER_TOLERANCE)
             rs = len(reflex_vertices(simple))
             if len(simple) < n and (len(simple) * rs <= n * r / 2 or n * r > self.MAX_COST):
@@ -741,19 +816,66 @@ class Skeletonator:
                         what = f'{n} vertices, {r} of them reflex (concave) corners'
                     else:
                         logging.getLogger('kicoil').info(
-                            f'Outline simplified for the straight skeleton: {n - len(simple)} reflex vertices within '
+                            f'Outline simplified for the straight skeleton: {n - len(simple)} vertices within '
                             f'{self.JITTER_TOLERANCE * 1000:.0f} µm of the chord between their neighbors were '
                             f'removed ({n} vertices, {r} of them reflex, before; {len(simple)} and {rs} after).')
                         return simple, nodes, edges
                 else:
                     n, r = len(simple), rs # for the error below
         if n * r > self.MAX_COST:
-            raise ValueError(f'The outline is too complex for the straight skeleton: it has {what}. The skeleton would '
-                             f'take minutes and gigabytes of memory (vertices x reflex corners = {n * r}, the limit is '
-                             f'{self.MAX_COST}). Simplify the outline: fewer vertices, or fewer concave corners (e.g. '
-                             f'smooth out noise from the import).')
+            raise ValueError(f'The outline is too complex for the straight skeleton: it has {what}. The skeleton needs '
+                             f'about 1.2 kB of memory or more per vertex and reflex corner pair ({n * r} pairs), more '
+                             f'than the 4 GB it can use (the limit is {self.MAX_COST} pairs). Simplify the outline: '
+                             f'fewer vertices, or fewer concave corners (e.g. smooth out noise from the import).')
         nodes, edges = compute_skeleton(exterior=poly)
         return poly, nodes, edges
+
+    def _spiral_vertices(self, skeleton_poly, min_gap):
+        """ The vertices of the spiral's coordinate system: the outline's vertices, where those that were removed for
+        the skeleton (see _skeleton_of) are projected onto the chord that replaced them. Returns (vertices, source),
+        with source[i] = (k, f): vertex i is at fraction f of the skeleton's edge from its vertex k to k+1 (f = 0 for
+        the skeleton's vertices themselves). source is None if the skeleton has all vertices of the outline.
+
+        Keeping these vertices keeps the angle reference (an angle span per edge, see set_angle_reference) as fine as
+        the outline, e.g. along nearly straight stretches with many vertices. A projected vertex that would not be at
+        least min_gap further along the chord than the one before it is left out. """
+        outline = self.outline
+        if len(skeleton_poly) == len(outline):
+            return skeleton_poly, None
+        kept, j = [], 0
+        for i, p in enumerate(outline):
+            if j < len(skeleton_poly) and p == skeleton_poly[j]:
+                kept.append(i)
+                j += 1
+        assert j == len(skeleton_poly) and kept[0] == 0, 'the skeleton outline must be a subsequence of the outline'
+        m, n = len(skeleton_poly), len(outline)
+        poly, source = [], []
+        for k in range(m):
+            (ax, ay), (bx, by) = skeleton_poly[k], skeleton_poly[(k + 1) % m]
+            poly.append((ax, ay))
+            source.append((k, 0.0))
+            dx, dy = bx - ax, by - ay
+            length = math.hypot(dx, dy)
+            end = kept[k + 1] if k + 1 < m else n
+            u_prev = 0.0
+            for i in range(kept[k] + 1, end):
+                px, py = outline[i]
+                u = ((px - ax)*dx + (py - ay)*dy) / length # distance along the chord
+                if u_prev + min_gap < u < length - min_gap:
+                    f = u / length
+                    poly.append((ax + f*dx, ay + f*dy))
+                    source.append((k, f))
+                    u_prev = u
+        return poly, source
+
+    def _expand_tracks(self, skeleton_tracks):
+        """ Tracks of all vertices (self.poly) from the tracks of the skeleton's vertices """
+        if self._vertex_source is None:
+            return skeleton_tracks
+        m = len(skeleton_tracks)
+        return [skeleton_tracks[k] if f == 0 else
+                _chord_track(skeleton_tracks[k], skeleton_tracks[(k + 1) % m], f, self.TIME_EPS)
+                for k, f in self._vertex_source]
 
     def set_fold_limit(self, limit):
         """ Cut off narrow protrusions of the offset outline.
@@ -786,7 +908,7 @@ class Skeletonator:
         if limit == self.fold_limit:
             return
         self.fold_limit = limit
-        raw = self._raw_tracks
+        raw = self._raw_skeleton_tracks # cut the skeleton's vertex tracks, the others follow them (_expand_tracks)
         tracks = list(raw)
         self.uncut_protrusions = []
         cut = {}
@@ -878,9 +1000,10 @@ class Skeletonator:
                         tracks[i] = head + [SkeletonNode(tx, ty, tc), SkeletonNode(qx, qy, tc)] + t[j+1:]
                 cut[e] = (e.x, e.y, T, tc)
         self.cut_protrusions = list(cut.values())
-        if tracks != self.tracks:
-            self.tracks = tracks
-            self._track_times = [[n.time for n in track] for track in tracks]
+        if tracks != self._skeleton_tracks:
+            self._skeleton_tracks = tracks
+            self.tracks = self._expand_tracks(tracks)
+            self._track_times = [[n.time for n in track] for track in self.tracks]
             self._tracks_version = getattr(self, '_tracks_version', 0) + 1
         self.set_angle_reference(getattr(self, 'ref_depth', None))
 

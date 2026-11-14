@@ -695,13 +695,17 @@ def test_dense_rounded_outline_is_simplified_for_the_skeleton():
     t0 = time.perf_counter()
     sk = skeletonator.Skeletonator(poly)
     assert time.perf_counter() - t0 < 60 # about 3 s
-    assert sk.outline == outline and len(sk.poly) < len(outline)
-    assert sk.poly[0] == outline[0] and set(sk.poly) <= set(outline)
-    assert len(skeletonator.reflex_vertices(sk.poly)) < 10
+    assert sk.outline == outline and len(sk.skeleton_poly) < len(outline)
+    assert sk.skeleton_poly[0] == outline[0] and set(sk.skeleton_poly) <= set(outline)
+    assert len(skeletonator.reflex_vertices(sk.skeleton_poly)) < 10
     # The simplified outline contains the original one and stays within 1 µm of it
-    orig, simple = Polygon(outline), Polygon(sk.poly)
+    orig, simple = Polygon(outline), Polygon(sk.skeleton_poly)
     assert simple.is_valid and simple.buffer(1e-9).contains(orig)
     assert orig.hausdorff_distance(simple) <= sk.JITTER_TOLERANCE + 1e-9
+    # The spiral keeps the removed vertices, on the chords that replace them
+    assert len(sk.poly) == len(outline) and sk.poly[0] == outline[0]
+    assert max(math.dist(p, q) for p, q in zip(sk.poly, outline)) <= sk.JITTER_TOLERANCE + 1e-9
+    assert simple.buffer(1e-9).contains(Polygon(sk.poly))
 
 
 def test_dense_rounded_outline_layout():
@@ -709,43 +713,124 @@ def test_dense_rounded_outline_layout():
     # the original outline.
     s = poly_spec(_smooth_blob(40, 1500, 4243, decimals=3), 9.0, 8, 3)
     model, intent, rep = layout(s)
-    assert len(model.shape.polygon) == len(s['polygon']) > len(model.shape.sk.poly)
+    assert len(model.shape.polygon) == len(s['polygon']) > len(model.shape.sk.skeleton_poly)
     assert rep.failure_kinds(intent.clearance, intent.trace_width) == []
     assert rep.overshoot == 0
 
 
-def test_nearly_collinear_vertices_are_kept():
-    # Outlines with few reflex vertices keep all of them, also nearly collinear ones (they carry the angle reference:
-    # removing the 0.1 µm jitter of a 24-gon split into runs of 8 edges loses 1.4 % of coverage at 90 % annular width)
+def _collinear_runs(sub, seed=1):
+    """ A 24-gon (40 mm) with each side split into `sub` edges, the vertices moved by up to 0.1 µm off the side """
     import random
-    from kicoil import skeletonator
-    rng = random.Random(1)
+    rng = random.Random(seed)
     base = corpus.regular(24, 40)
     poly = []
     for (x1, y1), (x2, y2) in zip(base, base[1:] + base[:1]):
         nx, ny = -(y2 - y1), x2 - x1
         ln = math.hypot(nx, ny)
-        for k in range(8):
+        for k in range(sub):
             j = rng.uniform(-1e-4, 1e-4) if k else 0.0
-            poly.append((x1 + k/8*(x2 - x1) + j*nx/ln, y1 + k/8*(y2 - y1) + j*ny/ln))
-    sk = skeletonator.Skeletonator(poly)
+            poly.append((x1 + k/sub*(x2 - x1) + j*nx/ln, y1 + k/sub*(y2 - y1) + j*ny/ln))
+    return poly
+
+
+def test_nearly_collinear_vertices_are_kept():
+    # Outlines with few reflex vertices are used as they are, also nearly collinear vertices with 0.1 µm jitter
+    from kicoil import skeletonator
+    sk = skeletonator.Skeletonator(_collinear_runs(8))
     assert len(skeletonator.reflex_vertices(sk.poly)) > 50
-    assert sk.poly == sk.outline
+    assert sk.poly == sk.outline == sk.skeleton_poly
+
+
+def test_simplified_vertices_keep_the_angle_reference():
+    # With 12 edges per side (288 vertices, 133 of them reflex) the jitter is removed for the skeleton, and with it
+    # the convex vertices that become reflex once a neighbor is gone: 89 vertices are left. The spiral used to have
+    # only these, which coarsened the angle reference: trace width 2.7781 -> 2.7376 mm, uncovered 0.81 % -> 2.29 %.
+    # The removed vertices stay vertices of the spiral, on the chord, moving like collinear vertices; the layout is
+    # that of the full outline (2.7781 mm and 0.81 % without the simplification).
+    from kicoil import skeletonator
+    poly = _collinear_runs(12)
+    s = poly_spec(poly, round(0.6 * corpus.max_depth(poly), 4), 8, 3)
+    model, intent, rep = layout(s)
+    sk = model.shape.sk
+    assert len(sk.skeleton_poly) < 100 and len(sk.poly) == len(sk.outline) == len(poly)
+    assert intent.trace_width == pytest.approx(2.7781, rel=1e-3)
+    assert rep.uncovered_fraction < 0.01
+    assert rep.failure_kinds(intent.clearance, intent.trace_width) == []
+    for depth in (s['annular_width'], sk.max_depth):
+        # Equal within float noise: an edge between two vertices on the same chord keeps its length while both move
+        # straight inwards, so its samples differ only by rounding
+        fast, brute = sk._min_edge_lengths(depth), sk._min_edge_lengths_bruteforce(depth)
+        assert max(abs(a - b) for a, b in zip(fast, brute)) <= 1e-15 * sk.circumference
+
+
+def test_chord_track():
+    # A vertex removed from the bottom edge of a square, at a quarter of it: it moves straight up until the corner's
+    # track (the diagonal) reaches it at depth 2.5, then follows the corner's track on the same nodes
+    from kicoil import skeletonator
+    sk = skeletonator.Skeletonator([(0, 0), (10, 0), (10, 10), (0, 10)])
+    ta, tb = sk.tracks[0], sk.tracks[1]
+    t = skeletonator._chord_track(ta, tb, 0.25, sk.TIME_EPS)
+    for d, p in ((0, (2.5, 0)), (1, (2.5, 1)), (2.5, (2.5, 2.5)), (4, (4, 4))):
+        assert math.dist(skeletonator._track_point(t, d, sk.TIME_EPS), p) < 1e-9
+    assert t[-1] is ta[-1] and t[-len(ta) + 1:] == ta[1:]
+    t = skeletonator._chord_track(ta, tb, 0.75, sk.TIME_EPS) # absorbed by the other corner
+    assert math.dist(skeletonator._track_point(t, 1, sk.TIME_EPS), (7.5, 1)) < 1e-9
+    assert math.dist(skeletonator._track_point(t, 3, sk.TIME_EPS), (7, 3)) < 1e-9
 
 
 def test_too_complex_outline_fails_fast():
-    # A noisy outline whose reflex corners are not rounding noise: its skeleton would need minutes and gigabytes
-    import random
+    # A star with 2000 points (4000 vertices, 2000 reflex): its skeleton would need about 1.2 kB of memory per
+    # vertex and reflex vertex pair, 10 GB, more than skeleton.wasm can use. It would run out of memory after many
+    # minutes; it is rejected at once.
     import time
     from kicoil import skeletonator
-    rng = random.Random(1)
-    n = 1500
-    poly = [((20 + rng.uniform(-0.005, 0.005))*math.cos(2*math.pi*i/n),
-             (20 + rng.uniform(-0.005, 0.005))*math.sin(2*math.pi*i/n)) for i in range(n)]
+    m = 2000
+    poly = []
+    for i in range(m):
+        for r, ph in ((20, 0), (19, 0.5)):
+            a = 2*math.pi*(i + ph)/m
+            poly.append((r*math.cos(a), r*math.sin(a)))
     t0 = time.perf_counter()
     with pytest.raises(ValueError, match='too complex'):
         skeletonator.Skeletonator(poly)
     assert time.perf_counter() - t0 < 5
+
+
+def test_too_complex_limit_keeps_outlines_that_fit(monkeypatch):
+    # Stars and gears with up to a few thousand vertices are clean (their reflex corners are real), so they are not
+    # simplified; their skeletons take minutes but fit into memory (2000 vertices, 1000 reflex: 3 minutes, 2.5 GB).
+    # They must not be rejected.
+    from kicoil import skeletonator
+    seen = []
+    class Stop(Exception):
+        pass
+    def fake_compute_skeleton(exterior):
+        seen.append(len(exterior))
+        raise Stop()
+    monkeypatch.setattr(skeletonator, 'compute_skeleton', fake_compute_skeleton)
+    for m in (520, 1000, 1300):
+        poly = []
+        for i in range(m):
+            for r, ph in ((20, 0), (19, 0.5)):
+                a = 2*math.pi*(i + ph)/m
+                poly.append((r*math.cos(a), r*math.sin(a)))
+        with pytest.raises(Stop):
+            skeletonator.Skeletonator(poly)
+    assert seen == [1040, 2000, 2600]
+
+
+def test_cornerflat_skeleton_errors_are_raised_again():
+    # The cornerflat layout computes the skeleton in a forked child (as long as wasm has not run in the process); a
+    # failure there was a generic RuntimeError, which lost the ValueError for an outline that is not simple.
+    import subprocess
+    import sys
+    code = ('from kicoil import skeletonator_alt_cornerflat as cf\n'
+            'try:\n'
+            '    cf.CornerFlatSkeletonator([(0, 0), (10, 0), (10, 10), (5, 0), (0, 10)])\n'
+            'except Exception as e:\n'
+            '    print(type(e).__name__, e)\n')
+    out = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, timeout=120).stdout
+    assert out.startswith('ValueError The outline is not a simple polygon')
 
 
 @pytest.mark.parametrize('poly', [[(0, 0), (20, 0), (0, 10), (0, -5)],

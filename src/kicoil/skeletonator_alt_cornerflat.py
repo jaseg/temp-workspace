@@ -46,7 +46,8 @@ def compute_skeleton(exterior):
     so cannot fork safely: the next WASI call in a forked child (e.g. a multiprocessing worker) deadlocks. As long as
     wasm has not run in this process yet, run the computation in a short-lived forked child instead, so that this
     process never starts those threads and stays safe to fork. `WasmApp.run` sets `.app`, so its presence tells us
-    whether wasm has already run in this process (or in a parent it was forked from). """
+    whether wasm has already run in this process (or in a parent it was forked from). An exception in the child (e.g.
+    the ValueError for an outline that is not simple) is raised again in this process. """
     if not hasattr(os, 'fork') or hasattr(base.skeleton_wasm, 'app'):
         return _base_compute_skeleton(exterior=exterior)
     rfd, wfd = os.pipe()
@@ -55,7 +56,14 @@ def compute_skeleton(exterior):
         status = 1
         try:
             os.close(rfd)
-            data = pickle.dumps(_base_compute_skeleton(exterior=exterior))
+            try:
+                data = pickle.dumps((True, _base_compute_skeleton(exterior=exterior)))
+            except Exception as e:
+                try:
+                    data = pickle.dumps((False, e))
+                    pickle.loads(data)
+                except Exception:
+                    data = pickle.dumps((False, RuntimeError(f'{type(e).__name__}: {e}')))
             with os.fdopen(wfd, 'wb') as f:
                 f.write(data)
             status = 0
@@ -67,7 +75,10 @@ def compute_skeleton(exterior):
     _, status = os.waitpid(pid, 0)
     if status != 0 or not data:
         raise RuntimeError('Error computing straight skeleton.')
-    return pickle.loads(data)
+    ok, result = pickle.loads(data)
+    if not ok:
+        raise result
+    return result
 
 
 class CornerFlatSkeletonator(base.Skeletonator):

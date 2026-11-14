@@ -488,9 +488,9 @@ class OffsetShape(Shape):
     def __post_init__(self):
         self.sk = skeletonator.Skeletonator(self.polygon)
         # The skeletonator normalizes the outline (counter-clockwise, no repeated points). Use the same outline here.
-        # For outlines with very many reflex vertices, the skeleton (and the spiral) use a version without the
-        # shallowest ones (sk.poly, within 1 µm of the outline, see Skeletonator._skeleton_of); the outline itself
-        # stays as given, e.g. for the keepout zone.
+        # For outlines with very many reflex vertices, the skeleton uses a version without the shallowest ones, and
+        # the spiral has those vertices on the chords that replace them (sk.skeleton_poly and sk.poly, within 1 µm of
+        # the outline, see Skeletonator._skeleton_of); the outline itself stays as given, e.g. for the keepout zone.
         self.polygon = list(self.sk.outline)
         if self.annular_width >= self.sk.max_depth:
             raise ValueError(f'Annular width ({self.annular_width:.2f}) is too large. Must be less than {self.sk.max_depth:.2f}')
