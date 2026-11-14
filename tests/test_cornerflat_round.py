@@ -138,17 +138,33 @@ def test_prepare_outline_raises_the_tolerance_for_coarse_noise():
     simple, tol = CF.prepare_outline(poly)
     assert tol == 0.01 and count_reflex(simple) == 0
     assert max(_point_polyline_distance(p, simple) for p in poly[::5]) <= tol + 1e-12
-    # 10 um radial jitter on a 1024-gon: within the budget at 10 um
+    # 10 um radial jitter on a 1024-gon: 10 um leaves 104 reflex vertices, 20 um none
     poly = clean_polygon(corpus_round.noisy_circle(40, 1024, 0.01, random.Random(5)))
     simple, tol = CF.prepare_outline(poly)
-    assert tol == 0.01 and len(simple) * count_reflex(simple) <= CF.SKELETON_BUDGET
+    assert tol == 0.02 and count_reflex(simple) == 0
     # Small cheap outlines are used as given (nearly collinear runs keep their vertices)
     poly = clean_polygon(corpus_round.shapes()['collinear'][0])
     assert CF.prepare_outline(poly) == (poly, 0.0)
-    # Real noise (0.2 mm jitter) is not removed by any tolerance up to 10 um: the 1 um outline is kept
+    # Real noise (0.2 mm jitter) is not removed by any tolerance up to 20 um: the 1 um outline is kept
     poly = clean_polygon(corpus_round.shapes()['noisy_l'][0])
     _simple, tol = CF.prepare_outline(poly)
     assert tol == 0.001
+
+
+def test_cornerflat_jittered_outline_deep():
+    # 10 um radial jitter, 90 % annular width: with the jitter corners left in the outline (1 um), the skeleton takes
+    # over a minute and the layout reaches a pitch ratio of 0.73 with a misplaced via; on the 20 um outline 0.81
+    import geomcheck
+    poly = corpus_round.noisy_circle(40, 1024, 0.01, random.Random(5))
+    spec = corpus._spec('noisy1024', 'polygon', 16, 5, polygon=poly, annular_width=round(0.9*corpus.max_depth(poly), 4))
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        model = build_model(spec, 'geometry_alt_cornerflat')
+        fp = model.render_footprint()
+    intent = geomcheck.intent_from_model(model)
+    rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
+    assert rep.failure_kinds(intent.clearance, intent.trace_width) == ['conformance'], rep.notes[:5]
+    assert (model.trace_width + model.clearance) / model.spiral_pitch > 0.8
 
 
 def test_cornerflat_coarsely_rounded_outline_is_fast():

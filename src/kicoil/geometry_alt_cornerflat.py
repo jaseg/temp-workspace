@@ -11,7 +11,7 @@ candidate when the vias cannot be placed clear of the turns. The trace width is 
 `kicoil.geometry`. The measurement additionally covers pieces of one arm that fold back onto each other within half a
 revolution, and the via check covers the connections between the arm ends and the vias.
 
-Large or noisy polygon outlines are simplified by 1 µm (up to 10 µm where 1 µm leaves too many reflex corners) before
+Large or noisy polygon outlines are simplified by 1 µm (up to 20 µm where 1 µm leaves too many reflex corners) before
 the straight skeleton is computed (see `CornerFlatSkeletonator.prepare_outline`): densely sampled outlines with rounded
 coordinates (e.g. from files) are otherwise full of tiny reflex corners, which make the skeleton slow or run it out of
 memory. On round outlines (many

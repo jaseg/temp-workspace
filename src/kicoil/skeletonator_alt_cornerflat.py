@@ -128,27 +128,29 @@ class CornerFlatSkeletonator(base.Skeletonator):
 
     W_EPS = 1e-9
     # Outline preparation, see prepare_outline: tolerances tried in turn (mm), the reflex vertices times vertices budget
-    # that is considered cheap for the straight skeleton (a few seconds), and the outline size below which a cheap
-    # outline is used as given
-    OUTLINE_TOLERANCES = (0.001, 0.0025, 0.005, 0.01)
-    SKELETON_BUDGET = 30_000
+    # a simplified outline should meet, and the size and budget up to which an outline is used as given
+    OUTLINE_TOLERANCES = (0.001, 0.0025, 0.005, 0.01, 0.02)
+    SKELETON_BUDGET = 10_000
     SMALL_OUTLINE = 300
+    SMALL_BUDGET = 30_000
     MERGE_TOL = 1e-4 # mm, see spiral
 
     @classmethod
     def prepare_outline(cls, poly):
         """ The outline the skeleton is computed on, and the tolerance (mm) it was simplified with (0: as given).
 
-        The straight skeleton's cost grows with the number of reflex vertices times the number of vertices. Small cheap
-        outlines are used as given. Others are simplified (`simplify_outline`) by 1 µm, which removes the noise of
-        coordinates rounded to 3 decimals (mm) and thins out densely sampled curves. Where that leaves more than
-        SKELETON_BUDGET (e.g. coordinates rounded to 2 decimals, or 10 µm jitter), the tolerance is raised step by step
-        up to 10 µm, and the first one that brings the outline within the budget is used. If none does, the 1 µm outline
-        is used unless a larger tolerance makes the skeleton at least 4 times cheaper, and a warning says that the
-        skeleton may be slow. The copper then follows the simplified outline, at most the tolerance away from the given
-        one (the checker allows 0.05 mm). """
+        The straight skeleton's cost grows with the number of reflex vertices times the number of vertices (seconds at
+        3e4, minutes at 1e6). Small cheap outlines are used as given. Others are simplified (`simplify_outline`) by
+        1 µm, which removes the noise of coordinates rounded to 3 decimals (mm) and thins out densely sampled curves.
+        Where that leaves more than SKELETON_BUDGET (e.g. coordinates rounded to 2 decimals, or 10 µm jitter), the
+        tolerance is raised step by step up to 20 µm, and the first one that brings the outline within the budget is
+        used. (Leftover noise corners also cost layout quality: on a 1024-gon with 10 µm jitter at 90 % annular width,
+        the pitch ratio is 0.63 at 10 µm, which leaves 104 reflex corners, and 0.81 at 20 µm, which leaves none.) If no
+        tolerance meets the budget, the 1 µm outline is used unless a larger tolerance makes the skeleton at least 4
+        times cheaper, and a warning says that the skeleton may be slow. The copper then follows the simplified outline,
+        at most the tolerance away from the given one (the checker allows 0.05 mm). """
         n, r = len(poly), count_reflex(poly)
-        if n <= cls.SMALL_OUTLINE and n * r <= cls.SKELETON_BUDGET:
+        if n <= cls.SMALL_OUTLINE and n * r <= cls.SMALL_BUDGET:
             return list(poly), 0.0
         levels = []
         for tol in cls.OUTLINE_TOLERANCES:
