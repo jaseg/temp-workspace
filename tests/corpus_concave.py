@@ -73,24 +73,27 @@ def shark():
     return _ccw_coords(_centered(geom), simplify=0.06)
 
 
-def shark_svg_path_d(pts, margin=5.0):
+def shark_svg_path_d(pts, margin=5.0, reverse=False):
     """ SVG path data of the outline in SVG coordinates (y down, all coordinates positive, so the shark appears upright
-    in an SVG viewer), clockwise in SVG coordinates and repeating the start point, in the dialect SVGShape reads
-    ("M x y,x y,...,x y Z" with commas between points). """
+    in an SVG viewer), repeating the start point, in the dialect SVGShape reads ("M x y,x y,...,x y Z" with commas
+    between points).
+
+    SVGShape takes the file's numbers as they are (KiCad's y axis points down, too) and reverses the point order when
+    their shoelace area is negative (`polygon_is_clockwise`). `pts` is counter-clockwise with y up; mirroring y flips the
+    sign of the shoelace area, so the default path is clockwise in its own numbers (negative shoelace area, which
+    appears counter-clockwise on screen) and SVGShape has to reorient it. `reverse=True` gives the other order. """
     xs = [x for x, _y in pts]
     ys = [y for _x, y in pts]
     x0, y1 = min(xs) - margin, max(ys) + margin
     svg_pts = [(x - x0, y1 - y) for x, y in pts]
-    # pts is counter-clockwise with y up, so after flipping y it is clockwise on screen ... in y-down coordinates the
-    # signed area flips sign: counter-clockwise in math orientation. Reverse it so that the file is clockwise in its own
-    # coordinates (signed area < 0), which SVGShape has to reorient.
-    svg_pts = svg_pts[::-1]
+    if reverse:
+        svg_pts = svg_pts[::-1]
     svg_pts.append(svg_pts[0])
     return 'M ' + ','.join(f'{x:.4f} {y:.4f}' for x, y in svg_pts) + ' Z', (max(xs) - x0 + margin, y1 - min(ys) + margin)
 
 
-def write_shark_svg(path=SHARK_SVG):
-    d, (w, h) = shark_svg_path_d(shark())
+def write_shark_svg(path=SHARK_SVG, reverse=False):
+    d, (w, h) = shark_svg_path_d(shark(), reverse=reverse)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f'<?xml version="1.0" encoding="UTF-8"?>\n'
                     f'<svg xmlns="http://www.w3.org/2000/svg" width="{w:.2f}mm" height="{h:.2f}mm" '
@@ -266,7 +269,8 @@ def cases():
             base['known_issue'] = KNOWN_ISSUES[name]
         out += _variants(f'concave_{name}', base, tags + ['concave'], depth)
         if name == 'shark':
-            # The same outline through the SVG import (clockwise path that repeats its start point, y down)
+            # The same outline through the SVG import (path clockwise in its own numbers, i.e. reoriented by SVGShape,
+            # repeating its start point, y down)
             out += _variants('concave_sharksvg', dict(shape='svg', svg_file=str(SHARK_SVG.relative_to(DATA_DIR.parent))),
                              tags + ['concave', 'svg'], depth)
     return out
