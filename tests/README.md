@@ -93,8 +93,9 @@ Extra families in their own modules (`tests/corpus_<family>.py`, selected alone 
 blob, a 1000 vertex outline with coordinates rounded to 1 µm, ellipses from 2:1 to 20:1, superellipses, smooth blobs,
 stadium, rounded rectangle, egg, teardrop, bean, noisy circles, nearly collinear runs, short edges, D shape, circle with a
 sharp tip). A case may declare failure kinds it is known to show in the fixed layout, with the reason
-(`known_failures`, e.g. the backtrack at the sliver tips of slender ellipses); `test_corpus_case` xfails those instead of
-asserting them.
+(`known_failures`, e.g. the backtrack at the sliver tips of slender ellipses, or the unwarned self short of blob2 at
+90 %, where the inner turn wraps around an inner contour smaller than the trace); `test_corpus_case` xfails those
+instead of asserting them.
 
 Concave family (`corpus_concave.py`, `--kind concave`, 132 cases): a plush-shark silhouette (91 vertices, as a polygon
 and as `data/shark.svg` loaded through `SVGShape`: a path that repeats its start point and is clockwise in its own
