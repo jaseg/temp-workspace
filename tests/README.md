@@ -96,6 +96,16 @@ sharp tip). A case may declare failure kinds it is known to show in the fixed la
 (`known_failures`, e.g. the backtrack at the sliver tips of slender ellipses); `test_corpus_case` xfails those instead of
 asserting them.
 
+Concave family (`corpus_concave.py`, `--kind concave`, 132 cases): a plush-shark silhouette (91 vertices, as a polygon
+and as `data/shark.svg` loaded through `SVGShape`: a path that repeats its start point and is clockwise in its own
+numbers, i.e. has a negative shoelace area, so that `SVGShape` has to reverse it; on screen, y down, it appears
+counter-clockwise; `test_concave.py` also imports the other orientation and the path without the repeated point),
+bean, heart, crescent, C, rounded L and U, cross, comb, star with rounded tips and a dumbbell. For non-convex outlines
+the straight skeleton's first split event limits the annular width (`Skeletonator.max_depth`), often far below the
+inscribed radius, so the annular widths are 30/60/90 % of each shape's split depth. Turns/twists n5k1, n8k3, n13k4,
+single layer, clockwise. Cases with a documented limitation of the layout carry `known_issue`, which names the
+failure kinds it explains; `test_layout.py` xfails such a case only when all of its failure kinds are among them.
+
 Parameters: annular width at 30 %, 60 % and 90 % of the outline's maximum inscribed radius; turns/twists from 2/1 to
 21/8 (only co-prime pairs); single layer; clockwise. Sweeps vary the annular width in 3 % steps and the outline scale by
 ±1–3 % on seven base shapes, which exposes layouts that break under small tweaks. Dense cases use 30–31 turns.

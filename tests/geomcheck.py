@@ -296,6 +296,11 @@ class Report:
     worst_self_overlap: float = 0.0 # mm, largest deficit among the self overlaps
     self_shorts: int = 0 # same-turn copper contacts at least SELF_SHORT_SEP turns apart (part of a turn is shorted)
     worst_self_short: float = 0.0 # mm, largest deficit among the self shorts
+    # Same-turn copper that touches or overlaps itself (deficit >= clearance) but less than SELF_SHORT_SEP turns apart,
+    # e.g. the two sides of a hairpin into a sharp tip merging: reported only, it does not fail a case. The merged
+    # copper bypasses that much conductor (path distance between the pieces).
+    self_touches: int = 0
+    max_self_touch_bypass: float = 0.0 # mm
     min_width: float = float('nan') # mm, narrowest emitted track
     max_width: float = float('nan') # mm, widest emitted track
     width_error: float = 0.0 # mm, largest deviation of an emitted track width from the intended trace width
@@ -930,6 +935,9 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         rep.worst_self_overlap = max(rep.worst_self_overlap, deficit)
         if len(rep.self_overlap_points) < max_records:
             rep.self_overlap_points.append((layer, p, q, deficit, dth, ds))
+        if deficit >= clr - 1e-4 and dth < SELF_SHORT_SEP:
+            rep.self_touches += 1
+            rep.max_self_touch_bypass = max(rep.max_self_touch_bypass, float(ds))
         if deficit >= clr - 1e-4 and dth >= SELF_SHORT_SEP:
             rep.self_shorts += 1
             if rep.worst_self_short < deficit:
@@ -1257,7 +1265,8 @@ def intent_from_model(model, contour_tol=0.01):
         contour = [(r*math.cos(2*math.pi*i/n), r*math.sin(2*math.pi*i/n)) for i in range(n)]
         annular = shape.outer_radius - shape.inner_radius
     else:
-        contour = list(shape.polygon)
+        # A shape that lays out on a modified outline (e.g. with rounded corners) names the intended one design_outline
+        contour = list(getattr(shape, 'design_outline', None) or shape.polygon)
         annular = shape.annular_width
     poly = Polygon(contour)
     if not poly.exterior.is_ccw:

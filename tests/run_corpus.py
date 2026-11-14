@@ -34,6 +34,10 @@ def build_model(spec, impl='kicoil'):
 
     if spec['shape'] == 'circle':
         shape = geometry.CircleShape(spec['outer_diameter'], spec['inner_diameter'])
+    elif spec['shape'] == 'svg':
+        # Outline from an SVG file (path relative to tests/), loaded through the implementation's SVG import
+        shape = geometry.SVGShape(filename=str(Path(__file__).parent / spec['svg_file']),
+                                  annular_width=spec['annular_width'])
     else:
         poly = [tuple(p) for p in spec['polygon']]
         base = getattr(geometry, 'PolygonShape', None)
@@ -183,6 +187,9 @@ def summarize(results, file=sys.stdout):
           f'via offset exceeded: {cnt(lambda r: r.get("via_misplacement", 0) > geomcheck.OVERSHOOT_TOL)}', file=file)
     print(f'  backtracks: {cnt(lambda r: r["backtracks"] > 0)}   stubs: {cnt(lambda r: r["stubs"] > 0)}   '
           f'self overlaps: {cnt(lambda r: r["self_overlaps"] > 0)}', file=file)
+    touch = [r for r in checked if r['status'] == 'pass' and r.get('self_touches', 0) > 0]
+    print(f'  passes with same-turn copper touching itself (not failed): {len(touch)}, bypassing up to '
+          f'{max((r["max_self_touch_bypass"] for r in touch), default=0):.1f} mm of conductor', file=file)
     print(f'  tracks ok (ignoring via issues): {cnt(lambda r: r["tracks_ok"])}', file=file)
     unc = sorted(r['uncovered_fraction'] for r in checked if not math.isnan(r['uncovered_fraction']))
     exc = sorted(r['excess_fraction'] for r in checked if not math.isnan(r['excess_fraction']))

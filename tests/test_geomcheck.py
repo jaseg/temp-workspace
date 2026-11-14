@@ -833,6 +833,10 @@ def test_fold_at_a_tip_is_not_a_self_short():
     assert rep.self_shorts == 0
     kinds = rep.failure_kinds(intent.clearance, intent.trace_width)
     assert 'self short' not in kinds and 'clearance' not in kinds
+    # ... but the merged copper is reported, with the length of conductor it bypasses
+    touching = [ds for _l, _p, _q, deficit, dth, ds in rep.self_overlap_points if deficit >= intent.clearance - 1e-4]
+    assert rep.self_touches == len(touching) > 0
+    assert rep.max_self_touch_bypass == pytest.approx(max(touching))
 
 
 @pytest.mark.parametrize('inside', [True, False])

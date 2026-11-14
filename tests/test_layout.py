@@ -53,6 +53,16 @@ def test_corpus_case(spec):
     # Every check of the geometric checker except outline coverage, which the linear spiral does not reach at convex
     # corners of deep annuli (that is measured by run_corpus.py, not asserted here).
     kinds = [k for k in rep.failure_kinds(intent.clearance, intent.trace_width) if k != 'conformance']
+    known = spec.get('known_issue')
+    if known:
+        # A documented limitation of the layout for this outline (see the corpus module that defines the case): only
+        # the failure kinds named there are tolerated, anything else still fails.
+        kinds += ['overshoot'] if rep.overshoot >= max(0.05, 0.1 * intent.trace_width) else []
+        kinds += ['contour'] if rep.contour_hausdorff >= 1.5 and not _cut_protrusions(model, intent) else []
+        unexplained = [k for k in kinds if k not in known['kinds']]
+        assert not unexplained, (unexplained, known['reason'], rep.notes[:5], rep.violations[:5])
+        if kinds:
+            pytest.xfail(f"known issue {kinds}: {known['reason']}")
     # Failure kinds a corpus case declares as known (with the reason, e.g. corpus_round.KNOWN_FAILURES) are expected
     known = spec.get('known_failures', {})
     hard = [k for k in kinds if k not in WARNED_KINDS and k not in known]
@@ -67,10 +77,13 @@ def test_corpus_case(spec):
                      f'known: {[(k, known[k]) for k in kinds if k in known]}' + (f', warned: {warned}' if warned else ''))
     # The copper must stay within the intended outline
     assert rep.overshoot < max(0.05, 0.1 * intent.trace_width)
-    cut = [c for c in getattr(getattr(model.shape, 'sk', None), 'cut_protrusions', ()) if c[3] < intent.annular_width]
-    if not cut:
+    if not _cut_protrusions(model, intent):
         # (Turns do not run into protrusions narrower than two turns, those parts of the outline stay uncovered)
         assert rep.contour_hausdorff < 1.5
+
+
+def _cut_protrusions(model, intent):
+    return [c for c in getattr(getattr(model.shape, 'sk', None), 'cut_protrusions', ()) if c[3] < intent.annular_width]
 
 
 def spec(name):
