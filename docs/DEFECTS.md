@@ -14,7 +14,8 @@ commit. Corpus numbers come from `tests/run_corpus.py --kind full` (588 cases), 
 | crashes / rejected requests | 1 / 85 | 0 / 17 (all infeasible) |
 
 The second review added 48 cases with narrow features of the outline (`narrow_*`: a T, a keyhole, a finger and a
-slot, 650 cases in all). On those:
+slot), the third review 48 more (a finger narrowing in two steps, an L-shaped finger, a finger with a side branch and a
+tapered finger; 698 cases in all). On the first 48:
 
 | | original | first fixes | now |
 |---|---|---|---|
@@ -22,6 +23,15 @@ slot, 650 cases in all). On those:
 | crossings between turns | 12 | 1 | 0 |
 | track clearance deficit > 5 % | 45 | 10 | 1 (one turn folding onto itself around the slot, warned; D28) |
 | via clearance deficit > 5 % | 33 | 0 | 0 |
+
+On the 48 cases of the third review (`narrow_stepped/lfinger/branch/taper_*`; the original code rejects 24 of them):
+
+| | original (24 laid out) | second fixes | now |
+|---|---|---|---|
+| connectivity broken | 5 | 10 | 0 |
+| crossings between turns | 2 | 0 | 0 |
+| track clearance deficit > 5 % | 23 | 0 | 0 |
+| via clearance deficit > 5 % | 14 | 0 | 0 |
 
 Entries from the second review:
 
@@ -34,13 +44,15 @@ Entries from the second review:
 | D28 | turns fold onto themselves in narrow protrusions and notches | yes |
 | D29 | trace width + clearance branch: 2-decimal rounding, wrong advice, no hint | yes (rounding, advice); the missing measured-spacing hint matters since D7 |
 | D1, D4, D7, D8, D10, D22 | `spiral()` argument order / NaN; merge tolerance from the distance to the origin; slow spacing measurement; silently tightened render settings; via offset through the center of circles; kicad-pcb export still failing in gerbonara | no, first version of the fixes |
+| D7, D8, D22, D28 (third review) | spacing measurement memory quadratic on dense outlines; render tolerance clearance/40 lost up to 5 % (two-sided), division by zero at clearance 0; kicad-pcb straight tracks on layer "False"; protrusion cut only once per track and oblique for L shapes, fold warning missed tapered fingers | no, second version of the fixes (D29's wording also corrected) |
 
 Every entry was checked by an independent reviewer against the original code (reproduction where practical) and
 corrected where it overstated or misdescribed something. Where a corpus case is given as the symptom, it fails with the
 original code and passes the corresponding check with the fixed code. Entries marked *latent* have no visible symptom
 in the corpus. Three bugs in the first version of the fixes were found the same way and are described with the fix they
 belong to (D2, D3, D10). A second review found more problems in the fixes (D1, D4, D7, D8, D10, D22, described with
-those entries) and six more defects of the original code (D24–D29). The remaining 17 rejections are annular widths beyond the straight-skeleton collapse depth
+those entries) and six more defects of the original code (D24–D29); a third review found problems in the second
+version (D7, D8, D22, D28, also described with those entries). The remaining 17 rejections are annular widths beyond the straight-skeleton collapse depth
 (stars, L/U shapes, the neck) and one circle whose pitch is smaller than the requested clearance.
 
 ---
@@ -177,6 +189,14 @@ segment distance. The search radius is the nominal pitch instead of 1.5 pitches,
 pitch anyway. The sampling is unchanged, so the result is the same: at most 2e-15 mm difference from the pure Python
 version on a sample of 80 corpus cases, a brute-force check in the tests, and identical trace widths and pitch ratios on all 602
 previous corpus cases. Same cases now: 0.04 s, 0.43 s, 0.24–0.86 s (found in the second review).
+That version still built all pairs of pieces of a grid cell at once. On a finely subdivided outline with few turns (an
+SVG import) a cell holds thousands of pieces of one turn: a one-turn spiral of 16 000 points with a 20 mm pitch took
+20 s and 2.4 GB, 32 000 points 84 s and 9.2 GB, and an 8000-vertex circle outline (n=2) 8 s and 0.8 GB in
+`PlanarInductor` (found in the third review). The pieces are now grouped into chunks of up to 64 consecutive pieces of
+one arm (about a quarter pitch long); chunk pairs come from the grid, chunk pairs whose pieces all belong to one turn
+are skipped as a whole, the others are expanded in order of increasing box distance in batches of at most 10^6 piece
+pairs (the grid also splits crowded cells), and pairs that cannot beat the current minimum are skipped. Same three
+cases now: 0.5 s and 0.2 GB, 0.9 s and 0.3 GB, 0.4 s; the results and all corpus trace widths are unchanged.
 
 ### D8. Arc approximation eats into the clearance
 
@@ -458,17 +478,30 @@ its other defects.
 
 **Fix.** Protrusions are cut (`Skeletonator.set_fold_limit`, set by `PlanarInductor` to half the nominal pitch): the
 vertices inside a protrusion (tracks that enter a constant-time skeleton group with one way up somewhere other than at
-its exit) jump at depth T − pitch/2 along the protrusion's axis onto its mouth line (through the mean position of the
-tracks that reach the group's exit from outside, perpendicular to the axis), so each stays on its own side, and follow
-the mouth from there. Turns that would have run into a sliver narrower than one pitch cut straight across its mouth
-(logged as info); turns that still enter have their two sides at least one pitch apart. A protrusion without a mouth is
-left alone and gives a warning. (Moving the tips to the mouth's mean point instead, as first tried, turned the side
-edges into chords that dipped up to 0.25 mm below the annulus in `narrow_slot_w10.0_n9k4`.) Folds around notches cannot be cut without moving copper outside the outline;
+its exit) jump at depth T − pitch/2 onto the protrusion's mouth and follow the mouth from there. The mouth is spanned by
+the tracks that reach the group's exit from outside (usually the two reflex corners at its base); each tip lands on the
+chord between the mouth vertices before and after it in outline order (orthogonal projection, clamped to the chord,
+kept in outline order), so each stays on its own side. Where the mouth has a single vertex (its other side is an edge,
+as for the parts of a square beside a slot), the tips move along the protrusion's axis at the mouth onto the line
+through that vertex. Protrusions are cut in order of increasing T, each on the tracks as cut by the shallower ones.
+Turns that would have run into a sliver narrower than one pitch cut straight across its mouth (logged as info); turns
+that still enter have their two sides at least one pitch apart. A protrusion without a mouth is left alone and gives a
+warning. (Moving the tips to the mouth's mean point instead, as first tried, turned the side edges into chords that
+dipped up to 0.25 mm below the annulus in `narrow_slot_w10.0_n9k4`.) The first version of this cut (found in the third
+review) stopped after the first protrusion a track passed through: in a finger narrowing in steps, or with a side
+branch, the inner tips were cut only at the inner mouth and still ran up the outer protrusion's axis while the outer
+protrusion's other vertices were cut at its mouth, so one turn ran up the axis and straight back (a zero-width hairpin:
+connectivity broken in 10 of the new `narrow_stepped/branch` cases, and in all three alternative layouts). It also
+moved each tip along the direction from its own entry node to the exit, which is oblique for a bent (L-shaped)
+protrusion: the tips landed up to 0.6 mm inside the outline, and the measured spacing, and with it the trace width of the
+whole coil, dropped to 33–63 % of the straight-finger value (`narrow_lfinger_w3.0_n9k4`: 0.07 mm instead of 0.50 mm).
+Folds around notches cannot be cut without moving copper outside the outline;
 `min_turn_spacing` now also reports the closest approach of two pieces of the same turn that are far apart along the
-conductor (more than π × their distance plus a pitch), and `PlanarInductor` warns when that is less than trace width plus
-clearance (it does not short different turns). None of the other 47 `narrow_*` cases has a connectivity, crossing,
-winding, backtrack, track clearance or via clearance problem any more, and nothing changed on the 602 previous corpus
-cases. 26 of the 48 fail the checker's coverage test, mostly because the cut-off part of a protrusion stays uncovered;
+conductor (more than π × their distance plus a pitch, or more than 4 × (trace width + clearance), which catches
+the converging sides of a tapered finger that the first criterion missed), and `PlanarInductor` warns when that is less
+than trace width plus clearance (it does not short different turns). None of the other 95 `narrow_*` cases has a
+connectivity, crossing, winding, backtrack, track clearance or via clearance problem any more, and nothing changed on
+the 602 previous corpus cases. 26 of the 48 fail the checker's coverage test, mostly because the cut-off part of a protrusion stays uncovered;
 4 of them passed before the cut (3 only because the checker counts a fold shorter than its `s_far` path distance as a
 harmless self-overlap). In the full corpus the fold warning also appears for
 `ellipse3to1_a0.90_n16k5` and `sector180_a0.90_n3k1`, where a 90 % annulus reaches deep into a narrow tip; there the

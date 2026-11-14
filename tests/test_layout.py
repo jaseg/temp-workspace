@@ -490,3 +490,118 @@ def test_fold_around_narrow_notch_is_reported():
     model, intent, rep = layout(spec('narrow_slot_w10.0_n4k1'), caught)
     assert rep.ok_connectivity and rep.crossings == 0
     assert any(FOLD_WARNING in m for m in caught)
+
+
+@pytest.mark.parametrize('name', ['narrow_stepped_w4.0_n4k1', 'narrow_stepped_w6.0_n4k1', 'narrow_branch_w3.0_n7k3',
+                                  'narrow_branch_w6.0_n4k1'])
+def test_nested_protrusions_are_cut_at_every_mouth(name):
+    # The protrusion cut stopped after the first protrusion a track passes through: the tips of a narrow finger on top
+    # of a wider one (or of a side branch) were cut at the inner mouth only and still ran up the outer protrusion's
+    # axis, while the other vertices of the outer protrusion were cut at its mouth. One turn then ran up the axis and
+    # straight back, a zero-width hairpin (connectivity broken, reported as a branch).
+    model, intent, rep = layout(spec(name))
+    assert rep.ok_connectivity and rep.branches == 0 and rep.crossings == 0 and rep.backtracks == 0
+    assert rep.worst_clearance_deficit <= 0.05 * intent.clearance + 1e-4
+
+
+def test_bent_protrusion_is_cut_on_its_mouth():
+    # The tips of a protrusion moved along the direction from their own entry into the collapsed group to its exit,
+    # which is oblique for an L-shaped protrusion: they landed 0.6 mm inside the outline, the measured spacing dropped
+    # to 61 % of the pitch and the whole coil got a 45 % thinner trace than with a straight finger of the same width.
+    sq = [(-20, -20), (20, -20), (20, 20)]
+    straight = sq + [(2, 20), (2, 32), (-2, 32), (-2, 20), (-20, 20)]
+    bent = sq + [(2, 20), (2, 28), (12, 28), (12, 32), (-2, 32), (-2, 20), (-20, 20)]
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        w_straight = build_model(poly_spec(straight, 6, 13, 3)).trace_width
+        model, intent, rep = layout(poly_spec(bent, 6, 13, 3))
+    assert model.trace_width >= 0.98 * w_straight
+    assert rep.ok_connectivity and rep.crossings == 0 and rep.worst_clearance_deficit <= 1e-4
+
+
+def test_fold_at_tapered_finger_is_reported():
+    # A turn running into a tapered finger and back: its copper overlapped itself (0.04 mm) at pieces 18.2 mm apart
+    # along the conductor, which the checker counts as a clearance violation. The fold test only looked at pieces more
+    # than pi*d + pitch = 19.3 mm apart and did not warn.
+    poly = [(-20.0, -20.0), (20.0, -20.0), (20.0, 20.0), (-4.487019801766503, 20.0), (-6.0495799658954175, 28.436328047481098),
+            (-9.675310650842189, 28.436328047481098), (-11.237870814971103, 20.0), (-20.0, 20.0)]
+    caught = []
+    model, intent, rep = layout(poly_spec(poly, 15.87099714894963, 5, 3), caught)
+    assert rep.ok_connectivity and rep.crossings == 0
+    assert any(FOLD_WARNING in m for m in caught)
+
+
+def _naive_folds(arms, search_radius, min_turn_separation=0.5):
+    """ Brute force fold candidates: pairs of pieces of the same turn with their distance d and their separation along
+    the conductor, if that is more than pi*d. Pieces are split like in min_turn_spacing. """
+    from kicoil.geometry import _split_by_angle, _seg_seg_distance
+    out = []
+    for points, angles in arms:
+        pieces, s = [], 0.0
+        for q1, q2, u1, u2 in _split_by_angle(points, angles, min_turn_separation / 10):
+            l = math.dist(q1, q2)
+            n = max(1, math.ceil(l / (4 * search_radius)))
+            for k in range(n):
+                a = (q1[0] + (q2[0]-q1[0])*k/n, q1[1] + (q2[1]-q1[1])*k/n)
+                b = (q1[0] + (q2[0]-q1[0])*(k+1)/n, q1[1] + (q2[1]-q1[1])*(k+1)/n)
+                pieces.append((a, b, min(u1, u2), max(u1, u2), s + l*k/n, s + l*(k+1)/n))
+            s += l
+        for i, (a, b, tlo, thi, s0, s1) in enumerate(pieces):
+            for c, d_, ulo, uhi, r0, r1 in pieces[i+1:]:
+                if max(ulo - thi, tlo - uhi) >= min_turn_separation:
+                    continue
+                d = _seg_seg_distance(a, b, c, d_)
+                path = max(r0 - s1, s0 - r1)
+                if d < search_radius and path > math.pi * d + 1e-9 * search_radius:
+                    out.append((d, path))
+    return out
+
+
+@pytest.mark.parametrize('name', ['narrow_slot_w10.0_n4k1', 'narrow_taper_w15.9_n5k2', 'sector180_a0.90_n3k1',
+                                  'ellipse3to1_a0.90_n16k5'])
+def test_fold_candidates_match_brute_force(name):
+    # The chunked search skips pairs of chunks that cannot hold a fold candidate; it must find the same ones.
+    from kicoil.geometry import min_turn_spacing
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        try:
+            model = build_model(spec(name))
+        except ValueError:
+            pytest.skip('rejected')
+    R = model.spiral_pitch
+    found = 0
+    for layer_arms in model.spiral_center_lines():
+        if not layer_arms:
+            continue
+        _best, _where, fold_best, _fold_where, front = min_turn_spacing(layer_arms, R, folds=True)
+        naive = _naive_folds(layer_arms, R)
+        found += len(naive)
+        assert fold_best == pytest.approx(min([d for d, p in naive if p > math.pi*d + R], default=R), abs=1e-12)
+        for min_path in (0.5*R, R, 2*R, 4*R, 8*R):
+            assert front.closest(min_path)[0] == pytest.approx(
+                    min([d for d, p in naive if p > min_path], default=math.inf), abs=1e-12)
+    assert found # every one of these cases has turns that come back close to themselves
+
+
+def test_spacing_measurement_dense_outline_few_turns():
+    # A finely subdivided outline with few turns (an SVG import) puts thousands of pieces of one turn into each grid
+    # cell of the spacing search: all pairs of a cell were built at once (2.4 GB and 20 s for 16000 points). The pieces
+    # are now paired chunk by chunk and pairs of one turn are skipped per chunk.
+    import time
+    import tracemalloc
+    from kicoil.geometry import min_turn_spacing
+    N = 16000
+    pts, ang = [], []
+    for i in range(N + 1):
+        t = i / N
+        r = 30 - 20 * t
+        pts.append((r * math.cos(2 * math.pi * t), r * math.sin(2 * math.pi * t)))
+        ang.append(t)
+    tracemalloc.start()
+    t0 = time.perf_counter()
+    best, _where = min_turn_spacing([(pts, ang)], 20.0)
+    elapsed = time.perf_counter() - t0
+    _cur, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert best == pytest.approx(19.662, abs=1e-3)
+    assert peak < 400e6 and elapsed < 10 # about 0.1 GB and 0.5 s
