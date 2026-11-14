@@ -307,10 +307,26 @@ def corpus(kind='full'):
                 cases.append(_spec(f'narrow_{sname}_w{aw:.1f}_n{turns}k{twists}', 'polygon', turns, twists,
                                    polygon=poly, annular_width=aw, tags=tags))
 
+    # Extra families live in their own modules (tests/corpus_<family>.py, each with a function cases()). They are part
+    # of the full corpus and can be selected alone with kind='<family>'.
+    import importlib
+    for family in EXTRA_FAMILIES:
+        try:
+            mod = importlib.import_module(f'corpus_{family}')
+        except ModuleNotFoundError:
+            continue
+        extra = mod.cases()
+        if kind == family:
+            return extra
+        cases.extend(extra)
+
     assert len({c['name'] for c in cases}) == len(cases)
     if kind == 'quick':
         return cases[::7]
     return cases
+
+
+EXTRA_FAMILIES = ('round', 'concave')
 
 
 if __name__ == '__main__':
