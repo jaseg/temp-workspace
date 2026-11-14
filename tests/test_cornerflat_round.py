@@ -48,7 +48,7 @@ def test_simplify_outline_removes_rounding_noise_within_tolerance():
 
 def test_cornerflat_dense_rounded_outline_is_fast():
     # The base skeleton of this outline runs out of memory after several minutes (3000 vertices, coordinates rounded to
-    # 1 um). cornerflat simplifies it by at most 1 um first.
+    # 1 um). cornerflat simplifies it by 1 um first.
     poly = corpus_round.svg_like(40, 3000, random.Random(4242))
     spec = corpus._spec('svg3000r', 'polygon', 8, 3, polygon=poly, annular_width=round(0.6*corpus.max_depth(poly), 4))
     t0 = time.perf_counter()
@@ -102,7 +102,8 @@ def test_cornerflat_no_nanometer_pieces_near_vias(monkeypatch):
     # the via (connectivity broken).
     import geomcheck
     from kicoil import skeletonator_alt_cornerflat
-    monkeypatch.setattr(skeletonator_alt_cornerflat.CornerFlatSkeletonator, 'OUTLINE_TOLERANCE', 0.0)
+    monkeypatch.setattr(skeletonator_alt_cornerflat.CornerFlatSkeletonator, 'prepare_outline',
+                        classmethod(lambda cls, poly: (list(poly), 0.0)))
     spec = next(c for c in corpus.corpus('round') if c['name'] == 'round_ellipse3to1_a0.60_n21k8')
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -116,3 +117,61 @@ def test_cornerflat_no_nanometer_pieces_near_vias(monkeypatch):
     rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
     assert rep.ok_connectivity, rep.notes
     assert rep.backtracks == 0
+
+
+def _rounded(pts, decimals):
+    out = []
+    for x, y in pts:
+        q = (round(x, decimals), round(y, decimals))
+        if not out or q != out[-1]:
+            out.append(q)
+    if out[-1] == out[0]:
+        out.pop()
+    return corpus._ccw(out)
+
+
+def test_prepare_outline_raises_the_tolerance_for_coarse_noise():
+    from kicoil.skeletonator import clean_polygon
+    from kicoil.skeletonator_alt_cornerflat import CornerFlatSkeletonator as CF, count_reflex
+    # Coordinates rounded to 10 um: 1 um leaves 667 reflex vertices among 1384, 10 um none
+    poly = clean_polygon(_rounded(corpus_round.fourier_blob(40, 2000, random.Random(12), order=5, amp=0.15), 2))
+    simple, tol = CF.prepare_outline(poly)
+    assert tol == 0.01 and count_reflex(simple) == 0
+    assert max(_point_polyline_distance(p, simple) for p in poly[::5]) <= tol + 1e-12
+    # 10 um radial jitter on a 1024-gon: within the budget at 10 um
+    poly = clean_polygon(corpus_round.noisy_circle(40, 1024, 0.01, random.Random(5)))
+    simple, tol = CF.prepare_outline(poly)
+    assert tol == 0.01 and len(simple) * count_reflex(simple) <= CF.SKELETON_BUDGET
+    # Small cheap outlines are used as given (nearly collinear runs keep their vertices)
+    poly = clean_polygon(corpus_round.shapes()['collinear'][0])
+    assert CF.prepare_outline(poly) == (poly, 0.0)
+    # Real noise (0.2 mm jitter) is not removed by any tolerance up to 10 um: the 1 um outline is kept
+    poly = clean_polygon(corpus_round.shapes()['noisy_l'][0])
+    _simple, tol = CF.prepare_outline(poly)
+    assert tol == 0.001
+
+
+def test_cornerflat_coarsely_rounded_outline_is_fast():
+    # Coordinates rounded to 10 um (2 decimals): the skeleton of the outline simplified by 1 um takes over 5 minutes
+    import geomcheck
+    poly = _rounded(corpus_round.fourier_blob(40, 2000, random.Random(12), order=5, amp=0.15), 2)
+    spec = corpus._spec('svg2000r2', 'polygon', 8, 3, polygon=poly, annular_width=round(0.6*corpus.max_depth(poly), 4))
+    t0 = time.perf_counter()
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        model = build_model(spec, 'geometry_alt_cornerflat')
+        fp = model.render_footprint()
+    assert time.perf_counter() - t0 < 60
+    intent = geomcheck.intent_from_model(model)
+    rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
+    assert rep.overshoot < 0.02
+    kinds = rep.failure_kinds(intent.clearance, intent.trace_width)
+    assert not [k for k in kinds if k != 'conformance'], (kinds, rep.notes[:5])
+
+
+def test_noisy_round_shapes_use_the_skeleton_depth():
+    # The straight skeleton of the 0.2 mm jitter circle collapses at 16.8 mm, well before its inscribed circle
+    # (19.8 mm): corpus_round uses the skeleton's limit for the annular fractions, so every case gets laid out
+    from kicoil.skeletonator import Skeletonator
+    for name, depth in corpus_round.SKELETON_DEPTH.items():
+        assert Skeletonator(corpus_round.shapes()[name][0]).max_depth == pytest.approx(depth, abs=1e-3)

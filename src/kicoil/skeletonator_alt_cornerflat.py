@@ -111,16 +111,66 @@ def simplify_outline(poly, tol):
     return out if len(out) >= 3 else list(poly)
 
 
+def count_reflex(poly):
+    """ Number of reflex vertices of a polygon (either orientation: the orientation is taken from the signed area) """
+    n = len(poly)
+    area2 = sum(poly[i - 1][0] * poly[i][1] - poly[i][0] * poly[i - 1][1] for i in range(n))
+    sign = 1 if area2 >= 0 else -1
+    r = 0
+    for i in range(n):
+        (x0, y0), (x1, y1), (x2, y2) = poly[i - 1], poly[i], poly[(i + 1) % n]
+        if sign * ((x1 - x0) * (y2 - y1) - (y1 - y0) * (x2 - x1)) < 0:
+            r += 1
+    return r
+
+
 class CornerFlatSkeletonator(base.Skeletonator):
 
     W_EPS = 1e-9
-    OUTLINE_TOLERANCE = 0.001 # mm, see simplify_outline
+    # Outline preparation, see prepare_outline: tolerances tried in turn (mm), the reflex vertices times vertices budget
+    # that is considered cheap for the straight skeleton (a few seconds), and the outline size below which a cheap
+    # outline is used as given
+    OUTLINE_TOLERANCES = (0.001, 0.0025, 0.005, 0.01)
+    SKELETON_BUDGET = 30_000
+    SMALL_OUTLINE = 300
     MERGE_TOL = 1e-4 # mm, see spiral
+
+    @classmethod
+    def prepare_outline(cls, poly):
+        """ The outline the skeleton is computed on, and the tolerance (mm) it was simplified with (0: as given).
+
+        The straight skeleton's cost grows with the number of reflex vertices times the number of vertices. Small cheap
+        outlines are used as given. Others are simplified (`simplify_outline`) by 1 µm, which removes the noise of
+        coordinates rounded to 3 decimals (mm) and thins out densely sampled curves. Where that leaves more than
+        SKELETON_BUDGET (e.g. coordinates rounded to 2 decimals, or 10 µm jitter), the tolerance is raised step by step
+        up to 10 µm, and the first one that brings the outline within the budget is used. If none does, the 1 µm outline
+        is used unless a larger tolerance makes the skeleton at least 4 times cheaper, and a warning says that the
+        skeleton may be slow. The copper then follows the simplified outline, at most the tolerance away from the given
+        one (the checker allows 0.05 mm). """
+        n, r = len(poly), count_reflex(poly)
+        if n <= cls.SMALL_OUTLINE and n * r <= cls.SKELETON_BUDGET:
+            return list(poly), 0.0
+        levels = []
+        for tol in cls.OUTLINE_TOLERANCES:
+            simple = simplify_outline(poly, tol)
+            cost = len(simple) * count_reflex(simple)
+            levels.append((cost, tol, simple))
+            if cost <= cls.SKELETON_BUDGET:
+                return simple, tol
+        cost, tol, simple = min(levels, key=lambda lv: lv[0])
+        if cost * 4 > levels[0][0]:
+            cost, tol, simple = levels[0]
+        if cost > 10 * cls.SKELETON_BUDGET:
+            import warnings
+            warnings.warn(f'The outline has {count_reflex(simple)} reflex corners among {len(simple)} vertices after '
+                          f'simplifying it by {tol * 1000:g} µm (noisy or rounded coordinates?). Computing its straight '
+                          f'skeleton may take minutes. Smooth or resample the outline.')
+        return simple, tol
 
     def __init__(self, poly, ref_depth=None, ramp_margin=0.0):
         self.ramp_margin = ramp_margin
         self.input_poly = base.clean_polygon(poly)
-        simple = simplify_outline(self.input_poly, self.OUTLINE_TOLERANCE)
+        simple, self.outline_tolerance = self.prepare_outline(self.input_poly)
         # Build the skeleton and vertex tracks exactly like the base class, but with the fork-safe skeleton computation
         base.compute_skeleton = compute_skeleton
         try:
