@@ -1054,7 +1054,8 @@ def intent_from_model(model, contour_tol=0.01):
         contour = [(r*math.cos(2*math.pi*i/n), r*math.sin(2*math.pi*i/n)) for i in range(n)]
         annular = shape.outer_radius - shape.inner_radius
     else:
-        contour = list(shape.polygon)
+        # A shape that lays out on a modified outline (e.g. with rounded corners) names the intended one design_outline
+        contour = list(getattr(shape, 'design_outline', None) or shape.polygon)
         annular = shape.annular_width
     poly = Polygon(contour)
     if not poly.exterior.is_ccw:
