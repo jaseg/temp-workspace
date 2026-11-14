@@ -210,9 +210,9 @@ KNOWN_FAILURES = {
     'slender': {'backtrack': 'via connection runs back along the arm at a sliver tip of the inner contour'},
 }
 # Per case. At 90 % of a slender ellipse the inner contour is a tiny sliver. With 5 arms, kicoil.geometry places several
-# inner vias at the same point (the end of the skeleton), which connects the arms there: a defect of the base layout
-# (geometry.py), reported, not fixed here.
-_COINCIDENT_VIAS = {'connectivity': 'inner vias coincide at the end of the skeleton (base layout defect)',
+# inner vias at the same point (the end of the skeleton), which connects the arms there. It warns ('Overlapping vias')
+# but still emits the layout instead of rejecting it: a defect of the base layout (geometry.py), reported, not fixed here.
+_COINCIDENT_VIAS = {'connectivity': 'inner vias coincide at the end of the skeleton (warned, but emitted)',
                     'winding': 'follows from the coincident inner vias'}
 CASE_KNOWN_FAILURES = {'round_ellipse10to1_a0.90_n16k5': _COINCIDENT_VIAS,
                        'round_ellipse20to1_a0.90_n16k5': _COINCIDENT_VIAS}
