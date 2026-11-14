@@ -29,10 +29,8 @@ import geomcheck
 
 
 def build_model(spec, impl='kicoil'):
-    if impl == 'alt':
-        from kicoil import geometry_alt as geometry
-    else:
-        from kicoil import geometry
+    import importlib
+    geometry = importlib.import_module('kicoil.geometry' if impl == 'kicoil' else f'kicoil.{impl}')
 
     if spec['shape'] == 'circle':
         shape = geometry.CircleShape(spec['outer_diameter'], spec['inner_diameter'])
@@ -199,6 +197,8 @@ def main():
 
     # warm up the wasm module cache once before forking
     import kicoil.geometry  # noqa
+    if args.impl != 'kicoil':
+        build_model(cases[0], args.impl) if cases else None
 
     t0 = time.perf_counter()
     with Pool(args.j) as pool:
