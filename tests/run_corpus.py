@@ -81,6 +81,10 @@ def run_case(args):
         return res
     res['gen_time'] = time.perf_counter() - t0
     res['nominal_pitch'] = getattr(model, 'spiral_pitch', float('nan'))
+    # Layout chosen by implementations that pick among candidates (e.g. cornerflat's spiral mode and arm phase)
+    mode = getattr(model.shape, 'spiral_mode', None)
+    if mode is not None:
+        res['layout'] = [mode, getattr(model, 'arm_phase', 0.0)]
 
     try:
         intent = geomcheck.intent_from_model(model)

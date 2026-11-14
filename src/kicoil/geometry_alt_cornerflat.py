@@ -19,62 +19,72 @@ import warnings
 from dataclasses import dataclass
 from math import pi, ceil, floor, dist, inf
 
+import numpy as np
+
 from . import geometry
 from .geometry import *  # noqa: F401,F403  re-export helpers
 from .geometry import CircleShape, Shape  # noqa: F401
 from .skeletonator_alt_cornerflat import CornerFlatSkeletonator, LinearView
 
 
-def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, min_path_separation=inf):
+def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, min_path_separation=inf, fold_limit=None):
     """ Like `geometry.min_turn_spacing`, but segments of the same arm that are less than min_turn_separation
     revolutions apart are also reported when they are more than min_path_separation apart along the arm: near the inner
     end of a deep annulus, the arm can fold back onto itself within less than half a revolution.
 
     Returns (distance, location, folds), where distance and location are as in geometry.min_turn_spacing, and folds is
-    a list of (distance, path separation, location) of such same-arm pairs closer than search_radius. """
-    segs = []
-    max_span = min_turn_separation / 10
-    for arm_idx, (points, angles) in enumerate(arms):
-        s = 0.0
-        for q1, q2, u1, u2 in geometry._split_by_angle(points, angles, max_span):
-            l = dist(q1, q2)
-            segs.append((q1, q2, arm_idx, min(u1, u2), max(u1, u2), s, s + l))
-            s += l
+    a tuple of arrays (distances, path separations, locations) of such same-arm pairs closer than fold_limit (default:
+    search_radius).
 
-    cell = search_radius
-    grid = {}
-    def cells(p1, p2, margin):
-        x0, x1 = min(p1[0], p2[0]) - margin, max(p1[0], p2[0]) + margin
-        y0, y1 = min(p1[1], p2[1]) - margin, max(p1[1], p2[1]) + margin
-        for gx in range(floor(x0/cell), floor(x1/cell) + 1):
-            for gy in range(floor(y0/cell), floor(y1/cell) + 1):
-                yield gx, gy
-
-    for idx, (p1, p2, *_rest) in enumerate(segs):
-        for c in cells(p1, p2, 0):
-            grid.setdefault(c, []).append(idx)
+    Vectorized with numpy (the candidate pairs come from `geometry._candidate_pairs`), so that outlines with thousands of
+    vertices are measured quickly. """
+    pieces = [geometry._split_by_angle_np(points, angles, min_turn_separation / 10) for points, angles in arms]
+    pieces = [pc for pc in pieces if len(pc[0])]
+    if fold_limit is None:
+        fold_limit = search_radius
+    fold_d, fold_sep, fold_at = [np.zeros(0)], [np.zeros(0)], [np.zeros((0, 2))]
+    if not pieces:
+        return search_radius, None, (fold_d[0], fold_sep[0], fold_at[0])
+    P = np.concatenate([q1 for q1, _q2, _u1, _u2 in pieces])
+    Q = np.concatenate([q2 for _q1, q2, _u1, _u2 in pieces])
+    U1 = np.concatenate([u1 for _q1, _q2, u1, _u2 in pieces])
+    U2 = np.concatenate([u2 for _q1, _q2, _u1, u2 in pieces])
+    arm = np.concatenate([np.full(len(pc[0]), i) for i, pc in enumerate(pieces)])
+    tlo, thi = np.minimum(U1, U2), np.maximum(U1, U2)
+    seg_len = np.hypot(*(Q - P).T)
+    S1 = np.concatenate([np.cumsum(seg_len[arm == i]) for i in range(len(pieces))])
+    S0 = S1 - seg_len
+    lo, hi = np.minimum(P, Q), np.maximum(P, Q)
+    lox, loy, hix, hiy = lo[:, 0], lo[:, 1], hi[:, 0], hi[:, 1]
 
     best, where = search_radius, None
-    folds = []
-    for idx, (p1, p2, arm, t_lo, t_hi, s_lo, s_hi) in enumerate(segs):
-        seen = set()
-        for c in cells(p1, p2, search_radius):
-            for jdx in grid.get(c, ()):
-                if jdx <= idx or jdx in seen:
-                    continue
-                seen.add(jdx)
-                q1, q2, arm_j, u_lo, u_hi, r_lo, r_hi = segs[jdx]
-                if arm_j == arm and max(u_lo - t_hi, t_lo - u_hi) < min_turn_separation:
-                    sep = max(r_lo - s_hi, s_lo - r_hi)
-                    if sep > min_path_separation:
-                        d = geometry._seg_seg_distance(p1, p2, q1, q2)
-                        if d < search_radius:
-                            folds.append((d, sep, ((p1[0]+p2[0])/2, (p1[1]+p2[1])/2)))
-                    continue
-                d = geometry._seg_seg_distance(p1, p2, q1, q2)
-                if d < best:
-                    best, where = d, ((p1[0]+p2[0])/2, (p1[1]+p2[1])/2)
-    return best, where, folds
+    for i, j in geometry._candidate_pairs(lo, hi, search_radius):
+        # Lower bound of the distance from the bounding boxes
+        gx = np.maximum(0, np.maximum(lox[i] - hix[j], lox[j] - hix[i]))
+        gy = np.maximum(0, np.maximum(loy[i] - hiy[j], loy[j] - hiy[i]))
+        sel = np.hypot(gx, gy) < search_radius
+        i, j = i[sel], j[sel]
+        same_turn = (arm[i] == arm[j]) & (np.maximum(tlo[j] - thi[i], tlo[i] - thi[j]) < min_turn_separation)
+        if same_turn.any() and min_path_separation < inf:
+            fi, fj = i[same_turn], j[same_turn]
+            sep = np.maximum(S0[fj] - S1[fi], S0[fi] - S1[fj])
+            sel = sep > min_path_separation
+            fi, fj, sep = fi[sel], fj[sel], sep[sel]
+            if len(fi):
+                d = geometry._seg_seg_distance_np(P[fi], Q[fi], P[fj], Q[fj])
+                sel = d < fold_limit
+                fold_d.append(d[sel])
+                fold_sep.append(sep[sel])
+                fold_at.append((P[fi[sel]] + Q[fi[sel]]) / 2)
+        i, j = i[~same_turn], j[~same_turn]
+        if not len(i):
+            continue
+        d = geometry._seg_seg_distance_np(P[i], Q[i], P[j], Q[j])
+        k = int(np.argmin(d))
+        if d[k] < best:
+            best = float(d[k])
+            where = tuple(float(c) for c in (P[i[k]] + Q[i[k]]) / 2)
+    return best, where, (np.concatenate(fold_d), np.concatenate(fold_sep), np.concatenate(fold_at))
 
 
 class OffsetShape(geometry.OffsetShape):
@@ -205,6 +215,8 @@ class PlanarInductor(geometry.PlanarInductor):
     PHASE_SEARCH_BELOW = 0.97 # try other arm phases when the spacing is below this fraction of the pitch
     PHASE_STEPS = 12 # arm phases tried per sector (1/twists revolution)
     PHASE_MIN_GAIN = 0.01 # use a non-zero arm phase only if it gains at least this fraction of the pitch
+    PHASE_COARSE = 3 # phases (in PHASE_STEPS) measured first; the others only if the spacing changes with these
+    PHASE_FLAT_TOL = 0.002 # ... by more than this fraction of the pitch
     MAX_VIA_RETRIES = 6
 
     def __post_init__(self):
@@ -316,12 +328,22 @@ class PlanarInductor(geometry.PlanarInductor):
         if phase_search:
             twists = 1 if self.layers == 1 else self.twists
             for mode in modes:
-                if mode == 'lattice':
+                if mode == 'lattice' or (mode, 0.0) not in results:
                     continue # the lattice allocation is specific to the arm phase it was computed for
-                for q in range(1, self.PHASE_STEPS):
+                # Coarse phases first. If the spacing does not change with them (e.g. on round outlines, where rotating
+                # the arms changes nothing), skip the others: they would have to gain PHASE_MIN_GAIN in between.
+                steps = range(1, self.PHASE_STEPS)
+                coarse = [q for q in steps if q % self.PHASE_COARSE == 0]
+                ref = results[(mode, 0.0)][0]
+                flat = all(abs(measure((mode, q / self.PHASE_STEPS / twists)) - ref)
+                           <= self.PHASE_FLAT_TOL * self.spiral_pitch for q in coarse)
+                for q in steps:
                     key = (mode, q / self.PHASE_STEPS / twists)
+                    if flat and q not in coarse:
+                        continue
                     self._candidates.append(key)
                     measure(key)
+                    results[key] = results.pop(key) # keep the candidates in phase order (ties go to the first one)
             bk = best_key()
 
         # The copper should reach the outline everywhere. A single layer spiral leaves sharp corners uncovered when they
@@ -397,22 +419,29 @@ class PlanarInductor(geometry.PlanarInductor):
             inner_len = 2*pi*self.shape.inner_radius
         # geomcheck's threshold depends on the trace pitch, which depends on the result. Collect all same-arm pairs that
         # are far enough apart along the arm for the smallest possible threshold, then resolve.
+        # Only folds closer than the nominal pitch matter, since the result is capped there.
         best, where, folds = search_radius, None, []
         for layer_arms in arms:
             if layer_arms:
-                d, w, f = min_turn_spacing(layer_arms, search_radius, min_path_separation=0.9*0.25*inner_len)
-                folds += f
+                d, w, f = min_turn_spacing(layer_arms, search_radius, min_path_separation=0.9*0.25*inner_len,
+                                           fold_limit=self.spiral_pitch)
+                folds.append(f)
                 if d < best:
                     best, where = d, w
-        if where is None and not folds:
+        fd = np.concatenate([f[0] for f in folds]) if folds else np.zeros(0)
+        fsep = np.concatenate([f[1] for f in folds]) if folds else np.zeros(0)
+        fat = np.concatenate([f[2] for f in folds]) if folds else np.zeros((0, 2))
+        if where is None and not len(fd):
             return self.spiral_pitch, None
         best = min(best, self.spiral_pitch)
         while True:
             min_path = 0.9 * max(4*best, 0.25*inner_len)
-            closer = [(d, w) for d, sep, w in folds if sep > min_path and d < best - 1e-12]
-            if not closer:
+            sel = np.flatnonzero((fsep > min_path) & (fd < best - 1e-12))
+            if not len(sel):
                 break
-            best, where = min(closer)
+            # smallest distance; ties broken by location like min() over (distance, location) tuples
+            k = sel[np.lexsort((fat[sel, 1], fat[sel, 0], fd[sel]))[0]]
+            best, where = float(fd[k]), (float(fat[k][0]), float(fat[k][1]))
         return min(best, self.spiral_pitch), where
 
     def via_track_clearance(self):
