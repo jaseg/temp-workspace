@@ -9,29 +9,36 @@ Checks:
 
     copper        Copper on a layer other than the coil's layer pair, pads other than pad 1 and pad 2, and copper in
                   footprint items the checker does not interpret (copper rectangles, circles, polygons, text, filled
-                  zones, custom pads) are reported as stray copper.
-    width         The emitted track widths must equal the intended trace width.
+                  zones, custom pads, non-circular vias) are reported as stray copper.
+    width         The emitted track widths must equal the intended trace width. Zero-length tracks ("dots", drawn by
+                  KiCad as disks of their stroke width) count as tracks here and are checked as copper disks below.
+    vias          Vias must be plated, have copper on both layers of the pair and an annular ring, and have the
+                  intended diameter and drill.
+    pad size      Pads 1 and 2 must be at least as large as intended (by default the trace width) in every direction.
     connectivity  The copper must form one simple path from pad 1 to pad 2 that uses every track segment exactly once.
                   Track ends are joined when they coincide, when a dangling track end lies within the copper of a via
                   or pad, or when two collinear pieces of track overlap (one track drawn in two pieces). Layer changes
-                  may only happen at vias. Reports open ends, branches, orphaned segments, duplicate segments, stray
-                  vias (fewer than two track connections), shorts (pad 1 and pad 2 connected directly, or a path from
-                  pad 1 to pad 2 that bypasses part of the conductor) and the winding number of the path around the
-                  coil's center (which must match the requested number of turns).
+                  may only happen at vias. Reports open ends, branches, orphaned segments and dots, duplicate segments,
+                  stray vias (fewer than two track connections), shorts (pad 1 and pad 2 connected directly through via
+                  or pad copper) and the winding number of the path around the coil's center (which must match the
+                  requested number of turns). Short dead ends at a terminal pad and track lying entirely within a via
+                  or pad are counted as stubs and tolerated.
     crossings     Centerlines of segments on the same layer that are not neighbors along the conductor path must not
                   intersect.
     clearance     Copper that belongs to different turns must keep at least `clearance` of edge-to-edge distance.
                   Copper belongs to different turns when it is at least half a turn apart in cumulative winding angle
-                  around the coil's center, or far apart along the conductor path. Track-track, via-track/via-via and
-                  pad-track/pad-via/pad-pad violations are reported separately. Clearance deficits between parts of the
-                  *same* turn (the conductor folding onto itself at a tight tip) are counted as self overlaps.
+                  around the coil's center (without a center: far apart along the conductor path). Track-track (and
+                  dots), via-track/via-via and pad-track/pad-via/pad-pad violations are reported separately.
+                  Clearance deficits between parts of the *same* turn (the conductor folding onto itself at a tight
+                  tip, or a hairpin) are counted as self overlaps and do not fail a case, unless the copper touches
+                  itself at least SELF_SHORT_SEP (0.18) turns apart, which shorts part of a turn (a self short).
     spacing       Sampled distribution of the edge-to-edge distance between neighboring turns, relative to the nominal
                   clearance. Tells how uniform the layout is, i.e. how much copper area is wasted by loose spacing.
     conformance   Per layer, the union of the tracks inflated by half a pitch must tile the intended annulus (contour
                   inflated by half a pitch minus the contour deflated by annular width plus half a pitch). Reports the
                   uncovered and excess area fractions, the Hausdorff distance between the actual and the intended
-                  outer contour, how far any copper (tracks, vias, pads) leaves the intended envelope, and how far via
-                  centers are beyond the intended via offset.
+                  outer contour, how far any copper (tracks, dots, vias, pads) leaves the intended envelope, and how
+                  far via centers are beyond the intended via offset.
 """
 
 import math
@@ -50,10 +57,20 @@ from shapely.strtree import STRtree
 JOIN_EPS = 1e-6 # mm, endpoints closer than this are considered connected
 ATTACH_TOL = 1e-3 # mm, a track end this close to a collinear track's centerline lies on it
 COLLINEAR_TOL = 1e-3 # rad, maximum angle between collinear track pieces
-TURN_SEP = 0.5 # revolutions; copper at least this far apart in winding angle belongs to different turns
+TURN_SEP = 0.5 # revolutions; copper at least this far apart in cumulative winding angle belongs to different turns
+# Copper of the same turn that touches itself shorts part of the turn when the two pieces are at least this many
+# revolutions apart in winding angle (and not close along the conductor). On the whole corpus (all four layout
+# implementations) such contacts at folds of the conductor at a tight tip stay below 0.14 turns; a wide trace that wraps
+# around a hole smaller than itself touches itself 0.22 to 0.5 turns further on. 0.18 lies in the middle of the gap.
+SELF_SHORT_SEP = 0.18
 OVERSHOOT_TOL = 0.05 # mm of copper (or of a via center) allowed beyond the intended envelope
 WIDTH_TOL = 0.01 # allowed relative deviation of an emitted track width from the intended trace width ...
 WIDTH_TOL_ABS = 0.001 # ... or this many mm, whichever is larger
+
+
+def _size_tol(size):
+    """ Allowed deviation of an emitted track width, via size or pad size from the intended size """
+    return max(WIDTH_TOL_ABS, WIDTH_TOL * size)
 
 
 @dataclass
@@ -73,6 +90,9 @@ class Via:
     x: float
     y: float
     diameter: float
+    drill: float = None # drill diameter, None if unknown
+    plated: bool = True
+    layers: tuple = None # copper layers, None for all layers
 
 
 @dataclass
@@ -206,7 +226,11 @@ def extract_copper(footprint, layers=("F.Cu", "B.Cu"), arc_tol=0.0005):
             continue
         number = str(p.number) if p.number is not None else ''
         if p.drill and p.drill.diameter and number in ('', 'NC'):
-            vias.append(Via(p.at.x, p.at.y, p.size.x))
+            ptype = str(getattr(p.type, 'name', p.type))
+            vias.append(Via(p.at.x, p.at.y, p.size.x, drill=p.drill.diameter, plated=(ptype != 'np_thru_hole'),
+                            layers=None if '*.Cu' in cu else cu))
+            if str(getattr(p.shape, 'name', p.shape)) != 'circle' or not math.isclose(p.size.x, p.size.y):
+                unhandled.append(f'non-circular via at ({p.at.x:.3f}, {p.at.y:.3f}) (checked as a circle)')
             continue
         shape = str(getattr(p.shape, 'name', p.shape))
         if shape not in ('circle', 'rect', 'oval', 'roundrect'):
@@ -229,9 +253,14 @@ class Intent:
     center: tuple = None # a point inside the coil's hole, used for winding number computation
     clockwise: bool = False
     spiral_layers: int = 2 # number of layers that carry spiral turns (the others only carry connections)
-    via_diameter: float = 0.0
+    via_diameter: float = 0.0 # intended via diameter; 0 means unknown (via sizes are then not checked)
+    via_drill: float = 0.0 # intended drill diameter; 0 means unknown
     via_offset: float = 0.0 # how far outside the contour (outer vias) or inside the inner contour (inner vias) vias sit
     via_stagger: bool = False # every other via sits at three times the via offset
+    pad_size: float = None # intended (minimum) size of the terminal pads, defaults to the trace width
+    # Terminal pads get the same allowance as vias: their copper may reach as far beyond the outline as the copper of a
+    # via of the intended diameter at the intended via offset. Pads whose copper (e.g. the corners of a rectangular pad)
+    # reaches further fail the conformance check.
 
 
 @dataclass
@@ -240,11 +269,16 @@ class Report:
     open_ends: int = 0
     branches: int = 0
     orphans: int = 0
-    degenerate_segments: int = 0
+    degenerate_segments: int = 0 # same as dots
     duplicate_segments: int = 0 # segments lying completely on top of another collinear segment
     stray_vias: int = 0 # vias with fewer than two track connections
     shorts: int = 0 # pad 1 connected to pad 2 directly, or a path from pad 1 to pad 2 that bypasses segments
     stray_copper: int = 0 # copper on other layers, extra pads, footprint items the checker does not interpret
+    via_defects: int = 0 # vias that are not plated, have no annular ring, lack copper on a layer, or differ in size
+    via_size_error: float = 0.0 # mm, largest deviation of a via diameter or drill from the intended one
+    min_pad_size: float = float('nan') # mm, smallest dimension of the terminal pads
+    small_pads: int = 0 # terminal pads smaller than the intended pad size (by default the trace width)
+    dots: int = 0 # zero-length tracks (round dots of copper), checked as copper disks
     backtracks: int = 0
     reaches_pad2: bool = True
     winding: float = float('nan')
@@ -260,6 +294,8 @@ class Report:
     violation_length: float = 0.0 # mm of conductor affected
     self_overlaps: int = 0 # same-turn clearance deficits, e.g. at very sharp tips
     worst_self_overlap: float = 0.0 # mm, largest deficit among the self overlaps
+    self_shorts: int = 0 # same-turn copper contacts at least SELF_SHORT_SEP turns apart (part of a turn is shorted)
+    worst_self_short: float = 0.0 # mm, largest deficit among the self shorts
     min_width: float = float('nan') # mm, narrowest emitted track
     max_width: float = float('nan') # mm, widest emitted track
     width_error: float = 0.0 # mm, largest deviation of an emitted track width from the intended trace width
@@ -301,7 +337,7 @@ class Report:
         return s
 
     def width_ok(self, trace_width):
-        return self.width_error <= max(WIDTH_TOL_ABS, WIDTH_TOL * trace_width)
+        return self.width_error <= _size_tol(trace_width)
 
     def conformance_ok(self, trace_width=None):
         """ `trace_width` is only accepted for backwards compatibility: the overshoot tolerance is absolute. """
@@ -320,6 +356,8 @@ class Report:
             kinds.append('short')
         if self.stray_vias:
             kinds.append('stray via')
+        if self.via_defects:
+            kinds.append('via')
         if self.duplicate_segments:
             kinds.append('duplicate')
         if self.stray_copper:
@@ -330,8 +368,12 @@ class Report:
             kinds.append('backtrack')
         if not self.width_ok(trace_width):
             kinds.append('width')
+        if self.small_pads:
+            kinds.append('pad size')
         if self.worst_clearance_deficit > tol:
             kinds.append('clearance')
+        if self.self_shorts:
+            kinds.append('self short')
         if self.worst_pad_deficit > tol:
             kinds.append('pad clearance')
         if vias and self.worst_via_deficit > tol:
@@ -482,16 +524,51 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         if pl:
             pads.append((pad, pl))
 
+    w, clr, pitch = intent.trace_width, intent.clearance, intent.pitch
+
+    # ---- terminal pad sizes ----
+    pad_size = intent.pad_size or w
+    for pad, _pl in pads:
+        if pad.number not in ('1', '2'):
+            continue
+        size = min(pad.size or (pad.diameter, pad.diameter))
+        rep.min_pad_size = min(size, rep.min_pad_size) if not math.isnan(rep.min_pad_size) else size
+        if size < pad_size - _size_tol(pad_size):
+            rep.small_pads += 1
+            rep.note(f'pad {pad.number} is {size:.4f} mm, smaller than the intended {pad_size:.4f} mm')
+
+    # ---- via integrity ----
+    for v in copper.vias:
+        where = f'via at ({v.x:.3f}, {v.y:.3f})'
+        problems = []
+        if not v.plated:
+            problems.append('is not plated')
+        if v.drill is not None and v.drill >= v.diameter:
+            problems.append(f'has a {v.drill:.3f} mm drill in {v.diameter:.3f} mm of copper (no annular ring)')
+        if v.layers is not None and not set(layers) <= set(v.layers):
+            problems.append(f'has copper only on {",".join(v.layers)}')
+        for what, actual, intended in (('diameter', v.diameter, intent.via_diameter),
+                                       ('drill', v.drill, intent.via_drill)):
+            if intended and actual is not None:
+                rep.via_size_error = max(rep.via_size_error, abs(actual - intended))
+                if abs(actual - intended) > _size_tol(intended):
+                    problems.append(f'{what} is {actual:.4f} mm, intended {intended:.4f} mm')
+        if problems:
+            rep.via_defects += 1
+            rep.note(f'{where} ' + ', '.join(problems))
+
     segs = [s for s in copper.segs if s.layer in layers]
     rep.n_segments = len(segs)
-    rep.degenerate_segments = sum(1 for s in segs if s.length < 1e-6)
+    # Zero-length tracks are round dots of copper (KiCad draws them as a disk of the stroke width). They are checked as
+    # copper bodies: attached to the track or body their center lies in, otherwise isolated copper.
+    dots = [s for s in segs if s.length < 1e-6]
+    rep.dots = rep.degenerate_segments = len(dots)
     segs = [s for s in segs if s.length >= 1e-6]
     rep.total_length = sum(s.length for s in segs)
 
-    w, clr, pitch = intent.trace_width, intent.clearance, intent.pitch
-    if segs:
-        rep.min_width = min(s.width for s in segs)
-        rep.max_width = max(s.width for s in segs)
+    if segs or dots:
+        rep.min_width = min(s.width for s in segs + dots)
+        rep.max_width = max(s.width for s in segs + dots)
         rep.width_error = max(abs(rep.min_width - w), abs(rep.max_width - w))
         if not rep.width_ok(w):
             rep.note(f'track widths {rep.min_width:.4f} to {rep.max_width:.4f} mm, intended {w:.4f} mm')
@@ -572,7 +649,8 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         vn = ('via', j)
         uf.find(vn)
         node_pos[vn] = (v.x, v.y)
-        bodies.append((vn, layers, (lambda p, v=v: math.dist(p, (v.x, v.y)) < v.diameter/2), (v.x, v.y)))
+        vl = layers if v.layers is None else tuple(l for l in layers if l in v.layers)
+        bodies.append((vn, vl, (lambda p, v=v: math.dist(p, (v.x, v.y)) < v.diameter/2), (v.x, v.y)))
     pad_node = defaultdict(list)
     for k, (pad, pl) in enumerate(pads):
         pn = ('pad', k)
@@ -617,10 +695,15 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         return 'pad' if 'pad' in kinds else 'via' if 'via' in kinds else 'track'
 
     adj = defaultdict(list) # representative node -> [(other node, length, segment index)]
+    internal = set() # segments with both ends in the same via or pad: copper inside that body, not a connection
     for i, s in enumerate(segs):
         if i in duplicate:
             continue
         n1, n2 = R(node_of[(i, 0)]), R(node_of[(i, 1)])
+        if n1 == n2 and body_kind(n1) != 'track':
+            internal.add(i)
+            rep.stubs += 1
+            continue
         adj[n1].append((n2, s.length, i))
         adj[n2].append((n1, s.length, i))
 
@@ -640,8 +723,8 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
 
     # Dangling stubs at the terminal pads (e.g. a connection to a via that was replaced by the pads): ugly, but they do
     # not break the circuit. A stub is a dead-end chain of track that starts at a pad and is at most as long as the pad
-    # plus the via offset.
-    stub_segs = set()
+    # plus three times the via offset. Track lying entirely within a via or pad is counted as a stub, too.
+    stub_segs = set(internal)
     stub_ends = defaultdict(int)
     for r, nbrs in list(adj.items()):
         if len(nbrs) != 1 or body_kind(r) != 'track':
@@ -725,19 +808,35 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             continue
         seg_s[i] = (d1 + d2) / 2
 
-    # The path from pad 1 to pad 2 must use every segment exactly once. If it does not although nothing branches off
-    # the path, some copper connects distant parts of the conductor.
-    if rep.reaches_pad2 and not (start & end):
-        n = min((n for n in end if n in dist), key=lambda n: dist[n])
-        on_path = set()
-        while prev_edge[n][0] is not None:
-            n, e = prev_edge[n]
-            on_path.add(e)
-        bypassed = [i for i in range(len(segs)) if not np.isnan(seg_s[i]) and i not in on_path and i not in stub_segs]
-        if bypassed and rep.branches == 0 and rep.open_ends == 0:
-            rep.shorts += 1
-            rep.note(f'short: the path from pad 1 to pad 2 bypasses {len(bypassed)} segments '
-                     f'({sum(segs[i].length for i in bypassed):.2f} mm)')
+    # The path from pad 1 to pad 2 uses every segment exactly once when the degree checks above pass: pads 1 and 2
+    # have one track connection, every other node two (stubs and track inside a via or pad aside), so the component
+    # that contains pad 1 is a simple path, and every other segment is counted as an orphan. Copper that connects
+    # distant parts of the conductor (a jumper) therefore shows up as a branch, a stray via or a pad 1 to pad 2 short.
+
+    # Dots attach to the track whose copper contains their center (the closest centerline), else to a via or pad whose
+    # copper contains it. Isolated dots are orphaned copper.
+    dot_attach = []
+    for dt in dots:
+        c = dt.a
+        best = None
+        for i in tree.query(Point(c), predicate='dwithin', distance=max_w/2):
+            s = segs[i]
+            if s.layer != dt.layer or i in duplicate:
+                continue
+            q = _closest_on_seg(c, s.a, s.b)
+            d = math.dist(c, q)
+            if d < s.width/2 and (best is None or d < best[0]):
+                best = (d, i, q)
+        if best is not None:
+            dot_attach.append(('seg', best[1], best[2]))
+            continue
+        body = next((bn for bn, bl, inside, _c in bodies if dt.layer in bl and inside(c)), None)
+        if body is not None:
+            dot_attach.append(('body', body))
+            continue
+        dot_attach.append(None)
+        rep.orphans += 1
+        rep.note(f'isolated copper dot on {dt.layer} at ({c[0]:.3f}, {c[1]:.3f}), {dt.width:.3f} mm wide')
 
     rep.ok_connectivity = (rep.reaches_pad2 and rep.orphans == 0 and rep.branches == 0 and rep.open_ends == 0
                            and rep.stray_vias == 0 and rep.shorts == 0 and rep.duplicate_segments == 0
@@ -745,9 +844,9 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
 
     # Order segments along the path. theta_a[i] is the cumulative winding angle around the center at the path-earlier
     # end of segment i; it also counts the angle between consecutive track ends (e.g. overlapping pieces).
-    order = [i for i in np.argsort(seg_s) if not np.isnan(seg_s[i])]
+    order = [i for i in np.argsort(seg_s) if not np.isnan(seg_s[i]) and i not in internal]
     oriented = {}
-    for i in order:
+    for i in order + sorted(i for i in internal if not np.isnan(seg_s[i])):
         s = segs[i]
         n1, n2 = R(node_of[(i, 0)]), R(node_of[(i, 1)])
         oriented[i] = (s.a, s.b, n1, n2) if dist[n1] <= dist[n2] else (s.b, s.a, n2, n1)
@@ -774,6 +873,9 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         rep.winding = total / (2*math.pi)
         expected = -intent.turns if intent.clockwise else intent.turns
         rep.winding_error = rep.winding - expected
+        for i in internal:
+            if i in oriented:
+                theta_a[i] = node_theta.get(oriented[i][2], math.nan)
 
     def theta_at(i, p):
         """ Cumulative winding angle at point p of segment i """
@@ -799,8 +901,10 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         prev = (s.layer, (a, b))
 
     # ---- crossings and clearance ----
-    # Copper at least TURN_SEP revolutions apart in cumulative winding angle belongs to different turns. So does copper
-    # that is far apart along the conductor path (also the fallback when there is no center).
+    # Copper at least TURN_SEP revolutions apart in cumulative winding angle belongs to different turns. Without a
+    # center (or where the angle is unknown, e.g. for copper that is not on the path) copper that is far apart along
+    # the conductor belongs to different turns. A fold that returns within the same angular range (a hairpin) is the
+    # same turn however long it is; it is reported as a backtrack.
     inner = _inset(contour, intent.annular_width)
     inner_len = inner.length if not inner.is_empty else contour.length
     s_far = max(4*(w + clr), 0.25 * inner_len)
@@ -809,7 +913,24 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
     turn_sep = TURN_SEP * 2*math.pi
 
     def other_turn(ds, th1, th2):
-        return abs(th1 - th2) >= turn_sep or ds >= s_far
+        dth = abs(th1 - th2)
+        if math.isnan(dth):
+            return ds >= s_far
+        return dth >= turn_sep
+
+    def same_turn_deficit(deficit, th1, th2, layer, p, q, ds):
+        """ Record a clearance deficit between two pieces of the same turn that are at least s_near apart """
+        dth = abs(th1 - th2) / (2*math.pi)
+        rep.self_overlaps += 1
+        rep.worst_self_overlap = max(rep.worst_self_overlap, deficit)
+        if len(rep.self_overlap_points) < max_records:
+            rep.self_overlap_points.append((layer, p, q, deficit, dth, ds))
+        if deficit >= clr - 1e-4 and dth >= SELF_SHORT_SEP:
+            rep.self_shorts += 1
+            if rep.worst_self_short < deficit:
+                rep.worst_self_short = deficit
+                rep.note(f'self short on {layer} at ({p[0]:.3f}, {p[1]:.3f}): copper touches itself {dth:.2f} turns '
+                         f'further on')
 
     q_a, q_b = tree.query(geoms, predicate='dwithin', distance=max_w + clr)
     mask = q_a < q_b
@@ -836,11 +957,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
                 rep.crossing_points.append((si.layer, p))
         if deficit > 1e-4:
             if not far:
-                rep.self_overlaps += 1
-                rep.worst_self_overlap = max(rep.worst_self_overlap, deficit)
-                if len(rep.self_overlap_points) < max_records:
-                    rep.self_overlap_points.append((si.layer, p, q, deficit,
-                                                    abs(theta_at(i, p) - theta_at(j, q)) / (2*math.pi), ds))
+                same_turn_deficit(deficit, theta_at(i, p), theta_at(j, q), si.layer, p, q, ds)
                 continue
             rep.clearance_violations += 1
             rep.worst_clearance_deficit = max(rep.worst_clearance_deficit, deficit)
@@ -856,21 +973,29 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             return None, math.nan
         return dist[r], node_theta.get(r, math.nan)
 
-    def body_seg_far(s_body, th_body, i, p):
+    def body_seg_rel(s_body, th_body, i, p):
+        """ (different turns, path distance, winding angle of segment i at p) for a via or pad and segment i """
         if s_body is None or np.isnan(seg_s[i]):
-            return True
+            return True, math.inf, math.nan
         th = theta_at(i, p)
-        return other_turn(abs(seg_s[i] - s_body) - segs[i].length/2, th, th_body)
+        ds = abs(seg_s[i] - s_body) - segs[i].length/2
+        return other_turn(ds, th, th_body), ds, th
 
     # vias vs tracks and vias vs vias
     for j, v in enumerate(copper.vias):
         s_via, th_via = body_pos(('via', j))
         for i in tree.query(Point(v.x, v.y), predicate='dwithin', distance=v.diameter/2 + max_w/2 + clr):
             s = segs[i]
-            q = _closest_on_seg((v.x, v.y), s.a, s.b)
-            if not body_seg_far(s_via, th_via, i, q):
+            if v.layers is not None and s.layer not in v.layers:
                 continue
+            q = _closest_on_seg((v.x, v.y), s.a, s.b)
+            far, ds, th = body_seg_rel(s_via, th_via, i, q)
             deficit = v.diameter/2 + s.width/2 + clr - math.dist((v.x, v.y), q)
+            if not far:
+                # (the track leading to the via runs within its copper for the via's radius)
+                if deficit > 1e-4 and ds >= s_near + v.diameter/2:
+                    same_turn_deficit(deficit, th, th_via, s.layer, (v.x, v.y), q, ds)
+                continue
             if deficit > 1e-4:
                 rep.via_violations += 1
                 rep.worst_via_deficit = max(rep.worst_via_deficit, deficit)
@@ -900,9 +1025,12 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             if s.layer not in pl:
                 continue
             q = _closest_on_seg((pad.x, pad.y), s.a, s.b)
-            if not body_seg_far(s_pad, th_pad, i, q):
-                continue
+            far, ds, th = body_seg_rel(s_pad, th_pad, i, q)
             deficit = s.width/2 + clr - pad.dist_to_seg(s.a, s.b)
+            if not far:
+                if deficit > 1e-4 and ds >= s_near + pad.extent/2:
+                    same_turn_deficit(deficit, th, th_pad, s.layer, (pad.x, pad.y), q, ds)
+                continue
             if deficit > 1e-4:
                 violating_segs.add(i)
                 pad_violation(pad, deficit)
@@ -922,6 +1050,71 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             deficit = clr - pad.geometry().distance(pad2.geometry())
             if deficit > 1e-4:
                 pad_violation(pad, deficit)
+
+    # dots vs tracks of other turns, vias, pads and other dots
+    def dot_pos(k):
+        att = dot_attach[k]
+        if att is None:
+            return None, math.nan
+        if att[0] == 'seg':
+            _, i, q = att
+            if i not in oriented:
+                return None, math.nan
+            a = oriented[i][0]
+            return seg_s[i] - segs[i].length/2 + math.dist(a, q), theta_at(i, q)
+        return body_pos(att[1])
+
+    def track_violation(deficit, pos):
+        rep.clearance_violations += 1
+        rep.worst_clearance_deficit = max(rep.worst_clearance_deficit, deficit)
+        if len(rep.violations) < max_records:
+            rep.violations.append(('dot', pos, deficit))
+
+    dot_info = [dot_pos(k) for k in range(len(dots))]
+    for k, dt in enumerate(dots):
+        c, r = dt.a, dt.width/2
+        s_dot, th_dot = dot_info[k]
+
+        def dot_far(s_other, th_other, extent=0.0):
+            if s_dot is None or s_other is None:
+                return True
+            return other_turn(abs(s_dot - s_other) - extent, th_dot, th_other)
+
+        for i in tree.query(Point(c), predicate='dwithin', distance=r + max_w/2 + clr):
+            s = segs[i]
+            if s.layer != dt.layer:
+                continue
+            q = _closest_on_seg(c, s.a, s.b)
+            if not np.isnan(seg_s[i]) and not dot_far(seg_s[i], theta_at(i, q), s.length/2):
+                continue
+            deficit = r + s.width/2 + clr - math.dist(c, q)
+            if deficit > 1e-4:
+                violating_segs.add(i)
+                track_violation(deficit, c)
+        for j, v in enumerate(copper.vias):
+            if v.layers is not None and dt.layer not in v.layers:
+                continue
+            if not dot_far(*body_pos(('via', j))):
+                continue
+            deficit = r + v.diameter/2 + clr - math.dist(c, (v.x, v.y))
+            if deficit > 1e-4:
+                rep.via_violations += 1
+                rep.worst_via_deficit = max(rep.worst_via_deficit, deficit)
+                if len(rep.violations) < max_records:
+                    rep.violations.append(('via', (v.x, v.y), deficit))
+        for kp, (pad, pl) in enumerate(pads):
+            if dt.layer not in pl or not dot_far(*body_pos(('pad', kp))):
+                continue
+            deficit = r + clr - pad.dist_to_seg(c, c)
+            if deficit > 1e-4:
+                pad_violation(pad, deficit)
+        for k2 in range(k+1, len(dots)):
+            d2 = dots[k2]
+            if d2.layer != dt.layer or not dot_far(*dot_info[k2]):
+                continue
+            deficit = r + d2.width/2 + clr - math.dist(c, d2.a)
+            if deficit > 1e-4:
+                track_violation(deficit, c)
     rep.violation_length = sum(segs[i].length for i in violating_segs)
 
     # ---- spacing distribution ----
@@ -960,7 +1153,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
 
     # ---- conformance ----
     if do_conformance:
-        _conformance(rep, copper, segs, geoms, [p for p, _pl in pads], intent, contour)
+        _conformance(rep, copper, segs, geoms, [p for p, _pl in pads], intent, contour, dots)
 
     return rep
 
@@ -974,7 +1167,7 @@ def _band(contour, outside, depth):
     return contour.buffer(outside, join_style='mitre', mitre_limit=10).difference(_inset(contour, depth))
 
 
-def _conformance(rep, copper, segs, geoms, pads, intent, contour):
+def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
     """ Compare the copper area with the intended annulus.
 
     A spiral only touches the outer contour where an arm starts, and only reaches the inner contour where an arm ends.
@@ -983,10 +1176,11 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour):
         core      Depths [pitch/2, annular - pitch/2] from the contour. Every layer must cover this completely when
                   its tracks are inflated by half a pitch. Uncovered area here means wasted space (loose spacing, a
                   missing turn, a collapsed region).
-        envelope  Depths [-w/2, annular + w/2]. No copper (tracks, vias, pads) may leave this region (overshoot,
-                  excess), except around vias: via centers may sit up to the intended via offset (three times that
-                  with staggered vias) outside the contour or inside the inner contour, and near a via, its copper and
-                  the copper of the tracks leading to it may extend into the band that a via at that offset covers.
+        envelope  Depths [-w/2, annular + w/2]. No copper (tracks, dots, vias, pads) may leave this region
+                  (overshoot, excess), except around vias and terminal pads: via centers may sit up to the intended
+                  via offset (three times that with staggered vias) outside the contour or inside the inner contour,
+                  and near a via or terminal pad, its copper and the copper of the tracks leading to it may extend into
+                  the band that a via of the intended diameter at that offset covers.
         contour   Every point of the outer contour must be within one pitch of copper on some layer (undershoot).
     """
     w, p = intent.trace_width, intent.pitch
@@ -1001,16 +1195,19 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour):
         via_band = _band(contour, via_reach + tol, intent.annular_width + via_reach + tol)
         rep.via_misplacement = float(shapely.distance(shapely.points([(v.x, v.y) for v in copper.vias]),
                                                       via_band).max())
-        vd = max([v.diameter for v in copper.vias] + [w])
-        ext = via_reach + vd/2 + tol
-        # The track from the arm end to the via runs along the skeleton, which at sharp corners is longer than the via
-        # offset. Allow three times the offset around the via.
-        zone_r = vd/2 + w/2 + 3*via_reach + tol
-        zones = shapely.unary_union([Point(v.x, v.y).buffer(zone_r) for v in copper.vias])
-        env = env.union(_band(contour, ext, intent.annular_width + ext).intersection(zones))
         if rep.via_misplacement > OVERSHOOT_TOL:
             rep.note(f'a via center is {rep.via_misplacement:.3f} mm beyond the intended via offset of '
                      f'{via_reach:.3f} mm')
+    # The allowance uses the intended via diameter when it is known (an oversized via does not widen it).
+    vd = max(intent.via_diameter or max([v.diameter for v in copper.vias] + [w]), w)
+    ext = via_reach + vd/2 + tol
+    # The track from the arm end to the via (or terminal pad) runs along the skeleton, which at sharp corners is longer
+    # than the via offset. Allow three times the offset around the via.
+    zone_r = vd/2 + w/2 + 3*via_reach + tol
+    centers = [(v.x, v.y) for v in copper.vias] + [(pad.x, pad.y) for pad in pads if pad.number in ('1', '2')]
+    if centers:
+        zones = shapely.unary_union([Point(c).buffer(zone_r) for c in centers])
+        env = env.union(_band(contour, ext, intent.annular_width + ext).intersection(zones))
 
     for li, layer in enumerate(copper.layers):
         idx = [i for i, s in enumerate(segs) if s.layer == layer]
@@ -1025,6 +1222,7 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour):
     if not all_copper:
         return
     all_copper += [Point(v.x, v.y).buffer(v.diameter/2, quad_segs=8) for v in copper.vias]
+    all_copper += [Point(d.a).buffer(d.width/2, quad_segs=8) for d in dots]
     all_copper += [pad.geometry(quad_segs=8) for pad in pads]
     cu = shapely.unary_union(all_copper)
     rep.uncovered_fraction = max(uncovered) if uncovered else 0.0
@@ -1072,6 +1270,7 @@ def intent_from_model(model, contour_tol=0.01):
 
     w = model.trace_width
     via_diameter = getattr(model, 'via_diameter', None) or w
+    via_drill = getattr(model, 'via_drill', None) or 0.0
     via_offset = getattr(model, 'via_offset', None)
     if via_offset is None:
         via_offset = max(0.0, (via_diameter - w)/2)
@@ -1079,4 +1278,4 @@ def intent_from_model(model, contour_tol=0.01):
     return Intent(contour=contour, annular_width=annular, turns=model.turns, trace_width=w,
                   clearance=model.clearance, pitch=w + model.clearance, center=center,
                   clockwise=model.clockwise, spiral_layers=getattr(model, 'layers', 2),
-                  via_diameter=via_diameter, via_offset=abs(via_offset), via_stagger=stagger)
+                  via_diameter=via_diameter, via_drill=via_drill, via_offset=abs(via_offset), via_stagger=stagger)
