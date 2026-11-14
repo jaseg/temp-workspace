@@ -32,7 +32,7 @@ Entries from the second review:
 | D26 | clockwise polygons crash; orientation test fooled by a repeated start point | yes |
 | D27 | circles rendered without arcs lose clearance to the chords | yes |
 | D28 | turns fold onto themselves in narrow protrusions and notches | yes |
-| D29 | trace width + clearance branch: 2-decimal rounding, wrong advice, no hint | yes |
+| D29 | trace width + clearance branch: 2-decimal rounding, wrong advice, no hint | yes (rounding, advice); the missing measured-spacing hint matters since D7 |
 | D1, D4, D7, D8, D10, D22 | `spiral()` argument order / NaN; merge tolerance from the distance to the origin; slow spacing measurement; silently tightened render settings; via offset through the center of circles; kicad-pcb export still failing in gerbonara | no, first version of the fixes |
 
 Every entry was checked by an independent reviewer against the original code (reproduction where practical) and
@@ -480,9 +480,13 @@ checker counts the fold as a self-overlap.
 pitch" check rounds to 2 decimals (the other branches to 3 since D11) and says "Reduce clearance" where the trace width
 is the problem. Neither message there says that the pitch is the *measured* smallest spacing, or where it is.
 
-**Symptom.** Rectangle 50×40 mm, annular width 10 mm, n=10, k=3 measures 1.885 mm against a 2.000 mm nominal pitch at
-the corners. Trace width 1.75 mm with clearance 0.2 mm is rejected with "Actual clearance for 1.75 mm trace is 0.13 mm",
-which gives no reason and no way out.
+**Symptom.** Original code, rectangle 50×40 mm, annular width 10 mm, n=10, k=3, clearance 0.2 mm (projected pitch
+1.992 mm): trace width 2.004 mm is rejected with "Given trace width of 2.00 mm is larger than the projected spiral pitch
+of 1.99 mm. Reduce clearance or increase the size of the coil" (reducing the clearance cannot help), and 1.804 mm with
+"Actual clearance for 1.80 mm trace is 0.19 mm, which is lower than the given clearance of 0.20 mm", where the rounded
+numbers add up to the pitch. The missing hint is worse since D7 measures the spacing: in the first version of the fixes
+the same rectangle measures 1.885 mm at the corners, and trace width 1.75 mm is rejected with "Actual clearance for
+1.75 mm trace is 0.14 mm", which gives no reason (the original accepts 1.75 mm against its 1.992 mm pitch).
 
 **Fix.** All four messages use 3 decimals, name the parameter to reduce ("Reduce trace width to at most 1.685 mm, reduce
 the clearance or increase the size of the coil") and, when the measured spacing is below the nominal pitch, give it,
