@@ -72,7 +72,9 @@ class TaperOptions:
     joint_angle: float = 2.0 # degrees; trapezoid joints bent more than this get a circle (polygon representation)
     max_v_ratio: float = 2.0 # wide / narrow width of one V; longer tapers are split
     width_tol: float = 0.03 # relative undercut allowed when merging pieces of a straight run into one taper
-    simplify: float = 1/200 # simplify curved center lines (Douglas-Peucker) to this fraction of the clearance; 0: off
+    arm_angle_turns: bool = False # also separate turns by the arm angle parameter (stricter than geomcheck)
+    simplify: float = 0.0 # simplify the center lines (Douglas-Peucker) to this fraction of the clearance; 0: off. This
+    # moves turns closer by up to twice the tolerance, which narrows the traces where the constant width layout is tight
 
 
 @dataclass
@@ -278,6 +280,7 @@ class TaperResult:
         tree = shapely.STRtree(cores)
         reach = float(radii.max()) if len(radii) else 0.0
         s_far = self._s_far()
+        arm = self.options.arm_angle_turns
         worst, where = inf, None
         ia, ib = tree.query(cores, predicate='dwithin', distance=2*reach + self.clearance)
         sel = (ia < ib) & (layers[ia] == layers[ib])
@@ -287,7 +290,7 @@ class TaperResult:
             close = d < 2 * self.clearance
             for i, j, g in zip(ia[close], ib[close], d[close]):
                 x, y = shapely.get_coordinates(shapely.shortest_line(cores[i], cores[j]))
-                if not _different_turn_at(_owner_at(owners[i], x), _owner_at(owners[j], y), s_far):
+                if not _different_turn_at(_owner_at(owners[i], x), _owner_at(owners[j], y), s_far, arm):
                     continue
                 if g - self.clearance < worst:
                     worst, where = g - self.clearance, tuple(x)
@@ -301,7 +304,8 @@ class TaperResult:
                     continue
                 x = shapely.get_coordinates(shapely.shortest_line(cores[i], bp))[0]
                 o = _owner_at(owners[i], x)
-                if not all(_different_turn_at(o, bo, s_far) for bo in b.owners):
+                if not all(_different_turn_at(o, (bo[0], bo[1], bo[2], (bo[3], bo[3])), s_far, arm)
+                           for bo in b.owners):
                     continue
                 if g - self.clearance < worst:
                     worst, where = g - self.clearance, (b.x, b.y)
@@ -427,31 +431,38 @@ def _trapezoid(p, q, wp, wq, layer, own):
 
 
 def _owner_at(o, x):
-    """ (conductor, theta, phi, s) of owner range o = (conductor, a, b, theta range, phi range, s range) at the point of
-    its center line a-b closest to x """
+    """ (conductor, theta, phi, s interval) of owner range o = (conductor, a, b, theta range, phi range, s range) at
+    the point of its center line a-b closest to x. The path position is kept as the piece's interval: geomcheck measures
+    path distances between pieces as the gap between their intervals. """
     ci, a, b = o[0], o[1], o[2]
     dx, dy = b[0] - a[0], b[1] - a[1]
     l2 = dx*dx + dy*dy
     t = 0.0 if l2 == 0 else min(1.0, max(0.0, ((x[0] - a[0])*dx + (x[1] - a[1])*dy) / l2))
-    return (ci, o[3] + t*(o[4] - o[3]), o[5] + t*(o[6] - o[5]), o[7] + t*(o[8] - o[7]))
+    return (ci, o[3] + t*(o[4] - o[3]), o[5] + t*(o[6] - o[5]), (min(o[7], o[8]), max(o[7], o[8])))
 
 
-def _different_turn_at(o1, o2, s_far):
-    """ Like _different_turn for single points (conductor, theta, phi, s) """
-    return (o1[0] != o2[0] or abs(o1[1] - o2[1]) >= TURN_SEP or abs(o1[2] - o2[2]) >= TURN_SEP
-            or abs(o1[3] - o2[3]) >= s_far)
+def _interval_gap(a, b):
+    return max(0.0, a[0] - b[1], b[0] - a[1])
 
 
-def _different_turn(o1, o2, s_far):
+def _different_turn_at(o1, o2, s_far, arm=False):
+    """ Like _different_turn at single points (conductor, theta, phi, s interval) """
+    return (o1[0] != o2[0] or (arm and abs(o1[1] - o2[1]) >= TURN_SEP) or abs(o1[2] - o2[2]) >= TURN_SEP
+            or _interval_gap(o1[3], o2[3]) >= s_far)
+
+
+def _different_turn(o1, o2, s_far, arm=False):
     """ Owners (conductor, theta range, phi range, s range): copper of different conductors always belongs to different
-    turns; on the same conductor, when it is half a revolution apart (arm angle or winding angle, largest difference) or
-    far apart along the path. """
+    turns; on the same conductor, when it is half a revolution apart in winding angle around the coil center (largest
+    difference; with arm=True also in the arm's angle parameter) or far apart along the path (gap between the path
+    intervals). This follows geomcheck's definition, with the largest instead of the local winding difference, and 0.9
+    times its path distance. """
     if o1[0] != o2[0]:
         return True
     th = max(abs(o1[1] - o2[1]), abs(o1[1] - o2[2]), abs(o1[2] - o2[1]), abs(o1[2] - o2[2]))
     ph = max(abs(o1[3] - o2[3]), abs(o1[3] - o2[4]), abs(o1[4] - o2[3]), abs(o1[4] - o2[4]))
-    ds = max(abs(o1[5] - o2[5]), abs(o1[5] - o2[6]), abs(o1[6] - o2[5]), abs(o1[6] - o2[6]))
-    return th >= TURN_SEP or ph >= TURN_SEP or ds >= s_far
+    ds = _interval_gap((min(o1[5], o1[6]), max(o1[5], o1[6])), (min(o2[5], o2[6]), max(o2[5], o2[6])))
+    return (arm and th >= TURN_SEP) or ph >= TURN_SEP or ds >= s_far
 
 
 def _douglas_peucker(P, tol):
@@ -624,16 +635,13 @@ def taper_layout(model, options=None, **kw):
     TH, PH, SS = map(np.concatenate, (TH, PH, SS))
     npieces = len(PA)
 
-    # envelope: outline grown by w0/2, inner contour shrunk by w0/2, plus vias, pads and the connections to them
+    # envelope: outline grown by w0/2, inner contour shrunk by w0/2, plus vias, pads
     env = contour.buffer(w0/2, quad_segs=32).difference(_inset(contour, annular + w0/2))
     extra = [Point(b.x, b.y).buffer(b.diameter/2, quad_segs=32) for b in bodies]
-    # connections: the parts of each conductor that leave the band (from the arm ends to the vias)
-    band = env
+    # and the copper of the constant width layout itself (where it leaves the band, e.g. the connections to the vias, or
+    # turns cutting across a narrow part of the outline), so that nothing is narrowed below the constant width by it
     for c in conductors:
-        line = LineString(c.pts)
-        outside = line.difference(band.buffer(-1e-9))
-        if not outside.is_empty:
-            extra.append(outside.buffer(w0/2, quad_segs=32))
+        extra.append(LineString(c.pts).buffer(w0/2, quad_segs=32))
     env = shapely.unary_union([env] + extra)
     ring = contour.difference(_inset(contour, annular))
 
@@ -655,7 +663,8 @@ def taper_layout(model, options=None, **kw):
             if LY[i] not in b.layers:
                 continue
             own = (CI[i], TH[i, 0], TH[i, 1], PH[i, 0], PH[i, 1], SS[i, 0], SS[i, 1])
-            if not all(_different_turn(own, (ci, th, th, ph, ph, s, s), s_far) for ci, th, ph, s in b.owners):
+            if not all(_different_turn(own, (ci, th, th, ph, ph, s, s), s_far, opt.arm_angle_turns)
+                       for ci, th, ph, s in b.owners):
                 continue
             d = float(_point_seg_distance_np(np.array([[b.x, b.y]]), PA[i:i+1], PB[i:i+1])[0])
             cap[i] = min(cap[i], 2 * (d - b.diameter/2 - clr))
@@ -670,8 +679,8 @@ def taper_layout(model, options=None, **kw):
         same = CI[ia] == CI[ib]
         th = np.max(np.abs(TH[ia][:, :, None] - TH[ib][:, None, :]), axis=(1, 2))
         ph = np.max(np.abs(PH[ia][:, :, None] - PH[ib][:, None, :]), axis=(1, 2))
-        ds = np.max(np.abs(SS[ia][:, :, None] - SS[ib][:, None, :]), axis=(1, 2))
-        diff = ~same | (th >= TURN_SEP) | (ph >= TURN_SEP) | (ds >= s_far)
+        ds = np.maximum(0, np.maximum(SS[ia].min(1) - SS[ib].max(1), SS[ib].min(1) - SS[ia].max(1)))
+        diff = ~same | ((th >= TURN_SEP) & opt.arm_angle_turns) | (ph >= TURN_SEP) | (ds >= s_far)
         ia, ib = ia[diff], ib[diff]
         return ia, ib, _seg_seg_distance_np(PA[ia], PB[ia], PA[ib], PB[ib])
 
@@ -688,7 +697,8 @@ def taper_layout(model, options=None, **kw):
         ja = np.flatnonzero(big)[ja]
         ja, jb, dj = other_turn_pairs(ja, jb)
         ia, ib, d = np.concatenate([ia, ja]), np.concatenate([ib, jb]), np.concatenate([d, dj])
-    keep = d < (W[ia] + W[ib]) / 2 + clr
+    # (<=: the pair with the nearest partner, which W is derived from, must stay even at equality)
+    keep = d <= (W[ia] + W[ib]) / 2 + clr + 1e-9
     ia, ib, d = ia[keep], ib[keep], d[keep]
     bound = 2 * (d - clr)
 

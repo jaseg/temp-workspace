@@ -670,6 +670,10 @@ def _merge_tapers(segs, copper, layers):
             continue
         if not attached(segs[i].layer, mids[c], {('s', i), ('s', j), ('c', c)}):
             continue
+        # the narrow end must be attached to other copper as well (this resolves four tracks forming a rhombus: two V
+        # tapers meeting at their wide ends, whose tracks also pair up the other way round)
+        if len(members[node[(i, e)]]) <= 2 and not attached(segs[i].layer, p, {('s', i), ('s', j), ('c', c)}):
+            continue
         used.update((i, j))
         w = segs[i].width
         merged.append(Seg(segs[i].layer, p, mids[c], w, width_b=w + sep, parts=((p, fi, w), (p, fj, w))))
