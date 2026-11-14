@@ -197,6 +197,18 @@ class CornerFlatSkeletonator(base.Skeletonator):
         finally:
             base.compute_skeleton = _base_compute_skeleton
 
+    def _skeleton_of(self, poly):
+        """ The skeleton of the outline prepare_outline made, without the base class's own simplification
+        (`base.remove_reflex_jitter`, for outlines whose skeleton would be expensive): prepare_outline already removed
+        the noise, by 1 µm or more, and a second pass would move the outline once more and leave the ramps with vertices
+        on chords. The base class's handling (simplification, or a ValueError right away) is kept for outlines that are
+        still too complex for skeleton.wasm's memory (MAX_COST) after prepare_outline. So `self.outline` (and
+        `self.poly`, `self.skeleton_poly`) is the prepared outline, `self.input_poly` the one given. """
+        if len(poly) * len(base.reflex_vertices(poly)) > self.MAX_COST:
+            return super()._skeleton_of(poly)
+        nodes, edges = base.compute_skeleton(exterior=poly)
+        return poly, nodes, edges
+
     # ---------------------------------------------------------------------------------------------------------------
     # Setup
 

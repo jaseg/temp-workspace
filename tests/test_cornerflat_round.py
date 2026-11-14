@@ -59,6 +59,36 @@ def test_cornerflat_dense_rounded_outline_is_fast():
     assert model.trace_width > 0.95 * (model.spiral_pitch - model.clearance)
 
 
+def test_cornerflat_simplifies_the_outline_once(monkeypatch):
+    # The base Skeletonator removes rounding noise for the skeleton itself (remove_reflex_jitter) when the outline's
+    # skeleton would be expensive, and keeps the removed vertices on chords. cornerflat simplifies the outline in
+    # prepare_outline instead; the base class must not simplify that outline once more.
+    from kicoil import skeletonator as base
+    from kicoil.skeletonator_alt_cornerflat import CornerFlatSkeletonator
+    calls = []
+    jitter = base.remove_reflex_jitter
+    monkeypatch.setattr(base, 'remove_reflex_jitter', lambda *a, **kw: calls.append(1) or jitter(*a, **kw))
+    poly = corpus_round.svg_like(40, 3000, random.Random(4242))
+    sk = CornerFlatSkeletonator(poly)
+    assert calls == []
+    assert sk.outline_tolerance == 0.001
+    assert sk.input_poly == base.clean_polygon(poly)
+    assert sk.poly == sk.outline == sk.skeleton_poly and sk._vertex_source is None
+    assert len(sk.poly) < len(poly) / 4
+    # The shape keeps the outline as given (keepout zone, checker)
+    spec = corpus._spec('svg3000r', 'polygon', 8, 3, polygon=poly, annular_width=round(0.6*corpus.max_depth(poly), 4))
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        model = build_model(spec, 'geometry_alt_cornerflat')
+    assert len(model.shape.polygon) == len(poly)
+    # An outline that prepare_outline leaves above the base class's simplification threshold (256 vertices, 117 reflex
+    # corners deeper than 1 um, see prepare_outline's budget)
+    noisy = next(c for c in corpus_round.cases() if c['name'].startswith('round_noisy_l_'))['polygon']
+    sk = CornerFlatSkeletonator([tuple(p) for p in noisy])
+    assert len(sk.poly) * len(base.reflex_vertices(sk.poly)) > base.Skeletonator.SIMPLIFY_COST
+    assert calls == [] and sk.poly == sk.outline == sk.skeleton_poly
+
+
 def _naive_spacing(arms, search_radius, min_path_separation):
     from kicoil.geometry import _split_by_angle, _seg_seg_distance
     segs = []
