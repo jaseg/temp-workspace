@@ -62,10 +62,88 @@ class Seg:
     a: tuple
     b: tuple
     width: float
+    # Variable width pieces (see check_layout with Intent.variable_width). A plain segment is a round-capped track of
+    # `width` along a-b. A tapered piece has the width `width` at a and `width_b` at b, and its copper is given exactly by
+    # `parts` (round-capped tracks (a, b, width), e.g. the two tracks of a V taper) or by `poly` (a filled polygon),
+    # plus `disks` ((x, y, diameter), filled copper circles at its ends).
+    width_b: float = None
+    parts: tuple = None
+    poly: tuple = None
+    disks: tuple = ()
 
     @property
     def length(self):
         return math.dist(self.a, self.b)
+
+    @property
+    def plain(self):
+        return self.parts is None and self.poly is None and not self.disks
+
+    @property
+    def wb(self):
+        return self.width if self.width_b is None else self.width_b
+
+    def width_at(self, p):
+        """ Width of the piece at the point of its center line closest to p """
+        if self.width_b is None:
+            return self.width
+        l2 = (self.b[0]-self.a[0])**2 + (self.b[1]-self.a[1])**2
+        t = 0.0 if l2 == 0 else max(0.0, min(1.0, ((p[0]-self.a[0])*(self.b[0]-self.a[0]) +
+                                                 (p[1]-self.a[1])*(self.b[1]-self.a[1])) / l2))
+        return self.width + t * (self.width_b - self.width)
+
+    @property
+    def reach(self):
+        """ Largest distance of the piece's copper from its center line """
+        if self.plain:
+            return self.width / 2
+        line = LineString([self.a, self.b]) if self.a != self.b else Point(self.a)
+        r = 0.0
+        for a, b, w in self.parts or ():
+            r = max(r, line.distance(Point(a)) + w/2, line.distance(Point(b)) + w/2)
+        for x, y in self.poly or ():
+            r = max(r, line.distance(Point(x, y)))
+        for x, y, d in self.disks:
+            r = max(r, line.distance(Point(x, y)) + d/2)
+        return r
+
+    def copper(self, quad_segs=8):
+        """ Copper of the piece as a shapely geometry (round caps approximated) """
+        geoms = []
+        if self.poly:
+            geoms.append(Polygon(self.poly))
+        for a, b, w in (self.parts or (() if self.poly else ((self.a, self.b, self.width),))):
+            geoms.append((LineString([a, b]) if a != b else Point(a)).buffer(w/2, quad_segs=quad_segs))
+        for x, y, d in self.disks:
+            geoms.append(Point(x, y).buffer(d/2, quad_segs=quad_segs))
+        return shapely.unary_union(geoms) if len(geoms) > 1 else geoms[0]
+
+    def cores(self):
+        """ Exact copper as [(shapely core geometry, radius)]: the copper is the union of the cores grown by their
+        radius """
+        out = []
+        if self.poly:
+            out.append((Polygon(self.poly), 0.0))
+        for a, b, w in (self.parts or (() if self.poly else ((self.a, self.b, self.width),))):
+            out.append((LineString([a, b]) if a != b else Point(a), w/2))
+        for x, y, d in self.disks:
+            out.append((Point(x, y), d/2))
+        return out
+
+
+def _copper_gap(s, t):
+    """ Exact edge-to-edge distance between the copper of two pieces """
+    if s.plain and t.plain:
+        return _seg_seg_dist(s.a, s.b, t.a, t.b) - (s.width + t.width)/2
+    return min(shapely.distance(g, h) - r - q for g, r in s.cores() for h, q in t.cores())
+
+
+def _copper_gap_point(s, p):
+    """ Exact distance from point p to the copper of piece s (negative inside a round-capped track) """
+    if s.plain:
+        return _pt_seg_dist(p, s.a, s.b) - s.width/2
+    pt = Point(p)
+    return min(shapely.distance(g, pt) - r for g, r in s.cores())
 
 
 @dataclass
@@ -138,6 +216,8 @@ class Copper:
     pads: list
     layers: tuple
     unhandled: list = field(default_factory=list) # descriptions of copper items the checker cannot interpret
+    polys: list = field(default_factory=list) # [(layer, [(x, y)])] filled copper polygons (extract_copper(shapes=True))
+    disks: list = field(default_factory=list) # [(layer, x, y, diameter)] filled copper circles (shapes=True)
 
 
 def _arc_points(start, mid, end, tol):
@@ -177,9 +257,18 @@ def _item_layers(item):
     return out
 
 
-def extract_copper(footprint, layers=("F.Cu", "B.Cu"), arc_tol=0.0005):
+def _stroke_width(item):
+    st = getattr(item, 'stroke', None)
+    if st is not None and st.width:
+        return st.width
+    return getattr(item, 'width', None) or 0.0
+
+
+def extract_copper(footprint, layers=("F.Cu", "B.Cu"), arc_tol=0.0005, shapes=False):
     """ Convert a gerbonara footprint into a flat list of straight copper segments, vias and pads. Copper items that
-    are not lines, arcs or simple pads are listed in `Copper.unhandled`. """
+    are not lines, arcs or simple pads are listed in `Copper.unhandled`. With shapes=True, filled copper polygons and
+    circles without an outline stroke are returned in `Copper.polys` and `Copper.disks` instead (check_layout only
+    accepts them for variable width layouts, see Intent.variable_width). """
     segs = []
     for l in footprint.lines:
         segs.append(Seg(l.layer, (l.start.x, l.start.y), (l.end.x, l.end.y), l.stroke.width))
@@ -189,11 +278,21 @@ def extract_copper(footprint, layers=("F.Cu", "B.Cu"), arc_tol=0.0005):
             segs.append(Seg(a.layer, p1, p2, a.stroke.width))
 
     unhandled = []
+    polys, disks = [], []
     for attr in ('rectangles', 'circles', 'polygons', 'curves', 'texts', 'text_boxes'):
         for item in getattr(footprint, attr, None) or []:
             cu = [l for l in _item_layers(item) if _is_copper_layer(l)]
-            if cu:
-                unhandled.append(f'{attr.rstrip("s")} on {",".join(cu)}')
+            if not cu:
+                continue
+            if shapes and attr in ('polygons', 'circles') and getattr(item, 'fill', None) and len(cu) == 1 \
+                    and not _stroke_width(item):
+                if attr == 'polygons':
+                    polys.append((cu[0], [(p.x, p.y) for p in item.pts]))
+                else:
+                    r = math.dist((item.center.x, item.center.y), (item.end.x, item.end.y))
+                    disks.append((cu[0], item.center.x, item.center.y, 2*r))
+                continue
+            unhandled.append(f'{attr.rstrip("s")} on {",".join(cu)}')
     for z in getattr(footprint, 'zones', None) or []:
         cu = [l for l in _item_layers(z) if _is_copper_layer(l)]
         if cu and getattr(z, 'keepout', None) is None:
@@ -214,7 +313,7 @@ def extract_copper(footprint, layers=("F.Cu", "B.Cu"), arc_tol=0.0005):
             shape = 'rect'
         pads.append(Pad(number, cu, p.at.x, p.at.y, p.size.x, size=(p.size.x, p.size.y), shape=shape,
                         angle=p.at.rotation or 0.0, rratio=getattr(p, 'roundrect_rratio', None) or 0.25))
-    return Copper(segs, vias, pads, tuple(layers), unhandled)
+    return Copper(segs, vias, pads, tuple(layers), unhandled, polys, disks)
 
 
 @dataclass
@@ -232,6 +331,14 @@ class Intent:
     via_diameter: float = 0.0
     via_offset: float = 0.0 # how far outside the contour (outer vias) or inside the inner contour (inner vias) vias sit
     via_stagger: bool = False # every other via sits at three times the via offset
+    # Variable width layouts: tracks may change width along the conductor. Tapered pieces are recognized as pairs of
+    # equal width tracks that share one end and diverge to the two sides of the other end (a "V", whose union is the
+    # taper), filled 4-point copper polygons whose two opposite end edges are attached to other copper at their
+    # midpoints (trapezoids), and filled copper circles at the end of a piece (joints). Copper overlapping is connected,
+    # clearance is checked on the exact copper. trace_width remains the reference width for the envelope.
+    variable_width: bool = False
+    width_range: tuple = None # (min, max) allowed width of variable width tracks, max may be None
+    piece_widths: list = None # [(layer, p, q, wp, wq)] intended width profile along straight pieces p-q
 
 
 @dataclass
@@ -262,6 +369,9 @@ class Report:
     worst_self_overlap: float = 0.0 # mm, largest deficit among the self overlaps
     min_width: float = float('nan') # mm, narrowest emitted track
     max_width: float = float('nan') # mm, widest emitted track
+    taper_pieces: int = 0 # tapered pieces recognized (variable width layouts)
+    taper_gaps: int = 0 # V tapers whose two tracks do not overlap all the way (far ends further apart than the width)
+    piece_width_error: float = 0.0 # mm, largest deviation from Intent.piece_widths
     width_error: float = 0.0 # mm, largest deviation of an emitted track width from the intended trace width
     min_spacing_ratio: float = float('nan') # min edge-to-edge distance between turns / clearance
     p5_spacing_ratio: float = float('nan')
@@ -328,6 +438,8 @@ class Report:
             kinds.append('crossing')
         if self.backtracks:
             kinds.append('backtrack')
+        if self.taper_gaps:
+            kinds.append('taper gap')
         if not self.width_ok(trace_width):
             kinds.append('width')
         if self.worst_clearance_deficit > tol:
@@ -456,6 +568,179 @@ def _on_seg(p, s, tol=ATTACH_TOL):
     return _pt_seg_dist(p, s.a, s.b) < tol
 
 
+def _piece_width_error(segs, claims, rep):
+    """ Largest deviation of the pieces' widths at their ends from the intended profile `claims` (Intent.piece_widths):
+    each piece must lie on a claimed straight piece of the same layer. """
+    lines = [LineString([p, q]) for _l, p, q, _wp, _wq in claims]
+    tree = STRtree(lines)
+    worst = 0.0
+    for sg in segs:
+        best = math.inf
+        for k in tree.query(LineString([sg.a, sg.b]), predicate='dwithin', distance=TAPER_TOL):
+            layer, p, q, wp, wq = claims[k]
+            if layer != sg.layer or _pt_seg_dist(sg.a, p, q) > TAPER_TOL or _pt_seg_dist(sg.b, p, q) > TAPER_TOL:
+                continue
+            l2 = math.dist(p, q)**2
+            def expect(x):
+                t = 0.0 if l2 == 0 else max(0.0, min(1.0, ((x[0]-p[0])*(q[0]-p[0]) + (x[1]-p[1])*(q[1]-p[1])) / l2))
+                return wp + t*(wq - wp)
+            best = min(best, max(abs(sg.width - expect(sg.a)), abs(sg.wb - expect(sg.b))))
+        if best == math.inf:
+            rep.note(f'piece on {sg.layer} at ({sg.a[0]:.3f}, {sg.a[1]:.3f})-({sg.b[0]:.3f}, {sg.b[1]:.3f}) is not part '
+                     f'of the intended width profile')
+        worst = max(worst, best)
+    return worst
+
+TAPER_TOL = 1e-5 # mm, derived points (midpoints) this close to another copper node are attached to it
+
+
+def _merge_tapers(segs, copper, layers):
+    """ Recognize the tapered pieces of a variable width layout (see Intent.variable_width). Returns the list of pieces
+    (plain segments and tapered virtual segments) and descriptions of copper that is not recognized. """
+    unrecognized = []
+    # V tapers: two tracks of equal width sharing one end, the other ends dangling and close together
+    pts = []
+    for i, sg in enumerate(segs):
+        pts.append(((i, 0), sg.a))
+        pts.append(((i, 1), sg.b))
+    by_layer = defaultdict(list)
+    for (i, e), p in pts:
+        by_layer[segs[i].layer].append(((i, e), p))
+    node = {}
+    for layer, lpts in by_layer.items():
+        for k, cid in _cluster_points(lpts, JOIN_EPS).items():
+            node[k] = (layer, cid)
+    members = defaultdict(list)
+    for k, n in node.items():
+        members[n].append(k)
+    # Candidate pairs: same width, same length, sharing one end, the other ends at most two widths apart. The far ends
+    # must not be connected to anything but far ends of other candidates (two V tapers on a straight run that meet at
+    # their wide ends share their far ends).
+    cands = []
+    for n, ends in members.items():
+        if len(ends) < 2:
+            continue
+        for (i, e), (j, f) in itertools.combinations(ends, 2):
+            si, sj = segs[i], segs[j]
+            if abs(si.width - sj.width) > 1e-6:
+                continue
+            p = si.b if e else si.a
+            fi, fj = (si.a if e else si.b), (sj.a if f else sj.b)
+            li, lj = math.dist(p, fi), math.dist(p, fj)
+            if li < 1e-6 or abs(li - lj) > TAPER_TOL:
+                continue
+            sep = math.dist(fi, fj)
+            mid = ((fi[0] + fj[0])/2, (fi[1] + fj[1])/2)
+            if sep < 1e-6 or sep > 2*si.width or math.dist(mid, p) < TAPER_TOL:
+                continue
+            cands.append((sep, i, j, e, f, p, fi, fj))
+    # The midpoint of the far ends (the wide end of the taper) must be attached to other copper: a track end, a via or
+    # pad center, or the wide end of another V (two V tapers on a straight run that meet at their wide ends share their
+    # far ends). And the far ends must not be connected to anything but far ends of other candidates.
+    far_ends = {(i, 1-e) for _sep, i, j, e, f, *_r in cands} | {(j, 1-f) for _sep, i, j, e, f, *_r in cands}
+    attach = defaultdict(list) # grid cell -> [(layer or None, point, owner)]
+    def add(layer, p, owner):
+        attach[(math.floor(p[0]/TAPER_TOL), math.floor(p[1]/TAPER_TOL))].append((layer, p, owner))
+    def attached(layer, p, own):
+        gx, gy = math.floor(p[0]/TAPER_TOL), math.floor(p[1]/TAPER_TOL)
+        return any((l is None or l == layer) and not (o & own) and math.dist(p, q) < TAPER_TOL
+                   for dx in (-1, 0, 1) for dy in (-1, 0, 1) for l, q, o in attach.get((gx+dx, gy+dy), ()))
+    for k, sg in enumerate(segs):
+        add(sg.layer, sg.a, {('s', k)})
+        add(sg.layer, sg.b, {('s', k)})
+    for v in copper.vias:
+        add(None, (v.x, v.y), {('via',)})
+    for pad in copper.pads:
+        for l in (layers if '*.Cu' in pad.layers else pad.layers):
+            add(l, (pad.x, pad.y), {('pad',)})
+    for layer, x, y, d in copper.disks:
+        add(layer, (x, y), {('disk',)})
+    mids = []
+    for c, (sep, i, j, e, f, p, fi, fj) in enumerate(cands):
+        mid = ((fi[0] + fj[0])/2, (fi[1] + fj[1])/2)
+        mids.append(mid)
+        add(segs[i].layer, mid, {('s', i), ('s', j), ('c', c)})
+    used = set()
+    merged = []
+    for c in sorted(range(len(cands)), key=lambda c: cands[c][0]):
+        sep, i, j, e, f, p, fi, fj = cands[c]
+        if i in used or j in used:
+            continue
+        if not all(set(members[node[k]]) <= far_ends for k in ((i, 1-e), (j, 1-f))):
+            continue
+        if not attached(segs[i].layer, mids[c], {('s', i), ('s', j), ('c', c)}):
+            continue
+        used.update((i, j))
+        w = segs[i].width
+        merged.append(Seg(segs[i].layer, p, mids[c], w, width_b=w + sep, parts=((p, fi, w), (p, fj, w))))
+    out = [sg for i, sg in enumerate(segs) if i not in used] + merged
+
+    # nodes that tapered polygons and joint circles may attach to
+    nodes = defaultdict(list) # grid cell -> [(layer or None, point, owner)]
+    def add_node(layer, p, owner):
+        nodes[(math.floor(p[0]/TAPER_TOL), math.floor(p[1]/TAPER_TOL))].append((layer, p, owner))
+    def find_node(layer, p, owner):
+        gx, gy = math.floor(p[0]/TAPER_TOL), math.floor(p[1]/TAPER_TOL)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for l, q, o in nodes.get((gx+dx, gy+dy), ()):
+                    if o != owner and (l is None or l == layer) and math.dist(p, q) < TAPER_TOL:
+                        return q
+        return None
+    for k, sg in enumerate(out):
+        add_node(sg.layer, sg.a, ('seg', k))
+        add_node(sg.layer, sg.b, ('seg', k))
+    for v in copper.vias:
+        add_node(None, (v.x, v.y), ('via',))
+    for pad in copper.pads:
+        for l in (layers if '*.Cu' in pad.layers else pad.layers):
+            add_node(l, (pad.x, pad.y), ('pad',))
+    for k, (layer, x, y, d) in enumerate(copper.disks):
+        add_node(layer, (x, y), ('disk', k))
+    polys = []
+    for k, (layer, ppts) in enumerate(copper.polys):
+        ppts = [tuple(p) for p in ppts]
+        if len(ppts) > 1 and ppts[0] == ppts[-1]:
+            ppts = ppts[:-1]
+        mids = [((ppts[i][0] + ppts[(i+1) % len(ppts)][0])/2, (ppts[i][1] + ppts[(i+1) % len(ppts)][1])/2)
+                for i in range(len(ppts))]
+        polys.append((layer, ppts, mids))
+        if len(ppts) == 4:
+            for m in mids:
+                add_node(layer, m, ('poly', k))
+    for k, (layer, ppts, mids) in enumerate(polys):
+        if layer not in layers:
+            unrecognized.append(f'polygon on {layer}, outside the layer pair')
+            continue
+        found = []
+        if len(ppts) == 4 and Polygon(ppts).is_valid:
+            for e1, e2 in ((3, 1), (0, 2)):
+                q1, q2 = find_node(layer, mids[e1], ('poly', k)), find_node(layer, mids[e2], ('poly', k))
+                if q1 is not None and q2 is not None:
+                    found.append((e1, e2, q1, q2))
+        if len(found) != 1:
+            x, y = ppts[0]
+            unrecognized.append(f'copper polygon with {len(ppts)} points at ({x:.3f}, {y:.3f}) is not a tapered piece '
+                                f'between two copper nodes')
+            continue
+        e1, e2, q1, q2 = found[0]
+        w1 = math.dist(ppts[e1], ppts[(e1+1) % 4])
+        w2 = math.dist(ppts[e2], ppts[(e2+1) % 4])
+        out.append(Seg(layer, q1, q2, w1, width_b=w2, poly=tuple(ppts)))
+    for layer, x, y, d in copper.disks:
+        if layer not in layers:
+            unrecognized.append(f'copper circle on {layer}, outside the layer pair')
+            continue
+        for k, sg in enumerate(out):
+            if sg.layer == layer and min(math.dist((x, y), sg.a), math.dist((x, y), sg.b)) < TAPER_TOL:
+                out[k] = Seg(sg.layer, sg.a, sg.b, sg.width, width_b=sg.width_b, parts=sg.parts, poly=sg.poly,
+                             disks=sg.disks + ((x, y, d),))
+                break
+        else:
+            unrecognized.append(f'copper circle at ({x:.3f}, {y:.3f}) is not at the end of a track')
+    return out, unrecognized
+
+
 def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformance=True, max_records=200,
                  keep_samples=False):
     rep = Report()
@@ -483,18 +768,47 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             pads.append((pad, pl))
 
     segs = [s for s in copper.segs if s.layer in layers]
-    rep.n_segments = len(segs)
+    rep.n_segments = len(segs) + len(copper.polys) + len(copper.disks)
+    if intent.variable_width:
+        segs, unrecognized = _merge_tapers(segs, copper, layers)
+        rep.taper_pieces = sum(1 for sg in segs if sg.width_b is not None)
+        for desc in unrecognized:
+            rep.stray_copper += 1
+            rep.note(f'unrecognized copper: {desc}')
+        for sg in segs:
+            if sg.parts and len(sg.parts) == 2 and sg.wb - sg.width > sg.width + 1e-6:
+                rep.taper_gaps += 1
+                rep.note(f'V taper on {sg.layer} at ({sg.a[0]:.3f}, {sg.a[1]:.3f}): its tracks do not overlap at the '
+                         f'wide end (widths {sg.width:.4f} to {sg.wb:.4f} mm)')
+    else:
+        for layer, ppts in copper.polys:
+            rep.stray_copper += 1
+            rep.note(f'copper polygon on {layer} (not a variable width layout)')
+        for layer, x, y, d in copper.disks:
+            rep.stray_copper += 1
+            rep.note(f'copper circle on {layer} at ({x:.3f}, {y:.3f}) (not a variable width layout)')
     rep.degenerate_segments = sum(1 for s in segs if s.length < 1e-6)
     segs = [s for s in segs if s.length >= 1e-6]
     rep.total_length = sum(s.length for s in segs)
 
     w, clr, pitch = intent.trace_width, intent.clearance, intent.pitch
     if segs:
-        rep.min_width = min(s.width for s in segs)
-        rep.max_width = max(s.width for s in segs)
-        rep.width_error = max(abs(rep.min_width - w), abs(rep.max_width - w))
-        if not rep.width_ok(w):
-            rep.note(f'track widths {rep.min_width:.4f} to {rep.max_width:.4f} mm, intended {w:.4f} mm')
+        rep.min_width = min(min(s.width, s.wb) for s in segs)
+        rep.max_width = max(max(s.width, s.wb) for s in segs)
+        if intent.variable_width:
+            lo, hi = intent.width_range or (0.0, None)
+            rep.width_error = max(0.0, (lo or 0.0) - rep.min_width, rep.max_width - (math.inf if hi is None else hi))
+            if intent.piece_widths is not None:
+                rep.piece_width_error = _piece_width_error(segs, intent.piece_widths, rep)
+                rep.width_error = max(rep.width_error, rep.piece_width_error)
+            if not rep.width_ok(w):
+                rep.note(f'track widths {rep.min_width:.4f} to {rep.max_width:.4f} mm, allowed range '
+                         f'{intent.width_range}, largest deviation from the intended profile '
+                         f'{rep.piece_width_error:.4f} mm')
+        else:
+            rep.width_error = max(abs(rep.min_width - w), abs(rep.max_width - w))
+            if not rep.width_ok(w):
+                rep.note(f'track widths {rep.min_width:.4f} to {rep.max_width:.4f} mm, intended {w:.4f} mm')
 
     contour = Polygon(intent.contour)
     if not contour.is_valid:
@@ -504,6 +818,9 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
     layer_arr = np.array([s.layer for s in segs])
     tree = STRtree(geoms)
     max_w = max([s.width for s in segs] + [0])
+    # largest distance of copper from a piece's center line (half the width for plain tracks)
+    max_reach = max([s.reach for s in segs] + [0])
+    max_w = max(max_w, 2*max_reach)
 
     # ---- connectivity graph ----
     pts = []
@@ -822,7 +1139,10 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         if np.isnan(seg_s[i]) or np.isnan(seg_s[j]):
             continue
         d, p, q = _seg_seg_closest(si.a, si.b, sj.a, sj.b)
-        deficit = (si.width + sj.width)/2 + clr - d
+        if si.plain and sj.plain:
+            deficit = (si.width + sj.width)/2 + clr - d
+        else:
+            deficit = clr - _copper_gap(si, sj)
         crossing = d == 0.0 and _segments_intersect(si.a, si.b, sj.a, sj.b)
         if deficit <= 1e-4 and not crossing:
             continue
@@ -870,7 +1190,10 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             q = _closest_on_seg((v.x, v.y), s.a, s.b)
             if not body_seg_far(s_via, th_via, i, q):
                 continue
-            deficit = v.diameter/2 + s.width/2 + clr - math.dist((v.x, v.y), q)
+            if s.plain:
+                deficit = v.diameter/2 + s.width/2 + clr - math.dist((v.x, v.y), q)
+            else:
+                deficit = v.diameter/2 + clr - _copper_gap_point(s, (v.x, v.y))
             if deficit > 1e-4:
                 rep.via_violations += 1
                 rep.worst_via_deficit = max(rep.worst_via_deficit, deficit)
@@ -902,7 +1225,10 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             q = _closest_on_seg((pad.x, pad.y), s.a, s.b)
             if not body_seg_far(s_pad, th_pad, i, q):
                 continue
-            deficit = s.width/2 + clr - pad.dist_to_seg(s.a, s.b)
+            if s.plain:
+                deficit = s.width/2 + clr - pad.dist_to_seg(s.a, s.b)
+            else:
+                deficit = clr - min(shapely.distance(pad.geometry(), g) - r for g, r in s.cores())
             if deficit > 1e-4:
                 violating_segs.add(i)
                 pad_violation(pad, deficit)
@@ -942,7 +1268,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
                 if j == i or layer_arr[j] != s.layer or np.isnan(seg_s[j]):
                     continue
                 q = _closest_on_seg(p, segs[j].a, segs[j].b)
-                gap = math.dist(p, q) - (s.width + segs[j].width)/2
+                gap = math.dist(p, q) - (s.width_at(p) + segs[j].width_at(q))/2
                 if gap >= best:
                     continue
                 if not other_turn(abs(seg_s[j] - sp) - segs[j].length/2, th_p, theta_at(j, q)):
@@ -951,7 +1277,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             if best < math.inf:
                 ratios.append(best / clr if clr > 0 else best)
                 if keep_samples:
-                    rep.spacing_samples.append((s.layer, p, (best + s.width) / pitch))
+                    rep.spacing_samples.append((s.layer, p, (best + s.width_at(p)) / pitch))
     if ratios:
         r = np.array(ratios)
         rep.min_spacing_ratio = float(r.min())
@@ -1020,8 +1346,11 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour):
         if core.area > 0 and li < intent.spiral_layers:
             loose = shapely.unary_union(shapely.buffer(lines, p/2 * 1.001, quad_segs=4))
             uncovered.append(core.difference(loose).area / core.area)
-        widths = np.array([segs[i].width for i in idx])
-        all_copper.append(shapely.unary_union(shapely.buffer(lines, widths/2, quad_segs=4)))
+        plain = [i for i in idx if segs[i].plain]
+        widths = np.array([segs[i].width for i in plain])
+        cu_layer = list(shapely.buffer([geoms[i] for i in plain], widths/2, quad_segs=4)) if plain else []
+        cu_layer += [segs[i].copper(quad_segs=4) for i in idx if not segs[i].plain]
+        all_copper.append(shapely.unary_union(cu_layer))
     if not all_copper:
         return
     all_copper += [Point(v.x, v.y).buffer(v.diameter/2, quad_segs=8) for v in copper.vias]
