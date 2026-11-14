@@ -348,7 +348,8 @@ def test_circle_inner_vias_stay_on_their_side_of_the_center():
     assert model.inner_via_ring_radius >= -1e-9
     assert model.via_offset <= model.shape.max_via_offset + 1e-9
     assert any('Overlapping vias' in str(x.message) for x in w)
-    assert any('overlaps a neighboring turn by' in str(x.message) for x in w)
+    overlap = [str(x.message) for x in w if 'overlaps a neighboring turn by' in str(x.message)]
+    assert overlap and not any('less than the clearance' in m for m in overlap) # the overlap is larger than it
 
 
 def test_polyline_circle_respects_clearance():
@@ -379,6 +380,46 @@ def test_tightened_render_settings_are_reported(caplog):
         model.render_footprint(arc_tolerance=0.1, circle_segments=32)
     msgs = [r.getMessage() for r in caplog.records if 'Overriding' in r.getMessage()]
     assert any('arc tolerance' in m for m in msgs) and any('circle segments' in m for m in msgs)
+    # The arc tolerance and the segment count only apply to circles drawn with arcs / as polylines respectively.
+    caplog.clear()
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        rect = geometry.PlanarInductor(shape=geometry.RectangleShape(width=50, height=40, annular_width=10), turns=5,
+                                       twists=1, clearance=0.2)
+        polyline = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=5, twists=1, clearance=0.15,
+                                           approximate_arcs=False)
+    with caplog.at_level(logging.WARNING, logger='kicoil'):
+        rect.render_footprint(arc_tolerance=0.1, circle_segments=32)
+        polyline.render_footprint(arc_tolerance=0.1)
+    assert not [r for r in caplog.records if 'Overriding' in r.getMessage()]
+
+
+@pytest.mark.parametrize('arcs', [False, True])
+def test_zero_clearance_renders(arcs):
+    # The chord error limit clearance/40 was 0 for clearance 0: ZeroDivisionError in effective_render_options.
+    from kicoil import geometry
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        model = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=7, twists=4, clearance=0.0,
+                                        approximate_arcs=arcs)
+        fp = model.render_footprint()
+    assert len(fp.arcs if arcs else fp.lines) > 0
+
+
+@pytest.mark.parametrize('od,idd,n,k,c,arcs', [(200, 190, 11, 3, 0.5, True), (4, 3, 11, 3, 0.05, True),
+                                               (50, 25, 11, 3, 0.15, False)])
+def test_circle_render_loses_at_most_clearance_over_40(od, idd, n, k, c, arcs):
+    # Both neighboring turns may deviate by the arc tolerance / chord error towards each other. With a tolerance of
+    # clearance/40 the rendered copper lost up to 4.4 % (arcs, 200/190 mm) and 5.1 % (4/3 mm) of the clearance.
+    from kicoil import geometry
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        model = geometry.PlanarInductor(shape=geometry.CircleShape(od, idd), turns=n, twists=k, clearance=c,
+                                        approximate_arcs=arcs)
+        fp = model.render_footprint()
+    intent = geomcheck.intent_from_model(model)
+    rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent, do_conformance=False)
+    assert rep.worst_clearance_deficit <= c / 40 + 1e-6
 
 
 def test_kicad_pcb_export(tmp_path):

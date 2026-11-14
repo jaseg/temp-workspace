@@ -764,11 +764,12 @@ class PlanarInductor():
             self.logger.info(f'Increased via offset to {self.via_offset:.2f} mm to keep vias clear of neighboring turns')
         if gap < self.clearance - 1e-6:
             if gap < 0:
-                problem = f'overlaps a neighboring turn by {-gap:.3f} mm'
+                problem = (f'overlaps a neighboring turn by {-gap:.3f} mm (a clearance of {self.clearance:.3f} mm is '
+                           f'required)')
             else:
-                problem = f'is only {gap:.3f} mm away from a neighboring turn'
-            warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {problem}, which is less than the clearance of '
-                          f'{self.clearance:.3f} mm. ' +
+                problem = (f'is only {gap:.3f} mm away from a neighboring turn, which is less than the clearance of '
+                           f'{self.clearance:.3f} mm')
+            warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {problem}. ' +
                           ('Reduce the via diameter or the annular width.' if auto_via_offset else
                            'Increase the via offset or reduce the via diameter.'))
         if self.via_offset * inner_reach > self.shape.max_via_offset + 1e-9:
@@ -948,34 +949,48 @@ class PlanarInductor():
     DEFAULT_ARC_TOLERANCE = 0.02 # mm
     DEFAULT_CIRCLE_SEGMENTS = 64 # per revolution
     MIN_ARC_FIT_SEGMENTS = 256 # points per revolution the arc approximation of circles is fitted to
+    RENDER_TOLERANCE_FLOOR = 0.0005 # mm, smallest arc tolerance / chord error, used when the clearance is (nearly) 0
 
     def effective_render_options(self, arc_tolerance=None, circle_segments=None):
         """ Arc tolerance and number of segments per revolution that render_footprint actually uses for circles, given
         the user's values (None: automatic). The trace width is sized from the exact spiral center lines, so the
-        approximation must not eat up a noticeable part of the clearance: the arc tolerance is at most clearance/40,
-        arcs are fitted to at least 256 points per revolution, and polylines (approximate_arcs=False) get enough
-        segments for a chord error of at most clearance/40. Returns (arc_tolerance, circle_segments, notes), where notes
-        lists the user values that were overridden. """
+        approximation must not eat up a noticeable part of the clearance. Both neighboring turns may deviate by the
+        tolerance towards each other, so the tolerance is at most clearance/80 (at least RENDER_TOLERANCE_FLOOR), which
+        bounds the loss to clearance/40: the arc tolerance is capped at that value, arcs are fitted to at least 256
+        points per revolution, and polylines (approximate_arcs=False) get enough segments for a chord error within it.
+        Returns (arc_tolerance, circle_segments, notes), where notes lists the user values that were overridden. Only
+        circles use these settings; other shapes get no notes. """
         notes = []
-        tol_limit = self.clearance / 40
+        tol_limit = self.render_tolerance_limit()
         user_tol, user_segs = arc_tolerance, circle_segments
         arc_tolerance = min(self.DEFAULT_ARC_TOLERANCE if user_tol is None else user_tol, tol_limit)
-        if user_tol is not None and user_tol > tol_limit:
-            notes.append(f'arc tolerance reduced from {user_tol:.4f} mm to {tol_limit:.4f} mm (clearance/40)')
-
         circle_segments = self.DEFAULT_CIRCLE_SEGMENTS if user_segs is None else user_segs
-        if isinstance(self.shape, CircleShape):
-            if self.approximate_arcs:
-                needed = self.MIN_ARC_FIT_SEGMENTS
-            else:
-                # Chord error r*(1 - cos(pi/n)) <= clearance/40 on the outer radius
-                needed = ceil(pi / acos(max(-1.0, 1 - tol_limit / self.shape.outer_radius)))
-            if circle_segments < needed:
-                if user_segs is not None:
-                    notes.append(f'circle segments raised from {user_segs} to {needed} per revolution to keep the '
-                                 f'{"arc fit" if self.approximate_arcs else "chord error"} within clearance/40')
-                circle_segments = needed
+        if not isinstance(self.shape, CircleShape):
+            return arc_tolerance, circle_segments, notes
+
+        if self.approximate_arcs:
+            if user_tol is not None and user_tol > tol_limit:
+                notes.append(f'arc tolerance reduced from {user_tol:.4f} mm to {tol_limit:.4f} mm '
+                             f'({self.render_tolerance_desc()})')
+            needed = self.MIN_ARC_FIT_SEGMENTS
+        else:
+            # Chord error r*(1 - cos(pi/n)) <= tol_limit on the outer radius
+            needed = ceil(pi / acos(max(-1.0, 1 - tol_limit / self.shape.outer_radius)))
+        if circle_segments < needed:
+            if user_segs is not None:
+                notes.append(f'circle segments raised from {user_segs} to {needed} per revolution to keep the '
+                             f'{"arc fit" if self.approximate_arcs else "chord error"} within '
+                             f'{tol_limit:.4f} mm ({self.render_tolerance_desc()})')
+            circle_segments = needed
         return arc_tolerance, circle_segments, notes
+
+    def render_tolerance_limit(self):
+        """ Largest deviation of the rendered circle tracks from the exact spiral: clearance/80, at least
+        RENDER_TOLERANCE_FLOOR (so that clearance 0 still gives a finite number of segments). """
+        return max(self.clearance / 80, self.RENDER_TOLERANCE_FLOOR)
+
+    def render_tolerance_desc(self):
+        return 'clearance/80' if self.clearance / 80 >= self.RENDER_TOLERANCE_FLOOR else 'minimum tolerance'
 
     def render_footprint(self, name=None, arc_tolerance=None, circle_segments=None, geometry_debug_file=None):
         """ Render the coil as a KiCad footprint. arc_tolerance and circle_segments only apply to circles; None means

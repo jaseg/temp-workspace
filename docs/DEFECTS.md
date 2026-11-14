@@ -188,7 +188,11 @@ previous corpus cases. Same cases now: 0.04 s, 0.43 s, 0.24–0.86 s (found in t
 The first version tightened the user's `--arc-tolerance` / `--circle-segments` (GUI: "Arc Tolerance", "Circle
 Segments") silently, so larger values had no visible effect (found in the second review). Both now default to
 automatic (`None`); an explicitly given value that has to be tightened is reported with a logged warning, and the CLI
-and GUI help state the rule (`PlanarInductor.effective_render_options`).
+and GUI help state the rule (`PlanarInductor.effective_render_options`). A third review found that both neighboring
+turns can deviate by the tolerance towards each other, so clearance/40 still cost up to 4.4 % of the clearance
+(circle 200/190 mm, clearance 0.5 mm) and 5.1 % (4/3 mm, 0.05 mm). The tolerance and the polyline chord error are now
+clearance/80 (at least 0.5 µm, so that clearance 0 no longer divides by zero), which bounds the loss at clearance/40
+(measured: 0.16 % and 0.83 % for those two cases); the arc tolerance note is only given for circles drawn with arcs.
 
 ### D9. Via ring overlap check crashes when a via is wider than the inner ring
 
@@ -432,9 +436,9 @@ about 0.03 mm at r = 25 mm, which the trace width does not allow for. D8 fixed o
 **Symptom.** Circle 50/25 mm, n=11, clearance 0.15 mm with 64 segments: up to 16 % of the clearance missing (worst with
 twists > 1, where the arms' vertices do not line up).
 
-**Fix.** Polyline circles get at least as many segments per turn as a chord error of clearance/40 on the outer radius
-needs (182 for this case); a smaller explicit value is raised with a warning (see D8). The same case now loses at most
-1.3 % of the clearance (0.002 mm).
+**Fix.** Polyline circles get at least as many segments per turn as a chord error of clearance/80 on the outer radius
+needs (257 for this case); a smaller explicit value is raised with a warning (see D8). The same case now loses at most
+0.5 % of the clearance (0.0007 mm).
 
 ### D28. Turns fold onto themselves in narrow protrusions and notches
 
