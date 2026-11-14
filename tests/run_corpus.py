@@ -2,7 +2,7 @@
 """Run the layout corpus through a layout implementation and the geometric checker.
 
 Usage:
-    python tests/run_corpus.py [--impl kicoil|alt] [--kind full|quick] [--out results.json] [--svg-dir DIR] [-j N]
+    python tests/run_corpus.py [--impl kicoil|MODULE] [--kind full|quick] [--out results.json] [--svg-dir DIR] [-j N]
                                [--filter SUBSTR]
 
 The implementation is imported from whatever `kicoil` package is first on sys.path, so to evaluate an older revision
