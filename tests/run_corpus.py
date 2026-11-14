@@ -167,7 +167,10 @@ def summarize(results, file=sys.stdout):
           f'shorts: {cnt(lambda r: r.get("shorts", 0) > 0)}   stray vias: {cnt(lambda r: r.get("stray_vias", 0) > 0)}   '
           f'duplicates: {cnt(lambda r: r.get("duplicate_segments", 0) > 0)}', file=file)
     print(f'  stray copper: {cnt(lambda r: r.get("stray_copper", 0) > 0)}   '
-          f'track width wrong: {cnt(lambda r: not r.get("width_ok", True))}', file=file)
+          f'track width wrong: {cnt(lambda r: not r.get("width_ok", True))}   '
+          f'via defects: {cnt(lambda r: r.get("via_defects", 0) > 0)}   '
+          f'pads too small: {cnt(lambda r: r.get("small_pads", 0) > 0)}   '
+          f'dots: {cnt(lambda r: r.get("dots", 0) > 0)}', file=file)
     print(f'  winding wrong (>0.05 turns): {cnt(lambda r: not abs(r["winding_error"]) < 0.05)}', file=file)
     print(f'  with crossings: {cnt(lambda r: r["crossings"] > 0)}', file=file)
     print(f'  clearance deficit >5%: {cnt(lambda r: r["rel_deficit"] > 0.05)}   >50%: {cnt(lambda r: r["rel_deficit"] > 0.5)}', file=file)
