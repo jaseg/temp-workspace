@@ -883,7 +883,12 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             return math.nan
         return theta_a[i] + _wrap(ang(p) - ang(oriented[i][0]))
 
-    # Backtracks: consecutive same-layer segments that reverse direction
+    def in_one_body(layer, *pts):
+        return any(layer in bl and all(inside(p) for p in pts) for _bn, bl, inside, _c in bodies)
+
+    # Backtracks: consecutive same-layer segments that reverse direction. A reversal whose reversing piece lies
+    # completely within the copper of one via or pad (e.g. an arm that ends at its fold point at the tip of a sliver
+    # shaped inner contour, where the via sits back along the arm) adds no copper outside that body: not a backtrack.
     prev = None
     for i in order:
         s = segs[i]
@@ -895,7 +900,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             l1, l2 = math.hypot(*v1), math.hypot(*v2)
             if l1 > 0 and l2 > 0:
                 cos = (v1[0]*v2[0] + v1[1]*v2[1]) / (l1*l2)
-                if cos < -0.985: # > ~170 deg turn
+                if cos < -0.985 and not (in_one_body(s.layer, a, b) or in_one_body(s.layer, pa, pb)): # > ~170 deg
                     rep.backtracks += 1
                     rep.note(f'backtrack on {s.layer} at ({a[0]:.3f}, {a[1]:.3f})')
         prev = (s.layer, (a, b))

@@ -81,16 +81,119 @@ def compute_skeleton(exterior):
     return result
 
 
+def simplify_outline(poly, tol):
+    """ Douglas-Peucker simplification of a closed polygon that keeps vertex 0. Every removed vertex lies within tol of
+    the simplified outline and vice versa (Hausdorff distance at most tol).
+
+    Outlines from files often have coordinates rounded to a few decimals. On a densely sampled curve, the rounding noise
+    turns a good part of the vertices into tiny reflex corners, and the straight skeleton's cost grows with the number of
+    reflex vertices times the number of edges (a 3000 point outline rounded to 1 µm makes skeleton.wasm run out of memory
+    after several minutes). Removing vertices that deviate by less than a micrometer from their neighbors' chord removes
+    that noise, without moving the outline by any amount that matters for a PCB. """
+    n = len(poly)
+    if n <= 4 or tol <= 0:
+        return list(poly)
+    keep = [False] * n
+    keep[0] = True
+    # split the ring at vertex 0 and the vertex farthest from it
+    far = max(range(n), key=lambda i: math.dist(poly[0], poly[i]))
+    keep[far] = True
+    stack = [(0, far), (far, n)]
+    while stack:
+        a, b = stack.pop()
+        if b - a < 2:
+            continue
+        (x0, y0), (x1, y1) = poly[a], poly[b % n]
+        dx, dy = x1 - x0, y1 - y0
+        l = math.hypot(dx, dy)
+        best, bi = -1.0, None
+        for i in range(a + 1, b):
+            x, y = poly[i]
+            if l > 0:
+                d = abs(dx * (y - y0) - dy * (x - x0)) / l
+            else:
+                d = math.hypot(x - x0, y - y0)
+            if d > best:
+                best, bi = d, i
+        if best > tol:
+            keep[bi] = True
+            stack += [(a, bi), (bi, b)]
+    out = [p for p, k in zip(poly, keep) if k]
+    return out if len(out) >= 3 else list(poly)
+
+
+def count_reflex(poly):
+    """ Number of reflex vertices of a polygon (either orientation: the orientation is taken from the signed area) """
+    n = len(poly)
+    area2 = sum(poly[i - 1][0] * poly[i][1] - poly[i][0] * poly[i - 1][1] for i in range(n))
+    sign = 1 if area2 >= 0 else -1
+    r = 0
+    for i in range(n):
+        (x0, y0), (x1, y1), (x2, y2) = poly[i - 1], poly[i], poly[(i + 1) % n]
+        if sign * ((x1 - x0) * (y2 - y1) - (y1 - y0) * (x2 - x1)) < 0:
+            r += 1
+    return r
+
+
 class CornerFlatSkeletonator(base.Skeletonator):
 
     W_EPS = 1e-9
+    # Outline preparation, see prepare_outline: tolerances tried in turn (mm), the reflex vertices times vertices budget
+    # a simplified outline should meet, and the size and budget up to which an outline is used as given
+    OUTLINE_TOLERANCES = (0.001, 0.0025, 0.005, 0.01, 0.02)
+    SKELETON_BUDGET = 10_000
+    SMALL_OUTLINE = 300
+    SMALL_BUDGET = 30_000
+    MERGE_TOL = 1e-4 # mm, see spiral
+
+    @classmethod
+    def prepare_outline(cls, poly):
+        """ The outline the skeleton is computed on, and the tolerance (mm) it was simplified with (0: as given).
+
+        The straight skeleton's cost grows with the number of reflex vertices times the number of vertices (seconds at
+        3e4, minutes at 1e6). Small cheap outlines are used as given. Others are simplified (`simplify_outline`) by
+        1 µm, which removes the noise of coordinates rounded to 3 decimals (mm) and thins out densely sampled curves.
+        Where that leaves more than SKELETON_BUDGET (e.g. coordinates rounded to 2 decimals, or 10 µm jitter), the
+        tolerance is raised step by step up to 20 µm, and the first one that brings the outline within the budget is
+        used. (Leftover noise corners also cost layout quality: on a 1024-gon with 10 µm jitter at 90 % annular width,
+        the pitch ratio is 0.63 at 10 µm, which leaves 104 reflex corners, and 0.81 at 20 µm, which leaves none.) If no
+        tolerance meets the budget, the 1 µm outline is used unless a larger tolerance makes the skeleton at least 4
+        times cheaper, and a warning says that the skeleton may be slow. The copper then follows the simplified outline,
+        at most the tolerance away from the given one (the checker allows 0.05 mm). """
+        n, r = len(poly), count_reflex(poly)
+        if n <= cls.SMALL_OUTLINE and n * r <= cls.SMALL_BUDGET:
+            return list(poly), 0.0
+        levels = []
+        for tol in cls.OUTLINE_TOLERANCES:
+            simple = simplify_outline(poly, tol)
+            cost = len(simple) * count_reflex(simple)
+            levels.append((cost, tol, simple))
+            if cost <= cls.SKELETON_BUDGET:
+                return simple, tol
+        cost, tol, simple = min(levels, key=lambda lv: lv[0])
+        if cost * 4 > levels[0][0]:
+            cost, tol, simple = levels[0]
+        if cost > 10 * cls.SKELETON_BUDGET:
+            import warnings
+            warnings.warn(f'The outline has {count_reflex(simple)} reflex corners among {len(simple)} vertices after '
+                          f'simplifying it by {tol * 1000:g} µm (noisy or rounded coordinates?). Computing its straight '
+                          f'skeleton may take minutes. Smooth or resample the outline.')
+        return simple, tol
 
     def __init__(self, poly, ref_depth=None, ramp_margin=0.0):
         self.ramp_margin = ramp_margin
+        self.input_poly = base.clean_polygon(poly)
+        simple, self.outline_tolerance = self.prepare_outline(self.input_poly)
         # Build the skeleton and vertex tracks exactly like the base class, but with the fork-safe skeleton computation
         base.compute_skeleton = compute_skeleton
         try:
-            super().__init__(poly, ref_depth)
+            try:
+                super().__init__(simple, ref_depth)
+            except (RuntimeError, ValueError):
+                if len(simple) == len(self.input_poly):
+                    raise
+                # (should not happen) the simplified outline is degenerate: use the original one
+                super().__init__(self.input_poly, ref_depth)
         finally:
             base.compute_skeleton = _base_compute_skeleton
 
@@ -258,6 +361,7 @@ class CornerFlatSkeletonator(base.Skeletonator):
         return W + [1.0]
 
     LATTICE_MAX_TURNS = 8
+    LATTICE_MIN_GAIN = 0.01 # use the lattice allocation only if its spacing factor is better by more than this
 
     def _lattice_edge(self, i, Wi, Wj, need):
         """ Spacing factor and ramp (beta=0) of edge i when its ramp runs from warped angle Wi to Wj, constrained only at
@@ -322,7 +426,35 @@ class CornerFlatSkeletonator(base.Skeletonator):
             return None
         return F, choice, delta
 
+    def _build_key(self):
+        """ Everything the ramp setup depends on. The tracks only differ from the raw skeleton tracks where
+        `set_fold_limit` cut a protrusion, and then cut_protrusions lists it (with the cut depth). """
+        tup = lambda v: tuple(v) if v is not None else None
+        return (self.ref_depth, getattr(self, 'pitch', None) or 0.0, getattr(self, 'twists', None) or 1,
+                getattr(self, 'direction', 1), getattr(self, 'shear', False), tup(getattr(self, 'residue_signs', None)),
+                tup(getattr(self, 'arm_starts', None)), tup(getattr(self, 'arm_folds', None)), self.ramp_margin,
+                tuple(getattr(self, 'cut_protrusions', ())))
+
     def _build(self):
+        """ Set up the ramps for the current depth range and spiral configuration. The result is cached: the shape is
+        set up several times with the same parameters (angle reference, configure_spiral, set_fold_limit), and the
+        setup is expensive for outlines with many vertices. """
+        key = self._build_key()
+        cache = self.__dict__.setdefault('_build_cache', {})
+        if key not in cache:
+            self._build_uncached()
+            cache[key] = (self.e_origin, self.e_dir, self._ext_l, self.allocations, self._p, self._k,
+                          self._unconfigured)
+            return
+        self.e_origin, self.e_dir, self._ext_l, allocations, self._p, self._k, unconfigured = cache[key]
+        self.allocations = dict(allocations)
+        if unconfigured is None:
+            self.set_mode('cont')
+        else:
+            self.spacing_factor = None
+            self._apply(*unconfigured)
+
+    def _build_uncached(self):
         n = len(self.poly)
         A = self.ref_depth
         p = getattr(self, 'pitch', None) or 0.0
@@ -330,6 +462,7 @@ class CornerFlatSkeletonator(base.Skeletonator):
         sign = getattr(self, 'direction', 1)
         configured = p > 0
         self._p, self._k = p, k
+        self._unconfigured = None
 
         self.e_origin, self.e_dir = [], []
         for i in range(n):
@@ -365,9 +498,12 @@ class CornerFlatSkeletonator(base.Skeletonator):
             alloc = self._allocate(cont_l, need, sign)
             if alloc is not None:
                 self.allocations['cont'] = alloc
-                if getattr(self, 'shear', False) is not True and A / p <= self.LATTICE_MAX_TURNS:
+                # The lattice allocation is only used when it gains more than LATTICE_MIN_GAIN, and its spacing factor
+                # is at most 1, so there is nothing to gain when the continuous allocation is already close to 1.
+                if (getattr(self, 'shear', False) is not True and A / p <= self.LATTICE_MAX_TURNS
+                        and alloc[0] < 1 - self.LATTICE_MIN_GAIN):
                     better = self._lattice_search(alloc, need)
-                    if better is not None and better[0] > alloc[0] + 0.01:
+                    if better is not None and better[0] > alloc[0] + self.LATTICE_MIN_GAIN:
                         self.allocations['lattice'] = better
             self.set_mode('cont')
         else:
@@ -379,7 +515,8 @@ class CornerFlatSkeletonator(base.Skeletonator):
                         choice[i] = c
             rs = [c[3] if c else 0.0 for c in choice]
             self.spacing_factor = None
-            self._apply(choice, [r / sum(rs) for r in rs] if sum(rs) > 0 else None)
+            self._unconfigured = (choice, [r / sum(rs) for r in rs] if sum(rs) > 0 else None)
+            self._apply(*self._unconfigured)
 
     def modes(self):
         """ Names of the alternative ramp allocations, best predicted first ('cont' is always valid) """
@@ -593,15 +730,19 @@ class CornerFlatSkeletonator(base.Skeletonator):
         else:
             depth_fn = lambda t: d1 + (d2 - d1) * (self.warp(t) - w1) / (w2 - w1)
 
+        # Vertices, ramp starts and ramp ends can lie within nanometers of each other (short edges of finely divided
+        # outlines). Pieces that short have an arbitrary direction, which shows up as hairpins in the copper, and near a
+        # via their ends get joined to it. Drop points closer than MERGE_TOL to the previous one (keeping both ends).
+        tol = self.MERGE_TOL
         points = [self.position(t1, d1)]
         angles = [t1]
         for a in self.iter_breaks(t1, t2):
             p = self.position(a, depth_fn(a))
-            if math.dist(p, points[-1]) > 1e-12:
+            if math.dist(p, points[-1]) > tol:
                 points.append(p)
                 angles.append(a)
         p = self.position(t2, d2)
-        if math.dist(p, points[-1]) > 1e-12 or len(points) == 1:
+        if math.dist(p, points[-1]) > tol or len(points) == 1:
             points.append(p)
             angles.append(t2)
         else:

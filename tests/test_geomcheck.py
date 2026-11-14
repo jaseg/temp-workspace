@@ -833,3 +833,25 @@ def test_fold_at_a_tip_is_not_a_self_short():
     assert rep.self_shorts == 0
     kinds = rep.failure_kinds(intent.clearance, intent.trace_width)
     assert 'self short' not in kinds and 'clearance' not in kinds
+
+
+@pytest.mark.parametrize('inside', [True, False])
+def test_reversal_inside_via_is_not_a_backtrack(inside):
+    # An arm that ends at its fold point at the tip of a sliver shaped inner contour, with the via back along the arm:
+    # the connection reverses direction. Inside the via's copper that adds nothing; outside it, it is a backtrack.
+    intent, cu = clean(SQUARE)
+    v = cu.vias[0]
+    c = (round(v.x, 6), round(v.y, 6))
+    j = next(i for i, s in enumerate(cu.segs) if key(s.layer, s.b)[1:] == c or key(s.layer, s.a)[1:] == c)
+    s = cu.segs[j]
+    far = s.a if key(s.layer, s.b)[1:] == c else s.b
+    dx, dy = v.x - far[0], v.y - far[1]
+    l = math.hypot(dx, dy)
+    reach = (0.8 if inside else 1.5) * v.diameter/2
+    tip = (v.x + dx/l*reach, v.y + dy/l*reach)
+    # far -> tip (over the via center), then back from tip to the via center
+    cu.segs[j] = Seg(s.layer, far, tip, s.width)
+    cu.segs.append(Seg(s.layer, tip, (v.x, v.y), s.width))
+    rep = report(cu, intent, do_conformance=False)
+    assert rep.ok_connectivity, rep.notes
+    assert (rep.backtracks == 0) == inside, rep.notes
