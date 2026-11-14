@@ -39,7 +39,7 @@ Prerequisite: `src/kicoil/skeleton.wasm` (built from `cgal_skeleton_core`, or co
 | Dots | A zero-length track is a round dot of copper of its stroke width. Dots are checked as copper bodies: attached to the track (or via, or pad) whose copper contains their center, otherwise counted as orphaned copper; their clearance to other turns, their width and their overshoot are checked like any other copper. |
 | Connectivity | Copper must form a simple path from pad 1 to pad 2 that uses every segment exactly once. Track ends are joined when they coincide (1 nm), when a dangling end lies inside a via's or pad's copper, or when two collinear pieces of track on one layer overlap and each one's dangling end lies on the other (1 µm). Vias join the layers. Reports open ends, branches, orphaned segments, duplicate segments (an exact copy, or a loose piece lying on another track), stray vias (fewer than two track connections), and shorts (pad 1 and pad 2 joined by via or pad copper, or a path that bypasses segments). Dangling stubs at a pad that are no longer than the pad plus three times the via offset, and track lying entirely within a via or pad, are counted as `stubs` and do not fail a case. A jumper that connects distant parts of the conductor always shows up as a branch (a node with three or more track connections), a stray via or a pad 1 to pad 2 short. |
 | Winding | Total angle swept by the path around a point in the coil's hole must equal the number of turns (sign by direction). Catches lost, doubled or reversed turns. |
-| Backtracking | Consecutive segments on one layer that reverse direction (> 170°), e.g. a hairpin inside the track's own lane. |
+| Backtracking | Consecutive segments on one layer that reverse direction (> 170°), e.g. a hairpin inside the track's own lane. A reversal whose reversing piece lies completely within one via's or pad's copper does not count. |
 | Crossings | Same-layer centerlines of segments that are not neighbors along the conductor must not intersect (strict crossing; touching shows up as zero clearance). |
 | Clearance | Edge-to-edge distance between copper of *different turns* must be at least the clearance. Copper belongs to different turns when it is at least half a turn apart in cumulative winding angle around the coil's center (measured at the closest points); only without a center (or for copper off the path) does distance along the conductor (more than max(4·(w+c), ¼ inner perimeter)) decide. Track-track (and dots), via-track/via-via and pad-track/pad-via/pad-pad violations are reported separately (worst deficit in mm and relative to the clearance). Deficits between parts of the same turn (the conductor folding onto itself at a tight tip, or a hairpin inside its own lane, which is a backtrack) are counted as `self_overlaps` and do not fail a case, unless the copper touches itself at least 0.18 turns apart (`self short`, part of a turn is shorted). See *Same turn or different turn* below. |
 | Spacing uniformity | Sampled edge-to-edge distance to the neighboring turn, relative to the clearance (min, 5th and 95th percentile), and `pitch_ratio` = (narrowest emitted track width + c) / nominal pitch, i.e. how much of the available pitch the layout turns into copper. |
@@ -90,8 +90,11 @@ sectors (45°, 90°, 180°), L, U and D shapes, random convex and random star-sh
 
 Extra families in their own modules (`tests/corpus_<family>.py`, selected alone with `--kind <family>`): `round`
 (`corpus_round.py`: polygonal circles with 16 to 1024 vertices and the analytic circle of the same size, a 2500 vertex
-blob, a 1000 vertex outline with coordinates rounded to 1 µm, ellipses, superellipses, smooth blobs, stadium, rounded
-rectangle, egg, teardrop, bean, noisy circles, nearly collinear runs, short edges, D shape, circle with a sharp tip).
+blob, a 1000 vertex outline with coordinates rounded to 1 µm, ellipses from 2:1 to 20:1, superellipses, smooth blobs,
+stadium, rounded rectangle, egg, teardrop, bean, noisy circles, nearly collinear runs, short edges, D shape, circle with a
+sharp tip). A case may declare failure kinds it is known to show in the fixed layout, with the reason
+(`known_failures`, e.g. the backtrack at the sliver tips of slender ellipses); `test_corpus_case` xfails those instead of
+asserting them.
 
 Parameters: annular width at 30 %, 60 % and 90 % of the outline's maximum inscribed radius; turns/twists from 2/1 to
 21/8 (only co-prime pairs); single layer; clockwise. Sweeps vary the annular width in 3 % steps and the outline scale by
