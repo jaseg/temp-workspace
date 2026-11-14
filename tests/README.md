@@ -54,6 +54,11 @@ Shapes: square, rectangles (2:1, 5:1), trapezoid, regular 3/5/6/8/24-gons, ellip
 tiny and small chamfers, rectangles with nearly collinear extra vertices (with and without jitter), stars, circular
 sectors (45°, 90°, 180°), L, U and D shapes, random convex and random star-shaped polygons, and circles.
 
+Extra families in their own modules (`tests/corpus_<family>.py`, selected alone with `--kind <family>`): `round`
+(`corpus_round.py`: polygonal circles with 16 to 1024 vertices and the analytic circle of the same size, a 2500 vertex
+blob, a 1000 vertex outline with coordinates rounded to 1 µm, ellipses, superellipses, smooth blobs, stadium, rounded
+rectangle, egg, teardrop, bean, noisy circles, nearly collinear runs, short edges, D shape, circle with a sharp tip).
+
 Parameters: annular width at 30 %, 60 % and 90 % of the outline's maximum inscribed radius; turns/twists from 2/1 to
 21/8 (only co-prime pairs); single layer; clockwise. Sweeps vary the annular width in 3 % steps and the outline scale by
 ±1–3 % on seven base shapes, which exposes layouts that break under small tweaks. Dense cases use 30–31 turns.

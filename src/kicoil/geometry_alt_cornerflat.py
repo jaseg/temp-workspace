@@ -11,6 +11,12 @@ candidate when the vias cannot be placed clear of the turns. The trace width is 
 `kicoil.geometry`. The measurement additionally covers pieces of one arm that fold back onto each other within half a
 revolution, and the via check covers the connections between the arm ends and the vias.
 
+Polygon outlines are simplified by at most 1 µm before the straight skeleton is computed (see
+`skeletonator_alt_cornerflat.simplify_outline`): densely sampled outlines with rounded coordinates (e.g. from files) are
+otherwise full of tiny reflex corners, which make the skeleton slow or run it out of memory. On round outlines (many
+short edges, no real corners) the flat corner layout and the linear layout come out about the same, and the measurement
+picks either; on noisy outlines the ramps get crowded out by the noise corners and the linear layout wins.
+
 CircleShape is the one of `kicoil.geometry`.
 """
 
