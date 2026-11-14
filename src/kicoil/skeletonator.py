@@ -132,7 +132,7 @@ def compute_skeleton(exterior):
     for p1, p2 in edge_cycle(exterior):
         if p2 != p1:
             points_deduplicated.append(p1)
-    input_data = '\n'.join(f'{x!r} {y!r}' for x, y in points_deduplicated)
+    input_data = '\n'.join(f'{float(x)!r} {float(y)!r}' for x, y in points_deduplicated)
 
     rc, data = skeleton_wasm.run(input_data)
 
@@ -218,19 +218,43 @@ class Skeletonator:
             adjacency.setdefault(c1, set()).add(c2)
             adjacency.setdefault(c2, set()).add(c1)
 
-        # Vertex tracks follow the skeleton towards strictly increasing time. A node with more than one way up is a
-        # split event (or a vertex event), beyond which the offset outline is no longer a single polygon.
+        # Vertex tracks follow the skeleton towards strictly increasing time. Nodes joined by constant-time edges (e.g.
+        # where two parallel edges of the outline meet) form a single event. An event with more than one way up is a
+        # split (or vertex) event, beyond which the offset outline is no longer a single polygon: a reflex vertex
+        # hitting an edge, or a neck between two reflex corners pinching off.
+        teps = 1e-9 * scale
         self.radius = max(n.time for n in self.skeleton_nodes)
         self.divergent = set()
         self.arc_map = {}
+        self._arc_exit = {} # node -> node of its constant-time group from which the way up leaves
         split_time = self.radius
-        for n, nbrs in adjacency.items():
-            up = [m for m in nbrs if m.time > n.time + self.TIME_EPS]
-            if len(up) > 1:
-                self.divergent.add(n)
-                split_time = min(split_time, n.time)
-            elif len(up) == 1:
-                self.arc_map[n] = up[0]
+        seen = set()
+        for n0 in adjacency:
+            if n0 in seen:
+                continue
+            group, todo = [], [n0]
+            seen.add(n0)
+            while todo:
+                n = todo.pop()
+                group.append(n)
+                for m in adjacency[n]:
+                    if m not in seen and abs(m.time - n.time) <= teps:
+                        seen.add(m)
+                        todo.append(m)
+            members = set(group)
+            ups = {}
+            for n in group:
+                for m in adjacency[n]:
+                    if m not in members and m.time > n.time + teps:
+                        ups.setdefault(m, n)
+            if len(ups) > 1:
+                self.divergent.update(group)
+                split_time = min(split_time, min(n.time for n in group))
+            elif len(ups) == 1:
+                (up, exit_node), = ups.items()
+                for n in group:
+                    self.arc_map[n] = up
+                    self._arc_exit[n] = exit_node
         self.min_radius = split_time
         self.max_depth = split_time
 
@@ -245,6 +269,9 @@ class Skeletonator:
             self.node_map[(x, y)] = start
             track = [start]
             while track[-1] in self.arc_map and track[-1] not in self.divergent:
+                exit_node = self._arc_exit[track[-1]]
+                if exit_node is not track[-1]:
+                    track.append(exit_node) # move along the constant-time group to where the way up leaves
                 track.append(self.arc_map[track[-1]])
             self.tracks.append(track)
         self._track_times = [[n.time for n in track] for track in self.tracks]
@@ -272,6 +299,9 @@ class Skeletonator:
             pts = [self.track_position(i, d) for i in range(n)]
             for i in range(n):
                 min_len[i] = min(min_len[i], math.dist(pts[i], pts[(i+1) % n]))
+        # Edges that (nearly) collapse within the depth range get a span of exactly zero, so that all vertices of a
+        # collapsing group share exactly the same angle. Tiny non-zero spans would break the tie resolution in _locate.
+        min_len = [l if l > 1e-9 * self.circumference else 0.0 for l in min_len]
         total = sum(min_len)
         if total <= 1e-9 * self.circumference:
             # Everything collapses at max_depth: fall back to outline edge lengths
@@ -281,8 +311,10 @@ class Skeletonator:
         self.vertex_angles = [0.0]
         for l in min_len[:-1]:
             self.vertex_angles.append(self.vertex_angles[-1] + l / total)
-        # Vertices at the end that share their angle with vertex 0 (i.e. a run of collapsing edges across vertex 0)
-        # must have an angle of exactly 1 so that angle comparisons are exact.
+        # Quantize the angles to a binary grid, so that `revolution + angle` is computed exactly and angle comparisons
+        # (in particular ties between vertices of a collapsing group) are exact. Vertices at the end that share their
+        # angle with vertex 0 (a run of collapsing edges across vertex 0) get an angle of exactly 1.
+        self.vertex_angles = [round(a * self.ANGLE_GRID) / self.ANGLE_GRID for a in self.vertex_angles]
         self.vertex_angles = [1.0 if 1.0 - a < 1e-12 else a for a in self.vertex_angles]
         self.edge_spans = [b - a for a, b in itertools.pairwise(self.vertex_angles + [1.0])]
 
@@ -330,6 +362,7 @@ class Skeletonator:
         return arcs, points
 
     ANGLE_EPS = 1e-9
+    ANGLE_GRID = 2**40 # vertex angles are multiples of 1/ANGLE_GRID, exact in sums with integers below 2**12
 
     def snap_angle(self, t):
         """ Snap an angle to the nearest vertex angle if it is within ANGLE_EPS of it. Angles of arm ends are computed

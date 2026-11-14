@@ -129,6 +129,19 @@ def _seg_seg_distance(a, b, c, d):
     return min(pt_seg(a, c, d), pt_seg(b, c, d), pt_seg(c, a, b), pt_seg(d, a, b))
 
 
+def _split_by_angle(points, angles, max_span):
+    """ Yield (p1, p2, t1, t2) for the segments of a polyline with point angles, skipping zero-length segments and
+    splitting segments that span more than max_span revolutions. """
+    for (p1, p2), (t1, t2) in zip(zip(points, points[1:]), zip(angles, angles[1:])):
+        if p1 == p2:
+            continue
+        n = max(1, ceil(abs(t2 - t1) / max_span))
+        for i in range(n):
+            q1 = (p1[0] + (p2[0]-p1[0])*i/n, p1[1] + (p2[1]-p1[1])*i/n)
+            q2 = (p1[0] + (p2[0]-p1[0])*(i+1)/n, p1[1] + (p2[1]-p1[1])*(i+1)/n)
+            yield q1, q2, t1 + (t2-t1)*i/n, t1 + (t2-t1)*(i+1)/n
+
+
 def min_turn_spacing(arms, search_radius, min_turn_separation=0.5):
     """ Find the smallest centerline distance between neighboring turns of a set of spiral arms on one layer.
 
@@ -141,18 +154,10 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5):
     nothing closer was found.
     """
     segs = []
-    max_span = min_turn_separation / 10
     for arm_idx, (points, angles) in enumerate(arms):
-        for (p1, p2), (t1, t2) in zip(zip(points, points[1:]), zip(angles, angles[1:])):
-            if p1 == p2:
-                continue
-            # Split long segments, so that the turn separation test is accurate to max_span
-            n = max(1, ceil(abs(t2 - t1) / max_span))
-            for i in range(n):
-                q1 = (p1[0] + (p2[0]-p1[0])*i/n, p1[1] + (p2[1]-p1[1])*i/n)
-                q2 = (p1[0] + (p2[0]-p1[0])*(i+1)/n, p1[1] + (p2[1]-p1[1])*(i+1)/n)
-                u1, u2 = t1 + (t2-t1)*i/n, t1 + (t2-t1)*(i+1)/n
-                segs.append((q1, q2, arm_idx, min(u1, u2), max(u1, u2)))
+        # Split long segments, so that the turn separation test is accurate to a tenth of the separation
+        for q1, q2, u1, u2 in _split_by_angle(points, angles, min_turn_separation / 10):
+            segs.append((q1, q2, arm_idx, min(u1, u2), max(u1, u2)))
 
     cell = search_radius
     grid = {}
@@ -529,19 +534,28 @@ class PlanarInductor():
         self.logger.info(f'Nominal spiral pitch {self.spiral_pitch:.3f} mm, '
                          f'smallest distance between turns {self.projected_spiral_pitch:.3f} mm.')
 
+        if self.projected_spiral_pitch < 0.5 * self.spiral_pitch and self.min_pitch_location is not None:
+            x, y = self.min_pitch_location
+            pitch_hint = (f' Neighboring turns come as close as {self.projected_spiral_pitch:.2f} mm (nominal pitch '
+                          f'{self.spiral_pitch:.2f} mm) near ({x:.2f}, {y:.2f}). This happens when the annular width '
+                          f'reaches into a narrow part of the outline that collapses before the innermost turn; a '
+                          f'smaller annular width or fewer twists avoid it.')
+        else:
+            pitch_hint = ''
+
         if self.trace_width is None and self.clearance is None:
             self.clearance = 0.15
             warnings.warn(f'Warning: Neither trace width nor clearance given. Defaulting to {self.clearance:.2f} mm clearance.')
 
         if self.trace_width is None:
             if round(self.clearance, 3) >= round(self.projected_spiral_pitch, 3):
-                raise ValueError(f'Given clearance of {self.clearance:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.')
+                raise ValueError(f'Given clearance of {self.clearance:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce clearance or increase the size of the coil.' + pitch_hint)
             self.trace_width = self.projected_spiral_pitch - self.clearance
             self.logger.info(f'Calculated trace width for {self.clearance:.2f} mm clearance is {self.trace_width:.2f} mm.')
 
         elif self.clearance is None:
             if round(self.trace_width, 3) >= round(self.projected_spiral_pitch, 3):
-                raise ValueError(f'Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce trace width or increase the size of the coil.')
+                raise ValueError(f'Given trace width of {self.trace_width:.2f} mm is larger than the projected spiral pitch of {self.projected_spiral_pitch:.2f} mm. Reduce trace width or increase the size of the coil.' + pitch_hint)
             self.clearance = self.projected_spiral_pitch - self.trace_width
             self.logger.info(f'Calculated clearance for {self.trace_width:.2f} mm trace width is {self.clearance:.2f} mm.')
 
@@ -675,7 +689,7 @@ class PlanarInductor():
         best, where = inf, None
         for layer, layer_arms in enumerate(self.spiral_center_lines()):
             for arm, (points, angles) in enumerate(layer_arms):
-                for (p1, p2), (t1, t2) in zip(zip(points, points[1:]), zip(angles, angles[1:])):
+                for p1, p2, t1, t2 in _split_by_angle(points, angles, 0.05):
                     for v, connections in vias:
                         # Skip the part of an arm that leads into the via itself
                         tv = connections.get((layer, arm))

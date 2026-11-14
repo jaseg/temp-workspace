@@ -129,3 +129,30 @@ def test_resistance_uses_full_arm_length():
         m2 = build_model(dict(spec('circle50x25_n5k1'), turns=9))
     # More turns means a longer track. The track length used to be computed from a single sector.
     assert m2.track_length > 1.5 * m1.track_length
+
+
+def test_neck_pinch_is_a_split():
+    # Two reflex corners facing each other pinch the outline off at a constant-time skeleton edge. Each end of that
+    # edge has only one way up, so a node-by-node test misses the split.
+    from kicoil import skeletonator
+    sk = skeletonator.Skeletonator(corpus.neck(40, 20, 8))
+    assert math.isclose(sk.max_depth, 4.0, abs_tol=1e-6)
+    with pytest.raises(ValueError):
+        build_model(poly_spec(corpus.neck(40, 20, 8), 5.0, 5, 1))
+
+
+def test_arm_end_on_collapsed_group_at_half_turn():
+    # The collapsing group at the ellipse's left tip has angle 0.49999999999999994. Adding the revolution number
+    # rounds that to an integer + 0.5, which used to resolve the tie to the wrong end of the group, so an arm end cut
+    # across the whole tip.
+    model, intent, rep = layout(spec('ellipse3to2_a0.90_n9k4'))
+    assert rep.crossings == 0 and rep.ok_connectivity
+    assert model.projected_spiral_pitch > 0.5 * model.spiral_pitch
+
+
+def test_via_clearance_on_long_segments():
+    # A long center line segment that reaches into the via's own half turn used to be measured against the via,
+    # which pushed the via offset far out and created real violations.
+    _model, intent, rep = layout(spec('subdiv_rect_jitter_a0.90_n3k1'))
+    assert rep.worst_via_deficit <= 0.05 * intent.clearance + 1e-4
+    assert rep.worst_clearance_deficit <= 0.05 * intent.clearance + 1e-4

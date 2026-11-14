@@ -137,6 +137,14 @@ def random_starlike(n, d, rng, depth=0.35):
     return _ccw(pts)
 
 
+def neck(w, h, neck_width, notch=2.0):
+    """ Rectangle pinched in the middle by two notches from top and bottom """
+    a = (h - neck_width) / 2
+    pts = [(-w/2, -h/2), (-notch/2, -h/2), (-notch/2, -h/2 + a), (notch/2, -h/2 + a), (notch/2, -h/2), (w/2, -h/2),
+           (w/2, h/2), (notch/2, h/2), (notch/2, h/2 - a), (-notch/2, h/2 - a), (-notch/2, h/2), (-w/2, h/2)]
+    return _ccw(pts)
+
+
 def max_depth(poly):
     """ Radius of the maximum inscribed circle """
     p = Polygon(poly)
@@ -182,6 +190,7 @@ def base_shapes():
         'l_shape': (l_shape(40, 40, 15), ['reflex']),
         'u_shape': (u_shape(40, 30, 12), ['reflex']),
         'd_shape': (d_shape(40), ['convex', 'many']),
+        'neck': (neck(40, 20, 8), ['reflex', 'neck']),
     }
     for i in range(4):
         shapes[f'rconvex{i}'] = (random_convex(8, 40, rng), ['convex', 'random'])
