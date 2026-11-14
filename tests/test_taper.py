@@ -292,3 +292,10 @@ def test_checker_verdict_does_not_depend_on_segmentation(impl, name):
     assert k1 == k2
     for attr in ('worst_clearance_deficit', 'worst_via_deficit', 'worst_self_short'):
         assert getattr(r1, attr) == pytest.approx(getattr(r2, attr), abs=1e-6), attr
+
+
+def test_neighboring_pieces_are_not_kept_apart():
+    """ The same-turn constraint must not catch neighboring pieces along the conductor: a deep annulus with many turns
+    keeps most of its taper gain (a wrong path distance there once pinned every width to the constant width) """
+    model, res = tapered('kicoil', 'triangle_a0.90_n9k4')
+    assert res.gain > 1.8

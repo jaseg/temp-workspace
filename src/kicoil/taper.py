@@ -533,14 +533,15 @@ def _different_turn(o1, o2, s_far, arm=False):
 
 def _self_relevant(o1, o2, gap, w0, s_near):
     """ Owners (conductor, theta range, phi range, s range) of the same turn whose copper must not merge: at least
-    s_near apart along the path somewhere, and at least SELF_SEP revolutions apart in winding angle or further apart
-    along the path than SELF_PATH_RATIO times their center line distance `gap` plus w0 (largest differences between the
-    pieces' ends, so that every pair geomcheck could see as a self short is included) """
+    s_near apart along the path somewhere (largest path distance) and at least SELF_SEP revolutions apart in winding
+    angle (largest difference; so that every pair geomcheck could see as a self short is included), or further apart
+    along the path (smallest distance) than SELF_PATH_RATIO times their center line distance `gap` plus w0 """
     if o1[0] != o2[0]:
         return False
     ph = max(abs(o1[3] - o2[3]), abs(o1[3] - o2[4]), abs(o1[4] - o2[3]), abs(o1[4] - o2[4]))
-    ds = max(abs(o1[5] - o2[5]), abs(o1[5] - o2[6]), abs(o1[6] - o2[5]), abs(o1[6] - o2[6])) # largest path distance
-    return ds >= s_near and (ph >= SELF_SEP or ds >= SELF_PATH_RATIO * (gap + w0))
+    dsx = max(abs(o1[5] - o2[5]), abs(o1[5] - o2[6]), abs(o1[6] - o2[5]), abs(o1[6] - o2[6])) # largest path distance
+    ds = _interval_gap((min(o1[5], o1[6]), max(o1[5], o1[6])), (min(o2[5], o2[6]), max(o2[5], o2[6]))) # smallest
+    return dsx >= s_near and (ph >= SELF_SEP or ds >= SELF_PATH_RATIO * (gap + w0))
 
 
 def _douglas_peucker(P, tol):
@@ -776,9 +777,10 @@ def taper_layout(model, options=None, **kw):
         if with_self:
             # same turn, but far enough apart (in winding angle, or along the path compared with the distance) that
             # merging would short part of the turn: keep min(clearance, constant layout gap)
-            # (largest path distance between the pieces: constrain every pair that could be far apart somewhere)
+            # (s_near against the largest path distance between the pieces, so that every pair that is that far apart
+            # somewhere counts; the path ratio uses the smallest, so that neighboring pieces never count)
             dsx = np.max(np.abs(SS[ia][:, :, None] - SS[ib][:, None, :]), axis=(1, 2))
-            selfp = ~diff & (dsx >= s_near) & ((ph >= SELF_SEP) | (dsx >= SELF_PATH_RATIO * (d + w0)))
+            selfp = ~diff & (dsx >= s_near) & ((ph >= SELF_SEP) | (ds >= SELF_PATH_RATIO * (d + w0)))
             diff = diff | selfp
             bound = np.where(selfp, np.maximum(bound, 2 * w0), bound)
         return ia[diff], ib[diff], d[diff], bound[diff]
