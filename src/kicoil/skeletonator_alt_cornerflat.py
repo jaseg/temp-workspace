@@ -115,6 +115,7 @@ class CornerFlatSkeletonator(base.Skeletonator):
 
     W_EPS = 1e-9
     OUTLINE_TOLERANCE = 0.001 # mm, see simplify_outline
+    MERGE_TOL = 1e-4 # mm, see spiral
 
     def __init__(self, poly, ref_depth=None, ramp_margin=0.0):
         self.ramp_margin = ramp_margin
@@ -666,15 +667,19 @@ class CornerFlatSkeletonator(base.Skeletonator):
         else:
             depth_fn = lambda t: d1 + (d2 - d1) * (self.warp(t) - w1) / (w2 - w1)
 
+        # Vertices, ramp starts and ramp ends can lie within nanometers of each other (short edges of finely divided
+        # outlines). Pieces that short have an arbitrary direction, which shows up as hairpins in the copper, and near a
+        # via their ends get joined to it. Drop points closer than MERGE_TOL to the previous one (keeping both ends).
+        tol = self.MERGE_TOL
         points = [self.position(t1, d1)]
         angles = [t1]
         for a in self.iter_breaks(t1, t2):
             p = self.position(a, depth_fn(a))
-            if math.dist(p, points[-1]) > 1e-12:
+            if math.dist(p, points[-1]) > tol:
                 points.append(p)
                 angles.append(a)
         p = self.position(t2, d2)
-        if math.dist(p, points[-1]) > 1e-12 or len(points) == 1:
+        if math.dist(p, points[-1]) > tol or len(points) == 1:
             points.append(p)
             angles.append(t2)
         else:
