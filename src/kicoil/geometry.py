@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 import sys
 from math import *
 
+import numpy as np
+
 from gerbonara.cad.kicad.footprints import Footprint
 from gerbonara.cad.kicad.primitives import Zone, Hatch, ZoneKeepout, ZonePolygon, XYCoord
 
@@ -102,12 +104,8 @@ def arc_approximate(points, trace_width, layer, tolerance=0.02, level=0):
 
 
 def polygon_is_clockwise(coords):
-    # https://en.wikipedia.org/wiki/Curve_orientation
-    xb, yb, i = min([(x, y, i) for i, (x, y) in enumerate(coords)])
-    xa, ya = coords[(i-1) % len(coords)]
-    xc, yc = coords[(i+1) % len(coords)]
-    det = (xa*yb + xb*yc + xc*ya) - (xa*yc + xb * ya + xc * yb)
-    return det < 0
+    """ Orientation from the polygon's signed (shoelace) area. Works when the path repeats its start point. """
+    return skeletonator.polygon_is_clockwise(coords)
 
 
 def _seg_seg_distance(a, b, c, d):
@@ -142,6 +140,93 @@ def _split_by_angle(points, angles, max_span):
             yield q1, q2, t1 + (t2-t1)*i/n, t1 + (t2-t1)*(i+1)/n
 
 
+def _split_by_angle_np(points, angles, max_span):
+    """ Vectorized `_split_by_angle`: returns arrays (q1, q2, u1, u2) of the pieces, with q1, q2 of shape (n, 2). """
+    pts = np.asarray(points, dtype=float).reshape(-1, 2)
+    ang = np.asarray(angles, dtype=float)
+    a, b, ta, tb = pts[:-1], pts[1:], ang[:-1], ang[1:]
+    keep = ~np.all(a == b, axis=1)
+    a, b, ta, tb = a[keep], b[keep], ta[keep], tb[keep]
+    n = np.maximum(1, np.ceil(np.abs(tb - ta) / max_span)).astype(np.int64)
+    idx = np.repeat(np.arange(len(a)), n)
+    k = np.arange(len(idx)) - np.repeat(np.cumsum(n) - n, n)
+    nn = n[idx]
+    f0, f1 = k / nn, (k + 1) / nn
+    a, b, ta, tb = a[idx], b[idx], ta[idx], tb[idx]
+    return (a + (b - a) * f0[:, None], a + (b - a) * f1[:, None], ta + (tb - ta) * f0, ta + (tb - ta) * f1)
+
+
+def _point_seg_distance_np(p, s1, s2):
+    d = s2 - s1
+    l2 = np.einsum('ij,ij->i', d, d)
+    t = np.einsum('ij,ij->i', p - s1, d) / np.where(l2 == 0, 1.0, l2)
+    t = np.clip(np.where(l2 == 0, 0.0, t), 0.0, 1.0)
+    return np.hypot(*(p - (s1 + d * t[:, None])).T)
+
+
+def _seg_seg_distance_np(a, b, c, d):
+    """ Vectorized `_seg_seg_distance` for arrays of segments ab and cd, shape (n, 2) each """
+    def orient(p, q, r):
+        return (q[:, 0]-p[:, 0])*(r[:, 1]-p[:, 1]) - (q[:, 1]-p[:, 1])*(r[:, 0]-p[:, 0])
+    d1, d2, d3, d4 = orient(c, d, a), orient(c, d, b), orient(a, b, c), orient(a, b, d)
+    crossing = (((d1 > 0) != (d2 > 0)) & (d1 != 0) & (d2 != 0) & ((d3 > 0) != (d4 > 0)) & (d3 != 0) & (d4 != 0))
+    dist = np.minimum(np.minimum(_point_seg_distance_np(a, c, d), _point_seg_distance_np(b, c, d)),
+                      np.minimum(_point_seg_distance_np(c, a, b), _point_seg_distance_np(d, a, b)))
+    return np.where(crossing, 0.0, dist)
+
+
+def _candidate_pairs(lo, hi, radius, max_pairs=2_000_000):
+    """ Yield arrays (i, j), i < j, of all pairs of boxes [lo, hi] (arrays of shape (n, 2)) that come closer than radius,
+    plus some pairs that do not, in batches. Each pair is yielded once. Uses a uniform grid with cell size radius: every
+    box, grown by radius/2, is entered into all cells it touches. Two boxes closer than radius share at least one cell,
+    and a pair is only reported in the cell that contains the lower left corner of the intersection of the grown
+    boxes. """
+    n = len(lo)
+    if n < 2:
+        return
+    cell = radius
+    glo, ghi = lo - radius/2, hi + radius/2
+    c0 = np.floor(glo / cell).astype(np.int64)
+    c1 = np.floor(ghi / cell).astype(np.int64)
+    cmin = c0.min(axis=0)
+    c0, c1 = c0 - cmin, c1 - cmin
+    width = int(c1[:, 1].max()) + 1
+    c0x, c0y = c0[:, 0], c0[:, 1]
+    nx, ny = c1[:, 0] - c0x + 1, c1[:, 1] - c0y + 1
+    counts = nx * ny
+    seg = np.repeat(np.arange(n), counts)
+    k = np.arange(len(seg)) - np.repeat(np.cumsum(counts) - counts, counts)
+    nys = ny[seg]
+    keys = (c0x[seg] + k // nys) * width + c0y[seg] + k % nys
+    order = np.argsort(keys, kind='stable')
+    keys, seg = keys[order], seg[order]
+    _uniq, starts, sizes = np.unique(keys, return_index=True, return_counts=True)
+    # Process groups (cells) in batches of at most about max_pairs pairs
+    pairs_per_group = sizes * (sizes - 1) // 2
+    cum = np.cumsum(pairs_per_group)
+    bounds = [0]
+    while bounds[-1] < len(sizes):
+        base = cum[bounds[-1] - 1] if bounds[-1] else 0
+        bounds.append(max(bounds[-1] + 1, int(np.searchsorted(cum, base + max_pairs, side='right'))))
+    gx, gy = glo[:, 0], glo[:, 1]
+    for g0, g1 in itertools.pairwise(bounds):
+        st, sz = starts[g0:g1], sizes[g0:g1]
+        pos = np.arange(st[0], st[-1] + sz[-1])
+        partners = np.repeat(st + sz, sz) - pos - 1
+        total = int(partners.sum())
+        if total == 0:
+            continue
+        I = np.repeat(pos, partners)
+        J = I + 1 + (np.arange(total) - np.repeat(np.cumsum(partners) - partners, partners))
+        si, sj = seg[I], seg[J]
+        # Reference cell of the pair: the cell containing the lower left corner of the intersection of the grown boxes
+        rx = np.floor(np.maximum(gx[si], gx[sj]) / cell).astype(np.int64) - cmin[0]
+        ry = np.floor(np.maximum(gy[si], gy[sj]) / cell).astype(np.int64) - cmin[1]
+        sel = (rx * width + ry) == keys[I]
+        si, sj = si[sel], sj[sel]
+        yield np.minimum(si, sj), np.maximum(si, sj)
+
+
 def min_turn_spacing(arms, search_radius, min_turn_separation=0.5):
     """ Find the smallest centerline distance between neighboring turns of a set of spiral arms on one layer.
 
@@ -153,41 +238,45 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5):
     Returns (distance, location). Distances above search_radius are not reported, (search_radius, None) is returned if
     nothing closer was found.
     """
-    segs = []
-    for arm_idx, (points, angles) in enumerate(arms):
-        # Split long segments, so that the turn separation test is accurate to a tenth of the separation
-        for q1, q2, u1, u2 in _split_by_angle(points, angles, min_turn_separation / 10):
-            segs.append((q1, q2, arm_idx, min(u1, u2), max(u1, u2)))
-
-    cell = search_radius
-    grid = {}
-    def cells(p1, p2, margin):
-        x0, x1 = min(p1[0], p2[0]) - margin, max(p1[0], p2[0]) + margin
-        y0, y1 = min(p1[1], p2[1]) - margin, max(p1[1], p2[1]) + margin
-        for gx in range(floor(x0/cell), floor(x1/cell) + 1):
-            for gy in range(floor(y0/cell), floor(y1/cell) + 1):
-                yield gx, gy
-
-    for idx, (p1, p2, *_rest) in enumerate(segs):
-        for c in cells(p1, p2, 0):
-            grid.setdefault(c, []).append(idx)
+    pieces = [_split_by_angle_np(points, angles, min_turn_separation / 10) for points, angles in arms]
+    if not pieces:
+        return search_radius, None
+    P = np.concatenate([q1 for q1, _q2, _u1, _u2 in pieces])
+    Q = np.concatenate([q2 for _q1, q2, _u1, _u2 in pieces])
+    U1 = np.concatenate([u1 for _q1, _q2, u1, _u2 in pieces])
+    U2 = np.concatenate([u2 for _q1, _q2, _u1, u2 in pieces])
+    arm = np.concatenate([np.full(len(q1), i) for i, (q1, _q2, _u1, _u2) in enumerate(pieces)])
+    tlo, thi = np.minimum(U1, U2), np.maximum(U1, U2)
+    # Cut pieces that are long compared to the search radius into shorter pieces for the spatial grid. The short pieces
+    # keep the angle interval of the piece they belong to, so the same-turn test does not change.
+    n_sub = np.maximum(1, np.ceil(np.hypot(*(Q - P).T) / (4 * search_radius))).astype(np.int64)
+    if n_sub.max() > 1:
+        idx = np.repeat(np.arange(len(P)), n_sub)
+        k = (np.arange(len(idx)) - np.repeat(np.cumsum(n_sub) - n_sub, n_sub))[:, None]
+        nn = n_sub[idx][:, None]
+        P, Q = P[idx] + (Q[idx] - P[idx]) * (k / nn), P[idx] + (Q[idx] - P[idx]) * ((k + 1) / nn)
+        tlo, thi, arm = tlo[idx], thi[idx], arm[idx]
+    lo, hi = np.minimum(P, Q), np.maximum(P, Q)
+    lox, loy, hix, hiy = lo[:, 0], lo[:, 1], hi[:, 0], hi[:, 1]
 
     best, where = search_radius, None
-    for idx, (p1, p2, arm, t_lo, t_hi) in enumerate(segs):
-        seen = set()
-        for c in cells(p1, p2, search_radius):
-            for jdx in grid.get(c, ()):
-                if jdx <= idx or jdx in seen:
-                    continue
-                seen.add(jdx)
-                q1, q2, arm_j, u_lo, u_hi = segs[jdx]
-                if arm_j == arm and max(u_lo - t_hi, t_lo - u_hi) < min_turn_separation:
-                    continue
-                d = _seg_seg_distance(p1, p2, q1, q2)
-                if d < best:
-                    best, where = d, ((p1[0]+p2[0])/2, (p1[1]+p2[1])/2)
+    for i, j in _candidate_pairs(lo, hi, search_radius):
+        # Lower bound of the distance from the bounding boxes
+        gx = np.maximum(0, np.maximum(lox[i] - hix[j], lox[j] - hix[i]))
+        gy = np.maximum(0, np.maximum(loy[i] - hiy[j], loy[j] - hiy[i]))
+        sel = gx*gx + gy*gy < best*best
+        i, j = i[sel], j[sel]
+        # Pieces of the same arm less than min_turn_separation apart belong to the same turn
+        same_turn = (arm[i] == arm[j]) & (np.maximum(tlo[j] - thi[i], tlo[i] - thi[j]) < min_turn_separation)
+        i, j = i[~same_turn], j[~same_turn]
+        if not len(i):
+            continue
+        d = _seg_seg_distance_np(P[i], Q[i], P[j], Q[j])
+        k = int(np.argmin(d))
+        if d[k] < best:
+            best = float(d[k])
+            where = tuple(float(c) for c in (P[i[k]] + Q[i[k]]) / 2)
     return best, where
-
 
 
 class Shape:
@@ -257,6 +346,9 @@ class CircleShape(Shape):
 class OffsetShape(Shape):
     def __post_init__(self):
         self.sk = skeletonator.Skeletonator(self.polygon)
+        # The skeletonator normalizes the outline (counter-clockwise, no repeated points). Use the same outline here, so
+        # that vertex indices agree.
+        self.polygon = list(self.sk.poly)
         if self.annular_width >= self.sk.max_depth:
             raise ValueError(f'Annular width ({self.annular_width:.2f}) is too large. Must be less than {self.sk.max_depth:.2f}')
         if self.annular_width <= 0:
@@ -304,7 +396,14 @@ class OffsetShape(Shape):
         return self.sk.project_point(a/(2*pi) % 1, r, r_ref=r_ref)
 
 
+    KEEPOUT_MITER_LIMIT = 2.0 # keepout corners are cut off at this multiple of the margin from the outline's corner
+
     def offset_exterior(self, margin):
+        """ Outline offset outwards by margin (inwards for a negative margin), e.g. for the keepout zone. """
+        if margin > 0:
+            # Extrapolating the skeleton tracks outwards is only valid up to the first event of the exterior skeleton,
+            # so compute a real polygon offset.
+            return skeletonator.offset_polygon_outward(self.polygon, margin, miter_limit=self.KEEPOUT_MITER_LIMIT)
         # do_spiral returns the closing point twice
         return [p for p, _r_ref in self.sk.do_spiral(0, 1, self.outer_radius + margin, self.outer_radius + margin)][:-1]
 
@@ -686,24 +785,38 @@ class PlanarInductor():
                 vias.append((self.shape.project_point(r, start_angle),
                              {(0, i): start_angle/(2*pi), (1, j): self.arm_angles(j)[2]/(2*pi)}))
 
+        center_lines = self.spiral_center_lines()
+        cached = getattr(self, '_via_pieces', None)
+        if cached is None or cached[0] is not center_lines:
+            # Arm center lines split into pieces of at most 0.05 revolutions, so that the part of an arm that leads into
+            # a via can be skipped accurately. Cached for the via offset search, which calls this repeatedly.
+            cached = self._via_pieces = (center_lines, {
+                (layer, arm): _split_by_angle_np(points, angles, 0.05)
+                for layer, layer_arms in enumerate(center_lines) for arm, (points, angles) in enumerate(layer_arms)})
         best, where = inf, None
-        for layer, layer_arms in enumerate(self.spiral_center_lines()):
-            for arm, (points, angles) in enumerate(layer_arms):
-                for p1, p2, t1, t2 in _split_by_angle(points, angles, 0.05):
-                    for v, connections in vias:
-                        # Skip the part of an arm that leads into the via itself
-                        tv = connections.get((layer, arm))
-                        if tv is not None and abs(t1 - tv) < 0.5 and abs(t2 - tv) < 0.5:
-                            continue
-                        d = _seg_seg_distance(p1, p2, v, v)
-                        if d < best:
-                            best, where = d, v
+        for (layer, arm), (p1, p2, t1, t2) in cached[1].items():
+            if not len(p1):
+                continue
+            for v, connections in vias:
+                # Skip the part of an arm that leads into the via itself
+                tv = connections.get((layer, arm))
+                if tv is not None:
+                    sel = ~((np.abs(t1 - tv) < 0.5) & (np.abs(t2 - tv) < 0.5))
+                    a, b = p1[sel], p2[sel]
+                    if not len(a):
+                        continue
+                else:
+                    a, b = p1, p2
+                d = float(_point_seg_distance_np(np.broadcast_to(np.asarray(v, dtype=float), a.shape), a, b).min())
+                if d < best:
+                    best, where = d, v
         return best - self.via_diameter/2 - self.trace_width/2, where
 
     def measure_turn_spacing(self):
         """ Smallest center line distance between neighboring turns on the same layer, and where it occurs """
         arms = self.spiral_center_lines()
-        search_radius = 1.5 * self.spiral_pitch
+        # The result is capped at the nominal pitch, so nothing further away needs to be looked at
+        search_radius = self.spiral_pitch * (1 + 1e-9)
         best, where = min(min_turn_spacing(layer_arms, search_radius) for layer_arms in arms if layer_arms)
         if where is None:
             # Nothing closer than the search radius: e.g. less than a single turn per layer. Fall back to the nominal

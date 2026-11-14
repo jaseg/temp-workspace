@@ -44,12 +44,239 @@ def edge_cycle(points):
     return itertools.pairwise(itertools.chain(points, points[:1]))
 
 
+def polygon_signed_area(points):
+    """ Signed area of a polygon (shoelace formula), positive for counter-clockwise polygons. Repeated points, e.g. a
+    closing point equal to the first one, do not change the result. """
+    n = len(points)
+    if n < 3:
+        return 0.0
+    x0, y0 = points[0]
+    area = 0.0
+    for (x1, y1), (x2, y2) in itertools.pairwise(points[1:]):
+        # Relative to the first point to limit cancellation for polygons far away from the origin
+        area += (x1 - x0)*(y2 - y0) - (x2 - x0)*(y1 - y0)
+    return area / 2
+
+
 def polygon_is_clockwise(points):
-    (x1, y1, i), *_rest = sorted((x, y, i) for i, (x, y) in enumerate(points))
-    x0, y0 = points[(i-1)%len(points)]
-    x2, y2 = points[(i+1)%len(points)]
-    det = (x0*y1 + x1*y2 + x2*y0) - (x2*y1 + x1*y0 + x0*y2)
-    return det < 0
+    """ Orientation of a simple polygon from its signed area. Unlike a test at a single extreme vertex, this works when
+    the polygon repeats a point (e.g. the start point at the end, as SVG paths often do). """
+    return polygon_signed_area(points) < 0
+
+
+def clean_polygon(points):
+    """ Return the polygon as a list of float tuples in counter-clockwise order, with consecutive duplicate points
+    (including a closing point equal to the first point) removed. Vertex 0 stays vertex 0. Raises ValueError for
+    polygons that have fewer than three distinct points, non-finite coordinates or zero area. """
+    pts = []
+    for p in points:
+        x, y = p
+        x, y = float(x), float(y)
+        if not (math.isfinite(x) and math.isfinite(y)):
+            raise ValueError(f'Polygon has a non-finite coordinate ({x}, {y})')
+        if not pts or (x, y) != pts[-1]:
+            pts.append((x, y))
+    while len(pts) > 1 and pts[-1] == pts[0]:
+        pts.pop()
+    if len(pts) < 3:
+        raise ValueError(f'Polygon must have at least 3 distinct points, it has {len(pts)}')
+    area = polygon_signed_area(pts)
+    if not area or not math.isfinite(area):
+        raise ValueError('Polygon has zero area')
+    if area < 0:
+        pts = pts[:1] + pts[:0:-1]
+    return pts
+
+
+def _remove_collinear(pts, tol):
+    """ Drop vertices that lie on the straight line through their neighbors (within tol), and repeated vertices """
+    pts = list(pts)
+    changed = True
+    while changed and len(pts) > 3:
+        changed = False
+        out = []
+        n = len(pts)
+        for i in range(n):
+            (x0, y0), (x1, y1) = (out[-1] if out else pts[i-1]), pts[i]
+            x2, y2 = pts[(i+1) % n]
+            l = math.hypot(x2 - x0, y2 - y0)
+            if math.hypot(x1 - x0, y1 - y0) <= tol or (
+                    l > tol and abs((x2 - x0)*(y1 - y0) - (y2 - y0)*(x1 - x0)) <= tol * l and
+                    (x1 - x0)*(x2 - x1) + (y1 - y0)*(y2 - y1) >= 0):
+                changed = True
+                continue
+            out.append(pts[i])
+        if len(out) < 3:
+            break
+        pts = out
+    return pts
+
+
+def _outer_boundary(points, tol):
+    """ Boundary of the unbounded face of the arrangement formed by a closed polyline, as a counter-clockwise list of
+    points. The polyline may intersect itself, touch itself and contain collinear overlapping pieces; intersections are
+    computed with tolerance tol. """
+    import numpy as np
+
+    n = len(points)
+    segs = [(points[i], points[(i+1) % n]) for i in range(n)]
+    segs = [(a, b) for a, b in segs if math.dist(a, b) > tol]
+    m = len(segs)
+    A = np.array([a for a, _b in segs])
+    B = np.array([b for _a, b in segs])
+    lo, hi = np.minimum(A, B) - tol, np.maximum(A, B) + tol
+
+    # Parameters at which each segment is cut: its ends, intersections with other segments, and the points where
+    # collinear segments start to overlap
+    cuts = [[0.0, 1.0] for _ in range(m)]
+    def add_cut(i, t):
+        cuts[i].append(min(1.0, max(0.0, t)))
+
+    chunk = max(1, 2_000_000 // max(m, 1))
+    for i0 in range(0, m, chunk):
+        i1 = min(m, i0 + chunk)
+        overlap = ((lo[i0:i1, None, 0] <= hi[None, :, 0]) & (lo[None, :, 0] <= hi[i0:i1, None, 0]) &
+                   (lo[i0:i1, None, 1] <= hi[None, :, 1]) & (lo[None, :, 1] <= hi[i0:i1, None, 1]))
+        ii, jj = np.nonzero(overlap)
+        ii = ii + i0
+        sel = jj > ii
+        for i, j in zip(ii[sel].tolist(), jj[sel].tolist()):
+            (ax, ay), (bx, by) = segs[i]
+            (cx, cy), (dx, dy) = segs[j]
+            rx, ry, sx, sy = bx - ax, by - ay, dx - cx, dy - cy
+            lr, ls = math.hypot(rx, ry), math.hypot(sx, sy)
+            denom = rx*sy - ry*sx
+            qx, qy = cx - ax, cy - ay
+            if abs(denom) > 1e-12 * lr * ls:
+                t = (qx*sy - qy*sx) / denom
+                u = (qx*ry - qy*rx) / denom
+                if -tol/lr <= t <= 1 + tol/lr and -tol/ls <= u <= 1 + tol/ls:
+                    add_cut(i, t)
+                    add_cut(j, u)
+            elif abs(qx*ry - qy*rx) <= tol * lr:
+                # Collinear: cut each segment where the other one's ends lie on it
+                for px, py in ((cx, cy), (dx, dy)):
+                    t = ((px - ax)*rx + (py - ay)*ry) / lr**2
+                    if -tol/lr <= t <= 1 + tol/lr:
+                        add_cut(i, t)
+                for px, py in ((ax, ay), (bx, by)):
+                    u = ((px - cx)*sx + (py - cy)*sy) / ls**2
+                    if -tol/ls <= u <= 1 + tol/ls:
+                        add_cut(j, u)
+
+    # Nodes: cut points, merged within tol
+    node_pos = []
+    grid = {}
+    def node(x, y):
+        key = (math.floor(x / tol), math.floor(y / tol))
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for k in grid.get((key[0]+dx, key[1]+dy), ()):
+                    if math.hypot(node_pos[k][0] - x, node_pos[k][1] - y) <= tol:
+                        return k
+        node_pos.append((x, y))
+        grid.setdefault(key, []).append(len(node_pos) - 1)
+        return len(node_pos) - 1
+
+    adjacency = {}
+    for (a, b), ts in zip(segs, cuts):
+        ids = []
+        for t in sorted(set(ts)):
+            k = node(a[0] + t*(b[0] - a[0]), a[1] + t*(b[1] - a[1]))
+            if not ids or ids[-1] != k:
+                ids.append(k)
+        for k1, k2 in itertools.pairwise(ids):
+            adjacency.setdefault(k1, set()).add(k2)
+            adjacency.setdefault(k2, set()).add(k1)
+
+    # Walk the outer face counter-clockwise, starting at the lowest of the leftmost nodes. At every node, take the
+    # rightmost turn (the smallest counter-clockwise angle from the direction we came from), keeping the unbounded face
+    # on the right.
+    start = min(adjacency, key=lambda k: node_pos[k])
+    back = math.pi / 2 # pretend we arrived heading downwards
+    cur = start
+    out = []
+    first_step = None
+    for _ in range(4 * sum(len(v) for v in adjacency.values()) + 10):
+        x, y = node_pos[cur]
+        best, best_angle = None, None
+        for k in adjacency[cur]:
+            a = math.atan2(node_pos[k][1] - y, node_pos[k][0] - x)
+            rel = (a - back) % (2*math.pi)
+            if rel <= 1e-12: # back where we came from, only if there is no other way
+                rel = 2*math.pi
+            if best is None or rel < best_angle:
+                best, best_angle = k, rel
+        step = (cur, best)
+        if step == first_step:
+            return out
+        if first_step is None:
+            first_step = step
+        out.append((x, y))
+        bx, by = node_pos[best]
+        back = math.atan2(y - by, x - bx)
+        cur = best
+    raise RuntimeError('Could not trace the outer boundary of the offset outline')
+
+
+def offset_polygon_outward(poly, margin, miter_limit=2.0):
+    """ Outward offset of a simple polygon by `margin` with mitered corners. Miters longer than miter_limit * margin are
+    cut off (beveled) at that distance from the corner. Returns the outer boundary of the offset region as a
+    counter-clockwise list of points; bays of the outline that close up are filled.
+
+    The raw offset curve (offset edges joined by miters at convex corners, and by a detour through the original vertex
+    at reflex corners) contains the boundary of the offset region, plus loops wherever the offset is not a simple
+    shift of the outline (short edges between reflex corners, bays that close up). Every point of the raw curve lies in
+    the offset region, so the boundary of its unbounded face is the outer boundary of the offset region.
+    """
+    pts = clean_polygon(poly)
+    xs, ys = [x for x, _y in pts], [y for _x, y in pts]
+    extent = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
+    tol = 1e-9 * (extent + margin) + 1e-12 * max(abs(c) for c in xs + ys)
+    pts = _remove_collinear(pts, tol)
+    if margin <= 0:
+        raise ValueError('margin must be positive')
+    n = len(pts)
+    raw = []
+    for i in range(n):
+        (x0, y0), (x1, y1), (x2, y2) = pts[i-1], pts[i], pts[(i+1) % n]
+        l1, l2 = math.hypot(x1 - x0, y1 - y0), math.hypot(x2 - x1, y2 - y1)
+        d1x, d1y, d2x, d2y = (x1 - x0)/l1, (y1 - y0)/l1, (x2 - x1)/l2, (y2 - y1)/l2
+        n1x, n1y, n2x, n2y = d1y, -d1x, d2y, -d2x # outward normals of the incoming and outgoing edge
+        cross = d1x*d2y - d1y*d2x
+        dot = d1x*d2x + d1y*d2y
+        if cross >= 0:
+            # Convex corner (or straight): miter, cut off at miter_limit
+            bx, by = n1x + n2x, n1y + n2y
+            bl = math.hypot(bx, by)
+            if bl > 1e-9 and margin * 2 / bl <= miter_limit * margin * (1 + 1e-9):
+                # The miter point is at distance margin / cos(half turn angle) = 2 * margin / bl
+                f = 2 * margin / bl**2
+                raw.append((x1 + f*bx, y1 + f*by))
+            else:
+                if bl > 1e-9:
+                    bx, by = bx / bl, by / bl
+                else: # U-turn
+                    bx, by = d1x, d1y
+                lim = miter_limit * margin
+                nb = n1x*bx + n1y*by # same for n2
+                s1 = (lim - margin*nb) / (d1x*bx + d1y*by)
+                s2 = (lim - margin*nb) / -(d2x*bx + d2y*by)
+                raw.append((x1 + margin*n1x + s1*d1x, y1 + margin*n1y + s1*d1y))
+                raw.append((x1 + margin*n2x - s2*d2x, y1 + margin*n2y - s2*d2y))
+        else:
+            # Reflex corner: the mitered inner corner when both edges are long enough for it, else a detour through the
+            # vertex itself (which lies inside the offset region)
+            retract = margin * -cross / (1 + dot) # margin * tan(half turn angle)
+            if dot > 0 and retract <= min(l1, l2):
+                f = margin / (1 + dot)
+                raw.append((x1 + f*(n1x + n2x), y1 + f*(n1y + n2y)))
+            else:
+                raw.append((x1 + margin*n1x, y1 + margin*n1y))
+                raw.append((x1, y1))
+                raw.append((x1 + margin*n2x, y1 + margin*n2y))
+    out = _outer_boundary(raw, tol)
+    return _remove_collinear(out, tol)
 
 
 def polygon_center_of_mass(polygon):
@@ -184,25 +411,36 @@ class Skeletonator:
     TIME_EPS = 1e-9
 
     def __init__(self, poly, ref_depth=None):
+        # Normalize the input: CGAL needs a counter-clockwise polygon without repeated points. Vertex 0 stays vertex 0.
+        poly = clean_polygon(poly)
         self.poly = poly
         self.poly_edges = list(zip(poly, poly[1:] + poly[:1]))
         self.circumference = sum(math.dist(a, b) for a, b in self.poly_edges)
         self.skeleton_nodes, self.skeleton_edges = compute_skeleton(exterior=poly)
         self.debug_arms = []
 
+        # Tolerances. They scale with the polygon's extent (bounding box diagonal), not with its distance from the
+        # origin. skeleton.wasm prints 12 significant digits, so coordinates of nodes that coincide exactly can differ by
+        # about 1e-12 times their magnitude; the floor (100x that) covers polygons far away from the origin.
+        xs, ys = [x for x, _y in poly], [y for _x, y in poly]
+        extent = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
+        magnitude = max(abs(c) for c in xs + ys)
+        float_floor = 1e-10 * magnitude
+        merge_tol = 3e-7 * extent + float_floor # nodes closer than this (in x, y and time) are one node
+        teps = 1e-9 * extent + float_floor # time tolerance for constant-time skeleton edges
+        self.merge_tol, self.teps = merge_tol, teps
+
         # Merge skeleton nodes that coincide (CGAL emits clusters of nodes connected by zero-length edges at degenerate
         # events, e.g. at the center of regular polygons).
-        scale = max(1.0, max(abs(c) for p in poly for c in p))
-        eps = 1e-9 * scale
         canon = {}
         buckets = {}
         for n in sorted(self.skeleton_nodes, key=lambda n: n.time):
-            key = (round(n.x / eps / 1e3), round(n.y / eps / 1e3))
+            key = (math.floor(n.x / merge_tol), math.floor(n.y / merge_tol))
             match = None
             for dx in (-1, 0, 1):
                 for dy in (-1, 0, 1):
                     for m in buckets.get((key[0]+dx, key[1]+dy), ()):
-                        if abs(m.x - n.x) <= 1e3*eps and abs(m.y - n.y) <= 1e3*eps and abs(m.time - n.time) <= 1e3*eps:
+                        if abs(m.x - n.x) <= merge_tol and abs(m.y - n.y) <= merge_tol and abs(m.time - n.time) <= merge_tol:
                             match = m
             if match is None:
                 buckets.setdefault(key, []).append(n)
@@ -222,7 +460,6 @@ class Skeletonator:
         # where two parallel edges of the outline meet) form a single event. An event with more than one way up is a
         # split (or vertex) event, beyond which the offset outline is no longer a single polygon: a reflex vertex
         # hitting an edge, or a neck between two reflex corners pinching off.
-        teps = 1e-9 * scale
         self.radius = max(n.time for n in self.skeleton_nodes)
         self.divergent = set()
         self.arc_map = {}
@@ -258,14 +495,19 @@ class Skeletonator:
         self.min_radius = split_time
         self.max_depth = split_time
 
-        contour_nodes = {}
-        for n in self.skeleton_nodes:
-            if n.time <= self.TIME_EPS:
-                contour_nodes[(round(n.x, 6), round(n.y, 6))] = canon[n]
+        # Match the polygon vertices to the skeleton's contour nodes (time 0). The coordinates CGAL prints are rounded
+        # to 12 significant digits, so they are matched to the nearest contour node instead of by value.
+        contour = sorted({canon[n] for n in self.skeleton_nodes if n.time <= teps}, key=lambda n: (n.x, n.y))
+        contour_x = [n.x for n in contour]
+        match_tol = 1e-6 * extent + float_floor
         self.node_map = {}
         self.tracks = []
         for x, y in poly:
-            start = contour_nodes[(round(x, 6), round(y, 6))]
+            lo = bisect.bisect_left(contour_x, x - match_tol)
+            hi = bisect.bisect_right(contour_x, x + match_tol)
+            start = min(contour[lo:hi], key=lambda n: math.hypot(n.x - x, n.y - y), default=None)
+            if start is None or math.hypot(start.x - x, start.y - y) > match_tol:
+                raise RuntimeError(f'Straight skeleton has no node at polygon vertex ({x}, {y})')
             self.node_map[(x, y)] = start
             track = [start]
             while track[-1] in self.arc_map and track[-1] not in self.divergent:
@@ -274,6 +516,9 @@ class Skeletonator:
                     track.append(exit_node) # move along the constant-time group to where the way up leaves
                 track.append(self.arc_map[track[-1]])
             self.tracks.append(track)
+        if self.max_depth <= 0 or any(len(track) < 2 or track[-1].time <= 0 for track in self.tracks):
+            raise ValueError('Degenerate straight skeleton: the polygon is too small, or too far away from the origin '
+                             'for its size, to be represented with floating point precision.')
         self._track_times = [[n.time for n in track] for track in self.tracks]
 
         self.set_angle_reference(ref_depth)
@@ -319,9 +564,14 @@ class Skeletonator:
         self.edge_spans = [b - a for a, b in itertools.pairwise(self.vertex_angles + [1.0])]
 
     def track_position(self, i, depth):
-        """ Position of polygon vertex i on the offset outline at the given depth. Negative depths are extrapolated
-        linearly along the first arc (this yields a mitered outward offset). Depths beyond the end of the track are
-        clamped to the track's end. """
+        """ Position of polygon vertex i on the offset outline at the given depth. Depths beyond the end of the track are
+        clamped to the track's end.
+
+        Negative depths are extrapolated linearly along the vertex's first skeleton arc. This is only a local
+        extrapolation, valid for small outward distances (e.g. the outer via ring): it is the vertex of a mitered
+        outward offset only until the first event of the *exterior* skeleton. Further out, short edges between reflex
+        vertices invert and convex tips give unbounded miters. Use `offset_polygon_outward` for a real outward offset.
+        """
         track = self.tracks[i]
         times = self._track_times[i]
         if len(track) == 1:
@@ -417,6 +667,8 @@ class Skeletonator:
 
     def iter_vertex_angles(self, t1, t2):
         """ Yield (angle, vertex index) for all vertices with t1 <= angle < t2, in order """
+        if not (math.isfinite(t1) and math.isfinite(t2)):
+            raise ValueError(f'Spiral angles must be finite, got {t1} and {t2}')
         n = len(self.poly)
         k = math.floor(t1) - 1
         while True:
@@ -429,8 +681,13 @@ class Skeletonator:
             k += 1
 
     def spiral(self, t1, t2, d1, d2):
-        """ Return the points and angles of a spiral arm from angle t1 at depth d1 to angle t2 at depth d2 (t1 < t2).
-        The depth changes linearly with the angle. """
+        """ Return the points and angles of a spiral arm from angle t1 at depth d1 to angle t2 at depth d2. The depth
+        changes linearly with the angle. The points are in order from t1 to t2, also when t2 < t1. """
+        if not all(math.isfinite(v) for v in (t1, t2, d1, d2)):
+            raise ValueError(f'Spiral parameters must be finite, got angles {t1}, {t2} and depths {d1}, {d2}')
+        if t2 < t1:
+            points, angles = self.spiral(t2, t1, d2, d1)
+            return points[::-1], angles[::-1]
         t1, t2 = self.snap_angle(t1), self.snap_angle(t2)
         if math.isclose(t1, t2):
             depth_fn = lambda t: d1

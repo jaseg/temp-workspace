@@ -11,6 +11,7 @@ dependencies = [
     "gerbonara>=1.6.0",
     "kicad-python>=0.5.0",
     "lxml>=6.0.2",
+    "numpy>=1.26",
     "platformdirs>=4.5.1",
     "py-straight-skeleton>=0.1.0",
     "wasmtime>=39.0.0",
