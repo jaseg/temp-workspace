@@ -318,7 +318,9 @@ class TaperResult:
                     # short part of the turn
                     ci, cj = owners[i], owners[j]
                     dc = _seg_dist(ci[1], ci[2], cj[1], cj[2])
-                    ds = abs(oi[4] - oj[4]) # (at the closest points, like geomcheck)
+                    # path distance between the pieces (their intervals: for overlapping copper the "closest points"
+                    # are arbitrary points of the overlap)
+                    ds = _interval_gap(oi[3], oj[3])
                     if not (oi[0] == oj[0] and ds >= s_near and
                             (abs(oi[2] - oj[2]) >= SELF_SEP or ds >= SELF_PATH_RATIO * (dc + self.w0))):
                         continue
@@ -340,8 +342,9 @@ class TaperResult:
                 if not all(_different_turn_at(o, (bo[0], bo[1], bo[2], (bo[3], bo[3])), s_far, arm)
                            for bo in b.owners):
                     dc = _seg_dist(owners[i][1], owners[i][2], (b.x, b.y), (b.x, b.y)) - b.diameter/2
-                    if not any(o[0] == bo[0] and abs(o[4] - bo[3]) >= s_near + b.diameter/2 and
-                               (abs(o[2] - bo[2]) >= SELF_SEP or abs(o[4] - bo[3]) >= SELF_PATH_RATIO * (dc + self.w0))
+                    if not any(o[0] == bo[0] and _interval_gap(o[3], (bo[3], bo[3])) >= s_near + b.diameter/2 and
+                               (abs(o[2] - bo[2]) >= SELF_SEP or
+                                _interval_gap(o[3], (bo[3], bo[3])) >= SELF_PATH_RATIO * (dc + self.w0))
                                for bo in b.owners):
                         continue
                     need = min(self.clearance, dc - self.w0/2)
