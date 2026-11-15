@@ -618,3 +618,61 @@ leaves it out (0.045 < 0.5 turns), and the fold warning (D28) reports exactly th
 copper of one turn comes within 0.122 mm of itself"). Since `33a665a` the checker decides by winding angle alone; it
 counts the 856 close pairs as self overlaps (no self short), and the case passes. No change to the generator; a test
 pins the classification and the warning.
+
+## SVG import
+
+### D-SVG-1. SVG import reads only one path dialect, the first path, and no transforms or units
+
+**Defect.** `SVGShape` took the `d` of the first `<path>` in the file and parsed it with
+`d.strip('MmZ ').replace(',', 'L').split('L')`. That reads only absolute `M x y L x y ... Z` and `M x y,x y,... Z`.
+Everything else that drawing programs write fails or is silently wrong (files in `tests/test_svg_import.py`):
+
+- errors: `H`/`V` ("could not convert string to float: 'H30'"), lower case `z` ("'z'"), relative `l` ("'l30'"),
+  `M 0,0 L 30,0 ...` (the most common form: "not enough values to unpack"), `M 0 0 30 0 30 20 ...` ("too many values
+  to unpack"), any curve or arc (an Inkscape rounded rectangle: "'h'"), `<circle>`/`<rect>`/`<polygon>` without a
+  `<path>` (`AttributeError: 'NoneType' object has no attribute 'attrs'`), a KiCad board outline plot (one path per
+  line or arc: a 2-point "polygon");
+- silently wrong: `<g transform="scale(2)">` around a 30 × 20 path gave 30 × 20 instead of 60 × 40; width/height/viewBox
+  were ignored (`width="60mm" viewBox="0 0 30 20"`: 30 × 20 mm instead of 60 × 40 mm); only the first `<path>` was
+  read, also one inside `<defs>` or a hidden layer, so a file with a small path before the outline gave the small path.
+
+Upstream has the same code and the same errors (all files above checked with `/tmp/claude-0/orig`).
+
+**Fix.** New module `kicoil/svg_import.py` (no new dependency, lxml was already one), used by `SVGShape`; its
+docstring states exactly what is read. In short: all path commands (M L H V Z C S Q T A, absolute and relative,
+implicit repetitions, number syntax with exponents, `-` and `.` as separators, compact arc flags); `<polygon>`,
+`<polyline>`, `<rect>` (also rounded), `<circle>`, `<ellipse>`, `<use>`; `transform` of the element and all ancestors
+(matrix/translate/scale/rotate/skewX/skewY) and nested `<svg>` viewports; `<defs>`, clip paths, masks, text and
+`display:none` are skipped. Curves are flattened in mm after all transforms, within `arc_tolerance` (now 0.002 mm, it
+was an unused field with 0.05; the CLI's `svg --arc-tolerance` default changed likewise): Bezier curves by Wang's
+formula, arcs by the sagitta of the transformed ellipse. A 45 mm radius `<circle>` gives 334 vertices (skeleton
+0.35 s). Units: width/height with mm, cm, in, pt, pc, Q or px (96 dpi) scale the viewBox (only its scale: the
+user origin stays the origin, so outlines drawn around (0, 0) stay there); when width and height agree with the viewBox
+size to the digits they are written with (`width="100.24mm"`, `viewBox="0 0 100.2394 54.4735"`) one user unit is
+exactly one mm (or one of their unit); without a viewBox user units are px (SVG spec, with a warning); without a
+physical unit user units are mm as before. Every subpath is a contour; a subpath is closed by Z or by ending on its
+start (within 1 µm); open paths whose ends meet are joined (KiCad, FreeCAD). The outline is the closed contour with the
+largest area. If that is open, or touches or crosses itself (grid-bucketed segment test), it is a `ValueError` naming
+the element and the point; other contours (holes, other shapes, open paths) are ignored with a warning naming them.
+
+Inputs that worked before give the same polygon: the shark fixture bit for bit (its 11 `concave_sharksvg` cases, kicoil
+and cornerflat, have identical results), also both orientations with and without the repeated start point, apart from
+the start vertex in one case (D-SVG-2). 82 tests in `tests/test_svg_import.py` (every dialect, flattening error and
+vertex count, transforms, shapes, units, outline choice, rejections, Inkscape and KiCad style files, the GUI call the
+KiCad plugin uses, layouts of a curved SVG through kicoil and cornerflat checked by geomcheck).
+
+The concave review said `tests/data/shark.svg` does not exercise the clockwise reorientation branch. It does: its raw
+signed area is −1741 mm² in its own numbers (y down; it looks counter-clockwise on screen). The new test
+`test_shark_fixture_takes_the_reorientation_branch` pins that the import returns it clockwise and that `SVGShape`
+reverses it.
+
+### D-SVG-2. Start vertex of a clockwise SVG path depends on whether the path repeats its start point
+
+**Defect.** `SVGShape` reversed clockwise paths with `coords[::-1]`. For a path that repeats its start point, the
+reversed list starts with that point again; for one that does not, it starts with the path's last vertex. The start
+vertex sets where the arms start (angle reference), so the same outline written with or without the closing point gave
+different layouts. Upstream has the same reversal (checked: the shark path without its closing point starts at
+(−47.22, −16.91) instead of (−48.68, −17.91)).
+
+**Fix.** `coords[:1] + coords[:0:-1]` (as `skeletonator.clean_polygon`): vertex 0 stays the path's first vertex. The
+fixture (which repeats its start point) is unchanged; `test_clockwise_and_counter_clockwise_give_the_same_outline`.

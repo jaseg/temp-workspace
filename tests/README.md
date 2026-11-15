@@ -100,7 +100,8 @@ instead of asserting them.
 Concave family (`corpus_concave.py`, `--kind concave`, 132 cases): a plush-shark silhouette (91 vertices, as a polygon
 and as `data/shark.svg` loaded through `SVGShape`: a path that repeats its start point and is clockwise in its own
 numbers, i.e. has a negative shoelace area, so that `SVGShape` has to reverse it; on screen, y down, it appears
-counter-clockwise; `test_concave.py` also imports the other orientation and the path without the repeated point),
+counter-clockwise; `test_concave.py` also imports the other orientation and the path without the repeated point,
+`test_svg_import.py` pins that the fixture takes the reorientation branch),
 bean, heart, crescent, C, rounded L and U, cross, comb, star with rounded tips and a dumbbell. For non-convex outlines
 the straight skeleton's first split event limits the annular width (`Skeletonator.max_depth`), often far below the
 inscribed radius, so the annular widths are 30/60/90 % of each shape's split depth. Turns/twists n5k1, n8k3, n13k4,
