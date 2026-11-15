@@ -64,14 +64,18 @@ TURN_SEP = 0.5 # revolutions; copper at least this far apart in cumulative windi
 # revolutions apart in winding angle (and not close along the conductor). On the whole corpus (all four layout
 # implementations) such contacts at folds of the conductor at a tight tip stay below 0.14 turns; a wide trace that wraps
 # around a hole smaller than itself touches itself 0.22 to 0.5 turns further on. 0.18 lies in the middle of the gap.
+# (Measured at closest points of segment pairs. Measured along the whole contact, the corners of an innermost turn close
+# to the center also touch themselves 0.18 to 0.46 turns further on, over 1.6 to 1.9 (w + c) of conductor: the same
+# wrap around a hole smaller than the trace, counted as a self short too.)
 SELF_SHORT_SEP = 0.18
 # Copper of the same turn that touches itself less than SELF_SHORT_SEP turns further on (a hairpin: the turn runs into a
 # tip or a narrow arm of the outline and comes back) shorts the conductor between the two pieces. Where they are less
 # than this many times (trace width + clearance) apart along the conductor, the merge is local: at a corner of angle a the
-# two sides' copper touches over at most w/sin(a/2) of conductor, less than 6*(w + c) for every corner wider than 19
-# degrees. Further apart, the merged copper bypasses a stretch of the turn (a self merge). On the whole corpus (all
-# four layout implementations) merges at tips stay below 5.7 (w + c) (crescent horns, shark fins); hairpins into the arms
-# of C and U shapes, combs, slots and the slivers of slender ellipses bypass 6.6 to 14 (w + c) and more.
+# two sides' copper touches over w/sin(a/2) of conductor, less than 6*(w + c) for every corner wider than 19 degrees.
+# Further apart, the merged copper bypasses a stretch of the turn of six pitches or more (a self merge). The threshold is
+# geometric; the corpus has no gap there: tips merge over up to 6.3 (w + c) (crescent horns, shark fins, tapered fingers,
+# ellipse ends), hairpins into the arms of C and U shapes, combs, slots, the heart's cusp spike and the slivers of slender
+# ellipses over 6.1 to 31 (w + c) (all four layout implementations, see docs/DEFECTS.md, D-FOLDS-2).
 SELF_MERGE_BYPASS = 6.0
 OVERSHOOT_TOL = 0.05 # mm of copper (or of a via center) allowed beyond the intended envelope
 WIDTH_TOL = 0.01 # allowed relative deviation of an emitted track width from the intended trace width ...
@@ -1292,7 +1296,8 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         return dth >= turn_sep
 
     def same_turn_deficit(deficit, th1, th2, layer, p, q, ds):
-        """ Record a clearance deficit between two pieces of the same turn that are at least s_near apart """
+        """ Record a clearance deficit between two pieces of the same turn that are at least s_near apart, at their
+        closest points (pieces other than plain tracks, see same_turn_contacts for those) """
         dth = abs(th1 - th2) / (2*math.pi)
         rep.self_overlaps += 1
         rep.worst_self_overlap = max(rep.worst_self_overlap, deficit)
@@ -1302,18 +1307,186 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             rep.self_touches += 1
             # (merged copper within one via or pad, e.g. an arm that runs past its via into a sharp tip and back, shorts
             # nothing outside that body)
-            if ds >= s_merge and not in_one_body(layer, p, q):
-                rep.self_merges += 1
-                if ds > rep.max_self_touch_bypass:
+            if not in_one_body(layer, p, q):
+                rep.max_self_touch_bypass = max(rep.max_self_touch_bypass, float(ds))
+                if ds >= s_merge:
+                    rep.self_merges += 1
                     rep.note(f'self merge on {layer} at ({p[0]:.3f}, {p[1]:.3f}): copper touches itself '
                              f'{ds:.2f} mm further on along the conductor')
-            rep.max_self_touch_bypass = max(rep.max_self_touch_bypass, float(ds))
         if deficit >= clr - 1e-4 and dth >= SELF_SHORT_SEP:
             rep.self_shorts += 1
             if rep.worst_self_short < deficit:
                 rep.worst_self_short = deficit
                 rep.note(f'self short on {layer} at ({p[0]:.3f}, {p[1]:.3f}): copper touches itself {dth:.2f} turns '
                          f'further on')
+
+    def project_pair(i, j, which, t):
+        """ Points at parameters t along the center line of plain segment i (which=0) or j (which=1), each with its
+        closest point on the other segment: (points on i, points on j, copper widths at both) """
+        si, sj = segs[i], segs[j]
+        s, o = (si, sj) if which == 0 else (sj, si)
+        t = np.asarray(t, dtype=float)[:, None]
+        a, b = np.array(s.a, dtype=float), np.array(s.b, dtype=float)
+        p = a + t * (b - a)
+        c, d = np.array(o.a, dtype=float), np.array(o.b, dtype=float)
+        v = d - c
+        l2 = float(v @ v)
+        u = np.zeros(len(p)) if l2 == 0 else np.clip((p - c) @ v / l2, 0.0, 1.0)
+        q = c + u[:, None] * v
+        P, Q = (p, q) if which == 0 else (q, p)
+
+        def width_along(s, X):
+            if s.width_b is None:
+                return np.full(len(X), s.width)
+            a, b = np.array(s.a, dtype=float), np.array(s.b, dtype=float)
+            v = b - a
+            l2 = float(v @ v)
+            t = np.zeros(len(X)) if l2 == 0 else np.clip((X - a) @ v / l2, 0.0, 1.0)
+            return s.width + t * (s.width_b - s.width)
+        return P, Q, width_along(si, P), width_along(sj, Q)
+
+    def s_at_many(i, X):
+        s = segs[i]
+        if i not in oriented or seg_span[i] == 0.0:
+            return np.full(len(X), seg_s[i])
+        a = np.array(oriented[i][0], dtype=float)
+        L = s.length
+        t = np.zeros(len(X)) if L == 0 else np.clip(np.hypot(*(X - a).T) / L, 0.0, 1.0)
+        return seg_s[i] + (t - 0.5) * seg_span[i]
+
+    def theta_at_many(i, X):
+        if not have_center or np.isnan(theta_a[i]):
+            return np.full(len(X), np.nan)
+        a = oriented[i][0]
+        rel = np.arctan2(X[:, 1] - cy, X[:, 0] - cx) - ang(a)
+        return theta_a[i] + (rel + np.pi) % (2*np.pi) - np.pi
+
+    def same_turn_contacts(i, j):
+        """ Clearance deficits between plain segments i and j of the same turn, measured over the whole stretch where
+        they are close, so that neither the deficits nor the length of conductor a contact bypasses depend on how the
+        conductor is cut into segments: a pair of segments has only one pair of closest points, but where two pieces of
+        the conductor run side by side (the two sides of a hairpin) the contact between them is all of that stretch.
+        Both center lines are sampled at a step of a quarter of the narrower width, each sample paired with its closest
+        point on the other segment and with the ends of the stretch of it that its copper touches (see measure); the
+        end of the longest contact is then located to 1/256 of that step. Points less
+        than s_near apart along the conductor are part of one bend (e.g. the inside of a corner) and are not compared. """
+        if abs(seg_s[i] - seg_s[j]) + (seg_span[i] + seg_span[j]) / 2 < s_near:
+            return
+        si, sj = segs[i], segs[j]
+        h = max(min(si.width, si.wb, sj.width, sj.wb) / 4, 1e-3)
+        ts = [np.linspace(0.0, 1.0, max(2, math.ceil(s.length / h) + 1)) for s in (si, sj)]
+
+        def measure(which, t):
+            """ For samples at t along segment i (which=0) or j (which=1): candidate contact pairs (point on i, point on
+            j) with their deficit, path distance and winding angle, and the parameter of the sample. Per sample: its
+            closest point on the other segment; where the copper touches, both ends of the stretch of the other segment
+            whose copper the sample's copper touches (any of them is a contact; the farthest one along the conductor
+            bypasses the most); and the points of the other segment s_near along the conductor and SELF_SHORT_SEP turns
+            in winding angle away from the sample, where the deficit is largest among the pairs that count. """
+            P, Q, wp, wq = project_pair(i, j, which, t)
+            R = (wp + wq) / 2
+            X, Y = (P, Q) if which == 0 else (Q, P) # X: the samples, Y: their closest points
+            mine, o = (i, j) if which == 0 else (j, i)
+            so = segs[o]
+            c, v = np.array(so.a, dtype=float), np.array(so.b, dtype=float) - np.array(so.a, dtype=float)
+            l2 = float(v @ v)
+            ys = [Y]
+            if l2 > 0:
+                rel = X - c
+                u = rel @ v / l2
+                h2 = np.maximum(0.0, (rel * rel).sum(axis=1) - u * u * l2) # squared distance from the line
+                half = np.sqrt(np.maximum(0.0, R * R - h2) / l2)
+                ys += [c + np.clip(u + sgn * half, 0.0, 1.0)[:, None] * v for sgn in (-1, 1)]
+                if o in oriented and seg_span[o] > 0:
+                    a0, b0 = (np.array(e, dtype=float) for e in oriented[o][:2])
+                    sx = s_at_many(mine, X)
+                    for sgn in (-1, 1):
+                        tt = np.clip((sx + sgn * s_near - seg_s[o]) / seg_span[o] + 0.5, 0.0, 1.0)
+                        ys.append(a0 + tt[:, None] * (b0 - a0))
+                    th0, th1 = theta_at_many(o, np.array([a0, b0]))
+                    if not (np.isnan(th0) or th0 == th1):
+                        thx = theta_at_many(mine, X)
+                        for sgn in (-1, 1):
+                            tt = np.clip((thx + sgn * SELF_SHORT_SEP * 2*math.pi - th0) / (th1 - th0), 0.0, 1.0)
+                            ys.append(a0 + tt[:, None] * (b0 - a0))
+            n = len(ys)
+            Xc = np.tile(X, (n, 1))
+            Yc = np.concatenate(ys)
+            Pc, Qc = (Xc, Yc) if which == 0 else (Yc, Xc)
+            Rc = np.tile(R, n)
+            dc = Rc + clr - np.hypot(*(Pc - Qc).T)
+            ds = np.abs(s_at_many(i, Pc) - s_at_many(j, Qc))
+            dth = np.abs(theta_at_many(i, Pc) - theta_at_many(j, Qc)) / (2*math.pi)
+            return Pc, Qc, dc, ds, dth, np.tile(np.asarray(t, dtype=float), n)
+        parts = [measure(0, ts[0]), measure(1, ts[1])]
+        P, Q, deficit, ds, dth, T = (np.concatenate(x) for x in zip(*parts))
+        which = np.concatenate([np.zeros(len(parts[0][0]), dtype=int), np.ones(len(parts[1][0]), dtype=int)])
+        keep = (ds >= s_near) & (deficit > 1e-4) & ~(dth >= TURN_SEP)
+        if not keep.any():
+            return
+        layer = si.layer
+        idx = np.flatnonzero(keep)
+        k = int(idx[np.argmax(deficit[idx])])
+
+        def pt(X, m):
+            return (float(X[m, 0]), float(X[m, 1]))
+        rep.self_overlaps += 1
+        rep.worst_self_overlap = max(rep.worst_self_overlap, float(deficit[k]))
+        records = [(pt(P, k), pt(Q, k), float(deficit[k]), float(dth[k]), float(ds[k]))]
+        touch = keep & (deficit >= clr - 1e-4)
+        short = np.flatnonzero(touch & (dth >= SELF_SHORT_SEP))
+        if len(short):
+            m = int(short[np.argmax(deficit[short])])
+            rep.self_shorts += 1
+            if rep.worst_self_short < deficit[m]:
+                rep.worst_self_short = float(deficit[m])
+                rep.note(f'self short on {layer} at ({P[m, 0]:.3f}, {P[m, 1]:.3f}): copper touches itself '
+                         f'{dth[m]:.2f} turns further on')
+            records.append((pt(P, m), pt(Q, m), float(deficit[m]), float(dth[m]), float(ds[m])))
+        local = np.flatnonzero(touch & ~(dth >= SELF_SHORT_SEP))
+        if len(local):
+            rep.self_touches += 1
+            # The longest stretch of conductor the merged copper bypasses. Merged copper within one via or pad (e.g. an
+            # arm that runs past its via into a sharp tip and back) shorts nothing outside that body.
+            for m in local[np.argsort(-ds[local])]:
+                m = int(m)
+                if not in_one_body(layer, pt(P, m), pt(Q, m)):
+                    break
+            else:
+                m = None
+            if m is not None:
+                best = (float(ds[m]), pt(P, m), pt(Q, m), float(deficit[m]), float(dth[m]))
+                # Locate the end of the contact between the sample and its untouched neighbors
+                wm, tm = int(which[m]), float(T[m])
+                step = 1.0 / (len(ts[wm]) - 1)
+                for t_out in (tm - step, tm + step):
+                    if not 0.0 <= t_out <= 1.0:
+                        continue
+                    lo, hi = tm, t_out # lo touches
+                    Po, Qo, do, so, tho, _t = measure(wm, [hi])
+                    if (do >= clr - 1e-4).any():
+                        continue # the neighbor touches, too (it was not the longest one for a reason)
+                    for _ in range(8):
+                        mid = (lo + hi) / 2
+                        Pm, Qm, dm, sm, thm, _t = measure(wm, [mid])
+                        ok = (dm >= clr - 1e-4) & (sm >= s_near) & ~(thm >= SELF_SHORT_SEP)
+                        if ok.any():
+                            lo = mid
+                            for n in np.flatnonzero(ok):
+                                if sm[n] > best[0] and not in_one_body(layer, pt(Pm, n), pt(Qm, n)):
+                                    best = (float(sm[n]), pt(Pm, n), pt(Qm, n), float(dm[n]), float(thm[n]))
+                        else:
+                            hi = mid
+                bypass, p, q, de, th = best
+                rep.max_self_touch_bypass = max(rep.max_self_touch_bypass, bypass)
+                if bypass >= s_merge:
+                    rep.self_merges += 1
+                    rep.note(f'self merge on {layer} at ({p[0]:.3f}, {p[1]:.3f}): copper touches itself '
+                             f'{bypass:.2f} mm further on along the conductor')
+                records.append((p, q, de, th, bypass))
+        for rec in dict.fromkeys(records):
+            if len(rep.self_overlap_points) < max_records:
+                rep.self_overlap_points.append((layer,) + rec)
 
     q_a, q_b = tree.query(geoms, predicate='dwithin', distance=max_w + clr)
     mask = q_a < q_b
@@ -1335,6 +1508,14 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             continue
         ds = abs(s_at(i, p) - s_at(j, q))
         far = other_turn(ds, theta_at(i, p), theta_at(j, q))
+        if not far and si.plain and sj.plain:
+            if crossing and ds >= s_near:
+                rep.crossings += 1
+                if len(rep.crossing_points) < max_records:
+                    rep.crossing_points.append((si.layer, p))
+            if deficit > 1e-4 and (int(i), int(j)) not in split_pairs: # (one track drawn in two overlapping pieces)
+                same_turn_contacts(i, j)
+            continue
         if not far and ds < s_near:
             continue
         if crossing:
@@ -1369,6 +1550,45 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         ds = abs(s_at(i, p) - s_body)
         return other_turn(ds, th, th_body), ds, th
 
+    def farthest_contact(i, q, ds, s_body, deficit, deficit_at):
+        """ The point of plain segment i in contact with a via or pad (deficit_at(points) >= clearance) farthest from it
+        along the conductor, and that distance; (q, ds), the closest point, if they do not touch. Like same_turn_contacts,
+        so that the length of conductor a contact bypasses does not depend on how the conductor is cut into segments. """
+        s = segs[i]
+        if not s.plain or deficit < clr - 1e-4 or s_body is None or s.length == 0:
+            return q, ds
+        n = max(2, math.ceil(s.length / max(s.width / 4, 1e-3)) + 1)
+        t = np.linspace(0.0, 1.0, n)
+        a, b = np.array(s.a, dtype=float), np.array(s.b, dtype=float)
+
+        def at(t):
+            return a + np.asarray(t, dtype=float)[:, None] * (b - a)
+        X = at(t)
+        touch = np.flatnonzero(deficit_at(X) >= clr - 1e-4)
+        if not len(touch):
+            return q, ds
+        sx = np.abs(s_at_many(i, X) - s_body)
+        m = int(touch[np.argmax(sx[touch])])
+        best = (float(sx[m]), (float(X[m, 0]), float(X[m, 1])))
+        step = 1.0 / (n - 1)
+        for t_out in (t[m] - step, t[m] + step):
+            if not 0.0 <= t_out <= 1.0 or deficit_at(at([t_out]))[0] >= clr - 1e-4:
+                continue
+            lo, hi = t[m], t_out
+            for _ in range(8):
+                mid = (lo + hi) / 2
+                Xm = at([mid])
+                if deficit_at(Xm)[0] >= clr - 1e-4:
+                    lo = mid
+                    sm = float(abs(s_at_many(i, Xm)[0] - s_body))
+                    if sm > best[0]:
+                        best = (sm, (float(Xm[0, 0]), float(Xm[0, 1])))
+                else:
+                    hi = mid
+        if best[0] <= ds:
+            return q, ds
+        return best[1], best[0]
+
     # vias vs tracks and vias vs vias
     for j, v in enumerate(copper.vias):
         s_via, th_via = body_pos(('via', j))
@@ -1384,8 +1604,11 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
                 deficit = v.diameter/2 + clr - _copper_gap_point(s, (v.x, v.y))
             if not far:
                 # (the track leading to the via runs within its copper for the via's radius)
-                if deficit > 1e-4 and ds >= s_near + v.diameter/2:
-                    same_turn_deficit(deficit, th, th_via, s.layer, (v.x, v.y), q, ds)
+                if deficit > 1e-4:
+                    q, ds = farthest_contact(i, q, ds, s_via, deficit, lambda X: v.diameter/2 + segs[i].width/2 + clr
+                                             - np.hypot(X[:, 0] - v.x, X[:, 1] - v.y))
+                    if ds >= s_near + v.diameter/2:
+                        same_turn_deficit(deficit, th, th_via, s.layer, (v.x, v.y), q, ds)
                 continue
             if deficit > 1e-4:
                 rep.via_violations += 1
@@ -1422,8 +1645,11 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             else:
                 deficit = clr - min(shapely.distance(pad.geometry(), g) - r for g, r in s.cores())
             if not far:
-                if deficit > 1e-4 and ds >= s_near + pad.extent/2:
-                    same_turn_deficit(deficit, th, th_pad, s.layer, (pad.x, pad.y), q, ds)
+                if deficit > 1e-4:
+                    q, ds = farthest_contact(i, q, ds, s_pad, deficit, lambda X, pad=pad, s=s: np.array(
+                        [s.width/2 + clr - pad.dist_to_seg(tuple(x), tuple(x)) for x in X]))
+                    if ds >= s_near + pad.extent/2:
+                        same_turn_deficit(deficit, th, th_pad, s.layer, (pad.x, pad.y), q, ds)
                 continue
             if deficit > 1e-4:
                 violating_segs.add(i)
@@ -1637,6 +1863,33 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
         rep.note(f'copper {rep.overshoot:.3f} mm outside the intended envelope at ({x:.3f}, {y:.3f})')
 
 
+def _interior_point(poly):
+    """ A point inside a polygon, as GEOS's interior point of an area (shapely's representative_point): the middle of
+    the widest stretch inside the polygon of a horizontal line through the middle of its extent, moved to lie between
+    vertices. Where GEOS's choice depends on rounding errors (e.g. on a symmetric outline), this one does not: a vertex in
+    the middle to rounding counts as below it, and of stretches equally wide to rounding the first one is taken. """
+    rings = [np.asarray(poly.exterior.coords)] + [np.asarray(r.coords) for r in poly.interiors]
+    ys = np.concatenate([r[:, 1] for r in rings])
+    mid = (ys.min() + ys.max()) / 2
+    tol = 1e-9 * (ys.max() - ys.min()) # (a vertex in the middle to rounding, e.g. of a symmetric outline, is below)
+    below, above = ys[ys <= mid + tol], ys[ys > mid + tol]
+    y = ((below.max() if len(below) else ys.min()) + (above.min() if len(above) else ys.max())) / 2
+    xs = []
+    for r in rings:
+        a, b = r[:-1], r[1:]
+        sel = (a[:, 1] != b[:, 1]) & (np.minimum(a[:, 1], b[:, 1]) <= y) & (np.maximum(a[:, 1], b[:, 1]) >= y)
+        sel &= ~((a[:, 1] == y) & (b[:, 1] < y)) & ~((b[:, 1] == y) & (a[:, 1] < y))
+        a, b = a[sel], b[sel]
+        xs.append(a[:, 0] + (y - a[:, 1]) * (b[:, 0] - a[:, 0]) / (b[:, 1] - a[:, 1]))
+    xs = np.sort(np.concatenate(xs))
+    if len(xs) < 2:
+        return poly.representative_point().coords[0]
+    lo, hi = xs[0:len(xs) - 1:2], xs[1::2]
+    width = hi - lo
+    k = int(np.flatnonzero(width >= width.max() * (1 - 1e-9))[0])
+    return (float((lo[k] + hi[k]) / 2), float(y))
+
+
 def intent_from_model(model, contour_tol=0.01):
     """ Derive the intended geometry from a kicoil PlanarInductor object. This only uses the user-facing parameters
     (shape outline, annular width, turns, trace width, clearance, via diameter, offset and staggering), not any internal
@@ -1660,11 +1913,11 @@ def intent_from_model(model, contour_tol=0.01):
     if inner.is_empty:
         inner = poly.buffer(-annular * 0.98, join_style='mitre', mitre_limit=10)
     if inner.is_empty:
-        center = poly.representative_point().coords[0]
+        center = _interior_point(poly)
     else:
         if not isinstance(inner, Polygon):
             inner = max(inner.geoms, key=lambda g: g.area)
-        center = inner.representative_point().coords[0]
+        center = _interior_point(inner)
 
     w = model.trace_width
     via_diameter = getattr(model, 'via_diameter', None) or w

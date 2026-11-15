@@ -54,11 +54,11 @@ undershoot < 1.25 pitches, overshoot < 0.05 mm). `run_corpus.py` stores the name
 `rejected`; a clear rejection of an infeasible request is acceptable, a crash (`error`) is not. `test_corpus_case` in
 `test_layout.py` asserts the same checks except outline coverage. Clearance, via clearance, self short and self merge
 failures are expected failures there only when the generator warned about them (a turn folding onto itself, a via that
-does not fit next to the neighboring turn); on the full corpus that is `octagon_a0.90_n3k1`, `24gon_a0.90_n3k1` and
-`sector180_a0.90_n3k1`, where three turns in 90 % of the inscribed radius make the trace (and the via) about 4-10 mm wide,
-`concave_starround_a0.9_n5k1` and `round_blob2_a0.90_n5k1` (self short: the innermost turn wraps around a hole smaller
-than the trace), and the self merges of `narrow_slot_w10.0_n4k1`, `concave_cshape/uround/comb_a0.9_n5k1` and
-`round_ellipse10to1_a0.90_n5k1`.
+does not fit next to the neighboring turn); on the full corpus those are the a0.90 n3k1 cases of the main corpus, where
+three turns in 90 % of the inscribed radius make the trace (and the via) about 4-10 mm wide and the innermost turn wraps
+around a hole smaller than the trace (self short), `concave_starround_a0.9_n5k1` and `round_blob2_a0.90_n5k1` (the same),
+and the self merges of `narrow_slot_w10.0_n4k1`, `concave_cshape/uround/comb_a0.9_n5k1`, `concave_crescent_a0.9_n8k3`,
+`concave_shark/sharksvg_a0.3_n8k3` and `round_ellipse10to1_a0.90_n5k1`.
 
 ### Same turn or different turn
 
@@ -81,19 +81,29 @@ lies in the middle of that gap. Before, with half a turn as the only threshold, 
 about 0.5 turns). Self shorts are also checked between a via or pad and track of its own turn. On the full corpus they fail
 `sector180_a0.90_n3k1` with every implementation, and with `geometry_alt_jog` also `rect40x20_a0.90_n3k1` and
 `roundrect_a0.90_n3k1`, where the inner via (as wide as the 5.9-7.3 mm trace) sits in a hole 2-2.5 mm tall and touches the
-track 0.38-0.43 turns before it. Remaining edges: the base implementation's `sector90_a0.90_n3k1` has a contact of 11 c at 0.14 turns
-(at the sector's apex), which passes as a fold; contacts of wraps closer than π/2·(w+c) along the conductor are not
-checked.
+track 0.38-0.43 turns before it. Since same-turn contacts are measured along the whole contact (below), a corner of the innermost turn
+close to the center whose copper merges over 1.6-1.9·(w+c) at 0.18-0.46 turns counts as a self short, too: 18 cases of
+kicoil's full corpus, 16 of them a0.90 n3k1 (all of which fail conformance anyway). Contacts of wraps closer than
+π/2·(w+c) along the conductor are not checked.
 
 Copper of one turn that touches itself less than 0.18 turns further on is a *self touch* (`self_touches`,
 `max_self_touch_bypass`: the conductor length between the pieces): the two sides of a hairpin, where a turn runs into a
-tip or an arm of the outline and back, merging. At a corner of angle α the copper merges over at most w/sin(α/2) of
-conductor, which is local for ordinary corners. When the pieces are at least `SELF_MERGE_BYPASS` = 6·(w+c) apart along
-the conductor (the merge of a tip sharper than 19°), the merged copper shorts a stretch of the turn: a `self merge`,
-which fails. On the cases of all families with a same-turn contact or a 90 % annulus, the largest bypass per case stays
-below 5.7·(w+c) at tips (crescent horns, shark fins, ellipse ends) with every implementation, and is at least 6.1·(w+c)
-for hairpins into C and U arms, the comb, the slot, the heart's cusp spike and the slivers of slender ellipses. The
-generator warns about merges from 3·(w+c) on (see docs/DEFECTS.md, D-FOLDS-1 and -2).
+tip or an arm of the outline and back, merging. At a corner of angle α the copper merges over w/sin(α/2) of conductor,
+which is local for ordinary corners. When the pieces are at least `SELF_MERGE_BYPASS` = 6·(w+c) apart along the
+conductor (the merge of a tip sharper than about 19°, or of a hairpin into a narrow arm), the merged copper shorts a
+stretch of the turn of six pitches or more: a `self merge`, which fails. The corpus has no gap at that length (tips reach
+6.3·(w+c), hairpins into arms start at 6.1), so the threshold is the geometric one; see docs/DEFECTS.md, D-FOLDS-2. The
+generator measures merges and wraps the same way and warns about merges from 5·(w+c) on (D-FOLDS-1, -3).
+
+Same-turn contacts are measured over the whole stretch where two plain tracks are close, not only at their closest
+points: both center lines are sampled at a quarter of the trace width, each sample paired with its closest point on the
+other track, the ends of the stretch of it that its copper touches, and the points where the pair starts to count (π/2·(w+c)
+along the conductor, 0.18 turns in winding angle); the end of the longest contact is located by bisection; vias and pads
+against a track likewise. The
+closest points of two long legs of a V lie at its tip, so before, the bypassed length (and whether a corner close to the
+center counted as a self short) depended on how the conductor was cut into segments (D-FOLDS-4). The coil's center is
+GEOS's interior point of the inset outline, except that its rounding-dependent choices (a vertex in the middle of the
+extent, two equally wide stretches of a symmetric hole) are made deterministically (D-FOLDS-5).
 
 ## Corpus
 
