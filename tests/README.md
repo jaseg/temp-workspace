@@ -111,7 +111,9 @@ n3k1 cases (traces 5-10 mm wide around holes of 2-4 mm) the pitch ratio drops, e
 (its old layout touched itself 0.176 turns apart, just below the checker's 0.18), `pentagon`, `octagon`, `24gon`,
 `star6_shallow`, `rconvex0`/`rconvex3` by 0.08-0.2 (all failing conformance before and after, with the base layout too).
 Among layout candidates with the same spacing (rotations often measure the same, up to rounding), the one covering the
-outline best is chosen; before, rounding noise decided.
+outline best is chosen; before, rounding noise decided (`narrow_branch_w6.0_n9k4` flipped to a conformance failure with
+the new measurement's rounding). On five heart cases the better covering rotation puts the inner via at the end of the
+cusp's spike ('via offset', among the heart's known issues; they fail with backtracks before and after).
 
 ## Corpus
 
