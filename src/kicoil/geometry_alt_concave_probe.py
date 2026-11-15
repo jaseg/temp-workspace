@@ -1,5 +1,8 @@
 """Prototype (exploration only): lift the split-depth limit of concave outlines by rounding sharp reflex corners.
 
+The base Skeletonator now cuts sharp reflex corners (turning by more than 120 degrees) itself, with a 0.01 mm arc
+(`skeletonator.round_cusps`, D-CUSP-1 in docs/DEFECTS.md); this probe rounds further corners on top of that.
+
 At a reflex corner with interior angle theta, the straight-skeleton (mitered) inward offset moves the corner vertex
 by depth/sin(theta/2) per unit of depth, i.e. a sharp reflex corner shoots a spike deep into the shape. The spike hits
 the opposite side long before the Euclidean inward offset (erosion) of the outline would pinch off, which is the

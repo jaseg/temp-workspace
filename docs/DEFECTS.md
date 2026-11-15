@@ -959,3 +959,152 @@ different layouts. Upstream has the same reversal (checked: the shark path witho
 
 **Fix.** `coords[:1] + coords[:0:-1]` (as `skeletonator.clean_polygon`): vertex 0 stays the path's first vertex. The
 fixture (which repeats its start point) is unchanged; `test_clockwise_and_counter_clockwise_give_the_same_outline`.
+
+---
+
+## Sharp reflex cusps
+
+### D-CUSP-1. Sharp reflex cusps make every turn run into a zero-width spike
+
+**Defect.** The spiral follows the straight skeleton's (mitered) inward offsets. At a reflex corner that turns by φ, the
+offset vertex moves along the bisector at 1/cos(φ/2) times the depth, while the true (Euclidean) offset runs around
+the corner on a circle of radius depth. At a cusp (the top of `corpus_concave.heart()`, φ = 173°: factor 16) every turn
+runs into a zero-width spike far inside the outline and back, and the spike hits the bottom of the heart at a depth of
+1.60 mm (the first split event, which limits the annular width), although the inscribed radius is 11.55 mm.
+
+**Symptom.** All 8 heart cases that are laid out fail (with every layout: kicoil, cornerflat, jog, optspan), the
+other 3 are rejected (pitch below the clearance): backtracks at the spikes, copper up to 6.89 mm past the intended band
+(`concave_heart_a0.6_n6_1layer`), `concave_heart_a0.6_n8k3` with a via 4.33 mm beyond the via offset and copper 6.68
+mm past the band, `concave_heart_a0.9_n8k3` with a clearance deficit of 0.020 mm and a via deficit of 0.216 mm.
+Annular widths above 1.6 mm are rejected. The original code has it as well (split depth 1.60 mm; at the same annular
+widths overshoot 5.1–10.2 mm, vias 3.8–4.3 mm off, connectivity failures, crossings). Upstream's other heart results
+are unrelated to the cusp: three cases crash with a `NameError` in its rejection of a pitch below the clearance (the
+current code rejects them), two are rejected with "r=... is out of bounds".
+
+**Fix.** `skeletonator.round_cusps`, called by `Skeletonator.__init__` before the skeleton is computed (constants
+`Skeletonator.CUSP_*`):
+- *Which corners.* A vertex is a cusp if the outline, measured at the points where it enters and leaves the circle of
+  radius r around it, turns by more than 120° (miter factor above `CUSP_MITER_LIMIT` = 2, as the keepout zone). All
+  vertices inside the circle belong to the cut, so the test and the cut do not depend on how the outline is sampled
+  (a collinear vertex next to the cusp, a dense outline, a cusp split into two corners).
+- *Cut.* The outline inside the circle is replaced by an arc of the circle through the inside of the polygon (the
+  polygon minus the disk): the outline only shrinks, by less than πr², so the copper stays inside it. r =
+  `CUSP_RADIUS` = 0.01 mm. It is raised where the arc's chords would fall below 3e-6 of the extent (10× the skeleton's
+  node merge tolerance; outlines above about 300 mm), and lowered where the rest of the outline comes within 2r.
+  The result is checked (simple, inside the outline); `remove_reflex_jitter` keeps the arc.
+- *Segments.* The arc's inward offset at depth d is a polygonal circle of radius r + d/cos(s/2) around the corner, so
+  turns near the cusp run up to r + d (1/cos(s/2) − 1) deeper than the Euclidean offset of the given outline. The
+  segment angle s keeps the second term below `CUSP_DEPTH_TOL` = 0.02 mm at the inscribed radius (heart: s = 6.7°,
+  48 segments). The whole interior angle needs these segments: a coarse chord between an edge and its normal survives
+  as a mitered reflex corner (tried: one chord there left the offsets 2.5 % of the depth too deep).
+- *Why so small.* Any cut makes the turns near the corner run deeper by about r (the layout measures depth from the
+  cut), so a radius tied to the annular width would overshoot by about that radius.
+- *Budget.* The arcs may add at most `CUSP_MAX_VERTICES` = 360 vertices and double the skeleton's cost (vertices ×
+  reflex vertices, D30) or add `CUSP_EXTRA_COST` = 50 000. With more cusps the segments coarsen up to 20° (with 29°, a
+  12-pointed sawblade's skeleton split at 4.6 mm instead of 19.9 mm: a residual reflex corner of each arc hits a
+  tooth); if even 20° does not fit, no corner is cut (all or nothing keeps a symmetric outline symmetric). A warning
+  is logged whenever a cusp stays mitered (budget, or the outline passes too close) and when coarse arcs let turns
+  run more than 0.05 mm deeper.
+- *Attributes.* `Skeletonator.outline` stays the outline as given (keepout zone, checker), `layout_outline` is the
+  cut one, `cusps` lists the cut corners, `cusp_segment_angle` the segment angle.
+
+Corners up to 120° keep their miter: in the whole corpus only the heart's cusp is cut (the next sharpest reflex
+corners turn by 90°: L, U, cross, comb, neck, slots), so no other case changes. cornerflat, jog and optspan build on
+`Skeletonator` and get the same cut.
+
+**Cost.** The skeleton of the cut heart takes 3–5× as long: 0.35 → 1.9 s at 80 vertices (133 after the cut), 6 → 28 s
+at 360. This comes from the cut itself, not from the arc's vertices: a flat two-vertex cut costs about as much (heart
+with 200 vertices: 2.0 s mitered, 4.9 s flat cut, 4.0 s with 60° arc segments, 7.3 s with 6.7°); the wavefront no
+longer falls apart at 1.6 mm. A 12-pointed sawblade with 17.6° arcs takes 5.2 s.
+
+**Review round.** The first version capped r at a quarter of the adjacent edges and skipped corners whose 5° chord
+was below 3e-6 of the extent. So a collinear vertex within 8 µm of the cusp, 380 or more vertices on the heart, or a
+heart wider than about 210 mm left the cusp mitered without a warning: split depth back to 0.4–8 mm, overshoot up to
+48 mm, vias up to 33 mm off. Its budget arcs of up to 45° split a 24-pointed sawblade at 2.2 mm (mitered 12.8 mm).
+The fix above replaces it. Checked: the heart at 80, 360 and 400 vertices, with a collinear vertex 1, 5 or 20 µm
+from the cusp, with the cusp split in two corners 1 µm apart, not at vertex 0, clockwise, rotated, on a 1 nm grid,
+and at 44 to 400 mm width: one cusp cut, split depth 0.2303–0.2305 × the width (10.13 mm at 44 mm).
+`concave_heart_a0.6_n8k3` with the collinear vertex, not at vertex 0, clockwise, rotated or on the 1 nm grid lays out
+with overshoot 0, via misplacement 0 and no failure but the bottom tip's contour undershoot.
+
+**Result.** Full corpus of 1008 cases (with the 11 `concave_heartdeep_*` cases), kicoil at b2d62b0 and cornerflat at
+f7d9948 (the later commit does not change any corpus layout; the heart cases are identical at both), against the merged
+code. Heart split depth 1.60 → 10.132 mm.
+- *Heart cases at the old annular widths* (11; 3 still rejected, pitch below the clearance): no backtrack into the
+  cusp, no clearance, via clearance or via offset failure. Overshoot at most 0.009 mm (before 1.3–6.9 mm), via
+  misplacement 0 (before up to 4.33 mm), trace widths within 0.0012 mm of before. kicoil: 7 fail only conformance
+  (contour undershoot at the convex bottom tip, below), `a0.9_n13k4` backtracks at that tip. cornerflat: 7 of 8 pass
+  (0 before), `a0.9_n13k4` backtracks at the tip.
+- *`concave_heartdeep_*`* at 30/60/90 % of the new split depth (3.0, 6.1, 9.1 mm; rejected before): kicoil passes 6 of
+  11, cornerflat 7; overshoot at most 0.010 mm, no clearance, via or via offset failure. The others fail at the bottom
+  tip: the n13k4 cases backtrack (cornerflat also `a0.9_n8k3`), kicoil's `a0.3_n8k3` and `a0.6_n6_1layer` miss the tip
+  (contour undershoot 1.53 and 1.33 pitches).
+- *jog and optspan* (heart cases only): no failure at the cusp; their backtracks are at the bottom tip, and jog puts
+  an outer via 2.95 mm outside the tip on `concave_heart_a0.6_n7k3_cw` (and 0.34 mm beyond the via offset on
+  `heartdeep_a0.3_n13k4`).
+- *Totals.* kicoil 508 → 515 passes, backtracks 16 → 12, via offset 2 → 0, via clearance 7 → 5, clearance 5 → 4.
+  cornerflat 765 → 779 passes, backtracks 16 → 13, via offset 2 → 0, via clearance 8 → 6, winding 3 → 2. No main or
+  round case changes its layout (trace widths identical). The only verdict change outside the hearts is kicoil's
+  `concave_lround_a0.9_n8k3` (fail → pass; checker, D-CUSP-2).
+- *Threshold.* The layout is continuous across the 120° threshold: on a 40 mm square with a 12 mm V notch, 5 mm
+  annular width, n5k1, the trace width is 1.807 mm at a 119° turn (mitered) and 1.821 mm at 121° (cut). The split
+  depth jumps from 9.43 to 14.00 mm.
+
+Tests: `test_concave.py` (`test_heart_cusp_is_cut_with_a_tiny_arc_inside_the_outline`,
+`test_cut_cusp_offsets_are_round`, `test_heart_cusp_cut_does_not_depend_on_sampling_or_size`,
+`test_modest_reflex_corners_keep_their_miter`, `test_many_cusps_get_coarser_arcs_within_the_budget`,
+`test_too_many_cusps_are_left_mitered_with_a_warning`, `test_cusp_next_to_another_edge_keeps_the_outline_simple`,
+`test_heart_cusp_layout`, `test_heart_layout_is_robust_to_scaling`).
+
+Not fixed: the heart's convex bottom tip (about 10°) is a separate limitation of the linear spiral at sharp convex
+tips. The outer turn does not reach it (contour undershoot 0.5–0.6 mm, 'contour', as for the crescent's horns), and
+where an arm starts at the tip (4 twists; jog with other arm phases) the outer turn runs into it and turns back by more
+than 170° ('backtrack'). These are recorded as known issues in `corpus_concave.py`. Outlines with many cusps (a
+24-pointed sawblade) exceed the budget and keep the mitered spikes, with a warning. Sharp reflex vertices from noise
+far below 0.01 mm (e.g. a notch 0.5 µm deep) turn by less than 120° measured at the cut radius and are not cut;
+their mitered spikes are not handled here.
+
+### D-CUSP-2. Intended inner contour mitered at reflex corners (checker)
+
+**Defect.** The checker's intended inner contour was the mitered inward offset of the outline (shapely
+`buffer(-a, join_style='mitre', mitre_limit=10)`), which at a reflex corner has a notch reaching up to 10 a deep.
+The core that must be covered included that notch, so a layout that follows the true (Euclidean) offset around a cusp,
+which is what the annular width means, was counted 6.5–22 % uncovered (`concave_heartdeep_*`, 6.5 % at
+`a0.9_n5k1`, 21.7 % at `a0.3_n5k1`), and copper running up to 10 a deep at a cusp passed as inside the envelope.
+
+**Fix.** The core (and the inner contour length behind s_far) uses the Euclidean offset, `buffer(-a)` with round joins
+(`INNER_MITER_LIMIT = None`). The envelope that copper must stay in also takes in the mitered offset up to a miter
+factor of 2 (`ENVELOPE_MITER_LIMIT`, the generator's `CUSP_MITER_LIMIT`; the miter of sharper corners is cut off at
+2 a), so the mitered inner corners of L, U, star and slot layouts stay legal. The uncovered fraction (uncovered core
+area) and the excess fraction are relative to that admitted band (mitered up to a factor of 2), so for outlines without
+sharper corners the normalizing area is the same as before. A fully Euclidean envelope would flag the mitered corners: on the
+full corpus with kicoil it changes 201 verdicts (L, U, neck, star, T, keyhole, finger and slot cases, overshoot up to
+2.2 mm at their 90° corners and vias up to that far off), a convention the layout never promised. Measured on the same
+layouts of the whole corpus (main, round, concave), only the checker convention differing (first version, normalized by
+the core): kicoil changes 10 verdicts, cornerflat 18; all but one are heart cases whose conformance now passes
+(uncovered 6.5–21.7 % → below 1 %; with cornerflat also the old-width heart cases, 8–12 % → 0.1 %). With the final
+normalization, against the merged code on the full corpus, kicoil verdicts outside the hearts change only for
+`concave_lround_a0.9_n8k3` (fail → pass, 5.04 → 4.97 % uncovered); the uncovered fractions of outlines with 90° reflex
+corners move by −0.019 to +0.003 (absolute), because the Euclidean core gains a sliver at depth p/2 and loses the miter
+wedge at depth a − p/2. No overshoot or via verdict changes (the envelope with miter limit 2 contains every mitered
+corner of the corpus up to 120°). This is a checker-only change; the upstream code has no checker.
+
+Review round: the first version normalized by the Euclidean core itself. The core is smaller than the mitered one at
+any reflex corner, so `narrow_taper_w8.0_n4k1` (two 79° reflex corners, layout unchanged) went from pass at 4.999 %
+uncovered to fail at 5.010 %. Normalizing by the admitted band restores 4.999 %.
+
+Cases that pass conformance and via placement, by family and convention (the layouts of the first version of this
+branch, laid out cases only, normalized by the core):
+
+| family | layout | mitered (before) | Euclidean core, envelope miter ≤ 2 (now) | fully Euclidean |
+|---|---|---|---|---|
+| main (671) | kicoil | 287 | 286 | 222 |
+| round (164) | kicoil | 133 | 133 | 131 |
+| concave (140) | kicoil | 98 | 107 | 38 |
+| main (671) | cornerflat | 527 | 527 | 441 |
+| round (164) | cornerflat | 139 | 139 | 137 |
+| concave (140) | cornerflat | 109 | 127 | 51 |
+
+With the final normalization and the final layouts the "now" column reads: kicoil main 287 (`narrow_taper_w8.0_n4k1`
+passes again), round 133, concave 109 (`concave_lround_a0.9_n8k3` and `concave_heartdeep_a0.9_n8k3` pass);
+cornerflat 527, 139, 127.
