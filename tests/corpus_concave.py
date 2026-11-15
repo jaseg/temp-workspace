@@ -208,14 +208,20 @@ def shapes():
 
 
 @lru_cache(maxsize=None)
-def _split_depth(poly):
+def _split_depth(poly, mitered_cusps):
     from kicoil import skeletonator
-    return skeletonator.Skeletonator(list(poly)).max_depth
+    cls = skeletonator.Skeletonator
+    if mitered_cusps:
+        class cls(cls):
+            CUSP_MITER_LIMIT = math.inf # no corner is cut
+    return cls(list(poly)).max_depth
 
 
-def split_depth(poly):
-    """ Depth of the straight skeleton's first split event (= the largest annular width the layout accepts) """
-    return _split_depth(tuple(map(tuple, poly)))
+def split_depth(poly, mitered_cusps=False):
+    """ Depth of the straight skeleton's first split event (= the largest annular width the layout accepts). With
+    mitered_cusps, of the skeleton of the outline as given, without cutting its sharp reflex corners (cusps, see
+    `Skeletonator.CUSP_MITER_LIMIT`). """
+    return _split_depth(tuple(map(tuple, poly)), mitered_cusps)
 
 
 def inscribed_radius(poly):
@@ -238,11 +244,10 @@ def _spec(name, shape, turns, twists, layers=2, clockwise=False, clearance=0.15,
 # such an outline only when every failure kind of the checker is among the listed ones ('overshoot': copper deeper than
 # the intended annulus; 'contour': the outer turn stays more than 1.5 mm from the outline somewhere).
 KNOWN_ISSUES = {
-    'heart': dict(
-        kinds=('backtrack', 'overshoot', 'contour', 'via offset', 'clearance', 'via clearance'),
-        reason='sharp reflex cusp: its mitered offset vertex moves at 1/sin(theta/2) per unit depth, so every turn runs '
-               'into a zero-width spike deep inside the outline and back (backtracks, copper far deeper than the '
-               'annular width) and the skeleton splits at 1.6 mm of 11.5 mm inscribed radius'),
+    # (The sharp reflex cusp at the top is cut with a tiny arc since D-CUSP-1; before, every turn ran into a zero-width
+    # spike there: backtracks, copper up to 10 mm deeper than the annulus, vias 4 mm off.)
+    'heart': dict(kinds=('contour',), reason='outer turn does not reach the sharp convex tip at the bottom (about 10 '
+                  'degrees)'),
 }
 
 
@@ -256,6 +261,12 @@ CASE_ISSUES = {
     # without a warning from the generator (defect of kicoil.geometry, see the report)
     'concave_starround_a0.9_n5k1': dict(kinds=('self short',), reason='unwarned self short around the small inner '
                                         'hole of a deep star'),
+    # With 4 twists an arm starts at the heart's bottom tip (about 10 degrees): the outer turn, at depth 0 there, runs
+    # into the tip and turns back by more than 170 degrees
+    **{name: dict(kinds=('contour', 'backtrack'), reason='arm start at the sharp convex bottom tip: the outer turn runs '
+                  'into the tip and back')
+       for name in ('concave_heartdeep_a0.3_n13k4', 'concave_heartdeep_a0.6_n13k4', 'concave_heartdeep_a0.9_n13k4',
+                    'concave_heart_a0.9_n13k4')},
 }
 
 
@@ -281,6 +292,12 @@ def cases():
         base = dict(shape='polygon', polygon=poly)
         if name in KNOWN_ISSUES:
             base['known_issue'] = KNOWN_ISSUES[name]
+        if name == 'heart':
+            # The heart's cusp is cut with a tiny arc for the skeleton (Skeletonator.CUSP_MITER_LIMIT), which lifts the
+            # split depth from 1.6 mm (the mitered cusp's spike hitting the bottom) to 10.1 mm. 'heart' keeps the
+            # annular widths of the mitered skeleton (the cases of the cusp defect), 'heartdeep' uses the new depth.
+            out += _variants('concave_heartdeep', base, tags + ['concave'], depth)
+            depth = split_depth(poly, mitered_cusps=True)
         out += _variants(f'concave_{name}', base, tags + ['concave'], depth)
         if name == 'shark':
             # The same outline through the SVG import (path clockwise in its own numbers, i.e. reoriented by SVGShape,
@@ -293,7 +310,8 @@ def cases():
         if c['annular_width'] * c['layers'] / c['turns'] - c['clearance'] < THIN_TRACE:
             c['tags'].append('thin')
         if c['name'] in CASE_ISSUES:
-            assert 'known_issue' not in c
+            # (a case's own entry replaces its shape's, and must name the shape's kinds too)
+            assert set(c.get('known_issue', {}).get('kinds', ())) <= set(CASE_ISSUES[c['name']]['kinds'])
             c['known_issue'] = CASE_ISSUES[c['name']]
     assert set(CASE_ISSUES) <= {c['name'] for c in out}
     return out

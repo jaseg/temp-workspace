@@ -298,7 +298,7 @@ def _point_segment_distance(p, a, b):
     return math.hypot(p[0] - a[0] - t*dx, p[1] - a[1] - t*dy)
 
 
-def remove_reflex_jitter(points, tol):
+def remove_reflex_jitter(points, tol, keep=()):
     """ Remove reflex vertices of a counter-clockwise polygon that lie within tol of the chord between their
     neighbors, e.g. the tiny concave corners that rounding the coordinates of a densely sampled smooth outline
     produces. A vertex is only removed while it is reflex, and only if all input vertices between its two neighbors
@@ -306,8 +306,10 @@ def remove_reflex_jitter(points, tol):
     the triangle between it and the chord to the polygon, so the result contains the input and lies within tol of it.
     Its neighbors become less convex: those that become reflex may be removed in turn, so the result also lacks some
     vertices that were convex in the input (nearly collinear ones next to removed reflex corners). Vertex 0 is always
-    kept. Vertices are removed in order of increasing deviation. """
+    kept, and so are the vertices whose indices are in `keep`. Vertices are removed in order of increasing deviation. """
     import heapq
+
+    keep = set(keep) | {0}
 
     n = len(points)
     prev = [(i - 1) % n for i in range(n)]
@@ -329,7 +331,7 @@ def remove_reflex_jitter(points, tol):
             k = (k + 1) % n
         return d
 
-    heap = [(deviation(i), i) for i in range(1, n) if is_reflex(i)]
+    heap = [(deviation(i), i) for i in range(1, n) if i not in keep and is_reflex(i)]
     heap = [h for h in heap if h[0] <= tol]
     heapq.heapify(heap)
     count = n
@@ -348,11 +350,92 @@ def remove_reflex_jitter(points, tol):
         p, q = prev[i], nxt[i]
         nxt[p], prev[q] = q, p
         for k in (p, q):
-            if k != 0 and is_reflex(k):
+            if k not in keep and is_reflex(k):
                 dk = deviation(k)
                 if dk <= tol:
                     heapq.heappush(heap, (dk, k))
     return [points[i] for i in range(n) if alive[i]]
+
+
+def _reflex_turn(p0, v, p1):
+    """ How far a counter-clockwise outline turns right (radians, > 0 for a reflex corner) at vertex v """
+    ux, uy = v[0] - p0[0], v[1] - p0[1]
+    wx, wy = p1[0] - v[0], p1[1] - v[1]
+    return -math.atan2(ux*wy - uy*wx, ux*wx + uy*wy)
+
+
+def round_cusps(points, miter_limit, radius, seg_angle, max_new_vertices, min_chord=0.0):
+    """ Cut the sharp reflex corners ("cusps") of a counter-clockwise polygon with a small disk around the corner.
+
+    At a reflex corner that turns by phi, the mitered inward offset (the straight skeleton's wavefront) has its vertex
+    on the bisector, 1/cos(phi/2) times the depth away from the corner, while the true (Euclidean) inward offset runs
+    around the corner on a circle of radius depth. For a sharp cusp (the top of a heart, phi near 180 degrees) the
+    mitered vertex shoots far into the shape: every turn of the spiral runs into a zero-width spike and back, and the
+    spike hits the other side long before the shape pinches off (an early split event, which limits the annular width).
+
+    Every reflex corner whose miter factor 1/cos(phi/2) exceeds miter_limit (phi > 120 degrees for a limit of 2) is
+    replaced by an arc of the given radius centered at the corner, through the inside of the polygon (the part of the
+    polygon within `radius` of the corner is removed). The arc's inward offset at depth d is a polygonal circle of radius
+    radius + d/cos(s/2) (s the arc's segment angle) around the corner, i.e. the Euclidean offset of the given outline
+    within radius + d*(1/cos(s/2) - 1). The removed area is less than pi*radius^2 per corner, and the result lies inside
+    the given polygon. The radius is limited to a quarter of the shorter adjacent edge and to half the distance from the
+    corner to the rest of the outline (so the result stays simple); corners where the arc's chords would be shorter than
+    min_chord are left alone. The segment angle is raised above seg_angle if the arcs would otherwise add more than
+    max_new_vertices vertices in total, up to 45 degrees; if the arcs need more vertices than that even then (an outline
+    with very many cusps, e.g. a star with hundreds of fine teeth), no corner is cut (all or nothing, so that a
+    symmetric outline stays symmetric).
+
+    Returns (polygon, cusps) with cusps a list of (index of the corner in points, radius, turn in radians, indices of
+    its arc's vertices in the result). Vertex 0 of the result is vertex 0 of the input, or the first vertex of its arc. """
+    n = len(points)
+    if n < 4:
+        return list(points), []
+    min_turn = 2 * math.acos(min(1.0, 1.0 / miter_limit))
+    corners = []
+    for i in range(n):
+        p0, v, p1 = points[i-1], points[i], points[(i+1) % n]
+        phi = _reflex_turn(p0, v, p1)
+        if phi <= min_turn:
+            continue
+        r = min(radius, 0.25 * math.dist(p0, v), 0.25 * math.dist(v, p1))
+        if 2 * r * math.sin(math.radians(45) / 2) < min_chord:
+            continue # (rounding noise between tiny edges)
+        corners.append((i, r, phi))
+    if not corners:
+        return list(points), []
+    sweep = sum(math.pi + phi for _i, _r, phi in corners) # angle the arcs sweep in total (interior angles)
+    # (never so coarse that the arc's own vertices turn by more than 45 degrees)
+    coarsest = max(seg_angle, math.radians(45))
+    if sum(max(2, math.ceil((math.pi + phi) / coarsest - 1e-9)) for _i, _r, phi in corners) > max_new_vertices:
+        return list(points), []
+    seg = min(max(seg_angle, sweep / max(1, max_new_vertices - len(corners))), coarsest) # (- len: rounding k up)
+    # Keep clear of the rest of the outline
+    for c, (i, r, phi) in enumerate(corners):
+        v = points[i]
+        for k in range(n):
+            if k in (i - 1 if i else n - 1, i):
+                continue
+            r = min(r, 0.5 * _point_segment_distance(v, points[k], points[(k+1) % n]))
+        corners[c] = (i, r, phi)
+    out, cusps = [], []
+    rounded = {i: (r, phi) for i, r, phi in corners}
+    for i in range(n):
+        v = points[i]
+        if i not in rounded:
+            out.append(v)
+            continue
+        r, phi = rounded[i]
+        theta = math.pi + phi # interior angle; the arc runs clockwise around v from direction -u to direction w
+        k = max(2, math.ceil(theta / seg - 1e-9))
+        if r <= 0 or r * 2 * math.sin(theta / k / 2) < min_chord:
+            out.append(v)
+            continue
+        p0 = points[i-1]
+        a0 = math.atan2(p0[1] - v[1], p0[0] - v[0])
+        first = len(out)
+        out.extend((v[0] + r*math.cos(a0 - theta*j/k), v[1] + r*math.sin(a0 - theta*j/k)) for j in range(k + 1))
+        cusps.append((i, r, phi, range(first, len(out))))
+    return out, cusps
 
 
 def _track_point(track, depth, time_eps, times=None):
@@ -630,6 +713,9 @@ class Skeletonator:
     has so many reflex vertices that its skeleton would be expensive: then `self.skeleton_poly` lacks the vertices that
     `remove_reflex_jitter` removes (within JITTER_TOLERANCE, 1 µm, of the chord that replaces them, see
     `_skeleton_of`), and `self.poly` has them projected onto that chord, with tracks along it (`_chord_track`).
+    Before that, sharp reflex corners (cusps) of the outline are cut with a tiny arc (`round_cusps`, see CUSP_*):
+    `self.layout_outline` is the outline after that (the one `self.poly` and `self.skeleton_poly` derive from),
+    `self.cusps` lists the corners that were cut. The layout outline lies inside `self.outline`.
 
     The angle coordinate is fixed for the whole shape: vertex i always sits at angle `self.vertex_angles[i]`, no matter
     the depth. This makes consecutive turns of a spiral, and the arms of a multi-arm spiral, line up with each other
@@ -642,6 +728,8 @@ class Skeletonator:
         # Normalize the input: CGAL needs a counter-clockwise polygon without repeated points. Vertex 0 stays vertex 0.
         poly = clean_polygon(poly)
         self.outline = poly # the outline as given, normalized
+        poly, self.cusps = self._round_cusps(poly)
+        self.layout_outline = poly # the outline the spiral follows: self.outline with its cusps cut
         poly, self.skeleton_nodes, self.skeleton_edges = self._skeleton_of(poly)
         self.skeleton_poly = poly # the outline the skeleton was computed for; self.outline unless it was simplified
         self.debug_arms = []
@@ -779,6 +867,37 @@ class Skeletonator:
 
         self.set_angle_reference(ref_depth)
 
+    # Sharp reflex corners (cusps), see round_cusps. A reflex corner whose mitered offset vertex moves more than
+    # CUSP_MITER_LIMIT times as fast as the wavefront (a turn of more than 120 degrees) is cut with an arc of radius
+    # CUSP_RADIUS around the corner, in segments of CUSP_SEGMENT_ANGLE, so that the offsets run around the corner on a
+    # (polygonal) circle instead of shooting a spike into the shape. The layout's depth near the corner is then measured
+    # from the arc, i.e. the turns there run up to CUSP_RADIUS + depth * (1/cos(CUSP_SEGMENT_ANGLE/2) - 1) deeper than
+    # the Euclidean offset of the given outline (0.02 mm at 10 mm depth). Corners up to 120 degrees (an L's 90 degree
+    # corner, a star's inner corners) keep their miter, as the keepout zone does (KEEPOUT_MITER_LIMIT in geometry.py).
+    CUSP_MITER_LIMIT = 2.0
+    CUSP_RADIUS = 0.01 # mm
+    CUSP_SEGMENT_ANGLE = math.radians(5)
+    CUSP_MAX_VERTICES = 360 # vertices all arcs together may add (more cusps: coarser arcs; far more: no cut)
+
+    def _round_cusps(self, poly):
+        xs, ys = [x for x, _y in poly], [y for _x, y in poly]
+        extent = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
+        # The arcs' vertices are reflex: they add to the skeleton's cost (vertices x reflex vertices, see _skeleton_of).
+        # Allow them to double it, or to add up to 60 000 (a few seconds), but at most CUSP_MAX_VERTICES vertices.
+        n, r = len(poly), len(reflex_vertices(poly))
+        budget = n * r + max(n * r, 60_000)
+        m = int((-(n + r) + math.sqrt((n - r)**2 + 4 * budget)) / 2) # largest m with (n + m) (r + m) <= budget
+        out, cusps = round_cusps(poly, self.CUSP_MITER_LIMIT, self.CUSP_RADIUS, self.CUSP_SEGMENT_ANGLE,
+                                 max(1, min(m, self.CUSP_MAX_VERTICES)), min_chord=3e-6 * extent)
+        self._cusp_vertices = {k for c in cusps for k in c[3]}
+        if cusps:
+            logging.getLogger('kicoil').info(
+                f'{len(cusps)} sharp reflex corner(s) of the outline cut with an arc of radius '
+                f'{min(c[1] for c in cusps):.3g} to {max(c[1] for c in cusps):.3g} mm: ' +
+                ', '.join(f'({poly[i][0]:.3f}, {poly[i][1]:.3f}) turning {math.degrees(phi):.1f} degrees'
+                          for i, _r, phi, _k in cusps[:5]) + (' ...' if len(cusps) > 5 else ''))
+        return out, [c[:3] for c in cusps]
+
     # Straight skeletons of outlines with many reflex vertices are slow and need a lot of memory: CGAL looks for split
     # events of every reflex vertex with every edge, and a nearly degenerate input (e.g. coordinates rounded to a grid)
     # makes it fall back to exact arithmetic. Time and memory grow with (number of vertices) x (number of reflex
@@ -803,7 +922,8 @@ class Skeletonator:
             # the chord that replaced them (_spiral_vertices), so the angle reference stays as fine as the outline.
             # This is only done where it makes the skeleton much cheaper (or possible at all): outlines whose reflex
             # corners are real, with a few shallow ones among them, are left alone.
-            simple = remove_reflex_jitter(poly, self.JITTER_TOLERANCE)
+            # (The arcs that cut cusps are not noise, although their chords are within 1 µm of each other)
+            simple = remove_reflex_jitter(poly, self.JITTER_TOLERANCE, keep=getattr(self, '_cusp_vertices', ()))
             rs = len(reflex_vertices(simple))
             if len(simple) < n and (len(simple) * rs <= n * r / 2 or n * r > self.MAX_COST):
                 what = (f'{len(simple)} vertices, {rs} of them reflex (concave) corners deeper than '
@@ -839,7 +959,7 @@ class Skeletonator:
         Keeping these vertices keeps the angle reference (an angle span per edge, see set_angle_reference) as fine as
         the outline, e.g. along nearly straight stretches with many vertices. A projected vertex that would not be at
         least min_gap further along the chord than the one before it is left out. """
-        outline = self.outline
+        outline = self.layout_outline
         if len(skeleton_poly) == len(outline):
             return skeleton_poly, None
         kept, j = [], 0

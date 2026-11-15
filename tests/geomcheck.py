@@ -64,6 +64,13 @@ TURN_SEP = 0.5 # revolutions; copper at least this far apart in cumulative windi
 # around a hole smaller than itself touches itself 0.22 to 0.5 turns further on. 0.18 lies in the middle of the gap.
 SELF_SHORT_SEP = 0.18
 OVERSHOOT_TOL = 0.05 # mm of copper (or of a via center) allowed beyond the intended envelope
+# The intended inner contour is the Euclidean inward offset of the outline by the annular width (round around reflex
+# corners): the area that must be covered (core) and the area normalization use it. Copper may also run along the
+# mitered offset around reflex corners whose miter factor 1/cos(turn/2) is at most ENVELOPE_MITER_LIMIT (an L's or a
+# star's inner corners keep their miter, as the layout does), and up to that many times the depth around sharper ones.
+# None: the core and the envelope use the mitered offset with the limit given (the convention before; 10).
+INNER_MITER_LIMIT = None
+ENVELOPE_MITER_LIMIT = 2.0
 WIDTH_TOL = 0.01 # allowed relative deviation of an emitted track width from the intended trace width ...
 WIDTH_TOL_ABS = 0.001 # ... or this many mm, whichever is larger
 
@@ -1259,7 +1266,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
     # center (or where the angle is unknown, e.g. for copper that is not on the path) copper that is far apart along
     # the conductor belongs to different turns. A fold that returns within the same angular range (a hairpin) is the
     # same turn however long it is; it is reported as a backtrack.
-    inner = _inset(contour, intent.annular_width)
+    inner = _inset(contour, intent.annular_width, INNER_MITER_LIMIT)
     inner_len = inner.length if not inner.is_empty else contour.length
     s_far = max(4*(w + clr), 0.25 * inner_len)
     # Pieces of the same turn closer than this along the path never count as clearance violations or crossings
@@ -1524,13 +1531,17 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
     return rep
 
 
-def _inset(poly, d):
-    return poly.buffer(-d, join_style='mitre', mitre_limit=10)
+def _inset(poly, d, mitre_limit):
+    """ Inward offset of poly by d: Euclidean (round around reflex corners) for mitre_limit None, else mitered with
+    that limit (the miter is cut off at mitre_limit * d from the corner) """
+    if mitre_limit is None:
+        return poly.buffer(-d, quad_segs=32)
+    return poly.buffer(-d, join_style='mitre', mitre_limit=mitre_limit)
 
 
-def _band(contour, outside, depth):
+def _band(contour, outside, depth, mitre_limit):
     """ Region from `outside` mm outside the contour to `depth` mm inside it """
-    return contour.buffer(outside, join_style='mitre', mitre_limit=10).difference(_inset(contour, depth))
+    return contour.buffer(outside, join_style='mitre', mitre_limit=10).difference(_inset(contour, depth, mitre_limit))
 
 
 def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
@@ -1551,14 +1562,16 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
     """
     w, p = intent.trace_width, intent.pitch
     tol = 1e-3
-    core = _inset(contour, p/2).difference(_inset(contour, intent.annular_width - p/2))
-    env = _band(contour, w/2 + tol, intent.annular_width + w/2 + tol)
+    core_limit = INNER_MITER_LIMIT
+    env_limit = ENVELOPE_MITER_LIMIT if INNER_MITER_LIMIT is None else INNER_MITER_LIMIT
+    core = _inset(contour, p/2, core_limit).difference(_inset(contour, intent.annular_width - p/2, core_limit))
+    env = _band(contour, w/2 + tol, intent.annular_width + w/2 + tol, env_limit)
     uncovered = []
     all_copper = []
 
     via_reach = abs(intent.via_offset or 0) * (3 if intent.via_stagger else 1)
     if copper.vias:
-        via_band = _band(contour, via_reach + tol, intent.annular_width + via_reach + tol)
+        via_band = _band(contour, via_reach + tol, intent.annular_width + via_reach + tol, env_limit)
         rep.via_misplacement = float(shapely.distance(shapely.points([(v.x, v.y) for v in copper.vias]),
                                                       via_band).max())
         if rep.via_misplacement > OVERSHOOT_TOL:
@@ -1573,7 +1586,7 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
     centers = [(v.x, v.y) for v in copper.vias] + [(pad.x, pad.y) for pad in pads if pad.number in ('1', '2')]
     if centers:
         zones = shapely.unary_union([Point(c).buffer(zone_r) for c in centers])
-        env = env.union(_band(contour, ext, intent.annular_width + ext).intersection(zones))
+        env = env.union(_band(contour, ext, intent.annular_width + ext, env_limit).intersection(zones))
 
     for li, layer in enumerate(copper.layers):
         idx = [i for i, s in enumerate(segs) if s.layer == layer]
@@ -1595,7 +1608,7 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
     all_copper += [pad.geometry(quad_segs=8) for pad in pads]
     cu = shapely.unary_union(all_copper)
     rep.uncovered_fraction = max(uncovered) if uncovered else 0.0
-    ring = _inset(contour, 0).difference(_inset(contour, intent.annular_width))
+    ring = _inset(contour, 0, core_limit).difference(_inset(contour, intent.annular_width, core_limit))
     rep.excess_fraction = cu.difference(env).area / max(ring.area, 1e-9)
     # undershoot: distance from the contour to the nearest copper, in units of pitch
     pts = shapely.points(shapely.get_coordinates(shapely.segmentize(contour.exterior, p/4)))
