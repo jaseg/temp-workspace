@@ -8,8 +8,12 @@ angles of `PlanarInductor` are warped angles, which the shape maps back to posit
 PlanarInductor picks the layout among a few candidates (the shape's layout modes, including the plain linear layout of
 `kicoil.geometry` as a fallback, and rotations of the arms) by the measured turn spacing, and falls back to the next
 candidate when the vias cannot be placed clear of the turns. The trace width is sized from the measured spacing as in
-`kicoil.geometry`. The measurement additionally covers pieces of one arm that fold back onto each other within half a
-revolution, and the via check covers the connections between the arm ends and the vias.
+`kicoil.geometry`. Within half a revolution of the arm's (warped) angle, the measurement tells turns apart like the
+geometric checker, by the winding angle around the coil's center (`hole_center`): pieces of one arm half a turn apart
+are neighboring turns, and one turn must not touch itself from 0.17 turns on (where it wraps around a hole smaller than
+the trace, or runs over its own end via), while it may fold onto itself at a tip (thin inner contours: ellipse tips,
+slivers, crescents), which is reported by the fold warning. The via check covers the connections between the arm ends
+and the vias.
 
 Large or noisy polygon outlines are simplified by 1 µm (up to 20 µm where 1 µm leaves too many reflex corners) before
 the straight skeleton is computed (see `CornerFlatSkeletonator.prepare_outline`): densely sampled outlines with rounded
@@ -35,30 +39,137 @@ from .geometry import CircleShape, Shape  # noqa: F401
 from .skeletonator_alt_cornerflat import CornerFlatSkeletonator, LinearView
 
 
-def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, min_path_separation=inf, fold_limit=None):
-    """ Like `geometry.min_turn_spacing`, but segments of the same arm that are less than min_turn_separation
-    revolutions apart are also reported when they are more than min_path_separation apart along the arm: near the inner
-    end of a deep annulus, the arm can fold back onto itself within less than half a revolution.
+# Same-turn rule of the geometric checker (tests/geomcheck.py): copper less than half a turn apart in winding angle around
+# the coil's center is one turn, and one turn may only touch itself less than 0.18 turns apart (a fold at a tip; further
+# apart it shorts part of the turn, a self short). Pieces closer than pi/2*(w + c) along the conductor are not compared.
+# The generator applies these rules with a margin: its center (`hole_center`) and its pieces of center line are not
+# exactly the checker's copper, and layouts right at a threshold flip with small changes of the input.
+TURN_WINDING = 0.48 # revolutions; pieces of one arm at least this far apart in winding angle are different turns
+WRAP_WINDING = 0.17 # revolutions; pieces of one turn at least this far apart in winding angle must not touch
+NEAR_FACTOR = 0.95 # pieces of one turn are compared from this fraction of the checker's distance along the conductor on
+TOUCH_GAP = 0.001 # mm; least gap between the copper of one turn where it must not touch (geomcheck counts copper within
+# 0.1 um as touching)
+WINDING_STEP = 0.02 # revolutions; pieces are split so that their winding angle changes at most this much
 
-    Returns (distance, location, folds), where distance and location are as in geometry.min_turn_spacing, and folds is
-    a tuple of arrays (distances, path separations, locations) of such same-arm pairs closer than fold_limit (default:
-    search_radius).
+
+def interior_point(poly):
+    """ A point inside a simple polygon: the middle of the widest section of the horizontal line half way between the
+    two vertex y coordinates nearest to the middle of its y extent (the interior point of GEOS, which shapely's
+    representative_point and the geometric checker use). """
+    ys = [y for _x, y in poly]
+    cy = (min(ys) + max(ys)) / 2
+    hi = min((y for y in ys if y > cy), default=max(ys))
+    lo = max((y for y in ys if y <= cy), default=min(ys))
+    y0 = (hi + lo) / 2
+    xs = sorted(a[0] + (y0 - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
+                for a, b in zip(poly, poly[1:] + poly[:1]) if (a[1] > y0) != (b[1] > y0))
+    if len(xs) < 2:
+        return (sum(x for x, _y in poly) / len(poly), cy)
+    x0, x1 = max(zip(xs[::2], xs[1::2]), key=lambda iv: iv[1] - iv[0])
+    return ((x0 + x1) / 2, y0)
+
+
+def hole_center(sk, depth):
+    """ The coil's center as the geometric checker sees it: the interior point (`interior_point`) of the inner contour,
+    the offset outline at the given depth (a little beyond the annular width), which every turn winds around. """
+    poly = []
+    for i in range(len(sk.tracks)):
+        p = tuple(float(c) for c in sk.track_position(i, depth))
+        if not poly or dist(p, poly[-1]) > 1e-9:
+            poly.append(p)
+    while len(poly) > 1 and dist(poly[0], poly[-1]) <= 1e-9:
+        poly.pop()
+    if len(poly) < 3:
+        return poly[0] if poly else (0.0, 0.0)
+    return interior_point(poly)
+
+
+def _split_pieces(points, angles, max_span, center):
+    """ Pieces of an arm's center line as arrays (q1, q2, u1, u2, w1, w2), split like `geometry._split_by_angle_np` (at
+    most max_span of the arm's angle per piece) and, with a center, also so that the winding angle around it changes by
+    at most WINDING_STEP per piece. w1, w2 are the cumulative winding angles (revolutions) at the piece's ends, exact for
+    the straight pieces (zeros without a center). """
+    pts = np.asarray(points, dtype=float).reshape(-1, 2)
+    ang = np.asarray(angles, dtype=float)
+    a, b, ta, tb = pts[:-1], pts[1:], ang[:-1], ang[1:]
+    keep = ~np.all(a == b, axis=1)
+    a, b, ta, tb = a[keep], b[keep], ta[keep], tb[keep]
+    if center is None:
+        q1, q2, u1, u2 = _split_uniform(a, b, ta, tb, max_span)
+        return q1, q2, u1, u2, np.zeros(len(q1)), np.zeros(len(q1))
+    c = np.asarray(center, dtype=float)
+    ra, rb = a - c, b - c
+    turn = np.arctan2(ra[:, 0]*rb[:, 1] - ra[:, 1]*rb[:, 0], ra[:, 0]*rb[:, 0] + ra[:, 1]*rb[:, 1]) / (2*pi)
+    # Cumulative winding angle at the segment starts (a straight segment turns by less than half a revolution)
+    wa = np.concatenate([[0.0], np.cumsum(turn)[:-1]])
+    if len(a):
+        wa += np.arctan2(ra[0, 1], ra[0, 0]) / (2*pi)
+    # Split at equal steps of the winding angle: the step boundaries are where rays from the center cross the segment
+    n = np.maximum(1, np.ceil(np.abs(turn) / WINDING_STEP)).astype(np.int64)
+    idx = np.repeat(np.arange(len(a)), n)
+    k = np.arange(len(idx)) - np.repeat(np.cumsum(n) - n, n)
+    nn = n[idx]
+    e = b[idx] - a[idx]
+    rai = ra[idx]
+
+    def cut(f):
+        th = 2*pi * (wa[idx] + turn[idx] * f)
+        ux, uy = np.cos(th), np.sin(th)
+        den = ux*e[:, 1] - uy*e[:, 0]
+        t = -(ux*rai[:, 1] - uy*rai[:, 0]) / np.where(den == 0, 1.0, den)
+        return np.where(f <= 0, 0.0, np.where(f >= 1, 1.0, np.clip(t, 0.0, 1.0)))
+    f0, f1 = k / nn, (k + 1) / nn
+    s0, s1 = cut(f0), cut(f1)
+    a1, b1 = a[idx] + e * s0[:, None], a[idx] + e * s1[:, None]
+    t1, t2 = ta[idx] + (tb[idx] - ta[idx]) * s0, ta[idx] + (tb[idx] - ta[idx]) * s1
+    w0 = wa[idx] + turn[idx] * f0
+    # Then at equal steps of the arm's angle, which is linear along the segment
+    q1, q2, u1, u2, parent = _split_uniform(a1, b1, t1, t2, max_span, with_parent=True)
+    rp = a1[parent] - c
+
+    def wind_at(q):
+        rq = q - c
+        return w0[parent] + np.arctan2(rp[:, 0]*rq[:, 1] - rp[:, 1]*rq[:, 0], rp[:, 0]*rq[:, 0] + rp[:, 1]*rq[:, 1]) / (2*pi)
+    return q1, q2, u1, u2, wind_at(q1), wind_at(q2)
+
+
+def _split_uniform(a, b, ta, tb, max_span, with_parent=False):
+    """ Split segments ab (angles ta, tb) into equal pieces of at most max_span in angle, like
+    `geometry._split_by_angle_np` """
+    n = np.maximum(1, np.ceil(np.abs(tb - ta) / max_span)).astype(np.int64)
+    idx = np.repeat(np.arange(len(a)), n)
+    k = np.arange(len(idx)) - np.repeat(np.cumsum(n) - n, n)
+    nn = n[idx]
+    f0, f1 = k / nn, (k + 1) / nn
+    a, b, ta, tb = a[idx], b[idx], ta[idx], tb[idx]
+    res = (a + (b - a) * f0[:, None], a + (b - a) * f1[:, None], ta + (tb - ta) * f0, ta + (tb - ta) * f1)
+    return res + (idx,) if with_parent else res
+
+
+def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, center=None, same_turn_limit=None):
+    """ Like `geometry.min_turn_spacing`, but with a center (a point inside the coil's hole), pairs of pieces of the same
+    arm that are less than min_turn_separation apart in the arm's angle and at least WRAP_WINDING revolutions apart in
+    winding angle around the center are also reported: where a turn wraps around a hole smaller than the trace, or
+    the arm runs at constant warped angle (around a flat corner, or the tip of a thin inner contour) while it winds
+    around the center, the arm's angle does not tell turns apart.
+
+    Returns (distance, location, wraps), where distance and location are as in geometry.min_turn_spacing, and wraps is
+    a tuple of arrays (distances, winding separations, path separations, locations) of such same-arm pairs closer than
+    same_turn_limit (default: search_radius). Separations are the gaps between the pieces' intervals.
 
     Vectorized with numpy (the candidate pairs come from `geometry._candidate_pairs`), so that outlines with thousands of
     vertices are measured quickly. """
-    pieces = [geometry._split_by_angle_np(points, angles, min_turn_separation / 10) for points, angles in arms]
+    pieces = [_split_pieces(points, angles, min_turn_separation / 10, center) for points, angles in arms]
     pieces = [pc for pc in pieces if len(pc[0])]
-    if fold_limit is None:
-        fold_limit = search_radius
-    fold_d, fold_sep, fold_at = [np.zeros(0)], [np.zeros(0)], [np.zeros((0, 2))]
+    if same_turn_limit is None:
+        same_turn_limit = search_radius
+    wrap_d, wrap_w, wrap_s, wrap_at = [np.zeros(0)], [np.zeros(0)], [np.zeros(0)], [np.zeros((0, 2))]
     if not pieces:
-        return search_radius, None, (fold_d[0], fold_sep[0], fold_at[0])
-    P = np.concatenate([q1 for q1, _q2, _u1, _u2 in pieces])
-    Q = np.concatenate([q2 for _q1, q2, _u1, _u2 in pieces])
-    U1 = np.concatenate([u1 for _q1, _q2, u1, _u2 in pieces])
-    U2 = np.concatenate([u2 for _q1, _q2, _u1, u2 in pieces])
+        return search_radius, None, (wrap_d[0], wrap_w[0], wrap_s[0], wrap_at[0])
+    P, Q, U1, U2, W1, W2 = (np.concatenate([pc[k] for pc in pieces]) for k in range(6))
     arm = np.concatenate([np.full(len(pc[0]), i) for i, pc in enumerate(pieces)])
     tlo, thi = np.minimum(U1, U2), np.maximum(U1, U2)
+    wlo, whi = np.minimum(W1, W2), np.maximum(W1, W2)
     seg_len = np.hypot(*(Q - P).T)
     S1 = np.concatenate([np.cumsum(seg_len[arm == i]) for i in range(len(pieces))])
     S0 = S1 - seg_len
@@ -73,17 +184,18 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, min_path_sepa
         sel = np.hypot(gx, gy) < search_radius
         i, j = i[sel], j[sel]
         same_turn = (arm[i] == arm[j]) & (np.maximum(tlo[j] - thi[i], tlo[i] - thi[j]) < min_turn_separation)
-        if same_turn.any() and min_path_separation < inf:
+        if same_turn.any() and center is not None:
             fi, fj = i[same_turn], j[same_turn]
-            sep = np.maximum(S0[fj] - S1[fi], S0[fi] - S1[fj])
-            sel = sep > min_path_separation
-            fi, fj, sep = fi[sel], fj[sel], sep[sel]
+            wsep = np.maximum(wlo[fj] - whi[fi], wlo[fi] - whi[fj])
+            sel = wsep >= WRAP_WINDING
+            fi, fj, wsep = fi[sel], fj[sel], wsep[sel]
             if len(fi):
                 d = geometry._seg_seg_distance_np(P[fi], Q[fi], P[fj], Q[fj])
-                sel = d < fold_limit
-                fold_d.append(d[sel])
-                fold_sep.append(sep[sel])
-                fold_at.append((P[fi[sel]] + Q[fi[sel]]) / 2)
+                sel = d < same_turn_limit
+                wrap_d.append(d[sel])
+                wrap_w.append(wsep[sel])
+                wrap_s.append(np.maximum(S0[fj] - S1[fi], S0[fi] - S1[fj])[sel])
+                wrap_at.append((P[fi[sel]] + Q[fi[sel]]) / 2)
         i, j = i[~same_turn], j[~same_turn]
         if not len(i):
             continue
@@ -92,7 +204,7 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, min_path_sepa
         if d[k] < best:
             best = float(d[k])
             where = tuple(float(c) for c in (P[i[k]] + Q[i[k]]) / 2)
-    return best, where, (np.concatenate(fold_d), np.concatenate(fold_sep), np.concatenate(fold_at))
+    return best, where, tuple(np.concatenate(x) for x in (wrap_d, wrap_w, wrap_s, wrap_at))
 
 
 def _record_folds(model):
@@ -383,7 +495,13 @@ class PlanarInductor(geometry.PlanarInductor):
                         self._candidates.append(key)
                     if measure(key) >= results[bk][0] - 0.005*self.spiral_pitch:
                         under[key] = self._contour_undershoot(key, results[key][0])
-                bk = min(under, key=lambda k: (under[k] > self.UNDERSHOOT_LIMIT, -results[k][0] if under[k] <= self.UNDERSHOOT_LIMIT else under[k]))
+                # The widest spacing among those that cover the outline, and among equally wide ones (rotations often
+                # measure the same spacing, up to rounding) the best coverage; else the best coverage
+                ok = [k for k in under if under[k] <= self.UNDERSHOOT_LIMIT]
+                if ok:
+                    widest = max(results[k][0] for k in ok)
+                    ok = [k for k in ok if results[k][0] >= widest - 1e-9 * self.spiral_pitch]
+                bk = min(ok or under, key=lambda k: under[k])
         self._set_layout(bk)
         _record_folds(self)
         return results[bk]
@@ -430,42 +548,50 @@ class PlanarInductor(geometry.PlanarInductor):
     def _measure_turn_spacing(self):
         """ Smallest center line distance between neighboring turns on the same layer, and where it occurs.
 
-        Pieces of the same arm count as neighbors when they are at least half a revolution apart, or when they are far
-        apart along the arm (geomcheck counts pieces more than max(4 pitches, a quarter of the inner contour length)
-        apart along the conductor as different turns; use a slightly smaller threshold here). """
+        Pieces of different arms, and of one arm at least half a revolution apart in the arm's angle, are neighbors (as
+        in `kicoil.geometry`). The geometric checker tells turns apart by the winding angle around the coil's center
+        instead. The arm's warped angle is constant around flat corners and around the tip of a thin inner contour, so
+        for pieces of one arm less than half a revolution apart in it, the winding angle around `hole_center` decides:
+        pieces at least TURN_WINDING apart are neighbors; pieces at least WRAP_WINDING apart (one turn wrapping around a
+        hole smaller than the trace, or running over its own end via) must not touch, which limits the trace width to
+        their distance; closer in winding angle, the turn folds onto itself at a tip, which does not limit the spacing
+        (`_record_folds` measures it for the fold warning). As in the checker, pieces of one turn are only compared when
+        they are at least pi/2 times the trace pitch apart along the conductor (closer, they are bends of one piece of
+        track). That threshold depends on the result: a pair rules out an interval of spacings, and the result is the
+        largest spacing no pair rules out. """
         arms = self.spiral_center_lines()
         search_radius = 1.5 * self.spiral_pitch
         sk = getattr(self.shape, 'sk', None)
-        if sk is not None:
-            inner_len = sk.calc_circumference(self.shape.inner_radius)
-        else:
-            inner_len = 2*pi*self.shape.inner_radius
-        # geomcheck's threshold depends on the trace pitch, which depends on the result. Collect all same-arm pairs that
-        # are far enough apart along the arm for the smallest possible threshold, then resolve.
-        # Only folds closer than the nominal pitch matter, since the result is capped there.
-        best, where, folds = search_radius, None, []
+        center = getattr(self.shape, '_hole_center', None)
+        if center is None and sk is not None:
+            A = self.shape.annular_width
+            center = self.shape._hole_center = hole_center(sk, min(1.02 * A, (A + sk.max_depth) / 2))
+        clearance = self.clearance or 0.0
+        best, where, wraps = search_radius, None, []
         for layer_arms in arms:
             if layer_arms:
-                d, w, f = min_turn_spacing(layer_arms, search_radius, min_path_separation=0.9*0.25*inner_len,
-                                           fold_limit=self.spiral_pitch)
-                folds.append(f)
+                d, w, f = min_turn_spacing(layer_arms, search_radius, center=center, same_turn_limit=self.spiral_pitch)
+                wraps.append(f)
                 if d < best:
                     best, where = d, w
-        fd = np.concatenate([f[0] for f in folds]) if folds else np.zeros(0)
-        fsep = np.concatenate([f[1] for f in folds]) if folds else np.zeros(0)
-        fat = np.concatenate([f[2] for f in folds]) if folds else np.zeros((0, 2))
-        if where is None and not len(fd):
+        wd, ww, ws, wat = (np.concatenate([f[k] for f in wraps]) if wraps else np.zeros((0, 2) if k == 3 else 0)
+                           for k in range(4))
+        if where is None and not len(wd):
             return self.spiral_pitch, None
         best = min(best, self.spiral_pitch)
+        # The spacing a pair allows: its distance for different turns, distance plus clearance for one turn
+        bound = np.where(ww >= TURN_WINDING, wd, wd + clearance - TOUCH_GAP)
+        # geomcheck compares pieces at least pi/2*(w + c) apart along the conductor, which depends on the result: a pair
+        # rules out the spacings s in (bound, ds / (NEAR_FACTOR*pi/2)]. Find the largest spacing no pair rules out.
+        reach = ws / (NEAR_FACTOR * pi/2)
         while True:
-            min_path = 0.9 * max(4*best, 0.25*inner_len)
-            sel = np.flatnonzero((fsep > min_path) & (fd < best - 1e-12))
+            sel = np.flatnonzero((reach >= best) & (bound < best - 1e-12))
             if not len(sel):
                 break
-            # smallest distance; ties broken by location like min() over (distance, location) tuples
-            k = sel[np.lexsort((fat[sel, 1], fat[sel, 0], fd[sel]))[0]]
-            best, where = float(fd[k]), (float(fat[k][0]), float(fat[k][1]))
-        return min(best, self.spiral_pitch), where
+            # smallest bound; ties broken by location like min() over (distance, location) tuples
+            k = sel[np.lexsort((wat[sel, 1], wat[sel, 0], bound[sel]))[0]]
+            best, where = float(bound[k]), (float(wat[k][0]), float(wat[k][1]))
+        return best, where
 
     def via_track_clearance(self):
         """ Like geometry.PlanarInductor.via_track_clearance, but also checks the straight connections between the arm

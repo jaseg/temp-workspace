@@ -76,11 +76,42 @@ cases: sector 90/180, square, D shape, random convex, star6, triangle) touches i
 lies in the middle of that gap. Before, with half a turn as the only threshold, the same wrap passed in one case
 (`sector180_a0.90_n3k1`, contacts of 9-15 c at 0.26-0.46 turns) and failed in another (`octagon_a0.90_n3k1`, 2.4 c at
 about 0.5 turns). Self shorts are also checked between a via or pad and track of its own turn. On the full corpus they fail
-`sector180_a0.90_n3k1` with every implementation, and with `geometry_alt_jog` also `rect40x20_a0.90_n3k1` and
+`sector180_a0.90_n3k1` with every implementation except `geometry_alt_cornerflat`, and with `geometry_alt_jog` also `rect40x20_a0.90_n3k1` and
 `roundrect_a0.90_n3k1`, where the inner via (as wide as the 5.9-7.3 mm trace) sits in a hole 2-2.5 mm tall and touches the
 track 0.38-0.43 turns before it. Remaining edges: the base implementation's `sector90_a0.90_n3k1` has a contact of 11 c at 0.14 turns
 (at the sector's apex), which passes as a fold; contacts of wraps closer than π/2·(w+c) along the conductor are not
 checked.
+
+### Same turn or different turn in the cornerflat layout
+
+`geometry_alt_cornerflat` sizes the trace from the measured turn spacing like the base layout, but its arms' (warped)
+angle is constant around flat corners and around the tip of a thin inner contour, so it cannot tell turns apart there.
+It used to count pieces of one arm more than 0.9·max(4·(w+c), ¼ inner length) apart along the conductor as different
+turns (the checker's old path rule), which made the innermost turn facing itself across a thin inner contour limit the
+spacing: `round_ellipse3to1_a0.90_n5k1` got a pitch ratio of 0.843 (two sides 3.03 mm apart at (13.73, ±1.57), 0.04 turns
+apart in winding angle), `round_ellipse10to1_a0.90_n5k1` 0.840, `concave_crescent_a0.9_n5k1` 0.741, all failing
+conformance, against 0.997, 1.000 and 0.996 for the base layout. Now it follows the checker's rule: pieces of one arm
+less than half a revolution apart in the arm's angle are classified by the winding angle around the coil's center (the
+interior point of the inner contour, as the checker picks it: `hole_center`), with margins: at least 0.48 turns apart they
+are different turns, at least 0.17 turns apart (a turn wrapping around a hole smaller than the trace, or running over its
+own end via) they must not touch (w < d), closer they are a fold at a tip, which does not limit the spacing but is
+reported by the fold warning (as in the base layout, D32). Like the checker, pieces of one turn closer than π/2·(w+c)
+along the conductor are not compared; since that threshold depends on the result, the measurement takes the largest
+spacing that no pair rules out.
+
+This also removes the self shorts of `round_blob2_a0.90_n5k1` (0.26 turns, linear layout; the base layout still has it)
+and `round_noisy_l_a0.90_n5k1` (0.19 turns), and the end via overrun of `rconvex0_a0.90_n3k1`: its 'lattice' layout ran
+the last half turn past its own inner via (6.6 mm, in a 2 mm hole), 0.47 turns before the via in winding angle,
+overlapping it by 2.8 mm. The checker exempts that (less than π/2·(w+c) plus the via radius along the conductor from the
+via), but the tapered layout narrowed the trace to 0.12·w0 there. Now another arm phase is chosen, whose last turn does
+not run over the via: no neck, but a narrower constant trace (pitch ratio 0.969 to 0.852).
+
+The price of not touching is trace width where the old layouts had same-turn contacts the checker accepts: on the a0.90
+n3k1 cases (traces 5-10 mm wide around holes of 2-4 mm) the pitch ratio drops, e.g. `triangle_a0.90_n3k1` 0.966 to 0.805
+(its old layout touched itself 0.176 turns apart, just below the checker's 0.18), `pentagon`, `octagon`, `24gon`,
+`star6_shallow`, `rconvex0`/`rconvex3` by 0.08-0.2 (all failing conformance before and after, with the base layout too).
+Among layout candidates with the same spacing (rotations often measure the same, up to rounding), the one covering the
+outline best is chosen; before, rounding noise decided.
 
 ## Corpus
 
