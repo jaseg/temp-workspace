@@ -32,6 +32,7 @@ Checks:
                   Clearance deficits between parts of the *same* turn (the conductor folding onto itself at a tight
                   tip, or a hairpin) are counted as self overlaps and do not fail a case, unless the copper touches
                   itself at least SELF_SHORT_SEP (0.18) turns apart, which shorts part of a turn (a self short).
+                  This includes a via touching copper of its own turn beyond the conductor's arrival into it.
     spacing       Sampled distribution of the edge-to-edge distance between neighboring turns, relative to the nominal
                   clearance. Tells how uniform the layout is, i.e. how much copper area is wasted by loose spacing.
     conformance   Per layer, the union of the tracks inflated by half a pitch must tile the intended annulus (contour
@@ -1341,6 +1342,57 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         ds = abs(s_at(i, p) - s_body)
         return other_turn(ds, th, th_body), ds, th
 
+    def own_via_overlap(v, i, s_via, th_via, step=0.05):
+        """ Copper of segment i that overlaps the via v of its own conductor, closer than s_near + the via radius to
+        it along the path, but not as part of the conductor's arrival into the via: a different part of the turn (at
+        least SELF_SHORT_SEP turns away from the via in winding angle) that comes back to the via, e.g. the innermost
+        turn of a wide trace curling around a small inner contour. The arrival is the copper within r + w/2 +
+        clearance of the via along the path: that close along the path, it cannot be farther away. Returns the
+        arguments for same_turn_deficit at the largest deficit, or None.
+
+        The largest deficit over the part of the segment that counts is found exactly (up to 1e-9 of the segment), so
+        that it does not depend on how the conductor is cut into segments: the deficit is concave along the segment,
+        so its maximum is the unconstrained maximum or lies on a boundary of that part, which is located on a 0.05 mm
+        grid and refined by bisection. """
+        if s_via is None or np.isnan(th_via) or np.isnan(seg_s[i]):
+            return None
+        s = segs[i]
+        r = v.diameter/2
+
+        def at(t):
+            p = (s.a[0] + (s.b[0]-s.a[0])*t, s.a[1] + (s.b[1]-s.a[1])*t)
+            reach = r + s.width_at(p)/2 + clr
+            deficit = reach - math.dist((v.x, v.y), p)
+            ds = abs(s_at(i, p) - s_via)
+            th = theta_at(i, p)
+            counts = deficit > 1e-4 and ds > reach and abs(th - th_via) / (2*math.pi) >= SELF_SHORT_SEP
+            return counts, deficit, (deficit, th, th_via, s.layer, (v.x, v.y), p, ds)
+
+        n = max(1, math.ceil(s.length / step))
+        ts = [k / n for k in range(n + 1)]
+        flags = [at(t)[0] for t in ts]
+        cands = [t for t, f in zip(ts, flags) if f]
+        for (t0, f0), (t1, f1) in itertools.pairwise(zip(ts, flags)):
+            if f0 != f1:
+                good, bad = (t0, t1) if f0 else (t1, t0)
+                for _ in range(40):
+                    mid = (good + bad) / 2
+                    good, bad = (mid, bad) if at(mid)[0] else (good, mid)
+                cands.append(good)
+        if not cands:
+            return None
+        lo, hi = 0.0, 1.0
+        for _ in range(60): # unconstrained maximum of the concave deficit
+            m1, m2 = lo + (hi - lo)/3, hi - (hi - lo)/3
+            lo, hi = (m1, hi) if at(m1)[1] < at(m2)[1] else (lo, m2)
+        cands.append((lo + hi) / 2)
+        best = None
+        for t in cands:
+            ok, deficit, args = at(t)
+            if ok and (best is None or deficit > best[0]):
+                best = args
+        return best
+
     # vias vs tracks and vias vs vias
     for j, v in enumerate(copper.vias):
         s_via, th_via = body_pos(('via', j))
@@ -1358,6 +1410,10 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
                 # (the track leading to the via runs within its copper for the via's radius)
                 if deficit > 1e-4 and ds >= s_near + v.diameter/2:
                     same_turn_deficit(deficit, th, th_via, s.layer, (v.x, v.y), q, ds)
+                elif deficit > 1e-4:
+                    hit = own_via_overlap(v, i, s_via, th_via)
+                    if hit is not None:
+                        same_turn_deficit(*hit)
                 continue
             if deficit > 1e-4:
                 rep.via_violations += 1

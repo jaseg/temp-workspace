@@ -156,6 +156,14 @@ def _split_by_angle_np(points, angles, max_span):
     return (a + (b - a) * f0[:, None], a + (b - a) * f1[:, None], ta + (tb - ta) * f0, ta + (tb - ta) * f1)
 
 
+def _point_seg_closest(p, a, b):
+    """ Point of segment ab closest to p """
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    l2 = dx*dx + dy*dy
+    t = 0.0 if l2 == 0 else max(0.0, min(1.0, ((p[0] - a[0])*dx + (p[1] - a[1])*dy) / l2))
+    return a[0] + t*dx, a[1] + t*dy
+
+
 def _point_seg_distance_np(p, s1, s2):
     d = s2 - s1
     l2 = np.einsum('ij,ij->i', d, d)
@@ -722,6 +730,52 @@ class SVGShape(OffsetShape):
     def desc(self):
         return f'{len(self.polygon)} node imported SVG shape'
 
+
+def _trim_arm_at_via(points, via, max_cos=-0.9):
+    """ Arm center line `points` (ending where it connects to `via`), ended where it comes closest to the via if the
+    connection from its end to the via would run back along the arm (at more than 154 degrees to the arm's last
+    piece; at a convex corner of the inner contour, where the via sits inwards along the bisector, the connection runs
+    back only at corners sharper than 52 degrees).
+
+    This happens where the arm ends at a sharp tip of the inner contour (e.g. the sliver-shaped inner contour of a
+    slender ellipse): the via cannot sit at the tip, where the neighboring turn's sides converge, but must sit back
+    along the tip's spine, where they are far enough apart. The arm would run on into the tip and its connection back
+    out over the arm's own copper. """
+    end = points[-1]
+    length = dist(end, via)
+    if length < 1e-9 or len(points) < 2:
+        return points
+    k = len(points) - 1
+    while k > 0 and dist(points[k-1], end) < 1e-12:
+        k -= 1
+    if k == 0:
+        return points
+    (ax, ay), (bx, by) = points[k-1], end
+    cos = ((bx-ax)*(via[0]-bx) + (by-ay)*(via[1]-by)) / (dist(points[k-1], end) * length)
+    if cos > max_cos:
+        return points
+    # Closest point to the via on the last part of the arm (twice the connection length along the arm)
+    best, cut, walked = length, None, 0.0
+    for j in range(len(points) - 1, 0, -1):
+        a, b = points[j-1], points[j]
+        q = tuple(float(c) for c in _point_seg_closest(via, a, b))
+        d = dist(q, via)
+        if d < best - 1e-9:
+            best, cut = d, (j, q)
+        walked += dist(a, b)
+        if walked > 2 * length:
+            break
+    if cut is None:
+        return points
+    j, q = cut
+    head = list(points[:j])
+    return head if dist(head[-1], q) < 1e-9 else head + [q]
+
+
+class OverlappingViasError(ValueError):
+    """ The copper of two vias overlaps, which would short the arms they connect """
+
+
 @dataclass
 class PlanarInductor():
     shape: Shape
@@ -869,6 +923,14 @@ class PlanarInductor():
         if isclose(self.via_offset, 0, abs_tol=1e-6):
             self.via_offset = 0
 
+        # Moving the inner vias inwards moves them closer together. Where the inner contour narrows (a sliver, or near
+        # the collapse depth of the outline, where it degenerates to a point or a segment) different angles map to the
+        # same point, and the vias of several arms end up on top of each other. When the via offset is calculated
+        # automatically, pull the vias back towards the innermost turn until they clear each other.
+        if auto_via_offset and self.via_ring_spacing() < self.via_diameter + self.clearance - 1e-6:
+            self.via_offset = self._via_offset_for_spacing(self.via_offset)
+            self.logger.info(f'Reduced via offset to {self.via_offset:.3f} mm to keep the vias apart')
+
         # Vias that are wider than the trace can come too close to a neighboring turn when that turn runs at an angle.
         # When the via offset is calculated automatically, move the vias further away from the turns until they clear.
         # Moving the inner vias inwards also moves them closer together, so stop when that would make them overlap.
@@ -905,12 +967,32 @@ class PlanarInductor():
         self.logger.info(f'Outer via ring @r={self.outer_via_ring_radius:.2f} mm (from {self.shape.outer_radius:.2f} mm)')
 
         # Check if the vias of the inner or outer ring are so large that they would overlap. This uses the actual via
-        # positions, so it works for any shape.
-        closest = self.via_ring_spacing()
+        # positions, so it works for any shape. Vias whose copper overlaps short the arms they connect: reject that.
+        closest, pair = self.via_ring_spacing(where=True)
         if closest < self.via_diameter + self.clearance - 1e-6:
-            warnings.warn(f'Overlapping vias: vias are {closest:.2f} mm apart, but need '
-                          f'{self.via_diameter + self.clearance:.2f} mm (via diameter plus clearance). '
-                          f'Reduce the annular width, the via diameter or the number of twists.')
+            (x1, y1), (x2, y2) = pair
+            where = f'the vias at ({x1:.3f}, {y1:.3f}) and ({x2:.3f}, {y2:.3f}) are {closest:.3f} mm apart'
+            hint = ('Reduce the annular width, the via diameter or the number of twists.' if auto_via_offset else
+                    'Reduce the via offset or the via diameter, the annular width or the number of twists.')
+            if closest < self.via_diameter - 1e-6:
+                raise OverlappingViasError(f'Overlapping vias: {where}, less than the via diameter of '
+                                           f'{self.via_diameter:.3f} mm, so they would short the arms they connect. '
+                                           + hint)
+            warnings.warn(f'Overlapping vias: {where}, but need {self.via_diameter + self.clearance:.3f} mm (via '
+                          f'diameter plus clearance). ' + hint)
+
+        # A via can also touch copper of its own turn: when the innermost turn of a wide trace wraps around an inner
+        # contour smaller than the via, the turn's copper comes back to the via from a different direction. Moving the
+        # via does not help (it is no wider than the trace and must sit at the end of the arm), so warn.
+        gap, where, ds = self.via_own_turn_clearance()
+        if gap < self.clearance - 1e-6:
+            what = (f'overlaps the copper of its own turn by {-gap:.3f} mm' if gap < 0 else
+                    f'comes within {gap:.3f} mm of the copper of its own turn')
+            warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {what}, {ds:.3f} mm away from it along the '
+                          f'conductor: the turn wraps around an inner contour that is too small for the trace width '
+                          f'and comes back to its via from another side. ' +
+                          ('This shorts part of the turn. ' if gap < 0 else '') +
+                          'Reduce the annular width, or use more turns or a smaller trace width.')
 
         t, _, b = self.layer_pair.partition(',')
         self.layer_pair = (t.strip(), b.strip())
@@ -982,12 +1064,37 @@ class PlanarInductor():
             self._center_lines = arms
         return self._center_lines
 
-    def via_ring_spacing(self):
-        """ Smallest center distance between any two vias for the current via offset """
+    def via_ring_spacing(self, where=False):
+        """ Smallest center distance between any two vias for the current via offset (with where=True, also the two
+        via positions, or None) """
         self.inner_via_ring_radius = self.shape.inner_radius - self.via_offset
         self.outer_via_ring_radius = self.shape.outer_radius + self.via_offset
         inner, outer = self.via_positions()
-        return min((dist(p, q) for p, q in itertools.combinations(inner + outer, 2)), default=inf)
+        d, pair = min(((dist(p, q), (p, q)) for p, q in itertools.combinations(inner + outer, 2)),
+                      default=(inf, None), key=lambda e: e[0])
+        return (d, pair) if where else d
+
+    def _via_offset_for_spacing(self, max_offset, samples=32):
+        """ Via offset in [0, max_offset] for vias that are too close together at max_offset: the largest offset at
+        which the vias clear each other and the neighboring turns by the clearance, or else the one with the largest
+        smallest gap (via to via, or via to a neighboring turn). """
+        def score(offset):
+            self.via_offset = offset
+            via_gap = self.via_ring_spacing() - self.via_diameter
+            track_gap, _where = self.via_track_clearance()
+            return min(via_gap, track_gap, self.clearance - 1e-6)
+
+        offsets = [max_offset * k / samples for k in range(samples + 1)]
+        scores = [score(o) for o in offsets]
+        best = max(range(len(offsets)), key=lambda k: (scores[k], k))
+        if scores[best] >= self.clearance - 1e-6 and best < samples:
+            # Clear at offsets[best], not at the next sample: find the largest clear offset in between
+            lo, hi = offsets[best], offsets[best + 1]
+            for _ in range(20):
+                mid = (lo + hi) / 2
+                lo, hi = (mid, hi) if score(mid) >= self.clearance - 1e-6 else (lo, mid)
+            return lo
+        return offsets[best]
 
     def via_track_clearance(self):
         """ Smallest edge-to-edge distance between a via and a turn of a spiral arm (other than the turn the via connects
@@ -1031,6 +1138,59 @@ class PlanarInductor():
                 if d < best:
                     best, where = d, v
         return best - self.via_diameter/2 - self.trace_width/2, where
+
+    # A via touching copper of its own arm at least this many revolutions away (in angle) from where the arm connects
+    # to it, and farther away along the conductor than it can be when the arm merely arrives at the via, touches a
+    # different part of its turn (the same limit as SELF_SHORT_SEP of the geometric checker in tests/geomcheck.py).
+    OWN_TURN_SEP = 0.18
+
+    def via_own_turn_clearance(self, step=0.05):
+        """ Smallest edge-to-edge distance between a via and the copper of the arms it connects, within half a
+        revolution of the via (via_track_clearance covers the rest), counting only copper at least OWN_TURN_SEP
+        revolutions away from the via in angle and farther away along the conductor than via radius + half the trace
+        width + clearance (closer, the arm cannot help touching the via on its way in). Returns (gap, via position,
+        path distance), or (inf, None, None). """
+        center_lines = self.spiral_center_lines()
+        inner, outer = self.via_positions()
+        vias = [] # (position, [(layer, arm index, index of the arm point at the via)])
+        for i in range(self.twists):
+            vias.append((inner[i], [(0, i, -1), (1, i, -1)]))
+            if i > 0:
+                vias.append((outer[i-1], [(0, i, 0), (1, (i - self.turns) % self.twists, 0)]))
+        reach = self.via_diameter/2 + self.trace_width/2 + self.clearance
+        best = (inf, None, None)
+        for v, connections in vias:
+            v = np.asarray(v, dtype=float)
+            for layer, arm, end in connections:
+                if layer >= len(center_lines) or arm >= len(center_lines[layer]):
+                    continue
+                points, angles = center_lines[layer][arm]
+                pts, ang = np.asarray(points, dtype=float).reshape(-1, 2), np.asarray(angles, dtype=float)
+                if end == -1:
+                    pts, ang = pts[::-1], ang[::-1]
+                # Only the part within half a revolution of the via
+                keep = np.abs(ang - ang[0]) < 0.5 + 1e-9
+                stop = len(ang) if keep.all() else int(np.argmin(keep)) + 1
+                pts, ang = pts[:stop], ang[:stop]
+                if len(pts) < 2:
+                    continue
+                # Sample the center line every `step` mm, with the path distance from the via
+                seg = np.hypot(*(pts[1:] - pts[:-1]).T)
+                n = np.maximum(1, np.ceil(seg / step)).astype(np.int64)
+                idx = np.repeat(np.arange(len(seg)), n)
+                f = (np.arange(len(idx)) - np.repeat(np.cumsum(n) - n, n)) / n[idx]
+                p = pts[idx] + (pts[idx + 1] - pts[idx]) * f[:, None]
+                t = ang[idx] + (ang[idx + 1] - ang[idx]) * f
+                s = float(np.hypot(*(pts[0] - v))) + np.concatenate([[0.0], np.cumsum(seg)])[idx] + seg[idx] * f
+                d = np.hypot(*(p - v).T)
+                sel = (np.abs(t - ang[0]) >= self.OWN_TURN_SEP) & (s > reach)
+                if not sel.any():
+                    continue
+                k = int(np.argmin(np.where(sel, d, inf)))
+                gap = float(d[k]) - self.via_diameter/2 - self.trace_width/2
+                if gap < best[0]:
+                    best = (gap, (float(v[0]), float(v[1])), float(s[k]))
+        return best
 
     def measure_turn_spacing(self):
         """ Smallest center line distance between neighboring turns on the same layer, and where it occurs """
@@ -1151,18 +1311,20 @@ class PlanarInductor():
                 footprint.lines.append(kicad.make_line(*p1, *p2, self.trace_width, layer))
 
         arms_layers = [[], []]
+        inner_vias, outer_vias = self.via_positions()
         for i in range(self.twists):
             start_angle, fold_angle, end_angle = self.arm_angles(i)
 
             # Handle the spiral arm
             points_layer0, arm_length, angle_refs_layer0 = self.shape.compute_spiral(a1=start_angle, a2=fold_angle, fn=circle_segments, debug=True)
             xn, yn = points_layer0[-1]
+            points_layer0 = _trim_arm_at_via(points_layer0, inner_vias[i])
             add_track(points_layer0, self.layer_pair[0])
 
             if self.layers > 1:
                 # Handle the returning arm on the bottom layer
                 points_layer1, _, angle_refs_layer1 = self.shape.compute_spiral(a1=end_angle, a2=fold_angle, fn=circle_segments, debug=True)
-                points_layer1 = points_layer1[::-1]
+                points_layer1 = _trim_arm_at_via(points_layer1, inner_vias[i])[::-1]
                 add_track(points_layer1, self.layer_pair[1])
 
             else:
@@ -1174,7 +1336,6 @@ class PlanarInductor():
             arms_layers[0].append(points_layer0)
             arms_layers[1].append(points_layer1)
 
-        inner_vias, outer_vias = self.via_positions()
         for i in range(self.twists):
             # Inner via ring
             points_layer0 = arms_layers[0][i]

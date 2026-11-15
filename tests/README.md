@@ -54,8 +54,9 @@ undershoot < 1.25 pitches, overshoot < 0.05 mm). `run_corpus.py` stores the name
 `rejected`; a clear rejection of an infeasible request is acceptable, a crash (`error`) is not. `test_corpus_case` in
 `test_layout.py` asserts the same checks except outline coverage. Clearance, via clearance and self short
 failures are expected failures there only when the generator warned about them (a turn folding onto itself, a via that
-does not fit next to the neighboring turn); on the full corpus that is `octagon_a0.90_n3k1`, `24gon_a0.90_n3k1` and
-`sector180_a0.90_n3k1`, where three turns in 90 % of the inscribed radius make the trace (and the via) about 4-10 mm wide.
+does not fit next to the neighboring turn, or touches its own turn); on the full corpus that is mostly the `a0.90_n3k1`
+cases and the round `a0.90_n5k1` cases, where few turns in 90 % of the inscribed radius make the trace (and the via)
+about 4-10 mm wide, so that the innermost turn wraps around an inner contour smaller than the trace.
 
 ### Same turn or different turn
 
@@ -78,9 +79,13 @@ lies in the middle of that gap. Before, with half a turn as the only threshold, 
 about 0.5 turns). Self shorts are also checked between a via or pad and track of its own turn. On the full corpus they fail
 `sector180_a0.90_n3k1` with every implementation, and with `geometry_alt_jog` also `rect40x20_a0.90_n3k1` and
 `roundrect_a0.90_n3k1`, where the inner via (as wide as the 5.9-7.3 mm trace) sits in a hole 2-2.5 mm tall and touches the
-track 0.38-0.43 turns before it. Remaining edges: the base implementation's `sector90_a0.90_n3k1` has a contact of 11 c at 0.14 turns
-(at the sector's apex), which passes as a fold; contacts of wraps closer than π/2·(w+c) along the conductor are not
-checked.
+track 0.38-0.43 turns before it. Copper of its own turn that touches a via closer than π/2·(w+c) + via radius along the
+conductor is a self short too when it is farther along the path than r + w/2 + c (closer, it is the conductor's arrival
+into the via) and at least 0.18 turns from the via in winding angle: the innermost turn of a wide trace wrapping around
+a small inner contour and touching its own via (`rstar0_a0.90_n3k1`, `pentagon_a0.90_n3k1`, `circle30x6_n2k1`;
+the generator warns "Via at … overlaps the copper of its own turn"). Remaining edges: the base implementation's
+`sector90_a0.90_n3k1` has a contact of 11 c at 0.14 turns (at the sector's apex), which passes as a fold; track-track
+contacts of wraps closer than π/2·(w+c) along the conductor are not checked.
 
 ## Corpus
 

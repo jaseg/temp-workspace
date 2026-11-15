@@ -71,7 +71,10 @@ def test_corpus_case(spec):
     if warned:
         # Clearance problems are acceptable only when the generator warned about them: a turn folding onto itself
         # around a notch or a hole narrower than the trace, or a via (as wide as the trace) that does not fit the hole.
-        assert any(FOLD_WARNING in m or (m.startswith('Via at') and 'neighboring turn' in m) for m in caught), (kinds, caught, rep.violations[:5])
+        # A via that touches its own turn (the innermost turn of a wide trace wrapping around a small inner contour) is
+        # a self short, warned as such.
+        assert any(FOLD_WARNING in m or (m.startswith('Via at') and ('neighboring turn' in m or 'its own turn' in m))
+                   for m in caught), (kinds, caught, rep.violations[:5])
     if kinds:
         pytest.xfail(f'warned: {warned}' if not set(kinds) & set(known) else
                      f'known: {[(k, known[k]) for k in kinds if k in known]}' + (f', warned: {warned}' if warned else ''))
@@ -360,14 +363,15 @@ def test_spacing_measurement_is_fast():
 def test_circle_inner_vias_stay_on_their_side_of_the_center():
     # With vias wider than the hole, the automatic via offset loop pushed the inner vias through the center of a circle
     # (no upper bound), where they swapped sides and the overlap check never fired.
+    # The two 2 mm vias in the 1 mm hole overlap each other even on the innermost turn, which shorts the arms: since
+    # D-VIAS-1 the request is rejected instead of warned. The vias it names are on opposite sides of the center.
     from kicoil import geometry
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter('always')
-        model = geometry.PlanarInductor(shape=geometry.CircleShape(20, 1), turns=9, twists=2, clearance=0.15,
-                                        via_diameter=2.0)
-    assert model.inner_via_ring_radius >= -1e-9
-    assert model.via_offset <= model.shape.max_via_offset + 1e-9
-    assert any('Overlapping vias' in str(x.message) for x in w)
+        with pytest.raises(geometry.OverlappingViasError,
+                           match=r'the vias at \(0\.000, 0\.500\) and \(-0\.000, -0\.500\) are 1\.000 mm apart'):
+            geometry.PlanarInductor(shape=geometry.CircleShape(20, 1), turns=9, twists=2, clearance=0.15,
+                                    via_diameter=2.0)
     overlap = [str(x.message) for x in w if 'overlaps a neighboring turn by' in str(x.message)]
     assert overlap and not any('less than the clearance' in m for m in overlap) # the overlap is larger than it
 
@@ -902,3 +906,76 @@ def test_real_reflex_corners_are_not_simplified(monkeypatch):
     with pytest.raises(Stop):
         skeletonator.Skeletonator(poly)
     assert seen == [poly]
+
+
+@pytest.mark.parametrize('name, pair', [
+    ('round_ellipse20to1_a0.90_n16k5', '(-10.449, -0.130) and (-10.449, 0.130)'),
+    ('round_ellipse10to1_a0.90_n16k5', '(-7.808, -0.196) and (-7.808, 0.196)')])
+def test_overlapping_vias_rejected(name, pair):
+    # 90 % of a slender ellipse, 5 arms: the inner contour is a sliver, and the automatic via offset (0.2 mm, up to the
+    # collapse depth) used to put all five inner vias at (0, 0) of the 20:1 ellipse, and two at (-7.389, 0) of the 10:1
+    # one, which shorted the arms (only a warning). Pulled back to the innermost turn, two vias on opposite sides of the
+    # sliver are still closer than the via diameter: no placement keeps them apart, so the request is rejected.
+    with pytest.raises(ValueError, match=r'Overlapping vias: the vias at .* would short the arms') as e:
+        build_model(spec(name))
+    assert pair in str(e.value)
+
+
+def test_overlapping_vias_rejected_circle():
+    # The same for a circle with a 1 mm hole and 5 arms: the inner vias are 0.59 mm apart even on the innermost turn
+    with pytest.raises(ValueError, match='Overlapping vias'):
+        build_model(corpus._spec('custom', 'circle', 16, 5, outer_diameter=20, inner_diameter=1.0))
+
+
+def test_via_offset_pulled_back_to_keep_vias_apart():
+    # 60 x 6 ellipse, 60 % annular width, 21 turns, 8 arms: at the automatic via offset (0.289 mm) two inner vias sit
+    # 0.623 mm apart on opposite sides of the sliver-shaped inner contour. The offset is reduced to where the smallest
+    # gap (via to via or via to the neighboring turn) is largest: 0.714 mm apart, 0.105 mm from the neighboring turn.
+    caught = []
+    model, intent, rep = layout(spec('round_ellipse10to1_a0.60_n21k8'), caught)
+    assert model.via_offset == pytest.approx(0.2441, abs=1e-3)
+    assert model.via_ring_spacing() == pytest.approx(0.714, abs=1e-3)
+    assert rep.ok_connectivity and rep.worst_via_deficit < 0.05
+    assert any(m.startswith('Overlapping vias') and '0.714 mm apart' in m for m in caught)
+
+
+@pytest.mark.parametrize('name', ['round_ellipse10to1_a0.60_n8k3', 'round_ellipse10to1_a0.60_n6_1layer',
+                                  'round_ellipse20to1_a0.30_n5k1'])
+def test_arm_ends_at_via(name):
+    # The arm that ends at the sharp tip of a sliver-shaped inner contour (fold point (23.879, 0) of the 60 x 6
+    # ellipse) has its via 1.36 mm back along the tip's spine: at the tip the neighboring turn's sides are only 0.45 mm
+    # from the spine and converge at about 6 degrees, so a via there has no clearance. The connection from the tip back
+    # to the via ran over the arm's own copper (a backtrack); now the arm ends where it passes the via.
+    model, intent, rep = layout(spec(name))
+    assert rep.backtracks == 0, rep.notes
+    assert rep.failure_kinds(intent.clearance, intent.trace_width) == []
+
+
+def test_arm_trim_at_via():
+    from kicoil.geometry import _trim_arm_at_via
+    arm = [(0, 0), (5, 0), (5, 1), (10, 1)]
+    # via back along the last piece: the arm ends at the point closest to the via
+    assert _trim_arm_at_via(arm, (8, 1.2)) == [(0, 0), (5, 0), (5, 1), (8.0, 1.0)]
+    assert _trim_arm_at_via(arm, (5.1, 0.5)) == [(0, 0), (5, 0), (5.0, 0.5)]
+    # via ahead or to the side of the arm end: unchanged
+    assert _trim_arm_at_via(arm, (10, -1)) == arm
+    assert _trim_arm_at_via(arm, (11, 1.2)) == arm
+
+
+@pytest.mark.parametrize('name, impl', [('rstar0_a0.90_n3k1', 'kicoil'), ('pentagon_a0.90_n3k1', 'kicoil'),
+                                        ('rconvex0_a0.90_n3k1', 'geometry_alt_cornerflat')])
+def test_via_touching_its_own_turn(name, impl):
+    # 90 % annular width, 3 turns: the innermost turn of the wide trace (7.2, 8.5 and 6.6 mm) wraps around an inner
+    # contour of a few mm, and the inner via (as wide as the trace) touches the copper of its own turn 0.3 to 0.4 turns
+    # before it, about 9 mm back along the conductor. The checker used to skip all copper within s_near + via radius of
+    # the via along the path (15 mm here) and passed these. It now counts copper beyond the via's reach along the path
+    # and at least SELF_SHORT_SEP turns away as a self short, and the generator warns.
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        model = build_model(spec(name), impl)
+        fp = model.render_footprint()
+    assert any(str(m.message).startswith('Via at') and 'copper of its own turn' in str(m.message) for m in w)
+    intent = geomcheck.intent_from_model(model)
+    rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
+    assert 'self short' in rep.failure_kinds(intent.clearance, intent.trace_width)
+    assert rep.worst_self_short > 2.0 and rep.clearance_violations == 0 and rep.via_violations == 0
