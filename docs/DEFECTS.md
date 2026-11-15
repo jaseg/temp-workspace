@@ -635,9 +635,10 @@ arms. `PlanarInductor` only warned ("Overlapping vias") and emitted the layout.
 arms): via offset 0.2 mm = the full collapse depth, all five inner vias at (0, 0); checker: "via at (0.000, 0.000) has
 10 track connections", connectivity, winding. `round_ellipse10to1_a0.90_n16k5`: two vias at (−7.389, 0), the others
 0.16 mm apart. `round_ellipse10to1_a0.60_n21k8` (8 arms): two vias 0.623 mm apart (via 0.6 mm), a via-via clearance
-deficit of 0.127 mm. The original code can not lay out these three (`math domain error`), but has the same defect: a
-circle 20/1 mm, 16 turns, 5 twists puts its 5 inner vias (0.68 mm, clipped to the trace) on a 0.5 mm ring, 0.59 mm
-apart, warns "Overlapping vias in inner via ring" and emits them.
+deficit of 0.127 mm. The original code has the same defect: it cannot lay out the two 90 % ellipses (`math domain
+error`), but lays out `round_ellipse10to1_a0.60_n21k8` with two inner vias 0.62 mm apart at (−17.907, ±0.310), warned
+only ("Overlapping vias in inner via ring"); a circle 20/1 mm, 16 turns, 5 twists puts its 5 inner vias (0.68 mm,
+clipped to the trace) on a 0.5 mm ring, 0.59 mm apart, with the same warning.
 
 **Fix.** With an automatic via offset, when the vias are closer than via diameter + clearance, the offset is chosen in
 [0, offset] (33 samples, then bisection): the largest offset at which the vias clear each other and the neighboring
@@ -648,41 +649,62 @@ reduce; a remaining clearance deficit between vias is warned, as before. The cor
 while they try layout candidates and raise it only if the chosen candidate has it. Both 90 % ellipses are now rejected:
 on the innermost turn the two vias on opposite sides of the sliver are 0.261 and 0.391 mm apart, so no placement fits.
 `round_ellipse10to1_a0.60_n21k8` gets offset 0.244 instead of 0.289 mm: vias 0.714 mm apart (deficit 0.036 mm),
-0.105 mm from the neighboring turn (warned) instead of 0.150 mm. The circle is rejected. Cornerflat rejects the same two
-ellipses; jog finds another of its layout candidates without overlapping vias for both (no connectivity or winding
-failure any more; its vias still overlap the neighboring turn, warned).
+0.105 mm from the neighboring turn (warned) instead of 0.150 mm. The circle is rejected. Cornerflat and jog reject the
+same two ellipses. Jog's other layout candidates keep the vias apart, but put a via 0.103 mm (20:1) and 0.035 mm (10:1)
+into a neighboring turn, which shorts as well: when the preferred candidate had overlapping vias, a candidate whose via
+overlaps a neighboring turn is rejected with the same error (`reject_shorting_fallback`, in jog and cornerflat).
 
 ### D-VIAS-2. A via touching the copper of its own turn (checker exemption)
 
-**Defect.** The checker skipped every contact between a via and copper of its own turn closer than s_near + via radius
-along the conductor (s_near = π/2·(w + c)), to allow the conductor's arrival into the via. With wide traces that is
-10 to 18 mm, more than the innermost turn of a coil that wraps around a small inner contour: the via (as wide as the
-trace) touches that turn's copper 0.2 to 0.4 turns before it, which shorts that part of the turn, and the case passed.
-The generator did not warn either (`via_track_clearance` skips the half revolution around the via's own connection).
+**Defect.** The checker skipped every contact between a via and copper of its own conductor closer than s_near + via
+radius along the path (s_near = π/2·(w + c)), to allow the conductor's arrival into the via. With wide traces that is
+10 to 18 mm, so a turn that leaves its via and comes back to touch it from another side within that distance (which
+shorts that part of the turn) passed. The generator did not warn either (`via_track_clearance` skips the half
+revolution next to the via's own connection).
 
-**Symptom.** `rstar0_a0.90_n3k1` (trace and via 7.18 mm): along the arm, the distance from the via center falls to
-5.06 mm 9.1 mm before the via (copper overlap 2.12 mm), 0.34 turns before it in skeleton angle; checker: pass (except
-conformance). The same in `pentagon_a0.90_n3k1` (2.28 mm overlap, 0.34 turns), cornerflat `rconvex0_a0.90_n3k1`
-(4.29 mm deficit, 0.31 turns) and `circle30x6_n2k1` / `circle30x6_n5k1` (11.3 / 4.6 mm traces around a 6 mm hole, 0.34
-/ 0.21 turns). `sector180_a0.90_n3k1` was flagged only through contacts farther than s_near + radius. The original code
-has it: its `circle30x6_n5k1` shows the same contact (0.21 turns); the other cases fail there with `math domain error`.
+**Symptom.** Triangle at 96 % of the inscribed radius, 4 turns, 1 twist (trace and via 3.76 mm): followed from the inner
+via at (0, 0.8), the arm runs out to a corner of the small triangular inner contour at (3.464, −2.0), 4.45 mm from the
+via center (0.55 mm more than via radius + w/2 + c, so clear of it), and comes back past the via: its center line passes
+3.33 mm from the via center, 0.43 mm into the via's copper, 7.4 mm along the path; checker: pass (except conformance).
+Not in the corpus. In a sweep of 388 nearby inputs (12 outlines at 80-96 % of the inscribed radius × 6 turn/twist
+combinations, 28 circles) the same happens in 7 kicoil layouts (triangles, `rstar0` at 96 %), 11 cornerflat and 3 jog
+ones. The original code cannot lay out any of them (`math domain error`: it fails on every polygon at 80-96 % and
+every circle with a 2-8 mm hole and 2-5 turns tried), so whether it has the defect cannot be tested.
 
-**Fix.** Checker (`own_via_overlap` in `check_layout`): on a segment of the via's own turn within s_near + radius
-along the path, a point counts when its copper is within the clearance of the via, it is farther along the path than
-r + w/2 + c (closer, it cannot be farther away in the plane, so that is the arrival) and at least `SELF_SHORT_SEP`
-(0.18) turns from the via in winding angle. The largest deficit over those points is found exactly (independent of how
-the track is cut into segments). The worst such point is a same-turn deficit, i.e. a self
-short when the copper touches. Generator: `PlanarInductor.via_own_turn_clearance` applies the same rule (skeleton angle,
-the half revolution of each arm next to the via) and `__post_init__` warns "Via at (x, y) overlaps the copper of its
-own turn by … mm, … mm away from it along the conductor"; `test_corpus_case` accepts this warning for a self short.
-The generator cannot avoid it: the via is no wider than the trace and sits at the end of the arm, so the arm's own end
-touches the turn in the same place; only a smaller annular width, more turns or a narrower trace help. The
-mutation tests of `test_geomcheck.py` that start from `circle30x6_n2k1` now expect its self short.
+**Not a defect: the arrival.** The wide innermost turns of e.g. `rstar0_a0.90_n3k1`, `pentagon_a0.90_n3k1`, cornerflat
+`rconvex0_a0.90_n3k1` and `circle30x6_n2k1` curve tightly into their via, and copper 7 to 11 mm back along the path
+(0.18 to 0.42 turns around the center) overlaps the via by up to 2.9 mm. Followed from the via, the distance from the via
+center to the center line only grows there (within 0.07 mm): that copper never leaves the via, it is one piece of copper
+with it, and the via shorts nothing that the track's own copper does not already connect. A first version of this fix
+flagged these by winding angle (at least 0.18 turns from the via). That verdict was set by where the 0.18-turn cut fell,
+measured around shapely's `representative_point` of a tiny inner contour: it changed with the outline's orientation
+(`star5` at 80 %, 5 turns, 2 twists: self short at 0-27° and 72-90°, none at 36-63°), alternated along an annular width
+sweep, and the generator (which measured the angle in skeleton parameter) missed some of them (unwarned self shorts).
 
-Full corpus: 36 kicoil cases gain a `self short` (22 a0.90_n3k1 cases, 12 round a0.90_n5k1 cases and
-`circle30x6_n2k1` / `n5k1`), 12 of them passed before; cornerflat 37, 15 of which passed. Every one is warned by the
-generator, so `test_corpus_case` treats it as an expected failure. The flagged contacts are 0.18 to 0.42 turns from the
-via; the generator measures 0.19 to 3.75 mm of copper overlap.
+**Fix.** Checker (`own_via_returns` in `check_layout`): within s_near + radius of a via along the path, followed away
+from the via on both sides, the deficit of a point at distance d from the via center is min(r + w/2 + c − d, X + c,
+M − d), with M the largest d and X the largest d − (r + w/2 + c) between the via and the point. It is a self short when
+the deficit reaches the clearance, i.e. the copper touches the via after its center line has been at least
+r + w/2 + c away (its copper cleared the via). It uses no winding center, and is exact per segment (d is convex along a
+segment, the deficit concave), so it depends neither on the orientation nor on how the track is cut into segments.
+Generator: `PlanarInductor.via_own_turn_clearance` applies the same rule to the arm center lines (trimmed at the via as
+`render_footprint` does), with margins: copper counts once the center line has been r + w/2 + c/2 away and come back by
+c/2, or when it is more than s_near + r − c along the arm, and `__post_init__` warns "Via at (x, y) overlaps the copper
+of its own turn by … mm, … mm away from it along the conductor" when it is closer than the clearance;
+`test_corpus_case` accepts this warning for a self short. The generator does not try to avoid it (the via sits at the
+arm end); a smaller annular width, more turns or a narrower trace help.
+
+Corpus (997 cases): no kicoil case changes status from this rule. Cornerflat: 7 cases gain a self short, all
+warned: `star5_a0.60_n7k3` (and `_cw`), `sector180_a0.90_n5k3` and `concave_crescent_a0.9_n8k3` passed before;
+`ellipse3to2_a0.90_n5k3`, `d_shape_a0.90_n5k3`, `rconvex0_a0.90_n9k4` and `rconvex2_a0.90_n5k3` failed only
+conformance. There an arm with a flattened corner hooks out of its via's reach and back; the copper overlap is 0.000 to
+0.28 mm (the crescent's contact is exactly at zero gap, so its verdict sits on the threshold). In the sweep every one
+of the 7/11/3 self shorts of this rule is warned; the generator warns 51/56/44 of the 388 inputs, so it errs on the
+side of warning.
+The verdict and deficit of `triangle_a0.96_n4k1` and `rstar0_a0.96_n4k1` (0.579 and 0.332 mm) are the same at every
+orientation from 0° to 90° in 9° steps; `star5` and `rstar0` with 2 twists and the pentagon at 80 % pass at all of
+them. The other unwarned self shorts of the sweep are track-to-track contacts ("copper touches itself … turns further
+on"), the same on `next`, not via related.
 
 ### D-VIAS-3. Arm runs into a sharp tip and back to its via (backtrack)
 

@@ -921,6 +921,16 @@ def test_overlapping_vias_rejected(name, pair):
     assert pair in str(e.value)
 
 
+@pytest.mark.parametrize('name', ['round_ellipse10to1_a0.90_n16k5'])
+@pytest.mark.parametrize('impl', ['geometry_alt_cornerflat', 'geometry_alt_jog'])
+def test_overlapping_vias_rejected_alternatives(name, impl):
+    # Cornerflat and jog try their other layout candidates when the preferred one has overlapping vias. Jog found ones
+    # whose vias stay apart but sit 0.035 mm (and 0.103 mm on the 20:1 ellipse) into a neighboring turn, which shorts
+    # as well: rejected too. (The 20:1 ellipse is left out: jog takes about a minute on it.)
+    with pytest.raises(ValueError, match=r'Overlapping vias: the vias at .* would short the arms'):
+        build_model(spec(name), impl)
+
+
 def test_overlapping_vias_rejected_circle():
     # The same for a circle with a 1 mm hole and 5 arms: the inner vias are 0.59 mm apart even on the innermost turn
     with pytest.raises(ValueError, match='Overlapping vias'):
@@ -962,20 +972,74 @@ def test_arm_trim_at_via():
     assert _trim_arm_at_via(arm, (11, 1.2)) == arm
 
 
+def _polygon_case(name, impl='kicoil', degrees=0, **kw):
+    """ (model, intent, report, warnings) for '<base shape>_a<fraction of the depth>_n<turns>k<twists>', the outline
+    rotated by `degrees` """
+    shape, frac, nk = name.rsplit('_', 2)
+    turns, twists = map(int, nk[1:].split('k'))
+    poly = corpus.base_shapes()[shape][0]
+    c, s = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    poly = [(x*c - y*s, x*s + y*c) for x, y in poly]
+    sp = corpus._spec(name, 'polygon', turns, twists, polygon=poly,
+                      annular_width=round(float(frac[1:]) * corpus.max_depth(poly), 4), **kw)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        model = build_model(sp, impl)
+        fp = model.render_footprint()
+    intent = geomcheck.intent_from_model(model)
+    rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
+    return model, intent, rep, [str(m.message) for m in w]
+
+
+def _via_returns(rep):
+    return [n for n in rep.notes if 'comes back to its own via' in n]
+
+
+def _own_turn_warned(caught):
+    return any(m.startswith('Via at') and 'copper of its own turn' in m for m in caught)
+
+
+@pytest.mark.parametrize('degrees', [0, 17, 45])
+def test_via_overlapping_its_own_turn(degrees):
+    # Triangle, 96 % annular width, 4 turns: the innermost turn runs from the inner via out to a corner of the small
+    # triangular inner contour and back past the via, 0.43 mm into its copper. The via shorts that part of the turn: a
+    # self short, and the generator warns. Neither depends on the orientation of the outline.
+    model, intent, rep, caught = _polygon_case('triangle_a0.96_n4k1', degrees=degrees)
+    assert 'self short' in rep.failure_kinds(intent.clearance, intent.trace_width)
+    assert _via_returns(rep) and rep.worst_self_short == pytest.approx(0.580, abs=0.01), rep.notes
+    assert _own_turn_warned(caught)
+
+
 @pytest.mark.parametrize('name, impl', [('rstar0_a0.90_n3k1', 'kicoil'), ('pentagon_a0.90_n3k1', 'kicoil'),
                                         ('rconvex0_a0.90_n3k1', 'geometry_alt_cornerflat')])
-def test_via_touching_its_own_turn(name, impl):
-    # 90 % annular width, 3 turns: the innermost turn of the wide trace (7.2, 8.5 and 6.6 mm) wraps around an inner
-    # contour of a few mm, and the inner via (as wide as the trace) touches the copper of its own turn 0.3 to 0.4 turns
-    # before it, about 9 mm back along the conductor. The checker used to skip all copper within s_near + via radius of
-    # the via along the path (15 mm here) and passed these. It now counts copper beyond the via's reach along the path
-    # and at least SELF_SHORT_SEP turns away as a self short, and the generator warns.
+def test_via_arrival_is_not_a_self_short(name, impl):
+    # 90 % annular width, 3 turns: the wide trace (7.2, 8.5 and 6.6 mm) curves tightly around the small inner contour
+    # into its via (as wide as the trace), and its copper overlaps the via for 7 to 10 mm back along the conductor
+    # (0.18 to 0.42 turns around the center). Followed from the via, that copper never leaves the via's reach: it is the
+    # conductor's own arrival, a single piece of copper that the via adds nothing to. It is not a self short.
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter('always')
         model = build_model(spec(name), impl)
         fp = model.render_footprint()
-    assert any(str(m.message).startswith('Via at') and 'copper of its own turn' in str(m.message) for m in w)
     intent = geomcheck.intent_from_model(model)
     rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
-    assert 'self short' in rep.failure_kinds(intent.clearance, intent.trace_width)
-    assert rep.worst_self_short > 2.0 and rep.clearance_violations == 0 and rep.via_violations == 0
+    assert rep.self_shorts == 0 and not _via_returns(rep), rep.notes
+    assert not _own_turn_warned([str(m.message) for m in w])
+
+
+@pytest.mark.parametrize('name, impl, degrees, kw', [
+    ('rstar0_a0.9_n3k2', 'kicoil', 0, {}), ('star5_a0.8_n5k2', 'kicoil', 0, {}), ('star5_a0.8_n5k2', 'kicoil', 45, {}),
+    ('rstar0_a0.8_n5k2', 'kicoil', 0, {}), ('hexagon_a0.8_n5k1', 'geometry_alt_cornerflat', 0, {}),
+    ('pentagon_a0.8_n5k1', 'geometry_alt_jog', 17, {}), ('rconvex2_a0.94_n4k1', 'geometry_alt_cornerflat', 0, {}),
+    ('d_shape_a0.94_n5k1', 'kicoil', 0, {'trace_width': 3.6}),
+    ('d_shape_a0.94_n5k1', 'geometry_alt_cornerflat', 0, {'trace_width': 3.6}),
+    ('triangle_a0.93_n2k1', 'kicoil', 0, {}), ('rstar0_a0.96_n4k1', 'kicoil', 0, {})])
+def test_via_self_short_is_warned(name, impl, degrees, kw):
+    # Inputs near the corpus where the checker and the generator used different measures of 'a different part of the
+    # turn' (winding angle about different centers): the checker flagged self shorts the generator did not warn about.
+    # Both now use the same center-independent rule, with margins on the generator's side.
+    model, intent, rep, caught = _polygon_case(name, impl, degrees, **kw)
+    if _via_returns(rep):
+        assert _own_turn_warned(caught), (rep.notes, caught)
+
+

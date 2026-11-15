@@ -917,8 +917,11 @@ class PlanarInductor(geometry.PlanarInductor):
 
         caught = None
         tried = []
+        first_error = None
         for layout in attempts:
             caught = build(layout)
+            if layout is attempts[0]:
+                first_error = self._via_error
             if self._via_error is None and self._vias_ok():
                 break
             gap, _where = self.via_track_clearance()
@@ -939,6 +942,8 @@ class PlanarInductor(geometry.PlanarInductor):
                     caught = build(best, final=True)
         if self._via_error is not None:
             raise self._via_error
+        if first_error is not None:
+            geometry.reject_shorting_fallback(self, first_error)
         self.layout = shape.layout
         for w in caught:
             warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)

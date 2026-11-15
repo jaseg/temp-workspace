@@ -776,6 +776,16 @@ class OverlappingViasError(ValueError):
     """ The copper of two vias overlaps, which would short the arms they connect """
 
 
+def reject_shorting_fallback(model, error):
+    """ For layouts that try other candidates when their preferred one has overlapping vias (OverlappingViasError
+    `error`): raise `error` if the candidate `model` ended up with puts a via onto a neighboring turn instead, which
+    shorts as well. """
+    gap, where = model.via_track_clearance()
+    if gap < 0:
+        raise OverlappingViasError(f'{error} The other layouts tried put the via at ({where[0]:.3f}, {where[1]:.3f}) '
+                                   f'{-gap:.3f} mm into a neighboring turn, which shorts it as well.') from error
+
+
 @dataclass
 class PlanarInductor():
     shape: Shape
@@ -981,11 +991,11 @@ class PlanarInductor():
             warnings.warn(f'Overlapping vias: {where}, but need {self.via_diameter + self.clearance:.3f} mm (via '
                           f'diameter plus clearance). ' + hint)
 
-        # A via can also touch copper of its own turn: when the innermost turn of a wide trace wraps around an inner
-        # contour smaller than the via, the turn's copper comes back to the via from a different direction. Moving the
-        # via does not help (it is no wider than the trace and must sit at the end of the arm), so warn.
+        # A via can also touch copper of its own turn: when the innermost turn of a wide trace runs around a small inner
+        # contour, its copper can leave the via and come back to it from another side. The via sits at the end of the
+        # arm; this is not avoided, but warned.
         gap, where, ds = self.via_own_turn_clearance()
-        if gap < self.clearance - 1e-6:
+        if gap < self.clearance - 1e-3:
             what = (f'overlaps the copper of its own turn by {-gap:.3f} mm' if gap < 0 else
                     f'comes within {gap:.3f} mm of the copper of its own turn')
             warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {what}, {ds:.3f} mm away from it along the '
@@ -1139,55 +1149,68 @@ class PlanarInductor():
                     best, where = d, v
         return best - self.via_diameter/2 - self.trace_width/2, where
 
-    # A via touching copper of its own arm at least this many revolutions away (in angle) from where the arm connects
-    # to it, and farther away along the conductor than it can be when the arm merely arrives at the via, touches a
-    # different part of its turn (the same limit as SELF_SHORT_SEP of the geometric checker in tests/geomcheck.py).
-    OWN_TURN_SEP = 0.18
-
     def via_own_turn_clearance(self, step=0.05):
-        """ Smallest edge-to-edge distance between a via and the copper of the arms it connects, within half a
-        revolution of the via (via_track_clearance covers the rest), counting only copper at least OWN_TURN_SEP
-        revolutions away from the via in angle and farther away along the conductor than via radius + half the trace
-        width + clearance (closer, the arm cannot help touching the via on its way in). Returns (gap, via position,
-        path distance), or (inf, None, None). """
+        """ Smallest edge-to-edge distance between a via and copper of the arms it connects that comes back to the via,
+        within half a revolution of the via (via_track_clearance covers the rest). Returns (gap, via position, path
+        distance), or (inf, None, None).
+
+        Followed along the arm's center line away from the via, copper counts once the center line has been farther
+        from the via than via radius + half the trace width + half the clearance (the arm's copper left the via's
+        copper) and has come back towards the via by half the clearance, or when it is farther from the via along the
+        arm than (pi/2)(trace width + clearance) + via radius - clearance. Copper that never left the via is the arm's
+        own arrival into the via, however tightly it curves. This mirrors the self-short rule of the geometric checker
+        (tests/geomcheck.py): a point that touches the via after the center line has been a full clearance farther
+        away (and so came back by at least the clearance), and beyond (pi/2)(trace width + clearance) + via radius
+        its same-turn rule. The margins (half a clearance on how far the arm left and came back, a clearance on the
+        gap and along the arm) make sure that what the checker flags is warned here. Neither depends on a winding center. The arm is trimmed at the via as render_footprint
+        does. """
         center_lines = self.spiral_center_lines()
         inner, outer = self.via_positions()
-        vias = [] # (position, [(layer, arm index, index of the arm point at the via)])
+        vias = [] # (position, [(layer, arm index, end of the arm at the via)])
         for i in range(self.twists):
-            vias.append((inner[i], [(0, i, -1), (1, i, -1)]))
+            vias.append((inner[i], [(0, i, -1), (1, i, -1)], True))
             if i > 0:
-                vias.append((outer[i-1], [(0, i, 0), (1, (i - self.turns) % self.twists, 0)]))
-        reach = self.via_diameter/2 + self.trace_width/2 + self.clearance
+                vias.append((outer[i-1], [(0, i, 0), (1, (i - self.turns) % self.twists, 0)], False))
+        r, w = self.via_diameter/2, self.trace_width
+        far = pi/2 * (w + self.clearance) + r - self.clearance
         best = (inf, None, None)
-        for v, connections in vias:
-            v = np.asarray(v, dtype=float)
+        for v, connections, is_inner in vias:
             for layer, arm, end in connections:
                 if layer >= len(center_lines) or arm >= len(center_lines[layer]):
                     continue
                 points, angles = center_lines[layer][arm]
                 pts, ang = np.asarray(points, dtype=float).reshape(-1, 2), np.asarray(angles, dtype=float)
-                if end == -1:
+                if end == 0:
                     pts, ang = pts[::-1], ang[::-1]
+                if is_inner:
+                    trimmed = _trim_arm_at_via([tuple(p) for p in pts], v)
+                    pts, ang = np.asarray(trimmed, dtype=float).reshape(-1, 2), ang[:len(trimmed)]
+                # from the via outward
+                pts, ang = pts[::-1], ang[::-1]
                 # Only the part within half a revolution of the via
                 keep = np.abs(ang - ang[0]) < 0.5 + 1e-9
                 stop = len(ang) if keep.all() else int(np.argmin(keep)) + 1
                 pts, ang = pts[:stop], ang[:stop]
                 if len(pts) < 2:
                     continue
+                v = np.asarray(v, dtype=float)
                 # Sample the center line every `step` mm, with the path distance from the via
                 seg = np.hypot(*(pts[1:] - pts[:-1]).T)
                 n = np.maximum(1, np.ceil(seg / step)).astype(np.int64)
                 idx = np.repeat(np.arange(len(seg)), n)
                 f = (np.arange(len(idx)) - np.repeat(np.cumsum(n) - n, n)) / n[idx]
-                p = pts[idx] + (pts[idx + 1] - pts[idx]) * f[:, None]
-                t = ang[idx] + (ang[idx + 1] - ang[idx]) * f
-                s = float(np.hypot(*(pts[0] - v))) + np.concatenate([[0.0], np.cumsum(seg)])[idx] + seg[idx] * f
+                p = np.concatenate([pts[idx] + (pts[idx + 1] - pts[idx]) * f[:, None], pts[-1:]])
+                s = float(np.hypot(*(pts[0] - v))) + np.concatenate([np.concatenate([[0.0], np.cumsum(seg)])[idx]
+                                                                     + seg[idx] * f, [seg.sum()]])
                 d = np.hypot(*(p - v).T)
-                sel = (np.abs(t - ang[0]) >= self.OWN_TURN_SEP) & (s > reach)
+                farthest = np.maximum.accumulate(d)
+                # the copper has left the via's copper and comes back
+                returning = (farthest >= r + w/2 + self.clearance/2) & (farthest - d >= self.clearance/2)
+                sel = returning | (s > far)
                 if not sel.any():
                     continue
                 k = int(np.argmin(np.where(sel, d, inf)))
-                gap = float(d[k]) - self.via_diameter/2 - self.trace_width/2
+                gap = float(d[k]) - r - w/2
                 if gap < best[0]:
                     best = (gap, (float(v[0]), float(v[1])), float(s[k]))
         return best

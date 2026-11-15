@@ -293,6 +293,8 @@ class PlanarInductor(geometry.PlanarInductor):
                 super().__post_init__()
         elif via_error is not None:
             raise via_error
+        elif via_errors[first] is not None:
+            geometry.reject_shorting_fallback(self, via_errors[first])
         for w in caught:
             warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
 
