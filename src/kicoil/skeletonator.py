@@ -479,22 +479,43 @@ def round_cusps(points, miter_limit, radius, seg_angle, max_new_vertices, min_ra
     turns = [_reflex_turn(points[k-1], points[k], points[(k+1) % n]) for k in range(n)]
     # Candidates: corners that turn by a few degrees or more themselves (a cusp may be split into several corners)
     order = sorted((k for k in range(n) if turns[k] > math.radians(5)), key=lambda k: -turns[k])
-    cuts = [] # (i, r, phi, j0, j1, e_in, e_out)
-    taken = set()
+    reflex = [t > 0 for t in turns]
+    n_reflex = sum(reflex)
+
+    def fits(cuts, seg):
+        # The arc's k + 1 vertices (e_in, e_out convex, the others reflex) replace the vertices inside the circle
+        new = new_reflex = 0
+        for _i, _r, phi, j0, j1, _a, _b in cuts:
+            k = max(2, math.ceil((math.pi + phi) / seg - 1e-9))
+            run = [(j0 + m) % n for m in range((j1 - j0) % n + 1)]
+            new += k + 1 - len(run)
+            new_reflex += k - 1 - sum(reflex[j] for j in run)
+        return new <= max_new_vertices and (max_cost is None or (n + new) * (n_reflex + new_reflex) <= max_cost)
+
+    # The cusps at the full radius (cheap), to reject outlines with too many of them before the clearance checks
+    candidates, taken = [], set()
     for i in order:
         if i in taken:
             continue
-        v = points[i]
-        if any(math.dist(v, points[c[0]]) <= c[1] for c in cuts):
-            continue # (within a cusp that is cut: its turn is part of that cusp's)
-        r = radius
-        cut = _cusp_cut(points, i, r)
+        cut = _cusp_cut(points, i, radius)
         if cut is None:
             continue
         j0, j1, e_in, e_out = cut
-        phi = _reflex_turn(e_in, v, e_out)
-        if phi <= min_turn:
-            continue
+        phi = _reflex_turn(e_in, points[i], e_out)
+        if phi > min_turn:
+            candidates.append((i, radius, phi, j0, j1, e_in, e_out))
+            taken |= {(j0 + m) % n for m in range((j1 - j0) % n + 1)}
+    if not candidates:
+        return list(points), [], seg_angle
+    if not fits(candidates, max_seg):
+        skipped.extend((c[0], turns[c[0]], 'too many cusps for the skeleton\'s vertex budget') for c in candidates)
+        return list(points), [], seg_angle
+
+    cuts = [] # (i, r, phi, j0, j1, e_in, e_out)
+    taken = set()
+    for i, r, phi, j0, j1, e_in, e_out in candidates:
+        v = points[i]
+        cut = (j0, j1, e_in, e_out)
         for _attempt in range(20):
             smaller = _cusp_clearance(points, i, j0, j1, r)
             if smaller is None:
@@ -523,27 +544,15 @@ def round_cusps(points, miter_limit, radius, seg_angle, max_new_vertices, min_ra
     if not cuts:
         return list(points), [], seg_angle
 
-    reflex = [t > 0 for t in turns]
-    n_reflex = sum(reflex)
-
-    def fits(seg):
-        # The arc's k + 1 vertices (e_in, e_out convex, the others reflex) replace the vertices inside the circle
-        new = new_reflex = 0
-        for _i, _r, phi, j0, j1, _a, _b in cuts:
-            k = max(2, math.ceil((math.pi + phi) / seg - 1e-9))
-            run = [(j0 + m) % n for m in range((j1 - j0) % n + 1)]
-            new += k + 1 - len(run)
-            new_reflex += k - 1 - sum(reflex[j] for j in run)
-        return new <= max_new_vertices and (max_cost is None or (n + new) * (n_reflex + new_reflex) <= max_cost)
     seg = seg_angle
-    if not fits(seg):
-        if not fits(max_seg):
+    if not fits(cuts, seg):
+        if not fits(cuts, max_seg):
             skipped.extend((c[0], turns[c[0]], 'too many cusps for the skeleton\'s vertex budget') for c in cuts)
             return list(points), [], seg_angle
         lo, hi = seg, max_seg # (bisect the finest segment angle within the budget)
         for _ in range(40):
             mid = 0.5 * (lo + hi)
-            lo, hi = (lo, mid) if fits(mid) else (mid, hi)
+            lo, hi = (lo, mid) if fits(cuts, mid) else (mid, hi)
         seg = hi
     arcs = {}
     for i, r, phi, j0, j1, e_in, e_out in cuts:
