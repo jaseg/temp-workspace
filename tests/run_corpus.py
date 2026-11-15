@@ -21,6 +21,7 @@ import traceback
 import dataclasses
 from pathlib import Path
 import multiprocessing
+import multiprocessing.connection
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -213,6 +214,65 @@ def summarize(results, file=sys.stdout):
     print(f'  total score: {sum(r["score"] for r in checked):.1f}', file=file)
 
 
+def _timed_worker(fn, job, conn):
+    try:
+        conn.send(fn(job))
+    except BaseException as e:  # report, never hang the parent
+        conn.send({'status': 'error', 'error': f'{type(e).__name__}: {e}'[:300]})
+    conn.close()
+
+
+def run_jobs(fn, jobs, n, timeout=None, on_timeout=None):
+    """Run fn over jobs in n worker processes, in order. With a timeout (seconds), every job gets its own process,
+    which is killed when it runs longer; the job's result is then on_timeout(job, elapsed). Used for the slow
+    pathological outlines (dense or noisy SVG-like outlines can keep the straight skeleton busy for many minutes)."""
+    if not timeout:
+        if n <= 1:
+            return [fn(job) for job in jobs]
+        ctx = multiprocessing.get_context('forkserver')
+        with ctx.Pool(n) as pool:
+            return pool.map(fn, jobs, chunksize=1)
+    ctx = multiprocessing.get_context('forkserver')
+    results = [None] * len(jobs)
+    pending = list(enumerate(jobs))[::-1]
+    running = {}
+    while pending or running:
+        while pending and len(running) < max(1, n):
+            i, job = pending.pop()
+            rx, tx = ctx.Pipe(duplex=False)
+            proc = ctx.Process(target=_timed_worker, args=(fn, job, tx), daemon=True)
+            proc.start()
+            tx.close()
+            running[i] = (proc, rx, time.perf_counter(), job)
+        multiprocessing.connection.wait([r[1] for r in running.values()], timeout=1.0)
+        for i, (proc, rx, t0, job) in list(running.items()):
+            if rx.poll():
+                try:
+                    results[i] = rx.recv()
+                except EOFError:
+                    results[i] = {'status': 'error', 'error': f'worker died (exit code {proc.exitcode})'}
+                proc.join()
+                del running[i]
+            elif not proc.is_alive():
+                results[i] = {'status': 'error', 'error': f'worker died (exit code {proc.exitcode})'}
+                del running[i]
+            elif time.perf_counter() - t0 > timeout:
+                proc.kill()
+                proc.join()
+                results[i] = on_timeout(job, time.perf_counter() - t0)
+                del running[i]
+            if results[i] is not None and isinstance(job, tuple) and isinstance(job[0], dict) and i not in running:
+                results[i].setdefault('name', job[0].get('name'))
+                results[i].setdefault('tags', job[0].get('tags', []))
+    return results
+
+
+def _timeout_result(job, elapsed):
+    spec = job[0]
+    return {'name': spec['name'], 'tags': spec['tags'], 'status': 'timeout', 'time': elapsed,
+            'error': f'timeout after {elapsed:.0f} s'}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--impl', default='kicoil')
@@ -222,6 +282,7 @@ def main():
     ap.add_argument('--filter', action='append')
     ap.add_argument('-j', type=int, default=os.cpu_count())
     ap.add_argument('-v', action='store_true')
+    ap.add_argument('--timeout', type=float, help='seconds per case; a case running longer is killed and recorded as timeout')
     args = ap.parse_args()
 
     cases = corpus_mod.corpus(args.kind)
@@ -238,12 +299,7 @@ def main():
 
     t0 = time.perf_counter()
     jobs = [(c, args.impl, args.svg_dir) for c in cases]
-    if args.j <= 1:
-        results = [run_case(job) for job in jobs]
-    else:
-        ctx = multiprocessing.get_context('forkserver')
-        with ctx.Pool(args.j) as pool:
-            results = pool.map(run_case, jobs, chunksize=1)
+    results = run_jobs(run_case, jobs, args.j, args.timeout, _timeout_result)
     elapsed = time.perf_counter() - t0
 
     if args.v:

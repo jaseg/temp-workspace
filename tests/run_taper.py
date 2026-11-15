@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import corpus as corpus_mod
 import geomcheck
-from run_corpus import build_model
+from run_corpus import build_model, run_jobs, _timeout_result
 
 
 def _check(fp, model, intent, sample_step):
@@ -160,6 +160,7 @@ def main():
     ap.add_argument('--rank', action='store_true')
     ap.add_argument('--max-candidates', type=int, default=8)
     ap.add_argument('--piece-length-factor', type=float, default=0.5)
+    ap.add_argument('--timeout', type=float, help='seconds per case; a case running longer is killed and recorded as timeout')
     args = ap.parse_args()
 
     cases = corpus_mod.corpus(args.kind)
@@ -172,14 +173,7 @@ def main():
     opts = dict(rank=args.rank, max_candidates=args.max_candidates, piece_length_factor=args.piece_length_factor)
     jobs = [(c, args.impl, opts) for c in cases]
     t0 = time.perf_counter()
-    if args.j <= 1:
-        results = []
-        for job in jobs:
-            results.append(run_case(job))
-    else:
-        ctx = multiprocessing.get_context('forkserver')
-        with ctx.Pool(args.j) as pool:
-            results = pool.map(run_case, jobs, chunksize=1)
+    results = run_jobs(run_case, jobs, args.j, args.timeout, _timeout_result)
     print(f'{len(results)} cases in {time.perf_counter() - t0:.0f} s')
     Path(args.out).write_text(json.dumps(results, indent=1, default=str))
 
