@@ -20,7 +20,8 @@ What is read:
   precision they are written with, as exporters write them (width="100.24mm" viewBox="0 0 100.2394 54.4735"), one user
   unit is exactly one unit of width and height. Without a viewBox, user units are CSS px (SVG specification), with a
   warning. Without an absolute unit (no width and height, unitless ones, or percentages) one user unit is taken as 1 mm
-  (and unitless width and height as mm, scaling the viewBox to them).
+  (and unitless width and height as mm, scaling the viewBox to them). Adobe Illustrator writes its points (1/72 in)
+  as px or without a unit, so its files come out at 3/4 size or 72/25.4 times too large; export them with mm units.
 * Several shapes and subpaths: each subpath is a contour. A subpath is closed by Z, or when it ends where it started
   (within JOIN_TOLERANCE). Open subpaths whose end points meet (as in KiCad and FreeCAD exports, where every line and
   arc of a board outline is a path of its own) are joined into closed contours. The outline is the contour with the
