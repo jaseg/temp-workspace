@@ -8,6 +8,8 @@ each shape's split depth (`split_depth()`), not of the inscribed radius as in th
 `cases()` is picked up by tests/corpus.py (family 'concave').
 """
 
+import hashlib
+import json
 import math
 from functools import lru_cache
 from pathlib import Path
@@ -207,14 +209,46 @@ def shapes():
     }
 
 
+# Split depths as computed by the fixed code, committed so that the corpus does not depend on the implementation under
+# test (the original upstream code has no `Skeletonator.max_depth`, other implementations might compute it
+# differently). Regenerate with `python tests/corpus_concave.py write-split-depths`; test_concave checks it is current.
+SPLIT_DEPTHS_FILE = DATA_DIR / 'concave_split_depths.json'
+
+
+def _poly_key(poly, mitered_cusps):
+    h = hashlib.sha1(json.dumps([[round(x, 6), round(y, 6)] for x, y in poly]).encode()).hexdigest()
+    return f'{h}{"-mitered" if mitered_cusps else ""}'
+
+
 @lru_cache(maxsize=None)
-def _split_depth(poly, mitered_cusps):
+def _split_depth_cache():
+    try:
+        return json.loads(SPLIT_DEPTHS_FILE.read_text())
+    except FileNotFoundError:
+        return {}
+
+
+def compute_split_depth(poly, mitered_cusps=False):
+    """ Split depth computed live with the kicoil package on the path (the fixed code). """
     from kicoil import skeletonator
     cls = skeletonator.Skeletonator
     if mitered_cusps:
         class cls(cls):
             CUSP_MITER_LIMIT = math.inf # no corner is cut
     return cls(list(poly)).max_depth
+
+
+@lru_cache(maxsize=None)
+def _split_depth(poly, mitered_cusps):
+    key = _poly_key(poly, mitered_cusps)
+    cache = _split_depth_cache()
+    if key in cache:
+        return cache[key]
+    try:
+        return compute_split_depth(poly, mitered_cusps)
+    except AttributeError as e:
+        raise RuntimeError(f'split depth of a concave outline is not in {SPLIT_DEPTHS_FILE.name} and the kicoil package '
+                           'on the path cannot compute it; regenerate the file with the fixed code') from e
 
 
 def split_depth(poly, mitered_cusps=False):
@@ -317,6 +351,21 @@ if __name__ == '__main__':
     import sys
     if sys.argv[1:] == ['write-svg']:
         write_shark_svg()
+    if sys.argv[1:] == ['write-split-depths']:
+        SPLIT_DEPTHS_FILE.write_text('{}')
+        _split_depth_cache.cache_clear()
+        _split_depth.cache_clear()
+        _record = {}
+        _orig = compute_split_depth
+        def compute_split_depth(poly, mitered_cusps=False):
+            d = _orig(poly, mitered_cusps)
+            _record[_poly_key(poly, mitered_cusps)] = d
+            return d
+        cases()
+        SPLIT_DEPTHS_FILE.write_text(json.dumps(dict(sorted(_record.items())), indent=1) + '\n')
+        _split_depth_cache.cache_clear()
+        _split_depth.cache_clear()
+        print(f'wrote {len(_record)} split depths to {SPLIT_DEPTHS_FILE}')
     for name, (poly, _tags) in shapes().items():
         d, ri = split_depth(poly), inscribed_radius(poly)
         print(f'{name:10s} {len(poly):4d} pts  split depth {d:6.3f}  inscribed radius {ri:6.3f}  ratio {d/ri:.3f}')

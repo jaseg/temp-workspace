@@ -256,3 +256,19 @@ def test_heart_layout_is_robust_to_scaling(scale):
     model, intent, rep = layout(s)
     assert set(rep.failure_kinds(intent.clearance, intent.trace_width)) <= {'conformance'}
     assert rep.backtracks == 0 and rep.overshoot < 0.025 and rep.uncovered_fraction < 0.05
+
+
+def test_committed_split_depths_are_current():
+    """ The concave corpus reads split depths from tests/data/concave_split_depths.json (so that it does not depend on
+    the implementation under test); every entry must match the live computation of the fixed code. """
+    cache = corpus_concave._split_depth_cache()
+    assert cache
+    shapes = {**{n: p for n, (p, _t) in corpus_concave.shapes().items()}}
+    seen = 0
+    for poly in shapes.values():
+        for mitered in (False, True):
+            key = corpus_concave._poly_key(tuple(map(tuple, poly)), mitered)
+            if key in cache:
+                seen += 1
+                assert abs(cache[key] - corpus_concave.compute_split_depth(poly, mitered)) < 1e-9
+    assert seen >= len(shapes)
