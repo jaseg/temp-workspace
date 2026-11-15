@@ -687,7 +687,7 @@ class SVGShape(OffsetShape):
     outside the outline's bounding box, then the outline is centered on its centroid. """
     filename: str
     annular_width: float
-    arc_tolerance: float = 0.002 # mm
+    arc_tolerance: float = 0.01 # mm (svg_import.DEFAULT_TOLERANCE)
     polygon: list = field(init=False)
 
     def __post_init__(self):

@@ -226,8 +226,8 @@ def test_use_element(tmp_path):
 @pytest.mark.parametrize('attrs, scale', [
     ('', 1.0),                                                    # no physical size: user units are mm
     ('viewBox="-5 -5 40 30"', 1.0),
-    ('width="40" height="30" viewBox="-5 -5 40 30"', 1.0),        # unitless width/height are mm, too
-    ('width="80" height="60" viewBox="-5 -5 40 30"', 2.0),
+    ('width="40" height="30" viewBox="-5 -5 40 30"', 1.0),        # unitless width/height: user units are mm, too
+    ('width="80" height="60" viewBox="-5 -5 40 30"', 1.0),        # ... also when they differ (with a warning)
     ('width="40mm" height="30mm" viewBox="-5 -5 40 30"', 1.0),
     ('width="80mm" height="60mm" viewBox="-5 -5 40 30"', 2.0),
     ('width="4cm" height="3cm" viewBox="-5 -5 40 30"', 1.0),
@@ -377,8 +377,9 @@ def test_inkscape_file(tmp_path):
     p = Polygon(pts)
     assert p.is_valid
     assert max(abs(a - b) for a, b in zip(p.bounds, (0, 10, 60, 50))) < 1e-6
-    # Rounded rectangle 60 x 40 with r = 10 (cubic Bezier quarter circles, 0.027 % radius error)
-    assert abs(p.area - (2400 - (400 - 100*math.pi))) < 0.1
+    # Rounded rectangle 60 x 40 with r = 10 (cubic Bezier quarter circles, 0.027 % radius error); the chords cut off
+    # less than the tolerance times the length of the curves
+    assert abs(p.area - (2400 - (400 - 100*math.pi))) < 2*math.pi*10*svg_import.DEFAULT_TOLERANCE + 0.03
 
 
 def test_svgshape_dialect_files(tmp_path):
@@ -446,7 +447,8 @@ def test_gui_and_kicad_plugin_call(tmp_path):
 def test_cli_svg_default_tolerance():
     from kicoil import cli
     opt = {p.name: p for p in cli.svg.params}['arc_tolerance']
-    assert opt.default == 0.002 == geometry.SVGShape.__dataclass_fields__['arc_tolerance'].default
+    assert opt.default == svg_import.DEFAULT_TOLERANCE == geometry.SVGShape.__dataclass_fields__['arc_tolerance'].default
+    assert svg_import.read_outline.__defaults__ == (svg_import.DEFAULT_TOLERANCE,)
 
 
 @pytest.mark.parametrize('impl', ['kicoil', 'geometry_alt_cornerflat'])
@@ -469,3 +471,193 @@ def test_curved_svg_lays_out_cleanly(tmp_path, impl):
     kinds = [k for k in rep.failure_kinds(intent.clearance, intent.trace_width) if k != 'conformance']
     assert not kinds, (kinds, rep.notes[:5])
     assert len(model.shape.polygon) < 400
+
+
+# Review round: straight curves, vertex counts, units, join tolerance, hidden content, symbols, GUI cache
+
+def test_straight_curves_are_single_segments(tmp_path):
+    # Straight edges written as degenerate curves (control points on the end points or on the chord) give the same
+    # polygon as the plain path, at any tolerance
+    plain = outline(tmp_path, '<path d="M0 0 H30 V20 H0 Z"/>')
+    for d in ('M0 0 C0 0 30 0 30 0 C30 0 30 20 30 20 C30 20 0 20 0 20 C0 20 0 0 0 0 Z',
+              'M0 0 C30 0 30 0 30 0 C30 5 30 5 30 20 Q15 20 0 20 Q0 3 0 0 Z',
+              'M0 0 C1 0.0005 29 -0.0005 30 0 L30 20 L0 20 Z'):  # bowed by less than the tolerance
+        for tol in (0.002, 0.01, 0.05):
+            assert same_polygon(outline(tmp_path, f'<path d="{d}"/>', tol=tol), plain), (d, tol)
+    # A control point on the line but beyond the end point: the curve runs past the end and back, it is not taken as
+    # straight (and the outline then folds back onto itself)
+    with pytest.raises(ValueError, match='touches or crosses itself'):
+        outline(tmp_path, '<path d="M0 0 C0 0 40 0 30 0 L30 20 L0 20 Z"/>')
+
+
+BLOB = '<path d="M 0 -40 C 30 -45 50 -20 40 0 C 35 15 50 35 20 40 C 0 45 -10 30 -25 35 C -45 40 -50 10 -40 -5 C -30 -20 -35 -40 0 -40 Z"/>'
+
+
+def test_free_form_curve_vertex_count_and_skeleton_time(tmp_path):
+    # A non-convex free-form outline of 5 cubics (about 85 x 85 mm): at the default tolerance the flattening stays
+    # within it, and the vertex count and the skeleton stay moderate (262 vertices, about 3 s; 585 vertices and 13 s
+    # at 0.002 mm)
+    import time
+    f = write(tmp_path, BLOB)
+    pts = svg_import.read_outline(f)
+    tol = svg_import.DEFAULT_TOLERANCE
+    ctrl = [[(0, -40), (30, -45), (50, -20), (40, 0)], [(40, 0), (35, 15), (50, 35), (20, 40)],
+            [(20, 40), (0, 45), (-10, 30), (-25, 35)], [(-25, 35), (-45, 40), (-50, 10), (-40, -5)],
+            [(-40, -5), (-30, -20), (-35, -40), (0, -40)]]
+    from shapely.geometry import Point
+    ring = Polygon(pts).exterior
+    assert max(ring.distance(Point(_bezier(c)(i/1000))) for c in ctrl for i in range(1001)) <= tol
+    assert 200 < len(pts) < 300
+    t = time.perf_counter()
+    geometry.SVGShape(filename=str(f), annular_width=5)
+    assert time.perf_counter() - t < 30 # generous: shared test machines
+
+
+def test_unitless_size_differing_from_the_viewbox_warns(tmp_path):
+    f = write(tmp_path, '<path d="M0 0 H30 V20 H0 Z"/>', 'width="300" height="200" viewBox="0 0 30 20"')
+    with pytest.warns(UserWarning, match='have no unit and differ from the viewBox'):
+        pts = svg_import.read_outline(f)
+    assert same_polygon(pts, RECT) # as kicoil always read it
+    f = write(tmp_path, '<path d="M0 0 H30 V20 H0 Z"/>', 'width="30" height="20" viewBox="0 0 30 20"')
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        assert same_polygon(svg_import.read_outline(f), RECT)
+
+
+@pytest.mark.parametrize('attrs, scale', [
+    # width/height that agree with the viewBox only to their written digits, but not to 1e-4: the spec scale
+    ('width="2in" height="2in" viewBox="0 0 2.4 2.4"', 50.8/2.4),
+    ('width="1in" height="1in" viewBox="0 0 1.4 1"', 25.4/1.4),       # meet: the smaller scale
+    ('width="20mm" height="10mm" viewBox="0 0 20.4 10.4"', 10/10.4),
+    ('width="1cm" height="1cm" viewBox="0 0 1.2 1.2"', 10/1.2),
+    ('width="10mm" height="10mm" viewBox="0 0 10.4 10.4"', 10/10.4),
+    ('width="10mm" height="10mm" viewBox="0 0 10.6 10.6"', 10/10.6),
+    # ... and the exporter case (shark fixture): exact
+    ('width="100.24mm" height="54.47mm" viewBox="0 0 100.2394 54.4735"', 1.0),
+])
+def test_rounded_width_rule_needs_relative_agreement(tmp_path, attrs, scale):
+    pts = outline(tmp_path, '<path d="M0 0 H30 V20 H0 Z"/>', attrs)
+    assert same_polygon(pts, [(scale*x, scale*y) for x, y in RECT], 1e-9 if scale == 1.0 else 1e-6)
+
+
+def test_rounded_width_rule_is_continuous(tmp_path):
+    # Across the threshold of the exact-unit rule the scale changes by less than EXACT_UNIT_REL
+    sizes = []
+    for vb in (100.0, 100.004, 100.0099, 100.0101, 100.02):
+        pts = outline(tmp_path, '<path d="M0 0 H30 V20 H0 Z"/>', f'width="100mm" height="100mm" viewBox="0 0 {vb} {vb}"')
+        sizes.append(max(p[0] for p in pts))
+    assert sizes[2] == 30 and sizes[3] < 30
+    assert all(abs(a - b) <= 30 * svg_import.EXACT_UNIT_REL * 1.05 for a, b in zip(sizes, sizes[1:]))
+
+
+def test_physical_size_without_viewbox_suggests_a_viewbox(tmp_path):
+    f = write(tmp_path, '<path d="M0 0 H30 V20 H0 Z"/>', 'width="30mm" height="20mm"')
+    with pytest.warns(UserWarning, match=r'add viewBox="0 0 30 20"'):
+        svg_import.read_outline(f)
+
+
+@pytest.mark.parametrize('x0', [10000, 20000, 30000, 33333, 40000, 50000, 60000, 70000, 77777, 80000, 90000])
+def test_join_tolerance_does_not_depend_on_rounding(tmp_path, x0):
+    # KiCad style segments in um user units with one corner off by 1 um (exporter rounding): joined wherever the
+    # outline is (with a 1 um tolerance this depended on float rounding of the position)
+    body = (f"<path d='M {x0} 10000 L {x0+20000} 10000'/><path d='M {x0+20000} 10000 L {x0+20000} 30000'/>"
+            f"<path d='M {x0+20000} 30000 L {x0} 30000'/><path d='M {x0+1} 30000 L {x0+1} 10000'/>")
+    pts = outline(tmp_path, body, "width='100.000mm' height='100.000mm' viewBox='0 0 100000 100000'")
+    assert len(pts) == 4 and abs(Polygon(pts).area - 400) < 0.01
+
+
+def test_join_tolerance(tmp_path):
+    seg = lambda gap: (f'<path d="M0 0 H30"/><path d="M30 0 V20"/><path d="M30 20 H0"/>'
+                       f'<path d="M{gap} 20 V{gap}"/>')
+    assert len(outline(tmp_path, seg(0.005))) == 4
+    with pytest.raises(ValueError, match='no closed outline'):
+        outline(tmp_path, seg(0.05))
+    # A subpath closes when it ends within the tolerance of its start, too
+    assert len(outline(tmp_path, '<path d="M0 0 H30 V20 H0 V0.005"/>')) == 4
+
+
+@pytest.mark.parametrize('hidden', [
+    '<rect width="100" height="100" visibility="hidden"/>',
+    '<rect width="100" height="100" style="visibility:hidden"/>',
+    '<g style="visibility: collapse"><rect width="100" height="100"/></g>',
+    '<style>.h{display:none}</style><rect class="a h" width="100" height="100"/>',
+    '<style>/* layer */ #big { visibility : hidden !important }</style><rect id="big" width="100" height="100"/>',
+    '<style>rect.h, circle {display:none}</style><rect class="h" width="100" height="100"/>',
+    '<defs><style type="text/css"><![CDATA[ g.layer2 { display: none; } ]]></style></defs>'
+    '<g class="layer2"><rect width="100" height="100"/></g>',
+])
+def test_hidden_by_visibility_or_style_sheet(tmp_path, hidden):
+    f = write(tmp_path, hidden + '<rect width="30" height="20"/>')
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        assert same_polygon(svg_import.read_outline(f), RECT)
+
+
+def test_visibility_is_inherited_and_can_be_overridden(tmp_path):
+    body = ('<g visibility="hidden"><rect width="100" height="100"/>'
+            '<rect width="30" height="20" visibility="visible"/></g>')
+    assert same_polygon(outline(tmp_path, body), RECT)
+
+
+def test_style_sheet_rules(tmp_path):
+    # Illustrator style sheets (fills, strokes) are fine; the inline style wins over the sheet; @media rules and rules
+    # that do not match are not applied
+    body = ('<style>.st0{fill:none;stroke:#000;} .h{display:none} @media print { rect { display: none } }'
+            ' .other{display:none}</style>'
+            '<rect class="st0 h" style="display:inline" width="30" height="20"/><rect class="st0" x="50" width="3" height="2"/>')
+    f = write(tmp_path, body)
+    with pytest.warns(UserWarning, match='1 other closed contour'):
+        assert same_polygon(svg_import.read_outline(f), RECT)
+    # A hiding rule with a selector that is not evaluated is an error, not a guess
+    with pytest.raises(ValueError, match='g > rect'):
+        outline(tmp_path, '<style>g > rect {display:none}</style><g><rect width="30" height="20"/></g>')
+
+
+def test_use_of_symbol_with_viewbox(tmp_path):
+    sym = '<defs><symbol id="s" viewBox="0 0 3 2"><path d="M0 0 H3 V2 H0 Z"/></symbol></defs>'
+    href = 'xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#s"'
+    assert same_polygon(outline(tmp_path, sym + f'<use {href} x="5" width="30" height="20"/>'),
+                        [(x + 5, y) for x, y in RECT], 1e-9)
+    # meet with a centered alignment: 60 x 20 viewport, the 30 x 20 symbol in its middle
+    assert same_polygon(outline(tmp_path, sym + f'<use {href} width="60" height="20"/>'),
+                        [(x + 15, y) for x, y in RECT], 1e-9)
+    # the size can come from the symbol
+    sym2 = '<defs><symbol id="s" viewBox="0 0 3 2" width="30" height="20"><path d="M0 0 H3 V2 H0 Z"/></symbol></defs>'
+    assert same_polygon(outline(tmp_path, sym2 + f'<use {href}/>'), RECT, 1e-9)
+    with pytest.raises(ValueError, match='symbol id="s".*needs a width and height'):
+        outline(tmp_path, sym + f'<use {href}/>')
+
+
+def test_frame_around_the_outline_warns(tmp_path):
+    f = write(tmp_path, '<rect x="-10" y="-10" width="297" height="210"/><rect width="30" height="20"/>')
+    with pytest.warns(UserWarning, match='frame or page border'):
+        svg_import.read_outline(f)
+
+
+def test_gui_caches_the_svg_shape(tmp_path):
+    # gui.KiCoilGUI.svg_shape, run without Tk: the shape (and its skeleton) is built once per file and annular width,
+    # its warnings are repeated each time, and a changed file is read again
+    src = (Path(geometry.__file__).parent / 'gui.py').read_text()
+    cls = next(n for n in ast.parse(src).body if isinstance(n, ast.ClassDef) and n.name == 'KiCoilGUI')
+    fn = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == 'svg_shape')
+    built = []
+
+    def counting_shape(**kw):
+        built.append(kw)
+        return geometry.SVGShape(**kw)
+    ns = {'Path': Path, 'warnings': warnings, 'SVGShape': counting_shape}
+    exec(compile(ast.Module(body=[fn], type_ignores=[]), 'gui.py', 'exec'), ns)
+
+    class Gui:
+        svg_shape = ns['svg_shape']
+    gui = Gui()
+    f = write(tmp_path, '<rect x="100" y="100" width="30" height="20"/>')
+    for aw in (3, 3, 4, 4):
+        with pytest.warns(UserWarning, match='not centered'):
+            shape = gui.svg_shape(str(f), aw)
+    assert len(built) == 2 and shape.annular_width == 4
+    f.write_text(f.read_text().replace('width="30"', 'width="40"'))
+    with pytest.warns(UserWarning, match='not centered'):
+        new = gui.svg_shape(str(f), 4)
+    assert Polygon(new.polygon).bounds[2] - Polygon(shape.polygon).bounds[2] == pytest.approx(5)
+    assert len(built) == 3

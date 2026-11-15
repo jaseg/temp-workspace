@@ -768,10 +768,7 @@ class KiCoilGUI:
                 annular_width=self.poly_annular_width_var.get()
             )
         elif shape_type == "SVG":
-            shape = SVGShape(
-                filename=self.svg_filename_var.get(),
-                annular_width=self.svg_annular_width_var.get()
-            )
+            shape = self.svg_shape(self.svg_filename_var.get(), self.svg_annular_width_var.get())
         else:
             raise ValueError(f"Unknown shape type: {shape_type}")
 
@@ -803,6 +800,36 @@ class KiCoilGUI:
             params['via_offset'] = float(via_offset_value)
 
         return params
+
+    def svg_shape(self, filename, annular_width):
+        """ The SVGShape of a file. Its straight skeleton can take seconds for curved outlines, and every change of a
+        coil parameter validates the parameters again, so the shape of the last file is kept while the file (path,
+        modification time, size) and the annular width stay the same. Its warnings are repeated on reuse. (The shape
+        can be shared: PlanarInductor only sets its fold limit, which is recomputed from the skeleton each time.) """
+        try:
+            st = Path(filename).stat()
+            key = (str(Path(filename).resolve()), st.st_mtime_ns, st.st_size, annular_width)
+        except (OSError, ValueError):
+            key = None
+        cached = getattr(self, '_svg_shape_cache', None)
+        if key is not None and cached is not None and cached[0] == key:
+            for w in cached[2]:
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+            return cached[1]
+        caught = []
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter('always')
+                shape = SVGShape(
+                    filename=filename,
+                    annular_width=annular_width
+                )
+        finally:
+            for w in caught:
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+        if key is not None:
+            self._svg_shape_cache = (key, shape, caught)
+        return shape
 
     def get_render_options(self):
         """ Arc tolerance and circle segment count for render_footprint. Empty fields (None) mean automatic. """

@@ -334,7 +334,7 @@ def star(ctx, outfile, **kwargs):
 
 
 @cli.command()
-@click.option('--arc-tolerance', type=float, default=0.002, help='Tolerance for flattening curves and arcs into straight segments [mm] (default: 0.002 mm)')
+@click.option('--arc-tolerance', type=float, default=0.01, help='Tolerance for flattening curves and arcs of the outline into straight segments [mm] (default: 0.01 mm)')
 @click.option('--annular-width', type=float, default=5, help='Width of the trace area on the outside of the shape [mm]')
 @click.argument('svg_file', required=False, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.argument('outfile', required=False, type=click.Path(writable=True, dir_okay=False, path_type=Path))

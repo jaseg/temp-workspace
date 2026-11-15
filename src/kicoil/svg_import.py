@@ -7,26 +7,36 @@ What is read:
 
 * Shapes: <path> (all commands: M L H V Z C S Q T A, absolute and relative, implicit repeated commands, numbers with
   exponents and without separators, "-" and "." starting a new number, arc flags without separators), <polygon>,
-  <polyline>, <rect> (also with rounded corners), <circle> and <ellipse>, also when reached through <use>. <line>,
-  text, and the contents of <defs>, <symbol>, <clipPath>, <mask>, <marker> and <pattern> are not part of the outline,
-  nor are elements with display:none (e.g. hidden Inkscape layers).
+  <polyline>, <rect> (also with rounded corners), <circle> and <ellipse>, also when reached through <use> (of a shape,
+  a group or a <symbol>, with the symbol's viewBox fitted to the width and height of the <use> or the symbol). <line>,
+  text, and the contents of <defs>, <symbol>, <clipPath>, <mask>, <marker> and <pattern> are not part of the outline.
+* Hidden elements are not part of it either: display:none (e.g. hidden Inkscape layers) and visibility:hidden or
+  collapse, given as attributes, in style attributes, or in <style> sheets with type, .class, #id or * selectors and
+  their combinations (other selectors that hide something are a ValueError; rules inside @media and other at-rules
+  are ignored). Other CSS (e.g. transforms in style) is not read.
 * Transforms: the transform attribute (matrix, translate, scale, rotate, skewX, skewY) of the shape and of all its
   ancestors, nested <svg> viewports and the x/y of <use>.
-* Curves and arcs are flattened to polylines that stay within `tolerance` (mm, after all transforms) of the curve.
-  Straight segments keep their vertices as given.
+* Curves and arcs are flattened to polylines that stay within `tolerance` (mm, after all transforms; default
+  DEFAULT_TOLERANCE = 0.01 mm) of the curve: Bezier curves with Wang's bound, as one segment if all control points are
+  within the tolerance of the chord; arcs by the sagitta of the transformed ellipse. Straight segments keep their
+  vertices as given.
 * Units: if the root <svg> has a width or height with an absolute unit (mm, cm, in, pt, pc, Q, or px at 96 px per
   inch), the viewBox is scaled to that size (only the scale: the origin of the user coordinate system stays the
   origin, so a drawing centered on (0, 0) stays centered). When width and height agree with the viewBox size up to the
-  precision they are written with, as exporters write them (width="100.24mm" viewBox="0 0 100.2394 54.4735"), one user
-  unit is exactly one unit of width and height. Without a viewBox, user units are CSS px (SVG specification), with a
-  warning. Without an absolute unit (no width and height, unitless ones, or percentages) one user unit is taken as 1 mm
-  (and unitless width and height as mm, scaling the viewBox to them). Adobe Illustrator writes its points (1/72 in)
-  as px or without a unit, so its files come out at 3/4 size or 72/25.4 times too large; export them with mm units.
+  precision they are written with and to 1e-4 relative (EXACT_UNIT_REL), as exporters write them (width="100.24mm"
+  viewBox="0 0 100.2394 54.4735"), one user unit is exactly one unit of width and height. Without a viewBox, user
+  units are CSS px (SVG specification), with a warning. Without an absolute unit (no width and height, unitless ones,
+  or percentages) one user unit is 1 mm, as kicoil always read SVG files; unitless width and height that differ from
+  the viewBox size only give a warning (by the specification they would be px and scale the viewBox). Adobe
+  Illustrator writes its points (1/72 in) as px or without a unit, so its files come out at 3/4 size or 72/25.4 times
+  too large; export them with mm units.
 * Several shapes and subpaths: each subpath is a contour. A subpath is closed by Z, or when it ends where it started
-  (within JOIN_TOLERANCE). Open subpaths whose end points meet (as in KiCad and FreeCAD exports, where every line and
-  arc of a board outline is a path of its own) are joined into closed contours. The outline is the contour with the
-  largest area. It has to be closed and must not touch or cross itself, otherwise this is a ValueError. All other
-  contours (holes inside it, shapes next to it, open paths) are ignored with a warning: the coil covers the whole outline.
+  (within JOIN_TOLERANCE = 0.01 mm). Open subpaths whose end points meet within JOIN_TOLERANCE (as in KiCad and FreeCAD
+  exports, where every line and arc of a board outline is a path of its own) are joined into closed contours. The
+  outline is the contour with the largest area. It has to be closed and must not touch or cross itself, otherwise this
+  is a ValueError. All other contours (holes inside it, shapes next to it, open paths) are ignored with a warning: the
+  coil covers the whole outline. A frame or page border drawn around the outline (e.g. a KiCad plot with the
+  worksheet) is the largest contour and is taken as the outline, with that warning; delete it from the file.
 """
 
 import math
@@ -36,7 +46,18 @@ import warnings
 from lxml import etree
 
 
-JOIN_TOLERANCE = 1e-3 # mm: end points closer than this are the same point (subpath closing, joining open subpaths)
+# mm: end points closer than this are the same point (subpath closing, joining open subpaths). Well above the rounding
+# of exporters (3 decimals of mm: 0.5 um per coordinate, so separately computed ends of a line and an arc can miss by
+# 1.4 um), well below any clearance.
+JOIN_TOLERANCE = 0.01
+# mm: default flattening tolerance of curves and arcs. 1/15 of a 0.15 mm clearance and below PCB etching tolerances.
+# The flattened outline is the outline of the coil (all turns are offsets of it), so the deviation from the true curve
+# only shifts the coil as a whole, by at most this much; the straight skeleton's cost grows about quadratically with
+# the vertex count of curved, non-convex outlines (60 cubic lobes of 40 mm radius: 460 vertices, 15 s; at 0.002 mm:
+# 996 vertices, 67 s).
+DEFAULT_TOLERANCE = 0.01
+# Relative agreement of width/height with the viewBox size below which one user unit is exactly one unit of them
+EXACT_UNIT_REL = 1e-4
 MAX_CURVE_SEGMENTS = 10000 # per curve segment, against absurd inputs
 
 UNIT_MM = {'mm': 1.0, 'cm': 10.0, 'in': 25.4, 'pt': 25.4/72, 'pc': 25.4/6, 'q': 0.25, 'px': 25.4/96}
@@ -201,24 +222,53 @@ def root_scale(root):
             raise ValueError(f'SVG: unsupported unit in {name}="{text}" of <svg>')
     physical = any(d is not None for _v, _u, d in size.values())
     if not physical:
-        if vb is None or not size:
-            return 1.0, 1.0
-        return _viewbox_scale(vb, *(size[k][0] if k in size else None for k in ('width', 'height')),
-                              root.get('preserveAspectRatio'))
+        # No physical unit: one user unit is 1 mm, whatever unitless width and height say (as kicoil always read them)
+        if vb is not None and any(abs(val - vb[2 if name == 'width' else 3]) > EXACT_UNIT_REL * vb[2 if name == 'width'
+                                  else 3] for name, (val, _u, _d) in size.items()):
+            warnings.warn(f'SVG width/height ({root.get("width")}, {root.get("height")}) have no unit and differ from '
+                          f'the viewBox size ({vb[2]:g} x {vb[3]:g}). One user unit is taken as 1 mm, the drawing is '
+                          f'not scaled to width/height. Give width and height a unit (e.g. mm) to scale it.')
+        return 1.0, 1.0
     if vb is None:
-        warnings.warn('SVG has a width/height with a unit but no viewBox: by the SVG specification its coordinates '
-                      'are then CSS px (1 px = 1/96 in = 0.2646 mm)')
+        dims = ' '.join(f'{size[k][0]:g}' for k in ('width', 'height') if k in size)
+        warnings.warn(f'SVG has a width/height with a unit but no viewBox: by the SVG specification its coordinates '
+                      f'are CSS px (1 px = 1/96 in = 0.2646 mm). If they are meant in the unit of width and height, add '
+                      f'viewBox="0 0 {dims}" to the <svg> element.')
         return UNIT_MM['px'], UNIT_MM['px']
     # Exporters write width and height with fewer digits than the viewBox. When both agree with the viewBox size up
-    # to the precision they are written with, one user unit is one unit of width and height, exactly.
+    # to the precision they are written with, and to EXACT_UNIT_REL, one user unit is one unit of width and height,
+    # exactly. (Otherwise the scale is width/viewBox width, which differs from that by less than EXACT_UNIT_REL.)
     units = {u for _v, u, _d in size.values()}
     if len(units) == 1 and all(d is not None for _v, _u, d in size.values()):
         unit = units.pop()
-        if all(abs(val - vb[2 if name == 'width' else 3]) <= 0.5 * 10.0**-dec * (1 + 1e-9)
-               for name, (val, _u, dec) in size.items()):
+        if all(abs(val - vbd) <= 0.5 * 10.0**-dec * (1 + 1e-9) and abs(val - vbd) <= EXACT_UNIT_REL * vbd
+               for name, (val, _u, dec) in size.items() for vbd in [vb[2 if name == 'width' else 3]]):
             return UNIT_MM[unit], UNIT_MM[unit]
     w, h = (size[k][0] * UNIT_MM[size[k][1]] if k in size else None for k in ('width', 'height'))
     return _viewbox_scale(vb, w, h, root.get('preserveAspectRatio'))
+
+
+def _fit_viewbox(vb, w, h, aspect):
+    """ Transform that maps a viewBox onto a viewport of size w x h at (0, 0), with preserveAspectRatio aspect """
+    sx, sy = _viewbox_scale(vb, w, h, aspect)
+    align, _ = _parse_aspect(aspect)
+    tx = ty = 0.0
+    if align is not None:
+        fx = {'xMin': 0.0, 'xMid': 0.5, 'xMax': 1.0}[align[:4]]
+        fy = {'YMin': 0.0, 'YMid': 0.5, 'YMax': 1.0}[align[4:]]
+        tx, ty = (w - vb[2]*sx) * fx, (h - vb[3]*sy) * fy
+    return (sx, 0.0, 0.0, sy, tx - vb[0]*sx, ty - vb[1]*sy)
+
+
+def _viewport_size(els, what):
+    """ (width, height) in user units of a viewport element, each from the first of els that has it """
+    size = []
+    for k in ('width', 'height'):
+        el = next((e for e in els if e.get(k, '').strip()), None)
+        if el is None or el.get(k).strip().endswith('%'):
+            raise ValueError(f'SVG: {what} with a viewBox needs a width and height (not a percentage)')
+        size.append(_user_length(el, k))
+    return size
 
 
 def _viewport_transform(el):
@@ -228,24 +278,94 @@ def _viewport_transform(el):
     vb = _parse_viewbox(el.get('viewBox'))
     if vb is None:
         return m
-    w, h = (None if el.get(k, '').strip().endswith('%') else _user_length(el, k, None) for k in ('width', 'height'))
-    if w is None or h is None:
-        raise ValueError('SVG: nested <svg> with a viewBox needs a width and height')
-    sx, sy = _viewbox_scale(vb, w, h, el.get('preserveAspectRatio'))
-    align, _ = _parse_aspect(el.get('preserveAspectRatio'))
-    tx = ty = 0.0
-    if align is not None:
-        fx = {'xMin': 0.0, 'xMid': 0.5, 'xMax': 1.0}[align[:4]]
-        fy = {'YMin': 0.0, 'YMid': 0.5, 'YMax': 1.0}[align[4:]]
-        tx, ty = (w - vb[2]*sx) * fx, (h - vb[3]*sy) * fy
-    return _mul(m, (sx, 0.0, 0.0, sy, tx - vb[0]*sx, ty - vb[1]*sy))
+    w, h = _viewport_size([el], 'nested <svg>')
+    return _mul(m, _fit_viewbox(vb, w, h, el.get('preserveAspectRatio')))
 
 
-def _hidden(el):
-    if el.get('display', '').strip() == 'none':
-        return True
-    style = el.get('style', '')
-    return bool(re.search(r'(?:^|;)\s*display\s*:\s*none\s*(?:;|$|!)', style))
+_STYLE_PROPS = ('display', 'visibility')
+_HIDING = {('display', 'none'), ('visibility', 'hidden'), ('visibility', 'collapse')}
+_SIMPLE_SELECTOR = re.compile(r'(\*|[A-Za-z][\w-]*)?((?:[.#][\w-]+)*)$')
+
+
+def _declarations(text):
+    """ {property: value} of the display and visibility declarations of a CSS declaration block """
+    out = {}
+    for decl in text.split(';'):
+        name, sep, value = decl.partition(':')
+        name = name.strip().lower()
+        if sep and name in _STYLE_PROPS:
+            out[name] = value.replace('!important', '').strip().lower()
+    return out
+
+
+def _strip_at_rules(text):
+    """ CSS without its at-rules (@media and @supports blocks, @import ...): their rules apply only conditionally """
+    out, i = [], 0
+    while (j := text.find('@', i)) >= 0:
+        out.append(text[i:j])
+        k = j
+        while k < len(text) and text[k] not in '{;':
+            k += 1
+        if k < len(text) and text[k] == '{':
+            depth = 0
+            while k < len(text):
+                depth += {'{': 1, '}': -1}.get(text[k], 0)
+                k += 1
+                if depth == 0:
+                    break
+        else:
+            k += 1
+        i = k
+    out.append(text[i:])
+    return ''.join(out)
+
+
+class _Styles:
+    """ The display and visibility of elements, from presentation attributes, style attributes and the document's
+    <style> sheets. Selectors in style sheets: type, .class, #id and their combinations (path.cut, #a.b) and *.
+    A sheet that hides elements (display:none, visibility:hidden or collapse) with another selector is a ValueError. """
+
+    def __init__(self, root):
+        sheets = [''.join(el.itertext()) for el in root.iter() if _localname(el) == 'style'
+                  and el.get('type', 'text/css').strip().lower() in ('', 'text/css')]
+        text = _strip_at_rules(re.sub(r'/\*.*?\*/', ' ', ' '.join(sheets), flags=re.S))
+        self.rules = []
+        for order, (selectors, block) in enumerate(re.findall(r'([^{}]*)\{([^{}]*)\}', text)):
+            props = _declarations(block)
+            if not props:
+                continue
+            for sel in selectors.split(','):
+                sel = sel.strip()
+                mo = _SIMPLE_SELECTOR.match(sel)
+                if not sel or not mo:
+                    hides = [f'{k}:{v}' for k, v in props.items() if (k, v) in _HIDING]
+                    if hides:
+                        raise ValueError(f'SVG: the style sheet hides elements with "{sel} {{{"; ".join(hides)}}}", '
+                                         f'a selector kicoil does not evaluate (only type, .class and #id). Delete the '
+                                         f'hidden elements or the rule.')
+                    continue
+                tag = mo.group(1) if mo.group(1) not in (None, '*') else None
+                parts = re.findall(r'([.#])([\w-]+)', mo.group(2))
+                ids = {n for k, n in parts if k == '#'}
+                classes = {n for k, n in parts if k == '.'}
+                self.rules.append(((len(ids), len(classes), tag is not None), order, tag, ids, classes, props))
+
+    def value(self, el, prop):
+        """ Specified value of prop on el (not inherited), or None """
+        inline = _declarations(el.get('style', ''))
+        if prop in inline:
+            return inline[prop]
+        best = None
+        if self.rules:
+            name, eid, classes = _localname(el), el.get('id'), set(el.get('class', '').split())
+            for spec, order, tag, ids, cls, props in self.rules:
+                if prop in props and (tag is None or tag == name) and ids <= {eid} and cls <= classes \
+                        and (best is None or (spec, order) >= best[0]):
+                    best = ((spec, order), props[prop])
+        if best is not None:
+            return best[1]
+        v = el.get(prop)
+        return v.strip().lower() if v is not None else None
 
 
 class _Scanner:
@@ -457,6 +577,14 @@ def _arc_points(p0, seg, m, tol):
     return out
 
 
+def _segment_distance(p, a, b):
+    """ Distance of point p from the segment ab """
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    ll = dx*dx + dy*dy
+    t = 0.0 if ll == 0 else min(1.0, max(0.0, ((p[0] - a[0])*dx + (p[1] - a[1])*dy) / ll))
+    return math.hypot(p[0] - a[0] - t*dx, p[1] - a[1] - t*dy)
+
+
 def flatten(start, segs, m, tol):
     """ Polyline (transformed by m) of a subpath, within tol of its curves """
     pts = [_apply(m, start)]
@@ -467,6 +595,13 @@ def flatten(start, segs, m, tol):
             pts.append(_apply(m, seg[1]))
         elif kind in ('C', 'Q'):
             ctrl = [_apply(m, p) for p in (cur,) + seg[1:]]
+            if all(_segment_distance(c, ctrl[0], ctrl[-1]) <= tol for c in ctrl[1:-1]):
+                # (Nearly) straight: the curve lies in the convex hull of its control points, so within tol of its
+                # chord. Wang's bound would also count the uneven speed along the line (e.g. a line written as
+                # "C x0 y0 x3 y3 x3 y3") and give it many collinear vertices.
+                pts.append(ctrl[-1])
+                cur = seg[-1]
+                continue
             n = _wang_segments(ctrl, tol)
             if len(ctrl) == 4:
                 (x0, y0), (x1, y1), (x2, y2), (x3, y3) = ctrl
@@ -554,12 +689,16 @@ def _href(el):
 def collect_contours(root, m_root, tol):
     """ All subpaths of all shapes of the document as (points in mm, closed, description) """
     ids = {el.get('id'): el for el in root.iter() if isinstance(el.tag, str) and el.get('id')}
+    styles = _Styles(root)
     out = []
 
-    def walk(el, m, stack):
+    def walk(el, m, stack, visible=True):
         name = _localname(el)
-        if name is None or name in SKIP_ELEMENTS or _hidden(el):
+        if name is None or name in SKIP_ELEMENTS or styles.value(el, 'display') == 'none':
             return
+        vis = styles.value(el, 'visibility')
+        if vis in ('visible', 'hidden', 'collapse'): # inherited, children can make themselves visible again
+            visible = vis == 'visible'
         m = _mul(m, parse_transform(el.get('transform')))
         if name == 'svg' and el is not root:
             m = _mul(m, _viewport_transform(el))
@@ -570,12 +709,24 @@ def collect_contours(root, m_root, tol):
                 return
             m = _mul(m, (1.0, 0.0, 0.0, 1.0, _user_length(el, 'x'), _user_length(el, 'y')))
             if _localname(target) == 'symbol':
+                if styles.value(target, 'display') == 'none':
+                    return
+                vis = styles.value(target, 'visibility')
+                if vis in ('visible', 'hidden', 'collapse'):
+                    visible = vis == 'visible'
+                vb = _parse_viewbox(target.get('viewBox'))
+                if vb is not None:
+                    what = f'<use> of <symbol id="{target.get("id")}">'
+                    w, h = _viewport_size([el, target], what)
+                    m = _mul(m, _fit_viewbox(vb, w, h, target.get('preserveAspectRatio')))
                 for child in target:
-                    walk(child, m, stack + (target,))
+                    walk(child, m, stack + (target,), visible)
             else:
-                walk(target, m, stack + (target,))
+                walk(target, m, stack + (target,), visible)
             return
         if name in ('path', 'polygon', 'polyline', 'rect', 'circle', 'ellipse'):
+            if not visible:
+                return
             what = f'<{name}' + (f' id="{el.get("id")}"' if el.get('id') else '') + '>'
             subs = element_subpaths(el)
             for i, (start, segs, closed) in enumerate(subs):
@@ -583,7 +734,7 @@ def collect_contours(root, m_root, tol):
                 out.append((pts, closed, what + (f' (subpath {i+1} of {len(subs)})' if len(subs) > 1 else '')))
             return
         for child in el:
-            walk(child, m, stack)
+            walk(child, m, stack, visible)
 
     walk(root, m_root, ())
     return out
@@ -757,7 +908,7 @@ def _intersection_point(a, b, c, d):
     return (a[0] + t*(b[0]-a[0]), a[1] + t*(b[1]-a[1]))
 
 
-def read_outline(filename, tolerance=0.002):
+def read_outline(filename, tolerance=DEFAULT_TOLERANCE):
     """ The outline of an SVG file as a list of (x, y) points in mm. See the module docstring. """
     parser = etree.XMLParser(resolve_entities=False, no_network=True, remove_comments=True, huge_tree=False)
     try:
@@ -808,6 +959,10 @@ def read_outline(filename, tolerance=0.002):
         outside = len(others) - holes
         parts = [f'{holes} hole(s) inside it'] * bool(holes) + [f'{outside} other closed contour(s)'] * bool(outside) + \
                 [f'{len(open_)} open path(s)'] * bool(open_)
-        warnings.warn(f'SVG: using {what} as the outline ({len(outline)} points, {area:.2f} mm²), ignoring '
-                      + ', '.join(parts) + '. The coil covers the whole outline.')
+        bounds = f'({min(p[0] for p in outline):.2f}, {min(p[1] for p in outline):.2f}) to ' \
+                 f'({max(p[0] for p in outline):.2f}, {max(p[1] for p in outline):.2f}) mm'
+        warnings.warn(f'SVG: using {what} as the outline ({len(outline)} points, {area:.2f} mm², {bounds}), ignoring '
+                      + ', '.join(parts) + '. The coil covers the whole outline.'
+                      + (' If this contour is a frame or page border around the intended outline, delete it from the '
+                         'file.' if holes else ''))
     return outline
