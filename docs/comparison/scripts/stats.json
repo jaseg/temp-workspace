@@ -1,0 +1,4928 @@
+{
+ "corpus": {
+  "cases": 1008,
+  "family_counts": {
+   "main": 698,
+   "round": 167,
+   "concave": 143
+  },
+  "thin_nominal": [
+   "circle20x18_n11k5",
+   "circle20x18_n16k5",
+   "concave_cshape_a0.3_n13k4",
+   "concave_dumbbell_a0.3_n13k4",
+   "concave_heart_a0.3_n13k4",
+   "concave_heart_a0.3_n5k1",
+   "concave_heart_a0.3_n8k3",
+   "concave_heart_a0.6_n13k4",
+   "concave_heart_a0.6_n6_1layer",
+   "concave_heart_a0.6_n8k3",
+   "concave_heart_a0.9_n13k4",
+   "concave_shark_a0.3_n13k4",
+   "concave_sharksvg_a0.3_n13k4",
+   "round_ellipse10to1_a0.30_n16k5",
+   "round_ellipse10to1_a0.60_n21k8",
+   "round_ellipse20to1_a0.30_n16k5",
+   "round_ellipse20to1_a0.30_n5k1",
+   "round_ellipse20to1_a0.60_n21k8",
+   "round_ellipse20to1_a0.90_n16k5"
+  ],
+  "thin_nominal_by_family": {
+   "concave": 11,
+   "round": 6,
+   "main": 2
+  },
+  "thin_tag": [
+   "concave_cshape_a0.3_n13k4",
+   "concave_dumbbell_a0.3_n13k4",
+   "concave_heart_a0.3_n13k4",
+   "concave_heart_a0.3_n5k1",
+   "concave_heart_a0.3_n8k3",
+   "concave_heart_a0.6_n13k4",
+   "concave_heart_a0.6_n6_1layer",
+   "concave_heart_a0.6_n8k3",
+   "concave_heart_a0.9_n13k4",
+   "concave_shark_a0.3_n13k4",
+   "concave_sharksvg_a0.3_n13k4",
+   "rect60x12_a0.30_n13k1",
+   "rect60x12_a0.30_n2k1",
+   "rect60x12_a0.30_n5k2",
+   "rect60x12_a0.30_n8k3",
+   "rect60x12_a0.60_n11k5",
+   "rect60x12_a0.60_n21k8",
+   "rect60x12_a0.60_n5k1",
+   "rect60x12_a0.60_n6_1layer",
+   "rect60x12_a0.60_n7k3",
+   "rect60x12_a0.60_n7k3_cw",
+   "rect60x12_a0.90_n16k5",
+   "rect60x12_a0.90_n3k1",
+   "rect60x12_a0.90_n5k3",
+   "rect60x12_a0.90_n9k4"
+  ],
+  "thin_tag_not_thin_nominal": [
+   "rect60x12_a0.30_n13k1",
+   "rect60x12_a0.30_n2k1",
+   "rect60x12_a0.30_n5k2",
+   "rect60x12_a0.30_n8k3",
+   "rect60x12_a0.60_n11k5",
+   "rect60x12_a0.60_n21k8",
+   "rect60x12_a0.60_n5k1",
+   "rect60x12_a0.60_n6_1layer",
+   "rect60x12_a0.60_n7k3",
+   "rect60x12_a0.60_n7k3_cw",
+   "rect60x12_a0.90_n16k5",
+   "rect60x12_a0.90_n3k1",
+   "rect60x12_a0.90_n5k3",
+   "rect60x12_a0.90_n9k4"
+  ],
+  "thin_nominal_not_tagged": [
+   "circle20x18_n11k5",
+   "circle20x18_n16k5",
+   "round_ellipse10to1_a0.30_n16k5",
+   "round_ellipse10to1_a0.60_n21k8",
+   "round_ellipse20to1_a0.30_n16k5",
+   "round_ellipse20to1_a0.30_n5k1",
+   "round_ellipse20to1_a0.60_n21k8",
+   "round_ellipse20to1_a0.90_n16k5"
+  ],
+  "thin_tag_nominal_trace_min": 0.12692307692307694
+ },
+ "impls": {
+  "original": {
+   "all_cases": {
+    "all": {
+     "cases": 1008,
+     "status": {
+      "pass": 50,
+      "fail": 742,
+      "rejected": 198,
+      "error": 18,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 792,
+     "failure_kinds": {
+      "clearance": 715,
+      "via clearance": 565,
+      "connectivity": 370,
+      "duplicate": 362,
+      "backtrack": 329,
+      "self merge": 259,
+      "conformance": 192,
+      "crossing": 154,
+      "self short": 99,
+      "pad clearance": 59,
+      "winding": 23,
+      "via offset": 2
+     },
+     "any_hard": 539,
+     "hard_or_clearance_class": 741,
+     "clearance_class_only": 202,
+     "conformance_only": 1,
+     "pitch_ratio_p10": 0.8474963165659327,
+     "pitch_ratio_median": 0.9917444596426341,
+     "uncovered_median": 0.017899626298552643,
+     "uncovered_p90": 0.1400698345717094,
+     "gen_time_median": 0.26115196949831443,
+     "gen_time_p90": 0.655118374308222,
+     "gen_time_max": 121.79058512099436,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 698,
+     "status": {
+      "pass": 36,
+      "fail": 542,
+      "rejected": 119,
+      "error": 1,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 578,
+     "failure_kinds": {
+      "clearance": 526,
+      "via clearance": 456,
+      "connectivity": 279,
+      "duplicate": 278,
+      "backtrack": 210,
+      "self merge": 178,
+      "conformance": 132,
+      "crossing": 95,
+      "self short": 80,
+      "pad clearance": 37,
+      "winding": 21
+     },
+     "any_hard": 374,
+     "hard_or_clearance_class": 542,
+     "clearance_class_only": 168,
+     "conformance_only": 0,
+     "pitch_ratio_p10": 0.8892324427898264,
+     "pitch_ratio_median": 0.9876800527137961,
+     "uncovered_median": 0.02056275068436738,
+     "uncovered_p90": 0.12776275701167744,
+     "gen_time_median": 0.24478552999789827,
+     "gen_time_p90": 0.30190861800510904,
+     "gen_time_max": 0.45187063299817964,
+     "gen_time_max_case": "sector180_a0.60_n6_1layer"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 11,
+      "fail": 120,
+      "rejected": 33,
+      "error": 3,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 131,
+     "failure_kinds": {
+      "clearance": 114,
+      "via clearance": 71,
+      "backtrack": 64,
+      "connectivity": 60,
+      "duplicate": 57,
+      "self merge": 32,
+      "conformance": 26,
+      "crossing": 26,
+      "pad clearance": 13,
+      "self short": 9,
+      "winding": 2
+     },
+     "any_hard": 99,
+     "hard_or_clearance_class": 120,
+     "clearance_class_only": 21,
+     "conformance_only": 0,
+     "pitch_ratio_p10": 0.8448904717277645,
+     "pitch_ratio_median": 0.9882682391190485,
+     "uncovered_median": 0.007950819447379196,
+     "uncovered_p90": 0.14044320955125977,
+     "gen_time_median": 0.5658019230031641,
+     "gen_time_p90": 4.812000457997783,
+     "gen_time_max": 121.79058512099436,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 143,
+     "status": {
+      "pass": 3,
+      "fail": 80,
+      "rejected": 46,
+      "error": 14,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 83,
+     "failure_kinds": {
+      "clearance": 75,
+      "backtrack": 55,
+      "self merge": 49,
+      "via clearance": 38,
+      "conformance": 34,
+      "crossing": 33,
+      "connectivity": 31,
+      "duplicate": 27,
+      "self short": 10,
+      "pad clearance": 9,
+      "via offset": 2
+     },
+     "any_hard": 66,
+     "hard_or_clearance_class": 79,
+     "clearance_class_only": 13,
+     "conformance_only": 1,
+     "pitch_ratio_p10": 0.9852346877794389,
+     "pitch_ratio_median": 0.9991737295581784,
+     "uncovered_median": 0.009526414903014539,
+     "uncovered_p90": 0.038669017428083034,
+     "gen_time_median": 0.511914661998162,
+     "gen_time_p90": 1.4383984014071756,
+     "gen_time_max": 1.607448465001653,
+     "gen_time_max_case": "concave_cshape_a0.9_n8k3"
+    }
+   },
+   "excl_thin": {
+    "all": {
+     "cases": 989,
+     "status": {
+      "pass": 50,
+      "fail": 733,
+      "rejected": 196,
+      "error": 10,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 783,
+     "failure_kinds": {
+      "clearance": 708,
+      "via clearance": 563,
+      "connectivity": 364,
+      "duplicate": 358,
+      "backtrack": 322,
+      "self merge": 253,
+      "conformance": 188,
+      "crossing": 151,
+      "self short": 99,
+      "pad clearance": 58,
+      "winding": 23
+     },
+     "any_hard": 531,
+     "hard_or_clearance_class": 732,
+     "clearance_class_only": 201,
+     "conformance_only": 1,
+     "pitch_ratio_p10": 0.8452208224139385,
+     "pitch_ratio_median": 0.9912563056407407,
+     "uncovered_median": 0.017909497915310893,
+     "uncovered_p90": 0.14009579526702284,
+     "gen_time_median": 0.2606905459979316,
+     "gen_time_p90": 0.6191306044027444,
+     "gen_time_max": 121.79058512099436,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 696,
+     "status": {
+      "pass": 36,
+      "fail": 541,
+      "rejected": 119,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 577,
+     "failure_kinds": {
+      "clearance": 525,
+      "via clearance": 456,
+      "connectivity": 279,
+      "duplicate": 278,
+      "backtrack": 210,
+      "self merge": 178,
+      "conformance": 132,
+      "crossing": 95,
+      "self short": 80,
+      "pad clearance": 37,
+      "winding": 21
+     },
+     "any_hard": 374,
+     "hard_or_clearance_class": 541,
+     "clearance_class_only": 167,
+     "conformance_only": 0,
+     "pitch_ratio_p10": 0.8883141003931518,
+     "pitch_ratio_median": 0.9874192184924991,
+     "uncovered_median": 0.02070509683034193,
+     "uncovered_p90": 0.12848175971815426,
+     "gen_time_median": 0.24481736999587156,
+     "gen_time_p90": 0.30191372700501234,
+     "gen_time_max": 0.45187063299817964,
+     "gen_time_max_case": "sector180_a0.60_n6_1layer"
+    },
+    "round": {
+     "cases": 161,
+     "status": {
+      "pass": 11,
+      "fail": 118,
+      "rejected": 32,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 129,
+     "failure_kinds": {
+      "clearance": 112,
+      "via clearance": 70,
+      "backtrack": 62,
+      "connectivity": 58,
+      "duplicate": 55,
+      "self merge": 30,
+      "conformance": 25,
+      "crossing": 25,
+      "pad clearance": 13,
+      "self short": 9,
+      "winding": 2
+     },
+     "any_hard": 97,
+     "hard_or_clearance_class": 118,
+     "clearance_class_only": 21,
+     "conformance_only": 0,
+     "pitch_ratio_p10": 0.8448903041654255,
+     "pitch_ratio_median": 0.9882682391190485,
+     "uncovered_median": 0.007950819447379196,
+     "uncovered_p90": 0.14049596166331138,
+     "gen_time_median": 0.5640992739936337,
+     "gen_time_p90": 4.837895444000606,
+     "gen_time_max": 121.79058512099436,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 3,
+      "fail": 74,
+      "rejected": 45,
+      "error": 10,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 77,
+     "failure_kinds": {
+      "clearance": 71,
+      "backtrack": 50,
+      "self merge": 45,
+      "via clearance": 37,
+      "conformance": 31,
+      "crossing": 31,
+      "connectivity": 27,
+      "duplicate": 25,
+      "self short": 10,
+      "pad clearance": 8
+     },
+     "any_hard": 60,
+     "hard_or_clearance_class": 73,
+     "clearance_class_only": 13,
+     "conformance_only": 1,
+     "pitch_ratio_p10": 0.9760667045910466,
+     "pitch_ratio_median": 0.9991737265397084,
+     "uncovered_median": 0.012097800236943464,
+     "uncovered_p90": 0.03956203838979316,
+     "gen_time_median": 0.490262541003176,
+     "gen_time_p90": 1.4160537662071877,
+     "gen_time_max": 1.607448465001653,
+     "gen_time_max_case": "concave_cshape_a0.9_n8k3"
+    }
+   },
+   "excl_thin_tag": {
+    "all": {
+     "cases": 983,
+     "status": {
+      "pass": 49,
+      "fail": 725,
+      "rejected": 195,
+      "error": 14,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 774,
+     "failure_kinds": {
+      "clearance": 702,
+      "via clearance": 557,
+      "connectivity": 358,
+      "duplicate": 352,
+      "backtrack": 319,
+      "self merge": 251,
+      "conformance": 186,
+      "crossing": 152,
+      "self short": 99,
+      "pad clearance": 58,
+      "winding": 23
+     },
+     "any_hard": 525,
+     "hard_or_clearance_class": 724,
+     "clearance_class_only": 199,
+     "conformance_only": 1,
+     "pitch_ratio_p10": 0.849961665428252,
+     "pitch_ratio_median": 0.9912657439086784,
+     "uncovered_median": 0.018010668908842245,
+     "uncovered_p90": 0.140062467293783,
+     "gen_time_median": 0.26194893699721433,
+     "gen_time_p90": 0.6532855872079384,
+     "gen_time_max": 121.79058512099436,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 684,
+     "status": {
+      "pass": 35,
+      "fail": 531,
+      "rejected": 117,
+      "error": 1,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 566,
+     "failure_kinds": {
+      "clearance": 517,
+      "via clearance": 449,
+      "connectivity": 271,
+      "duplicate": 270,
+      "backtrack": 205,
+      "self merge": 174,
+      "conformance": 129,
+      "crossing": 95,
+      "self short": 80,
+      "pad clearance": 37,
+      "winding": 21
+     },
+     "any_hard": 366,
+     "hard_or_clearance_class": 531,
+     "clearance_class_only": 165,
+     "conformance_only": 0,
+     "pitch_ratio_p10": 0.901724088352256,
+     "pitch_ratio_median": 0.9876800527137961,
+     "uncovered_median": 0.020742705192899724,
+     "uncovered_p90": 0.1198837086970627,
+     "gen_time_median": 0.24505302049510647,
+     "gen_time_p90": 0.30200718250125647,
+     "gen_time_max": 0.45187063299817964,
+     "gen_time_max_case": "sector180_a0.60_n6_1layer"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 11,
+      "fail": 120,
+      "rejected": 33,
+      "error": 3,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 131,
+     "failure_kinds": {
+      "clearance": 114,
+      "via clearance": 71,
+      "backtrack": 64,
+      "connectivity": 60,
+      "duplicate": 57,
+      "self merge": 32,
+      "conformance": 26,
+      "crossing": 26,
+      "pad clearance": 13,
+      "self short": 9,
+      "winding": 2
+     },
+     "any_hard": 99,
+     "hard_or_clearance_class": 120,
+     "clearance_class_only": 21,
+     "conformance_only": 0,
+     "pitch_ratio_p10": 0.8448904717277645,
+     "pitch_ratio_median": 0.9882682391190485,
+     "uncovered_median": 0.007950819447379196,
+     "uncovered_p90": 0.14044320955125977,
+     "gen_time_median": 0.5658019230031641,
+     "gen_time_p90": 4.812000457997783,
+     "gen_time_max": 121.79058512099436,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 3,
+      "fail": 74,
+      "rejected": 45,
+      "error": 10,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 77,
+     "failure_kinds": {
+      "clearance": 71,
+      "backtrack": 50,
+      "self merge": 45,
+      "via clearance": 37,
+      "conformance": 31,
+      "crossing": 31,
+      "connectivity": 27,
+      "duplicate": 25,
+      "self short": 10,
+      "pad clearance": 8
+     },
+     "any_hard": 60,
+     "hard_or_clearance_class": 73,
+     "clearance_class_only": 13,
+     "conformance_only": 1,
+     "pitch_ratio_p10": 0.9760667045910466,
+     "pitch_ratio_median": 0.9991737265397084,
+     "uncovered_median": 0.012097800236943464,
+     "uncovered_p90": 0.03956203838979316,
+     "gen_time_median": 0.490262541003176,
+     "gen_time_p90": 1.4160537662071877,
+     "gen_time_max": 1.607448465001653,
+     "gen_time_max_case": "concave_cshape_a0.9_n8k3"
+    }
+   },
+   "nonchecked_groups": [
+    {
+     "status": "error",
+     "message": "RuntimeError: Error computing straight skeleton.",
+     "count": 11,
+     "by_family": {
+      "concave": 11
+     },
+     "thin": 1,
+     "examples": [
+      "concave_sharksvg_a0.3_n5k1",
+      "concave_sharksvg_a0.3_n8k3",
+      "concave_sharksvg_a0.3_n13k4",
+      "concave_sharksvg_a0.6_n5k1"
+     ]
+    },
+    {
+     "status": "error",
+     "message": "NameError: name 'clearance' is not defined",
+     "count": 7,
+     "by_family": {
+      "main": 1,
+      "round": 3,
+      "concave": 3
+     },
+     "thin": 7,
+     "examples": [
+      "circle20x18_n16k5",
+      "round_ellipse10to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.60_n21k8"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "ValueError: Annular width (#) is too large. Must be less than #",
+     "count": 96,
+     "by_family": {
+      "main": 62,
+      "round": 7,
+      "concave": 27
+     },
+     "thin": 0,
+     "examples": [
+      "roundrect_a0.60_n5k1",
+      "roundrect_a0.60_n7k3",
+      "roundrect_a0.60_n11k5",
+      "roundrect_a0.60_n21k8"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "ValueError: math domain error",
+     "count": 85,
+     "by_family": {
+      "main": 57,
+      "round": 23,
+      "concave": 5
+     },
+     "thin": 1,
+     "examples": [
+      "circle30x6_n2k1",
+      "square40_a0.90_n3k1",
+      "square40_a0.90_n5k3",
+      "rect40x20_a0.90_n3k1"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "ValueError: r=# is out of bounds [#, #]",
+     "count": 17,
+     "by_family": {
+      "round": 3,
+      "concave": 14
+     },
+     "thin": 1,
+     "examples": [
+      "round_squircle_a0.60_n8k3",
+      "round_squircle_a0.60_n21k8",
+      "round_squircle_a0.60_n7k3_cw",
+      "concave_heart_a0.9_n8k3"
+     ]
+    }
+   ],
+   "timeouts": [],
+   "hard_declared": [],
+   "hard_cases": {
+    "square40_a0.30_n5k2": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "square40_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "square40_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "square40_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "square40_a0.60_n11k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "square40_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "square40_a0.90_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "square40_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rect40x20_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rect40x20_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rect40x20_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rect40x20_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rect40x20_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rect40x20_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rect40x20_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rect40x20_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "winding"
+    ],
+    "rect40x20_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rect60x12_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rect60x12_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rect60x12_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rect60x12_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rect60x12_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rect60x12_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rect60x12_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rect60x12_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "trapezoid_a0.90_n9k4": [
+     "backtrack"
+    ],
+    "triangle_a0.30_n8k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "triangle_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "triangle_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "pentagon_a0.60_n11k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "pentagon_a0.90_n16k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "hexagon_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "hexagon_a0.30_n8k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "hexagon_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "hexagon_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "hexagon_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "hexagon_a0.60_n11k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "hexagon_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "hexagon_a0.90_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "hexagon_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "octagon_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "octagon_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "octagon_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "octagon_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "octagon_a0.60_n11k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "octagon_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "octagon_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "octagon_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.30_n8k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.60_n11k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.90_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "24gon_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "ellipse3to1_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "ellipse3to1_a0.30_n8k3": [
+     "backtrack"
+    ],
+    "ellipse3to1_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "ellipse3to1_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "ellipse3to1_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "ellipse3to1_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "ellipse3to1_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "ellipse3to1_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "ellipse3to1_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "ellipse3to1_a0.60_n6_1layer": [
+     "connectivity",
+     "duplicate"
+    ],
+    "ellipse3to1_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "ellipse3to2_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "ellipse3to2_a0.30_n8k3": [
+     "backtrack"
+    ],
+    "ellipse3to2_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "ellipse3to2_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "ellipse3to2_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "ellipse3to2_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "ellipse3to2_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "ellipse3to2_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "ellipse3to2_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "ellipse3to2_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "roundrect_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "roundrect_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_tiny_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_tiny_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_tiny_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_tiny_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_tiny_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "chamfer_tiny_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "pad clearance",
+     "winding"
+    ],
+    "chamfer_tiny_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "chamfer_tiny_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "winding"
+    ],
+    "chamfer_tiny_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "chamfer_small_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_small_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_small_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_small_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "chamfer_small_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "chamfer_small_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "winding"
+    ],
+    "chamfer_small_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "chamfer_small_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "winding"
+    ],
+    "chamfer_small_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "subdiv_rect_a0.60_n11k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "subdiv_rect_a0.60_n21k8": [
+     "crossing",
+     "backtrack"
+    ],
+    "subdiv_rect_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing"
+    ],
+    "subdiv_rect_a0.90_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "subdiv_rect_jitter_a0.60_n11k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "subdiv_rect_jitter_a0.60_n21k8": [
+     "crossing",
+     "backtrack"
+    ],
+    "subdiv_rect_jitter_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "subdiv_rect_jitter_a0.90_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "star5_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star5_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star5_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star5_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star5_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "star5_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star5_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.30_n8k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.60_n11k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.90_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star6_shallow_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star8_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star8_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star8_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star8_a0.60_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star8_a0.60_n11k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star8_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "star8_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sector45_a0.30_n8k3": [
+     "backtrack"
+    ],
+    "sector45_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sector45_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector45_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sector45_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sector45_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector45_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector45_a0.60_n6_1layer": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sector45_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sector90_a0.30_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "sector90_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sector90_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector90_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector90_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector90_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector90_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector90_a0.60_n6_1layer": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sector90_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector180_a0.30_n5k2": [
+     "backtrack"
+    ],
+    "sector180_a0.30_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "sector180_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sector180_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sector180_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector180_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector180_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector180_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sector180_a0.60_n6_1layer": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sector180_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "l_shape_a0.30_n5k2": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "l_shape_a0.30_n8k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "l_shape_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "l_shape_a0.60_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "l_shape_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing"
+    ],
+    "l_shape_a0.60_n11k5": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "l_shape_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "l_shape_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "u_shape_a0.60_n11k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "u_shape_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "d_shape_a0.30_n8k3": [
+     "backtrack"
+    ],
+    "d_shape_a0.60_n7k3": [
+     "backtrack"
+    ],
+    "d_shape_a0.60_n11k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "d_shape_a0.60_n21k8": [
+     "crossing",
+     "backtrack"
+    ],
+    "d_shape_a0.90_n9k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "d_shape_a0.90_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "d_shape_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "neck_a0.30_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "neck_a0.30_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "neck_a0.30_n13k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "rconvex0_a0.30_n5k2": [
+     "backtrack"
+    ],
+    "rconvex0_a0.30_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex0_a0.60_n7k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex0_a0.60_n11k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex0_a0.60_n21k8": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex0_a0.90_n9k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex0_a0.90_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex0_a0.60_n7k3_cw": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex1_a0.60_n11k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex1_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "rconvex1_a0.90_n9k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex1_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "rconvex2_a0.30_n8k3": [
+     "backtrack"
+    ],
+    "rconvex2_a0.60_n7k3": [
+     "backtrack"
+    ],
+    "rconvex2_a0.60_n11k5": [
+     "backtrack"
+    ],
+    "rconvex2_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "rconvex2_a0.90_n9k4": [
+     "backtrack"
+    ],
+    "rconvex2_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "rconvex2_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "rconvex3_a0.60_n11k5": [
+     "backtrack"
+    ],
+    "rconvex3_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "rconvex3_a0.90_n9k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "rconvex3_a0.90_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "rstar0_a0.60_n5k1": [
+     "backtrack"
+    ],
+    "rstar0_a0.60_n7k3": [
+     "backtrack"
+    ],
+    "rstar0_a0.60_n11k5": [
+     "backtrack"
+    ],
+    "rstar0_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rstar0_a0.90_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rstar0_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "rstar0_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "rstar1_a0.60_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "rstar1_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "rstar1_a0.90_n9k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "rstar1_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "rstar1_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "rstar2_a0.30_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "rstar2_a0.60_n7k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "rstar2_a0.60_n11k5": [
+     "backtrack"
+    ],
+    "rstar2_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "rstar2_a0.90_n9k4": [
+     "backtrack"
+    ],
+    "rstar2_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "rstar3_a0.30_n8k3": [
+     "backtrack"
+    ],
+    "rstar3_a0.60_n7k3": [
+     "backtrack"
+    ],
+    "rstar3_a0.60_n11k5": [
+     "backtrack"
+    ],
+    "rstar3_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "rstar3_a0.90_n9k4": [
+     "backtrack"
+    ],
+    "rstar3_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "rstar3_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.500_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.530_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.560_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.590_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.620_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.650_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.680_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.710_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_a0.740_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_s0.97_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_s0.99_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_s1.00_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_s1.01_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_rect40x20_s1.03_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_hexagon_a0.500_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_a0.530_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_a0.560_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_a0.590_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_a0.620_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_a0.650_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_a0.680_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_a0.710_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_a0.740_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_hexagon_s0.97_n7k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "sweep_hexagon_s0.99_n7k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "sweep_hexagon_s1.00_n7k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "sweep_hexagon_s1.01_n7k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "sweep_hexagon_s1.03_n7k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "sweep_star8_a0.500_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_a0.530_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_a0.560_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_a0.590_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_a0.620_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_a0.650_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_a0.680_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_a0.710_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_a0.740_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_s0.97_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_s0.99_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_s1.00_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_s1.01_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_star8_s1.03_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_sector90_a0.500_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_sector90_a0.530_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_a0.560_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_a0.590_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_a0.620_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_a0.650_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_a0.680_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_a0.710_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_a0.740_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_s0.97_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_s0.99_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_s1.00_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_s1.01_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_sector90_s1.03_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_rstar1_a0.500_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_a0.530_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_a0.560_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_a0.590_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_a0.620_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_a0.650_n9k4": [
+     "backtrack"
+    ],
+    "sweep_rstar1_a0.680_n9k4": [
+     "backtrack"
+    ],
+    "sweep_rstar1_a0.710_n9k4": [
+     "backtrack"
+    ],
+    "sweep_rstar1_a0.740_n9k4": [
+     "backtrack"
+    ],
+    "sweep_rstar1_s0.97_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_s0.99_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_s1.00_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_s1.01_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_rstar1_s1.03_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "sweep_ellipse3to1_a0.500_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_a0.530_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_a0.560_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_a0.590_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_a0.620_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_a0.650_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_a0.680_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_a0.710_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_a0.740_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_s0.97_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_s0.99_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_s1.00_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_s1.01_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_ellipse3to1_s1.03_n7k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "sweep_chamfer_small_a0.500_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_a0.530_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_a0.560_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_a0.590_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_a0.620_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_a0.650_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_a0.680_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_a0.710_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_a0.740_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_s0.97_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_s0.99_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_s1.00_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_s1.01_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "sweep_chamfer_small_s1.03_n7k3": [
+     "connectivity",
+     "duplicate"
+    ],
+    "dense_square40_n31k7": [
+     "connectivity",
+     "duplicate"
+    ],
+    "dense_octagon_n31k7": [
+     "connectivity",
+     "duplicate"
+    ],
+    "dense_star6_shallow_n31k7": [
+     "connectivity",
+     "duplicate"
+    ],
+    "dense_rconvex1_n31k7": [
+     "backtrack"
+    ],
+    "narrow_tshape_w2.0_n9k4": [
+     "backtrack"
+    ],
+    "narrow_tshape_w5.0_n4k1": [
+     "crossing"
+    ],
+    "narrow_tshape_w5.0_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "narrow_tshape_w5.0_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing"
+    ],
+    "narrow_tshape_w5.0_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "narrow_tshape_w8.0_n4k1": [
+     "connectivity",
+     "duplicate",
+     "winding"
+    ],
+    "narrow_tshape_w8.0_n5k2": [
+     "connectivity",
+     "duplicate"
+    ],
+    "narrow_tshape_w8.0_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing"
+    ],
+    "narrow_tshape_w8.0_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "narrow_keyhole_w1.5_n5k2": [
+     "backtrack"
+    ],
+    "narrow_keyhole_w4.0_n4k1": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "narrow_keyhole_w4.0_n5k2": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "pad clearance"
+    ],
+    "narrow_keyhole_w4.0_n7k3": [
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ],
+    "narrow_keyhole_w4.0_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ],
+    "narrow_keyhole_w7.0_n4k1": [
+     "pad clearance"
+    ],
+    "narrow_keyhole_w7.0_n5k2": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "pad clearance"
+    ],
+    "narrow_keyhole_w7.0_n7k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ],
+    "narrow_keyhole_w7.0_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ],
+    "narrow_finger_w3.0_n5k2": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "narrow_finger_w3.0_n7k3": [
+     "backtrack"
+    ],
+    "narrow_finger_w3.0_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "narrow_finger_w6.0_n5k2": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "narrow_finger_w6.0_n7k3": [
+     "backtrack"
+    ],
+    "narrow_finger_w6.0_n9k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "narrow_slot_w2.0_n7k3": [
+     "backtrack"
+    ],
+    "narrow_slot_w2.0_n9k4": [
+     "backtrack"
+    ],
+    "narrow_slot_w6.0_n7k3": [
+     "backtrack"
+    ],
+    "narrow_slot_w6.0_n9k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "narrow_slot_w10.0_n4k1": [
+     "crossing",
+     "backtrack"
+    ],
+    "narrow_slot_w10.0_n5k2": [
+     "crossing",
+     "backtrack"
+    ],
+    "narrow_slot_w10.0_n7k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "narrow_slot_w10.0_n9k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "narrow_stepped_w2.0_n5k2": [
+     "backtrack"
+    ],
+    "narrow_stepped_w2.0_n7k3": [
+     "backtrack"
+    ],
+    "narrow_stepped_w2.0_n9k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "narrow_lfinger_w1.5_n5k2": [
+     "backtrack"
+    ],
+    "narrow_branch_w1.5_n7k3": [
+     "backtrack"
+    ],
+    "narrow_branch_w1.5_n9k4": [
+     "backtrack"
+    ],
+    "narrow_taper_w3.0_n5k2": [
+     "backtrack"
+    ],
+    "narrow_taper_w3.0_n7k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "narrow_taper_w3.0_n9k4": [
+     "backtrack"
+    ],
+    "narrow_taper_w8.0_n5k2": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "narrow_taper_w8.0_n7k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "narrow_taper_w8.0_n9k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "narrow_taper_w15.9_n5k2": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance",
+     "winding"
+    ],
+    "narrow_taper_w15.9_n7k3": [
+     "connectivity",
+     "backtrack"
+    ],
+    "narrow_taper_w15.9_n9k4": [
+     "connectivity",
+     "duplicate",
+     "crossing"
+    ],
+    "round_poly16_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_poly16_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_poly64_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_poly64_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_poly64_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_poly256_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_poly256_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_poly1024_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_poly1024_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_dense2500_a0.30_n5k1": [
+     "backtrack"
+    ],
+    "round_dense2500_a0.60_n21k8": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_dense2500_a0.90_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse2to1_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_ellipse2to1_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_ellipse2to1_a0.60_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse2to1_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse2to1_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse2to1_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "round_ellipse3to1_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_ellipse3to1_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_ellipse3to1_a0.60_n8k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse3to1_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse3to1_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse3to1_a0.60_n6_1layer": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_squircle_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_squircle_a0.30_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_superell_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_superell_a0.30_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_superell_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_superell_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_superell_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "round_blob1_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_blob1_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_blob1_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "round_blob1_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "round_blob1_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "round_blob2_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_blob2_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_blob2_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "round_blob2_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "round_stadium_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_stadium_a0.30_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_stadium_a0.60_n8k3": [
+     "crossing"
+    ],
+    "round_stadium_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack",
+     "winding"
+    ],
+    "round_stadium_a0.90_n16k5": [
+     "connectivity",
+     "crossing",
+     "backtrack",
+     "winding"
+    ],
+    "round_stadium_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_roundrect_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_egg_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_egg_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_egg_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_egg_a0.60_n21k8": [
+     "connectivity",
+     "backtrack"
+    ],
+    "round_egg_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "round_egg_a0.60_n7k3_cw": [
+     "connectivity",
+     "backtrack"
+    ],
+    "round_teardrop_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_teardrop_a0.60_n21k8": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_bean_a0.30_n5k1": [
+     "backtrack"
+    ],
+    "round_bean_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_bean_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_bean_a0.60_n21k8": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_bean_a0.90_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_bean_a0.60_n7k3_cw": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_noisy_s_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_noisy_s_a0.60_n21k8": [
+     "backtrack"
+    ],
+    "round_noisy_s_a0.90_n16k5": [
+     "backtrack"
+    ],
+    "round_noisy_l_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_noisy_l_a0.30_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_noisy_l_a0.60_n8k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "round_noisy_l_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ],
+    "round_noisy_l_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_noisy_l_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance"
+    ],
+    "round_collinear_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_collinear_a0.60_n8k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "round_collinear_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "round_collinear_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance"
+    ],
+    "round_collinear_a0.60_n6_1layer": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_shortedge_a0.30_n5k1": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_shortedge_a0.30_n16k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_shortedge_a0.60_n8k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_shortedge_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_shortedge_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_shortedge_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_dshape_a0.30_n16k5": [
+     "backtrack"
+    ],
+    "round_dshape_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_dshape_a0.60_n21k8": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_dshape_a0.90_n16k5": [
+     "crossing",
+     "backtrack"
+    ],
+    "round_tip_a0.30_n5k1": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_tip_a0.30_n16k5": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_tip_a0.60_n8k3": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_tip_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_tip_a0.90_n16k5": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_tip_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "round_ellipse10to1_a0.30_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "round_ellipse10to1_a0.60_n8k3": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "round_ellipse10to1_a0.60_n21k8": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse10to1_a0.60_n6_1layer": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.30_n5k1": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.60_n8k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.60_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "round_svg1000r_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "concave_shark_a0.3_n5k1": [
+     "backtrack"
+    ],
+    "concave_shark_a0.3_n8k3": [
+     "backtrack"
+    ],
+    "concave_shark_a0.3_n13k4": [
+     "backtrack"
+    ],
+    "concave_shark_a0.6_n5k1": [
+     "backtrack"
+    ],
+    "concave_shark_a0.6_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_shark_a0.6_n13k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_shark_a0.9_n5k1": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_shark_a0.9_n8k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_shark_a0.9_n13k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_shark_a0.6_n7k3_cw": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_bean_a0.3_n8k3": [
+     "backtrack"
+    ],
+    "concave_bean_a0.3_n13k4": [
+     "backtrack"
+    ],
+    "concave_bean_a0.6_n8k3": [
+     "backtrack"
+    ],
+    "concave_bean_a0.6_n13k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_bean_a0.9_n8k3": [
+     "backtrack"
+    ],
+    "concave_bean_a0.9_n13k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_bean_a0.6_n7k3_cw": [
+     "backtrack"
+    ],
+    "concave_heart_a0.3_n5k1": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "concave_heart_a0.6_n5k1": [
+     "connectivity",
+     "backtrack",
+     "pad clearance"
+    ],
+    "concave_heart_a0.6_n8k3": [
+     "connectivity",
+     "crossing",
+     "backtrack",
+     "pad clearance",
+     "via offset"
+    ],
+    "concave_heart_a0.9_n5k1": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance"
+    ],
+    "concave_heart_a0.6_n6_1layer": [
+     "connectivity",
+     "backtrack",
+     "via offset"
+    ],
+    "concave_heart_a0.6_n7k3_cw": [
+     "connectivity",
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ],
+    "concave_crescent_a0.3_n5k1": [
+     "connectivity",
+     "duplicate",
+     "backtrack",
+     "pad clearance"
+    ],
+    "concave_crescent_a0.3_n8k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_crescent_a0.3_n13k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_crescent_a0.6_n5k1": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_crescent_a0.6_n8k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_crescent_a0.6_n13k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_crescent_a0.9_n8k3": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_crescent_a0.9_n13k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_crescent_a0.6_n6_1layer": [
+     "connectivity",
+     "duplicate"
+    ],
+    "concave_crescent_a0.6_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_cshape_a0.3_n8k3": [
+     "backtrack"
+    ],
+    "concave_cshape_a0.3_n13k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_cshape_a0.6_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_cshape_a0.6_n13k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_cshape_a0.9_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_cshape_a0.9_n13k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_cshape_a0.6_n7k3_cw": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_lround_a0.3_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_uround_a0.3_n8k3": [
+     "backtrack"
+    ],
+    "concave_uround_a0.3_n13k4": [
+     "backtrack"
+    ],
+    "concave_uround_a0.6_n8k3": [
+     "backtrack"
+    ],
+    "concave_uround_a0.6_n13k4": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_uround_a0.6_n7k3_cw": [
+     "crossing"
+    ],
+    "concave_cross_a0.3_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "concave_cross_a0.3_n8k3": [
+     "crossing"
+    ],
+    "concave_cross_a0.3_n13k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "concave_starround_a0.3_n8k3": [
+     "backtrack"
+    ],
+    "concave_starround_a0.3_n13k4": [
+     "backtrack"
+    ],
+    "concave_starround_a0.6_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "concave_starround_a0.6_n8k3": [
+     "backtrack"
+    ],
+    "concave_starround_a0.6_n13k4": [
+     "connectivity",
+     "duplicate",
+     "backtrack"
+    ],
+    "concave_starround_a0.9_n13k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "concave_starround_a0.6_n7k3_cw": [
+     "backtrack"
+    ],
+    "concave_dumbbell_a0.3_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "concave_dumbbell_a0.3_n8k3": [
+     "backtrack"
+    ],
+    "concave_dumbbell_a0.3_n13k4": [
+     "connectivity",
+     "duplicate"
+    ],
+    "concave_dumbbell_a0.6_n5k1": [
+     "connectivity",
+     "duplicate"
+    ],
+    "concave_dumbbell_a0.6_n8k3": [
+     "crossing",
+     "backtrack"
+    ],
+    "concave_dumbbell_a0.6_n13k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack"
+    ],
+    "concave_dumbbell_a0.9_n5k1": [
+     "connectivity",
+     "duplicate",
+     "pad clearance"
+    ],
+    "concave_dumbbell_a0.9_n8k3": [
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ],
+    "concave_dumbbell_a0.9_n13k4": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ],
+    "concave_dumbbell_a0.6_n7k3_cw": [
+     "connectivity",
+     "duplicate",
+     "crossing",
+     "backtrack",
+     "pad clearance"
+    ]
+   },
+   "error_tracebacks": [
+    {
+     "site": "File \"/tmp/claude-0/orig/src/kicoil/skeletonator.py\", line 112, in run",
+     "error": "RuntimeError: Error computing straight skeleton.",
+     "count": 11
+    },
+    {
+     "site": "File \"/tmp/claude-0/orig/src/kicoil/geometry.py\", line 434, in __post_init__",
+     "error": "NameError: name 'clearance' is not defined",
+     "count": 7
+    }
+   ]
+  },
+  "fixed": {
+   "all_cases": {
+    "all": {
+     "cases": 1008,
+     "status": {
+      "pass": 514,
+      "fail": 459,
+      "rejected": 35,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 973,
+     "failure_kinds": {
+      "conformance": 445,
+      "self short": 17,
+      "self merge": 10,
+      "backtrack": 7,
+      "via clearance": 3,
+      "clearance": 2
+     },
+     "any_hard": 7,
+     "hard_or_clearance_class": 32,
+     "clearance_class_only": 25,
+     "conformance_only": 427,
+     "pitch_ratio_p10": 0.8218965245790757,
+     "pitch_ratio_median": 0.9690055505038236,
+     "uncovered_median": 0.036251817132345744,
+     "uncovered_p90": 0.17575964427788648,
+     "gen_time_median": 0.046026049996726215,
+     "gen_time_p90": 0.5232495502044915,
+     "gen_time_max": 4.823423458990874,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 698,
+     "status": {
+      "pass": 286,
+      "fail": 385,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 671,
+     "failure_kinds": {
+      "conformance": 384,
+      "self short": 15,
+      "clearance": 2,
+      "via clearance": 2,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 16,
+     "clearance_class_only": 16,
+     "conformance_only": 369,
+     "pitch_ratio_p10": 0.7502449143639037,
+     "pitch_ratio_median": 0.9534381012296589,
+     "uncovered_median": 0.06767022572399035,
+     "uncovered_p90": 0.25182646103016804,
+     "gen_time_median": 0.027022811002098024,
+     "gen_time_p90": 0.07999977200233843,
+     "gen_time_max": 0.3350785379880108,
+     "gen_time_max_case": "sector180_a0.30_n13k1"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 126,
+      "fail": 36,
+      "rejected": 5,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 162,
+     "failure_kinds": {
+      "conformance": 30,
+      "self merge": 4,
+      "backtrack": 3,
+      "self short": 1,
+      "via clearance": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 6,
+     "clearance_class_only": 3,
+     "conformance_only": 30,
+     "pitch_ratio_p10": 0.8492805231065593,
+     "pitch_ratio_median": 0.9892087007262045,
+     "uncovered_median": 0.006475503274416132,
+     "uncovered_p90": 0.14641200494640075,
+     "gen_time_median": 0.31163402250240324,
+     "gen_time_p90": 4.234141904799618,
+     "gen_time_max": 4.823423458990874,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 143,
+     "status": {
+      "pass": 102,
+      "fail": 38,
+      "rejected": 3,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 140,
+     "failure_kinds": {
+      "conformance": 31,
+      "self merge": 5,
+      "backtrack": 4,
+      "self short": 1
+     },
+     "any_hard": 4,
+     "hard_or_clearance_class": 10,
+     "clearance_class_only": 6,
+     "conformance_only": 28,
+     "pitch_ratio_p10": 0.9606598198921575,
+     "pitch_ratio_median": 0.9917662244873073,
+     "uncovered_median": 0.009217807904714919,
+     "uncovered_p90": 0.06962187066537434,
+     "gen_time_median": 0.28365895599563373,
+     "gen_time_p90": 1.9012144283973613,
+     "gen_time_max": 2.0385259300092002,
+     "gen_time_max_case": "concave_heart_a0.6_n5k1"
+    }
+   },
+   "excl_thin": {
+    "all": {
+     "cases": 989,
+     "status": {
+      "pass": 508,
+      "fail": 454,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 962,
+     "failure_kinds": {
+      "conformance": 442,
+      "self short": 17,
+      "self merge": 9,
+      "backtrack": 6,
+      "clearance": 2,
+      "via clearance": 2
+     },
+     "any_hard": 6,
+     "hard_or_clearance_class": 29,
+     "clearance_class_only": 23,
+     "conformance_only": 425,
+     "pitch_ratio_p10": 0.8212027318669513,
+     "pitch_ratio_median": 0.9684471494307438,
+     "uncovered_median": 0.03698060383253282,
+     "uncovered_p90": 0.1777627996698866,
+     "gen_time_median": 0.0446487064982648,
+     "gen_time_p90": 0.4632515584016799,
+     "gen_time_max": 4.823423458990874,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 696,
+     "status": {
+      "pass": 285,
+      "fail": 385,
+      "rejected": 26,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 670,
+     "failure_kinds": {
+      "conformance": 384,
+      "self short": 15,
+      "clearance": 2,
+      "via clearance": 2,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 16,
+     "clearance_class_only": 16,
+     "conformance_only": 369,
+     "pitch_ratio_p10": 0.7500970937742757,
+     "pitch_ratio_median": 0.9532648458450599,
+     "uncovered_median": 0.06773632085283751,
+     "uncovered_p90": 0.2518323245627351,
+     "gen_time_median": 0.026958562499203254,
+     "gen_time_p90": 0.08004607110196958,
+     "gen_time_max": 0.3350785379880108,
+     "gen_time_max_case": "sector180_a0.30_n13k1"
+    },
+    "round": {
+     "cases": 161,
+     "status": {
+      "pass": 125,
+      "fail": 35,
+      "rejected": 1,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 160,
+     "failure_kinds": {
+      "conformance": 30,
+      "self merge": 4,
+      "backtrack": 3,
+      "self short": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 5,
+     "clearance_class_only": 2,
+     "conformance_only": 30,
+     "pitch_ratio_p10": 0.847643385948852,
+     "pitch_ratio_median": 0.9890487744359631,
+     "uncovered_median": 0.006549148097648149,
+     "uncovered_p90": 0.14957527253375102,
+     "gen_time_median": 0.3090748954928131,
+     "gen_time_p90": 4.2508930926982424,
+     "gen_time_max": 4.823423458990874,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 98,
+      "fail": 34,
+      "rejected": 0,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 132,
+     "failure_kinds": {
+      "conformance": 28,
+      "self merge": 4,
+      "backtrack": 3,
+      "self short": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 8,
+     "clearance_class_only": 5,
+     "conformance_only": 26,
+     "pitch_ratio_p10": 0.9596120875796578,
+     "pitch_ratio_median": 0.9913699442769704,
+     "uncovered_median": 0.010619922191009462,
+     "uncovered_p90": 0.09818176316888488,
+     "gen_time_median": 0.26004683149949415,
+     "gen_time_p90": 1.851453635390499,
+     "gen_time_max": 2.0385259300092002,
+     "gen_time_max_case": "concave_heart_a0.6_n5k1"
+    }
+   },
+   "excl_thin_tag": {
+    "all": {
+     "cases": 983,
+     "status": {
+      "pass": 497,
+      "fail": 454,
+      "rejected": 32,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 951,
+     "failure_kinds": {
+      "conformance": 441,
+      "self short": 17,
+      "self merge": 9,
+      "backtrack": 6,
+      "via clearance": 3,
+      "clearance": 2
+     },
+     "any_hard": 6,
+     "hard_or_clearance_class": 30,
+     "clearance_class_only": 24,
+     "conformance_only": 424,
+     "pitch_ratio_p10": 0.8211942751511355,
+     "pitch_ratio_median": 0.9683289017589102,
+     "uncovered_median": 0.03787341283021647,
+     "uncovered_p90": 0.1779799772145532,
+     "gen_time_median": 0.046166430998709984,
+     "gen_time_p90": 0.4762713870004518,
+     "gen_time_max": 4.823423458990874,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 684,
+     "status": {
+      "pass": 273,
+      "fail": 384,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 657,
+     "failure_kinds": {
+      "conformance": 383,
+      "self short": 15,
+      "clearance": 2,
+      "via clearance": 2,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 16,
+     "clearance_class_only": 16,
+     "conformance_only": 368,
+     "pitch_ratio_p10": 0.7496536320053918,
+     "pitch_ratio_median": 0.9487438066002057,
+     "uncovered_median": 0.07012190869738603,
+     "uncovered_p90": 0.2518499151604361,
+     "gen_time_median": 0.027286990996799432,
+     "gen_time_p90": 0.07998582559812348,
+     "gen_time_max": 0.3350785379880108,
+     "gen_time_max_case": "sector180_a0.30_n13k1"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 126,
+      "fail": 36,
+      "rejected": 5,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 162,
+     "failure_kinds": {
+      "conformance": 30,
+      "self merge": 4,
+      "backtrack": 3,
+      "self short": 1,
+      "via clearance": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 6,
+     "clearance_class_only": 3,
+     "conformance_only": 30,
+     "pitch_ratio_p10": 0.8492805231065593,
+     "pitch_ratio_median": 0.9892087007262045,
+     "uncovered_median": 0.006475503274416132,
+     "uncovered_p90": 0.14641200494640075,
+     "gen_time_median": 0.31163402250240324,
+     "gen_time_p90": 4.234141904799618,
+     "gen_time_max": 4.823423458990874,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 98,
+      "fail": 34,
+      "rejected": 0,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 132,
+     "failure_kinds": {
+      "conformance": 28,
+      "self merge": 4,
+      "backtrack": 3,
+      "self short": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 8,
+     "clearance_class_only": 5,
+     "conformance_only": 26,
+     "pitch_ratio_p10": 0.9596120875796578,
+     "pitch_ratio_median": 0.9913699442769704,
+     "uncovered_median": 0.010619922191009462,
+     "uncovered_p90": 0.09818176316888488,
+     "gen_time_median": 0.26004683149949415,
+     "gen_time_p90": 1.851453635390499,
+     "gen_time_max": 2.0385259300092002,
+     "gen_time_max_case": "concave_heart_a0.6_n5k1"
+    }
+   },
+   "nonchecked_groups": [
+    {
+     "status": "rejected",
+     "message": "ValueError: Annular width (#) is too large. Must be less than #",
+     "count": 26,
+     "by_family": {
+      "main": 26
+     },
+     "thin": 0,
+     "examples": [
+      "star5_a0.90_n3k1",
+      "star5_a0.90_n5k3",
+      "star5_a0.90_n9k4",
+      "star5_a0.90_n16k5"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "ValueError: Given clearance of # mm is larger than the projected spiral pitch of # mm. Reduce clearance or increase the size of the coil.",
+     "count": 6,
+     "by_family": {
+      "main": 1,
+      "round": 3,
+      "concave": 2
+     },
+     "thin": 6,
+     "examples": [
+      "circle20x18_n16k5",
+      "round_ellipse10to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.60_n21k8"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "OverlappingViasError: Overlapping vias: the vias at (#, #) and (#, #) are # mm apart, less than the via diameter of # mm, so they would short the arms they conn",
+     "count": 2,
+     "by_family": {
+      "round": 2
+     },
+     "thin": 1,
+     "examples": [
+      "round_ellipse10to1_a0.90_n16k5",
+      "round_ellipse20to1_a0.90_n16k5"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "ValueError: Given clearance of # mm is larger than the projected spiral pitch of # mm. Reduce clearance or increase the size of the coil. The projected pitch is",
+     "count": 1,
+     "by_family": {
+      "concave": 1
+     },
+     "thin": 1,
+     "examples": [
+      "concave_heart_a0.6_n13k4"
+     ]
+    }
+   ],
+   "timeouts": [],
+   "hard_declared": [
+    "concave_heart_a0.9_n13k4",
+    "concave_heartdeep_a0.3_n13k4",
+    "concave_heartdeep_a0.6_n13k4",
+    "concave_heartdeep_a0.9_n13k4",
+    "round_ellipse20to1_a0.60_n7k3_cw",
+    "round_ellipse20to1_a0.60_n8k3",
+    "round_ellipse20to1_a0.90_n5k1"
+   ],
+   "hard_cases": {
+    "round_ellipse20to1_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.90_n5k1": [
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.3_n13k4": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.6_n13k4": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.9_n13k4": [
+     "backtrack"
+    ],
+    "concave_heart_a0.9_n13k4": [
+     "backtrack"
+    ]
+   },
+   "error_tracebacks": []
+  },
+  "cornerflat": {
+   "all_cases": {
+    "all": {
+     "cases": 1008,
+     "status": {
+      "pass": 777,
+      "fail": 196,
+      "rejected": 35,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 973,
+     "failure_kinds": {
+      "conformance": 177,
+      "self short": 18,
+      "self merge": 12,
+      "backtrack": 8,
+      "via clearance": 1
+     },
+     "any_hard": 8,
+     "hard_or_clearance_class": 36,
+     "clearance_class_only": 28,
+     "conformance_only": 160,
+     "pitch_ratio_p10": 0.9016260808698131,
+     "pitch_ratio_median": 0.9980921583518573,
+     "uncovered_median": 0.005964227020234607,
+     "uncovered_p90": 0.10453794971039494,
+     "gen_time_median": 0.1560236579971388,
+     "gen_time_p90": 1.5630134656006704,
+     "gen_time_max": 67.05206457599706,
+     "gen_time_max_case": "round_ellipse10to1_a0.60_n21k8"
+    },
+    "main": {
+     "cases": 698,
+     "status": {
+      "pass": 524,
+      "fail": 147,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 671,
+     "failure_kinds": {
+      "conformance": 144,
+      "self short": 17,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 18,
+     "clearance_class_only": 18,
+     "conformance_only": 129,
+     "pitch_ratio_p10": 0.8801785914295571,
+     "pitch_ratio_median": 0.9970615221780781,
+     "uncovered_median": 0.007577474808528115,
+     "uncovered_p90": 0.12312768960667511,
+     "gen_time_median": 0.10550625900214072,
+     "gen_time_p90": 0.28218673399533145,
+     "gen_time_max": 1.1816235589940334,
+     "gen_time_max_case": "ellipse3to2_a0.90_n16k5"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 136,
+      "fail": 26,
+      "rejected": 5,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 162,
+     "failure_kinds": {
+      "conformance": 21,
+      "self merge": 4,
+      "backtrack": 3,
+      "via clearance": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 5,
+     "clearance_class_only": 2,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.9026495862218173,
+     "pitch_ratio_median": 0.994054374074414,
+     "uncovered_median": 0.004575238171873873,
+     "uncovered_p90": 0.09843413588446033,
+     "gen_time_median": 1.141162458989129,
+     "gen_time_p90": 5.182255264994456,
+     "gen_time_max": 67.05206457599706,
+     "gen_time_max_case": "round_ellipse10to1_a0.60_n21k8"
+    },
+    "concave": {
+     "cases": 143,
+     "status": {
+      "pass": 117,
+      "fail": 23,
+      "rejected": 3,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 140,
+     "failure_kinds": {
+      "conformance": 12,
+      "self merge": 7,
+      "backtrack": 5,
+      "self short": 1
+     },
+     "any_hard": 5,
+     "hard_or_clearance_class": 13,
+     "clearance_class_only": 8,
+     "conformance_only": 10,
+     "pitch_ratio_p10": 0.9969787745687495,
+     "pitch_ratio_median": 0.999892764889724,
+     "uncovered_median": 0.0014177169152702644,
+     "uncovered_p90": 0.025764702496170768,
+     "gen_time_median": 0.6102212814948871,
+     "gen_time_p90": 2.92124926240067,
+     "gen_time_max": 13.456049768996309,
+     "gen_time_max_case": "concave_shark_a0.3_n13k4"
+    }
+   },
+   "excl_thin": {
+    "all": {
+     "cases": 989,
+     "status": {
+      "pass": 768,
+      "fail": 194,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 962,
+     "failure_kinds": {
+      "conformance": 177,
+      "self short": 18,
+      "self merge": 12,
+      "backtrack": 7
+     },
+     "any_hard": 7,
+     "hard_or_clearance_class": 34,
+     "clearance_class_only": 27,
+     "conformance_only": 160,
+     "pitch_ratio_p10": 0.9015247449665,
+     "pitch_ratio_median": 0.9979876897482745,
+     "uncovered_median": 0.0059941163756436116,
+     "uncovered_p90": 0.10788915555812574,
+     "gen_time_median": 0.15414716149825836,
+     "gen_time_p90": 1.4603332641971063,
+     "gen_time_max": 18.999446211004397,
+     "gen_time_max_case": "round_poly1024_a0.90_n16k5"
+    },
+    "main": {
+     "cases": 696,
+     "status": {
+      "pass": 523,
+      "fail": 147,
+      "rejected": 26,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 670,
+     "failure_kinds": {
+      "conformance": 144,
+      "self short": 17,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 18,
+     "clearance_class_only": 18,
+     "conformance_only": 129,
+     "pitch_ratio_p10": 0.8801046858752958,
+     "pitch_ratio_median": 0.9970183474356362,
+     "uncovered_median": 0.0075941215848075935,
+     "uncovered_p90": 0.12327972837330002,
+     "gen_time_median": 0.105467100001988,
+     "gen_time_p90": 0.2826933683958488,
+     "gen_time_max": 1.1816235589940334,
+     "gen_time_max_case": "ellipse3to2_a0.90_n16k5"
+    },
+    "round": {
+     "cases": 161,
+     "status": {
+      "pass": 135,
+      "fail": 25,
+      "rejected": 1,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 160,
+     "failure_kinds": {
+      "conformance": 21,
+      "self merge": 4,
+      "backtrack": 3
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 4,
+     "clearance_class_only": 1,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.9000152184661209,
+     "pitch_ratio_median": 0.9938381337445151,
+     "uncovered_median": 0.004744749106885036,
+     "uncovered_p90": 0.09935366591333392,
+     "gen_time_median": 1.141162458989129,
+     "gen_time_p90": 5.062627377005992,
+     "gen_time_max": 18.999446211004397,
+     "gen_time_max_case": "round_poly1024_a0.90_n16k5"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 110,
+      "fail": 22,
+      "rejected": 0,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 132,
+     "failure_kinds": {
+      "conformance": 12,
+      "self merge": 7,
+      "backtrack": 4,
+      "self short": 1
+     },
+     "any_hard": 4,
+     "hard_or_clearance_class": 12,
+     "clearance_class_only": 8,
+     "conformance_only": 10,
+     "pitch_ratio_p10": 0.9962416254644764,
+     "pitch_ratio_median": 0.999882858286014,
+     "uncovered_median": 0.0015743828446950292,
+     "uncovered_p90": 0.02617902824419219,
+     "gen_time_median": 0.5287131389923161,
+     "gen_time_p90": 2.5331414758067705,
+     "gen_time_max": 5.571163161992445,
+     "gen_time_max_case": "concave_heart_a0.6_n7k3_cw"
+    }
+   },
+   "excl_thin_tag": {
+    "all": {
+     "cases": 983,
+     "status": {
+      "pass": 756,
+      "fail": 195,
+      "rejected": 32,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 951,
+     "failure_kinds": {
+      "conformance": 177,
+      "self short": 18,
+      "self merge": 12,
+      "backtrack": 7,
+      "via clearance": 1
+     },
+     "any_hard": 7,
+     "hard_or_clearance_class": 35,
+     "clearance_class_only": 28,
+     "conformance_only": 160,
+     "pitch_ratio_p10": 0.8992943950759508,
+     "pitch_ratio_median": 0.9978382460621896,
+     "uncovered_median": 0.006017872727874923,
+     "uncovered_p90": 0.10828356368698283,
+     "gen_time_median": 0.15604348899796605,
+     "gen_time_p90": 1.4829645300051197,
+     "gen_time_max": 67.05206457599706,
+     "gen_time_max_case": "round_ellipse10to1_a0.60_n21k8"
+    },
+    "main": {
+     "cases": 684,
+     "status": {
+      "pass": 510,
+      "fail": 147,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 657,
+     "failure_kinds": {
+      "conformance": 144,
+      "self short": 17,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 18,
+     "clearance_class_only": 18,
+     "conformance_only": 129,
+     "pitch_ratio_p10": 0.8766726115731188,
+     "pitch_ratio_median": 0.9967670166420408,
+     "uncovered_median": 0.007846711660886397,
+     "uncovered_p90": 0.1254647082278488,
+     "gen_time_median": 0.10577218599792104,
+     "gen_time_p90": 0.2818251025979407,
+     "gen_time_max": 1.1816235589940334,
+     "gen_time_max_case": "ellipse3to2_a0.90_n16k5"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 136,
+      "fail": 26,
+      "rejected": 5,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 162,
+     "failure_kinds": {
+      "conformance": 21,
+      "self merge": 4,
+      "backtrack": 3,
+      "via clearance": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 5,
+     "clearance_class_only": 2,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.9026495862218173,
+     "pitch_ratio_median": 0.994054374074414,
+     "uncovered_median": 0.004575238171873873,
+     "uncovered_p90": 0.09843413588446033,
+     "gen_time_median": 1.141162458989129,
+     "gen_time_p90": 5.182255264994456,
+     "gen_time_max": 67.05206457599706,
+     "gen_time_max_case": "round_ellipse10to1_a0.60_n21k8"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 110,
+      "fail": 22,
+      "rejected": 0,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 132,
+     "failure_kinds": {
+      "conformance": 12,
+      "self merge": 7,
+      "backtrack": 4,
+      "self short": 1
+     },
+     "any_hard": 4,
+     "hard_or_clearance_class": 12,
+     "clearance_class_only": 8,
+     "conformance_only": 10,
+     "pitch_ratio_p10": 0.9962416254644764,
+     "pitch_ratio_median": 0.999882858286014,
+     "uncovered_median": 0.0015743828446950292,
+     "uncovered_p90": 0.02617902824419219,
+     "gen_time_median": 0.5287131389923161,
+     "gen_time_p90": 2.5331414758067705,
+     "gen_time_max": 5.571163161992445,
+     "gen_time_max_case": "concave_heart_a0.6_n7k3_cw"
+    }
+   },
+   "nonchecked_groups": [
+    {
+     "status": "rejected",
+     "message": "ValueError: Annular width (#) is too large. Must be less than #",
+     "count": 26,
+     "by_family": {
+      "main": 26
+     },
+     "thin": 0,
+     "examples": [
+      "star5_a0.90_n3k1",
+      "star5_a0.90_n5k3",
+      "star5_a0.90_n9k4",
+      "star5_a0.90_n16k5"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "ValueError: Given clearance of # mm is larger than the projected spiral pitch of # mm. Reduce clearance or increase the size of the coil.",
+     "count": 7,
+     "by_family": {
+      "main": 1,
+      "round": 3,
+      "concave": 3
+     },
+     "thin": 7,
+     "examples": [
+      "circle20x18_n16k5",
+      "round_ellipse10to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.60_n21k8"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "OverlappingViasError: Overlapping vias: the vias at (#, #) and (#, #) are # mm apart, less than the via diameter of # mm, so they would short the arms they conn",
+     "count": 2,
+     "by_family": {
+      "round": 2
+     },
+     "thin": 1,
+     "examples": [
+      "round_ellipse10to1_a0.90_n16k5",
+      "round_ellipse20to1_a0.90_n16k5"
+     ]
+    }
+   ],
+   "timeouts": [],
+   "hard_declared": [
+    "concave_heart_a0.9_n13k4",
+    "concave_heartdeep_a0.3_n13k4",
+    "concave_heartdeep_a0.6_n13k4",
+    "concave_heartdeep_a0.9_n13k4",
+    "round_ellipse20to1_a0.60_n7k3_cw",
+    "round_ellipse20to1_a0.60_n8k3",
+    "round_ellipse20to1_a0.90_n5k1"
+   ],
+   "hard_cases": {
+    "round_ellipse20to1_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.90_n5k1": [
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.3_n13k4": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.6_n13k4": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.9_n8k3": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.9_n13k4": [
+     "backtrack"
+    ],
+    "concave_heart_a0.9_n13k4": [
+     "backtrack"
+    ]
+   },
+   "error_tracebacks": []
+  },
+  "optspan": {
+   "all_cases": {
+    "all": {
+     "cases": 1008,
+     "status": {
+      "pass": 667,
+      "fail": 305,
+      "rejected": 35,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 1
+     },
+     "checked": 972,
+     "failure_kinds": {
+      "conformance": 291,
+      "self short": 27,
+      "via clearance": 9,
+      "self merge": 8,
+      "backtrack": 7,
+      "clearance": 7
+     },
+     "any_hard": 7,
+     "hard_or_clearance_class": 39,
+     "clearance_class_only": 32,
+     "conformance_only": 266,
+     "pitch_ratio_p10": 0.884978104532472,
+     "pitch_ratio_median": 0.9861372793690432,
+     "uncovered_median": 0.017484192252905005,
+     "uncovered_p90": 0.13049505010965068,
+     "gen_time_median": 0.7141287900012685,
+     "gen_time_p90": 1.8376729327006613,
+     "gen_time_max": 74.09690995900019,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 698,
+     "status": {
+      "pass": 434,
+      "fail": 237,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 671,
+     "failure_kinds": {
+      "conformance": 235,
+      "self short": 21,
+      "clearance": 7,
+      "via clearance": 7
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 21,
+     "clearance_class_only": 21,
+     "conformance_only": 216,
+     "pitch_ratio_p10": 0.8687167901094869,
+     "pitch_ratio_median": 0.9798750573896838,
+     "uncovered_median": 0.0322968810161419,
+     "uncovered_p90": 0.13389588528888688,
+     "gen_time_median": 0.5937838699901477,
+     "gen_time_p90": 1.1050956469989615,
+     "gen_time_max": 2.0984408509975765,
+     "gen_time_max_case": "sector180_a0.60_n21k8"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 131,
+      "fail": 30,
+      "rejected": 5,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 1
+     },
+     "checked": 161,
+     "failure_kinds": {
+      "conformance": 24,
+      "self merge": 4,
+      "self short": 4,
+      "backtrack": 3,
+      "via clearance": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 9,
+     "clearance_class_only": 6,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.8719996073178022,
+     "pitch_ratio_median": 0.9907997714594263,
+     "uncovered_median": 0.005203432471581012,
+     "uncovered_p90": 0.12204962295416494,
+     "gen_time_median": 1.4280471370002488,
+     "gen_time_p90": 10.778988133999519,
+     "gen_time_max": 74.09690995900019,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 143,
+     "status": {
+      "pass": 102,
+      "fail": 38,
+      "rejected": 3,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 140,
+     "failure_kinds": {
+      "conformance": 32,
+      "backtrack": 4,
+      "self merge": 4,
+      "self short": 2,
+      "via clearance": 1
+     },
+     "any_hard": 4,
+     "hard_or_clearance_class": 9,
+     "clearance_class_only": 5,
+     "conformance_only": 29,
+     "pitch_ratio_p10": 0.9778663673511613,
+     "pitch_ratio_median": 0.998385544747018,
+     "uncovered_median": 0.0033546957886231637,
+     "uncovered_p90": 0.06853653668943373,
+     "gen_time_median": 1.217914013999689,
+     "gen_time_p90": 3.040255517409242,
+     "gen_time_max": 4.4427419240091695,
+     "gen_time_max_case": "concave_heartdeep_a0.6_n7k3_cw"
+    }
+   },
+   "excl_thin": {
+    "all": {
+     "cases": 989,
+     "status": {
+      "pass": 661,
+      "fail": 300,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 1
+     },
+     "checked": 961,
+     "failure_kinds": {
+      "conformance": 288,
+      "self short": 27,
+      "via clearance": 8,
+      "clearance": 7,
+      "self merge": 7,
+      "backtrack": 6
+     },
+     "any_hard": 6,
+     "hard_or_clearance_class": 36,
+     "clearance_class_only": 30,
+     "conformance_only": 264,
+     "pitch_ratio_p10": 0.8848072934874496,
+     "pitch_ratio_median": 0.9859096895900875,
+     "uncovered_median": 0.017570639201606415,
+     "uncovered_p90": 0.1307588942758824,
+     "gen_time_median": 0.7077959719899809,
+     "gen_time_p90": 1.7729456249944633,
+     "gen_time_max": 74.09690995900019,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 696,
+     "status": {
+      "pass": 433,
+      "fail": 237,
+      "rejected": 26,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 670,
+     "failure_kinds": {
+      "conformance": 235,
+      "self short": 21,
+      "clearance": 7,
+      "via clearance": 7
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 21,
+     "clearance_class_only": 21,
+     "conformance_only": 216,
+     "pitch_ratio_p10": 0.8684031313069511,
+     "pitch_ratio_median": 0.9797974532835154,
+     "uncovered_median": 0.03229688101614218,
+     "uncovered_p90": 0.134071261000912,
+     "gen_time_median": 0.5954814099968644,
+     "gen_time_p90": 1.105446229998779,
+     "gen_time_max": 2.0984408509975765,
+     "gen_time_max_case": "sector180_a0.60_n21k8"
+    },
+    "round": {
+     "cases": 161,
+     "status": {
+      "pass": 130,
+      "fail": 29,
+      "rejected": 1,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 1
+     },
+     "checked": 159,
+     "failure_kinds": {
+      "conformance": 24,
+      "self merge": 4,
+      "self short": 4,
+      "backtrack": 3
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 8,
+     "clearance_class_only": 5,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.869814677173587,
+     "pitch_ratio_median": 0.9898368008063037,
+     "uncovered_median": 0.005226967441224436,
+     "uncovered_p90": 0.12234819754832807,
+     "gen_time_median": 1.4268076000007568,
+     "gen_time_p90": 10.745524675608614,
+     "gen_time_max": 74.09690995900019,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 98,
+      "fail": 34,
+      "rejected": 0,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 132,
+     "failure_kinds": {
+      "conformance": 29,
+      "backtrack": 3,
+      "self merge": 3,
+      "self short": 2,
+      "via clearance": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 7,
+     "clearance_class_only": 4,
+     "conformance_only": 27,
+     "pitch_ratio_p10": 0.975334469086434,
+     "pitch_ratio_median": 0.9982379127999246,
+     "uncovered_median": 0.004075443948834332,
+     "uncovered_p90": 0.06953033570053753,
+     "gen_time_median": 1.1495796004965086,
+     "gen_time_p90": 2.980926773099055,
+     "gen_time_max": 4.4427419240091695,
+     "gen_time_max_case": "concave_heartdeep_a0.6_n7k3_cw"
+    }
+   },
+   "excl_thin_tag": {
+    "all": {
+     "cases": 983,
+     "status": {
+      "pass": 649,
+      "fail": 301,
+      "rejected": 32,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 1
+     },
+     "checked": 950,
+     "failure_kinds": {
+      "conformance": 288,
+      "self short": 27,
+      "via clearance": 9,
+      "clearance": 7,
+      "self merge": 7,
+      "backtrack": 6
+     },
+     "any_hard": 6,
+     "hard_or_clearance_class": 37,
+     "clearance_class_only": 31,
+     "conformance_only": 264,
+     "pitch_ratio_p10": 0.8838348407652518,
+     "pitch_ratio_median": 0.9858749512181706,
+     "uncovered_median": 0.01767186953206451,
+     "uncovered_p90": 0.13081693366127323,
+     "gen_time_median": 0.7147707425028784,
+     "gen_time_p90": 1.7792509335093205,
+     "gen_time_max": 74.09690995900019,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "main": {
+     "cases": 684,
+     "status": {
+      "pass": 420,
+      "fail": 237,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 657,
+     "failure_kinds": {
+      "conformance": 235,
+      "self short": 21,
+      "clearance": 7,
+      "via clearance": 7
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 21,
+     "clearance_class_only": 21,
+     "conformance_only": 216,
+     "pitch_ratio_p10": 0.8651351946389261,
+     "pitch_ratio_median": 0.9789933432122299,
+     "uncovered_median": 0.033429662601427546,
+     "uncovered_p90": 0.13869688379460138,
+     "gen_time_median": 0.6065803480014438,
+     "gen_time_p90": 1.1117818230006375,
+     "gen_time_max": 2.0984408509975765,
+     "gen_time_max_case": "sector180_a0.60_n21k8"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 131,
+      "fail": 30,
+      "rejected": 5,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 1
+     },
+     "checked": 161,
+     "failure_kinds": {
+      "conformance": 24,
+      "self merge": 4,
+      "self short": 4,
+      "backtrack": 3,
+      "via clearance": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 9,
+     "clearance_class_only": 6,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.8719996073178022,
+     "pitch_ratio_median": 0.9907997714594263,
+     "uncovered_median": 0.005203432471581012,
+     "uncovered_p90": 0.12204962295416494,
+     "gen_time_median": 1.4280471370002488,
+     "gen_time_p90": 10.778988133999519,
+     "gen_time_max": 74.09690995900019,
+     "gen_time_max_case": "round_svg1000r_a0.60_n8k3"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 98,
+      "fail": 34,
+      "rejected": 0,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 132,
+     "failure_kinds": {
+      "conformance": 29,
+      "backtrack": 3,
+      "self merge": 3,
+      "self short": 2,
+      "via clearance": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 7,
+     "clearance_class_only": 4,
+     "conformance_only": 27,
+     "pitch_ratio_p10": 0.975334469086434,
+     "pitch_ratio_median": 0.9982379127999246,
+     "uncovered_median": 0.004075443948834332,
+     "uncovered_p90": 0.06953033570053753,
+     "gen_time_median": 1.1495796004965086,
+     "gen_time_p90": 2.980926773099055,
+     "gen_time_max": 4.4427419240091695,
+     "gen_time_max_case": "concave_heartdeep_a0.6_n7k3_cw"
+    }
+   },
+   "nonchecked_groups": [
+    {
+     "status": "rejected",
+     "message": "ValueError: Annular width (#) is too large. Must be less than #",
+     "count": 26,
+     "by_family": {
+      "main": 26
+     },
+     "thin": 0,
+     "examples": [
+      "star5_a0.90_n3k1",
+      "star5_a0.90_n5k3",
+      "star5_a0.90_n9k4",
+      "star5_a0.90_n16k5"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "ValueError: Given clearance of # mm is larger than the projected spiral pitch of # mm. Reduce clearance or increase the size of the coil.",
+     "count": 7,
+     "by_family": {
+      "main": 1,
+      "round": 3,
+      "concave": 3
+     },
+     "thin": 7,
+     "examples": [
+      "circle20x18_n16k5",
+      "round_ellipse10to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.60_n21k8"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "OverlappingViasError: Overlapping vias: the vias at (#, #) and (#, #) are # mm apart, less than the via diameter of # mm, so they would short the arms they conn",
+     "count": 2,
+     "by_family": {
+      "round": 2
+     },
+     "thin": 1,
+     "examples": [
+      "round_ellipse10to1_a0.90_n16k5",
+      "round_ellipse20to1_a0.90_n16k5"
+     ]
+    },
+    {
+     "status": "timeout",
+     "message": "timeout after # s",
+     "count": 1,
+     "by_family": {
+      "round": 1
+     },
+     "thin": 0,
+     "examples": [
+      "round_dense2500_a0.90_n16k5"
+     ]
+    }
+   ],
+   "timeouts": [
+    {
+     "name": "round_dense2500_a0.90_n16k5",
+     "family": "round",
+     "time": 600.774361445001,
+     "error": "timeout after 601 s",
+     "other_impls": {
+      "original": {
+       "status": "fail",
+       "gen_time": 16.415567178002675,
+       "failures": [
+        "crossing",
+        "backtrack",
+        "clearance",
+        "self merge",
+        "conformance"
+       ]
+      },
+      "fixed": {
+       "status": "fail",
+       "gen_time": 4.6472682369931135,
+       "failures": [
+        "conformance"
+       ]
+      },
+      "cornerflat": {
+       "status": "fail",
+       "gen_time": 7.44048187599401,
+       "failures": [
+        "conformance"
+       ]
+      },
+      "jog": {
+       "status": "fail",
+       "gen_time": 166.33951096200326,
+       "failures": [
+        "conformance"
+       ]
+      }
+     }
+    }
+   ],
+   "hard_declared": [
+    "concave_heart_a0.9_n13k4",
+    "concave_heartdeep_a0.3_n13k4",
+    "concave_heartdeep_a0.9_n13k4",
+    "round_ellipse20to1_a0.60_n7k3_cw",
+    "round_ellipse20to1_a0.60_n8k3",
+    "round_ellipse20to1_a0.90_n5k1"
+   ],
+   "hard_cases": {
+    "round_ellipse20to1_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.90_n5k1": [
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.3_n13k4": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.6_n8k3": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.9_n13k4": [
+     "backtrack"
+    ],
+    "concave_heart_a0.9_n13k4": [
+     "backtrack"
+    ]
+   },
+   "error_tracebacks": []
+  },
+  "jog": {
+   "all_cases": {
+    "all": {
+     "cases": 1008,
+     "status": {
+      "pass": 763,
+      "fail": 210,
+      "rejected": 35,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 973,
+     "failure_kinds": {
+      "conformance": 194,
+      "self short": 22,
+      "backtrack": 9,
+      "self merge": 7,
+      "clearance": 4,
+      "via clearance": 3,
+      "via offset": 2
+     },
+     "any_hard": 11,
+     "hard_or_clearance_class": 37,
+     "clearance_class_only": 26,
+     "conformance_only": 173,
+     "pitch_ratio_p10": 0.9027996129830607,
+     "pitch_ratio_median": 0.99999999998492,
+     "uncovered_median": 0.005028468434418148,
+     "uncovered_p90": 0.12097171081927383,
+     "gen_time_median": 0.8832566249911906,
+     "gen_time_p90": 5.008101326605543,
+     "gen_time_max": 166.33951096200326,
+     "gen_time_max_case": "round_dense2500_a0.90_n16k5"
+    },
+    "main": {
+     "cases": 698,
+     "status": {
+      "pass": 510,
+      "fail": 161,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 671,
+     "failure_kinds": {
+      "conformance": 155,
+      "self short": 20,
+      "clearance": 4,
+      "via clearance": 3,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 21,
+     "clearance_class_only": 21,
+     "conformance_only": 140,
+     "pitch_ratio_p10": 0.8846983008347753,
+     "pitch_ratio_median": 0.9999999999927943,
+     "uncovered_median": 0.005989570187489156,
+     "uncovered_p90": 0.1375,
+     "gen_time_median": 0.688993447998655,
+     "gen_time_p90": 1.3867261889972724,
+     "gen_time_max": 3.2780490949953673,
+     "gen_time_max_case": "sector180_a0.60_n21k8"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 136,
+      "fail": 26,
+      "rejected": 5,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 162,
+     "failure_kinds": {
+      "conformance": 23,
+      "self merge": 4,
+      "backtrack": 3,
+      "self short": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 5,
+     "clearance_class_only": 2,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.9007499133485427,
+     "pitch_ratio_median": 0.99551715152874,
+     "uncovered_median": 0.004047969453059493,
+     "uncovered_p90": 0.11504227799691151,
+     "gen_time_median": 4.898630685500393,
+     "gen_time_p90": 11.630777914510693,
+     "gen_time_max": 166.33951096200326,
+     "gen_time_max_case": "round_dense2500_a0.90_n16k5"
+    },
+    "concave": {
+     "cases": 143,
+     "status": {
+      "pass": 117,
+      "fail": 23,
+      "rejected": 3,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 140,
+     "failure_kinds": {
+      "conformance": 16,
+      "backtrack": 6,
+      "self merge": 2,
+      "via offset": 2,
+      "self short": 1
+     },
+     "any_hard": 8,
+     "hard_or_clearance_class": 11,
+     "clearance_class_only": 3,
+     "conformance_only": 12,
+     "pitch_ratio_p10": 0.9943657311764319,
+     "pitch_ratio_median": 0.999999999960903,
+     "uncovered_median": 0.0015964558455952803,
+     "uncovered_p90": 0.02269736550554281,
+     "gen_time_median": 2.836661579502106,
+     "gen_time_p90": 5.525060118206603,
+     "gen_time_max": 8.037644833995728,
+     "gen_time_max_case": "concave_cshape_a0.6_n6_1layer"
+    }
+   },
+   "excl_thin": {
+    "all": {
+     "cases": 989,
+     "status": {
+      "pass": 756,
+      "fail": 206,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 962,
+     "failure_kinds": {
+      "conformance": 193,
+      "self short": 22,
+      "self merge": 7,
+      "backtrack": 6,
+      "clearance": 4,
+      "via clearance": 3,
+      "via offset": 2
+     },
+     "any_hard": 8,
+     "hard_or_clearance_class": 34,
+     "clearance_class_only": 26,
+     "conformance_only": 172,
+     "pitch_ratio_p10": 0.9021027579170531,
+     "pitch_ratio_median": 0.9999999999850171,
+     "uncovered_median": 0.00513280957811148,
+     "uncovered_p90": 0.121964532546892,
+     "gen_time_median": 0.8777622580018942,
+     "gen_time_p90": 4.714557207096368,
+     "gen_time_max": 166.33951096200326,
+     "gen_time_max_case": "round_dense2500_a0.90_n16k5"
+    },
+    "main": {
+     "cases": 696,
+     "status": {
+      "pass": 509,
+      "fail": 161,
+      "rejected": 26,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 670,
+     "failure_kinds": {
+      "conformance": 155,
+      "self short": 20,
+      "clearance": 4,
+      "via clearance": 3,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 21,
+     "clearance_class_only": 21,
+     "conformance_only": 140,
+     "pitch_ratio_p10": 0.8845801077853211,
+     "pitch_ratio_median": 0.9999999999928175,
+     "uncovered_median": 0.0059895701874892225,
+     "uncovered_p90": 0.1376383380868009,
+     "gen_time_median": 0.6897844759951113,
+     "gen_time_p90": 1.3871515951963376,
+     "gen_time_max": 3.2780490949953673,
+     "gen_time_max_case": "sector180_a0.60_n21k8"
+    },
+    "round": {
+     "cases": 161,
+     "status": {
+      "pass": 134,
+      "fail": 26,
+      "rejected": 1,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 160,
+     "failure_kinds": {
+      "conformance": 23,
+      "self merge": 4,
+      "backtrack": 3,
+      "self short": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 5,
+     "clearance_class_only": 2,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.8992412499473177,
+     "pitch_ratio_median": 0.9953627524913233,
+     "uncovered_median": 0.004176646212480713,
+     "uncovered_p90": 0.1171740206274216,
+     "gen_time_median": 4.849876667496574,
+     "gen_time_p90": 10.838971692595804,
+     "gen_time_max": 166.33951096200326,
+     "gen_time_max_case": "round_dense2500_a0.90_n16k5"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 113,
+      "fail": 19,
+      "rejected": 0,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 132,
+     "failure_kinds": {
+      "conformance": 15,
+      "backtrack": 3,
+      "self merge": 2,
+      "via offset": 2,
+      "self short": 1
+     },
+     "any_hard": 5,
+     "hard_or_clearance_class": 8,
+     "clearance_class_only": 3,
+     "conformance_only": 11,
+     "pitch_ratio_p10": 0.9931467537725835,
+     "pitch_ratio_median": 0.999999999960903,
+     "uncovered_median": 0.0017465350878657815,
+     "uncovered_p90": 0.022852843079745593,
+     "gen_time_median": 2.55867306899745,
+     "gen_time_p90": 4.834775857106434,
+     "gen_time_max": 8.037644833995728,
+     "gen_time_max_case": "concave_cshape_a0.6_n6_1layer"
+    }
+   },
+   "excl_thin_tag": {
+    "all": {
+     "cases": 983,
+     "status": {
+      "pass": 745,
+      "fail": 206,
+      "rejected": 32,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 951,
+     "failure_kinds": {
+      "conformance": 193,
+      "self short": 22,
+      "self merge": 7,
+      "backtrack": 6,
+      "clearance": 4,
+      "via clearance": 3,
+      "via offset": 2
+     },
+     "any_hard": 8,
+     "hard_or_clearance_class": 34,
+     "clearance_class_only": 26,
+     "conformance_only": 172,
+     "pitch_ratio_p10": 0.9015238818673458,
+     "pitch_ratio_median": 0.9999999999844584,
+     "uncovered_median": 0.00519008990364178,
+     "uncovered_p90": 0.12354249592498136,
+     "gen_time_median": 0.8832566249911906,
+     "gen_time_p90": 4.848067576007452,
+     "gen_time_max": 166.33951096200326,
+     "gen_time_max_case": "round_dense2500_a0.90_n16k5"
+    },
+    "main": {
+     "cases": 684,
+     "status": {
+      "pass": 496,
+      "fail": 161,
+      "rejected": 27,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 657,
+     "failure_kinds": {
+      "conformance": 155,
+      "self short": 20,
+      "clearance": 4,
+      "via clearance": 3,
+      "self merge": 1
+     },
+     "any_hard": 0,
+     "hard_or_clearance_class": 21,
+     "clearance_class_only": 21,
+     "conformance_only": 140,
+     "pitch_ratio_p10": 0.8835163703402338,
+     "pitch_ratio_median": 0.9999999999925416,
+     "uncovered_median": 0.006163317415407428,
+     "uncovered_p90": 0.1390483871275506,
+     "gen_time_median": 0.6932371379953111,
+     "gen_time_p90": 1.381150479603093,
+     "gen_time_max": 3.2780490949953673,
+     "gen_time_max_case": "sector180_a0.60_n21k8"
+    },
+    "round": {
+     "cases": 167,
+     "status": {
+      "pass": 136,
+      "fail": 26,
+      "rejected": 5,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 162,
+     "failure_kinds": {
+      "conformance": 23,
+      "self merge": 4,
+      "backtrack": 3,
+      "self short": 1
+     },
+     "any_hard": 3,
+     "hard_or_clearance_class": 5,
+     "clearance_class_only": 2,
+     "conformance_only": 21,
+     "pitch_ratio_p10": 0.9007499133485427,
+     "pitch_ratio_median": 0.99551715152874,
+     "uncovered_median": 0.004047969453059493,
+     "uncovered_p90": 0.11504227799691151,
+     "gen_time_median": 4.898630685500393,
+     "gen_time_p90": 11.630777914510693,
+     "gen_time_max": 166.33951096200326,
+     "gen_time_max_case": "round_dense2500_a0.90_n16k5"
+    },
+    "concave": {
+     "cases": 132,
+     "status": {
+      "pass": 113,
+      "fail": 19,
+      "rejected": 0,
+      "error": 0,
+      "checker-error": 0,
+      "timeout": 0
+     },
+     "checked": 132,
+     "failure_kinds": {
+      "conformance": 15,
+      "backtrack": 3,
+      "self merge": 2,
+      "via offset": 2,
+      "self short": 1
+     },
+     "any_hard": 5,
+     "hard_or_clearance_class": 8,
+     "clearance_class_only": 3,
+     "conformance_only": 11,
+     "pitch_ratio_p10": 0.9931467537725835,
+     "pitch_ratio_median": 0.999999999960903,
+     "uncovered_median": 0.0017465350878657815,
+     "uncovered_p90": 0.022852843079745593,
+     "gen_time_median": 2.55867306899745,
+     "gen_time_p90": 4.834775857106434,
+     "gen_time_max": 8.037644833995728,
+     "gen_time_max_case": "concave_cshape_a0.6_n6_1layer"
+    }
+   },
+   "nonchecked_groups": [
+    {
+     "status": "rejected",
+     "message": "ValueError: Annular width (#) is too large. Must be less than #",
+     "count": 26,
+     "by_family": {
+      "main": 26
+     },
+     "thin": 0,
+     "examples": [
+      "star5_a0.90_n3k1",
+      "star5_a0.90_n5k3",
+      "star5_a0.90_n9k4",
+      "star5_a0.90_n16k5"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "ValueError: Given clearance of # mm is larger than the projected spiral pitch of # mm. Reduce clearance or increase the size of the coil.",
+     "count": 7,
+     "by_family": {
+      "main": 1,
+      "round": 3,
+      "concave": 3
+     },
+     "thin": 7,
+     "examples": [
+      "circle20x18_n16k5",
+      "round_ellipse10to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.30_n16k5",
+      "round_ellipse20to1_a0.60_n21k8"
+     ]
+    },
+    {
+     "status": "rejected",
+     "message": "OverlappingViasError: Overlapping vias: the vias at (#, #) and (#, #) are # mm apart, less than the via diameter of # mm, so they would short the arms they conn",
+     "count": 2,
+     "by_family": {
+      "round": 2
+     },
+     "thin": 1,
+     "examples": [
+      "round_ellipse10to1_a0.90_n16k5",
+      "round_ellipse20to1_a0.90_n16k5"
+     ]
+    }
+   ],
+   "timeouts": [],
+   "hard_declared": [
+    "concave_heart_a0.9_n13k4",
+    "concave_heartdeep_a0.9_n13k4",
+    "round_ellipse20to1_a0.60_n7k3_cw",
+    "round_ellipse20to1_a0.60_n8k3",
+    "round_ellipse20to1_a0.90_n5k1"
+   ],
+   "hard_cases": {
+    "round_ellipse20to1_a0.60_n8k3": [
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.90_n5k1": [
+     "backtrack"
+    ],
+    "round_ellipse20to1_a0.60_n7k3_cw": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.3_n13k4": [
+     "via offset"
+    ],
+    "concave_heartdeep_a0.9_n13k4": [
+     "backtrack"
+    ],
+    "concave_heartdeep_a0.6_n6_1layer": [
+     "backtrack"
+    ],
+    "concave_heart_a0.3_n5k1": [
+     "backtrack"
+    ],
+    "concave_heart_a0.6_n5k1": [
+     "backtrack"
+    ],
+    "concave_heart_a0.6_n8k3": [
+     "backtrack"
+    ],
+    "concave_heart_a0.9_n13k4": [
+     "backtrack"
+    ],
+    "concave_heart_a0.6_n7k3_cw": [
+     "via offset"
+    ]
+   },
+   "error_tracebacks": []
+  }
+ }
+}
