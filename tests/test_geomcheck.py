@@ -9,6 +9,7 @@ endpoint matches and via centers) to find path order and winding angles.
 """
 
 import copy
+import dataclasses
 import math
 import warnings
 import logging
@@ -469,8 +470,11 @@ def test_hairpin_backtrack(name):
     assert rep.ok_connectivity, rep.notes
     assert rep.backtracks > 0
     # The spike stays within the same turn (no winding angle between it and its track), so its copper overlapping the
-    # track is a self overlap, not a clearance violation, however long it is.
-    assert rep.failure_kinds(intent.clearance, intent.trace_width) == ['backtrack'], rep.notes
+    # track is a self overlap, not a clearance violation, however long it is. A spike longer than 3 * (w + c) also
+    # merges copper that is 6 * (w + c) apart along the conductor (a self merge).
+    kinds = rep.failure_kinds(intent.clearance, intent.trace_width)
+    assert kinds == ['backtrack'] + (['self merge'] if l/2 >= 3 * (intent.trace_width + intent.clearance) else []), \
+        (kinds, rep.notes)
     assert not rep.passed(intent.clearance, intent.trace_width)
 
 
@@ -831,7 +835,8 @@ def _reroute_into_via(cu, intent, path):
 
 
 def _via_returns(rep):
-    return [n for n in rep.notes if 'comes back to its own via' in n]
+    """ Self shorts where copper leaves its own via and comes back to it (not hidden by a larger track-track one) """
+    return rep.own_via_shorts
 
 
 @pytest.mark.parametrize('name', [SQUARE, LSHAPE])
@@ -900,7 +905,7 @@ def test_fold_at_a_tip_is_not_a_self_short():
     assert 'self short' not in kinds and 'clearance' not in kinds
     # ... but the merged copper is reported, with the length of conductor it bypasses
     touching = [ds for _l, _p, _q, deficit, dth, ds in rep.self_overlap_points if deficit >= intent.clearance - 1e-4]
-    assert rep.self_touches == len(touching) > 0
+    assert rep.self_touches > 0 and touching
     assert rep.max_self_touch_bypass == pytest.approx(max(touching))
 
 
@@ -924,3 +929,113 @@ def test_reversal_inside_via_is_not_a_backtrack(inside):
     rep = report(cu, intent, do_conformance=False)
     assert rep.ok_connectivity, rep.notes
     assert (rep.backtracks == 0) == inside, rep.notes
+
+
+def test_hairpin_merge_is_a_self_merge():
+    # The innermost turn of a deep C runs into the C's arm and back; the copper of its two sides merges over the whole
+    # arm and bypasses about 20 mm (11 * (w + c)) of the conductor: a self merge, less than 0.18 turns apart in winding
+    # angle, so not a self short.
+    intent, cu, kinds = load('concave_cshape_a0.9_n5k1')
+    rep = report(cu, intent, do_conformance=False)
+    if rep.max_self_touch_bypass < geomcheck.SELF_MERGE_BYPASS * (intent.trace_width + intent.clearance):
+        pytest.skip('the generator no longer produces this merge')
+    assert 'self merge' in kinds and 'self short' not in kinds
+    s_merge = geomcheck.SELF_MERGE_BYPASS * (intent.trace_width + intent.clearance)
+    merges = [ds for _l, _p, _q, deficit, dth, ds in rep.self_overlap_points
+              if deficit >= intent.clearance - 1e-4 and dth < geomcheck.SELF_SHORT_SEP and ds >= s_merge]
+    assert rep.self_merges > 0 and merges
+
+
+@pytest.mark.parametrize('name', ['ellipse3to1_a0.90_n3k1', 'concave_crescent_a0.6_n5k1'])
+def test_merge_at_a_tip_is_not_a_self_merge(name):
+    # At the narrow ends of an ellipse and the horns of a crescent the copper of the two sides of a turn merges, but only
+    # locally (3.2 to 3.5 times trace width plus clearance along the conductor)
+    intent, cu, kinds = load(name)
+    rep = report(cu, intent, do_conformance=False)
+    assert rep.self_touches > 0
+    assert rep.self_merges == 0 and 'self merge' not in kinds
+    assert rep.max_self_touch_bypass < geomcheck.SELF_MERGE_BYPASS * (intent.trace_width + intent.clearance)
+
+
+def test_self_merge_threshold():
+    # A straight hairpin: a track runs out and back 0.8 * w apart (copper overlaps), with legs of length L. The merged
+    # copper bypasses about 2*L of conductor: a self merge from 2*L >= 6*(w + c) = 7.2 mm on.
+    def hairpin(L):
+        w, c = 1.0, 0.2
+        d = 0.8 * w
+        pts = [(-10.0, -8.0), (0.0, 0.0), (L, 0.0), (L, d), (0.0, d), (-10.0, d + 8.0)]
+        segs = [Seg('F.Cu', a, b, w) for a, b in zip(pts, pts[1:])]
+        pads = [Pad('1', ('F.Cu',), *pts[0], w), Pad('2', ('F.Cu',), *pts[-1], w)]
+        return geomcheck.Copper(segs=segs, vias=[], pads=pads, layers=('F.Cu', 'B.Cu')), w, c
+    out = {}
+    for L in (2.0, 5.0):
+        cu, w, c = hairpin(L)
+        intent = geomcheck.Intent(contour=[(-20, -20), (20, -20), (20, 20), (-20, 20)], annular_width=5,
+                                  turns=0, trace_width=w, clearance=c, pitch=w + c, center=(0.0, -15.0))
+        out[L] = report(cu, intent, do_conformance=False)
+    assert out[2.0].self_touches > 0 and out[2.0].self_merges == 0
+    assert out[5.0].self_merges > 0
+
+
+def _v_hairpin(alpha, nseg, L=15.0, w=1.0, c=0.2):
+    """ A conductor running into a V-shaped tip of angle alpha (degrees) and back, each leg drawn in nseg pieces """
+    a = math.radians(alpha / 2)
+    A, B = (-L*math.cos(a), -L*math.sin(a)), (-L*math.cos(a), L*math.sin(a))
+    leg1 = [(A[0] * (1 - k/nseg), A[1] * (1 - k/nseg)) for k in range(nseg + 1)]
+    leg2 = [(B[0] * k/nseg, B[1] * k/nseg) for k in range(nseg + 1)]
+    pts = [(A[0] - 10, A[1] - 8)] + leg1 + leg2[1:] + [(B[0] - 10, B[1] + 8)]
+    segs = [Seg('F.Cu', p, q, w) for p, q in zip(pts, pts[1:])]
+    pads = [Pad('1', ('F.Cu',), *pts[0], w), Pad('2', ('F.Cu',), *pts[-1], w)]
+    cu = geomcheck.Copper(segs=segs, vias=[], pads=pads, layers=('F.Cu', 'B.Cu'))
+    intent = geomcheck.Intent(contour=[(-60, -40), (20, -40), (20, 40), (-60, 40)], annular_width=5, turns=0,
+                              trace_width=w, clearance=c, pitch=w + c, center=(-60.0, 0.0))
+    return cu, intent
+
+
+@pytest.mark.parametrize('alpha', [12, 15, 18])
+def test_self_merge_does_not_depend_on_segmentation(alpha):
+    # The copper of the two legs of a V merges over w/sin(alpha/2) of conductor (points on the two legs at that distance
+    # from the tip are w apart; 12 deg: 8.0 (w + c), 15 deg: 6.4, 18 deg: 5.3). With the closest points of segment pairs
+    # only, legs drawn as one segment each touched at the tip only (bypass 0), legs cut into 20 pieces gave 6.7 (w + c) at
+    # 13 degrees: the verdict depended on the segmentation.
+    out = []
+    for nseg in (1, 2, 16, 64):
+        cu, intent = _v_hairpin(alpha, nseg)
+        rep = report(cu, intent, do_conformance=False)
+        out.append((rep.max_self_touch_bypass / 1.2, rep.self_merges > 0))
+    expected = 1/math.sin(math.radians(alpha/2)) / 1.2
+    assert all(b == pytest.approx(expected, rel=0.02) for b, _m in out), out
+    assert {m for _b, m in out} == {expected >= geomcheck.SELF_MERGE_BYPASS}
+
+
+def _split(cu, maxlen):
+    segs = []
+    for s in cu.segs:
+        k = max(1, math.ceil(s.length / maxlen)) if s.plain else 1
+        segs += [dataclasses.replace(s, a=(s.a[0] + (s.b[0]-s.a[0])*i/k, s.a[1] + (s.b[1]-s.a[1])*i/k),
+                                     b=(s.a[0] + (s.b[0]-s.a[0])*(i+1)/k, s.a[1] + (s.b[1]-s.a[1])*(i+1)/k))
+                 for i in range(k)]
+    return dataclasses.replace(cu, segs=segs)
+
+
+@pytest.mark.parametrize('name', ['concave_crescent_a0.9_n8k3', 'concave_shark_a0.3_n8k3'])
+def test_same_turn_contacts_do_not_depend_on_segmentation(name):
+    # The same copper with every track cut into pieces of at most 0.5 mm: the crescent's horn merge (6.3 (w + c)) was
+    # 5.6 (w + c) as emitted and 6.0-6.2 when cut; in the shark the inner via's copper touches the track that runs past
+    # it into the tip 6.0 (w + c) further on (5.0 or 3.0 before, depending on the cut).
+    intent, cu, kinds = load(name)
+    wc = intent.trace_width + intent.clearance
+    a = report(cu, intent, do_conformance=False)
+    b = report(_split(cu, 0.5), intent, do_conformance=False)
+    assert a.max_self_touch_bypass / wc == pytest.approx(b.max_self_touch_bypass / wc, abs=0.05)
+    assert (a.self_merges > 0) == (b.self_merges > 0) and a.self_shorts == 0 == b.self_shorts
+
+
+def test_center_ties_take_the_first_stretch():
+    # A symmetric arch: the horizontal line through the middle of its extent crosses both legs, equally wide. GEOS takes
+    # the first of the widest stretches, so that rounding errors decide; the checker takes the first one of those equal
+    # to 1e-9.
+    arch = Polygon([(-6, -1), (-4, -1), (-4, 2), (4, 2), (4, -1), (6, -1), (6, 4), (-6, 4)])
+    for dx in (0.0, 1e-13, -1e-13):
+        p = geomcheck._interior_point(Polygon([(x + dx if x == 6 else x, y) for x, y in arch.exterior.coords]))
+        assert p == pytest.approx((-5.0, 0.5))

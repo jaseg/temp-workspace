@@ -239,10 +239,11 @@ def _spec(name, shape, turns, twists, layers=2, clockwise=False, clearance=0.15,
 # the intended annulus; 'contour': the outer turn stays more than 1.5 mm from the outline somewhere).
 KNOWN_ISSUES = {
     'heart': dict(
-        kinds=('backtrack', 'overshoot', 'contour', 'via offset', 'clearance', 'via clearance'),
+        kinds=('backtrack', 'overshoot', 'contour', 'via offset', 'clearance', 'via clearance', 'self merge'),
         reason='sharp reflex cusp: its mitered offset vertex moves at 1/sin(theta/2) per unit depth, so every turn runs '
                'into a zero-width spike deep inside the outline and back (backtracks, copper far deeper than the '
-               'annular width) and the skeleton splits at 1.6 mm of 11.5 mm inscribed radius'),
+               'annular width, the copper of the spike merging) and the skeleton splits at 1.6 mm of 11.5 mm '
+               'inscribed radius'),
 }
 
 
@@ -252,10 +253,6 @@ CASE_ISSUES = {
     # reach; in the single-layer shark only with the start vertex of the SVG import, which puts the arm start there.
     **{name: dict(kinds=('contour',), reason='outer turn does not reach a sharp convex tip')
        for name in ('concave_crescent_a0.3_n13k4', 'concave_crescent_a0.6_n13k4', 'concave_sharksvg_a0.6_n6_1layer')},
-    # The trace (3.6 mm) wraps around an inner hole smaller than itself and touches itself 0.21 turns further on,
-    # without a warning from the generator (defect of kicoil.geometry, see the report)
-    'concave_starround_a0.9_n5k1': dict(kinds=('self short',), reason='unwarned self short around the small inner '
-                                        'hole of a deep star'),
 }
 
 

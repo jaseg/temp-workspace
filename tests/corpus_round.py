@@ -208,15 +208,11 @@ KNOWN_FAILURES = {
     # spine by running back over the arm; it now ends where it passes the via, see test_layout.test_arm_ends_at_via.)
     'slender': {'backtrack': 'a turn reverses at a sharp tip of a deeper offset of the outline'},
 }
-# Per case. At 90 % of a slender ellipse with 5 arms the inner vias overlap each other (they used to coincide at the end
-# of the skeleton): kicoil.geometry rejects these, see test_layout.test_overlapping_vias_rejected.
-# At 90 % of blob2 with 5 turns (2 layers, 6.4 mm trace) the innermost turn wraps around an inner contour much smaller
-# than the trace and its copper touches itself 0.4 turns further on. kicoil.geometry only warns about folds whose pieces
-# are far apart along the conductor (pi*d plus the pitch, or 4*(trace width + clearance)), so this one goes unwarned: a defect of the base
-# layout, the same as concave_starround_a0.9_n5k1 in corpus_concave.CASE_ISSUES (shown by the checker since it reports
-# self shorts).
-_UNWARNED_SELF_SHORT = {'self short': 'unwarned self short around the small inner contour of a deep annulus'}
-CASE_KNOWN_FAILURES = {'round_blob2_a0.90_n5k1': _UNWARNED_SELF_SHORT}
+# Per case: none at present. The 90 % slender ellipses with 5 arms used to place inner vias on top of each other;
+# kicoil.geometry now rejects these (test_layout.test_overlapping_vias_rejected). The unwarned self short of blob2 at
+# 90 % (the innermost turn wrapping around its small inner contour) is now warned (test_layout, wraps), so its xfail
+# comes from the warning.
+CASE_KNOWN_FAILURES = {}
 
 
 def cases():

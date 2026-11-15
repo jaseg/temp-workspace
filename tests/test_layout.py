@@ -14,10 +14,10 @@ import geomcheck
 from run_corpus import build_model
 
 
-def layout(spec, caught=None):
+def layout(spec, caught=None, impl='kicoil'):
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter('always')
-        model = build_model(spec)
+        model = build_model(spec, impl)
         fp = model.render_footprint()
     if caught is not None:
         caught.extend(str(x.message) for x in w)
@@ -28,7 +28,7 @@ def layout(spec, caught=None):
 
 FOLD_WARNING = 'folds onto itself'
 # Failure kinds that a warning from the generator can explain
-WARNED_KINDS = ('clearance', 'via clearance', 'self short')
+WARNED_KINDS = ('clearance', 'via clearance', 'self short', 'self merge')
 
 
 def _cases(request_full):
@@ -992,7 +992,8 @@ def _polygon_case(name, impl='kicoil', degrees=0, **kw):
 
 
 def _via_returns(rep):
-    return [n for n in rep.notes if 'comes back to its own via' in n]
+    """ Self shorts where copper leaves its own via and comes back to it (not hidden by a larger track-track one) """
+    return rep.own_via_shorts
 
 
 def _own_turn_warned(caught):
@@ -1006,7 +1007,7 @@ def test_via_overlapping_its_own_turn(degrees):
     # self short, and the generator warns. Neither depends on the orientation of the outline.
     model, intent, rep, caught = _polygon_case('triangle_a0.96_n4k1', degrees=degrees)
     assert 'self short' in rep.failure_kinds(intent.clearance, intent.trace_width)
-    assert _via_returns(rep) and rep.worst_self_short == pytest.approx(0.580, abs=0.01), rep.notes
+    assert _via_returns(rep) and rep.worst_own_via_short == pytest.approx(0.580, abs=0.01), rep.notes
     assert _own_turn_warned(caught)
 
 
@@ -1016,15 +1017,20 @@ def test_via_arrival_is_not_a_self_short(name, impl):
     # 90 % annular width, 3 turns: the wide trace (7.2, 8.5 and 6.6 mm) curves tightly around the small inner contour
     # into its via (as wide as the trace), and its copper overlaps the via for 7 to 10 mm back along the conductor
     # (0.18 to 0.42 turns around the center). Followed from the via, that copper never leaves the via's reach: it is the
-    # conductor's own arrival, a single piece of copper that the via adds nothing to. It is not a self short.
+    # conductor's own arrival, a single piece of copper that the via adds nothing to. It is not a self short of the via.
+    # (Elsewhere the innermost turn of these cases wraps around the small inner contour, and its track copper touches
+    # itself 0.2-0.4 turns further on: a track-track self short, which the generator warns about as a wrap.)
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter('always')
         model = build_model(spec(name), impl)
         fp = model.render_footprint()
     intent = geomcheck.intent_from_model(model)
     rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
-    assert rep.self_shorts == 0 and not _via_returns(rep), rep.notes
-    assert not _own_turn_warned([str(m.message) for m in w])
+    caught = [str(m.message) for m in w]
+    assert not _via_returns(rep), rep.notes
+    assert not _own_turn_warned(caught)
+    if rep.self_shorts:
+        assert any(WRAP_WARNING in m for m in caught), (rep.notes, caught)
 
 
 @pytest.mark.parametrize('name, impl, degrees, kw', [
@@ -1043,3 +1049,142 @@ def test_via_self_short_is_warned(name, impl, degrees, kw):
         assert _own_turn_warned(caught), (rep.notes, caught)
 
 
+def _fold_warnings(case, impl='kicoil'):
+    """ (model, fold warnings) of a corpus case (by name) or a spec """
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        model = build_model(spec(case) if isinstance(case, str) else case, impl)
+    return model, [str(x.message) for x in w if FOLD_WARNING in str(x.message)]
+
+
+MERGE_WARNING = 'touches itself where the turn runs into'
+WRAP_WARNING = 'wraps around a hole'
+
+
+def _tri15(f):
+    # An isosceles triangle with a 15 degree apex, 50 mm tall, annular width f * split depth, 13 turns, 4 twists
+    import corpus_concave as cc
+    from shapely.geometry import Polygon
+    b = 2*50*math.tan(math.radians(7.5))
+    poly = cc._ccw_coords(cc._centered(Polygon([(0, 50), (-b/2, 0), (b/2, 0)])))
+    return dict(name=f'tri15_f{f}', shape='polygon', polygon=poly, annular_width=round(f*cc.split_depth(poly), 4),
+                turns=13, twists=4, layers=2, clockwise=False, clearance=0.15, trace_width=None, tags=[])
+
+
+def _sector90(f, turns):
+    # corpus case sector90_a0.90_n3k1 with the annular width at f instead of 0.9 of its maximum
+    s = dict(spec('sector90_a0.90_n3k1'), turns=turns, twists=1, tags=[])
+    s['annular_width'] = round(s['annular_width'] * f / 0.9, 4)
+    s['name'] = f'sector90_f{f}_n{turns}k1'
+    return s
+
+
+@pytest.mark.parametrize('case', ['concave_crescent_a0.9_n8k3', 'concave_cshape_a0.9_n5k1'])
+def test_merge_is_measured_and_warned_like_the_checker(case):
+    # The two sides of a hairpin merge: at the crescent's horns over 6.3 (w + c) of conductor, over the whole arm of the
+    # C (11.5). The generator measures the bypassed conductor as the checker does (center lines sampled at w/4) and
+    # warns from MERGE_WARN_BYPASS (5) times w + c on. Before, it measured between the ends of pieces up to 4 pitches
+    # long and missed some merges altogether.
+    caught = []
+    model, intent, rep = layout(spec(case), caught)
+    assert 'self merge' in rep.failure_kinds(intent.clearance, intent.trace_width)
+    assert any(MERGE_WARNING in m for m in caught), caught
+    assert model.max_merge_bypass == pytest.approx(rep.max_self_touch_bypass, rel=0.05)
+
+
+@pytest.mark.parametrize('f', [0.70, 0.72, 0.75, 0.78])
+def test_tip_merge_at_the_inner_via_is_gone(f):
+    # Triangle with a 15 degree apex, 13 turns, 4 twists: the innermost arm used to run past its inner via into the
+    # apex and its copper merged with the via's over 6.6-7.2 (w + c), a self merge. The arm now ends where it passes
+    # its via (geometry._trim_arm_at_via), so the hairpin at the apex merges only locally (below 5 (w + c)); generator
+    # and checker still measure it alike, and neither warns nor fails a self merge.
+    caught = []
+    model, intent, rep = layout(_tri15(f), caught)
+    wc = model.trace_width + model.clearance
+    assert 'self merge' not in rep.failure_kinds(intent.clearance, intent.trace_width)
+    assert not any(MERGE_WARNING in m for m in caught), caught
+    assert rep.max_self_touch_bypass < 5 * wc
+    assert model.max_merge_bypass == pytest.approx(rep.max_self_touch_bypass, abs=0.2 * wc)
+    if 'self short' in rep.failure_kinds(intent.clearance, intent.trace_width):
+        # (the copper comes back to the via it now ends at: warned)
+        assert _own_turn_warned(caught), (rep.notes, caught)
+
+
+@pytest.mark.parametrize('name', ['concave_crescent_a0.6_n5k1', 'triangle_a0.60_n5k1', 'star5_a0.60_n5k1',
+                                  'circle30x6_n5k1', 'square40_a0.30_n8k3'])
+def test_local_merges_and_ordinary_corners_are_not_warned(name):
+    # The crescent's horns merge locally (3.9 (w + c) of conductor); corners wider than about 23 degrees merge over less
+    # than 5 (w + c); a turn bending around a hole is one bend (pieces less than pi/2 * (w + c) apart along the conductor)
+    model, folds = _fold_warnings(name)
+    assert not [m for m in folds if MERGE_WARNING in m or WRAP_WARNING in m], folds
+    from kicoil import geometry
+    assert model.max_merge_bypass < geometry.MERGE_WARN_BYPASS * (model.trace_width + model.clearance)
+
+
+@pytest.mark.parametrize('name, width', [('circle30x6_n5k1', 4.590), ('hexagon_a0.60_n5k1', 3.867)])
+def test_neighboring_turns_are_not_a_wrap(name, width):
+    # A given trace width that leaves the clearance only to rounding (w + c exceeds the pitch by up to 0.5 um): the
+    # wrap measure once compared pieces one turn apart, too, and reported the ordinary turn spacing as a wrap
+    model, folds = _fold_warnings(dict(spec(name), trace_width=width))
+    assert not [m for m in folds if WRAP_WARNING in m], folds
+    assert model.min_wrap_spacing == math.inf
+
+
+@pytest.mark.parametrize('case, impl', [('concave_starround_a0.9_n5k1', 'kicoil'),
+                                        ('concave_starround_a0.9_n5k1', 'geometry_alt_cornerflat'),
+                                        ('round_blob2_a0.90_n5k1', 'kicoil'),
+                                        ('sector90_0.95_2', 'kicoil'), ('sector90_0.95_3', 'kicoil'),
+                                        ('sector90_0.95_3', 'geometry_alt_cornerflat')])
+def test_wrap_around_a_small_hole_is_warned(case, impl):
+    # The innermost turn wraps around a hole smaller than the trace (star: 3.6 mm trace, blob: 6.4 mm, sector: 5.7 to 8.7
+    # mm) and its copper touches itself 0.2 to 0.4 turns further on, which the checker reports as a self short. Before,
+    # neither rule saw it (pieces less than half a turn apart in the spiral's parameter angle, and less than pi*d apart
+    # along the conductor). The sector's hole is an arch whose center the checker takes on one of its legs; around the
+    # deepest skeleton node the short was only 0.11 turns long.
+    if case.startswith('sector90'):
+        _, f, n = case.split('_')
+        s = _sector90(float(f), int(n))
+    else:
+        s = spec(case)
+    caught = []
+    model, intent, rep = layout(s, caught, impl)
+    assert rep.self_shorts > 0
+    assert any(WRAP_WARNING in m and FOLD_WARNING in m for m in caught), caught
+    assert model.min_wrap_spacing < model.trace_width
+
+
+@pytest.mark.parametrize('case', ['square40_a0.30_n8k3', 'triangle_a0.90_n3k1', 'concave_cshape_a0.9_n5k1',
+                                  'concave_starround_a0.9_n5k1', 'sector90_0.95_2', 'sector90_0.92_2'])
+def test_winding_center_is_the_checkers(case):
+    # Pieces of one turn are told apart by winding angle around the center the checker uses (at 0.95 the sector's
+    # inset at 1.02 times the annular width lies beyond the depth at which the offset outline splits)
+    if case.startswith('sector90'):
+        _, f, n = case.split('_')
+        s = _sector90(float(f), int(n))
+    else:
+        s = spec(case)
+    model, _folds = _fold_warnings(s)
+    assert math.dist(model.shape.winding_center, geomcheck.intent_from_model(model).center) < 1e-6
+
+
+@pytest.mark.parametrize('f', [1.0, 1.01])
+def test_wrap_measurement_uses_the_winding_angle(f):
+    # The noisy circle's angle reference stands still over runs of short edges and then jumps by 0.19 turns within
+    # 2.6 mm: in the spiral's parameter angle, the outer turn near (5.0, 18.6) seems to come back to itself. In winding
+    # angle it does not (and at 1 % more annular width neither).
+    s = dict(spec('round_noisy_l_a0.90_n5k1'))
+    s['annular_width'] *= f
+    model, _folds = _fold_warnings(s)
+    loc = model.min_wrap_location
+    assert loc is None or math.dist(loc, (5.0, 18.6)) > 5
+
+
+def test_local_merge_at_a_sharp_tip_is_logged(caplog):
+    # The crescent's horns: the copper of one turn merges over 3.9 (w + c) of conductor (0.86 mm overlap at
+    # (21.6, -17.5)). That is local (no fold warning, the checker passes it), but the generator measures and logs it.
+    caplog.set_level('WARNING', logger='kicoil')
+    model, folds = _fold_warnings('concave_crescent_a0.6_n5k1')
+    wc = model.trace_width + model.clearance
+    assert 3 * wc <= model.max_merge_bypass < 5 * wc
+    assert any('merges where the turn runs into a sharp tip' in r.getMessage() for r in caplog.records)
+    assert not [m for m in folds if MERGE_WARNING in m]
