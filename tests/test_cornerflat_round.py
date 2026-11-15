@@ -5,6 +5,7 @@ import random
 import time
 import warnings
 
+import numpy as np
 import pytest
 
 import corpus
@@ -89,41 +90,91 @@ def test_cornerflat_simplifies_the_outline_once(monkeypatch):
     assert calls == [] and sk.poly == sk.outline == sk.skeleton_poly
 
 
-def _naive_spacing(arms, search_radius, min_path_separation):
-    from kicoil.geometry import _split_by_angle, _seg_seg_distance
+def _closest(p1, p2, q1, q2):
+    """ Distance and closest points of segments p1p2 and q1q2 (scalar reference) """
+    from kicoil.geometry import _seg_seg_distance
+
+    def foot(p, a, b):
+        dx, dy = b[0]-a[0], b[1]-a[1]
+        l2 = dx*dx + dy*dy
+        t = 0.0 if l2 == 0 else max(0.0, min(1.0, ((p[0]-a[0])*dx + (p[1]-a[1])*dy) / l2))
+        return (a[0] + t*dx, a[1] + t*dy)
+    if _seg_seg_distance(p1, p2, q1, q2) == 0.0:
+        # crossing: the intersection point
+        dx1, dy1, dx2, dy2 = p2[0]-p1[0], p2[1]-p1[1], q2[0]-q1[0], q2[1]-q1[1]
+        den = dx1*dy2 - dy1*dx2
+        if den != 0:
+            t = ((q1[0]-p1[0])*dy2 - (q1[1]-p1[1])*dx2) / den
+            x = (p1[0] + t*dx1, p1[1] + t*dy1)
+            return 0.0, x, x
+    cands = [(p1, foot(p1, q1, q2)), (p2, foot(p2, q1, q2)), (foot(q1, p1, p2), q1), (foot(q2, p1, p2), q2)]
+    x, y = min(cands, key=lambda c: math.dist(*c))
+    return math.dist(x, y), x, y
+
+
+def _wind(a, b, c):
+    """ Signed angle from a to b around c, in revolutions """
+    a1 = math.atan2(a[1] - c[1], a[0] - c[0])
+    b1 = math.atan2(b[1] - c[1], b[0] - c[0])
+    return ((b1 - a1 + math.pi) % (2*math.pi) - math.pi) / (2*math.pi)
+
+
+def _naive_spacing(arms, search_radius, centers):
+    """ Brute force version of geometry_alt_cornerflat.min_turn_spacing (same pieces, every pair) """
+    from kicoil.geometry_alt_cornerflat import _split_pieces
     segs = []
+    off = 0
     for arm_idx, (points, angles) in enumerate(arms):
         s = 0.0
-        for q1, q2, u1, u2 in _split_by_angle(points, angles, 0.05):
+        w = [math.atan2(points[0][1] - c[1], points[0][0] - c[0]) / (2*math.pi) for c in centers or ()]
+        for q1, q2, u1, u2, parent in zip(*_split_pieces(points, angles, 0.05)):
+            q1, q2 = tuple(q1), tuple(q2)
             l = math.dist(q1, q2)
-            segs.append((q1, q2, arm_idx, min(u1, u2), max(u1, u2), s, s + l))
+            segs.append((q1, q2, arm_idx, min(u1, u2), max(u1, u2), list(w), s, off + parent))
+            w = [wi + _wind(q1, q2, c) for wi, c in zip(w, centers or ())]
             s += l
-    best, folds = search_radius, []
-    for i, (p1, p2, arm, t_lo, t_hi, s_lo, s_hi) in enumerate(segs):
-        for q1, q2, arm_j, u_lo, u_hi, r_lo, r_hi in segs[i+1:]:
-            d = _seg_seg_distance(p1, p2, q1, q2)
+        off += len(points) - 1
+    best, same = search_radius, {}
+    for i, (p1, p2, arm, t_lo, t_hi, w1, s1, g1) in enumerate(segs):
+        for q1, q2, arm_j, u_lo, u_hi, w2, s2, g2 in segs[i+1:]:
             if arm_j == arm and max(u_lo - t_hi, t_lo - u_hi) < 0.5:
-                if max(r_lo - s_hi, s_lo - r_hi) > min_path_separation and d < search_radius:
-                    folds.append(d)
+                if not centers:
+                    continue
+                d, x, y = _closest(p1, p2, q1, q2)
+                if d >= search_radius:
+                    continue
+                wsep = max(abs(a + _wind(p1, x, c) - b - _wind(q1, y, c)) for a, b, c in zip(w1, w2, centers))
+                ds = abs(s1 + math.dist(p1, x) - s2 - math.dist(q1, y))
+                key = (g1, g2)
+                if key not in same or d < same[key][0]:
+                    same[key] = (d, wsep, ds)
                 continue
-            best = min(best, d)
-    return best, sorted(folds)
+            best = min(best, _closest(p1, p2, q1, q2)[0])
+    return best, sorted(same.values())
 
 
-@pytest.mark.parametrize('name', ['star5_a0.60_n5k1', 'round_poly16_a0.90_n5k1', 'sector90_a0.90_n3k1'])
+@pytest.mark.parametrize('name', ['star5_a0.60_n5k1', 'round_poly16_a0.90_n5k1', 'sector90_a0.90_n3k1',
+                                  'round_blob2_a0.90_n5k1', 'octagon_a0.90_n3k1'])
 def test_cornerflat_vectorized_spacing_matches_brute_force(name):
-    from kicoil.geometry_alt_cornerflat import min_turn_spacing
+    from kicoil.geometry_alt_cornerflat import min_turn_spacing, checker_centers
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         model = build_model(next(c for c in corpus.corpus('full') if c['name'] == name), 'geometry_alt_cornerflat')
     radius = 1.5 * model.spiral_pitch
+    centers = checker_centers(model.shape)
     for layer_arms in model.spiral_center_lines():
         if layer_arms:
-            for min_path in (math.inf, 2 * model.spiral_pitch):
-                d, _where, folds = min_turn_spacing(layer_arms, radius, min_path_separation=min_path)
-                nd, nfolds = _naive_spacing(layer_arms, radius, min_path)
+            for c in (None, centers):
+                d, _where, same = min_turn_spacing(layer_arms, radius, centers=c)
+                nd, nsame = _naive_spacing(layer_arms, radius, c)
                 assert d == pytest.approx(nd, abs=1e-12)
-                assert sorted(folds[0]) == pytest.approx(nfolds, abs=1e-12)
+                got = sorted(zip(*(x.tolist() for x in same[:3])))
+                assert len(got) == len(nsame)
+                # (closest points of nearly parallel pieces are not unique: compare distances exactly, the separations
+                # loosely)
+                assert [g[0] for g in got] == pytest.approx([n[0] for n in nsame], abs=1e-9)
+                if got:
+                    assert np.array(got)[:, 1:] == pytest.approx(np.array(nsame)[:, 1:], abs=0.02)
 
 
 def test_cornerflat_no_nanometer_pieces_near_vias(monkeypatch):
@@ -221,3 +272,136 @@ def test_noisy_round_shapes_use_the_skeleton_depth():
     from kicoil.skeletonator import Skeletonator
     for name, depth in corpus_round.SKELETON_DEPTH.items():
         assert Skeletonator(corpus_round.shapes()[name][0]).max_depth == pytest.approx(depth, abs=1e-3)
+
+
+def _cornerflat_case(name):
+    import geomcheck
+    spec = next(c for c in corpus.corpus('full') if c['name'] == name)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        model = build_model(spec, 'geometry_alt_cornerflat')
+        fp = model.render_footprint(circle_segments=64)
+    intent = geomcheck.intent_from_model(model)
+    rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
+    return model, rep, rep.failure_kinds(intent.clearance, intent.trace_width), [str(w.message) for w in caught]
+
+
+@pytest.mark.parametrize('name', ['round_ellipse3to1_a0.90_n5k1', 'round_ellipse10to1_a0.90_n5k1',
+                                  'concave_crescent_a0.9_n5k1'])
+def test_cornerflat_thin_inner_contour_folds_do_not_limit_the_spacing(name):
+    # The innermost turn runs into the tip of the thin inner contour and comes back along its other side, a few
+    # hundredths of a turn further on in winding angle: one turn folding onto itself, which the checker accepts (a self
+    # overlap). cornerflat used to count pieces of one arm far apart along the conductor as different turns and got a
+    # pitch ratio of 0.84 (ellipses) and 0.74 (crescent), failing conformance; the fixed layout gets 0.997 and 1.0.
+    model, rep, kinds, caught = _cornerflat_case(name)
+    assert kinds == [], rep.notes[:5]
+    assert (model.trace_width + model.clearance) / model.spiral_pitch > 0.99
+    assert rep.self_overlaps > 0 and rep.self_shorts == 0
+    # ... and warns about the fold, like the fixed layout (D32)
+    assert any('the copper of one turn' in w for w in caught), caught
+
+
+@pytest.mark.parametrize('name', ['round_blob2_a0.90_n5k1', 'round_noisy_l_a0.90_n5k1', 'sector90_a0.90_n3k1',
+                                  'sector180_a0.90_n3k1', 'rstar0_a0.90_n3k1'])
+def test_cornerflat_turn_wrapping_a_small_hole_does_not_touch_itself(name):
+    # A trace about as wide as the pitch wraps around an inner contour smaller than itself and touched itself 0.19 to
+    # 0.26 turns further on (a self short): pieces of one arm less than half a revolution apart in the arm's angle were
+    # never compared unless they were far apart along the conductor.
+    model, rep, kinds, _caught = _cornerflat_case(name)
+    assert rep.self_shorts == 0, rep.notes[:5]
+    assert not [k for k in kinds if k != 'conformance'], rep.notes[:5]
+
+
+def _variant(name, rotate=0.0, shift=(0.0, 0.0), **changes):
+    """ A corpus case with its outline rotated about the origin and shifted, and other spec entries changed """
+    spec = dict(next(c for c in corpus.corpus('full') if c['name'] == name))
+    c, s = math.cos(math.radians(rotate)), math.sin(math.radians(rotate))
+    spec['polygon'] = [(c*x - s*y + shift[0], s*x + c*y + shift[1]) for x, y in spec['polygon']]
+    spec.update(changes)
+    spec['name'] = f'{name}@r{rotate}_t{shift[0]},{shift[1]}'
+    return spec
+
+
+def _check_spec(spec):
+    import geomcheck
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        model = build_model(spec, 'geometry_alt_cornerflat')
+        fp = model.render_footprint(circle_segments=64)
+    intent = geomcheck.intent_from_model(model)
+    rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
+    return model, rep, rep.failure_kinds(intent.clearance, intent.trace_width), [str(w.message) for w in caught]
+
+
+@pytest.mark.parametrize('name,rotate,shift', [
+    ('concave_crescent_a0.9_n5k1', 270, (0, 0)), ('concave_crescent_a0.9_n5k1', 90, (0, 0)),
+    ('cres16_12_a0.93_n5k1', 90, (0, 0)), ('cres17_10_a0.93_n5k1', 90, (0, 0)), ('sector180_a0.90_n3k1', 0, (0.01, 0)),
+    ('sector180_a0.90_n3k1', 0, (0, 0)), ('octagon_a0.90_n3k1', 0, (0.01, 0.003))])
+def test_cornerflat_layout_does_not_depend_on_the_checker_center_tie(name, rotate, shift):
+    # The checker's center is the interior point of the inner contour: on a mirror symmetric hole (crescent, sector,
+    # octagon) two sections of the scan line are equally wide, and rounding decides which one it picks. The rotated
+    # crescent and the shifted sector180 got self shorts and clearance violations when the generator's center landed in
+    # the other one. The measurement now uses both.
+    if name.startswith('cres1'):
+        # other crescents than the corpus one (outer radius 22, inner radius r2 offset by off)
+        import corpus_concave
+        r2, off = (int(v) for v in name[4:].split('_')[:2])
+        poly = corpus_concave.crescent(22, r2, off)
+        c, s = math.cos(math.radians(rotate)), math.sin(math.radians(rotate))
+        poly = corpus._ccw([(c*x - s*y, s*x + c*y) for x, y in poly])
+        spec = corpus._spec(f'{name}@r{rotate}', 'polygon', 5, 1, polygon=poly,
+                            annular_width=round(0.93 * corpus.max_depth(poly), 4))
+    else:
+        spec = _variant(name, rotate, shift)
+    _model, rep, kinds, _caught = _check_spec(spec)
+    assert rep.self_shorts == 0 and not [k for k in kinds if k not in ('conformance', 'backtrack')], rep.notes[:5]
+
+
+@pytest.mark.parametrize('turns,twists', [(3, 1), (5, 1)])
+def test_cornerflat_keeps_the_checker_clean_layout_around_its_end_via(turns, twists):
+    # rconvex0 at 90 %: a 6-7 mm trace in a 2 mm hole, whose innermost track and end via overlap the track leading
+    # past them. The checker compares whole track segments (closest points), and the via with track of its own turn
+    # only from pi/2*(w + c) plus its radius along the conductor on, and accepts the layout. The measurement compared
+    # short pieces of the long segments and rejected it: at n3k1 the pitch ratio dropped from 0.969 to 0.852, at n5k1
+    # a passing layout (0.983) was replaced by a failing one (0.960) with same-turn contacts.
+    _model, rep, kinds, _caught = _check_spec(_variant('rconvex0_a0.90_n3k1', turns=turns, twists=twists))
+    assert rep.self_shorts == 0 and not [k for k in kinds if k != 'conformance'], rep.notes[:5]
+    assert (_model.trace_width + _model.clearance) / _model.spiral_pitch > (0.96 if turns == 3 else 0.98)
+    if turns == 5:
+        assert kinds == []
+
+
+def test_checker_centers_start_with_the_checker_center():
+    # The first center is the checker's own (geomcheck.intent_from_model), on every polygon case of the corpus
+    import types
+    import geomcheck
+    from shapely.geometry import Polygon
+    from kicoil.geometry_alt_cornerflat import interior_point, checker_centers
+    rng = random.Random(3)
+    for _ in range(50):
+        poly = corpus.random_starlike(12, 30, rng)
+        assert interior_point(poly) == pytest.approx(Polygon(poly).representative_point().coords[0], abs=1e-12)
+    cases = corpus.corpus('full')
+    for kind in corpus.EXTRA_FAMILIES:
+        cases += corpus.corpus(kind)
+    seen = 0
+    for spec in cases:
+        if spec.get('shape') != 'polygon' or not spec.get('polygon'):
+            continue
+        shape = types.SimpleNamespace(polygon=[tuple(p) for p in spec['polygon']], annular_width=spec['annular_width'])
+        model = types.SimpleNamespace(shape=shape, turns=spec['turns'], trace_width=1.0, clearance=0.1, clockwise=False)
+        want = geomcheck.intent_from_model(model).center
+        got = checker_centers(shape)
+        assert got[0] == pytest.approx(want, abs=1e-9), spec['name']
+        seen += 1
+    assert seen > 500
+
+
+def test_checker_centers_cover_mirrored_ties():
+    # A mirror symmetric hole has two equally wide sections: both centers are used
+    import types
+    from kicoil.geometry_alt_cornerflat import checker_centers
+    spec = next(c for c in corpus.corpus('full') if c['name'] == 'octagon_a0.90_n3k1')
+    shape = types.SimpleNamespace(polygon=[tuple(p) for p in spec['polygon']], annular_width=spec['annular_width'])
+    ys = sorted(round(c[1], 6) for c in checker_centers(shape))
+    assert len(ys) == 2 and ys[0] == pytest.approx(-ys[1]) and ys[1] > 0.1

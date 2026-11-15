@@ -80,7 +80,7 @@ cases: sector 90/180, square, D shape, random convex, star6, triangle) touches i
 lies in the middle of that gap. Before, with half a turn as the only threshold, the same wrap passed in one case
 (`sector180_a0.90_n3k1`, contacts of 9-15 c at 0.26-0.46 turns) and failed in another (`octagon_a0.90_n3k1`, 2.4 c at
 about 0.5 turns). Self shorts are also checked between a via or pad and track of its own turn. On the full corpus they fail
-`sector180_a0.90_n3k1` with every implementation, and with `geometry_alt_jog` also `rect40x20_a0.90_n3k1` and
+`sector180_a0.90_n3k1` with every implementation except `geometry_alt_cornerflat`, and with `geometry_alt_jog` also `rect40x20_a0.90_n3k1` and
 `roundrect_a0.90_n3k1`, where the inner via (as wide as the 5.9-7.3 mm trace) sits in a hole 2-2.5 mm tall and touches the
 track 0.38-0.43 turns before it. Closer than π/2·(w+c) + via radius along the conductor, copper touching its own via is
 a self short only when it comes back: followed along the conductor away from the via, the center line first gets farther
@@ -115,6 +115,63 @@ closest points of two long legs of a V lie at its tip, so before, the bypassed l
 center counted as a self short) depended on how the conductor was cut into segments (D-FOLDS-4). The coil's center is
 GEOS's interior point of the inset outline, except that its rounding-dependent choices (a vertex in the middle of the
 extent, two equally wide stretches of a symmetric hole) are made deterministically (D-FOLDS-5).
+
+### Same turn or different turn in the cornerflat layout
+
+`geometry_alt_cornerflat` sizes the trace from the measured turn spacing like the base layout, but its arms' (warped)
+angle is constant around flat corners and around the tip of a thin inner contour, so it cannot tell turns apart there.
+It used to count pieces of one arm more than 0.9·max(4·(w+c), ¼ inner length) apart along the conductor as different
+turns (the checker's old path rule), which made the innermost turn facing itself across a thin inner contour limit the
+spacing: `round_ellipse3to1_a0.90_n5k1` got a pitch ratio of 0.843 (two sides 3.03 mm apart at (13.73, ±1.57), 0.04 turns
+apart in winding angle), `round_ellipse10to1_a0.90_n5k1` 0.840, `concave_crescent_a0.9_n5k1` 0.741, all failing
+conformance, against 0.997, 1.000 and 0.996 for the base layout.
+
+Now the measurement follows the checker's rule for pieces of one arm less than half a revolution apart in the arm's
+angle:
+
+- It compares what the checker compares: for each pair of center line segments the closest points (the checker does not
+  split track segments), with the cumulative winding angle and the path position at those points. Comparing short
+  pieces of long segments instead found contacts the checker never sees (a long segment passing the arm's end in a 2 mm
+  hole, `rconvex0_a0.90`), and rejected checker-clean layouts.
+- At least 0.48 turns apart in winding angle the pieces are different turns. At least 0.175 turns apart (0.18 in the
+  checker) the turn wraps around a hole smaller than the trace: the pieces keep the full clearance, like different turns,
+  but, as in the checker, only where they are at least 0.98·π/2·(w+c) apart along the conductor. That threshold depends
+  on the result, so the measurement takes the largest spacing no pair rules out. Closer in winding angle, the turn folds
+  onto itself at a tip; that does not limit the spacing, and where such a fold comes within the clearance at least
+  π/2·(w+c) along the conductor, the fold warning reports it (as in the base layout, D32).
+- The vias at the arm ends (as wide as the trace) are checked against the track of their own arm the same way: the
+  checker compares a via with track of its own turn from π/2·(w+c) plus the via radius along the conductor on.
+- The center: the checker takes the interior point of the outline inset by 1.02 times the annular width (shapely's
+  representative_point: the middle of the widest section of a horizontal scan line). On mirror symmetric holes (crescents
+  rotated by 90°, sectors, octagons) two sections are equally wide, and rounding decides which one it picks; a 10 µm
+  shift of `sector180_a0.90_n3k1` or a 90° rotation of the crescent flips it to the other horn. `checker_centers` returns
+  the checker's center and every point it may pick when vertex heights near the scan line (within 0.2 % of the inset's
+  height) or section widths (within 0.5 %) tie, and the largest winding separation over these centers counts.
+
+This also removes the self shorts of `round_blob2_a0.90_n5k1` (0.26 turns, linear layout; the base layout still has it),
+`round_noisy_l_a0.90_n5k1` (0.19 turns), `sector90`, `sector180`, `rstar0` (a0.90 n3k1) and `concave_starround_a0.9_n5k1`.
+Where the old layouts touched themselves the trace gets narrower (e.g. `sector90_a0.90_n3k1` 0.985 to 0.969); where the
+old layout was checker-clean the measurement now keeps it (e.g. `rconvex0_a0.90_n3k1` at 0.969, `triangle_a0.90_n3k1` at
+0.966). The full clearance between the pieces of a wrapping turn costs width where the old layouts kept less than the
+clearance (`24gon_a0.90_n3k1` 0.878 to 0.739, `octagon_a0.90_n3k1` 0.918 to 0.902, both with clearance violations
+before). `pentagon_a0.90_n3k1` drops from 0.934 to 0.831 for another reason: its widest candidate fails the generator's
+via check (a via 0.37 mm into a neighboring turn, which the generator also warned about before; the checker does not see
+it), and the via fallback now reaches a candidate whose vias fit.
+
+Limits: on symmetric holes the conservative center set narrows some arm phases, and the coverage step only looks at
+candidates within 0.005 pitches of the widest spacing, so it can be left with candidates that do not cover the outline:
+the corpus crescent rotated by 90° or 270° fails conformance (outline distance up to 1.8 pitches) at a pitch ratio of
+0.996, where it passes unrotated. The via at an arm end is assumed at the arm's end point and as wide as the trace (true
+unless a via wider than the trace is given).
+
+`rconvex0_a0.90_n3k1` runs its last half turn past its own inner via (6.6 mm, in a 2 mm hole), 0.47 turns before the
+via in winding angle and 11.7 mm before it along the conductor: the checker exempts that (less than π/2·(w+c) plus the
+via radius), but the tapered layout (`taper.py`) narrows the trace to 0.12·w0 there. The other layout candidates that do
+not run over the via are 12 % narrower, and worse in both constant and tapered resistance, so the measurement keeps the
+checker's exemption, and the neck stays a matter of `taper.py`'s own-via rule.
+
+Among layout candidates with the same spacing (to within 1e-9 of the pitch) the first one in phase order is kept, as
+before; a coverage tie-break tried in between moved the inner vias of five `concave_heart` cases onto the cusp's spike.
 
 ## Corpus
 
