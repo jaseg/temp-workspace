@@ -364,7 +364,74 @@ def _reflex_turn(p0, v, p1):
     return -math.atan2(ux*wy - uy*wx, ux*wx + uy*wy)
 
 
-def round_cusps(points, miter_limit, radius, seg_angle, max_new_vertices, min_chord=0.0):
+def _circle_crossing(a, b, v, r, last):
+    """ Parameter t in [0, 1] where segment a-b crosses the circle of radius r around v (the first crossing, or the
+    last one if `last`) """
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    fx, fy = a[0] - v[0], a[1] - v[1]
+    qa, qb, qc = dx*dx + dy*dy, 2 * (fx*dx + fy*dy), fx*fx + fy*fy - r*r
+    root = math.sqrt(max(0.0, qb*qb - 4*qa*qc))
+    t = (-qb + root) / (2*qa) if last else (-qb - root) / (2*qa)
+    return max(0.0, min(1.0, t))
+
+
+def _cusp_cut(points, i, r):
+    """ The part of a counter-clockwise polygon's outline within distance r of vertex i: (j0, j1, e_in, e_out) with
+    vertices j0 .. j1 (cyclic, around i) inside the circle and e_in, e_out the points where the outline enters and
+    leaves it (on the edges j0-1 -> j0 and j1 -> j1+1). None if (nearly) the whole outline is inside. """
+    n = len(points)
+    v = points[i]
+    j0, j1, inside = i, i, 1
+    while math.dist(points[(j0 - 1) % n], v) < r:
+        j0, inside = (j0 - 1) % n, inside + 1
+        if inside > n - 3:
+            return None
+    while math.dist(points[(j1 + 1) % n], v) < r:
+        j1, inside = (j1 + 1) % n, inside + 1
+        if inside > n - 3:
+            return None
+    a, b = points[(j0 - 1) % n], points[j0]
+    t = _circle_crossing(a, b, v, r, last=False) # (a is outside, b inside: one crossing)
+    e_in = (a[0] + t*(b[0] - a[0]), a[1] + t*(b[1] - a[1]))
+    c, d = points[j1], points[(j1 + 1) % n]
+    t = _circle_crossing(c, d, v, r, last=True)
+    e_out = (c[0] + t*(d[0] - c[0]), c[1] + t*(d[1] - c[1]))
+    return j0, j1, e_in, e_out
+
+
+def _cusp_clearance(points, i, j0, j1, r):
+    """ Whether the outline outside the cut of vertex i (vertices j0 .. j1, see _cusp_cut) keeps clear of the circle
+    of radius r around it: the edges that continue the outline from the circle may not re-enter it, all other edges
+    must stay 2 r away. Returns the radius to try instead, or None if r is fine. """
+    n = len(points)
+    v = points[i]
+    near = set() # edges (k -> k+1) continuing the outline outwards from the circle, up to 3 r
+    for step, start in ((1, j1), (-1, (j0 - 1) % n)):
+        k, d = start, math.dist(points[(start + (1 if step > 0 else 0)) % n], v)
+        while len(near) < n:
+            near.add(k)
+            k2 = (k + step) % n
+            far_end = points[(k2 + (1 if step > 0 else 0)) % n]
+            d2 = math.dist(far_end, v)
+            if d2 <= d or d > 3 * r:
+                break
+            k, d = k2, d2
+    worst = None
+    k = j1
+    while True:
+        k = (k + 1) % n
+        if k == (j0 - 1) % n:
+            break
+        dist = _point_segment_distance(v, points[k], points[(k + 1) % n])
+        need = r * (1 + 1e-9) if k in near else 2 * r
+        if dist <= need:
+            cand = (dist if k in near else 0.5 * dist) * (1 - 1e-6)
+            worst = cand if worst is None else min(worst, cand)
+    return worst
+
+
+def round_cusps(points, miter_limit, radius, seg_angle, max_new_vertices, min_radius=0.0, max_seg_angle=None,
+                max_cost=None, skipped=None):
     """ Cut the sharp reflex corners ("cusps") of a counter-clockwise polygon with a small disk around the corner.
 
     At a reflex corner that turns by phi, the mitered inward offset (the straight skeleton's wavefront) has its vertex
@@ -373,69 +440,144 @@ def round_cusps(points, miter_limit, radius, seg_angle, max_new_vertices, min_ch
     mitered vertex shoots far into the shape: every turn of the spiral runs into a zero-width spike and back, and the
     spike hits the other side long before the shape pinches off (an early split event, which limits the annular width).
 
-    Every reflex corner whose miter factor 1/cos(phi/2) exceeds miter_limit (phi > 120 degrees for a limit of 2) is
-    replaced by an arc of the given radius centered at the corner, through the inside of the polygon (the part of the
-    polygon within `radius` of the corner is removed). The arc's inward offset at depth d is a polygonal circle of radius
-    radius + d/cos(s/2) (s the arc's segment angle) around the corner, i.e. the Euclidean offset of the given outline
-    within radius + d*(1/cos(s/2) - 1). The removed area is less than pi*radius^2 per corner, and the result lies inside
-    the given polygon. The radius is limited to a quarter of the shorter adjacent edge and to half the distance from the
-    corner to the rest of the outline (so the result stays simple); corners where the arc's chords would be shorter than
-    min_chord are left alone. The segment angle is raised above seg_angle if the arcs would otherwise add more than
-    max_new_vertices vertices in total, up to 45 degrees; if the arcs need more vertices than that even then (an outline
-    with very many cusps, e.g. a star with hundreds of fine teeth), no corner is cut (all or nothing, so that a
-    symmetric outline stays symmetric).
+    A corner is a cusp if the outline, measured where it enters and leaves the circle of the given radius around the
+    vertex, turns by more than the turn whose miter factor 1/cos(phi/2) is miter_limit (120 degrees for a limit of 2).
+    Measuring the turn at that scale makes the test independent of how densely the outline is sampled (vertices
+    within the circle, e.g. a collinear vertex next to the cusp or a cusp split into two corners of 87 degrees, count
+    as one corner, cut around the sharpest of them; reflex vertices from rounding noise far below the radius are no
+    cusps).
 
-    Returns (polygon, cusps) with cusps a list of (index of the corner in points, radius, turn in radians, indices of
-    its arc's vertices in the result). Vertex 0 of the result is vertex 0 of the input, or the first vertex of its arc. """
+    The part of the polygon within the radius of the cusp is removed: the outline between the points where it enters
+    and leaves the circle (e_in, e_out) is replaced by an arc of the circle through the inside of the polygon, in
+    segments of at most seg_angle (s). The arc's inward offset at depth d is a polygonal circle of radius
+    radius + d/cos(s/2) around the corner, i.e. the Euclidean offset of the given outline within
+    radius + d (1/cos(s/2) - 1). (The whole arc needs the fine segments, also the 90 degrees on either side between
+    an edge and its normal: there the convex vertex at e_in eats up the arc's segments one by one, and a coarse
+    segment would survive as a mitered reflex corner.) The removed area is less than pi radius^2 per cusp and the
+    result lies inside the given polygon (checked; if not, nothing is cut).
+
+    The radius is reduced if the rest of the outline comes closer than 2 radii to the corner (or the outline re-enters
+    the circle), so that the result stays simple; a corner that would need a radius below min_radius (arc chords too
+    short for the skeleton's numerical resolution) is left as it is. If the arcs together would add more than
+    max_new_vertices vertices, or the skeleton's cost (vertices x reflex vertices) would exceed max_cost, the segment
+    angle is raised, up to max_seg_angle (default 20 degrees: coarser arcs leave reflex corners whose mitered tracks
+    can hit another edge early, e.g. a 12-pointed sawblade splits at 4.6 mm instead of 19.9 mm with 29 degree
+    segments); if they need more vertices even then (an outline with many cusps), no corner is cut (all or nothing,
+    so that a symmetric outline stays symmetric). Corners left as they are are appended to `skipped` as
+    (index, turn, reason).
+
+    Returns (polygon, cusps, seg) with cusps a list of (index of the corner in points, radius, turn in radians,
+    indices of the new vertices in the result) and seg the segment angle used. Vertex 0 of the result is vertex 0 of
+    the input, or the first new vertex of the cut that removes it. """
     n = len(points)
+    if skipped is None:
+        skipped = []
     if n < 4:
-        return list(points), []
+        return list(points), [], seg_angle
     min_turn = 2 * math.acos(min(1.0, 1.0 / miter_limit))
-    corners = []
-    for i in range(n):
-        p0, v, p1 = points[i-1], points[i], points[(i+1) % n]
-        phi = _reflex_turn(p0, v, p1)
+    max_seg = max(seg_angle, math.radians(20) if max_seg_angle is None else max_seg_angle)
+    turns = [_reflex_turn(points[k-1], points[k], points[(k+1) % n]) for k in range(n)]
+    # Candidates: corners that turn by a few degrees or more themselves (a cusp may be split into several corners)
+    order = sorted((k for k in range(n) if turns[k] > math.radians(5)), key=lambda k: -turns[k])
+    cuts = [] # (i, r, phi, j0, j1, e_in, e_out)
+    taken = set()
+    for i in order:
+        if i in taken:
+            continue
+        v = points[i]
+        if any(math.dist(v, points[c[0]]) <= c[1] for c in cuts):
+            continue # (within a cusp that is cut: its turn is part of that cusp's)
+        r = radius
+        cut = _cusp_cut(points, i, r)
+        if cut is None:
+            continue
+        j0, j1, e_in, e_out = cut
+        phi = _reflex_turn(e_in, v, e_out)
         if phi <= min_turn:
             continue
-        r = min(radius, 0.25 * math.dist(p0, v), 0.25 * math.dist(v, p1))
-        if 2 * r * math.sin(math.radians(45) / 2) < min_chord:
-            continue # (rounding noise between tiny edges)
-        corners.append((i, r, phi))
-    if not corners:
-        return list(points), []
-    sweep = sum(math.pi + phi for _i, _r, phi in corners) # angle the arcs sweep in total (interior angles)
-    # (never so coarse that the arc's own vertices turn by more than 45 degrees)
-    coarsest = max(seg_angle, math.radians(45))
-    if sum(max(2, math.ceil((math.pi + phi) / coarsest - 1e-9)) for _i, _r, phi in corners) > max_new_vertices:
-        return list(points), []
-    seg = min(max(seg_angle, sweep / max(1, max_new_vertices - len(corners))), coarsest) # (- len: rounding k up)
-    # Keep clear of the rest of the outline
-    for c, (i, r, phi) in enumerate(corners):
-        v = points[i]
-        for k in range(n):
-            if k in (i - 1 if i else n - 1, i):
-                continue
-            r = min(r, 0.5 * _point_segment_distance(v, points[k], points[(k+1) % n]))
-        corners[c] = (i, r, phi)
-    out, cusps = [], []
-    rounded = {i: (r, phi) for i, r, phi in corners}
-    for i in range(n):
-        v = points[i]
-        if i not in rounded:
-            out.append(v)
+        for _attempt in range(20):
+            smaller = _cusp_clearance(points, i, j0, j1, r)
+            if smaller is None:
+                break
+            r = smaller
+            if r < min_radius:
+                break
+            cut = _cusp_cut(points, i, r)
+            if cut is None:
+                break
+            j0, j1, e_in, e_out = cut
+        else:
+            cut = None
+        if cut is None or r < min_radius:
+            skipped.append((i, turns[i], 'the outline passes too close to it'))
             continue
-        r, phi = rounded[i]
-        theta = math.pi + phi # interior angle; the arc runs clockwise around v from direction -u to direction w
+        phi = _reflex_turn(e_in, v, e_out) # (the turn at the smaller radius)
+        if phi <= min_turn:
+            continue
+        span = {(j0 + m) % n for m in range((j1 - j0) % n + 1)}
+        if span & taken or {(j0 - 1) % n, (j1 + 1) % n} & taken or \
+                any(math.dist(v, points[c[0]]) < c[1] + r for c in cuts):
+            continue # (overlaps a cut)
+        taken |= span
+        cuts.append((i, r, phi, j0, j1, e_in, e_out))
+    if not cuts:
+        return list(points), [], seg_angle
+
+    reflex = [t > 0 for t in turns]
+    n_reflex = sum(reflex)
+
+    def fits(seg):
+        # The arc's k + 1 vertices (e_in, e_out convex, the others reflex) replace the vertices inside the circle
+        new = new_reflex = 0
+        for _i, _r, phi, j0, j1, _a, _b in cuts:
+            k = max(2, math.ceil((math.pi + phi) / seg - 1e-9))
+            run = [(j0 + m) % n for m in range((j1 - j0) % n + 1)]
+            new += k + 1 - len(run)
+            new_reflex += k - 1 - sum(reflex[j] for j in run)
+        return new <= max_new_vertices and (max_cost is None or (n + new) * (n_reflex + new_reflex) <= max_cost)
+    seg = seg_angle
+    if not fits(seg):
+        if not fits(max_seg):
+            skipped.extend((c[0], turns[c[0]], 'too many cusps for the skeleton\'s vertex budget') for c in cuts)
+            return list(points), [], seg_angle
+        lo, hi = seg, max_seg # (bisect the finest segment angle within the budget)
+        for _ in range(40):
+            mid = 0.5 * (lo + hi)
+            lo, hi = (lo, mid) if fits(mid) else (mid, hi)
+        seg = hi
+    arcs = {}
+    for i, r, phi, j0, j1, e_in, e_out in cuts:
+        v = points[i]
+        a_in = math.atan2(e_in[1] - v[1], e_in[0] - v[0])
+        theta = math.pi + phi # the interior angle at v, measured at e_in and e_out
         k = max(2, math.ceil(theta / seg - 1e-9))
-        if r <= 0 or r * 2 * math.sin(theta / k / 2) < min_chord:
-            out.append(v)
-            continue
-        p0 = points[i-1]
-        a0 = math.atan2(p0[1] - v[1], p0[0] - v[0])
-        first = len(out)
-        out.extend((v[0] + r*math.cos(a0 - theta*j/k), v[1] + r*math.sin(a0 - theta*j/k)) for j in range(k + 1))
-        cusps.append((i, r, phi, range(first, len(out))))
-    return out, cusps
+        # Clockwise around v (through the inside) from e_in to e_out
+        arc = [e_in] + [(v[0] + r*math.cos(a_in - theta*m/k), v[1] + r*math.sin(a_in - theta*m/k))
+                        for m in range(1, k)] + [e_out]
+        arcs[j0] = (i, r, phi, j1, arc)
+    start = 0
+    for j0, (_i, _r, _phi, j1, _arc) in arcs.items():
+        if 0 != j0 and (0 - j0) % n <= (j1 - j0) % n:
+            start = j0 # vertex 0 is inside this cut: start with the cut
+    out, cusps = [], []
+    m = 0
+    while m < n:
+        k = (start + m) % n
+        if k in arcs:
+            i, r, phi, j1, arc = arcs[k]
+            first = len(out)
+            out.extend(arc)
+            cusps.append((i, r, phi, range(first, len(out))))
+            m += (j1 - k) % n + 1
+        else:
+            out.append(points[k])
+            m += 1
+    from shapely.geometry import Polygon
+    cut, given = Polygon(out), Polygon(points)
+    if not cut.is_valid or not given.buffer(1e-9 * math.sqrt(given.area)).contains(cut):
+        skipped.extend((c[0], turns[c[0]], 'the cut outline would not be simple') for c in cuts)
+        return list(points), [], seg_angle
+    return out, cusps, seg
 
 
 def _track_point(track, depth, time_eps, times=None):
@@ -868,34 +1010,69 @@ class Skeletonator:
         self.set_angle_reference(ref_depth)
 
     # Sharp reflex corners (cusps), see round_cusps. A reflex corner whose mitered offset vertex moves more than
-    # CUSP_MITER_LIMIT times as fast as the wavefront (a turn of more than 120 degrees) is cut with an arc of radius
-    # CUSP_RADIUS around the corner, in segments of CUSP_SEGMENT_ANGLE, so that the offsets run around the corner on a
-    # (polygonal) circle instead of shooting a spike into the shape. The layout's depth near the corner is then measured
-    # from the arc, i.e. the turns there run up to CUSP_RADIUS + depth * (1/cos(CUSP_SEGMENT_ANGLE/2) - 1) deeper than
-    # the Euclidean offset of the given outline (0.02 mm at 10 mm depth). Corners up to 120 degrees (an L's 90 degree
-    # corner, a star's inner corners) keep their miter, as the keepout zone does (KEEPOUT_MITER_LIMIT in geometry.py).
+    # CUSP_MITER_LIMIT times as fast as the wavefront (a turn of more than 120 degrees, measured at CUSP_RADIUS from
+    # the corner) is cut with an arc of radius CUSP_RADIUS around it, so that the offsets run around the corner on a
+    # polygonal circle instead of shooting a spike into the shape. Near the corner the turns then run up to
+    # CUSP_RADIUS + depth * (1/cos(s/2) - 1) deeper than the Euclidean offset of the given outline, s the arc's segment
+    # angle: s is chosen so that the second term stays below CUSP_DEPTH_TOL at the maximum inscribed radius (the
+    # deepest any offset gets). Corners up to 120 degrees (an L's 90 degree corner, a star's inner corners) keep their
+    # miter, as the keepout zone does (KEEPOUT_MITER_LIMIT in geometry.py). The radius grows with the outline's
+    # extent where the arc's chords would otherwise come near the skeleton's numerical resolution (outlines above
+    # about 300 mm).
     CUSP_MITER_LIMIT = 2.0
     CUSP_RADIUS = 0.01 # mm
-    CUSP_SEGMENT_ANGLE = math.radians(5)
+    CUSP_DEPTH_TOL = 0.02 # mm
+    CUSP_DEPTH_WARN = 0.05 # mm; warn if the budget makes the arcs so coarse that turns run this much deeper
+    CUSP_MIN_CHORD = 3e-6 # times the extent: 10x the node merge tolerance
     CUSP_MAX_VERTICES = 360 # vertices all arcs together may add (more cusps: coarser arcs; far more: no cut)
+    CUSP_EXTRA_COST = 50_000 # skeleton cost the arcs may add at least (about 5 s), see _skeleton_of
 
     def _round_cusps(self, poly):
+        log = logging.getLogger('kicoil')
         xs, ys = [x for x, _y in poly], [y for _x, y in poly]
         extent = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
-        # The arcs' vertices are reflex: they add to the skeleton's cost (vertices x reflex vertices, see _skeleton_of).
-        # Allow them to double it, or to add up to 60 000 (a few seconds), but at most CUSP_MAX_VERTICES vertices.
         n, r = len(poly), len(reflex_vertices(poly))
-        budget = n * r + max(n * r, 60_000)
-        m = int((-(n + r) + math.sqrt((n - r)**2 + 4 * budget)) / 2) # largest m with (n + m) (r + m) <= budget
-        out, cusps = round_cusps(poly, self.CUSP_MITER_LIMIT, self.CUSP_RADIUS, self.CUSP_SEGMENT_ANGLE,
-                                 max(1, min(m, self.CUSP_MAX_VERTICES)), min_chord=3e-6 * extent)
+        if not any(_reflex_turn(poly[k-1], poly[k], poly[(k+1) % n]) > math.radians(5) for k in range(n)):
+            self._cusp_vertices, self.cusp_segment_angle = set(), None
+            return poly, []
+        import shapely
+        from shapely.geometry import Polygon
+        try:
+            ref_depth = shapely.maximum_inscribed_circle(Polygon(poly), 1e-3 * extent).length
+        except Exception:
+            ref_depth = 0.5 * extent
+        ref_depth = max(ref_depth, self.CUSP_DEPTH_TOL)
+        seg = 2 * math.acos(1 / (1 + self.CUSP_DEPTH_TOL / ref_depth))
+        seg = min(seg, math.radians(15))
+        min_chord = self.CUSP_MIN_CHORD * extent
+        radius = max(self.CUSP_RADIUS, min_chord / (2 * math.sin(seg / 2)))
+        # The arcs' vertices are reflex: they add to the skeleton's cost (vertices x reflex vertices, see _skeleton_of).
+        # Allow them to double it, or to add CUSP_EXTRA_COST, but at most CUSP_MAX_VERTICES vertices. (This bounds the
+        # cost of the arcs' vertices. A cut cusp makes the skeleton slower in any case, by about the same factor for a
+        # single flat cut as for a fine arc: the wavefront no longer falls apart early. Heart: 0.35 s -> 1.9 s at 80
+        # vertices, 6 s -> 28 s at 360.)
+        skipped = []
+        out, cusps, used = round_cusps(poly, self.CUSP_MITER_LIMIT, radius, seg, self.CUSP_MAX_VERTICES,
+                                       min_radius=min_chord / (2 * math.sin(seg / 2)),
+                                       max_cost=n * r + max(n * r, self.CUSP_EXTRA_COST), skipped=skipped)
         self._cusp_vertices = {k for c in cusps for k in c[3]}
+        self.cusp_segment_angle = used
         if cusps:
-            logging.getLogger('kicoil').info(
-                f'{len(cusps)} sharp reflex corner(s) of the outline cut with an arc of radius '
-                f'{min(c[1] for c in cusps):.3g} to {max(c[1] for c in cusps):.3g} mm: ' +
-                ', '.join(f'({poly[i][0]:.3f}, {poly[i][1]:.3f}) turning {math.degrees(phi):.1f} degrees'
-                          for i, _r, phi, _k in cusps[:5]) + (' ...' if len(cusps) > 5 else ''))
+            log.info(f'{len(cusps)} sharp reflex corner(s) of the outline cut with an arc of radius '
+                     f'{min(c[1] for c in cusps):.3g} to {max(c[1] for c in cusps):.3g} mm in '
+                     f'{math.degrees(used):.1f} degree segments: ' +
+                     ', '.join(f'({poly[i][0]:.3f}, {poly[i][1]:.3f}) turning {math.degrees(phi):.1f} degrees'
+                               for i, _r, phi, _k in cusps[:5]) + (' ...' if len(cusps) > 5 else ''))
+            err = ref_depth * (1 / math.cos(used / 2) - 1)
+            if radius + err > self.CUSP_DEPTH_WARN:
+                log.warning(f'{len(cusps)} sharp reflex corners: their arcs have {math.degrees(used):.1f} degree '
+                            f'segments to keep the skeleton affordable, so turns near them can run up to '
+                            f'{radius + err:.3f} mm deeper than the intended offset')
+        if skipped:
+            log.warning(f'{len(skipped)} sharp reflex corner(s) of the outline left mitered (' +
+                        '; '.join(f'({poly[i][0]:.3f}, {poly[i][1]:.3f}) turning {math.degrees(t):.1f} degrees: {why}'
+                                  for i, t, why in skipped[:3]) + (' ...' if len(skipped) > 3 else '') +
+                        '): the offsets shoot a spike into the shape there, and the usable annular width may be small')
         return out, [c[:3] for c in cusps]
 
     # Straight skeletons of outlines with many reflex vertices are slow and need a lot of memory: CGAL looks for split

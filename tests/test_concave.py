@@ -1,5 +1,6 @@
 """Tests specific to the concave corpus family (tests/corpus_concave.py)."""
 
+import logging
 import math
 import re
 import warnings
@@ -88,10 +89,13 @@ def test_heart_cusp_is_cut_with_a_tiny_arc_inside_the_outline():
     layout = Polygon(sk.layout_outline)
     assert layout.is_valid and Polygon(heart).buffer(1e-9).contains(layout)
     assert Polygon(heart).area - layout.area < math.pi * r * r
-    # The arc: vertices on a circle of radius r around the corner, segments of at most CUSP_SEGMENT_ANGLE
+    # The arc: vertices on a circle of radius r around the corner, segments of at most the segment angle, which keeps
+    # the arc's depth error below CUSP_DEPTH_TOL at the inscribed radius
+    seg = sk.cusp_segment_angle
+    assert 11.5 * (1 / math.cos(seg / 2) - 1) <= sk.CUSP_DEPTH_TOL * 1.01
     arc = [p for p in sk.layout_outline if p not in set(heart)]
     assert all(abs(math.dist(p, heart[i]) - r) < 1e-12 for p in arc)
-    assert len(arc) == math.ceil((math.pi + phi) / sk.CUSP_SEGMENT_ANGLE) + 1
+    assert len(arc) == math.ceil((math.pi + phi) / seg) + 1
     assert sk.poly == sk.layout_outline
 
 
@@ -102,7 +106,7 @@ def test_cut_cusp_offsets_are_round():
     sk = skeletonator.Skeletonator(heart)
     (i, r, _phi), = sk.cusps
     v = heart[i]
-    s = sk.CUSP_SEGMENT_ANGLE
+    s = sk.cusp_segment_angle
     for d in (1.0, 3.0, 6.0, 9.0):
         pts = [sk.track_position(k, d) for k in range(len(sk.poly))]
         near = min(math.dist(p, v) for p in pts)
@@ -110,6 +114,49 @@ def test_cut_cusp_offsets_are_round():
         ring = Polygon(pts)
         euclid = Polygon(heart).buffer(-d, quad_segs=64)
         assert ring.symmetric_difference(euclid).area < 0.01 * euclid.area
+
+
+def _insert_after(poly, i, dist):
+    """ poly with a collinear vertex inserted dist mm after vertex i """
+    a, b = poly[i], poly[(i + 1) % len(poly)]
+    t = dist / math.dist(a, b)
+    return poly[:i+1] + [(a[0] + t*(b[0] - a[0]), a[1] + t*(b[1] - a[1]))] + poly[i+1:]
+
+
+def _split_cusp(poly, i, dist):
+    """ poly with vertex i replaced by two vertices dist mm apart, on its two edges (a cusp split in two corners) """
+    v, a, b = poly[i], poly[i-1], poly[(i + 1) % len(poly)]
+    pa = (v[0] + dist/2 * (a[0] - v[0]) / math.dist(a, v), v[1] + dist/2 * (a[1] - v[1]) / math.dist(a, v))
+    pb = (v[0] + dist/2 * (b[0] - v[0]) / math.dist(b, v), v[1] + dist/2 * (b[1] - v[1]) / math.dist(b, v))
+    return poly[:i] + [pa, pb] + poly[i+1:]
+
+
+@pytest.mark.parametrize('variant', ['n400', 'collinear_1um', 'collinear_5um', 'split_1um', 'size250', 'not_vertex0'])
+def test_heart_cusp_cut_does_not_depend_on_sampling_or_size(variant):
+    # The cusp is found and cut however the outline is sampled near it (vertices within the arc's radius are part of
+    # the cut), and also for large outlines (the radius grows so that the arc's chords stay well above the skeleton's
+    # numerical resolution). Before, a vertex within 8 µm of the cusp, 380 or more vertices on the heart, or a heart
+    # wider than 210 mm left the cusp mitered (split depth back to 0.4 to 8 mm).
+    heart = corpus_concave.heart()
+    size = 44
+    if variant == 'n400':
+        poly = corpus_concave.heart(n=400)
+    elif variant.startswith('collinear'):
+        poly = _insert_after(heart, 0, 0.001 if variant.endswith('1um') else 0.005)
+    elif variant == 'split_1um':
+        poly = _split_cusp(heart, 0, 0.001)
+    elif variant == 'size250':
+        size = 250
+        poly = corpus_concave.heart(size=size)
+    else:
+        poly = heart[17:] + heart[:17]
+    sk = skeletonator.Skeletonator(poly)
+    assert len(sk.cusps) == 1
+    assert sk.max_depth > 0.229 * size # (10.13 mm at 44 mm)
+    layout = Polygon(sk.layout_outline)
+    assert layout.is_valid and Polygon(poly).buffer(1e-9).contains(layout)
+    if variant == 'size250':
+        assert sk.cusps[0][1] > sk.CUSP_RADIUS
 
 
 @pytest.mark.parametrize('name', ['lround', 'uround', 'cross', 'comb', 'starround', 'dumbbell', 'shark', 'bean',
@@ -122,30 +169,47 @@ def test_modest_reflex_corners_keep_their_miter(name):
     assert sk.cusps == [] and sk.layout_outline == sk.outline
 
 
-def test_many_cusps_stay_within_the_vertex_budget():
-    # A 24-pointed "sawblade" whose inner corners all turn by 150 degrees: the arcs get coarser so that the skeleton's
-    # cost (vertices x reflex vertices) stays bounded, but no arc vertex turns by more than 45 degrees
-    n, ro, ri = 24, 30.0, 20.0
+def _sawblade(n, ro, ri=20.0, f=0.97):
     pts = []
     for k in range(n):
         a = 2*math.pi*k/n
         pts.append((ro*math.cos(a), ro*math.sin(a)))
-        b = a + 2*math.pi/n * 0.97
+        b = a + 2*math.pi/n * f
         pts.append((ri*math.cos(b), ri*math.sin(b)))
+    return pts
+
+
+def test_many_cusps_get_coarser_arcs_within_the_budget():
+    # A 12-pointed sawblade whose inner corners all turn by 137 degrees: the arcs get coarser (at most 20 degree
+    # segments) so that the skeleton's cost stays bounded. Its Euclidean offsets never fall apart; the cut outline's
+    # skeleton does not split before 19 mm either (mitered: 13.4 mm; with 29 degree segments a residual reflex corner
+    # of each arc hits a tooth at 4.6 mm, hence the limit).
+    pts = _sawblade(12, 60.0)
     turns = [skeletonator._reflex_turn(pts[k-1], pts[k], pts[(k+1) % len(pts)]) for k in range(len(pts))]
-    assert sum(t > math.radians(120) for t in turns) == n
-    out, cusps = skeletonator.round_cusps(pts, 2.0, 0.01, math.radians(5), 200)
-    assert len(cusps) == n
-    # (24 arcs of 330 degrees in 45 degree segments, within the budget of 200 new vertices; with 5 degree segments it
-    # would be 1600)
-    assert len(out) - len(pts) == n * 8
-    assert max(skeletonator._reflex_turn(out[k-1], out[k], out[(k+1) % len(out)]) for k in range(len(out))) \
-        < math.radians(45) + 1e-9
-    assert Polygon(pts).buffer(1e-9).contains(Polygon(out)) and Polygon(out).is_valid
+    assert sum(t > math.radians(120) for t in turns) == 12
     sk = skeletonator.Skeletonator(pts)
-    assert len(sk.cusps) == n and len(sk.layout_outline) == len(pts) + n * 8
-    # More cusps than even 45 degree arcs fit into the budget: none is cut (all or nothing keeps the outline symmetric)
-    assert skeletonator.round_cusps(pts, 2.0, 0.01, math.radians(5), n * 8 - 1) == (pts, [])
+    assert len(sk.cusps) == 12
+    assert math.radians(10) < sk.cusp_segment_angle <= math.radians(20) + 1e-9
+    assert sk.max_depth > 19 and _mitered_skeletonator(pts).max_depth < 13.5
+    out = sk.layout_outline
+    assert max(skeletonator._reflex_turn(out[k-1], out[k], out[(k+1) % len(out)]) for k in range(len(out))) \
+        <= sk.cusp_segment_angle * (1 + 1e-6)
+    assert Polygon(pts).buffer(1e-9).contains(Polygon(out)) and Polygon(out).is_valid
+
+
+def test_too_many_cusps_are_left_mitered_with_a_warning(caplog):
+    # A 24-pointed sawblade: even 20 degree arcs exceed the budget. No corner is cut (all or nothing keeps the outline
+    # symmetric), and a warning says so.
+    pts = _sawblade(24, 30.0)
+    skipped = []
+    out, cusps, _seg = skeletonator.round_cusps(pts, 2.0, 0.01, math.radians(5), 360, skipped=skipped)
+    assert (out, cusps) == (pts, []) and len(skipped) == 24
+    out, cusps, seg = skeletonator.round_cusps(pts, 2.0, 0.01, math.radians(5), 10**6)
+    assert len(cusps) == 24 and seg == math.radians(5)
+    with caplog.at_level(logging.WARNING, logger='kicoil'):
+        sk = skeletonator.Skeletonator(pts)
+    assert sk.cusps == [] and sk.layout_outline == sk.outline
+    assert any('left mitered' in r.getMessage() for r in caplog.records)
 
 
 def test_cusp_next_to_another_edge_keeps_the_outline_simple():
@@ -153,7 +217,7 @@ def test_cusp_next_to_another_edge_keeps_the_outline_simple():
     # distance of their corner
     poly = [(-10, -10), (-0.5, -10), (0, -0.002), (0.5, -10), (10, -10), (10, 10), (0.5, 10), (0, 0.002), (-0.5, 10),
             (-10, 10)]
-    out, cusps = skeletonator.round_cusps(poly, 2.0, 0.01, math.radians(5), 100)
+    out, cusps, _seg = skeletonator.round_cusps(poly, 2.0, 0.01, math.radians(5), 100)
     assert len(cusps) == 2
     assert all(r <= 0.002 + 1e-9 for _i, r, _phi, _arc in cusps)
     assert Polygon(out).is_valid and Polygon(poly).buffer(1e-9).contains(Polygon(out))

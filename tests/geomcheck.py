@@ -65,9 +65,10 @@ TURN_SEP = 0.5 # revolutions; copper at least this far apart in cumulative windi
 SELF_SHORT_SEP = 0.18
 OVERSHOOT_TOL = 0.05 # mm of copper (or of a via center) allowed beyond the intended envelope
 # The intended inner contour is the Euclidean inward offset of the outline by the annular width (round around reflex
-# corners): the area that must be covered (core) and the area normalization use it. Copper may also run along the
-# mitered offset around reflex corners whose miter factor 1/cos(turn/2) is at most ENVELOPE_MITER_LIMIT (an L's or a
-# star's inner corners keep their miter, as the layout does), and up to that many times the depth around sharper ones.
+# corners): it bounds the area that must be covered (core). Copper may also run along the mitered offset around
+# reflex corners whose miter factor 1/cos(turn/2) is at most ENVELOPE_MITER_LIMIT (an L's or a star's inner corners
+# keep their miter, as the layout does), and up to that many times the depth around sharper ones; the uncovered and
+# excess fractions are relative to that admitted band (so they are unchanged for outlines without sharper corners).
 # None: the core and the envelope use the mitered offset with the limit given (the convention before; 10).
 INNER_MITER_LIMIT = None
 ENVELOPE_MITER_LIMIT = 2.0
@@ -1565,6 +1566,9 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
     core_limit = INNER_MITER_LIMIT
     env_limit = ENVELOPE_MITER_LIMIT if INNER_MITER_LIMIT is None else INNER_MITER_LIMIT
     core = _inset(contour, p/2, core_limit).difference(_inset(contour, intent.annular_width - p/2, core_limit))
+    # The uncovered fraction is relative to the band the envelope admits (mitered up to ENVELOPE_MITER_LIMIT), so
+    # that layouts of outlines with modest reflex corners (miter factor <= 2, identical to before) keep their numbers
+    norm = _inset(contour, p/2, env_limit).difference(_inset(contour, intent.annular_width - p/2, env_limit)).area
     env = _band(contour, w/2 + tol, intent.annular_width + w/2 + tol, env_limit)
     uncovered = []
     all_copper = []
@@ -1595,7 +1599,7 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
         lines = [geoms[i] for i in idx]
         if core.area > 0 and li < intent.spiral_layers:
             loose = shapely.unary_union(shapely.buffer(lines, p/2 * 1.001, quad_segs=4))
-            uncovered.append(core.difference(loose).area / core.area)
+            uncovered.append(core.difference(loose).area / max(norm, core.area))
         plain = [i for i in idx if segs[i].plain]
         widths = np.array([segs[i].width for i in plain])
         cu_layer = list(shapely.buffer([geoms[i] for i in plain], widths/2, quad_segs=4)) if plain else []
@@ -1608,7 +1612,7 @@ def _conformance(rep, copper, segs, geoms, pads, intent, contour, dots=()):
     all_copper += [pad.geometry(quad_segs=8) for pad in pads]
     cu = shapely.unary_union(all_copper)
     rep.uncovered_fraction = max(uncovered) if uncovered else 0.0
-    ring = _inset(contour, 0, core_limit).difference(_inset(contour, intent.annular_width, core_limit))
+    ring = _inset(contour, 0, env_limit).difference(_inset(contour, intent.annular_width, env_limit))
     rep.excess_fraction = cu.difference(env).area / max(ring.area, 1e-9)
     # undershoot: distance from the contour to the nearest copper, in units of pitch
     pts = shapely.points(shapely.get_coordinates(shapely.segmentize(contour.exterior, p/4)))
