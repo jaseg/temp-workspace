@@ -234,6 +234,14 @@ def _box_gap(lox, loy, hix, hiy, i, j):
     return np.hypot(gx, gy)
 
 
+# Warn about the merged copper of a hairpin of one turn (centerline pieces closer than the trace width) when the pieces
+# are more than this many times (trace width + clearance) apart along the conductor (see PlanarInductor._warn_folds)
+MERGE_WARN_BYPASS = 3.0
+# Pieces of one turn at least this many revolutions apart that come closer than trace width plus clearance: the turn
+# wraps around a hole smaller than the trace (see PlanarInductor._warn_folds)
+WRAP_SEPARATION = 0.18
+
+
 class FoldCandidates:
     """ Pairs of pieces of the same spiral turn that come close to each other although they are far apart along the
     conductor (see min_turn_spacing), kept as the Pareto front of (distance small, path separation large): for every
@@ -258,16 +266,19 @@ class FoldCandidates:
     def merge(self, other):
         self.add(other.d, other.path, other.loc)
 
-    def closest(self, min_path):
-        """ (distance, location) of the closest pair at least min_path apart along the conductor, or (inf, None) """
+    def closest(self, min_path, with_path=False):
+        """ (distance, location) of the closest pair at least min_path apart along the conductor, or (inf, None). With
+        with_path=True, (distance, location, path separation). """
         sel = self.path > min_path
         if not sel.any():
-            return inf, None
+            return (inf, None, inf) if with_path else (inf, None)
         k = int(np.flatnonzero(sel)[-1]) # path descending, distance descending along the front: the last one
+        if with_path:
+            return float(self.d[k]), tuple(float(c) for c in self.loc[k]), float(self.path[k])
         return float(self.d[k]), tuple(float(c) for c in self.loc[k])
 
 
-def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False, max_pairs=1_000_000):
+def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False, max_pairs=1_000_000, min_path=0.0):
     """ Find the smallest centerline distance between neighboring turns of a set of spiral arms on one layer.
 
     arms is a list of (points, angles) tuples, with angles in revolutions. Segments of different arms are always
@@ -276,7 +287,7 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False, 
     this test is accurate to a tenth of min_turn_separation.
 
     Returns (distance, location). Distances above search_radius are not reported, (search_radius, None) is returned if
-    nothing closer was found.
+    nothing closer was found. Pieces of the same arm less than min_path apart along the conductor are not paired.
 
     With folds=True, also looks at pairs of pieces of the *same* turn (less than min_turn_separation apart) that are far
     apart along the conductor compared to their distance d: more than pi*d along the conductor (a U-turn of diameter d
@@ -404,6 +415,8 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False, 
                         fold_best = float(far[kk])
                         fold_where = tuple(float(c) for c in loc[kk])
         dsel = ~same_turn & diff_ok & (gap < best)
+        if min_path > 0:
+            dsel &= (arm[i] != arm[j]) | (np.maximum(S0[j] - S1[i], S0[i] - S1[j]) >= min_path)
         i, j = i[dsel], j[dsel]
         if not len(i):
             continue
@@ -415,6 +428,34 @@ def min_turn_spacing(arms, search_radius, min_turn_separation=0.5, folds=False, 
     if folds:
         return best, where, fold_best, fold_where, fold_front
     return best, where
+
+
+def measure_wraps(model, min_path):
+    """ Closest approach of two pieces of the same turn that are at least WRAP_SEPARATION revolutions apart in winding
+    angle around the coil's center (the shape's `winding_center`): a turn that wraps around a hole smaller than the
+    trace comes back to itself there. Sets model.min_wrap_spacing and model.min_wrap_location (centerline distance and
+    location; the search radius and None if nothing is closer than one nominal pitch). Pieces less than min_path apart
+    along the conductor are not compared: within a bend of the turn they are close anyway.
+
+    The angles that parameterize the spiral are not used: they advance with the length of the outline's edges at a
+    reference depth, not with the winding angle, and on a noisy outline they jump by a fifth of a turn over a few
+    millimeters. The geometric checker separates turns by winding angle, too. """
+    R = model.spiral_pitch * (1 + 1e-9)
+    center = getattr(model.shape, 'winding_center', None)
+    best, where = R, None
+    for layer_arms in model.spiral_center_lines():
+        geo = []
+        for points, _angles in layer_arms:
+            p = np.asarray(points, dtype=float)
+            if center is None or len(p) < 2:
+                continue
+            a = np.unwrap(np.arctan2(p[:, 1] - center[1], p[:, 0] - center[0])) / (2*pi)
+            geo.append((p, a))
+        if geo:
+            d, loc = min_turn_spacing(geo, R, min_turn_separation=WRAP_SEPARATION, min_path=min_path)
+            if loc is not None and d < best:
+                best, where = d, loc
+    model.min_wrap_spacing, model.min_wrap_location = best, where
 
 
 class Shape:
@@ -444,6 +485,10 @@ class CircleShape(Shape):
     def desc(self):
         return f'{self.outer_diameter:.2f} mm OD, {self.inner_diameter:.2f} mm ID circular'
 
+    @property
+    def winding_center(self):
+        """ A point inside the innermost turn, around which the turns wind """
+        return (0.0, 0.0)
 
     def compute_spiral(self, a1, a2, fn=64, debug=False):
         r1, r2 = self.outer_radius, self.inner_radius
@@ -500,6 +545,13 @@ class OffsetShape(Shape):
         self.max_via_offset = self.sk.max_depth - self.annular_width
         self.outer_radius = self.sk.radius
         self.inner_radius = self.sk.radius - self.annular_width
+
+    @property
+    def winding_center(self):
+        """ A point inside the innermost turn, around which the turns wind: the deepest node of the straight skeleton,
+        which lies deeper than the annular width (that is less than the depth at which the outline splits) """
+        n = max(self.sk.skeleton_nodes, key=lambda n: n.time)
+        return (float(n.x), float(n.y))
 
     def set_fold_limit(self, limit):
         """ Turns closer than `limit` to the collapse depth of a narrow protrusion of the outline cut across the
@@ -827,26 +879,7 @@ class PlanarInductor():
                                  f'width to at most {floor((pp - self.clearance) * 1000) / 1000:.3f} mm, reduce the '
                                  f'clearance or increase the size of the coil.' + pitch_hint)
 
-        # Copper of one turn folding onto itself: two pieces of the same turn closer than trace width plus clearance
-        # that are more than pi*d plus the pitch apart along the conductor (folds around notches), or more than
-        # 4*(trace width + clearance) (converging sides of a tapered tip; the geometric checker counts pieces of copper
-        # that far apart along the conductor as different turns). Subclasses with their own measure_turn_spacing may
-        # not measure folds.
-        fold_location, fold_spacing = getattr(self, 'min_fold_location', None), getattr(self, 'min_fold_spacing', inf)
-        candidates = getattr(self, 'fold_candidates', None)
-        if candidates is not None:
-            d, loc = candidates.closest(4 * (self.trace_width + self.clearance))
-            if loc is not None and d < fold_spacing:
-                fold_spacing, fold_location = d, loc
-        if fold_location is not None and fold_spacing < self.trace_width + self.clearance - 1e-6:
-            x, y = fold_location
-            gap = fold_spacing - self.trace_width
-            what = f'overlaps itself by {-gap:.3f} mm' if gap < 0 else f'comes within {gap:.3f} mm of itself'
-            warnings.warn(f'Near ({x:.3f}, {y:.3f}) the copper of one turn {what}: the turn runs around a part of '
-                          f'the outline that is narrower than the turn pitch (a narrow notch or slot, or a narrow tip the '
-                          f'annulus reaches deep into) and comes back along its other side. This does not short '
-                          f'different turns, but the copper of that turn folds onto itself. Widen that part of the '
-                          f'outline, reduce the annular width, or use fewer turns or a smaller trace width.')
+        self._warn_folds()
 
         if round(self.via_diameter, 2) < round(self.trace_width, 2):
             self.logger.warning(f'Clipping via diameter from {self.via_diameter:.2f} mm to trace width of {self.trace_width:.2f} mm.')
@@ -936,6 +969,59 @@ class PlanarInductor():
         rho = 1.68e-8 # specific resistivity of copper
         self.R = self.track_length/1e3 * rho / A
         self.logger.info(f'Approximate resistance: {self.R:g} Ω')
+
+    def _warn_folds(self):
+        """ Warn where the copper of one turn comes back close to itself. Subclasses with their own measure_turn_spacing
+        may not measure folds (then the attributes used here are missing).
+
+        - Folds: two pieces of the same turn closer than trace width plus clearance that are more than pi*d plus the
+          pitch apart along the conductor (folds around notches), or more than 4*(trace width + clearance) (converging
+          sides of a tapered tip).
+        - Merges: the two sides of a hairpin (a turn running into a sharp tip or a narrow arm of the outline and back)
+          closer than the trace width, so that their copper merges, more than MERGE_WARN_BYPASS*(trace width +
+          clearance) apart along the conductor. At a corner of angle a the copper of the two sides merges over w/sin(a/2)
+          of conductor: this warns for tips sharper than about 35 degrees, not for ordinary corners. The geometric
+          checker fails merges that bypass twice as much (tests/geomcheck.py, SELF_MERGE_BYPASS).
+        - Wraps: two pieces of the same turn at least WRAP_SEPARATION revolutions apart closer than trace width plus
+          clearance: the turn wraps around a hole of the outline smaller than the trace and comes back to itself (the
+          geometric checker fails copper that touches itself SELF_SHORT_SEP = 0.18 turns further on). """
+        wc = self.trace_width + self.clearance
+        folds = [] # (centerline distance, location, path separation or None)
+        fold_location, fold_spacing = getattr(self, 'min_fold_location', None), getattr(self, 'min_fold_spacing', inf)
+        if fold_location is not None and fold_spacing < wc - 1e-6:
+            folds.append((fold_spacing, fold_location, None))
+        candidates = getattr(self, 'fold_candidates', None)
+        if candidates is not None:
+            d, loc, path = candidates.closest(4 * wc, with_path=True)
+            if loc is not None and d < wc - 1e-6:
+                folds.append((d, loc, path))
+            d, loc, path = candidates.closest(MERGE_WARN_BYPASS * wc, with_path=True)
+            if loc is not None and d < self.trace_width - 1e-6:
+                folds.append((d, loc, path))
+        if folds:
+            d, (x, y), path = min(folds, key=lambda f: f[0])
+            gap = d - self.trace_width
+            what = f'overlaps itself by {-gap:.3f} mm' if gap < 0 else f'comes within {gap:.3f} mm of itself'
+            along = f' (pieces {path:.1f} mm apart along the conductor)' if path is not None else ''
+            warnings.warn(f'Near ({x:.3f}, {y:.3f}) the copper of one turn {what}{along}: the turn runs around a part '
+                          f'of the outline that is narrower than the turn pitch (a narrow notch or slot, a sharp tip, or a '
+                          f'narrow tip the annulus reaches deep into) and comes back along its other side. This does not '
+                          f'short different turns, but the copper of that turn folds onto itself. Widen that part of the '
+                          f'outline, reduce the annular width, or use fewer turns or a smaller trace width.')
+        # Pieces closer than pi/2*(w + c) along the conductor are part of one bend (the checker ignores them, too)
+        try:
+            measure_wraps(self, pi/2 * wc)
+        except AttributeError: # a subclass without spiral center lines
+            pass
+        wrap_location, wrap_spacing = getattr(self, 'min_wrap_location', None), getattr(self, 'min_wrap_spacing', inf)
+        if wrap_location is not None and wrap_spacing < wc - 1e-6:
+            x, y = wrap_location
+            gap = wrap_spacing - self.trace_width
+            what = f'overlaps itself by {-gap:.3f} mm' if gap < 0 else f'comes within {gap:.3f} mm of itself'
+            warnings.warn(f'Near ({x:.3f}, {y:.3f}) the copper of one turn {what} {WRAP_SEPARATION:g} turns or more '
+                          f'further on: the turn wraps around a hole smaller than the trace width (or a deep notch) and '
+                          f'comes back to itself, so the copper folds onto itself; where it touches, it shorts part of '
+                          f'that turn. Reduce the annular width, or use fewer turns or a smaller trace width.')
 
     def _prepare_shape(self):
         """ Configure the shape for this coil's pitch: turns that would run into a protrusion of the outline narrower

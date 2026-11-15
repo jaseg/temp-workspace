@@ -618,3 +618,98 @@ leaves it out (0.045 < 0.5 turns), and the fold warning (D28) reports exactly th
 copper of one turn comes within 0.122 mm of itself"). Since `33a665a` the checker decides by winding angle alone; it
 counts the 856 close pairs as self overlaps (no self short), and the case passes. No change to the generator; a test
 pins the classification and the warning.
+
+---
+
+## Folds, merges and wraps of one turn
+
+### D-FOLDS-1. Merged copper at hairpins of one turn not warned (fold rule gap)
+
+**Defect.** `PlanarInductor` warned about a turn coming back to itself only for pieces closer than trace width plus
+clearance that are more than π·d + pitch, or more than 4·(w + c), apart along the conductor (D28). Where a turn runs
+into a sharp tip of the outline and back (a hairpin), the centerlines of its two sides converge at the tip's angle α:
+they come closer than the trace width, so the copper merges, over w/sin(α/2) of conductor, and at every point the pieces
+are only d/sin(α/2) apart along the conductor. For tips between about 29° and 39° neither criterion holds anywhere.
+
+**Symptom.** `concave_crescent_a0.6_n5k1` (w = 1.642 mm): at each horn tip the copper of one turn merges (up to 0.86 mm
+overlap at (21.6, −17.5), pieces 3.2–6.2 mm = up to 3.4·(w + c) apart along the conductor, 0.003 turns apart in winding
+angle), without a warning. Of the 24 concave cases that pass with copper of one turn touching itself (crescent, shark,
+C, U), 18 had no warning.
+
+**Fix.** `PlanarInductor._warn_folds` also warns when centerline pieces of one turn come closer than the trace width
+(copper overlaps) more than `MERGE_WARN_BYPASS` = 3·(w + c) apart along the conductor (from the fold candidates the
+spacing measurement already keeps). That is tips sharper than about 35° (w/sin(α/2) > 3·(w + c)), not ordinary corners
+(a 60° tip merges over 2·w): no new warning for any star, triangle or polygon of the main corpus. The warning names the overlap and the conductor length between the pieces. It is
+half the checker's self-merge limit (D-FOLDS-2), so a layout the checker fails for a merge always carries the warning,
+also after a small change of the input. The alternatives (cornerflat, optspan, jog) use the same rule. Avoiding the merge
+was measured and not done: narrowing the trace cannot remove a merge at a V-shaped tip (the merged length w/sin(α/2)
+shrinks with w), and removing the merges beyond 3·(w + c) on the crescent would take the trace width from 1.642 to 1.169
+mm (−29 %; −21 % for n8k3, −72 % for a0.9 n5k1) for the whole coil; cutting the turn short of the tip would need a
+corner cut in the skeleton like D28's protrusion cut, which also leaves the tip uncovered. In kicoil's full corpus the
+merge rule newly warns in 5 cases (`concave_crescent_a0.3_n5k1`, `_a0.6_n5k1`, `_a0.6_n8k3`, `_a0.6_n6_1layer`,
+`_a0.6_n7k3_cw`); of the 24 concave cases that pass with copper of one turn touching itself, 9 are warned instead of 6.
+The 15 unwarned ones merge over at most 3.1·(w + c), or only within the inner via (the shark's inner tip, 5·(w + c)).
+
+**Original code:** has no fold warning at all; it lays out the crescent with other defects (connectivity, crossings,
+clearance) and the same unwarned merge at the horns (up to 3.9·(w + c)).
+
+### D-FOLDS-2. Checker: merged copper of one turn never fails (self merge)
+
+**Defect.** `geomcheck` counts same-turn copper contacts (deficit ≥ clearance) less than `SELF_SHORT_SEP` = 0.18 turns
+apart as self touches and reports the bypassed conductor length (`max_self_touch_bypass`), but never fails them. A hairpin
+whose copper merges over the whole arm of a C shorts that stretch of the conductor ("connectivity end to end").
+
+**Symptom.** `concave_cshape_a0.9_n5k1` and `concave_uround_a0.9_n5k1` pass with merged copper bypassing 20.3 mm and
+30.6 mm (11.3 and 13.3·(w + c)) of the innermost turn.
+
+**Fix.** New failure kind `self merge`: a self touch (copper touching or overlapping, the same condition as a self short)
+whose pieces are at least `SELF_MERGE_BYPASS` = 6·(w + c) apart along the conductor (`Report.self_merges`). At a corner
+of angle α the copper merges over at most w/sin(α/2) < (w + c)/sin(α/2), so 6·(w + c) is the merge of a 19° tip; local
+merges at wider tips do not fail. The threshold sits in the gap of the data: over the 412 cases of all families with a
+same-turn contact or a 90 % annulus, the largest bypass per case (in units of w + c) is at most 5.60 (kicoil), 5.69
+(cornerflat), 5.58 (optspan) and 5.67 (jog) for tips (crescent horns, shark fins, ellipse ends, `round_tip`), and at
+least 6.63 / 6.09 / 6.63 / 6.63 for hairpins into C and U arms, the comb, the slot, the heart's cusp spike and the
+slivers of slender ellipses. Contacts within the copper of one via or pad do not count (an arm that runs past its via
+into a sharp inner tip and back, up to 5·(w + c) in the shark), nor do the two pieces of one track drawn in two
+overlapping pieces. `test_layout.test_corpus_case` treats it like the other warned kinds (xfail when the generator warned, which
+D-FOLDS-1 guarantees); the heart's known issue lists it. Cases failing it:
+
+| | before | after | of these passing before | warned (generator) |
+|---|---|---|---|---|
+| kicoil (full corpus, 997 cases) | 0 | 13 | 3: `concave_cshape_a0.9_n5k1`, `concave_uround_a0.9_n5k1`, `round_ellipse10to1_a0.90_n5k1` | 13 |
+| cornerflat (full corpus) | 0 | 11 | 2: `concave_cshape_a0.9_n5k1`, `concave_uround_a0.9_n5k1` | 11 |
+| optspan (29 cases with a bypass ≥ 4.5·(w + c) in any layout) | 0 | 12 | 1: `concave_cshape_a0.9_n5k1` | 12 |
+| jog (the same 29 cases) | 0 | 11 | 2: `concave_cshape_a0.9_n5k1`, `narrow_slot_w6.0_n5k2` | 11 |
+
+The others already failed (backtracks at the slivers of slender ellipses, conformance of the comb and the slot, the
+heart's cusp). In kicoil's `concave_heart_a0.3_n5k1` the longest contact (6.7·(w + c)) lies within the inner via and does
+not count.
+
+### D-FOLDS-3. Unwarned self short where the innermost turn wraps around a small hole
+
+**Defect.** The spacing measurement only pairs pieces at least 0.5 turns apart (in the spiral's parameter angle), and
+the fold rule needs pieces more than π·d apart along the conductor. A turn that wraps around a hole smaller than the
+trace comes back to itself 0.2–0.4 turns further on, only about π/2·d along the conductor: neither rule sees it, while
+the checker reports copper touching itself at least 0.18 turns further on as a self short.
+
+**Symptom.** `concave_starround_a0.9_n5k1` (10.5 mm annulus in a star with 13 mm inscribed radius, w = 3.644 mm): self
+short on F.Cu at (−1.864, 2.566), copper touching itself 0.21 turns further on (deficit 0.526 mm), no warning; the same
+with cornerflat, optspan and jog. `round_blob2_a0.90_n5k1` (w = 6.368 mm, 0.3–0.4 turns), cornerflat's
+`round_noisy_l_a0.90_n5k1`, `rstar0_a0.90_n3k1`. Both corpus cases were xfailed by name. Over the 17 cases with a self
+short in any layout, the self shorts without a fold warning were 3 of 4 (kicoil), 6 of 8 (cornerflat), 12 of 13 (optspan)
+and 4 of 6 (jog); now each of them is warned. In kicoil's full corpus the wrap rule also warns, without a self short, in 11
+a0.90_n3k1 cases of the main corpus (traces of 4–10 mm whose innermost turn comes within the clearance of itself around
+the hole) and in `round_dshape_a0.90_n5k1`.
+
+**Fix.** `measure_wraps` measures the closest approach of pieces of one turn at least `WRAP_SEPARATION` = 0.18 turns
+apart in *winding angle* around the shape's `winding_center` (the deepest straight-skeleton node, inside the hole;
+the origin for circles), skipping pieces less than π/2·(w + c) apart along the conductor (one bend, as in the
+checker); `_warn_folds` warns when it is less than trace width plus clearance. The spiral's parameter angle cannot be
+used: on noisy outlines it stands still over runs of short edges and then jumps 0.19 turns within 2.6 mm
+(`round_noisy_l_a0.90_n5k1`, outer turn near (5.0, 18.6)), which would report wraps that are not there. The two by-name
+xfails are removed: both cases now xfail as warned. Avoiding the short by narrowing the trace was tried and not kept:
+narrowing also shrinks the length within which pieces count as one bend, and the fixed point is 1.835 mm instead of
+3.644 (−50 %) for the star, 3.95 instead of 6.37 mm (−38 %) for blob2.
+
+**Original code:** rejects `concave_starround_a0.9_n5k1` and `round_blob2_a0.90_n5k1` (math domain error) and has no
+fold warnings.

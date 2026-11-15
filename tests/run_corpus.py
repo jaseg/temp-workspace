@@ -189,7 +189,9 @@ def summarize(results, file=sys.stdout):
           f'self overlaps: {cnt(lambda r: r["self_overlaps"] > 0)}', file=file)
     touch = [r for r in checked if r['status'] == 'pass' and r.get('self_touches', 0) > 0]
     print(f'  passes with same-turn copper touching itself (not failed): {len(touch)}, bypassing up to '
-          f'{max((r["max_self_touch_bypass"] for r in touch), default=0):.1f} mm of conductor', file=file)
+          f'{max((r["max_self_touch_bypass"] for r in touch), default=0):.1f} mm of conductor   '
+          f'self merges: {cnt(lambda r: r.get("self_merges", 0) > 0)}   '
+          f'self shorts: {cnt(lambda r: r.get("self_shorts", 0) > 0)}', file=file)
     print(f'  tracks ok (ignoring via issues): {cnt(lambda r: r["tracks_ok"])}', file=file)
     unc = sorted(r['uncovered_fraction'] for r in checked if not math.isnan(r['uncovered_fraction']))
     exc = sorted(r['excess_fraction'] for r in checked if not math.isnan(r['excess_fraction']))

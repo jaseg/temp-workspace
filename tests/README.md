@@ -41,21 +41,24 @@ Prerequisite: `src/kicoil/skeleton.wasm` (built from `cgal_skeleton_core`, or co
 | Winding | Total angle swept by the path around a point in the coil's hole must equal the number of turns (sign by direction). Catches lost, doubled or reversed turns. |
 | Backtracking | Consecutive segments on one layer that reverse direction (> 170°), e.g. a hairpin inside the track's own lane. A reversal whose reversing piece lies completely within one via's or pad's copper does not count. |
 | Crossings | Same-layer centerlines of segments that are not neighbors along the conductor must not intersect (strict crossing; touching shows up as zero clearance). |
-| Clearance | Edge-to-edge distance between copper of *different turns* must be at least the clearance. Copper belongs to different turns when it is at least half a turn apart in cumulative winding angle around the coil's center (measured at the closest points); only without a center (or for copper off the path) does distance along the conductor (more than max(4·(w+c), ¼ inner perimeter)) decide. Track-track (and dots), via-track/via-via and pad-track/pad-via/pad-pad violations are reported separately (worst deficit in mm and relative to the clearance). Deficits between parts of the same turn (the conductor folding onto itself at a tight tip, or a hairpin inside its own lane, which is a backtrack) are counted as `self_overlaps` and do not fail a case, unless the copper touches itself at least 0.18 turns apart (`self short`, part of a turn is shorted). See *Same turn or different turn* below. |
+| Clearance | Edge-to-edge distance between copper of *different turns* must be at least the clearance. Copper belongs to different turns when it is at least half a turn apart in cumulative winding angle around the coil's center (measured at the closest points); only without a center (or for copper off the path) does distance along the conductor (more than max(4·(w+c), ¼ inner perimeter)) decide. Track-track (and dots), via-track/via-via and pad-track/pad-via/pad-pad violations are reported separately (worst deficit in mm and relative to the clearance). Deficits between parts of the same turn (the conductor folding onto itself at a tight tip, or a hairpin inside its own lane, which is a backtrack) are counted as `self_overlaps` and do not fail a case, unless the copper touches itself at least 0.18 turns apart (`self short`, part of a turn is shorted) or, less than 0.18 turns apart, at least 6·(w+c) apart along the conductor (`self merge`, a stretch of the turn is shorted). See *Same turn or different turn* below. |
 | Spacing uniformity | Sampled edge-to-edge distance to the neighboring turn, relative to the clearance (min, 5th and 95th percentile), and `pitch_ratio` = (narrowest emitted track width + c) / nominal pitch, i.e. how much of the available pitch the layout turns into copper. |
 | Outline conformance | *Core coverage*: every spiral layer, inflated by half a pitch, must cover the band from ½ pitch to annular width − ½ pitch inside the outline (uncovered area means wasted space or a missing turn). *Overshoot*: no copper (tracks, dots, vias, pads) outside the envelope from −w/2 to annular width + w/2 (0.05 mm tolerance, independent of the trace width). Near a via or a terminal pad, copper may extend as far as a via of the intended diameter at the intended via offset reaches (offset + intended via radius, with three times the offset with staggered vias), so terminal pads may sit on the outer via ring; pads whose corners stick out further (e.g. a rotated square pad at a curved arm start when the via is no larger than the trace) fail. *Via offset*: every via center must lie within the intended via offset (three times that with staggered vias) of the band between outline and inner outline. *Undershoot*: every point of the outline within one pitch of copper. |
 
 A case passes when none of the checks fails: connectivity intact, no stray copper, vias intact and of the intended size,
 terminal pads at least as large as intended, track widths as intended, no
-crossings, no backtracks, no self shorts, track, pad and via clearance deficits at most 5 % of the clearance, via centers within
+crossings, no backtracks, no self shorts or self merges, track, pad and via clearance deficits at most 5 % of the clearance, via centers within
 0.05 mm of the intended via offset, the winding within 0.05 turns, and conformance holds (uncovered < 5 %,
 undershoot < 1.25 pitches, overshoot < 0.05 mm). `run_corpus.py` stores the names of the failed checks per case in
 `failures` and prints a count per kind. Requests that the generator rejects with a `ValueError` are reported as
 `rejected`; a clear rejection of an infeasible request is acceptable, a crash (`error`) is not. `test_corpus_case` in
-`test_layout.py` asserts the same checks except outline coverage. Clearance, via clearance and self short
+`test_layout.py` asserts the same checks except outline coverage. Clearance, via clearance, self short and self merge
 failures are expected failures there only when the generator warned about them (a turn folding onto itself, a via that
 does not fit next to the neighboring turn); on the full corpus that is `octagon_a0.90_n3k1`, `24gon_a0.90_n3k1` and
-`sector180_a0.90_n3k1`, where three turns in 90 % of the inscribed radius make the trace (and the via) about 4-10 mm wide.
+`sector180_a0.90_n3k1`, where three turns in 90 % of the inscribed radius make the trace (and the via) about 4-10 mm wide,
+`concave_starround_a0.9_n5k1` and `round_blob2_a0.90_n5k1` (self short: the innermost turn wraps around a hole smaller
+than the trace), and the self merges of `narrow_slot_w10.0_n4k1`, `concave_cshape/uround/comb_a0.9_n5k1` and
+`round_ellipse10to1_a0.90_n5k1`.
 
 ### Same turn or different turn
 
@@ -82,6 +85,16 @@ track 0.38-0.43 turns before it. Remaining edges: the base implementation's `sec
 (at the sector's apex), which passes as a fold; contacts of wraps closer than π/2·(w+c) along the conductor are not
 checked.
 
+Copper of one turn that touches itself less than 0.18 turns further on is a *self touch* (`self_touches`,
+`max_self_touch_bypass`: the conductor length between the pieces): the two sides of a hairpin, where a turn runs into a
+tip or an arm of the outline and back, merging. At a corner of angle α the copper merges over at most w/sin(α/2) of
+conductor, which is local for ordinary corners. When the pieces are at least `SELF_MERGE_BYPASS` = 6·(w+c) apart along
+the conductor (the merge of a tip sharper than 19°), the merged copper shorts a stretch of the turn: a `self merge`,
+which fails. On the cases of all families with a same-turn contact or a 90 % annulus, the largest bypass per case stays
+below 5.7·(w+c) at tips (crescent horns, shark fins, ellipse ends) with every implementation, and is at least 6.1·(w+c)
+for hairpins into C and U arms, the comb, the slot, the heart's cusp spike and the slivers of slender ellipses. The
+generator warns about merges from 3·(w+c) on (see docs/DEFECTS.md, D-FOLDS-1 and -2).
+
 ## Corpus
 
 Shapes: square, rectangles (2:1, 5:1), trapezoid, regular 3/5/6/8/24-gons, ellipses, rounded rectangle, rectangles with
@@ -93,8 +106,7 @@ Extra families in their own modules (`tests/corpus_<family>.py`, selected alone 
 blob, a 1000 vertex outline with coordinates rounded to 1 µm, ellipses from 2:1 to 20:1, superellipses, smooth blobs,
 stadium, rounded rectangle, egg, teardrop, bean, noisy circles, nearly collinear runs, short edges, D shape, circle with a
 sharp tip). A case may declare failure kinds it is known to show in the fixed layout, with the reason
-(`known_failures`, e.g. the backtrack at the sliver tips of slender ellipses, or the unwarned self short of blob2 at
-90 %, where the inner turn wraps around an inner contour smaller than the trace); `test_corpus_case` xfails those
+(`known_failures`, e.g. the backtrack at the sliver tips of slender ellipses); `test_corpus_case` xfails those
 instead of asserting them.
 
 Concave family (`corpus_concave.py`, `--kind concave`, 132 cases): a plush-shark silhouette (91 vertices, as a polygon

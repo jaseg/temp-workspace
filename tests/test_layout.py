@@ -5,6 +5,7 @@ uses the quick subset.
 """
 
 import math
+import re
 import warnings
 
 import pytest
@@ -28,7 +29,7 @@ def layout(spec, caught=None):
 
 FOLD_WARNING = 'folds onto itself'
 # Failure kinds that a warning from the generator can explain
-WARNED_KINDS = ('clearance', 'via clearance', 'self short')
+WARNED_KINDS = ('clearance', 'via clearance', 'self short', 'self merge')
 
 
 def _cases(request_full):
@@ -871,7 +872,9 @@ def test_fold_at_thin_inner_tip_is_a_same_turn_fold():
     caught = []
     model, intent, rep = layout(poly_spec(poly, round(0.9 * corpus.max_depth(poly), 4), 5, 1), caught)
     folds = [m for m in caught if FOLD_WARNING in m or 'comes within' in m]
-    assert any('(12.445, -1.820)' in m for m in folds)
+    # (since the warning also covers merged copper, it names the closest approach at that tip)
+    at = [tuple(map(float, re.match(r'Near \(([-\d.]+), ([-\d.]+)\)', m).groups())) for m in folds]
+    assert any(math.dist(p, (12.445, -1.820)) < 2 for p in at), folds
     assert rep.clearance_violations == 0 and rep.self_overlaps > 0 and rep.self_shorts == 0
     assert rep.failure_kinds(intent.clearance, intent.trace_width) == []
 
@@ -902,3 +905,52 @@ def test_real_reflex_corners_are_not_simplified(monkeypatch):
     with pytest.raises(Stop):
         skeletonator.Skeletonator(poly)
     assert seen == [poly]
+
+
+def _fold_warnings(name, impl='kicoil'):
+    caught = []
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        model = build_model(spec(name), impl)
+    return model, [str(x.message) for x in w if FOLD_WARNING in str(x.message)]
+
+
+@pytest.mark.parametrize('name', ['concave_crescent_a0.6_n5k1', 'concave_crescent_a0.6_n8k3',
+                                  'concave_crescent_a0.6_n7k3_cw'])
+def test_merge_at_a_sharp_tip_is_warned(name):
+    # The turns run into the crescent's horns and back: the copper of the two sides of a turn merges (centerlines
+    # closer than the trace width) over more than 3 * (w + c) of conductor. The fold rule only looked at pieces closer
+    # than trace width plus clearance more than pi*d + pitch or 4 * (w + c) apart along the conductor, and did not warn.
+    _model, folds = _fold_warnings(name)
+    assert any('overlaps itself' in m for m in folds), folds
+
+
+@pytest.mark.parametrize('name', ['triangle_a0.60_n5k1', 'star5_a0.60_n5k1', 'circle30x6_n5k1', 'square40_a0.30_n8k3'])
+def test_ordinary_corners_and_small_holes_are_not_warned(name):
+    # Copper merging at corners wider than about 35 degrees, and a turn bending around a hole (pieces less than
+    # pi/2 * (w + c) apart along the conductor), are not folds
+    _model, folds = _fold_warnings(name)
+    assert folds == []
+
+
+@pytest.mark.parametrize('name, impl', [('concave_starround_a0.9_n5k1', 'kicoil'),
+                                        ('concave_starround_a0.9_n5k1', 'geometry_alt_cornerflat'),
+                                        ('round_blob2_a0.90_n5k1', 'kicoil'),
+                                        ('round_noisy_l_a0.90_n5k1', 'geometry_alt_cornerflat')])
+def test_wrap_around_a_small_hole_is_warned(name, impl):
+    # The innermost turn wraps around a hole smaller than the trace (star: 3.6 mm trace, blob: 6.4 mm) and its copper
+    # touches itself 0.2 to 0.4 turns further on, which the checker reports as a self short. The spacing measurement
+    # skips pieces less than half a turn apart (in the spiral's parameter angle) and the fold rule needs pieces more than
+    # pi*d apart along the conductor, which a wrap around a small hole (about pi/2*d) is not: no warning before.
+    model, folds = _fold_warnings(name, impl)
+    assert any('wraps around a hole' in m for m in folds), folds
+    assert model.min_wrap_spacing < model.trace_width + model.clearance
+
+
+def test_wrap_measurement_uses_the_winding_angle():
+    # The noisy circle's angle reference stands still over runs of short edges and then jumps by 0.19 turns within
+    # 2.6 mm; in the spiral's parameter angle, the outer turn near (5.0, 18.6) seems to come back to itself. In winding
+    # angle it does not, and the checker finds no self short in this layout.
+    model, folds = _fold_warnings('round_noisy_l_a0.90_n5k1')
+    assert folds == []
+    assert model.min_wrap_spacing >= model.trace_width + model.clearance - 1e-6

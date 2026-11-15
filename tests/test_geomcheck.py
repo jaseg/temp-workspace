@@ -469,8 +469,11 @@ def test_hairpin_backtrack(name):
     assert rep.ok_connectivity, rep.notes
     assert rep.backtracks > 0
     # The spike stays within the same turn (no winding angle between it and its track), so its copper overlapping the
-    # track is a self overlap, not a clearance violation, however long it is.
-    assert rep.failure_kinds(intent.clearance, intent.trace_width) == ['backtrack'], rep.notes
+    # track is a self overlap, not a clearance violation, however long it is. A spike longer than 3 * (w + c) also
+    # merges copper that is 6 * (w + c) apart along the conductor (a self merge).
+    kinds = rep.failure_kinds(intent.clearance, intent.trace_width)
+    assert kinds == ['backtrack'] + (['self merge'] if l/2 >= 3 * (intent.trace_width + intent.clearance) else []), \
+        (kinds, rep.notes)
     assert not rep.passed(intent.clearance, intent.trace_width)
 
 
@@ -859,3 +862,49 @@ def test_reversal_inside_via_is_not_a_backtrack(inside):
     rep = report(cu, intent, do_conformance=False)
     assert rep.ok_connectivity, rep.notes
     assert (rep.backtracks == 0) == inside, rep.notes
+
+
+def test_hairpin_merge_is_a_self_merge():
+    # The innermost turn of a deep C runs into the C's arm and back; the copper of its two sides merges over the whole
+    # arm and bypasses about 20 mm (11 * (w + c)) of the conductor: a self merge, less than 0.18 turns apart in winding
+    # angle, so not a self short.
+    intent, cu, kinds = load('concave_cshape_a0.9_n5k1')
+    rep = report(cu, intent, do_conformance=False)
+    if rep.max_self_touch_bypass < geomcheck.SELF_MERGE_BYPASS * (intent.trace_width + intent.clearance):
+        pytest.skip('the generator no longer produces this merge')
+    assert 'self merge' in kinds and 'self short' not in kinds
+    s_merge = geomcheck.SELF_MERGE_BYPASS * (intent.trace_width + intent.clearance)
+    merges = [ds for _l, _p, _q, deficit, dth, ds in rep.self_overlap_points
+              if deficit >= intent.clearance - 1e-4 and dth < geomcheck.SELF_SHORT_SEP and ds >= s_merge]
+    assert rep.self_merges == len(merges) > 0
+
+
+@pytest.mark.parametrize('name', ['ellipse3to1_a0.90_n3k1', 'concave_crescent_a0.6_n5k1'])
+def test_merge_at_a_tip_is_not_a_self_merge(name):
+    # At the narrow ends of an ellipse and the horns of a crescent the copper of the two sides of a turn merges, but only
+    # locally (3.2 to 3.5 times trace width plus clearance along the conductor)
+    intent, cu, kinds = load(name)
+    rep = report(cu, intent, do_conformance=False)
+    assert rep.self_touches > 0
+    assert rep.self_merges == 0 and 'self merge' not in kinds
+    assert rep.max_self_touch_bypass < geomcheck.SELF_MERGE_BYPASS * (intent.trace_width + intent.clearance)
+
+
+def test_self_merge_threshold():
+    # A straight hairpin: a track runs out and back 0.8 * w apart (copper overlaps), with legs of length L. The merged
+    # copper bypasses about 2*L of conductor: a self merge from 2*L >= 6*(w + c) = 7.2 mm on.
+    def hairpin(L):
+        w, c = 1.0, 0.2
+        d = 0.8 * w
+        pts = [(-10.0, -8.0), (0.0, 0.0), (L, 0.0), (L, d), (0.0, d), (-10.0, d + 8.0)]
+        segs = [Seg('F.Cu', a, b, w) for a, b in zip(pts, pts[1:])]
+        pads = [Pad('1', ('F.Cu',), *pts[0], w), Pad('2', ('F.Cu',), *pts[-1], w)]
+        return geomcheck.Copper(segs=segs, vias=[], pads=pads, layers=('F.Cu', 'B.Cu')), w, c
+    out = {}
+    for L in (2.0, 5.0):
+        cu, w, c = hairpin(L)
+        intent = geomcheck.Intent(contour=[(-20, -20), (20, -20), (20, 20), (-20, 20)], annular_width=5,
+                                  turns=0, trace_width=w, clearance=c, pitch=w + c, center=(0.0, -15.0))
+        out[L] = report(cu, intent, do_conformance=False)
+    assert out[2.0].self_touches > 0 and out[2.0].self_merges == 0
+    assert out[5.0].self_merges > 0

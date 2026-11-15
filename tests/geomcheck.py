@@ -31,7 +31,9 @@ Checks:
                   dots), via-track/via-via and pad-track/pad-via/pad-pad violations are reported separately.
                   Clearance deficits between parts of the *same* turn (the conductor folding onto itself at a tight
                   tip, or a hairpin) are counted as self overlaps and do not fail a case, unless the copper touches
-                  itself at least SELF_SHORT_SEP (0.18) turns apart, which shorts part of a turn (a self short).
+                  itself at least SELF_SHORT_SEP (0.18) turns apart, which shorts part of a turn (a self short), or
+                  less than that apart in winding angle but at least SELF_MERGE_BYPASS (6) times trace width plus
+                  clearance apart along the conductor, which shorts a stretch of the turn (a self merge).
     spacing       Sampled distribution of the edge-to-edge distance between neighboring turns, relative to the nominal
                   clearance. Tells how uniform the layout is, i.e. how much copper area is wasted by loose spacing.
     conformance   Per layer, the union of the tracks inflated by half a pitch must tile the intended annulus (contour
@@ -63,6 +65,14 @@ TURN_SEP = 0.5 # revolutions; copper at least this far apart in cumulative windi
 # implementations) such contacts at folds of the conductor at a tight tip stay below 0.14 turns; a wide trace that wraps
 # around a hole smaller than itself touches itself 0.22 to 0.5 turns further on. 0.18 lies in the middle of the gap.
 SELF_SHORT_SEP = 0.18
+# Copper of the same turn that touches itself less than SELF_SHORT_SEP turns further on (a hairpin: the turn runs into a
+# tip or a narrow arm of the outline and comes back) shorts the conductor between the two pieces. Where they are less
+# than this many times (trace width + clearance) apart along the conductor, the merge is local: at a corner of angle a the
+# two sides' copper touches over at most w/sin(a/2) of conductor, less than 6*(w + c) for every corner wider than 19
+# degrees. Further apart, the merged copper bypasses a stretch of the turn (a self merge). On the whole corpus (all
+# four layout implementations) merges at tips stay below 5.7 (w + c) (crescent horns, shark fins); hairpins into the arms
+# of C and U shapes, combs, slots and the slivers of slender ellipses bypass 6.6 to 14 (w + c) and more.
+SELF_MERGE_BYPASS = 6.0
 OVERSHOOT_TOL = 0.05 # mm of copper (or of a via center) allowed beyond the intended envelope
 WIDTH_TOL = 0.01 # allowed relative deviation of an emitted track width from the intended trace width ...
 WIDTH_TOL_ABS = 0.001 # ... or this many mm, whichever is larger
@@ -408,6 +418,9 @@ class Report:
     # copper bypasses that much conductor (path distance between the pieces).
     self_touches: int = 0
     max_self_touch_bypass: float = 0.0 # mm
+    # Self touches that bypass at least SELF_MERGE_BYPASS * (trace width + clearance) of conductor (a self merge: the
+    # merged copper shorts a stretch of the turn)
+    self_merges: int = 0
     min_width: float = float('nan') # mm, narrowest emitted track
     max_width: float = float('nan') # mm, widest emitted track
     taper_pieces: int = 0 # tapered pieces recognized (variable width layouts)
@@ -491,6 +504,8 @@ class Report:
             kinds.append('clearance')
         if self.self_shorts:
             kinds.append('self short')
+        if self.self_merges:
+            kinds.append('self merge')
         if self.worst_pad_deficit > tol:
             kinds.append('pad clearance')
         if vias and self.worst_via_deficit > tol:
@@ -947,6 +962,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
     # partially, where each one's dangling end lies on the other, are one track drawn in two pieces. Pieces that fold
     # back onto each other at a common node are left to the backtrack check.
     duplicate = set()
+    split_pairs = set() # (i, j), i < j: one track drawn in two partially overlapping pieces
     q_a, q_b = tree.query(geoms, predicate='dwithin', distance=ATTACH_TOL)
     for i, j in zip(q_a, q_b):
         if i >= j or segs[i].layer != segs[j].layer or not _parallel(segs[i], segs[j]):
@@ -974,6 +990,7 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
                 nj = node_of[(j, ej)]
                 if seg_deg[nj] == 1 and _on_seg(sj.b if ej else sj.a, si):
                     uf.union(ni, nj)
+                    split_pairs.add((int(i), int(j)))
     rdeg = defaultdict(int)
     for n, d in seg_deg.items():
         rdeg[uf.find(n)] += d
@@ -1264,6 +1281,8 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
     s_far = max(4*(w + clr), 0.25 * inner_len)
     # Pieces of the same turn closer than this along the path never count as clearance violations or crossings
     s_near = math.pi/2 * (w + clr)
+    # Same-turn copper contacts at least this far apart along the conductor bypass a stretch of the turn (self merge)
+    s_merge = SELF_MERGE_BYPASS * (w + clr)
     turn_sep = TURN_SEP * 2*math.pi
 
     def other_turn(ds, th1, th2):
@@ -1281,6 +1300,13 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             rep.self_overlap_points.append((layer, p, q, deficit, dth, ds))
         if deficit >= clr - 1e-4 and dth < SELF_SHORT_SEP:
             rep.self_touches += 1
+            # (merged copper within one via or pad, e.g. an arm that runs past its via into a sharp tip and back, shorts
+            # nothing outside that body)
+            if ds >= s_merge and not in_one_body(layer, p, q):
+                rep.self_merges += 1
+                if ds > rep.max_self_touch_bypass:
+                    rep.note(f'self merge on {layer} at ({p[0]:.3f}, {p[1]:.3f}): copper touches itself '
+                             f'{ds:.2f} mm further on along the conductor')
             rep.max_self_touch_bypass = max(rep.max_self_touch_bypass, float(ds))
         if deficit >= clr - 1e-4 and dth >= SELF_SHORT_SEP:
             rep.self_shorts += 1
@@ -1316,6 +1342,8 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
             if len(rep.crossing_points) < max_records:
                 rep.crossing_points.append((si.layer, p))
         if deficit > 1e-4:
+            if not far and (int(i), int(j)) in split_pairs:
+                continue # the two pieces of one track overlap each other by construction
             if not far:
                 same_turn_deficit(deficit, theta_at(i, p), theta_at(j, q), si.layer, p, q, ds)
                 continue
