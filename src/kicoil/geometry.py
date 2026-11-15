@@ -993,25 +993,22 @@ class RegularPolygonShape(OffsetShape):
 
 @dataclass
 class SVGShape(OffsetShape):
+    """ Outline from an SVG file: the largest closed contour of all its paths and shapes, with transforms and units
+    applied and curves flattened to within arc_tolerance (mm). See svg_import for what is read and how units are taken.
+    The file's coordinates are used as they are (y down, as in KiCad); the origin stays the file's origin unless it is
+    outside the outline's bounding box, then the outline is centered on its centroid. """
     filename: str
     annular_width: float
-    arc_tolerance: float = 0.05 # mm
+    arc_tolerance: float = 0.01 # mm (svg_import.DEFAULT_TOLERANCE)
     polygon: list = field(init=False)
 
     def __post_init__(self):
-        # center on y axis
-        from bs4 import BeautifulSoup
-        with open(self.filename) as f:
-            soup = BeautifulSoup(f.read(), features='xml')
-            path = soup.find('path', recursive=True)
-            d = path.attrs['d']
-            d = d.strip('MmZ ').replace(',', 'L')
-            coord_pairs = d.split('L')
-            coords = [tuple(map(float, pair.split())) for pair in coord_pairs]
-            
+        from . import svg_import
+        coords = svg_import.read_outline(self.filename, self.arc_tolerance)
+
         if polygon_is_clockwise(coords):
-            coords = coords[::-1]
-            
+            coords = coords[:1] + coords[:0:-1] # vertex 0 stays vertex 0
+
         # Calculate bounding box
         min_x = min(x for x, _y in coords)
         max_x = max(x for x, _y in coords)

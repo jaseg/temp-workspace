@@ -75,8 +75,8 @@ def shark():
 
 def shark_svg_path_d(pts, margin=5.0, reverse=False):
     """ SVG path data of the outline in SVG coordinates (y down, all coordinates positive, so the shark appears upright
-    in an SVG viewer), repeating the start point, in the dialect SVGShape reads ("M x y,x y,...,x y Z" with commas
-    between points).
+    in an SVG viewer), repeating the start point, in the dialect the original SVGShape read ("M x y,x y,...,x y Z" with
+    commas between points; kicoil.svg_import reads all path syntax, test_svg_import.py tests the others).
 
     SVGShape takes the file's numbers as they are (KiCad's y axis points down, too) and reverses the point order when
     their shoelace area is negative (`polygon_is_clockwise`). `pts` is counter-clockwise with y up; mirroring y flips the
