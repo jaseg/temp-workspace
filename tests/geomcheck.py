@@ -79,7 +79,7 @@ SELF_SHORT_SEP = 0.18
 # Further apart, the merged copper bypasses a stretch of the turn of six pitches or more (a self merge). The threshold is
 # geometric; the corpus has no gap there: tips merge over up to 6.3 (w + c) (crescent horns, shark fins, tapered fingers,
 # ellipse ends), hairpins into the arms of C and U shapes, combs, slots, the heart's cusp spike and the slivers of slender
-# ellipses over 6.1 to 31 (w + c) (all four layout implementations, see docs/DEFECTS.md, D-FOLDS-2).
+# ellipses over 6.1 to 31 (w + c) (all four layout implementations, see docs/DEFECTS.md, D37).
 SELF_MERGE_BYPASS = 6.0
 OVERSHOOT_TOL = 0.05 # mm of copper (or of a via center) allowed beyond the intended envelope
 # The intended inner contour is the Euclidean inward offset of the outline by the annular width (round around reflex

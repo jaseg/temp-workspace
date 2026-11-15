@@ -41,9 +41,9 @@ Prerequisite: `src/kicoil/skeleton.wasm` (built from `cgal_skeleton_core`, or co
 | Winding | Total angle swept by the path around a point in the coil's hole must equal the number of turns (sign by direction). Catches lost, doubled or reversed turns. |
 | Backtracking | Consecutive segments on one layer that reverse direction (> 170°), e.g. a hairpin inside the track's own lane. A reversal whose reversing piece lies completely within one via's or pad's copper does not count. |
 | Crossings | Same-layer centerlines of segments that are not neighbors along the conductor must not intersect (strict crossing; touching shows up as zero clearance). |
-| Clearance | Edge-to-edge distance between copper of *different turns* must be at least the clearance. Copper belongs to different turns when it is at least half a turn apart in cumulative winding angle around the coil's center (measured at the closest points); only without a center (or for copper off the path) does distance along the conductor (more than max(4·(w+c), ¼ inner perimeter)) decide. Track-track (and dots), via-track/via-via and pad-track/pad-via/pad-pad violations are reported separately (worst deficit in mm and relative to the clearance). Deficits between parts of the same turn (the conductor folding onto itself at a tight tip, or a hairpin inside its own lane, which is a backtrack) are counted as `self_overlaps` and do not fail a case, unless the copper touches itself at least 0.18 turns apart (`self short`, part of a turn is shorted) or, less than 0.18 turns apart, at least 6·(w+c) apart along the conductor (`self merge`, a stretch of the turn is shorted). See *Same turn or different turn* below. |
+| Clearance | Edge-to-edge distance between copper of *different turns* must be at least the clearance. Copper belongs to different turns when it is at least half a turn apart in cumulative winding angle around the coil's center (measured at the closest points); only without a center (or for copper off the path) does distance along the conductor (more than max(4·(w+c), ¼ inner perimeter)) decide. Track-track (and dots), via-track/via-via and pad-track/pad-via/pad-pad violations are reported separately (worst deficit in mm and relative to the clearance). Deficits between parts of the same turn (the conductor folding onto itself at a tight tip, or a hairpin inside its own lane, which is a backtrack) are counted as `self_overlaps` and do not fail a case, unless the copper touches itself at least 0.18 turns apart (`self short`, part of a turn is shorted) or, less than 0.18 turns apart, at least 6·(w+c) apart along the conductor (`self merge`, a stretch of the turn is shorted). Copper that leaves its own via and comes back to touch it is a self short as well (`own_via_shorts`), however close to the via along the conductor; copper that never left the via is the conductor's arrival. See *Same turn or different turn* below. |
 | Spacing uniformity | Sampled edge-to-edge distance to the neighboring turn, relative to the clearance (min, 5th and 95th percentile), and `pitch_ratio` = (narrowest emitted track width + c) / nominal pitch, i.e. how much of the available pitch the layout turns into copper. |
-| Outline conformance | *Core coverage*: every spiral layer, inflated by half a pitch, must cover the band from ½ pitch to annular width − ½ pitch inside the outline (uncovered area means wasted space or a missing turn). Depths are Euclidean: the inner contour is the true inward offset of the outline, round around reflex corners (D-CUSP-2); the uncovered fraction is relative to the band the envelope admits (below), whose area is the mitered band's for outlines without reflex corners sharper than 120°. *Overshoot*: no copper (tracks, dots, vias, pads) outside the envelope from −w/2 to annular width + w/2 (0.05 mm tolerance, independent of the trace width); around reflex corners the envelope also takes in the mitered offset, cut off at twice the depth (`ENVELOPE_MITER_LIMIT`). Near a via or a terminal pad, copper may extend as far as a via of the intended diameter at the intended via offset reaches (offset + intended via radius, with three times the offset with staggered vias), so terminal pads may sit on the outer via ring; pads whose corners stick out further (e.g. a rotated square pad at a curved arm start when the via is no larger than the trace) fail. *Via offset*: every via center must lie within the intended via offset (three times that with staggered vias) of the band between outline and inner outline. *Undershoot*: every point of the outline within one pitch of copper. |
+| Outline conformance | *Core coverage*: every spiral layer, inflated by half a pitch, must cover the band from ½ pitch to annular width − ½ pitch inside the outline (uncovered area means wasted space or a missing turn). Depths are Euclidean: the inner contour is the true inward offset of the outline, round around reflex corners (D44); the uncovered fraction is relative to the band the envelope admits (below), whose area is the mitered band's for outlines without reflex corners sharper than 120°. *Overshoot*: no copper (tracks, dots, vias, pads) outside the envelope from −w/2 to annular width + w/2 (0.05 mm tolerance, independent of the trace width); around reflex corners the envelope also takes in the mitered offset, cut off at twice the depth (`ENVELOPE_MITER_LIMIT`). Near a via or a terminal pad, copper may extend as far as a via of the intended diameter at the intended via offset reaches (offset + intended via radius, with three times the offset with staggered vias), so terminal pads may sit on the outer via ring; pads whose corners stick out further (e.g. a rotated square pad at a curved arm start when the via is no larger than the trace) fail. *Via offset*: every via center must lie within the intended via offset (three times that with staggered vias) of the band between outline and inner outline. *Undershoot*: every point of the outline within one pitch of copper. |
 
 A case passes when none of the checks fails: connectivity intact, no stray copper, vias intact and of the intended size,
 terminal pads at least as large as intended, track widths as intended, no
@@ -54,12 +54,14 @@ undershoot < 1.25 pitches, overshoot < 0.05 mm). `run_corpus.py` stores the name
 `rejected`; a clear rejection of an infeasible request is acceptable, a crash (`error`) is not. `test_corpus_case` in
 `test_layout.py` asserts the same checks except outline coverage. Clearance, via clearance, self short and self merge
 failures are expected failures there only when the generator warned about them (a turn folding onto itself, a via that
-does not fit next to the neighboring turn, or a via that touches its own turn); on the full corpus those are the a0.90
-n3k1 cases of the main corpus, where three turns in 90 % of the inscribed radius make the trace (and the via) about 4-10
-mm wide and the innermost turn wraps around a hole smaller than the trace (self short), `concave_starround_a0.9_n5k1`
-and `round_blob2_a0.90_n5k1` (the same), and the self merges of `narrow_slot_w10.0_n4k1`,
-`concave_cshape/uround/comb_a0.9_n5k1`, `concave_crescent_a0.9_n8k3`, `concave_shark/sharksvg_a0.3_n8k3` and
-`round_ellipse10to1_a0.90_n5k1`.
+does not fit next to the neighboring turn, or a via that touches its own turn). On the full corpus (kicoil) those are:
+the a0.90 n3k1 cases of the main corpus, where three turns in 90 % of the inscribed radius make the trace (and the via)
+about 4-10 mm wide and the innermost turn wraps around a hole smaller than the trace (self short; `octagon` and `24gon`
+also clearance and via clearance), `concave_starround_a0.9_n5k1` and `round_blob2_a0.90_n5k1` (the same), and the self
+merges of `narrow_slot_w10.0_n4k1`, `concave_cshape/uround/comb_a0.9_n5k1`, `concave_crescent_a0.9_n8k3`,
+`concave_heart_a0.3_n5k1` (at the bottom tip), `round_ellipse10to1_a0.90_n5k1`, `round_ellipse20to1_a0.90_n5k1` and
+`round_ellipse20to1_a0.60_n7k3_cw/n8k3`. `round_ellipse10to1_a0.60_n21k8` keeps a warned via-via clearance deficit
+(D33).
 
 ### Same turn or different turn
 
@@ -94,8 +96,8 @@ triangle at 96 %, 4 turns: the innermost turn runs out to a corner and back past
 wraps closer than π/2·(w+c) along the conductor are not checked.
 
 Since same-turn contacts are measured along the whole contact (below), a corner of the innermost turn close to the
-center whose copper merges over 1.6-1.9·(w+c) at 0.18-0.46 turns counts as a self short, too: 18 cases of
-kicoil's full corpus, 16 of them a0.90 n3k1 (all of which fail conformance anyway).
+center whose copper merges over 1.6-1.9·(w+c) at 0.18-0.46 turns counts as a self short, too: 15 a0.90 n3k1 cases of
+kicoil's full corpus (all of which fail conformance anyway).
 
 Copper of one turn that touches itself less than 0.18 turns further on is a *self touch* (`self_touches`,
 `max_self_touch_bypass`: the conductor length between the pieces): the two sides of a hairpin, where a turn runs into a
@@ -103,8 +105,8 @@ tip or an arm of the outline and back, merging. At a corner of angle α the copp
 which is local for ordinary corners. When the pieces are at least `SELF_MERGE_BYPASS` = 6·(w+c) apart along the
 conductor (the merge of a tip sharper than about 19°, or of a hairpin into a narrow arm), the merged copper shorts a
 stretch of the turn of six pitches or more: a `self merge`, which fails. The corpus has no gap at that length (tips reach
-6.3·(w+c), hairpins into arms start at 6.1), so the threshold is the geometric one; see docs/DEFECTS.md, D-FOLDS-2. The
-generator measures merges and wraps the same way and warns about merges from 5·(w+c) on (D-FOLDS-1, -3).
+6.3·(w+c), hairpins into arms start at 6.1), so the threshold is the geometric one; see docs/DEFECTS.md, D37. The
+generator measures merges and wraps the same way and warns about merges from 5·(w+c) on (D36, D38).
 
 Same-turn contacts are measured over the whole stretch where two plain tracks are close, not only at their closest
 points: both center lines are sampled at a quarter of the trace width, each sample paired with its closest point on the
@@ -112,9 +114,9 @@ other track, the ends of the stretch of it that its copper touches, and the poin
 along the conductor, 0.18 turns in winding angle); the end of the longest contact is located by bisection; vias and pads
 against a track likewise. The
 closest points of two long legs of a V lie at its tip, so before, the bypassed length (and whether a corner close to the
-center counted as a self short) depended on how the conductor was cut into segments (D-FOLDS-4). The coil's center is
+center counted as a self short) depended on how the conductor was cut into segments (D39). The coil's center is
 GEOS's interior point of the inset outline, except that its rounding-dependent choices (a vertex in the middle of the
-extent, two equally wide stretches of a symmetric hole) are made deterministically (D-FOLDS-5).
+extent, two equally wide stretches of a symmetric hole) are made deterministically (D40).
 
 ### Same turn or different turn in the cornerflat layout
 
@@ -138,7 +140,7 @@ angle:
   but, as in the checker, only where they are at least 0.98·π/2·(w+c) apart along the conductor. That threshold depends
   on the result, so the measurement takes the largest spacing no pair rules out. Closer in winding angle, the turn folds
   onto itself at a tip; that does not limit the spacing, and where such a fold comes within the clearance at least
-  π/2·(w+c) along the conductor, the fold warning reports it (as in the base layout, D32).
+  π/2·(w+c) along the conductor, the fold warning reports it (as in the base layout, D28 and D32).
 - The vias at the arm ends (as wide as the trace) are checked against the track of their own arm the same way: the
   checker compares a via with track of its own turn from π/2·(w+c) plus the via radius along the conductor on.
 - The center: the checker takes the interior point of the outline inset by 1.02 times the annular width (shapely's
@@ -148,8 +150,9 @@ angle:
   the checker's center and every point it may pick when vertex heights near the scan line (within 0.2 % of the inset's
   height) or section widths (within 0.5 %) tie, and the largest winding separation over these centers counts.
 
-This also removes the self shorts of `round_blob2_a0.90_n5k1` (0.26 turns, linear layout; the base layout still has it),
-`round_noisy_l_a0.90_n5k1` (0.19 turns), `sector90`, `sector180`, `rstar0` (a0.90 n3k1) and `concave_starround_a0.9_n5k1`.
+This also removed the self shorts of `round_blob2_a0.90_n5k1` (0.26 turns, linear layout; the base layout still has it),
+`round_noisy_l_a0.90_n5k1` (0.19 turns), `sector90`, `sector180`, `rstar0` (a0.90 n3k1) and `concave_starround_a0.9_n5k1`
+as the checker measured them before D39 (since then `sector90`, `rstar0` and `starround` have warned ones again, below).
 Where the old layouts touched themselves the trace gets narrower (e.g. `sector90_a0.90_n3k1` 0.985 to 0.969); where the
 old layout was checker-clean the measurement now keeps it (e.g. `rconvex0_a0.90_n3k1` at 0.969, `triangle_a0.90_n3k1` at
 0.966). The full clearance between the pieces of a wrapping turn costs width where the old layouts kept less than the
@@ -157,6 +160,20 @@ clearance (`24gon_a0.90_n3k1` 0.878 to 0.739, `octagon_a0.90_n3k1` 0.918 to 0.90
 before). `pentagon_a0.90_n3k1` drops from 0.934 to 0.831 for another reason: its widest candidate fails the generator's
 via check (a via 0.37 mm into a neighboring turn, which the generator also warned about before; the checker does not see
 it), and the via fallback now reaches a candidate whose vias fit.
+
+Since the checker measures same-turn contacts along their whole length (D39) and counts copper that comes back to
+its own via (D34), it sees contacts that this measurement (closest points of each pair of center line segments, and end
+vias only from π/2·(w+c) plus the via radius along the conductor on) does not. On the full corpus that gives 18
+cornerflat self shorts and 12 self merges, all warned by the generator (fold or own-via warning), so
+`test_cornerflat_round` accepts them as warned (`_unwarned`): self shorts at corners of the wide innermost turn of 10
+a0.90 cases (`triangle`, `pentagon`, `star6_shallow`, `sector90`, `rconvex0/3`, `rstar0/1/3` at n3k1, `rconvex0` at
+n5k3) and of `concave_starround_a0.9_n5k1`, which the closest-point measurement had cleared; own-via self shorts in
+`ellipse3to2/d_shape/rconvex2_a0.90_n5k3`, `rconvex0_a0.90_n9k4`, `sector180_a0.90_n5k3` and `star5_a0.60_n7k3(_cw)`;
+and the self merges of the sliver tips, the same as in the base layout (`round_ellipse10to1_a0.90_n5k1`,
+`concave_crescent_a0.9_n5k1`, which this measurement widened to a pitch ratio of 1.0, a narrower trace would not shorten
+the merge), the C, U, comb, slot, crescent n8k3 and shark a0.6 n13k4. Comparing pieces of at most a quarter pitch
+instead (as the checker samples) was tried on the a0.90 n3k1 cases: it removes 6 of 9 self shorts there but costs up to
+16 % of the pitch (`rconvex0` 0.969 to 0.811, `triangle` 0.966 to 0.821, still with a self short), so it was not adopted.
 
 Limits: on symmetric holes the conservative center set narrows some arm phases, and the coverage step only looks at
 candidates within 0.005 pitches of the widest spacing, so it can be left with candidates that do not cover the outline:
@@ -184,7 +201,7 @@ Extra families in their own modules (`tests/corpus_<family>.py`, selected alone 
 blob, a 1000 vertex outline with coordinates rounded to 1 µm, ellipses from 2:1 to 20:1, superellipses, smooth blobs,
 stadium, rounded rectangle, egg, teardrop, bean, noisy circles, nearly collinear runs, short edges, D shape, circle with a
 sharp tip). A case may declare failure kinds it is known to show in the fixed layout, with the reason
-(`known_failures`, e.g. the backtrack at the sliver tips of slender ellipses); `test_corpus_case` xfails those
+(`known_failures`, e.g. the backtrack of turns reversing at the sharp tips of the deeper offsets of the 20:1 ellipse); `test_corpus_case` xfails those
 instead of asserting them.
 
 Concave family (`corpus_concave.py`, `--kind concave`, 143 cases): a plush-shark silhouette (91 vertices, as a polygon
@@ -195,7 +212,7 @@ counter-clockwise; `test_concave.py` also imports the other orientation and the 
 bean, heart, crescent, C, rounded L and U, cross, comb, star with rounded tips and a dumbbell. For non-convex outlines
 the straight skeleton's first split event limits the annular width (`Skeletonator.max_depth`), often far below the
 inscribed radius, so the annular widths are 30/60/90 % of each shape's split depth. The heart's cusp is cut with a
-tiny arc for the skeleton (D-CUSP-1), which lifts its split depth from 1.6 to 10.1 mm: `heart` keeps the annular widths
+tiny arc for the skeleton (D43), which lifts its split depth from 1.6 to 10.1 mm: `heart` keeps the annular widths
 of the mitered skeleton (0.48–1.44 mm, the cases of that defect), `heartdeep` uses the new depth. Turns/twists n5k1, n8k3, n13k4,
 single layer, clockwise. Cases with a documented limitation of the layout carry `known_issue`, which names the
 failure kinds it explains; `test_layout.py` xfails such a case only when all of its failure kinds are among them.

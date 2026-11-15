@@ -623,7 +623,7 @@ pins the classification and the warning.
 
 ## Vias
 
-### D-VIAS-1. Inner vias placed on top of each other, shorting the arms (warned only)
+### D33. Inner vias placed on top of each other, shorting the arms (warned only)
 
 **Defect.** The automatic via offset ((via diameter − trace width)/2, at most the collapse depth minus the annular
 width) moves the inner vias inwards along the skeleton. Where the inner contour narrows (a sliver, or near the
@@ -654,7 +654,7 @@ same two ellipses. Jog's other layout candidates keep the vias apart, but put a 
 into a neighboring turn, which shorts as well: when the preferred candidate had overlapping vias, a candidate whose via
 overlaps a neighboring turn is rejected with the same error (`reject_shorting_fallback`, in jog and cornerflat).
 
-### D-VIAS-2. A via touching the copper of its own turn (checker exemption)
+### D34. A via touching the copper of its own turn (checker exemption)
 
 **Defect.** The checker skipped every contact between a via and copper of its own conductor closer than s_near + via
 radius along the path (s_near = π/2·(w + c)), to allow the conductor's arrival into the via. With wide traces that is
@@ -706,7 +706,7 @@ orientation from 0° to 90° in 9° steps; `star5` and `rstar0` with 2 twists an
 them. The other unwarned self shorts of the sweep are track-to-track contacts ("copper touches itself … turns further
 on"), the same on `next`, not via related.
 
-### D-VIAS-3. Arm runs into a sharp tip and back to its via (backtrack)
+### D35. Arm runs into a sharp tip and back to its via (backtrack)
 
 **Defect.** An arm whose fold angle lands on a sharp tip of the inner contour (the sliver of a slender ellipse) ends at
 the tip, but its via has to sit back along the tip's spine: there the neighboring turn's sides are only (w + c)/2 from
@@ -734,7 +734,7 @@ stay known failures (`corpus_round.KNOWN_FAILURES['slender']`).
 
 ## Folds, merges and wraps of one turn
 
-### D-FOLDS-1. Merged copper at hairpins of one turn not warned (fold rule gap)
+### D36. Merged copper at hairpins of one turn not warned (fold rule gap)
 
 **Defect.** `PlanarInductor` warned about a turn coming back to itself only for pieces closer than trace width plus
 clearance that are more than π·d + pitch, or more than 4·(w + c), apart along the conductor (D28). Where a turn runs
@@ -743,17 +743,17 @@ the copper merges over w/sin(α/2) of conductor, but each pair of pieces is only
 about 29–39° neither criterion holds anywhere. The spacing measurement also only compares pieces up to 4 pitches long
 and measures between their ends, so it cannot see a merge along one long centerline segment at all.
 
-**Symptom.** `concave_crescent_a0.6_n5k1` (w = 1.642 mm): at each horn tip the copper of one turn merges (0.86 mm overlap
-at (21.6, −17.5), 3.9·(w + c) of conductor), without a message. An isosceles triangle with a 15° apex (50 mm, 13 turns,
-4 twists, annular width 0.72 of the split depth) merges over 6.8·(w + c) at the apex, a self merge (D-FOLDS-2), and the
-pieces of the spacing measurement show no pair closer than w at all: no warning.
+**Symptom.** `concave_crescent_a0.6_n5k1` (w = 1.642 mm): at each horn tip the copper of one turn merges (0.86 mm
+overlap at (21.6, −17.5), 3.9·(w + c) of conductor), without a message. An isosceles triangle with a 15° apex (50 mm, 13
+turns, 4 twists, annular width 0.72 of the split depth) merged over 6.8·(w + c) at the apex (until D35, see D37), a self
+merge (D37), and the pieces of the spacing measurement show no pair closer than w at all: no warning.
 
 **Fix.** `measure_same_turn_contacts` measures merges the way the checker does: the arms' centerlines, with their
 connections to the vias, sampled at w/4 (at most (w + c)/8), each sample paired with the ends of the stretch of the
 other piece's centerline that its copper touches (centerline distance w); pieces of one turn (less than 0.5 turns apart
-in winding angle around the checker's center, see D-FOLDS-3) at least π/2·(w + c) apart along the conductor, and vias
+in winding angle around the checker's center, see D38) at least π/2·(w + c) apart along the conductor, and vias
 against the tracks of their own arm (the via's copper as such). The longest bypassed stretch of conductor,
-`max_merge_bypass`, is at most 0.2·(w + c) below the checker's `max_self_touch_bypass` (D-FOLDS-4), and never above it,
+`max_merge_bypass`, is at most 0.2·(w + c) below the checker's `max_self_touch_bypass` (D39), and never above it,
 on all corpus cases that merge over 3·(w + c) or more. `_warn_same_turn_contacts` warns ("folds onto itself") from `MERGE_WARN_BYPASS` = 5·(w + c) on, one (w + c)
 below the checker's limit, and logs local merges from 3·(w + c) on (tips sharper than about 39°, e.g. the crescent).
 On the 125 cases of the corpus with merges or wraps, kicoil warns on 28, 22 of them failing `self merge` and 5 passing
@@ -768,7 +768,7 @@ corner cut in the skeleton like D28's protrusion cut, which also leaves the tip 
 **Original code:** has no fold warning at all; it lays out the crescent with other defects (connectivity, crossings,
 clearance) and the same unwarned merge at the horns.
 
-### D-FOLDS-2. Checker: merged copper of one turn never fails (self merge)
+### D37. Checker: merged copper of one turn never fails (self merge)
 
 **Defect.** `geomcheck` counts same-turn copper contacts (deficit ≥ clearance) less than `SELF_SHORT_SEP` = 0.18 turns
 apart as self touches and reports the bypassed conductor length (`max_self_touch_bypass`), but never fails them. A hairpin
@@ -779,7 +779,7 @@ whose copper merges over the whole arm of a C shorts that stretch of the conduct
 
 **Fix.** New failure kind `self merge`: a self touch (copper touching or overlapping, the same condition as a self short)
 whose pieces are at least `SELF_MERGE_BYPASS` = 6·(w + c) apart along the conductor (`Report.self_merges`), measured
-along the whole contact (D-FOLDS-4). Contacts within the copper of one via or pad do not count, nor do the two pieces of
+along the whole contact (D39). Contacts within the copper of one via or pad do not count, nor do the two pieces of
 one track drawn as overlapping pieces. The threshold is geometric: at a tip of angle α the two sides merge over
 w/sin(α/2), so 6·(w + c) is the merge of a tip sharper than about 19°, or of a hairpin into an arm; the merged copper
 then shorts six pitches of conductor or more. Measured along the whole contact, the corpus has no gap there: over the
@@ -789,7 +789,7 @@ inner via's copper touching the arm that runs past it into the tip), 6.31 (kicoi
 8.1–8.9, the C 11.5–11.7, the U 10.0–13.8 and the slivers of slender ellipses 6.9–31.
 (The first version of this fix claimed a gap between 5.7 and 6.1 from closest points of segment pairs; that measure
 depended on the segmentation.) `test_layout.test_corpus_case` treats it like the other warned kinds (xfail when the
-generator warned, D-FOLDS-1); the heart's known issue lists it. Full corpus (997 cases):
+generator warned, D36); the heart's known issue lists it. Full corpus (997 cases):
 
 | | self merges | of these passing before | warned |
 |---|---|---|---|
@@ -801,7 +801,21 @@ generator warned, D-FOLDS-1); the heart's known issue lists it. Full corpus (997
 The others already failed (backtracks at the heart's cusp and the slivers of slender ellipses, conformance of the comb
 and the slot).
 
-### D-FOLDS-3. Unwarned self short where the innermost turn wraps around a small hole
+**Together with D33, D35 and D43.** These were measured before the via and cusp fixes were merged. 12 of kicoil's 22
+self merges came from defects those fix, not from hairpins of the outline. An arm ran past its inner via into a tip and
+came back along itself (D35, the arm now ends at its via): `concave_shark/sharksvg_a0.3_n8k3`,
+`round_ellipse10to1_a0.60_n6_1layer/n8k3` and `round_ellipse20to1_a0.30_n5k1`, which now pass. The 15° triangle of D36
+belongs here as well: at f = 0.70–0.78 its apex now merges over only 4.7–4.9·(w + c), with no warning and no self merge
+(`test_layout.test_tip_merge_at_the_inner_via_is_gone`). At f = 0.68–0.70 its arm comes back to the via it now ends at,
+a warned self short (D34). Five heart cases merged in the cusp's spike (D43); the two 90 % n16k5 ellipses are now
+rejected (D33). The remaining 10 kicoil self merges are all warned: `narrow_slot_w10.0_n4k1`,
+`concave_cshape/uround/comb_a0.9_n5k1`, `concave_crescent_a0.9_n8k3`, `round_ellipse10to1_a0.90_n5k1`,
+`round_ellipse20to1_a0.90_n5k1`, `round_ellipse20to1_a0.60_n7k3_cw/n8k3`, and `concave_heart_a0.3_n5k1`, whose 0.04 mm
+trace merges at the heart's convex bottom tip over 7.5·(w + c). Cornerflat has 12 self merges (the same outlines
+except the heart, plus the crescent a0.9 n5k1 and the shark and sharksvg a0.6 n13k4) and 18 self shorts (D34, D39), all
+warned; tests/README.md, "Same turn or different turn in the cornerflat layout", lists them.
+
+### D38. Unwarned self short where the innermost turn wraps around a small hole
 
 **Defect.** The spacing measurement only pairs pieces at least 0.5 turns apart (in the spiral's parameter angle), and
 the fold rule needs pieces more than π·d apart along the conductor. A turn that wraps around a hole smaller than the
@@ -813,10 +827,10 @@ short on F.Cu at (−1.864, 2.566), copper touching itself 0.21 turns further on
 optspan and jog. `round_blob2_a0.90_n5k1` (w = 6.368 mm, 0.3–0.4 turns). Both were xfailed by name. The sector 90° of
 the corpus with 2 or 3 turns at 93–96 % of the maximal annular width: self shorts 0.24–0.42 turns long, no warning.
 
-**Fix.** `measure_same_turn_contacts` (D-FOLDS-1) also finds the closest approach of pieces of one turn at least
+**Fix.** `measure_same_turn_contacts` (D36) also finds the closest approach of pieces of one turn at least
 `WRAP_SEPARATION` = 0.18 and less than 0.5 turns apart in winding angle (`min_wrap_spacing`), and
 `_warn_same_turn_contacts` warns when their copper touches. The winding angle is measured around the point the checker
-uses, the shape's `winding_center`: the interior point (GEOS's rule as in D-FOLDS-5, `interior_point`) of the outline offset inwards by
+uses, the shape's `winding_center`: the interior point (GEOS's rule as in D40, `interior_point`) of the outline offset inwards by
 1.02 times the annular width, which the straight skeleton gives exactly up to the depth where the offset splits (beyond
 it, from a grid of the points that deep, `_deep_interior_point`). It agrees with the checker's center to 1e-10 mm except
 on outlines with many tiny reflex corners (0.8 mm on `round_noisy_l`, whose skeleton is computed for a simplified
@@ -825,7 +839,7 @@ then jumps 0.19 turns within 2.6 mm. The first version of this fix used the deep
 an arbitrary end of a ridge for many shapes (the sector's self short was 0.11 turns long around it), and also compared
 pieces one turn apart, so that its result was the ordinary turn spacing and a trace width given within the rounding of
 the pitch (`circle30x6_n5k1` with 4.590 mm) was warned as a wrap; and it warned at clearance level. Since the checker
-measures contacts along their whole length (D-FOLDS-4), the corners of an innermost turn close to the center that touch
+measures contacts along their whole length (D39), the corners of an innermost turn close to the center that touch
 themselves 0.18–0.46 turns further on count as self shorts, too; the generator finds them the same way (with a margin of
 one sampling step on the π/2·(w + c) of one bend). On the 125 cases with merges or wraps every self short is warned
 (kicoil 18 of 18, cornerflat 13 of 13, optspan 22 of 22, jog 19 of 19). Wrap warnings without a checker self short:
@@ -837,7 +851,7 @@ star, −38 % for blob2.
 **Original code:** rejects `concave_starround_a0.9_n5k1` and `round_blob2_a0.90_n5k1` (math domain error) and has no
 fold warnings.
 
-### D-FOLDS-4. Checker: same-turn contacts measured at one pair of closest points per segment pair
+### D39. Checker: same-turn contacts measured at one pair of closest points per segment pair
 
 **Defect.** For two segments of the same turn, `check_layout` used only their closest points: the deficit, the winding
 angle between them and the path distance (bypassed conductor) all came from that one pair; vias and pads against a
@@ -847,7 +861,7 @@ legs was invisible or underestimated, and contacts closer than π/2·(w + c) alo
 **Symptom.** The same copper cut into shorter collinear pieces gives other results: `concave_crescent_a0.9_n8k3` 5.60 →
 6.2·(w + c) (pass → self merge), `concave_shark_a0.3_n8k3` 3.03 / 5.04 / 6.00·(w + c) depending on the cut, a 13° V with
 one segment per leg no contact at all. A corner of the innermost turn close to the center, whose copper merges over
-1.6–1.8·(w + c) at 0.18–0.41 turns (the same as the wraps of D-FOLDS-3), was a self short or not depending on the
+1.6–1.8·(w + c) at 0.18–0.41 turns (the same as the wraps of D38), was a self short or not depending on the
 segmentation: `trapezoid_a0.90_n3k1` and the other a0.90 n3k1 cases below.
 
 **Fix.** `same_turn_contacts` samples both center lines at a quarter of the narrower width and pairs each sample with
@@ -861,7 +875,7 @@ same for vias and pads). A V hairpin now gives w/sin(α/2) to 1 % with 1 to 64 s
 failing conformance already, and `round_ellipse20to1_a0.90_n16k5`); cornerflat's 8 → 14. No case changes status from
 this alone, and no trace width changes. The checker takes 2.0 s instead of 1.7 s on the slowest corpus case. Not in the original code (no checker).
 
-### D-FOLDS-5. Checker: the coil's center decided by rounding errors on symmetric holes
+### D40. Checker: the coil's center decided by rounding errors on symmetric holes
 
 **Defect.** The checker takes the coil's center as shapely's `representative_point` of the inset outline (GEOS: the
 middle of the widest stretch of a horizontal line through the middle of the extent, moved between vertex heights). On
@@ -875,14 +889,14 @@ winding angle around it (0.42 turns around one, 0.11 around the other).
 **Fix.** `_interior_point` follows GEOS but counts a vertex within 1e-9 of the extent from the middle as below it, and
 takes the first of stretches equally wide to 1e-9; the generator's `interior_point` makes the same choices. The center
 moves in 164 of the 997 cases (symmetric outlines; up to 4.9 mm in `octagon_a0.30_*`); in both full corpus runs the only
-changes of status or failure kinds are the self merges and self shorts of D-FOLDS-2 and -4. Not in the original code (no
+changes of status or failure kinds are the self merges and self shorts of D37 and D39. Not in the original code (no
 checker).
 
 ---
 
 ## SVG import
 
-### D-SVG-1. SVG import reads only one path dialect, the first path, and no transforms or units
+### D41. SVG import reads only one path dialect, the first path, and no transforms or units
 
 **Defect.** `SVGShape` took the `d` of the first `<path>` in the file and parsed it with
 `d.strip('MmZ ').replace(',', 'L').split('L')`. That reads only absolute `M x y L x y ... Z` and `M x y,x y,... Z`.
@@ -930,7 +944,7 @@ with type/.class/#id selectors; a hiding rule with another selector is a `ValueE
 
 Inputs that worked before give the same polygon (the shark fixture bit for bit: its 11 `concave_sharksvg` cases, kicoil
 and cornerflat, have identical results; also both orientations with and without the repeated start point, apart from
-the start vertex in one case, D-SVG-2), except where the old reading was wrong. Changed on purpose:
+the start vertex in one case, D42), except where the old reading was wrong. Changed on purpose:
 
 - transforms are applied (`<g transform="scale(2)">` around a 30 × 20 path: 60 × 40, was 30 × 20);
 - a physical width/height scale the viewBox (`width="60mm" viewBox="0 0 30 20"`: 60 × 40 mm, was 30 × 20);
@@ -949,7 +963,7 @@ signed area is −1741 mm² in its own numbers (y down; it looks counter-clockwi
 `test_shark_fixture_takes_the_reorientation_branch` pins that the import returns it clockwise and that `SVGShape`
 reverses it.
 
-### D-SVG-2. Start vertex of a clockwise SVG path depends on whether the path repeats its start point
+### D42. Start vertex of a clockwise SVG path depends on whether the path repeats its start point
 
 **Defect.** `SVGShape` reversed clockwise paths with `coords[::-1]`. For a path that repeats its start point, the
 reversed list starts with that point again; for one that does not, it starts with the path's last vertex. The start
@@ -964,7 +978,7 @@ fixture (which repeats its start point) is unchanged; `test_clockwise_and_counte
 
 ## Sharp reflex cusps
 
-### D-CUSP-1. Sharp reflex cusps make every turn run into a zero-width spike
+### D43. Sharp reflex cusps make every turn run into a zero-width spike
 
 **Defect.** The spiral follows the straight skeleton's (mitered) inward offsets. At a reflex corner that turns by φ, the
 offset vertex moves along the bisector at 1/cos(φ/2) times the depth, while the true (Euclidean) offset runs around
@@ -1045,7 +1059,7 @@ code. Heart split depth 1.60 → 10.132 mm.
 - *Totals.* kicoil 508 → 515 passes, backtracks 16 → 12, via offset 2 → 0, via clearance 7 → 5, clearance 5 → 4.
   cornerflat 765 → 779 passes, backtracks 16 → 13, via offset 2 → 0, via clearance 8 → 6, winding 3 → 2. No main or
   round case changes its layout (trace widths identical). The only verdict change outside the hearts is kicoil's
-  `concave_lround_a0.9_n8k3` (fail → pass; checker, D-CUSP-2).
+  `concave_lround_a0.9_n8k3` (fail → pass; checker, D44).
 - *Threshold.* The layout is continuous across the 120° threshold: on a 40 mm square with a 12 mm V notch, 5 mm
   annular width, n5k1, the trace width is 1.807 mm at a 119° turn (mitered) and 1.821 mm at 121° (cut). The split
   depth jumps from 9.43 to 14.00 mm.
@@ -1064,7 +1078,7 @@ than 170° ('backtrack'). These are recorded as known issues in `corpus_concave.
 far below 0.01 mm (e.g. a notch 0.5 µm deep) turn by less than 120° measured at the cut radius and are not cut;
 their mitered spikes are not handled here.
 
-### D-CUSP-2. Intended inner contour mitered at reflex corners (checker)
+### D44. Intended inner contour mitered at reflex corners (checker)
 
 **Defect.** The checker's intended inner contour was the mitered inward offset of the outline (shapely
 `buffer(-a, join_style='mitre', mitre_limit=10)`), which at a reflex corner has a notch reaching up to 10 a deep.

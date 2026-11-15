@@ -244,7 +244,7 @@ def _spec(name, shape, turns, twists, layers=2, clockwise=False, clearance=0.15,
 # such an outline only when every failure kind of the checker is among the listed ones ('overshoot': copper deeper than
 # the intended annulus; 'contour': the outer turn stays more than 1.5 mm from the outline somewhere).
 KNOWN_ISSUES = {
-    # (The sharp reflex cusp at the top is cut with a tiny arc since D-CUSP-1; before, every turn ran into a zero-width
+    # (The sharp reflex cusp at the top is cut with a tiny arc since D43; before, every turn ran into a zero-width
     # spike there: backtracks, copper up to 10 mm deeper than the annulus, vias 4 mm off.)
     'heart': dict(kinds=('contour',), reason='outer turn does not reach the sharp convex tip at the bottom (about 10 '
                   'degrees)'),

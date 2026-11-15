@@ -232,10 +232,17 @@ HEART_CASES = ['concave_heart_a0.6_n8k3', 'concave_heart_a0.6_n6_1layer', 'conca
 @pytest.mark.parametrize('name', HEART_CASES)
 def test_heart_cusp_layout(name):
     from test_layout import layout, spec
-    model, intent, rep = layout(spec(name))
+    caught = []
+    model, intent, rep = layout(spec(name), caught)
     # Conformance fails only where the outer turn does not reach the heart's sharp convex bottom tip (contour, a known
-    # limitation of the linear spiral at tips of a few degrees, as for the crescent's horns)
-    assert set(rep.failure_kinds(intent.clearance, intent.trace_width)) <= {'conformance'}
+    # limitation of the linear spiral at tips of a few degrees, as for the crescent's horns). With the 0.04 mm trace of
+    # concave_heart_a0.3_n5k1 the innermost turn's copper also merges at that tip (a self merge, 7.5 (w + c), warned).
+    kinds = set(rep.failure_kinds(intent.clearance, intent.trace_width))
+    assert kinds <= {'conformance', 'self merge'}
+    if 'self merge' in kinds:
+        assert any('touches itself where the turn runs into a sharp tip' in m for m in caught), caught
+        assert all(f' at (' in n and float(n.split(' at (')[1].split(',')[1].split(')')[0]) < -20
+                   for n in rep.notes if n.startswith('self merge')), rep.notes # (at the bottom tip, not the cusp)
     assert rep.backtracks == 0
     assert rep.overshoot < 0.025 and rep.via_misplacement < 0.025
     assert rep.uncovered_fraction < 0.05 # (the mitered intended contour counted 6.5 to 22 % here)

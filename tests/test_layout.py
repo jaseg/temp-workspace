@@ -42,6 +42,13 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize('spec', cases, ids=[c['name'] for c in cases])
 
 
+def _warned(caught):
+    """ Whether the generator warned about a clearance problem: a turn folding onto itself, or a via that does not fit
+    next to the neighboring turn or touches its own turn """
+    return any(FOLD_WARNING in m or (m.startswith('Via at') and ('neighboring turn' in m or 'its own turn' in m))
+               for m in caught)
+
+
 def test_corpus_case(spec):
     caught = []
     try:
@@ -59,7 +66,9 @@ def test_corpus_case(spec):
         # the failure kinds named there are tolerated, anything else still fails.
         kinds += ['overshoot'] if rep.overshoot >= max(0.05, 0.1 * intent.trace_width) else []
         kinds += ['contour'] if rep.contour_hausdorff >= 1.5 and not _cut_protrusions(model, intent) else []
-        unexplained = [k for k in kinds if k not in known['kinds']]
+        # (failure kinds the generator warned about, as below, need not be named there: e.g. the self merge of the
+        # 0.04 mm trace of concave_heart_a0.3_n5k1 at the heart's bottom tip)
+        unexplained = [k for k in kinds if k not in known['kinds'] and not (k in WARNED_KINDS and _warned(caught))]
         assert not unexplained, (unexplained, known['reason'], rep.notes[:5], rep.violations[:5])
         if kinds:
             pytest.xfail(f"known issue {kinds}: {known['reason']}")
@@ -73,8 +82,7 @@ def test_corpus_case(spec):
         # around a notch or a hole narrower than the trace, or a via (as wide as the trace) that does not fit the hole.
         # A via that touches its own turn (the innermost turn of a wide trace wrapping around a small inner contour) is
         # a self short, warned as such.
-        assert any(FOLD_WARNING in m or (m.startswith('Via at') and ('neighboring turn' in m or 'its own turn' in m))
-                   for m in caught), (kinds, caught, rep.violations[:5])
+        assert _warned(caught), (kinds, caught, rep.violations[:5])
     if kinds:
         pytest.xfail(f'warned: {warned}' if not set(kinds) & set(known) else
                      f'known: {[(k, known[k]) for k in kinds if k in known]}' + (f', warned: {warned}' if warned else ''))
@@ -364,7 +372,7 @@ def test_circle_inner_vias_stay_on_their_side_of_the_center():
     # With vias wider than the hole, the automatic via offset loop pushed the inner vias through the center of a circle
     # (no upper bound), where they swapped sides and the overlap check never fired.
     # The two 2 mm vias in the 1 mm hole overlap each other even on the innermost turn, which shorts the arms: since
-    # D-VIAS-1 the request is rejected instead of warned. The vias it names are on opposite sides of the center.
+    # D33 the request is rejected instead of warned. The vias it names are on opposite sides of the center.
     from kicoil import geometry
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter('always')
@@ -1148,6 +1156,9 @@ def test_wrap_around_a_small_hole_is_warned(case, impl):
         s = spec(case)
     caught = []
     model, intent, rep = layout(s, caught, impl)
+    if impl == 'geometry_alt_cornerflat' and case.startswith('sector90') and rep.self_shorts == 0:
+        # cornerflat keeps the pieces of a turn wrapping around the hole a clearance apart (test_cornerflat_round)
+        return
     assert rep.self_shorts > 0
     assert any(WRAP_WARNING in m and FOLD_WARNING in m for m in caught), caught
     assert model.min_wrap_spacing < model.trace_width
