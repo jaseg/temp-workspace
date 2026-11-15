@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+"""Run the layout corpus through a layout implementation and the geometric checker.
+
+Usage:
+    python tests/run_corpus.py [--impl kicoil|MODULE] [--kind full|quick] [--out results.json] [--svg-dir DIR] [-j N]
+                               [--filter SUBSTR]
+
+The implementation is imported from whatever `kicoil` package is first on sys.path, so to evaluate an older revision
+run this with PYTHONPATH pointing to that revision's `src` directory.
+"""
+
+import sys
+import os
+import json
+import math
+import time
+import argparse
+import warnings
+import logging
+import traceback
+import dataclasses
+from pathlib import Path
+import multiprocessing
+import multiprocessing.connection
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+import corpus as corpus_mod
+import geomcheck
+
+
+def build_model(spec, impl='kicoil'):
+    import importlib
+    geometry = importlib.import_module('kicoil.geometry' if impl == 'kicoil' else f'kicoil.{impl}')
+
+    if spec['shape'] == 'circle':
+        shape = geometry.CircleShape(spec['outer_diameter'], spec['inner_diameter'])
+    elif spec['shape'] == 'svg':
+        # Outline from an SVG file (path relative to tests/), loaded through the implementation's SVG import
+        shape = geometry.SVGShape(filename=str(Path(__file__).parent / spec['svg_file']),
+                                  annular_width=spec['annular_width'])
+    else:
+        poly = [tuple(p) for p in spec['polygon']]
+        base = getattr(geometry, 'PolygonShape', None)
+        if base is not None:
+            shape = base(polygon=poly, annular_width=spec['annular_width'])
+        else:
+            @dataclasses.dataclass
+            class _PolygonShape(geometry.OffsetShape):
+                polygon: list
+                annular_width: float
+                arc_tolerance: float = 0.05
+
+                @property
+                def slug(self):
+                    return f'polygon_{len(self.polygon)}pt'
+
+                @property
+                def desc(self):
+                    return f'{len(self.polygon)} point polygonal'
+            shape = _PolygonShape(poly, spec['annular_width'])
+
+    kw = dict(turns=spec['turns'], twists=spec['twists'], layers=spec['layers'], clockwise=spec['clockwise'],
+              clearance=spec['clearance'])
+    if spec.get('trace_width'):
+        kw['trace_width'] = spec['trace_width']
+    return geometry.PlanarInductor(shape=shape, **kw)
+
+
+def run_case(args):
+    spec, impl, svg_dir = args
+    res = {'name': spec['name'], 'tags': spec['tags']}
+    t0 = time.perf_counter()
+    logging.getLogger('kicoil').setLevel(logging.ERROR)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            model = build_model(spec, impl)
+            fp = model.render_footprint(circle_segments=64)
+    except Exception as e:
+        res['status'] = 'rejected' if isinstance(e, ValueError) else 'error'
+        res['error'] = f'{type(e).__name__}: {e}'.splitlines()[0][:300]
+        if res['status'] == 'error':
+            res['traceback'] = traceback.format_exc()[-1500:]
+        res['time'] = time.perf_counter() - t0
+        return res
+    res['gen_time'] = time.perf_counter() - t0
+    res['nominal_pitch'] = getattr(model, 'spiral_pitch', float('nan'))
+    res['layout'] = getattr(model, 'layout_key', None) # (spiral mode, arm phase) the generator chose
+
+    try:
+        intent = geomcheck.intent_from_model(model)
+        copper = geomcheck.extract_copper(fp, layers=model.layer_pair)
+        rep = geomcheck.check_layout(copper, intent, keep_samples=bool(svg_dir))
+    except Exception as e:
+        res['status'] = 'checker-error'
+        res['error'] = f'{type(e).__name__}: {e}'
+        res['traceback'] = traceback.format_exc()[-1500:]
+        return res
+
+    kinds = rep.failure_kinds(intent.clearance, intent.trace_width)
+    res['status'] = 'fail' if kinds else 'pass'
+    res['failures'] = kinds
+    res['conformance_ok'] = rep.conformance_ok(intent.trace_width)
+    res['width_ok'] = rep.width_ok(intent.trace_width)
+    d = dataclasses.asdict(rep)
+    viol, cross, samples = d.pop('violations'), d.pop('crossing_points'), d.pop('spacing_samples')
+    d.pop('self_overlap_points')
+    res.update(d)
+    res['score'] = rep.score(intent.clearance)
+    res['clearance'] = intent.clearance
+    res['trace_width'] = intent.trace_width
+    res['rel_deficit'] = rep.worst_clearance_deficit / intent.clearance
+    # How much of the nominal pitch survives as trace width + clearance (1.0 is ideal). Uses the narrowest track that
+    # was actually emitted, not the width the generator reports.
+    res['pitch_ratio'] = (rep.min_width + intent.clearance) / res['nominal_pitch']
+    res['rel_via_deficit'] = rep.worst_via_deficit / intent.clearance
+    res['rel_pad_deficit'] = rep.worst_pad_deficit / intent.clearance
+    res['tracks_ok'] = rep.passed(intent.clearance, intent.trace_width, vias=False)
+    res['time'] = time.perf_counter() - t0
+    if svg_dir and (res['status'] != 'pass' or os.environ.get('RENDER_ALL')):
+        loc = getattr(model, 'min_pitch_location', None)
+        if loc:
+            cross = list(cross) + [('pitch', loc)]
+        render_svg(Path(svg_dir) / f"{spec['name']}.svg", copper, intent, viol, cross, samples)
+    return res
+
+
+def render_svg(path, copper, intent, violations, crossings, samples=()):
+    xs = [p[0] for p in intent.contour]
+    ys = [p[1] for p in intent.contour]
+    m = 3
+    x0, y0, x1, y1 = min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0} {-y1} {x1-x0} {y1-y0}" width="800" '
+           f'height="{800*(y1-y0)/(x1-x0):.0f}"><g transform="scale(1,-1)">',
+           f'<rect x="{x0}" y="{y0}" width="{x1-x0}" height="{y1-y0}" fill="white"/>']
+    pts = ' '.join(f'{x},{y}' for x, y in intent.contour)
+    out.append(f'<polygon points="{pts}" fill="none" stroke="black" stroke-width="0.05"/>')
+    colors = {copper.layers[0]: '#eb5c5c', copper.layers[1]: '#5c5ceb'}
+    for s in copper.segs:
+        out.append(f'<line x1="{s.a[0]}" y1="{s.a[1]}" x2="{s.b[0]}" y2="{s.b[1]}" stroke="{colors.get(s.layer, "gray")}" '
+                   f'stroke-opacity="0.45" stroke-width="{s.width}" stroke-linecap="round"/>')
+    for s in copper.segs:
+        out.append(f'<line x1="{s.a[0]}" y1="{s.a[1]}" x2="{s.b[0]}" y2="{s.b[1]}" stroke="black" stroke-width="0.03"/>')
+    for v in copper.vias:
+        out.append(f'<circle cx="{v.x}" cy="{v.y}" r="{v.diameter/2}" fill="#52cc52" fill-opacity="0.6"/>')
+    # Spacing heat map: (spacing + width) / nominal pitch at sample points, green = 1.0, red <= 0.8, blue >= 1.2
+    for layer, (x, y), ratio in samples:
+        if layer != copper.layers[0]:
+            continue
+        v = max(-1, min(1, (ratio - 1) / 0.2))
+        color = f'rgb({int(255*max(0, -v))},{int(200*(1-abs(v)))},{int(255*max(0, v))})'
+        out.append(f'<circle cx="{x}" cy="{y}" r="{intent.trace_width/4}" fill="{color}"/>')
+    for layer, (x, y), deficit in violations:
+        out.append(f'<circle cx="{x}" cy="{y}" r="{max(0.3, deficit*3)}" fill="none" stroke="orange" stroke-width="0.1"/>')
+    for layer, (x, y) in crossings:
+        out.append(f'<circle cx="{x}" cy="{y}" r="0.6" fill="none" stroke="magenta" stroke-width="0.15"/>')
+    out.append('</g></svg>')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('\n'.join(out))
+
+
+def summarize(results, file=sys.stdout):
+    from collections import Counter
+    st = Counter(r['status'] for r in results)
+    print(f'{len(results)} cases: ' + ', '.join(f'{k}={v}' for k, v in sorted(st.items())), file=file)
+    checked = [r for r in results if r['status'] in ('pass', 'fail')]
+    if not checked:
+        return
+    def cnt(pred):
+        return sum(1 for r in checked if pred(r))
+    print(f'  connectivity broken: {cnt(lambda r: not r["ok_connectivity"])}   '
+          f'shorts: {cnt(lambda r: r.get("shorts", 0) > 0)}   stray vias: {cnt(lambda r: r.get("stray_vias", 0) > 0)}   '
+          f'duplicates: {cnt(lambda r: r.get("duplicate_segments", 0) > 0)}', file=file)
+    print(f'  stray copper: {cnt(lambda r: r.get("stray_copper", 0) > 0)}   '
+          f'track width wrong: {cnt(lambda r: not r.get("width_ok", True))}   '
+          f'via defects: {cnt(lambda r: r.get("via_defects", 0) > 0)}   '
+          f'pads too small: {cnt(lambda r: r.get("small_pads", 0) > 0)}   '
+          f'dots: {cnt(lambda r: r.get("dots", 0) > 0)}', file=file)
+    print(f'  winding wrong (>0.05 turns): {cnt(lambda r: not abs(r["winding_error"]) < 0.05)}', file=file)
+    print(f'  with crossings: {cnt(lambda r: r["crossings"] > 0)}', file=file)
+    print(f'  clearance deficit >5%: {cnt(lambda r: r["rel_deficit"] > 0.05)}   >50%: {cnt(lambda r: r["rel_deficit"] > 0.5)}', file=file)
+    print(f'  via deficit >5%: {cnt(lambda r: r["rel_via_deficit"] > 0.05)}   '
+          f'pad deficit >5%: {cnt(lambda r: r.get("rel_pad_deficit", 0) > 0.05)}   '
+          f'via offset exceeded: {cnt(lambda r: r.get("via_misplacement", 0) > geomcheck.OVERSHOOT_TOL)}', file=file)
+    print(f'  backtracks: {cnt(lambda r: r["backtracks"] > 0)}   stubs: {cnt(lambda r: r["stubs"] > 0)}   '
+          f'self overlaps: {cnt(lambda r: r["self_overlaps"] > 0)}', file=file)
+    touch = [r for r in checked if r['status'] == 'pass' and r.get('self_touches', 0) > 0]
+    print(f'  passes with same-turn copper touching itself (not failed): {len(touch)}, bypassing up to '
+          f'{max((r["max_self_touch_bypass"] for r in touch), default=0):.1f} mm of conductor   '
+          f'self merges: {cnt(lambda r: r.get("self_merges", 0) > 0)}   '
+          f'self shorts: {cnt(lambda r: r.get("self_shorts", 0) > 0)}', file=file)
+    print(f'  tracks ok (ignoring via issues): {cnt(lambda r: r["tracks_ok"])}', file=file)
+    unc = sorted(r['uncovered_fraction'] for r in checked if not math.isnan(r['uncovered_fraction']))
+    exc = sorted(r['excess_fraction'] for r in checked if not math.isnan(r['excess_fraction']))
+    haus = sorted(r['contour_hausdorff'] for r in checked if not math.isnan(r['contour_hausdorff']))
+    over = sorted(r['overshoot'] for r in checked if not math.isnan(r['overshoot']))
+    med = lambda l: l[len(l)//2] if l else float('nan')
+    print(f'  uncovered fraction: median {med(unc):.4f} max {max(unc, default=float("nan")):.4f}', file=file)
+    print(f'  excess fraction:    median {med(exc):.4f} max {max(exc, default=float("nan")):.4f}', file=file)
+    print(f'  contour undershoot: median {med(haus):.3f} max {max(haus, default=float("nan")):.3f} pitches', file=file)
+    print(f'  copper overshoot:   median {med(over):.3f} max {max(over, default=float("nan")):.3f} mm', file=file)
+    print(f'  conformance bad: {cnt(lambda r: not r["conformance_ok"])}', file=file)
+    pr = sorted(r['pitch_ratio'] for r in checked if not math.isnan(r.get('pitch_ratio', float('nan'))))
+    if pr:
+        print(f'  pitch ratio (emitted w+c)/nominal: p10 {pr[len(pr)//10]:.3f} median {med(pr):.3f} min {pr[0]:.3f}',
+              file=file)
+    kinds = Counter(k for r in checked for k in r.get('failures', []))
+    if kinds:
+        print('  failure kinds: ' + ', '.join(f'{k}={v}' for k, v in kinds.most_common()), file=file)
+    print(f'  total score: {sum(r["score"] for r in checked):.1f}', file=file)
+
+
+def _timed_worker(fn, job, conn):
+    try:
+        conn.send(fn(job))
+    except BaseException as e:  # report, never hang the parent
+        conn.send({'status': 'error', 'error': f'{type(e).__name__}: {e}'[:300]})
+    conn.close()
+
+
+def run_jobs(fn, jobs, n, timeout=None, on_timeout=None):
+    """Run fn over jobs in n worker processes, in order. With a timeout (seconds), every job gets its own process,
+    which is killed when it runs longer; the job's result is then on_timeout(job, elapsed). Used for the slow
+    pathological outlines (dense or noisy SVG-like outlines can keep the straight skeleton busy for many minutes)."""
+    if not timeout:
+        if n <= 1:
+            return [fn(job) for job in jobs]
+        ctx = multiprocessing.get_context('forkserver')
+        with ctx.Pool(n) as pool:
+            return pool.map(fn, jobs, chunksize=1)
+    ctx = multiprocessing.get_context('forkserver')
+    results = [None] * len(jobs)
+    pending = list(enumerate(jobs))[::-1]
+    running = {}
+    while pending or running:
+        while pending and len(running) < max(1, n):
+            i, job = pending.pop()
+            rx, tx = ctx.Pipe(duplex=False)
+            proc = ctx.Process(target=_timed_worker, args=(fn, job, tx), daemon=True)
+            proc.start()
+            tx.close()
+            running[i] = (proc, rx, time.perf_counter(), job)
+        multiprocessing.connection.wait([r[1] for r in running.values()], timeout=1.0)
+        for i, (proc, rx, t0, job) in list(running.items()):
+            if rx.poll():
+                try:
+                    results[i] = rx.recv()
+                except EOFError:
+                    results[i] = {'status': 'error', 'error': f'worker died (exit code {proc.exitcode})'}
+                proc.join()
+                del running[i]
+            elif not proc.is_alive():
+                results[i] = {'status': 'error', 'error': f'worker died (exit code {proc.exitcode})'}
+                del running[i]
+            elif time.perf_counter() - t0 > timeout:
+                proc.kill()
+                proc.join()
+                results[i] = on_timeout(job, time.perf_counter() - t0)
+                del running[i]
+            if results[i] is not None and isinstance(job, tuple) and isinstance(job[0], dict) and i not in running:
+                results[i].setdefault('name', job[0].get('name'))
+                results[i].setdefault('tags', job[0].get('tags', []))
+    return results
+
+
+def _timeout_result(job, elapsed):
+    spec = job[0]
+    return {'name': spec['name'], 'tags': spec['tags'], 'status': 'timeout', 'time': elapsed,
+            'error': f'timeout after {elapsed:.0f} s'}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--impl', default='kicoil')
+    ap.add_argument('--kind', default='full')
+    ap.add_argument('--out')
+    ap.add_argument('--svg-dir')
+    ap.add_argument('--filter', action='append')
+    ap.add_argument('-j', type=int, default=os.cpu_count())
+    ap.add_argument('-v', action='store_true')
+    ap.add_argument('--timeout', type=float, help='seconds per case; a case running longer is killed and recorded as timeout')
+    ap.add_argument('--known-failures', help='write the failure kinds of every case, except conformance, to this JSON '
+                                             'file (tests/data/known_failures.json, read by test_layout.py)')
+    args = ap.parse_args()
+
+    cases = corpus_mod.corpus(args.kind)
+    if args.filter:
+        cases = [c for c in cases if any(f in c['name'] for f in args.filter)]
+
+    # Compile the wasm module once so that its on-disk cache exists before the workers start. The workers do not fork
+    # from this process: wasmtime starts threads when a module runs, and forking a process with running threads can
+    # deadlock the children (this used to hang with --impl MODULE). 'forkserver' starts them from a clean process; they
+    # re-import this script (which puts tests/ on sys.path) and the kicoil package.
+    import kicoil.geometry  # noqa
+    if args.impl != 'kicoil' and cases:
+        build_model(cases[0], args.impl)
+
+    t0 = time.perf_counter()
+    jobs = [(c, args.impl, args.svg_dir) for c in cases]
+    results = run_jobs(run_case, jobs, args.j, args.timeout, _timeout_result)
+    elapsed = time.perf_counter() - t0
+
+    if args.v:
+        for r in results:
+            if r['status'] == 'pass':
+                continue
+            if r['status'] in ('fail',):
+                print(f"{r['status']:8s} {r['name']:45s} [{','.join(r.get('failures', []))}] "
+                      f"conn={r['ok_connectivity']!s:5s} open={r['open_ends']} "
+                      f"branch={r['branches']} wind={r['winding_error']:+.3f} cross={r['crossings']} "
+                      f"deficit={r['rel_deficit']:.2f} via={r['rel_via_deficit']:.2f} unc={r['uncovered_fraction']:.3f} under={r['contour_hausdorff']:.2f} "
+                      f"over={r['overshoot']:.3f}")
+            else:
+                print(f"{r['status']:8s} {r['name']:45s} {r.get('error', '')}")
+    summarize(results)
+    print(f'  elapsed: {elapsed:.1f} s')
+    if args.out:
+        Path(args.out).write_text(json.dumps(results, indent=1, default=str))
+    if args.known_failures:
+        known = {r['name']: kinds for r in results if (kinds := sorted(set(r.get('failures') or ()) - {'conformance'}))}
+        Path(args.known_failures).write_text(json.dumps(known, indent=1, sort_keys=True) + '\n')
+
+
+if __name__ == '__main__':
+    main()
