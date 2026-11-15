@@ -32,6 +32,10 @@ Checks:
                   Clearance deficits between parts of the *same* turn (the conductor folding onto itself at a tight
                   tip, or a hairpin) are counted as self overlaps and do not fail a case, unless the copper touches
                   itself at least SELF_SHORT_SEP (0.18) turns apart, which shorts part of a turn (a self short).
+                  A via is also shorted to its own conductor when, followed along the path away from the via, the
+                  conductor first clears the via (center line farther than via radius + w/2 + clearance) and later
+                  comes back to touch it (a self short; independent of the winding center). Copper that never left
+                  the via is the conductor's own arrival into it, however tightly it curves.
     spacing       Sampled distribution of the edge-to-edge distance between neighboring turns, relative to the nominal
                   clearance. Tells how uniform the layout is, i.e. how much copper area is wasted by loose spacing.
     conformance   Per layer, the union of the tracks inflated by half a pitch must tile the intended annulus (contour
@@ -1341,9 +1345,85 @@ def check_layout(copper: Copper, intent: Intent, sample_step=None, do_conformanc
         ds = abs(s_at(i, p) - s_body)
         return other_turn(ds, th, th_body), ds, th
 
+    seg_order_s = np.array([seg_s[i] for i in order])
+
+    def own_via_returns(v, s_via):
+        """ Copper of the via's own conductor, closer than s_near + the via radius to it along the path, that comes back
+        to the via after it has left it: followed along the path away from the via, the conductor's center line first
+        gets farther from the via center than reach = via radius + half the trace width + clearance (its copper clears
+        the via), and later the copper overlaps the via again, e.g. a turn that runs around a small inner contour and
+        returns to its via from another side. Copper that never left the via's reach is the conductor's own arrival
+        into the via, however tightly it curves, and is not counted.
+
+        The deficit of a point p is min(reach - d(p), X + clearance, M - d(p)), where d is the distance to the via
+        center, X the largest d - reach and M the largest d between the via and p: the overlap with the via, but at
+        most as much as the conductor cleared the via, and came back towards it, before. It is a self short (deficit
+        >= clearance) when the copper touches the via after it has cleared it. The deficit is continuous in the geometry and does not depend on a winding center,
+        the input's orientation or how the conductor is cut into segments: d is convex along a segment, so the
+        conductor is farthest from the via at the vertices passed or at p itself (and then not coming back), and the
+        deficit is concave along a segment (its maximum is found by ternary search). Returns [(deficit, layer, p, ds,
+        segment)] with the largest positive deficit of each segment. """
+        if s_via is None or not order:
+            return []
+        r = v.diameter/2
+        c = (v.x, v.y)
+        lim = s_near + r
+        out = []
+        k0 = int(np.searchsorted(seg_order_s, s_via))
+        for side in (-1, 1):
+            ks = range(k0 - 1, -1, -1) if side < 0 else range(k0, len(order))
+            x = -math.inf # largest d - reach at the vertices passed so far
+            m = 0.0 # largest d at the vertices passed so far
+            for k in ks:
+                i = order[k]
+                s = segs[i]
+                a, b, _n1, _n2 = oriented[i]
+                near, far_end = (b, a) if side < 0 else (a, b)
+                s_near_end = seg_s[i] + side * (-seg_span[i]/2)
+                if side * (s_near_end - s_via) >= lim:
+                    break
+                x = max(x, math.dist(c, near) - r - s.width_at(near)/2 - clr)
+                m = max(m, math.dist(c, near))
+                if x > -clr and (v.layers is None or s.layer in v.layers):
+                    def f(u, s=s, near=near, far_end=far_end, x=x, m=m):
+                        p = (near[0] + (far_end[0]-near[0])*u, near[1] + (far_end[1]-near[1])*u)
+                        d = math.dist(c, p)
+                        return min(r + s.width_at(p)/2 + clr - d, x + clr, m - d), p
+                    # the part of the segment closer than lim to the via along the path
+                    span = seg_span[i]
+                    u1 = 1.0 if span <= 0 else max(0.0, min(1.0, (lim - side * (s_near_end - s_via)) / span))
+                    lo, hi = 0.0, u1
+                    for _ in range(60):
+                        m1, m2 = lo + (hi - lo)/3, hi - (hi - lo)/3
+                        lo, hi = (m1, hi) if f(m1)[0] < f(m2)[0] else (lo, m2)
+                    deficit, p, u = max((f(u) + (u,) for u in (0.0, (lo + hi)/2, u1)), key=lambda e: e[0])
+                    if deficit > 1e-4:
+                        ds = abs(s_near_end - s_via) + u * span
+                        out.append((deficit, s.layer, p, ds, i))
+                x = max(x, math.dist(c, far_end) - r - s.width_at(far_end)/2 - clr)
+                m = max(m, math.dist(c, far_end))
+        return out
+
+    def own_via_deficit(v, deficit, layer, p, ds, th, th_via):
+        """ Record copper of a via's own conductor that comes back to the via (own_via_returns) """
+        rep.self_overlaps += 1
+        rep.worst_self_overlap = max(rep.worst_self_overlap, deficit)
+        dth = abs(th - th_via) / (2*math.pi)
+        if len(rep.self_overlap_points) < max_records:
+            rep.self_overlap_points.append((layer, (v.x, v.y), p, deficit, dth, ds))
+        if deficit >= clr - 1e-4:
+            rep.self_shorts += 1
+            if rep.worst_self_short < deficit:
+                rep.worst_self_short = deficit
+                rep.note(f'self short on {layer} at ({p[0]:.3f}, {p[1]:.3f}): copper comes back to its own via at '
+                         f'({v.x:.3f}, {v.y:.3f}), {ds:.2f} mm from it along the conductor')
+
     # vias vs tracks and vias vs vias
     for j, v in enumerate(copper.vias):
         s_via, th_via = body_pos(('via', j))
+        # (copper closer than s_near + the via radius along the path: only where it comes back to the via)
+        for deficit, layer, p, ds, i in own_via_returns(v, s_via):
+            own_via_deficit(v, deficit, layer, p, ds, theta_at(i, p), th_via)
         for i in tree.query(Point(v.x, v.y), predicate='dwithin', distance=v.diameter/2 + max_w/2 + clr):
             s = segs[i]
             if v.layers is not None and s.layer not in v.layers:

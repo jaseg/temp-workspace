@@ -258,6 +258,7 @@ class PlanarInductor(geometry.PlanarInductor):
         initial = {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
         excluded = []
         first = None
+        via_errors = {} # layout key: OverlappingViasError (vias that overlap each other are rejected by the base class)
         for attempt in range(self.MAX_VIA_RETRIES + 1):
             if attempt > 0:
                 for name, value in initial.items():
@@ -265,25 +266,35 @@ class PlanarInductor(geometry.PlanarInductor):
             self._excluded = tuple(excluded)
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
-                super().__post_init__()
+                try:
+                    super().__post_init__()
+                    via_error = None
+                except geometry.OverlappingViasError as e:
+                    via_error = e
             key = self._layout_key()
+            via_errors[key] = via_error
             if first is None:
                 first = key
-            if self._vias_ok():
+            if via_error is None and self._vias_ok():
                 break
             fails = sum(1 for e in excluded if isinstance(e, tuple) and e[0] == key[0]
                         or isinstance(e, tuple) and e[:1] == ('phases',) and e[1] == key[0])
             excluded.append(key if fails == 0 else ('phases', key[0]) if fails == 1 else key[0])
             if not [c for c in self._candidates if not self._is_excluded(c, excluded)]:
                 break
-        if not self._vias_ok() and self._layout_key() != first:
-            # Nothing helped: use the layout with the best spacing
+        if (via_error is not None or not self._vias_ok()) and self._layout_key() != first and (
+                via_errors[first] is None or via_error is not None):
+            # Nothing helped: use the layout with the best spacing (unless only this one has vias that do not overlap)
             for name, value in initial.items():
                 setattr(self, name, value)
             self._excluded = ('only', first)
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
                 super().__post_init__()
+        elif via_error is not None:
+            raise via_error
+        elif via_errors[first] is not None:
+            geometry.reject_shorting_fallback(self, via_errors[first])
         for w in caught:
             warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
 

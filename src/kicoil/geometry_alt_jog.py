@@ -897,38 +897,53 @@ class PlanarInductor(geometry.PlanarInductor):
         # Layouts in order of decreasing spacing; the first one whose vias clear the turns wins
         attempts = [layout for d, layout in ranked][:self.MAX_TRIES]
 
-        def build(layout):
+        def build(layout, final=False):
             for name, value in initial.items():
                 setattr(self, name, value)
             shape.set_layout(layout)
             self._center_lines = None
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
-                super(PlanarInductor, self).__post_init__()
+                try:
+                    super(PlanarInductor, self).__post_init__()
+                except geometry.OverlappingViasError as e:
+                    # Vias that overlap each other: rejected by the base class unless another layout avoids them
+                    if final:
+                        raise
+                    self._via_error = e
+                    return caught
+            self._via_error = None
             return caught
 
         caught = None
         tried = []
+        first_error = None
         for layout in attempts:
             caught = build(layout)
-            if self._vias_ok():
+            if layout is attempts[0]:
+                first_error = self._via_error
+            if self._via_error is None and self._vias_ok():
                 break
             gap, _where = self.via_track_clearance()
-            tried.append((gap - self.clearance, layout))
+            tried.append((gap - self.clearance if self._via_error is None else -inf, layout))
         else:
             # Nothing had clear vias. The linear spiral is the reference layout: use it if its vias are clear, else the
             # layout whose vias come closest to clearing the turns.
             if not any(layout is None for layout in attempts):
                 caught = build(None)
-                if self._vias_ok():
+                if self._via_error is None and self._vias_ok():
                     tried = None
                 else:
                     gap, _where = self.via_track_clearance()
-                    tried.append((gap - self.clearance, None))
+                    tried.append((gap - self.clearance if self._via_error is None else -inf, None))
             if tried is not None:
                 best = max(tried, key=lambda t: t[0])[1]
-                if best is not shape.layout:
-                    caught = build(best)
+                if best is not shape.layout or self._via_error is not None:
+                    caught = build(best, final=True)
+        if self._via_error is not None:
+            raise self._via_error
+        if first_error is not None:
+            geometry.reject_shorting_fallback(self, first_error)
         self.layout = shape.layout
         for w in caught:
             warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)

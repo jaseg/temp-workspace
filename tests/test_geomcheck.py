@@ -811,6 +811,71 @@ def test_pads_on_the_outer_via_ring(name):
 
 # ---- same turn: folds and wraps ----
 
+def _reroute_into_via(cu, intent, path):
+    """ Reroute the track that arrives at the first via: from the far end of its last segment through `path` (points
+    as (along, across) in units of reach = via radius + half the trace width + clearance, relative to the via center,
+    'along' pointing away from the arm) into the via center. Returns the via. """
+    v = cu.vias[0]
+    c = (round(v.x, 6), round(v.y, 6))
+    j = next(i for i, s in enumerate(cu.segs) if key(s.layer, s.b)[1:] == c or key(s.layer, s.a)[1:] == c)
+    s = cu.segs[j]
+    far = s.a if key(s.layer, s.b)[1:] == c else s.b
+    dx, dy = v.x - far[0], v.y - far[1]
+    l = math.hypot(dx, dy)
+    u, n = (dx/l, dy/l), (-dy/l, dx/l)
+    reach = v.diameter/2 + s.width/2 + intent.clearance
+    pts = [far] + [(v.x + reach*(a*u[0] + b*n[0]), v.y + reach*(a*u[1] + b*n[1])) for a, b in path] + [(v.x, v.y)]
+    cu.segs[j] = Seg(s.layer, pts[0], pts[1], s.width)
+    cu.segs += [Seg(s.layer, p, q, s.width) for p, q in zip(pts[1:], pts[2:])]
+    return v
+
+
+def _via_returns(rep):
+    return [n for n in rep.notes if 'comes back to its own via' in n]
+
+
+@pytest.mark.parametrize('name', [SQUARE, LSHAPE])
+def test_track_returning_to_its_own_via_is_a_self_short(name):
+    # Followed from the via, the track leaves the via's reach (behind it, 1.1 reach away) and comes back past its side
+    # (0.6 reach from its center), where its copper overlaps the via: the via shorts the loop.
+    intent, cu = clean(name)
+    _reroute_into_via(cu, intent, [(-0.3, 0.6), (1.1, 0.0)])
+    rep = report(cu, intent, do_conformance=False)
+    assert rep.ok_connectivity, rep.notes
+    assert _via_returns(rep) and rep.self_shorts and rep.worst_self_short >= intent.clearance, rep.notes
+    # The same with every segment cut into three: the deficit does not depend on how the track is cut
+    split = copy.deepcopy(cu)
+    split.segs = [Seg(s.layer, lerp(s, a), lerp(s, b), s.width) for s in cu.segs for a, b in ((0, 1/3), (1/3, 0.7),
+                                                                                              (0.7, 1))]
+    rep2 = report(split, intent, do_conformance=False)
+    assert rep2.worst_self_short == pytest.approx(rep.worst_self_short, abs=1e-6)
+
+
+@pytest.mark.parametrize('name', [SQUARE, LSHAPE])
+def test_tight_arrival_into_via_is_not_a_self_short(name):
+    # The track hooks around the via but stays within its reach (at most 0.9 reach from its center): its copper never
+    # leaves the via, so it is the track's own arrival, not a part of the turn that comes back. A track that leaves
+    # the via only by less than the clearance before it comes back is not a self short either.
+    for path in ([(-0.3, 0.6), (0.6, 0.6), (0.9, 0.0)], [(-0.3, 0.6), (1.0 - 0.5*intent_clearance_frac(name), 0.0)]):
+        intent, cu = clean(name)
+        _reroute_into_via(cu, intent, path)
+        rep = report(cu, intent, do_conformance=False)
+        assert rep.ok_connectivity, rep.notes
+        assert not _via_returns(rep) and rep.self_shorts == 0, rep.notes
+
+
+def intent_clearance_frac(name):
+    """ The clearance of a corpus case in units of reach (via radius + half the trace width + clearance) """
+    intent, cu, _kinds = load(name)
+    v, s = cu.vias[0], cu.segs[0]
+    return intent.clearance / (v.diameter/2 + s.width/2 + intent.clearance)
+
+
+def lerp(s, t):
+    return (s.a[0] + (s.b[0]-s.a[0])*t, s.a[1] + (s.b[1]-s.a[1])*t)
+
+
+
 def test_wrap_around_a_tiny_hole_is_a_self_short():
     # A trace about 4 mm wide wraps around a hole smaller than itself and touches its own copper 0.25 to 0.46 turns
     # further on, which shorts part of the turn.

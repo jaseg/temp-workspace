@@ -202,27 +202,21 @@ SKELETON_DEPTH = {'noisy_l': 16.804822919}
 # Failure kinds that a case is known to show in the fixed layout (kicoil.geometry), with the reason. test_corpus_case
 # expects these to fail (xfail) instead of asserting them; any other failure kind still fails the test.
 KNOWN_FAILURES = {
-    # The inner contour of a slender ellipse is a sliver whose tips are sharper than 20 degrees. An arm that ends at its
-    # fold point at a tip connects to a via that sits back along the sliver's spine (the vertex track there moves ~8x
-    # faster than the depth, and the via needs the wider part of the sliver to clear the neighboring turn): the
-    # connection runs back over the arm's own copper for 1 to 5 mm. Same net, no clearance problem, but a backtrack.
-    # Deeper offsets of the 20:1 ellipse have such tips, too, and a turn running around one reverses at a vertex.
-    'slender': {'backtrack': 'via connection runs back along the arm at a sliver tip of the inner contour'},
+    # The inner contour of a slender ellipse is a sliver whose tips are sharper than 20 degrees, and so are the deeper
+    # offsets of the 20:1 ellipse: a turn running around such a tip reverses at a vertex there (a backtrack of the turn
+    # itself). (An arm that ends at its fold point at a tip used to connect to a via that sits back along the tip's
+    # spine by running back over the arm; it now ends where it passes the via, see test_layout.test_arm_ends_at_via.)
+    'slender': {'backtrack': 'a turn reverses at a sharp tip of a deeper offset of the outline'},
 }
-# Per case. At 90 % of a slender ellipse the inner contour is a tiny sliver. With 5 arms, kicoil.geometry places several
-# inner vias at the same point (the end of the skeleton), which connects the arms there. It warns ('Overlapping vias')
-# but still emits the layout instead of rejecting it: a defect of the base layout (geometry.py), reported, not fixed here.
-_COINCIDENT_VIAS = {'connectivity': 'inner vias coincide at the end of the skeleton (warned, but emitted)',
-                    'winding': 'follows from the coincident inner vias'}
+# Per case. At 90 % of a slender ellipse with 5 arms the inner vias overlap each other (they used to coincide at the end
+# of the skeleton): kicoil.geometry rejects these, see test_layout.test_overlapping_vias_rejected.
 # At 90 % of blob2 with 5 turns (2 layers, 6.4 mm trace) the innermost turn wraps around an inner contour much smaller
 # than the trace and its copper touches itself 0.4 turns further on. kicoil.geometry only warns about folds whose pieces
 # are far apart along the conductor (pi*d plus the pitch, or 4*(trace width + clearance)), so this one goes unwarned: a defect of the base
 # layout, the same as concave_starround_a0.9_n5k1 in corpus_concave.CASE_ISSUES (shown by the checker since it reports
 # self shorts).
 _UNWARNED_SELF_SHORT = {'self short': 'unwarned self short around the small inner contour of a deep annulus'}
-CASE_KNOWN_FAILURES = {'round_ellipse10to1_a0.90_n16k5': _COINCIDENT_VIAS,
-                       'round_ellipse20to1_a0.90_n16k5': _COINCIDENT_VIAS,
-                       'round_blob2_a0.90_n5k1': _UNWARNED_SELF_SHORT}
+CASE_KNOWN_FAILURES = {'round_blob2_a0.90_n5k1': _UNWARNED_SELF_SHORT}
 
 
 def cases():
