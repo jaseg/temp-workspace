@@ -22,8 +22,10 @@ uv run python tests/compare_results.py before=a.json after=results.json
 
 | | main 373f65c | fix-base | cornerflat |
 |---|---:|---:|---:|
-| pass (of 1008) | 18 | 514 | 742 |
+| pass (of 1008) | 18 | 509 | 736 |
 
-These are the results after the first review round. The branches no longer contain docs/, and cornerflat has no
-automatic layout search (774 passes before, 742 now; most lost cases pass with a hand-picked `--arm-phase` or
-`--no-flat-corners`). The previous version of the tests and results is in this directory's git history (0c71e60).
+These are the results after the second review round, which removed helpers from fix-base: protrusions narrower
+than one pitch are no longer cut, arms are no longer trimmed at their via, and the SVG import takes one closed path
+only. `docs/DEFECTS.md` still describes the fixes of the first round, including those two. The skeleton.wasm must be
+built from the branch's `cgal_skeleton_core` (it now prints 17 digits). Earlier versions of the tests and results are
+in this directory's git history (0c71e60, ff8e866).

@@ -155,3 +155,43 @@ def test_rereads_an_edited_svg_file(gui, tmp_path):
     path.write_text(SQUARE_SVG.format(60))
     second, _, _ = gui.run()
     assert second.trace_width != first.trace_width
+
+
+PARENT = '''
+import multiprocessing, sys, time
+from functools import partial
+from kicoil.geometry import StarShape
+from kicoil.worker import build_model
+if __name__ == '__main__':
+    ctx = multiprocessing.get_context('spawn')
+    conn, child_conn = ctx.Pipe(duplex=False)
+    params = {'shape': partial(StarShape, inner_diameter=24, outer_diameter=40, annular_width=3, points=600),
+              'turns': 5, 'twists': 2, 'clearance': 0.15}
+    process = ctx.Process(target=build_model, args=(child_conn, params), daemon=True)
+    process.start()
+    print(process.pid, flush=True)
+    time.sleep(600)
+'''
+
+
+def test_exits_when_the_gui_is_killed(tmp_path):
+    import os
+    import signal
+    import subprocess
+    script = tmp_path / 'parent.py'
+    script.write_text(PARENT)
+    parent = subprocess.Popen([sys.executable, str(script)], stdout=subprocess.PIPE, text=True)
+    child = int(parent.stdout.readline())
+    time.sleep(3) # (the child is computing the skeleton)
+    os.kill(parent.pid, signal.SIGKILL)
+    parent.wait()
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 10:
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            return
+        # (it is a child of init now, which reaps it)
+        time.sleep(0.1)
+    os.kill(child, signal.SIGKILL)
+    pytest.fail('The layout process is still running after the GUI process was killed')

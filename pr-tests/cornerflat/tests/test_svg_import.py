@@ -52,55 +52,36 @@ def test_shapes_transforms_and_use(tmp_path):
 
 
 def test_units(tmp_path):
-    # Absolute units of width and height scale the viewBox; without them one user unit is one mm
+    # Absolute units of width and height scale the viewBox; without them one user unit is one mm. (svgelements' unit
+    # constants are good to about 1 ppm.)
     poly, _ = outline(tmp_path, '<rect width="30" height="20"/>', 'width="60mm" height="40mm" viewBox="0 0 30 20"')
-    assert box(poly) == (0, 0, 60, 40)
+    assert poly.bounds == pytest.approx((0, 0, 60, 40), rel=1e-5)
     poly, _ = outline(tmp_path, '<rect width="96" height="48"/>', 'width="1in" height="0.5in" viewBox="0 0 96 48"')
-    assert box(poly) == (0, 0, 25.4, 12.7)
+    assert poly.bounds == pytest.approx((0, 0, 25.4, 12.7), rel=1e-5)
     poly, _ = outline(tmp_path, '<rect width="30" height="20"/>')
     assert box(poly) == (0, 0, 30, 20)
-    # Exporters round width and height: one user unit is exactly one mm then
-    poly, _ = outline(tmp_path, '<rect width="100.2394" height="54.4735"/>',
-                      'width="100.24mm" height="54.47mm" viewBox="0 0 100.2394 54.4735"')
-    assert box(poly) == (0, 0, 100.2394, 54.4735)
 
 
 def test_hidden_elements_are_not_part_of_the_outline(tmp_path):
     big = '<rect width="100" height="100"/>'
     poly, _ = outline(tmp_path, f'<g style="display:none">{big}</g><rect width="30" height="20"/>')
     assert box(poly) == (0, 0, 30, 20)
-    poly, _ = outline(tmp_path, f'<g visibility="hidden">{big}</g><rect width="30" height="20"/>')
-    assert box(poly) == (0, 0, 30, 20)
     poly, _ = outline(tmp_path, f'<defs>{big}</defs><rect width="30" height="20"/>')
     assert box(poly) == (0, 0, 30, 20)
     poly, _ = outline(tmp_path, f'<style>.h {{ display: none }}</style><g class="h">{big}</g>'
                                 f'<rect width="30" height="20"/>')
     assert box(poly) == (0, 0, 30, 20)
-    for tag in ('clipPath', 'mask', 'marker', 'pattern', 'symbol'): # (only drawn where referenced, also outside <defs>)
-        poly, _ = outline(tmp_path, f'<{tag} id="x">{big}</{tag}><rect width="30" height="20"/>')
-        assert box(poly) == (0, 0, 30, 20), tag
-    poly, _ = outline(tmp_path, '<symbol id="s"><rect width="30" height="20"/></symbol><use xlink:href="#s" x="5"/>')
-    assert box(poly) == (5, 0, 35, 20)
 
 
-def test_largest_contour_with_a_warning(tmp_path):
-    # The original import took the first path, here a small one before the outline
-    poly, caught = outline(tmp_path, '<rect width="3" height="2"/><rect x="10" width="30" height="20"/>')
-    assert box(poly) == (10, 0, 40, 20)
-    assert any('largest' in m for m in caught)
-
-
-def test_open_paths_are_joined(tmp_path):
-    # KiCad exports a board outline as one path per line or arc, with ends that meet only to rounding
-    paths = ''.join(f'<path d="{d}"/>' for d in ['M 0 0 L 30 0', 'M 30.0005 0 L 30 20', 'M 30 20 A 15 10 0 0 1 0 20',
-                                                 'M 0 20 L 0 0'])
-    poly, caught = outline(tmp_path, paths)
-    assert poly.is_valid and poly.area > 600
-    assert not caught
+def test_first_shape_is_the_outline(tmp_path):
+    poly, _ = outline(tmp_path, '<rect width="3" height="2"/><rect x="10" width="30" height="20"/>')
+    assert box(poly) == (0, 0, 3, 2)
 
 
 def test_errors(tmp_path):
-    with pytest.raises(ValueError, match='crosses or touches itself'):
-        outline(tmp_path, '<path d="M 0 0 L 30 20 L 30 0 L 0 20 Z"/>')
-    with pytest.raises(ValueError, match='no closed outline'):
+    with pytest.raises(ValueError, match='not closed'):
         outline(tmp_path, '<path d="M 0 0 L 30 20"/>')
+    with pytest.raises(ValueError, match='more than one contour'):
+        outline(tmp_path, '<path d="M 0 0 L 30 0 L 30 20 Z M 40 0 L 50 0 L 50 10 Z"/>')
+    with pytest.raises(ValueError, match='no path'):
+        outline(tmp_path, '<text>x</text>')

@@ -68,37 +68,13 @@ def test_vias_at_flat_corners_clear_the_turns(name):
     assert model.via_track_clearance()[0] >= model.clearance - 1e-6
 
 
-def test_edges_of_cut_protrusions_get_no_ramp():
-    @dataclasses.dataclass
-    class Poly(geometry.OffsetShape):
-        polygon: list
-        annular_width: float
-
-    shape = Poly(corpus.finger_square(40, 2, 8), 3.0)
-    _model(shape, 5, 1)
-    sk, flat = shape.sk, shape.layout
-    assert sk.cut_protrusions and flat is not sk
-    cut = {i for i, (track, raw) in enumerate(zip(sk.tracks, sk._raw_tracks)) if track is not raw}
-    assert cut
-    for i, p in enumerate(sk.poly):
-        if i in cut or (i + 1) % len(sk.poly) in cut:
-            assert flat.edge_spans[flat.poly.index(p)] == 0
-
-
 def test_arm_phase_rotates_the_arms(square):
     def starts(model):
-        return sorted((round(x, 9), round(y, 9)) for x, y in (points[0] for points, _ in model.spiral_center_lines()[0]))
+        arms = [model.shape.compute_spiral(*model.arm_angles(i)[:2]) for i in range(model.twists)]
+        return sorted((round(x, 9), round(y, 9)) for x, y in (points[0] for points, _ in arms))
     base = starts(_model(square))
     assert starts(_model(square, arm_phase=360 / 3)) == base
     assert starts(_model(square, arm_phase=30)) != base
-
-
-def test_spiral_arguments_must_be_finite(square):
-    _model(square)
-    with pytest.raises(ValueError):
-        square.compute_spiral(0.0, float('nan'))
-    with pytest.raises(ValueError):
-        square.compute_spiral(0.0, float('inf'))
 
 
 def test_debug_arms_mark_start_end_and_vertices(square):

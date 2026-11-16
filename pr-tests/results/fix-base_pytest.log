@@ -1,22 +1,7 @@
-warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
-........................................................................ [ 16%]
-........................................................................ [ 33%]
-........................................................................ [ 50%]
-..s...s.......s.s...s................................................... [ 67%]
-...............xs......xsx.....x........................................ [ 84%]
-..................................................................       [100%]
-=============================== warnings summary ===============================
-tests/test_layout.py::test_overlapping_vias_rejected[round_ellipse20to1_a0.90_n16k5-(-10.449, -0.130) and (-10.449, 0.130)]
-  /tmp/claude-0/pr/r2-base/src/kicoil/geometry.py:615: UserWarning: Via at (17.413, -0.000) overlaps a neighboring turn by 0.113 mm (a clearance of 0.150 mm is required). Reduce the via diameter or the annular width.
-    warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {problem}. ' +
-
-tests/test_layout.py::test_overlapping_vias_rejected[round_ellipse10to1_a0.90_n16k5-(-7.808, -0.196) and (-7.808, 0.196)]
-  /tmp/claude-0/pr/r2-base/src/kicoil/geometry.py:615: UserWarning: Via at (13.011, 0.000) overlaps a neighboring turn by 0.057 mm (a clearance of 0.150 mm is required). Reduce the via diameter or the annular width.
-    warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {problem}. ' +
-
-tests/test_layout.py::test_overlapping_vias_rejected_circle
-  /tmp/claude-0/pr/r2-base/src/kicoil/geometry.py:615: UserWarning: Via at (0.155, -0.476) is only 0.069 mm away from a neighboring turn, which is less than the clearance of 0.150 mm. Reduce the via diameter or the annular width.
-    warnings.warn(f'Via at ({where[0]:.3f}, {where[1]:.3f}) {problem}. ' +
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-415 passed, 7 skipped, 4 xfailed, 3 warnings in 348.67s (0:05:48)
+........................................................................ [ 18%]
+........................................................................ [ 36%]
+........................................................................ [ 54%]
+.s...s.......s.s...s....................................x.x..xx......... [ 72%]
+..............xs......xsx.....x..x...................................... [ 90%]
+....................................                                     [100%]
+380 passed, 7 skipped, 9 xfailed in 388.56s (0:06:28)

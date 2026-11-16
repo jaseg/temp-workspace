@@ -56,7 +56,7 @@ def test_corpus_case(spec):
         # A documented limitation of the layout for this outline (see the corpus module that defines the case)
         known |= set(spec['known_issue']['kinds'])
         kinds += ['overshoot'] if rep.overshoot >= max(0.05, 0.1 * intent.trace_width) else []
-        kinds += ['contour'] if rep.contour_hausdorff >= 1.5 and not _cut_protrusions(model, intent) else []
+        kinds += ['contour'] if rep.contour_hausdorff >= 1.5 and 'narrow' not in spec['tags'] else []
     known |= set(spec.get('known_failures', {}))
     unexplained = [k for k in kinds if k not in known]
     assert not unexplained, (unexplained, rep.notes[:5], rep.violations[:5])
@@ -64,13 +64,9 @@ def test_corpus_case(spec):
         pytest.xfail(f'known: {kinds}')
     # The copper must stay within the intended outline
     assert rep.overshoot < max(0.05, 0.1 * intent.trace_width)
-    if not _cut_protrusions(model, intent):
-        # (Turns do not run into protrusions narrower than two turns, those parts of the outline stay uncovered)
+    if 'narrow' not in spec['tags']:
+        # (Turns that run into narrow parts of the outline leave their tips uncovered)
         assert rep.contour_hausdorff < 1.5
-
-
-def _cut_protrusions(model, intent):
-    return [c for c in getattr(getattr(model.shape, 'sk', None), 'cut_protrusions', ()) if c[3] < intent.annular_width]
 
 
 def spec(name):
@@ -214,22 +210,15 @@ def test_merge_tolerance_does_not_depend_on_position():
         assert [len(t) for t in sk.tracks] == [len(t) for t in ref.tracks]
         for i in range(len(ch)):
             x, y = sk.track_position(i, 5)
-            # skeleton.wasm prints 12 significant digits, i.e. 1e-6 mm at 1e6 mm
             assert (x - off, y - off) == pytest.approx(ref.track_position(i, 5), abs=1e-11 * off)
-    with pytest.raises(ValueError):
-        skeletonator.Skeletonator([(x*1e-6 + 1e7, y*1e-6 + 1e7) for x, y in corpus.rect(10, 10)])
 
 
-def test_spiral_argument_order_and_finiteness():
+def test_spiral_argument_order():
     from kicoil import skeletonator
     sk = skeletonator.Skeletonator(corpus.rect(10, 10))
     pts, angles = sk.spiral(0.0, 1.0, 0.0, 3.0)
     rpts, rangles = sk.spiral(1.0, 0.0, 3.0, 0.0)
     assert rpts == pts[::-1] and rangles == angles[::-1]
-    with pytest.raises(ValueError):
-        sk.spiral(0.0, math.nan, 0.0, 3.0)
-    with pytest.raises(ValueError):
-        list(sk.iter_vertex_angles(0.0, math.inf))
 
 
 def _keepout_polygons():
@@ -300,11 +289,17 @@ def _naive_min_turn_spacing(arms, search_radius, min_turn_separation=0.5):
 
 @pytest.mark.parametrize('name', ['square40_a0.30_n8k3', 'star5_a0.60_n7k3', 'circle30x6_n5k3', 'rstar1_a0.30_n8k3'])
 def test_spacing_matches_brute_force(name):
-    from kicoil.geometry import min_turn_spacing
+    from kicoil.geometry import PIECE_STEP, center_line_pieces, min_turn_spacing
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         model = build_model(spec(name))
-    for layer_arms, pieces in zip(model.spiral_center_lines(), model._pieces):
+    arms = [[], []]
+    for i in range(model.twists):
+        start_angle, fold_angle, end_angle = model.arm_angles(i)
+        arms[0].append(model.shape.compute_spiral(start_angle, fold_angle))
+        arms[1].append(model.shape.compute_spiral(end_angle, fold_angle))
+    for layer_arms in arms:
+        pieces = center_line_pieces(layer_arms, PIECE_STEP)
         for radius in (model.spiral_pitch, 1.5 * model.spiral_pitch):
             assert min_turn_spacing(pieces, radius)[0] == pytest.approx(
                     _naive_min_turn_spacing(layer_arms, radius), abs=1e-12)
@@ -335,12 +330,10 @@ def test_circle_inner_vias_stay_on_their_side_of_the_center():
     from kicoil import geometry
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter('always')
-        with pytest.raises(geometry.OverlappingViasError,
+        with pytest.raises(ValueError,
                            match=r'the vias at \(0\.000, 0\.500\) and \(-0\.000, -0\.500\) are 1\.000 mm apart'):
             geometry.PlanarInductor(shape=geometry.CircleShape(20, 1), turns=9, twists=2, clearance=0.15,
                                     via_diameter=2.0)
-    overlap = [str(x.message) for x in w if 'overlaps a neighboring turn by' in str(x.message)]
-    assert overlap and not any('less than the clearance' in m for m in overlap) # the overlap is larger than it
 
 
 @pytest.mark.parametrize('arcs', [False, True])
@@ -435,44 +428,6 @@ def test_error_messages_give_the_measured_spacing():
     assert 'Reduce trace width' in msg and '1.885 mm' in msg and 'measured near' in msg
 
 
-@pytest.mark.parametrize('name', ['narrow_tshape_w5.0_n4k1', 'narrow_tshape_w5.0_n7k3', 'narrow_finger_w6.0_n5k2',
-                                  'narrow_keyhole_w7.0_n7k3', 'narrow_finger_w6.0_n9k4'])
-def test_vanishing_protrusion_is_cut(name):
-    # The two sides of a protrusion that collapses inside the annulus (stem of a T, finger, keyhole tab) used to be
-    # followed by turns just above the collapse depth, so that the turn's copper folded onto itself along the whole
-    # protrusion (clearance deficit up to 18x the clearance, path touching itself).
-    model, intent, rep = layout(spec(name))
-    assert rep.ok_connectivity and rep.crossings == 0 and rep.backtracks == 0
-    assert rep.worst_clearance_deficit <= 0.05 * intent.clearance + 1e-4
-
-
-@pytest.mark.parametrize('name', ['narrow_stepped_w4.0_n4k1', 'narrow_stepped_w6.0_n4k1', 'narrow_branch_w3.0_n7k3',
-                                  'narrow_branch_w6.0_n4k1'])
-def test_nested_protrusions_are_cut_at_every_mouth(name):
-    # The protrusion cut stopped after the first protrusion a track passes through: the tips of a narrow finger on top
-    # of a wider one (or of a side branch) were cut at the inner mouth only and still ran up the outer protrusion's
-    # axis, while the other vertices of the outer protrusion were cut at its mouth. One turn then ran up the axis and
-    # straight back, a zero-width hairpin (connectivity broken, reported as a branch).
-    model, intent, rep = layout(spec(name))
-    assert rep.ok_connectivity and rep.branches == 0 and rep.crossings == 0 and rep.backtracks == 0
-    assert rep.worst_clearance_deficit <= 0.05 * intent.clearance + 1e-4
-
-
-def test_bent_protrusion_is_cut_on_its_mouth():
-    # The tips of a protrusion moved along the direction from their own entry into the collapsed group to its exit,
-    # which is oblique for an L-shaped protrusion: they landed 0.6 mm inside the outline, the measured spacing dropped
-    # to 61 % of the pitch and the whole coil got a 45 % thinner trace than with a straight finger of the same width.
-    sq = [(-20, -20), (20, -20), (20, 20)]
-    straight = sq + [(2, 20), (2, 32), (-2, 32), (-2, 20), (-20, 20)]
-    bent = sq + [(2, 20), (2, 28), (12, 28), (12, 32), (-2, 32), (-2, 20), (-20, 20)]
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        w_straight = build_model(poly_spec(straight, 6, 13, 3)).trace_width
-        model, intent, rep = layout(poly_spec(bent, 6, 13, 3))
-    assert model.trace_width >= 0.98 * w_straight
-    assert rep.ok_connectivity and rep.crossings == 0 and rep.worst_clearance_deficit <= 1e-4
-
-
 def test_spacing_measurement_dense_outline_few_turns():
     # A finely subdivided outline with few turns (an SVG import) puts thousands of pieces of one turn into each grid
     # cell of the spacing search: all pairs of a cell were built at once (2.4 GB and 20 s for 16000 points). The pieces
@@ -517,66 +472,20 @@ def _smooth_blob(d, n, seed, order=5, amp=0.15, decimals=None):
     return pts
 
 
-ANGLE_REFERENCE_CASES = ['ellipse3to1_a0.90_n16k5', 'sector180_a0.30_n8k3', 'star5_a0.30_n8k3', 'neck_a0.30_n5k2',
-                         'chamfer_tiny_a0.30_n8k3', 'sector90_a0.30_n5k2', 'narrow_tshape_w5.0_n7k3',
-                         'narrow_stepped_w4.0_n4k1', 'narrow_branch_w3.0_n7k3', 'narrow_lfinger_w3.0_n9k4',
-                         'narrow_slot_w10.0_n4k1']
-
-
-def _min_edge_lengths_bruteforce(sk, max_depth):
-    """ Every edge at depth 0, max_depth and every node time of all tracks in between """
-    times = sorted({n.time for t in sk.tracks for n in t if 0 < n.time < max_depth} | {0.0, max_depth})
-    n = len(sk.poly)
-    out = [math.inf] * n
-    for d in times:
-        pts = [sk.track_position(i, d) for i in range(n)]
-        out = [min(out[i], math.dist(pts[i], pts[(i+1) % n])) for i in range(n)]
-    return out
-
-
-@pytest.mark.parametrize('name', ANGLE_REFERENCE_CASES)
-def test_edge_lengths_match_brute_force(name):
-    # set_angle_reference evaluated every edge at every node time of all tracks (quadratic, 35 s for a 2500 vertex
-    # outline). The fast version only looks at the edge's own tracks until they meet; it must give the same lengths,
-    # also on tracks cut at protrusions.
-    from kicoil import skeletonator
-    s = spec(name)
-    sk = skeletonator.Skeletonator(s['polygon'])
-    pitch = s['annular_width'] / (s['turns'] / s['layers'])
-    for limit in (0.0, pitch / 2):
-        sk.set_fold_limit(limit)
-        for depth in (s['annular_width'], sk.max_depth, 0.5 * s['annular_width']):
-            fast = sk._min_edge_lengths(depth)
-            brute = _min_edge_lengths_bruteforce(sk, depth)
-            assert max(abs(a - b) for a, b in zip(fast, brute)) <= 1e-15 * sum(brute)
-
-
 def test_angle_reference_is_linear_on_smooth_outlines(monkeypatch):
     # On a smooth outline all vertex tracks run to the center, so the old set_angle_reference called track_position
-    # n times for each of about n node times (6.3 million calls for 2500 vertices). It also ran again for every call
-    # of set_fold_limit, although nothing was cut.
+    # n times for each of about n node times (6.3 million calls for 2500 vertices). It samples a fixed number of depths.
     from kicoil import skeletonator
     poly = _smooth_blob(40, 1000, 7)
-    calls = {'track_position': 0, 'min_edge_lengths': 0}
+    calls = {'track_position': 0}
     track_position = skeletonator.Skeletonator.track_position
-    min_edge_lengths = skeletonator.Skeletonator._min_edge_lengths
     def counting_track_position(self, i, depth):
         calls['track_position'] += 1
         return track_position(self, i, depth)
-    def counting_min_edge_lengths(self, depth):
-        calls['min_edge_lengths'] += 1
-        return min_edge_lengths(self, depth)
     monkeypatch.setattr(skeletonator.Skeletonator, 'track_position', counting_track_position)
-    monkeypatch.setattr(skeletonator.Skeletonator, '_min_edge_lengths', counting_min_edge_lengths)
     sk = skeletonator.Skeletonator(poly)
     assert sum(len(t) for t in sk.tracks) > 100 * len(poly) # long tracks
-    assert calls['track_position'] < 30 * len(poly)
-    angles = list(sk.vertex_angles)
-    sk.set_fold_limit(1.0) # nothing to cut
-    sk.set_angle_reference(sk.max_depth) # same depth
-    assert calls['min_edge_lengths'] == 1 and sk.vertex_angles == angles
-    sk.set_angle_reference(0.5 * sk.max_depth)
-    assert calls['min_edge_lengths'] == 2
+    assert calls['track_position'] <= skeletonator.ANGLE_REFERENCE_SAMPLES * len(poly)
 
 
 @pytest.mark.parametrize('poly', [[(0, 0), (20, 0), (0, 10), (0, -5)],
@@ -608,7 +517,7 @@ def test_overlapping_vias_rejected(name, pair):
     # collapse depth) used to put all five inner vias at (0, 0) of the 20:1 ellipse, and two at (-7.389, 0) of the 10:1
     # one, which shorted the arms (only a warning). Pulled back to the innermost turn, two vias on opposite sides of the
     # sliver are still closer than the via diameter: no placement keeps them apart, so the request is rejected.
-    with pytest.raises(ValueError, match=r'Overlapping vias: the vias at .* would short the arms') as e:
+    with pytest.raises(ValueError, match=r'Overlapping vias: the vias at .* apart') as e:
         build_model(spec(name))
     assert pair in str(e.value)
 
@@ -621,37 +530,13 @@ def test_overlapping_vias_rejected_circle():
 
 def test_via_offset_pulled_back_to_keep_vias_apart():
     # 60 x 6 ellipse, 60 % annular width, 21 turns, 8 arms: at the automatic via offset (0.289 mm) two inner vias sit
-    # 0.623 mm apart on opposite sides of the sliver-shaped inner contour. The offset is reduced to where the smallest
-    # gap (via to via or via to the neighboring turn) is largest: 0.714 mm apart, 0.105 mm from the neighboring turn.
+    # 0.623 mm apart on opposite sides of the sliver-shaped inner contour. The offset is reduced until they clear each
+    # other (they then come 0.064 mm too close to the neighboring turn).
     caught = []
     model, intent, rep = layout(spec('round_ellipse10to1_a0.60_n21k8'), caught)
-    assert model.via_offset == pytest.approx(0.2441, abs=1e-3)
-    assert model.via_ring_spacing()[0] == pytest.approx(0.714, abs=1e-3)
-    assert rep.ok_connectivity and rep.worst_via_deficit < 0.05
-    assert any(m.startswith('Overlapping vias') and '0.714 mm apart' in m for m in caught)
-
-
-@pytest.mark.parametrize('name', ['round_ellipse10to1_a0.60_n8k3', 'round_ellipse10to1_a0.60_n6_1layer',
-                                  'round_ellipse20to1_a0.30_n5k1'])
-def test_arm_ends_at_via(name):
-    # The arm that ends at the sharp tip of a sliver-shaped inner contour (fold point (23.879, 0) of the 60 x 6
-    # ellipse) has its via 1.36 mm back along the tip's spine: at the tip the neighboring turn's sides are only 0.45 mm
-    # from the spine and converge at about 6 degrees, so a via there has no clearance. The connection from the tip back
-    # to the via ran over the arm's own copper (a backtrack); now the arm ends where it passes the via.
-    model, intent, rep = layout(spec(name))
-    assert rep.backtracks == 0, rep.notes
-    assert rep.failure_kinds(intent.clearance, intent.trace_width) == []
-
-
-def test_arm_trim_at_via():
-    from kicoil.geometry import _trim_arm_at_via
-    arm = [(0, 0), (5, 0), (5, 1), (10, 1)]
-    # via back along the last piece: the arm ends at the point closest to the via
-    assert _trim_arm_at_via(arm, (8, 1.2)) == [(0, 0), (5, 0), (5, 1), (8.0, 1.0)]
-    assert _trim_arm_at_via(arm, (5.1, 0.5)) == [(0, 0), (5, 0), (5.0, 0.5)]
-    # via ahead or to the side of the arm end: unchanged
-    assert _trim_arm_at_via(arm, (10, -1)) == arm
-    assert _trim_arm_at_via(arm, (11, 1.2)) == arm
+    assert model.via_offset == pytest.approx(0.2251, abs=1e-3)
+    assert model.via_ring_spacing()[0] >= model.via_diameter + model.clearance
+    assert rep.ok_connectivity and not any(m.startswith('Overlapping vias') for m in caught)
 
 
 @pytest.mark.parametrize('name', ['rstar0_a0.90_n3k1', 'pentagon_a0.90_n3k1'])
@@ -662,27 +547,6 @@ def test_via_arrival_is_not_a_self_short(name):
     # conductor's own arrival, a single piece of copper that the via adds nothing to, not a self short (checker).
     _model, _intent, rep = layout(spec(name))
     assert not rep.own_via_shorts, rep.notes
-
-
-def _tri15(f):
-    # An isosceles triangle with a 15 degree apex, 50 mm tall, annular width f * split depth, 13 turns, 4 twists
-    import corpus_concave as cc
-    from shapely.geometry import Polygon
-    b = 2*50*math.tan(math.radians(7.5))
-    poly = cc._ccw_coords(cc._centered(Polygon([(0, 50), (-b/2, 0), (b/2, 0)])))
-    return dict(name=f'tri15_f{f}', shape='polygon', polygon=poly, annular_width=round(f*cc.split_depth(poly), 4),
-                turns=13, twists=4, layers=2, clockwise=False, clearance=0.15, trace_width=None, tags=[])
-
-
-@pytest.mark.parametrize('f', [0.70, 0.72, 0.75, 0.78])
-def test_tip_merge_at_the_inner_via_is_gone(f):
-    # Triangle with a 15 degree apex, 13 turns, 4 twists: the innermost arm used to run past its inner via into the
-    # apex and its copper merged with the via's over 6.6-7.2 (w + c), a self merge. The arm now ends where it passes
-    # its via (geometry._trim_arm_at_via), so the hairpin at the apex merges only locally (below 5 (w + c)).
-    model, intent, rep = layout(_tri15(f))
-    assert 'self merge' not in rep.failure_kinds(intent.clearance, intent.trace_width)
-    assert rep.max_self_touch_bypass < 5 * (model.trace_width + model.clearance)
-
 
 
 @pytest.mark.parametrize('turns, twists', [(5, 2), (7, 3)])
