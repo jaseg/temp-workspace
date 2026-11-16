@@ -19,9 +19,9 @@ Prerequisite: `src/kicoil/skeleton.wasm` (built from `cgal_skeleton_core`, or co
 - `compare_results.py`: compares the JSON of several runs (e.g. two implementations, or before/after a change).
 - `test_layout.py`: pytest suite. Runs the quick corpus plus regression tests for specific bugs. `--full-corpus` runs
   everything.
-- `test_flat_corners.py`: the flat corner layout (warped angle, flat corners, wider spacing, argument checks, debug
-  output) and the choice among layouts (via fallback, copper that comes back to its own via, a shape shared between
-  coils).
+- `test_flat_corners.py`: the flat corner layout (constant depth around corners, wider spacing, vias at flat corners,
+  no ramps on the edges of cut protrusions, argument checks, debug output, a shape shared between coils) and the arm
+  phase.
 - `test_geomcheck.py`: mutation tests for the checker. Takes clean layouts of a few corpus cases, injects one defect
   at a time (gaps, deleted or duplicated segments, pushed vertices, joints pushed across the neighboring turn, shorted
   turns, vias moved outside, grown or defective vias, narrow tracks, oversized, undersized or displaced pads, copper

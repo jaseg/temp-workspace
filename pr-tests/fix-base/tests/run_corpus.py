@@ -76,7 +76,7 @@ def run_case(args):
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             model = build_model(spec, impl)
-            fp = model.render_footprint(circle_segments=64)
+            fp = model.render_footprint()
     except Exception as e:
         res['status'] = 'rejected' if isinstance(e, ValueError) else 'error'
         res['error'] = f'{type(e).__name__}: {e}'.splitlines()[0][:300]

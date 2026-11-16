@@ -14,7 +14,7 @@ To run them, copy the branch's `tests/` into a checkout of that PR branch:
 ```bash
 git clone -b cornerflat https://github.com/jaseg/kicoil && cd kicoil
 cp -r /path/to/pr-tests/cornerflat/tests .
-unzip -j de.jaseg.kicoil-v0.11.1.zip plugins/kicoil/skeleton.wasm -d src/kicoil/   # or build it in cgal_skeleton_core
+# build src/kicoil/skeleton.wasm from cgal_skeleton_core (the v0.11.1 release's wasm lacks the outline error messages)
 uv run --with pytest pytest tests                     # quick corpus and regression tests, ~5-9 min
 uv run python tests/run_corpus.py --kind full -j 3 --out results.json --svg-dir failures/
 uv run python tests/compare_results.py before=a.json after=results.json
@@ -22,4 +22,8 @@ uv run python tests/compare_results.py before=a.json after=results.json
 
 | | main 373f65c | fix-base | cornerflat |
 |---|---:|---:|---:|
-| pass (of 1008) | 18 | 513 | 774 |
+| pass (of 1008) | 18 | 514 | 742 |
+
+These are the results after the first review round. The branches no longer contain docs/, and cornerflat has no
+automatic layout search (774 passes before, 742 now; most lost cases pass with a hand-picked `--arm-phase` or
+`--no-flat-corners`). The previous version of the tests and results is in this directory's git history (0c71e60).

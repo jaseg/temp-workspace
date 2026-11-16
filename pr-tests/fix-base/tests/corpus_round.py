@@ -246,7 +246,7 @@ def cases():
 
     # Dense outline with coordinates rounded to 1 µm, as imported from a file with 3 decimals: the rounding noise turns
     # about 15 % of the vertices into tiny reflex corners, which makes the straight skeleton slow (about 80 s; with
-    # 3000 vertices it runs out of memory). Such outlines should be simplified before the import (docs/outlines.md);
+    # 3000 vertices it runs out of memory). Such outlines should be simplified before the import;
     # the case is kept as the slowest of the corpus. One case only.
     poly = svg_like(40, 1000, random.Random(4243))
     out.append(_spec('round_svg1000r_a0.60_n8k3', 'polygon', 8, 3, polygon=poly,

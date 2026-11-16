@@ -228,14 +228,23 @@ def _split_depth_cache():
         return {}
 
 
+def mitered_skeletonator(poly):
+    """ Skeletonator of the outline without round joints (no corner is rounded) """
+    from kicoil import skeletonator
+    saved = skeletonator.ROUND_JOINT_MIN_TURN
+    skeletonator.ROUND_JOINT_MIN_TURN = math.inf
+    try:
+        return skeletonator.Skeletonator(list(poly))
+    finally:
+        skeletonator.ROUND_JOINT_MIN_TURN = saved
+
+
 def compute_split_depth(poly, mitered_cusps=False):
     """ Split depth computed live with the kicoil package on the path (the fixed code). """
     from kicoil import skeletonator
-    cls = skeletonator.Skeletonator
     if mitered_cusps:
-        class cls(cls):
-            ROUND_JOINT_MIN_TURN = math.inf # no corner is rounded
-    return cls(list(poly)).max_depth
+        return mitered_skeletonator(poly).max_depth
+    return skeletonator.Skeletonator(list(poly)).max_depth
 
 
 @lru_cache(maxsize=None)
@@ -254,7 +263,7 @@ def _split_depth(poly, mitered_cusps):
 def split_depth(poly, mitered_cusps=False):
     """ Depth of the straight skeleton's first split event (= the largest annular width the layout accepts). With
     mitered_cusps, of the skeleton of the outline as given, without cutting its sharp reflex corners (cusps, see
-    `Skeletonator.ROUND_JOINT_MIN_TURN`). """
+    `skeletonator.ROUND_JOINT_MIN_TURN`). """
     return _split_depth(tuple(map(tuple, poly)), mitered_cusps)
 
 
@@ -323,7 +332,7 @@ def cases():
         if name in KNOWN_ISSUES:
             base['known_issue'] = KNOWN_ISSUES[name]
         if name == 'heart':
-            # The heart's cusp gets a round joint (Skeletonator.ROUND_JOINT_MIN_TURN), which lifts the
+            # The heart's cusp gets a round joint (skeletonator.ROUND_JOINT_MIN_TURN), which lifts the
             # split depth from 1.6 mm (the mitered cusp's spike hitting the bottom) to 10.1 mm. 'heart' keeps the
             # annular widths of the mitered skeleton (the cases of the cusp defect), 'heartdeep' uses the new depth.
             out += _variants('concave_heartdeep', base, tags + ['concave'], depth)

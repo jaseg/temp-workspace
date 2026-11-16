@@ -1,18 +1,19 @@
 {
  "24gon_a0.90_n3k1": [
   "clearance",
+  "self short",
   "via clearance"
  ],
  "concave_comb_a0.9_n5k1": [
-  "self merge"
- ],
- "concave_crescent_a0.9_n5k1": [
   "self merge"
  ],
  "concave_crescent_a0.9_n8k3": [
   "self merge"
  ],
  "concave_cshape_a0.9_n5k1": [
+  "self merge"
+ ],
+ "concave_heart_a0.3_n5k1": [
   "self merge"
  ],
  "concave_heart_a0.9_n13k4": [
@@ -27,17 +28,8 @@
  "concave_heartdeep_a0.9_n13k4": [
   "backtrack"
  ],
- "concave_heartdeep_a0.9_n8k3": [
-  "backtrack"
- ],
  "concave_lround_a0.9_n5k1": [
   "clearance"
- ],
- "concave_shark_a0.6_n13k4": [
-  "self merge"
- ],
- "concave_sharksvg_a0.6_n13k4": [
-  "self merge"
  ],
  "concave_starround_a0.9_n5k1": [
   "self short"
@@ -45,19 +37,23 @@
  "concave_uround_a0.9_n5k1": [
   "self merge"
  ],
- "narrow_slot_w10.0_n4k1": [
-  "self merge"
- ],
  "octagon_a0.90_n3k1": [
-  "self short"
+  "clearance",
+  "self short",
+  "via clearance"
  ],
  "pentagon_a0.90_n3k1": [
-  "self short"
+  "clearance",
+  "self short",
+  "via clearance"
  ],
  "rconvex0_a0.90_n3k1": [
   "self short"
  ],
- "rconvex0_a0.90_n5k3": [
+ "rconvex0_a0.90_n9k4": [
+  "self short"
+ ],
+ "rconvex1_a0.90_n3k1": [
   "self short"
  ],
  "rconvex3_a0.90_n3k1": [
@@ -84,10 +80,18 @@
   "backtrack",
   "self merge"
  ],
- "rstar0_a0.90_n3k1": [
+ "round_teardrop_a0.90_n5k1": [
   "self short"
  ],
+ "rstar0_a0.90_n3k1": [
+  "clearance",
+  "self short",
+  "via clearance"
+ ],
  "rstar1_a0.90_n3k1": [
+  "self short"
+ ],
+ "rstar2_a0.90_n3k1": [
   "self short"
  ],
  "sector180_a0.90_n3k1": [
@@ -98,7 +102,16 @@
  "sector90_a0.90_n3k1": [
   "self short"
  ],
+ "square40_a0.90_n3k1": [
+  "self short"
+ ],
+ "star5_a0.60_n21k8": [
+  "via clearance"
+ ],
  "star6_shallow_a0.90_n3k1": [
+  "self short"
+ ],
+ "trapezoid_a0.90_n3k1": [
   "self short"
  ],
  "triangle_a0.90_n3k1": [

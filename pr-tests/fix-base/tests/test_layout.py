@@ -304,11 +304,10 @@ def test_spacing_matches_brute_force(name):
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         model = build_model(spec(name))
-    for layer_arms, chunks in zip(model.spiral_center_lines(), model._chunks):
-        if layer_arms:
-            for radius in (model.spiral_pitch, 1.5 * model.spiral_pitch):
-                assert min_turn_spacing(chunks, radius)[0] == pytest.approx(
-                        _naive_min_turn_spacing(layer_arms, radius), abs=1e-12)
+    for layer_arms, pieces in zip(model.spiral_center_lines(), model._pieces):
+        for radius in (model.spiral_pitch, 1.5 * model.spiral_pitch):
+            assert min_turn_spacing(pieces, radius)[0] == pytest.approx(
+                    _naive_min_turn_spacing(layer_arms, radius), abs=1e-12)
 
 
 def test_spacing_measurement_is_fast():
@@ -344,51 +343,25 @@ def test_circle_inner_vias_stay_on_their_side_of_the_center():
     assert overlap and not any('less than the clearance' in m for m in overlap) # the overlap is larger than it
 
 
-def test_polyline_circle_respects_clearance():
-    # Without arcs, circles were rendered with the given 64 segments per turn, and the chords ate up to 16 % of the
-    # clearance.
+@pytest.mark.parametrize('arcs', [False, True])
+@pytest.mark.parametrize('diameters', [(50, 25), (4, 1)])
+def test_default_circle_segments_respect_clearance(arcs, diameters):
+    # Without arcs, circles were rendered with 64 segments per turn, and the chords ate up to 16 % of the clearance.
+    # An arc tolerance in mm made small circles rough.
     from kicoil import geometry
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        model = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=11, twists=3, clearance=0.15,
-                                        approximate_arcs=False)
-        fp = model.render_footprint(circle_segments=64)
+        model = geometry.PlanarInductor(shape=geometry.CircleShape(*diameters), turns=11, twists=3, clearance=0.05,
+                                        approximate_arcs=arcs)
+        fp = model.render_footprint()
     intent = geomcheck.intent_from_model(model)
     rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
     assert rep.worst_clearance_deficit <= 0.05 * intent.clearance
-    assert model.effective_render_options(None, 64)[1] > 64
-
-
-def test_tightened_render_settings_are_reported(caplog):
-    import logging
-    from kicoil import geometry
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        model = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=5, twists=1, clearance=0.15)
-    with caplog.at_level(logging.WARNING, logger='kicoil'):
-        model.render_footprint()
-    assert not [r for r in caplog.records if 'Overriding' in r.getMessage()]
-    with caplog.at_level(logging.WARNING, logger='kicoil'):
-        model.render_footprint(arc_tolerance=0.1, circle_segments=32)
-    msgs = [r.getMessage() for r in caplog.records if 'Overriding' in r.getMessage()]
-    assert any('arc tolerance' in m for m in msgs) and any('circle segments' in m for m in msgs)
-    # The arc tolerance and the segment count only apply to circles drawn with arcs / as polylines respectively.
-    caplog.clear()
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        rect = geometry.PlanarInductor(shape=geometry.RectangleShape(width=50, height=40, annular_width=10), turns=5,
-                                       twists=1, clearance=0.2)
-        polyline = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=5, twists=1, clearance=0.15,
-                                           approximate_arcs=False)
-    with caplog.at_level(logging.WARNING, logger='kicoil'):
-        rect.render_footprint(arc_tolerance=0.1, circle_segments=32)
-        polyline.render_footprint(arc_tolerance=0.1)
-    assert not [r for r in caplog.records if 'Overriding' in r.getMessage()]
 
 
 @pytest.mark.parametrize('arcs', [False, True])
 def test_zero_clearance_renders(arcs):
-    # The chord error limit clearance/40 was 0 for clearance 0: ZeroDivisionError in effective_render_options.
+    # The chord error limit clearance/40 was 0 for clearance 0: ZeroDivisionError when rendering.
     from kicoil import geometry
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -506,7 +479,7 @@ def test_spacing_measurement_dense_outline_few_turns():
     # are now paired chunk by chunk and pairs of one turn are skipped per chunk.
     import time
     import tracemalloc
-    from kicoil.geometry import center_line_chunks, min_turn_spacing
+    from kicoil.geometry import center_line_pieces, min_turn_spacing
     N = 16000
     pts, ang = [], []
     for i in range(N + 1):
@@ -516,7 +489,7 @@ def test_spacing_measurement_dense_outline_few_turns():
         ang.append(t)
     tracemalloc.start()
     t0 = time.perf_counter()
-    best, _where = min_turn_spacing([center_line_chunks(pts, ang, 0.025)], 20.0)
+    best, _where = min_turn_spacing(center_line_pieces([(pts, ang)], 0.025), 20.0)
     elapsed = time.perf_counter() - t0
     _cur, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()

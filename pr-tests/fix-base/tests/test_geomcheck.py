@@ -41,7 +41,7 @@ def generate(name, **override):
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         model = build_model(spec)
-        fp = model.render_footprint(circle_segments=64)
+        fp = model.render_footprint()
     return model, fp
 
 

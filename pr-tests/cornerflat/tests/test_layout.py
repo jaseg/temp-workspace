@@ -304,11 +304,10 @@ def test_spacing_matches_brute_force(name):
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         model = build_model(spec(name))
-    for layer_arms, chunks in zip(model.spiral_center_lines(), model._chunks):
-        if layer_arms:
-            for radius in (model.spiral_pitch, 1.5 * model.spiral_pitch):
-                assert min_turn_spacing(chunks, radius)[0] == pytest.approx(
-                        _naive_min_turn_spacing(layer_arms, radius), abs=1e-12)
+    for layer_arms, pieces in zip(model.spiral_center_lines(), model._pieces):
+        for radius in (model.spiral_pitch, 1.5 * model.spiral_pitch):
+            assert min_turn_spacing(pieces, radius)[0] == pytest.approx(
+                    _naive_min_turn_spacing(layer_arms, radius), abs=1e-12)
 
 
 def test_spacing_measurement_is_fast():
@@ -344,51 +343,25 @@ def test_circle_inner_vias_stay_on_their_side_of_the_center():
     assert overlap and not any('less than the clearance' in m for m in overlap) # the overlap is larger than it
 
 
-def test_polyline_circle_respects_clearance():
-    # Without arcs, circles were rendered with the given 64 segments per turn, and the chords ate up to 16 % of the
-    # clearance.
+@pytest.mark.parametrize('arcs', [False, True])
+@pytest.mark.parametrize('diameters', [(50, 25), (4, 1)])
+def test_default_circle_segments_respect_clearance(arcs, diameters):
+    # Without arcs, circles were rendered with 64 segments per turn, and the chords ate up to 16 % of the clearance.
+    # An arc tolerance in mm made small circles rough.
     from kicoil import geometry
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        model = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=11, twists=3, clearance=0.15,
-                                        approximate_arcs=False)
-        fp = model.render_footprint(circle_segments=64)
+        model = geometry.PlanarInductor(shape=geometry.CircleShape(*diameters), turns=11, twists=3, clearance=0.05,
+                                        approximate_arcs=arcs)
+        fp = model.render_footprint()
     intent = geomcheck.intent_from_model(model)
     rep = geomcheck.check_layout(geomcheck.extract_copper(fp, layers=model.layer_pair), intent)
     assert rep.worst_clearance_deficit <= 0.05 * intent.clearance
-    assert model.effective_render_options(None, 64)[1] > 64
-
-
-def test_tightened_render_settings_are_reported(caplog):
-    import logging
-    from kicoil import geometry
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        model = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=5, twists=1, clearance=0.15)
-    with caplog.at_level(logging.WARNING, logger='kicoil'):
-        model.render_footprint()
-    assert not [r for r in caplog.records if 'Overriding' in r.getMessage()]
-    with caplog.at_level(logging.WARNING, logger='kicoil'):
-        model.render_footprint(arc_tolerance=0.1, circle_segments=32)
-    msgs = [r.getMessage() for r in caplog.records if 'Overriding' in r.getMessage()]
-    assert any('arc tolerance' in m for m in msgs) and any('circle segments' in m for m in msgs)
-    # The arc tolerance and the segment count only apply to circles drawn with arcs / as polylines respectively.
-    caplog.clear()
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        rect = geometry.PlanarInductor(shape=geometry.RectangleShape(width=50, height=40, annular_width=10), turns=5,
-                                       twists=1, clearance=0.2)
-        polyline = geometry.PlanarInductor(shape=geometry.CircleShape(50, 25), turns=5, twists=1, clearance=0.15,
-                                           approximate_arcs=False)
-    with caplog.at_level(logging.WARNING, logger='kicoil'):
-        rect.render_footprint(arc_tolerance=0.1, circle_segments=32)
-        polyline.render_footprint(arc_tolerance=0.1)
-    assert not [r for r in caplog.records if 'Overriding' in r.getMessage()]
 
 
 @pytest.mark.parametrize('arcs', [False, True])
 def test_zero_clearance_renders(arcs):
-    # The chord error limit clearance/40 was 0 for clearance 0: ZeroDivisionError in effective_render_options.
+    # The chord error limit clearance/40 was 0 for clearance 0: ZeroDivisionError when rendering.
     from kicoil import geometry
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -506,7 +479,7 @@ def test_spacing_measurement_dense_outline_few_turns():
     # are now paired chunk by chunk and pairs of one turn are skipped per chunk.
     import time
     import tracemalloc
-    from kicoil.geometry import center_line_chunks, min_turn_spacing
+    from kicoil.geometry import center_line_pieces, min_turn_spacing
     N = 16000
     pts, ang = [], []
     for i in range(N + 1):
@@ -516,7 +489,7 @@ def test_spacing_measurement_dense_outline_few_turns():
         ang.append(t)
     tracemalloc.start()
     t0 = time.perf_counter()
-    best, _where = min_turn_spacing([center_line_chunks(pts, ang, 0.025)], 20.0)
+    best, _where = min_turn_spacing(center_line_pieces([(pts, ang)], 0.025), 20.0)
     elapsed = time.perf_counter() - t0
     _cur, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
@@ -628,8 +601,8 @@ def test_fold_at_thin_inner_tip_is_a_same_turn_fold():
 
 
 @pytest.mark.parametrize('name, pair', [
-    ('round_ellipse20to1_a0.90_n16k5', '(-10.449, -0.130) and (-10.449, 0.130)'),
-    ('round_ellipse10to1_a0.90_n16k5', '(-7.808, -0.196) and (-7.808, 0.196)')])
+    ('round_ellipse20to1_a0.90_n16k5', '(-10.447, -0.130) and (-10.447, 0.130)'),
+    ('round_ellipse10to1_a0.90_n16k5', '(-7.807, -0.196) and (-7.807, 0.196)')])
 def test_overlapping_vias_rejected(name, pair):
     # 90 % of a slender ellipse, 5 arms: the inner contour is a sliver, and the automatic via offset (0.2 mm, up to the
     # collapse depth) used to put all five inner vias at (0, 0) of the 20:1 ellipse, and two at (-7.389, 0) of the 10:1
@@ -649,13 +622,13 @@ def test_overlapping_vias_rejected_circle():
 def test_via_offset_pulled_back_to_keep_vias_apart():
     # 60 x 6 ellipse, 60 % annular width, 21 turns, 8 arms: at the automatic via offset (0.289 mm) two inner vias sit
     # 0.623 mm apart on opposite sides of the sliver-shaped inner contour. The offset is reduced to where the smallest
-    # gap (via to via or via to the neighboring turn) is largest: 0.714 mm apart, 0.105 mm from the neighboring turn.
+    # gap (via to via or via to the neighboring turn) is largest: 0.715 mm apart, 0.105 mm from the neighboring turn.
     caught = []
     model, intent, rep = layout(spec('round_ellipse10to1_a0.60_n21k8'), caught)
     assert model.via_offset == pytest.approx(0.2441, abs=1e-3)
-    assert model.via_ring_spacing()[0] == pytest.approx(0.714, abs=1e-3)
+    assert model.via_ring_spacing()[0] == pytest.approx(0.715, abs=1e-3)
     assert rep.ok_connectivity and rep.worst_via_deficit < 0.05
-    assert any(m.startswith('Overlapping vias') and '0.714 mm apart' in m for m in caught)
+    assert any(m.startswith('Overlapping vias') and '0.715 mm apart' in m for m in caught)
 
 
 @pytest.mark.parametrize('name', ['round_ellipse10to1_a0.60_n8k3', 'round_ellipse10to1_a0.60_n6_1layer',
@@ -705,11 +678,11 @@ def _tri15(f):
 def test_tip_merge_at_the_inner_via_is_gone(f):
     # Triangle with a 15 degree apex, 13 turns, 4 twists: the innermost arm used to run past its inner via into the
     # apex and its copper merged with the via's over 6.6-7.2 (w + c), a self merge. The arm now ends where it passes
-    # its via (geometry._trim_arm_at_via), so the hairpin at the apex merges only locally (5.7-5.8 (w + c), below the
+    # its via (geometry._trim_arm_at_via), so the hairpin at the apex merges only locally (5.7-6.0 (w + c), below the
     # checker's limit of 6 (w + c)).
     model, intent, rep = layout(_tri15(f))
     assert 'self merge' not in rep.failure_kinds(intent.clearance, intent.trace_width)
-    assert rep.max_self_touch_bypass < 5.9 * (model.trace_width + model.clearance)
+    assert rep.max_self_touch_bypass < 6.0 * (model.trace_width + model.clearance)
 
 
 

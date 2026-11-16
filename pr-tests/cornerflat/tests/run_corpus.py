@@ -76,7 +76,7 @@ def run_case(args):
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             model = build_model(spec, impl)
-            fp = model.render_footprint(circle_segments=64)
+            fp = model.render_footprint()
     except Exception as e:
         res['status'] = 'rejected' if isinstance(e, ValueError) else 'error'
         res['error'] = f'{type(e).__name__}: {e}'.splitlines()[0][:300]
@@ -86,7 +86,8 @@ def run_case(args):
         return res
     res['gen_time'] = time.perf_counter() - t0
     res['nominal_pitch'] = getattr(model, 'spiral_pitch', float('nan'))
-    res['layout'] = getattr(model, 'layout_key', None) # (spiral mode, arm phase) the generator chose
+    sk = getattr(model.shape, 'sk', None)
+    res['layout'] = None if sk is None else 'linear' if getattr(model.shape, 'layout', sk) is sk else 'flat'
 
     try:
         intent = geomcheck.intent_from_model(model)

@@ -61,12 +61,10 @@ def test_svg_import_independent_of_orientation(tmp_path, reverse, repeat_start):
     assert abs(shape.sk.max_depth - corpus_concave.split_depth(corpus_concave.shark())) < 1e-3
 
 
-# ---- Round joints at sharp reflex corners (Skeletonator.ROUND_JOINT_*) ----
+# ---- Round joints at sharp reflex corners (skeletonator.ROUND_JOINT_*) ----
 
 def _mitered_skeletonator(poly):
-    class Mitered(skeletonator.Skeletonator):
-        ROUND_JOINT_MIN_TURN = math.inf
-    return Mitered(poly)
+    return corpus_concave.mitered_skeletonator(poly)
 
 
 def test_heart_cusp_gets_a_round_joint():
@@ -74,13 +72,13 @@ def test_heart_cusp_gets_a_round_joint():
     sk = skeletonator.Skeletonator(heart)
     assert _mitered_skeletonator(heart).max_depth < 1.7 # the mitered cusp's spike hits the bottom of the heart
     assert sk.max_depth > 10 # (inscribed radius 11.5 mm)
-    assert sk.joint_radius == sk.ROUND_JOINT_RADIUS
+    assert sk.joint_radius == skeletonator.ROUND_JOINT_RADIUS
     assert sk.outline == skeletonator.clean_polygon(heart) # the outline as given (keepout zone, checker)
     turns = skeletonator.turn_angles(sk.outline)
-    (k,), = (-turns > sk.ROUND_JOINT_MIN_TURN).nonzero()
+    (k,), = (-turns > skeletonator.ROUND_JOINT_MIN_TURN).nonzero()
     v = heart[k]
     assert abs(v[0]) < 1e-9 and math.degrees(-turns[k]) > 170 # the cusp at the top
-    # The cusp is cut by an arc of the joint radius through the inside of the outline: every other vertex stays
+    # The cusp is replaced by an arc of the joint radius through the inside of the outline: every other vertex stays
     joint = Polygon(sk.poly)
     assert joint.is_valid and Polygon(heart).buffer(1e-9).contains(joint)
     assert Polygon(heart).area - joint.area < math.pi * sk.joint_radius**2
@@ -98,7 +96,7 @@ def test_round_joint_offsets_are_round():
     for d in (1.0, 3.0, 6.0, 9.0):
         pts = [sk.track_position(k, d) for k in range(len(sk.poly))]
         near = min(math.dist(p, v) for p in pts)
-        assert d + r - 1e-4 <= near <= d + r + sk.ROUND_JOINT_TOLERANCE
+        assert d + r - 1e-4 <= near <= d + r + skeletonator.ROUND_JOINT_TOLERANCE
         euclid = Polygon(heart).buffer(-d, quad_segs=64)
         assert Polygon(pts).symmetric_difference(euclid).area < 0.01 * euclid.area
 
@@ -127,7 +125,7 @@ def test_heart_round_joint_does_not_depend_on_sampling_or_size(variant):
     assert sk.joint_radius > 0 and Polygon(sk.poly).is_valid and Polygon(poly).buffer(1e-9).contains(Polygon(sk.poly))
     assert sk.max_depth > 0.229 * size # (10.13 mm at 44 mm)
     if variant == 'size250':
-        assert sk.joint_radius > sk.ROUND_JOINT_RADIUS # (the arc's chords well above the skeleton's resolution)
+        assert sk.joint_radius > skeletonator.ROUND_JOINT_RADIUS # (the arc's chords well above the skeleton's resolution)
 
 
 @pytest.mark.parametrize('name', ['lround', 'uround', 'cross', 'comb', 'starround', 'dumbbell', 'shark', 'bean',
@@ -166,8 +164,8 @@ def test_round_joint_next_to_another_edge_keeps_the_outline_simple():
             (-10, 10)]
     sk = skeletonator.Skeletonator(poly)
     assert 0 < sk.joint_radius <= 0.002 and Polygon(sk.poly).is_valid
-    with pytest.raises(ValueError):
-        skeletonator.round_reflex_joints(skeletonator.clean_polygon(poly), 0.01, math.radians(5), math.radians(120))
+    rounded = skeletonator.round_reflex_joints(skeletonator.clean_polygon(poly), 0.01, math.radians(5), math.radians(120))
+    assert not Polygon(rounded).is_valid
 
 
 # Before the fix (mitered cusp): backtracks into the spike, copper 1.3 to 6.9 mm deeper than the annulus, vias up to
