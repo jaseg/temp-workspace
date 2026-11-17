@@ -1,0 +1,154 @@
+:root {
+  --border: #c8ccd2;
+  --background: #ffffff;
+  --panel: #f3f4f6;
+  --text: #1f2328;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --selected: #dbeafe;
+  --body-fill: #fffbe6;   /* KiCad's default symbol body colour */
+  --body-line: #840000;
+  --pin-line: #840000;
+  --pin-name: #006464;
+  --pin-number: #a90000;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font: 14px system-ui, sans-serif;
+  color: var(--text);
+  background: var(--background);
+}
+
+button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+
+/* --- Header --- */
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+header h1 { margin: 0; font-size: 16px; }
+header nav { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* --- Main area: table on the left, preview on the right --- */
+
+main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+pin-table, symbol-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+pin-table { border-right: 1px solid var(--border); }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.toolbar button { white-space: nowrap; }
+.toolbar .hint { color: var(--muted); font-size: 12px; }
+.repeat-count { width: 50px; }
+
+/* --- Pin table --- */
+
+.table-scroll { flex: 1; overflow: auto; }
+
+table { border-collapse: collapse; width: 100%; }
+th, td { border-bottom: 1px solid var(--border); padding: 0; }
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 4px 6px;
+  background: var(--panel);
+  text-align: left;
+  white-space: nowrap;
+}
+th[data-key] { cursor: pointer; }
+th[data-key]::after { content: attr(data-sort); margin-left: 4px; }
+
+td input, td select {
+  width: 100%;
+  min-width: 60px;
+  border: none;
+  padding: 4px 6px;
+  font: inherit;
+  background: transparent;
+}
+td input[type="checkbox"] { min-width: 0; width: auto; margin: 0 8px; }
+td select { min-width: 90px; }
+td [data-key="etype"] { min-width: 130px; }
+td [data-key="group"] { min-width: 100px; }
+td [data-key="unit"] { min-width: 50px; }
+td [data-key="alternates"] { min-width: 180px; }
+td input.duplicate { color: #b91c1c; font-weight: bold; }
+td input:focus, td select:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.row-number { color: var(--muted); padding: 0 6px; text-align: right; }
+
+tr.selected { background: var(--selected); }
+tr.flash { animation: flash 1.2s; }
+@keyframes flash { from { background: #fde68a; } }
+
+/* --- Symbol preview --- */
+
+symbol-preview svg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  cursor: grab;
+  background: #fafafa;
+  user-select: none;
+}
+symbol-preview svg:active { cursor: grabbing; }
+
+.body { fill: var(--body-fill); stroke: var(--body-line); stroke-width: 10; }
+.pin line { stroke: var(--pin-line); stroke-width: 6; }
+.pin-name { fill: var(--pin-name); }
+.pin-number { fill: var(--pin-number); }
+.pin.hidden { opacity: 0.3; }
+.pin:hover line { stroke: var(--accent); stroke-width: 12; }
+.pin { cursor: pointer; }
+.unit-label { font-size: 60px; fill: var(--muted); }
+
+/* --- Settings dialog --- */
+
+dialog { border: 1px solid var(--border); border-radius: 6px; min-width: 400px; }
+dialog h2 { margin-top: 0; font-size: 16px; }
+dialog label { display: block; margin-bottom: 10px; }
+dialog label input:not([type="checkbox"]), dialog label select {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  padding: 4px;
+  font: inherit;
+}
+dialog .buttons { display: flex; justify-content: flex-end; gap: 6px; }

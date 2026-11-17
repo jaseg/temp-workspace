@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KiCad IC Symbol Editor</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Symbol editor: <span id="symbol-name"></span></h1>
+    <nav>
+      <button data-action="new">New</button>
+      <button data-action="uploadXlsx">Upload .xlsx</button>
+      <button data-action="downloadXlsx">Download .xlsx</button>
+      <button data-action="importFootprint">Import footprint</button>
+      <button data-action="settings">Symbol settings</button>
+      <button data-action="downloadKicad" class="primary">Download .kicad_sym</button>
+    </nav>
+  </header>
+  <main>
+    <pin-table></pin-table>
+    <symbol-preview></symbol-preview>
+  </main>
+  <symbol-settings></symbol-settings>
+</body>
+</html>
