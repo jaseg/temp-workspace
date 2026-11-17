@@ -11,16 +11,23 @@
   <header>
     <h1>Symbol editor: <span id="symbol-name"></span></h1>
     <nav>
+      <button data-action="undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+      <button data-action="redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)">↷ Redo</button>
+      <span class="separator"></span>
       <button data-action="new">New</button>
       <button data-action="uploadXlsx">Upload .xlsx</button>
       <button data-action="downloadXlsx">Download .xlsx</button>
-      <button data-action="importFootprint">Import footprint</button>
+      <button data-action="importFootprint" title="Add a row for every pad of a .kicad_mod footprint">Import footprint</button>
+      <button data-action="importKicad" title="Load a symbol from a .kicad_sym library">Import .kicad_sym</button>
+      <span class="separator"></span>
+      <button data-action="balanceSides" title="Move groups between left and right until both sides are about equally long">Balance sides</button>
       <button data-action="settings">Symbol settings</button>
       <button data-action="downloadKicad" class="primary">Download .kicad_sym</button>
     </nav>
   </header>
   <main>
     <pin-table></pin-table>
+    <div class="splitter" title="Drag to resize"></div>
     <symbol-preview></symbol-preview>
   </main>
   <symbol-settings></symbol-settings>

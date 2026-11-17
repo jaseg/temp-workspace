@@ -1,15 +1,18 @@
 // Wires the page together: the header buttons, the pin table, the preview and the
-// settings dialog. The whole symbol lives in `state` and is saved to the browser's
-// localStorage after every change, so a page reload doesn't lose work.
+// settings dialog. The whole symbol lives in `state`. After every change it is
+// recorded for undo and saved to the browser's localStorage, so a reload keeps it.
 
 import './pin-table.js';
 import './symbol-preview.js';
 import './settings-dialog.js';
 import { defaultSettings, newPin, pinsToRows, rowsToPins, settingsToRows, rowsToSettings } from './pins.js';
 import { layoutSymbol } from './layout.js';
+import { balanceSides } from './balance.js';
 import { toKicadSym } from './kicad-export.js';
+import { fromKicadSym } from './kicad-import.js';
 import { writeXlsx, readXlsx } from './xlsx.js';
 import { padNumbers, footprintName } from './footprint-import.js';
+import { History } from './history.js';
 
 const STORAGE_KEY = 'kicad-symbol-editor';
 
@@ -18,11 +21,12 @@ const preview = document.querySelector('symbol-preview');
 const settingsDialog = document.querySelector('symbol-settings');
 
 let state = loadState();
+const history = new History(state);
 table.load(state.pins);
-update();
+redraw();
 
-table.addEventListener('pins-changed', update);
-settingsDialog.addEventListener('settings-changed', update);
+table.addEventListener('pins-changed', event => update({ typing: event.detail.typing }));
+settingsDialog.addEventListener('settings-changed', () => update());
 preview.addEventListener('pin-click', event => table.highlight(event.detail));
 
 document.querySelector('header').addEventListener('click', event => {
@@ -31,13 +35,29 @@ document.querySelector('header').addEventListener('click', event => {
 });
 
 const actions = {
+  undo() {
+    const snapshot = history.undo();
+    if (snapshot) showSnapshot(snapshot);
+  },
+
+  redo() {
+    const snapshot = history.redo();
+    if (snapshot) showSnapshot(snapshot);
+  },
+
   new() {
-    if (!confirm('Start a new, empty symbol? Unsaved work will be lost.')) return;
+    if (!confirm('Start a new, empty symbol? (Undo brings the old one back.)')) return;
     replaceState({ settings: defaultSettings(), pins: [] });
   },
 
   settings() {
     settingsDialog.open(state.settings);
+  },
+
+  balanceSides() {
+    balanceSides(state.pins, state.settings);
+    table.load(state.pins);
+    update();
   },
 
   async uploadXlsx() {
@@ -67,16 +87,57 @@ const actions = {
     preview.fit();
   },
 
+  async importKicad() {
+    const text = await (await pickFile('.kicad_sym')).text();
+    try {
+      replaceState(fromKicadSym(text));
+    } catch (error) {
+      alert(`Could not read this file: ${error.message}`);
+    }
+  },
+
   downloadKicad() {
     const text = toKicadSym(state.pins, state.settings);
     download(new Blob([text], { type: 'text/plain' }), `${state.settings.name}.kicad_sym`);
   },
 };
 
-function update() {
-  document.querySelector('#symbol-name').textContent = state.settings.name;
-  preview.show(layoutSymbol(state.pins, state.settings));
+// Ctrl+Z undoes, Ctrl+Y or Ctrl+Shift+Z redoes (Cmd on a Mac).
+document.addEventListener('keydown', event => {
+  if (!(event.ctrlKey || event.metaKey) || event.target.closest('dialog')) return;
+  const key = event.key.toLowerCase();
+  if (key === 'z' && !event.shiftKey) {
+    event.preventDefault();
+    actions.undo();
+  } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
+    event.preventDefault();
+    actions.redo();
+  }
+});
+
+// Drag the bar between table and preview to resize them.
+const splitter = document.querySelector('.splitter');
+splitter.addEventListener('pointerdown', event => {
+  splitter.setPointerCapture(event.pointerId);
+  const resize = moveEvent => {
+    document.querySelector('main').style.setProperty('--table-width', `${moveEvent.clientX}px`);
+  };
+  splitter.addEventListener('pointermove', resize);
+  splitter.addEventListener('pointerup', () => splitter.removeEventListener('pointermove', resize), { once: true });
+});
+
+// --- Showing and changing the state ---
+
+// Call after every change: records it for undo, saves it and redraws.
+function update({ typing = false } = {}) {
+  history.record(state, typing);
   saveState();
+  redraw();
+}
+
+function redraw() {
+  document.querySelector('#symbol-name').textContent = state.settings.name;
+  preview.show(layoutSymbol(state.pins, state.settings), state.settings);
 }
 
 function replaceState(newState) {
@@ -84,6 +145,14 @@ function replaceState(newState) {
   table.load(state.pins);
   update();
   preview.fit();
+}
+
+// For undo/redo: show an earlier state without recording it again.
+function showSnapshot(snapshot) {
+  state = snapshot;
+  table.load(state.pins);
+  saveState();
+  redraw();
 }
 
 // --- Saving in the browser ---

@@ -1,9 +1,11 @@
 // <symbol-preview>: draws the symbol as SVG, with zoom (mouse wheel), pan (drag) and "Fit view".
 //
-// Call preview.show(units) with the result of layoutSymbol().
+// Call preview.show(units, settings) with the result of layoutSymbol().
 // Clicking a pin fires a "pin-click" event with the pin in event.detail.
 //
 // Coordinates are mil, like in layout.js, but SVG's y axis points down, so every y is flipped.
+
+import { propertyPositions } from './layout.js';
 
 const UNIT_SPACING = 600; // mil between units
 const FONT_SIZE = 50;
@@ -32,28 +34,37 @@ class SymbolPreview extends HTMLElement {
 
   // --- Drawing ---
 
-  show(units) {
+  show(units, settings) {
     this.shownPins = [];
     let cursor = 0; // left edge of the next unit, including its pins
     let svg = '';
     for (const unit of units) {
       const centerX = cursor + unit.pinLength + unit.width / 2;
-      svg += this.unitSvg(unit, centerX, units.length > 1);
+      svg += this.unitSvg(unit, centerX, units.length > 1, unit.unit === 1 ? settings : null);
       cursor = centerX + unit.width / 2 + unit.pinLength + UNIT_SPACING;
     }
     this.content.innerHTML = svg;
     if (!this.view && units.length > 0) this.fit();
   }
 
-  unitSvg(unit, centerX, showUnitName) {
+  // `settings` is only given for unit 1, which shows the Reference and Value texts.
+  unitSvg(unit, centerX, showUnitName, settings) {
     const w = unit.width;
     const h = unit.height;
     const label = showUnitName
-      ? `<text class="unit-label" x="${-w / 2}" y="${-h / 2 - unit.pinLength - 60}">Unit ${String.fromCharCode(64 + unit.unit)}</text>`
+      ? `<text class="unit-label" x="${-w / 2}" y="${-h / 2 - unit.pinLength - 220}">Unit ${String.fromCharCode(64 + unit.unit)}</text>`
       : '';
+    let properties = '';
+    if (settings) {
+      const { reference, value } = propertyPositions(unit);
+      properties = `
+        <text class="property" x="${reference.x}" y="${-reference.y}" dominant-baseline="central" font-size="${FONT_SIZE}">${escapeXml(settings.reference)}?</text>
+        <text class="property" x="${value.x}" y="${-value.y}" dominant-baseline="central" font-size="${FONT_SIZE}">${escapeXml(settings.name)}</text>`;
+    }
     const pins = unit.pins.filter(placed => !placed.stacked).map(placed => this.pinSvg(placed, unit.pinLength));
     return `<g transform="translate(${centerX} 0)">
       ${label}
+      ${properties}
       <rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}"/>
       ${pins.join('')}
     </g>`;

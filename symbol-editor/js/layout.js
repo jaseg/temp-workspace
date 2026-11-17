@@ -78,8 +78,19 @@ function layoutUnit(pins, settings, pinLength) {
   return { width, height, pins: placed };
 }
 
+// Where KiCad's Reference and Value texts go: above and below the body,
+// clear of any top and bottom pins.
+export function propertyPositions(unit) {
+  const hasPins = angle => unit.pins.some(placed => placed.angle === angle);
+  const left = -unit.width / 2;
+  return {
+    reference: { x: left, y: unit.height / 2 + (hasPins(270) ? unit.pinLength : 0) + GRID },
+    value: { x: left, y: -unit.height / 2 - (hasPins(90) ? unit.pinLength : 0) - GRID },
+  };
+}
+
 // One slot per pin, null between groups. Power pins with the same name share a slot.
-function makeSlots(pins, stackPowerPins) {
+export function makeSlots(pins, stackPowerPins) {
   const slots = [];
   const groups = [...new Set(pins.map(pin => pin.group))];
   for (const group of groups) {

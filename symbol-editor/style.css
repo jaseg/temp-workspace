@@ -48,7 +48,8 @@ header {
   background: var(--panel);
 }
 header h1 { margin: 0; font-size: 16px; }
-header nav { display: flex; gap: 6px; flex-wrap: wrap; }
+header nav { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+header nav .separator { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
 
 /* --- Main area: table on the left, preview on the right --- */
 
@@ -56,15 +57,18 @@ main {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  /* --table-width is set by dragging the splitter, see main.js */
+  grid-template-columns: minmax(200px, var(--table-width, 60%)) 6px minmax(200px, 1fr);
 }
+
+.splitter { cursor: col-resize; background: var(--border); }
+.splitter:hover { background: var(--accent); }
 
 pin-table, symbol-preview {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-pin-table { border-right: 1px solid var(--border); }
 
 .toolbar {
   display: flex;
@@ -138,6 +142,7 @@ symbol-preview svg:active { cursor: grabbing; }
 .pin:hover line { stroke: var(--accent); stroke-width: 12; }
 .pin { cursor: pointer; }
 .unit-label { font-size: 60px; fill: var(--muted); }
+.property { fill: var(--pin-name); }
 
 /* --- Settings dialog --- */
 

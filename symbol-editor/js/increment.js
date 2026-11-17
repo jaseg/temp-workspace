@@ -14,6 +14,15 @@ export function continueBlock(pins) {
   return pins.map((pin, i) => ({ ...pin, name: names[i], number: numbers[i], alternates: '' }));
 }
 
+// Single steps, used for Tab completion.
+export function nextName(name) {
+  return nextNames([name])[0];
+}
+
+export function nextNumber(number) {
+  return nextNumbers([number])[0];
+}
+
 // --- Names ---
 
 const DIFF_PAIR = /^(.*[\d_])([PN])$/; // "TX0_P", "CLK1N"

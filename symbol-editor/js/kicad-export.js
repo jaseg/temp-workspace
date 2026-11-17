@@ -9,18 +9,15 @@
 //         (pin ...))
 //       (symbol "NAME_2_1" ...)))     <- unit 2, ...
 
-import { layoutSymbol } from './layout.js';
+import { layoutSymbol, propertyPositions } from './layout.js';
 
 const FONT = '(effects (font (size 1.27 1.27)))';
 
 export function toKicadSym(pins, settings) {
   const units = layoutSymbol(pins, settings);
   const name = settings.name;
-  // Reference goes above unit 1, Value below it, both clear of top and bottom pins.
   const first = units[0] || { width: 0, height: 0, pinLength: 0, pins: [] };
-  const hasPins = angle => first.pins.some(placed => placed.angle === angle);
-  const referenceY = first.height / 2 + (hasPins(270) ? first.pinLength : 0) + 100;
-  const valueY = -first.height / 2 - (hasPins(90) ? first.pinLength : 0) - 100;
+  const { reference, value } = propertyPositions(first);
 
   const lines = [
     '(kicad_symbol_lib',
@@ -30,8 +27,8 @@ export function toKicadSym(pins, settings) {
     '    (exclude_from_sim no)',
     '    (in_bom yes)',
     '    (on_board yes)',
-    property('Reference', settings.reference, -first.width / 2, referenceY),
-    property('Value', name, -first.width / 2, valueY),
+    property('Reference', settings.reference, reference.x, reference.y),
+    property('Value', name, value.x, value.y),
     property('Footprint', settings.footprint, 0, 0, true),
     property('Datasheet', settings.datasheet, 0, 0, true),
     property('Description', settings.description, 0, 0, true),

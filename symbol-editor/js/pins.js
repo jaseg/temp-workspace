@@ -14,6 +14,14 @@ export const PIN_SHAPES = [
 
 export const SIDES = ['left', 'right', 'top', 'bottom'];
 
+// Pin types as datasheets tend to write them, for pasting and xlsx import.
+const TYPE_ALIASES = {
+  'i': 'input', 'in': 'input', 'o': 'output', 'out': 'output',
+  'i/o': 'bidirectional', 'io': 'bidirectional', 'od': 'open_collector',
+  'p': 'power_in', 's': 'power_in', 'pwr': 'power_in', 'power': 'power_in',
+  'a': 'passive', 'nc': 'no_connect',
+};
+
 // The table columns, in order. The titles are also the xlsx column headers.
 export const COLUMNS = [
   { key: 'number', title: 'Number', input: 'text' },
@@ -21,7 +29,7 @@ export const COLUMNS = [
   { key: 'group', title: 'Group', input: 'text' },
   { key: 'side', title: 'Side', input: 'select', options: SIDES },
   { key: 'unit', title: 'Unit', input: 'number' },
-  { key: 'etype', title: 'Type', input: 'select', options: ELECTRICAL_TYPES },
+  { key: 'etype', title: 'Type', input: 'select', options: ELECTRICAL_TYPES, aliases: TYPE_ALIASES },
   { key: 'shape', title: 'Shape', input: 'select', options: PIN_SHAPES },
   { key: 'hidden', title: 'Hidden', input: 'checkbox' },
   { key: 'alternates', title: 'Alternate functions', input: 'text' },
@@ -60,6 +68,19 @@ export function naturalCompare(a, b) {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 }
 
+// All pins of a group sit on the same side.
+// Returns the side a group already has (looking at pins other than `exceptPin`), if any.
+export function groupSide(pins, group, exceptPin) {
+  const other = group && pins.find(pin => pin !== exceptPin && pin.group === group);
+  return other ? other.side : null;
+}
+
+export function setGroupSide(pins, group, side) {
+  for (const pin of pins) {
+    if (group && pin.group === group) pin.side = side;
+  }
+}
+
 export function parseBool(value) {
   return /^(yes|true|1|x)$/i.test(String(value).trim());
 }
@@ -88,16 +109,19 @@ export function rowsToPins(rows) {
       if (index < 0 || cell === undefined || cell === '') continue;
       pin[column.key] = cellToValue(column, cell);
     }
+    pin.side = groupSide(pins, pin.group) || pin.side;
     pins.push(pin);
   }
   return pins;
 }
 
-function cellToValue(column, cell) {
+// Turns a spreadsheet cell (or pasted text) into a value for the given column.
+export function cellToValue(column, cell) {
   if (column.input === 'checkbox') return parseBool(cell);
   if (column.input === 'number') return Math.max(1, parseInt(cell) || 1);
   if (column.input === 'select') {
-    const value = String(cell).trim().toLowerCase();
+    let value = String(cell).trim().toLowerCase();
+    if (column.aliases && column.aliases[value]) value = column.aliases[value];
     return column.options.includes(value) ? value : column.options[0];
   }
   return String(cell).trim();
