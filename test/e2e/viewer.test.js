@@ -126,3 +126,40 @@ test('project overview lists the hierarchy and opens a file', async () => {
   assert.equal(n, 5);
   assert.deepEqual(errors, []);
 });
+
+test('annotations: draw, export as JSON, and embed in a PDF', async () => {
+  const { page, errors } = await open(PAIR);
+  const shadowClick = sel => page.evaluate(sel => document.querySelector('kicad-diff').shadowRoot.querySelector(sel).click(), sel);
+  await shadowClick('.annotate');
+  await shadowClick('[data-tool="rect"]');
+  const box = await page.evaluate(() => {
+    const r = document.querySelector('kicad-diff').viewports[0].getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  });
+  await page.mouse.move(box.x - 40, box.y - 30);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 40, box.y + 30, { steps: 4 });
+  await page.mouse.up();
+  const count = await page.evaluate(() => document.querySelector('kicad-diff').annotations.length);
+  assert.equal(count, 1);
+
+  const [json] = await Promise.all([page.waitForEvent('download'), shadowClick('.export')]);
+  const doc = JSON.parse(await streamText(await json.createReadStream()));
+  assert.equal(doc.format, 'kicad-diff-annotations');
+  assert.equal(doc.annotations[0].type, 'rect');
+  assert.equal(doc.files.new.name, 'new.kicad_sch');
+
+  const [pdf] = await Promise.all([page.waitForEvent('download'), shadowClick('.pdf')]);
+  const bytes = Buffer.from(await streamText(await pdf.createReadStream(), 'latin1'), 'latin1');
+  const { PDFDocument, PDFName } = await import('../../vendor/pdf-lib.esm.min.js');
+  const loaded = await PDFDocument.load(bytes);
+  assert.equal(loaded.getPageCount(), 4); // changes, old, new, change list
+  assert.equal(loaded.getPage(0).node.lookup(PDFName.of('Annots')).size(), 1);
+  assert.deepEqual(errors, []);
+});
+
+async function streamText(stream, encoding = 'utf8') {
+  const chunks = [];
+  for await (const c of stream) chunks.push(c);
+  return Buffer.concat(chunks).toString(encoding);
+}

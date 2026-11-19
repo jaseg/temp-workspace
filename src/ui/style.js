@@ -72,6 +72,8 @@ button, select, input { font: inherit; color: inherit; }
 .side section.changes { flex: 1; min-height: 120px; overflow: auto; }
 .btn[aria-pressed="true"] { background: var(--kd-accent); color: #fff; }
 
+.ann-input { position: absolute; z-index: 2; font: 600 14px var(--kd-font); background: var(--kd-bg); border: 1px solid var(--kd-border); border-radius: 4px; padding: 1px 4px; }
+.seg button { min-width: 28px; }
 .pick { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; max-width: 520px; }
 .hidden { display: none !important; }
 @media (max-width: 700px) {

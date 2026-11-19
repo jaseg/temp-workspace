@@ -1,6 +1,8 @@
 // <kicad-diff>: the visual diff viewer.
 //
-// Attributes: old-src, new-src (URLs), mode (left | right | split | diff), ui-theme (light | dark | auto).
+// Attributes: old-src, new-src (URLs), mode (left | right | split | diff), ui-theme (light | dark | auto),
+//             config-src (URL of a configuration file, see config.js).
+// Properties: config (configuration object, see config.js).
 // Methods:    setSources({old: {name, text}, new: {name, text}}) to pass file contents directly.
 //
 // Colours: left/right show the KiCad colour theme unchanged. The diff view (and the split view
@@ -16,10 +18,11 @@ import { diffFiles } from '../diff/index.js';
 import { boxContains, unionBox, isEmptyBox } from '../geom.js';
 import { changeArea, extract, isDark, itemIndices, PALETTE, tone } from './highlight.js';
 import { createChangeList, renderInspector } from './changes.js';
+import { annotationsSvg, exportAnnotations, hitAnnotation, importAnnotations, TOOLS } from './annotate.js';
 import { STYLE } from './style.js';
+import { DEFAULTS, mergeConfig } from '../config.js';
 
 const MODES = [['left', 'Old'], ['right', 'New'], ['split', 'Split'], ['diff', 'Diff']];
-const TONE = { old: 0.72, new: 0.45 };
 const CLASSES = ['layout-minor', 'layout', 'metadata', 'electrical']; // drawn back to front
 const classOf = c => (c.kind === 'layout' && c.minor ? 'layout-minor' : c.kind);
 
@@ -33,7 +36,7 @@ const SCHEMATIC_LABELS = {
 };
 
 export class KicadDiff extends HTMLElement {
-  static observedAttributes = ['old-src', 'new-src', 'mode', 'ui-theme'];
+  static observedAttributes = ['old-src', 'new-src', 'mode', 'ui-theme', 'config-src'];
 
   constructor() {
     super();
@@ -45,10 +48,43 @@ export class KicadDiff extends HTMLElement {
     this.theme = loadTheme({});
     this.entry = undefined;
     this.overlay = true;
+    this.annotations = [];
+    this.tool = null;
+    this._config = mergeConfig(DEFAULTS);
+  }
+
+  get config() {
+    return this._config;
+  }
+
+  /** Apply a configuration (merged over the defaults). */
+  set config(c) {
+    this._config = mergeConfig(DEFAULTS, c);
+    this.hiddenLayers = new Set(this._config.hiddenLayers);
+    if (this.list) {
+      Object.assign(this.list.state.filters, this._config.kinds);
+      this.renderThemes();
+      this.selectTheme(this._config.colorTheme);
+      this.applyUiTheme();
+      if (this.files.old || this.files.new) this.renderScenes();
+    }
+  }
+
+  async loadConfig() {
+    try {
+      const res = await fetch(this.getAttribute('config-src'));
+      if (res.ok) this.config = await res.json();
+    } catch {
+      // A missing configuration file leaves the defaults in place.
+    }
   }
 
   connectedCallback() {
-    if (!this.shell) this.build();
+    if (!this.shell) {
+      this.build();
+      this.config = this._config;
+      if (this.getAttribute('config-src')) this.loadConfig();
+    }
     this.applyUiTheme();
     if (this.getAttribute('old-src') || this.getAttribute('new-src')) this.loadUrls();
     else if (!this.files.old && !this.files.new) this.showPicker();
@@ -58,11 +94,12 @@ export class KicadDiff extends HTMLElement {
     if (!this.shell || before === after) return;
     if (name === 'mode') this.update();
     else if (name === 'ui-theme') this.applyUiTheme();
+    else if (name === 'config-src') this.loadConfig();
     else this.loadUrls();
   }
 
   get mode() {
-    return this.getAttribute('mode') || this.defaultMode || 'diff';
+    return this.getAttribute('mode') || this._config.mode || this.defaultMode || 'diff';
   }
 
   set mode(v) {
@@ -75,9 +112,20 @@ export class KicadDiff extends HTMLElement {
         <span class="seg modes"></span>
         <button class="btn overlay" title="Show changes on top of both versions">Highlight changes</button>
         <select class="entry hidden" title="Library entry"></select>
+        <select class="color-theme hidden" title="Colour theme"></select>
         <span class="spacer"></span>
+        <button class="btn annotate" title="Draw annotations">Annotate</button>
+        <button class="btn pdf" title="Download the diff as PDF, with annotations">PDF</button>
         <button class="btn fit" title="Fit to view (double-click)">Fit</button>
         <button class="btn ui-theme" title="Light/dark interface"></button>
+      </div>
+      <div class="toolbar annotations hidden">
+        <span class="seg tools"></span>
+        <input type="color" class="ann-color" value="#e53935" title="Colour">
+        <button class="btn undo" title="Remove the last annotation">Undo</button>
+        <span class="spacer"></span>
+        <button class="btn export" title="Download annotations as JSON">Export JSON</button>
+        <label class="btn" title="Load annotations from JSON">Import JSON<input type="file" class="import hidden" accept=".json,application/json"></label>
       </div>
       <div class="banner"></div>
       <div class="main"><div class="views"></div>
@@ -92,8 +140,10 @@ export class KicadDiff extends HTMLElement {
     const $ = s => this.root.querySelector(s);
     this.el = {
       modes: $('.modes'), overlay: $('.overlay'), entry: $('.entry'), banner: $('.banner'), views: $('.views'),
-      layers: $('.layers .list'), uiTheme: $('.ui-theme'), inspector: $('.inspector'),
+      layers: $('.layers .list'), uiTheme: $('.ui-theme'), inspector: $('.inspector'), colorTheme: $('.color-theme'),
     };
+    this.el.colorTheme.onchange = () => this.selectTheme(this.el.colorTheme.value);
+    this.buildAnnotationTools($);
     for (const [mode, label] of MODES) {
       const b = document.createElement('button');
       b.textContent = label;
@@ -127,8 +177,154 @@ export class KicadDiff extends HTMLElement {
     });
   }
 
+  buildAnnotationTools($) {
+    const bar = $('.toolbar.annotations');
+    $('.annotate').onclick = () => {
+      const on = bar.classList.toggle('hidden') === false;
+      $('.annotate').setAttribute('aria-pressed', String(on));
+      this.setTool(on ? 'pen' : null);
+    };
+    for (const [tool, icon, title] of TOOLS) {
+      const b = document.createElement('button');
+      b.textContent = icon;
+      b.title = title;
+      b.dataset.tool = tool;
+      b.onclick = () => this.setTool(tool);
+      $('.tools').append(b);
+    }
+    $('.undo').onclick = () => {
+      this.annotations.pop();
+      this.redrawOverlays();
+    };
+    $('.export').onclick = async () => {
+      const doc = await exportAnnotations(this.annotations, this.sources, { mode: this.mode, entry: this.entry });
+      download('annotations.json', new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' }));
+    };
+    $('.import').onchange = async e => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        const { annotations, warning } = await importAnnotations(await file.text(), this.sources);
+        this.annotations = annotations;
+        if (warning) this.el.banner.textContent = warning;
+      } catch (err) {
+        this.el.banner.textContent = `Could not import annotations: ${err.message}`;
+      }
+      this.redrawOverlays();
+    };
+    $('.pdf').onclick = () => this.exportPdf();
+  }
+
+  setTool(tool) {
+    this.tool = tool;
+    for (const b of this.root.querySelectorAll('.tools button')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
+    for (const v of this.viewports ?? []) v.panDisabled = !!tool;
+  }
+
+  redrawOverlays() {
+    for (const v of this.viewports ?? []) this.drawOverlay(v);
+  }
+
+  /** Pointer input for the annotation tools, in model coordinates of viewport `v`. */
+  bindAnnotationInput(v) {
+    let current = null;
+    const at = e => {
+      const r = v.getBoundingClientRect();
+      return v.toModel(e.clientX - r.left, e.clientY - r.top);
+    };
+    const px = () => devicePixelRatio / v.view.scale; // one CSS pixel in mm
+    v.addEventListener('pointerdown', e => {
+      if (!this.tool || e.button !== 0) return;
+      const p = at(e);
+      const color = this.root.querySelector('.ann-color').value;
+      if (this.tool === 'erase') {
+        const i = hitAnnotation(this.annotations, p, 4 * px());
+        if (i >= 0) this.annotations.splice(i, 1);
+        return this.redrawOverlays();
+      }
+      if (this.tool === 'text') return this.askText(v, e, p, color);
+      current = this.tool === 'pen'
+        ? { type: 'pen', points: [p], color, width: 2.5 * px() }
+        : { type: this.tool, x0: p.x, y0: p.y, x1: p.x, y1: p.y, color, width: 2.5 * px() };
+      this.annotations.push(current);
+      v.setPointerCapture(e.pointerId);
+    });
+    v.addEventListener('pointermove', e => {
+      if (!current) return;
+      const p = at(e);
+      if (current.type === 'pen') current.points.push(p);
+      else Object.assign(current, { x1: p.x, y1: p.y });
+      this.redrawOverlays();
+    });
+    v.addEventListener('pointerup', () => (current = null));
+  }
+
+  /** Text tool: an inline input at the click position. */
+  askText(v, e, p, color) {
+    const input = document.createElement('input');
+    input.className = 'ann-input';
+    const r = this.el.views.getBoundingClientRect();
+    Object.assign(input.style, { left: `${e.clientX - r.left}px`, top: `${e.clientY - r.top - 14}px`, color });
+    this.el.views.append(input);
+    setTimeout(() => input.focus());
+    const done = commit => {
+      if (commit && input.value.trim()) {
+        this.annotations.push({ type: 'text', x: p.x, y: p.y, text: input.value.trim(), size: (14 * devicePixelRatio) / v.view.scale, color });
+      }
+      input.remove();
+      this.redrawOverlays();
+    };
+    input.onkeydown = ev => {
+      ev.stopPropagation();
+      if (ev.key === 'Enter') done(true);
+      if (ev.key === 'Escape') done(false);
+    };
+    input.onblur = () => input.isConnected && done(true);
+  }
+
+  async exportPdf() {
+    const { buildPdf } = await import('../render/pdf.js');
+    const box = Object.values(this.scenes).filter(Boolean).map(s => s.bbox).reduce(unionBox);
+    const bg = this.background();
+    const pal = this.palette();
+    const shades = this.list.visible().filter(c => c.area).map(c => ({ area: c.area, color: [...pal[c.kind].slice(0, 3), c.minor ? 0.06 : c.kind === 'layout' ? 0.1 : 0.16] }));
+    const name = this.sources?.new?.name ?? this.sources?.old?.name ?? 'kicad-diff';
+    const pages = [];
+    if (this.scenes.old && this.scenes.new) pages.push({ title: `${name} — changes`, box, background: bg, passes: this.passesFor('diff'), shades, annotations: this.annotations });
+    for (const side of ['old', 'new']) {
+      if (this.scenes[side]) pages.push({ title: `${name} — ${side} version`, box, background: bg, passes: this.passesFor(side, { plain: true }) });
+    }
+    const json = await exportAnnotations(this.annotations, this.sources, { mode: this.mode, entry: this.entry });
+    const bytes = await buildPdf({ title: name, pages, changes: this.list.visible(), attachment: { name: 'annotations.json', json } });
+    download(name.replace(/\.kicad_\w+$/, '') + '-diff.pdf', new Blob([bytes], { type: 'application/pdf' }));
+  }
+
+  /** Colour themes offered: KiCad's default plus those named in the configuration. */
+  renderThemes() {
+    const names = ['KiCad Default', ...this._config.colorThemes.map(t => t.name)];
+    this.el.colorTheme.classList.toggle('hidden', names.length < 2);
+    this.el.colorTheme.replaceChildren(...names.map(n => Object.assign(document.createElement('option'), { textContent: n })));
+  }
+
+  async selectTheme(name) {
+    const entry = this._config.colorThemes.find(t => t.name === name);
+    let json = {};
+    try {
+      json = entry?.theme ?? (entry?.url ? await (await fetch(entry.url)).json() : {});
+    } catch {
+      // An unreadable theme falls back to the default colours.
+    }
+    this.theme = loadTheme(json);
+    this.el.colorTheme.value = entry ? name : 'KiCad Default';
+    if (this.files.old || this.files.new) {
+      this.renderLayers();
+      this.updatePasses();
+    }
+  }
+
   applyUiTheme() {
-    const pref = this.getAttribute('ui-theme') || 'auto';
+    const pref = this.getAttribute('ui-theme') || this._config.uiTheme || 'auto';
     this.uiDark = pref === 'dark' || (pref === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
     this.dataset.uiTheme = this.uiDark ? 'dark' : 'light';
     this.el.uiTheme.textContent = this.uiDark ? '☀' : '☾';
@@ -288,7 +484,9 @@ export class KicadDiff extends HTMLElement {
         this.el.views.append(cap);
       }
       v.addEventListener('kd-fit', () => this.fit());
-      v.addEventListener('kd-draw', () => this.drawShades(v));
+      v.addEventListener('kd-draw', () => this.drawOverlay(v));
+      this.bindAnnotationInput(v);
+      v.panDisabled = !!this.tool;
       v.addEventListener('kd-click', e => this.pickAt(v, e.detail));
       v.onViewChange = view => this.viewports.forEach(o => o !== v && o.setView(view, false));
       return v;
@@ -303,6 +501,14 @@ export class KicadDiff extends HTMLElement {
   }
 
   updatePasses() {
+    for (const v of this.viewports ?? []) v.setPasses(this.passesFor(v.side), this.background());
+  }
+
+  /**
+   * What to draw for a view: 'diff' (both versions toned, with highlights), or 'old'/'new' (one
+   * version; toned with highlights when the split-view overlay is on, else plain KiCad colours).
+   */
+  passesFor(side, { plain = false } = {}) {
     const bg = this.background();
     const visible = this.layerNames().filter(n => !this.hiddenLayers.has(n));
     const base = k => visible.map(name => ({ name, color: k ? tone(this.colorOf(name), bg, k) : this.colorOf(name) }));
@@ -320,25 +526,23 @@ export class KicadDiff extends HTMLElement {
       { scene: this.selectionScenes[side], layers: [{ name: 'sel', color: pal[this.selected.kind] }] },
     ] : []);
 
-    for (const v of this.viewports ?? []) {
-      let passes;
-      if (v.side === 'diff') {
-        passes = [
-          { scene: this.scenes.old, layers: base(TONE.old) },
-          { scene: this.scenes.new, layers: base(TONE.new) },
-          ...highlight('old', 0.6), ...highlight('new'), ...selection('old'), ...selection('new'),
-        ];
-      } else if (this.showsChanges()) {
-        passes = [{ scene: this.scenes[v.side], layers: base(TONE.new) }, ...highlight(v.side), ...selection(v.side)];
-      } else {
-        passes = [{ scene: this.scenes[v.side], layers: base(0) }, ...selection(v.side)];
-      }
-      v.setPasses(passes.filter(p => p.scene), bg);
+    let passes;
+    if (side === 'diff') {
+      passes = [
+        { scene: this.scenes.old, layers: base(this._config.tone.old) },
+        { scene: this.scenes.new, layers: base(this._config.tone.new) },
+        ...highlight('old', 0.6), ...highlight('new'), ...selection('old'), ...selection('new'),
+      ];
+    } else if (this.showsChanges() && !plain) {
+      passes = [{ scene: this.scenes[side], layers: base(this._config.tone.new) }, ...highlight(side), ...selection(side)];
+    } else {
+      passes = [{ scene: this.scenes[side], layers: base(0) }, ...(plain ? [] : selection(side))];
     }
+    return passes.filter(p => p.scene);
   }
 
-  /** Soft shades over the areas of changes (SVG overlay, redrawn with the view). */
-  drawShades(v) {
+  /** SVG overlay, redrawn with the view: soft shades over the areas of changes, and annotations. */
+  drawOverlay(v) {
     const svg = v.overlay;
     const pal = this.palette();
     const css = (c, a) => `rgba(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)}, ${a})`;
@@ -355,7 +559,8 @@ export class KicadDiff extends HTMLElement {
       const rad = Math.min(12, w / 4, h / 4);
       rects.push(`<rect x="${a.x}" y="${a.y}" width="${w}" height="${h}" rx="${rad}" fill="${css(pal[c.kind], alpha)}"${sel ? ` stroke="${css(pal[c.kind], 0.9)}" stroke-width="2"` : ''}/>`);
     }
-    svg.innerHTML = rects.join('');
+    const s = v.view.scale / devicePixelRatio;
+    svg.innerHTML = rects.join('') + annotationsSvg(this.annotations, (x, y) => v.toScreen(x, y), s);
   }
 
   selectChange(change) {
@@ -410,6 +615,14 @@ export class KicadDiff extends HTMLElement {
     const box = boxes.reduce(unionBox);
     this.viewports?.forEach(v => v.fit(box));
   }
+}
+
+function download(name, blob) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function escapeHtml(s) {

@@ -1,6 +1,7 @@
 // <kicad-diff-project>: compares two versions of a KiCad project file by file.
 //
-// Attributes: old-src, new-src: URLs of the projects' .kicad_pro (or top-level .kicad_sch) files.
+// Attributes: old-src, new-src: URLs of the projects' .kicad_pro (or top-level .kicad_sch) files;
+//             config-src, ui-theme as for <kicad-diff>. Property: config.
 // Methods:    setProject({entry, old: {load, list?}, new: {load, list?}}) with loaders as in
 //             kicad/project.js, e.g. for local folders or the CLI server.
 //
@@ -50,7 +51,7 @@ function urlLoader(entryUrl) {
 }
 
 export class KicadDiffProject extends HTMLElement {
-  static observedAttributes = ['old-src', 'new-src', 'ui-theme'];
+  static observedAttributes = ['old-src', 'new-src', 'ui-theme', 'config-src'];
 
   constructor() {
     super();
@@ -136,7 +137,8 @@ export class KicadDiffProject extends HTMLElement {
       this.el.project.classList.remove('hidden');
     };
     const viewer = this.el.viewer.querySelector('kicad-diff');
-    if (this.getAttribute('ui-theme')) viewer.setAttribute('ui-theme', this.getAttribute('ui-theme'));
+    if (this.config) viewer.config = this.config;
+    for (const a of ['ui-theme', 'config-src']) if (this.getAttribute(a)) viewer.setAttribute(a, this.getAttribute(a));
     viewer.setSources({ old: r.texts.old && { name: node.path, text: r.texts.old }, new: r.texts.new && { name: node.path, text: r.texts.new } });
   }
 }

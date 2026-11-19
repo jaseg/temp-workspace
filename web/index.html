@@ -14,12 +14,16 @@
 </head>
 <body>
   <script type="module">
-    // ?old=URL&new=URL[&mode=diff][&ui=dark][&project=1]
+    // ?old=URL&new=URL[&config=URL][&mode=diff][&ui=dark][&theme=NAME][&hide=LAYER,...][&project=1]
     // A .kicad_pro URL (or project=1 with a top-level .kicad_sch) opens the project overview.
+    import { configFromParams, mergeConfig } from '../src/config.js';
     const q = new URLSearchParams(location.search);
     const project = q.get('project') === '1' || [q.get('old'), q.get('new')].some(u => u?.split(/[?#]/)[0].endsWith('.kicad_pro'));
     const el = document.createElement(project ? 'kicad-diff-project' : 'kicad-diff');
-    for (const [param, attr] of [['mode', 'mode'], ['ui', 'ui-theme'], ['old', 'old-src'], ['new', 'new-src']]) {
+    let fileConfig = {};
+    if (q.has('config')) fileConfig = await fetch(q.get('config')).then(r => (r.ok ? r.json() : {}), () => ({}));
+    el.config = mergeConfig(fileConfig, configFromParams(q));
+    for (const [param, attr] of [['old', 'old-src'], ['new', 'new-src']]) {
       if (q.has(param)) el.setAttribute(attr, q.get(param));
     }
     document.body.append(el);
