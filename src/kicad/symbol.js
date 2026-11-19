@@ -9,6 +9,22 @@ function lineEnd(n, name) {
   return e && { shape: str(e), length: numOf(e, 'length'), width: numOf(e, 'width'), stroke: child(e, 'stroke') && stroke(e) };
 }
 
+/** Early v6 library arcs have no (mid) but (radius (at cx cy) (length r) (angles a0 a1)), y-up, degrees. */
+function legacyMid(n) {
+  const r = child(n, 'radius');
+  const c = xy(child(r, 'at'));
+  const angles = child(r, 'angles');
+  if (!c || !angles) {
+    const a = xy(child(n, 'start')), b = xy(child(n, 'end'));
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  }
+  const len = numOf(r, 'length', 0);
+  let a0 = num(angles, 1, 0), a1 = num(angles, 2, 0);
+  if (a1 < a0) a1 += 360;
+  const mid = (((a0 + a1) / 2) * Math.PI) / 180;
+  return { x: c.x + len * Math.cos(mid), y: c.y + len * Math.sin(mid) };
+}
+
 /** Graphic shape shared by schematics and symbol bodies. */
 export function readShape(n) {
   const base = { type: n[0], stroke: stroke(n), fill: fill(n), uuid: uuid(n), locked: flag(n, 'locked') };
@@ -22,7 +38,7 @@ export function readShape(n) {
       return { ...base, center: xy(child(n, 'center')), radius: numOf(n, 'radius', 0) };
     case 'arc':
       return {
-        ...base, start: xy(child(n, 'start')), mid: xy(child(n, 'mid')), end: xy(child(n, 'end')),
+        ...base, start: xy(child(n, 'start')), mid: xy(child(n, 'mid')) ?? legacyMid(n), end: xy(child(n, 'end')),
         startShape: lineEnd(n, 'start_shape'), endShape: lineEnd(n, 'end_shape'),
       };
     case 'ellipse':

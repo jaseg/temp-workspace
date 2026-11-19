@@ -18,7 +18,7 @@ function readLayers(root) {
 
 function readTrack(n, ctx) {
   return {
-    type: n[0] === 'arc' ? 'arc' : 'segment',
+    type: 'track',
     start: xy(child(n, 'start')),
     mid: n[0] === 'arc' ? xy(child(n, 'mid')) : undefined,
     end: xy(child(n, 'end')),

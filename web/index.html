@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KiCad Diff</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { padding: 8px; box-sizing: border-box; background: Canvas; color: CanvasText; }
+    kicad-diff { height: 100%; }
+  </style>
+  <script type="module" src="../src/ui/kicad-diff.js"></script>
+</head>
+<body>
+  <kicad-diff></kicad-diff>
+  <script type="module">
+    // ?old=URL&new=URL&mode=split
+    const q = new URLSearchParams(location.search);
+    const el = document.querySelector('kicad-diff');
+    for (const [param, attr] of [['mode', 'mode'], ['ui', 'ui-theme'], ['old', 'old-src'], ['new', 'new-src']]) {
+      if (q.has(param)) el.setAttribute(attr, q.get(param));
+    }
+  </script>
+</body>
+</html>

@@ -21,6 +21,15 @@ export function netOf(n, ctx) {
   return ctx.nets?.get(v) ?? v;
 }
 
+/** Pre-v7 board arcs: (start center) (end arc-start) (angle sweep°, clockwise on screen) → start/mid/end. */
+function legacyArc(center, start, angle) {
+  const r = Math.hypot(start.x - center.x, start.y - center.y);
+  const a0 = Math.atan2(start.y - center.y, start.x - center.x);
+  const at = a => ({ x: center.x + r * Math.cos(a), y: center.y + r * Math.sin(a) });
+  const sweep = (angle * Math.PI) / 180;
+  return { start, mid: at(a0 + sweep / 2), end: at(a0 + sweep) };
+}
+
 /** gr_*, fp_* and pad primitive graphics. The type is the part after the prefix: line, rect, circle, arc, poly, curve, bbox, vector. */
 export function readGraphic(n, ctx) {
   const type = n[0].replace(/^(gr|fp)_/, '');
@@ -43,7 +52,9 @@ export function readGraphic(n, ctx) {
       Object.assign(g, { center: xy(child(n, 'center')), end: xy(child(n, 'end')) });
       break;
     case 'arc':
-      Object.assign(g, { start: xy(child(n, 'start')), mid: xy(child(n, 'mid')), end: xy(child(n, 'end')) });
+      Object.assign(g, child(n, 'mid')
+        ? { start: xy(child(n, 'start')), mid: xy(child(n, 'mid')), end: xy(child(n, 'end')) }
+        : legacyArc(xy(child(n, 'start')), xy(child(n, 'end')), numOf(n, 'angle', 0)));
       break;
     case 'poly': case 'curve':
       g.pts = pts(n);
@@ -122,6 +133,7 @@ export function readPad(n, ctx) {
     roundrectRatio: numOf(n, 'roundrect_rratio', 0.25),
     chamferRatio: numOf(n, 'chamfer_ratio', 0),
     chamfer: chamfer ? chamfer.slice(1).map(text) : [],
+    anchor: strOf(child(n, 'options'), 'anchor'),
     rectDelta: delta ? { x: num(delta, 1, 0), y: num(delta, 2, 0) } : undefined,
     primitives: primitives ? readAll(primitives, ['gr_line', 'gr_rect', 'gr_circle', 'gr_arc', 'gr_poly', 'gr_curve', 'gr_bbox', 'gr_vector'], readGraphic, ctx) : [],
     locked: hasAtom(n, 'locked') || flag(n, 'locked'),

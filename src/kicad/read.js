@@ -48,10 +48,11 @@ export function str(n, i = 1) {
   return n ? text(n[i]) : undefined;
 }
 
-/** Number at position i of a list; undefined if absent. */
+/** Number at position i of a list; `fallback` if absent or not a number (e.g. legacy `(at x y unlocked)`). */
 export function num(n, i = 1, fallback = undefined) {
   const v = n ? text(n[i]) : undefined;
-  return v === undefined ? fallback : Number(v);
+  const x = v === undefined ? NaN : Number(v);
+  return Number.isNaN(x) ? fallback : x;
 }
 
 /** Number from a named child, e.g. numOf(n, 'width') for (width 0.1). */
