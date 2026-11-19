@@ -76,7 +76,7 @@ def fig_aperture() -> None:
     axs[0].set_xlabel("strobe time − step time (ns)")
     axs[0].set_ylabel("held voltage, normalised")
     axs[0].set_xlim(-1.2, 1.2)
-    axs[0].legend(loc="upper left", labelcolor=INK2, fontsize=9, title="10–90 % rise time", title_fontsize=9)
+    axs[0].legend(loc="center left", bbox_to_anchor=(0.0, 0.62), labelcolor=INK2, fontsize=9, title="10–90 % rise time", title_fontsize=9)
 
     trs = sorted({r["fpga_tr"] for r in ap})
     for name, (label, col) in CASES.items():
@@ -98,12 +98,14 @@ def fig_system() -> None:
     sy = load("system.json")
     fig, ax = plt.subplots(figsize=(11, 4.4))
     for r in sy:
+        if r["case"] == "direct-3v3":
+            continue    # the two-shot steady-state solve does not hold there, see README
         label, col = CASES[r["case"]]
         x, v = np.array(r["x"]) * 1e9, np.array(r["v"])
-        ax.plot(x, v / np.nanmax(np.abs(v)), color=col, label=label)
+        ax.plot(x, v, color=col, label=label)
     ax.set_title("Recorded TDR trace: open 1 ns line on the TDR port")
     ax.set_xlabel("strobe time − stimulus edge at the FPGA pin (ns)")
-    ax.set_ylabel("held voltage (P − N), normalised to its peak")
+    ax.set_ylabel("held voltage, SPL_LS_1P − SPL_LS_1N (V)")
     legend(ax)
     fig.suptitle("FPGA edge 300 ps (20–80 %), strobe overdrive 0.65 V", x=0.01, ha="left", fontsize=9, color=INK2)
     fig.tight_layout()
@@ -137,8 +139,10 @@ def table() -> str:
                 rows.append(f"| {label} | {r['overdrive']:.2f} V | {2 * r['vbias']:+.2f} V | {r['tr_10_90'] * 1e12:.0f} ps | {r['gain']:.2f} | {r['eff_plateau'] * 100:.0f} % |")
     rows += ["", "| Case (FPGA edge 300 ps, overdrive 0.65 V) | Incident edge 10–90 % as recorded | Reflected edge 10–90 % as recorded |", "|---|---|---|"]
     for r in sy:
+        if r["case"] == "direct-3v3":
+            continue
         x, v = np.array(r["x"]), np.array(r["v"])
-        rows.append(f"| {CASES[r['case']][0]} | {edges(x, v, -0.6e-9, 1.6e-9) * 1e12:.0f} ps | {edges(x, v, 1.6e-9, 4.2e-9) * 1e12:.0f} ps |")
+        rows.append(f"| {CASES[r['case']][0]} | {edges(x, v, 0.0, 1.3e-9) * 1e12:.0f} ps | {edges(x, v, 2.2e-9, 3.5e-9) * 1e12:.0f} ps |")
     return "\n".join(rows) + "\n"
 
 
