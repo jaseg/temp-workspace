@@ -3,6 +3,7 @@
 
 import { angleOf, bezierPoints, flattenPts, rotate, scale, translate } from '../geom.js';
 import { strokeText } from './text.js';
+import { fieldKey, itemKey, padKey } from '../kicad/keys.js';
 
 export const HOLES = 'holes';
 
@@ -168,10 +169,6 @@ export function boardText(scene, t, upright = false) {
 
 // Items ----------------------------------------------------------------------------------------
 
-function keyOf(obj, fallback) {
-  return obj.uuid ?? fallback;
-}
-
 /** Expand text variables like ${REFERENCE} from the footprint's own properties. */
 function expandVars(text, fp) {
   return text.replace(/\$\{(\w+)\}/g, (all, name) => fp.properties.find(p => p.name.toUpperCase() === name)?.value ?? all);
@@ -189,14 +186,14 @@ export function renderFootprint(scene, fp, key, copper) {
     fp.zones.forEach(z => zone(scene, z));
     fp.dimensions.forEach(d => dimension(scene, d));
     scene.endItem();
-    fp.properties.forEach((p, i) => {
+    fp.properties.forEach(p => {
       if (p.hide || !p.layer) return;
-      scene.beginItem(`${key}:property:${p.name}:${i}`, { kind: 'field', ref, field: p.name, parent: key });
+      scene.beginItem(fieldKey(key, p.name), { kind: 'field', ref, field: p.name, parent: key });
       boardText(scene, { ...p, text: expandVars(p.value, fp) }, true);
       scene.endItem();
     });
     fp.pads.forEach((pad, i) => {
-      scene.beginItem(keyOf(pad, `${key}:pad:${pad.number}:${i}`), { kind: 'pad', ref, pad: pad.number, net: pad.net, parent: key });
+      scene.beginItem(padKey(key, pad, i), { kind: 'pad', ref, pad: pad.number, net: pad.net, parent: key });
       renderPad(scene, pad, copper);
       scene.endItem();
     });
@@ -237,7 +234,7 @@ export function renderBoard(scene, model) {
 }
 
 function boardItem(scene, it, i, copper) {
-  const key = keyOf(it, `${it.type}:${i}`);
+  const key = itemKey(it, i);
   switch (it.type) {
     case 'footprint':
       return renderFootprint(scene, it, key, copper);

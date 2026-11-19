@@ -120,8 +120,8 @@ export function paper(n) {
  */
 export function settings(n, ...names) {
   const out = {};
-  for (const c of children(n, ...names)) markUsed(c), add(out, tag(c), print(c));
-  return out;
+  for (const c of children(n, ...names)) markUsed(c), add(out, tag(c), print(withoutIds(c)));
+  return sortValues(out);
 }
 
 /**
@@ -132,13 +132,24 @@ export function rest(n) {
   const out = {};
   for (let i = 1; i < n.length; i++) {
     const c = n[i];
-    if (Array.isArray(c) && !c.used) add(out, tag(c) ?? '()', print(c));
+    if (Array.isArray(c) && !c.used) add(out, tag(c) ?? '()', print(withoutIds(c)));
   }
-  return out;
+  return sortValues(out);
 }
 
 function add(out, key, value) {
-  out[key] = key in out ? out[key] + '\n' + value : value;
+  (out[key] ??= []).push(value);
+}
+
+/** Repeated entries are compared regardless of order. */
+function sortValues(out) {
+  for (const k in out) out[k] = out[k].sort().join('\n');
+  return out;
+}
+
+/** Copy of a subtree without (uuid ..)/(tstamp ..) identity nodes, which carry no content. */
+function withoutIds(n) {
+  return Array.isArray(n) ? n.filter(c => !(Array.isArray(c) && (c[0] === 'uuid' || c[0] === 'tstamp'))).map(withoutIds) : n;
 }
 
 function markUsed(n) {

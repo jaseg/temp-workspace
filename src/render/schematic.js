@@ -4,6 +4,7 @@
 import { apply, arcPoints, bezierPoints, circlePoints, emptyBox, extendBox, multiply, rotate, translate } from '../geom.js';
 import { drawnUnits, FLIP_Y, findDef, orientation, placedPins, referenceOf, symbolTransform } from '../kicad/place.js';
 import { layout, toModel } from './text.js';
+import { fieldKey, itemKey, libSymbolKey, pinKey, sheetPinKey } from '../kicad/keys.js';
 
 const MIL = 0.0254;
 const LINE = 6 * MIL;
@@ -190,14 +191,14 @@ function placedSymbol(scene, sch, sym, key, version) {
   if (def) {
     for (const p of placedPins(def, sym)) {
       if (p.pin.hide) continue;
-      scene.beginItem(`${key}:pin:${p.number}`, { kind: 'pin', ref, pin: p.number, pinName: p.name, parent: key });
+      scene.beginItem(pinKey(key, p.number), { kind: 'pin', ref, pin: p.number, pinName: p.name, parent: key });
       pin(scene, p, def, version);
       scene.endItem();
     }
   }
-  sym.properties.forEach((f, i) => {
+  sym.properties.forEach(f => {
     if (f.hide || !f.value) return;
-    scene.beginItem(`${key}:field:${f.name}:${i}`, { kind: 'field', ref, field: f.name, parent: key });
+    scene.beginItem(fieldKey(key, f.name), { kind: 'field', ref, field: f.name, parent: key });
     symbolField(scene, sym, f, fieldLayer(f.name), fieldText(f));
     scene.endItem();
   });
@@ -297,7 +298,7 @@ function sheet(scene, s, key) {
   for (const f of s.properties) if (!f.hide && f.value) scene.text(fieldLayer(f.name, true), readable(rec(fieldText(f, true), f.at, f.effects)));
   scene.endItem();
   for (const p of s.pins) {
-    scene.beginItem(`${key}:pin:${p.name}`, { kind: 'sheet_pin', name: p.name, parent: key });
+    scene.beginItem(sheetPinKey(key, p.name), { kind: 'sheet_pin', name: p.name, parent: key });
     const side = p.at.rot === 0 ? 'right' : p.at.rot === 180 ? 'left' : p.at.rot === 90 ? 'top' : 'bottom';
     // Glyph points into the sheet; text sits inside the sheet.
     const inward = { right: 180, left: 0, top: 270, bottom: 90 }[side];
@@ -332,7 +333,7 @@ export function renderSchematic(scene, sch) {
 }
 
 function schematicItem(scene, sch, it, i, version) {
-  const key = it.uuid ?? `${it.type}:${i}`;
+  const key = itemKey(it, i);
   switch (it.type) {
     case 'symbol':
       return placedSymbol(scene, sch, it, key, version);
@@ -381,18 +382,19 @@ function schematicItem(scene, sch, it, i, version) {
 /** Render one symbol of a library (or a schematic's lib_symbols) at the origin, unit 1. */
 export function renderLibSymbol(scene, def, { unit = 1, bodyStyle = 1, version } = {}) {
   const sym = { at: { x: 0, y: 0, rot: 0 }, unit, bodyStyle, properties: def.properties };
-  scene.beginItem(`symbol:${def.name}`, { kind: 'symbol', ref: def.name });
+  const key = libSymbolKey(def.name);
+  scene.beginItem(key, { kind: 'symbol', ref: def.name });
   symbolBody(scene, def, sym, FLIP_Y);
   scene.endItem();
   for (const p of placedPins(def, sym)) {
     if (p.pin.hide) continue;
-    scene.beginItem(`symbol:${def.name}:pin:${p.number}`, { kind: 'pin', ref: def.name, pin: p.number, pinName: p.name });
+    scene.beginItem(pinKey(key, p.number), { kind: 'pin', ref: def.name, pin: p.number, pinName: p.name, parent: key });
     pin(scene, p, def, version);
     scene.endItem();
   }
-  def.properties.forEach((f, i) => {
+  def.properties.forEach(f => {
     if (f.hide || !f.value) return;
-    scene.beginItem(`symbol:${def.name}:field:${f.name}:${i}`, { kind: 'field', ref: def.name, field: f.name });
+    scene.beginItem(fieldKey(key, f.name), { kind: 'field', ref: def.name, field: f.name, parent: key });
     // Library field positions are y-up like the rest of the library.
     symbolField(scene, sym, { ...f, at: { ...f.at, y: -f.at.y } }, fieldLayer(f.name), fieldText(f));
     scene.endItem();
