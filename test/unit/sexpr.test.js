@@ -39,6 +39,7 @@ test('print round-trips', () => {
 
 test('errors carry offsets', () => {
   assert.throws(() => parse('(a (b "c)'), SexprError);
-  assert.throws(() => parse('(a))'), e => e.pos === 3);
+  assert.throws(() => parseAll('(a))'), e => e.pos === 3);
+  assert.equal(parse('(a) trailing junk)')[0], 'a');
   assert.equal(parseAll('').length, 0);
 });

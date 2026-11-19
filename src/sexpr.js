@@ -18,8 +18,16 @@ const ESCAPES = { n: '\n', t: '\t', r: '\r' };
 /**
  * Parse text containing one or more s-expressions; returns the list of top-level values.
  * With `first`, stop after the first complete top-level list (KiCad ignores trailing text).
+ * With `onError`, recover from malformed input instead of throwing: stray ')' are skipped,
+ * unterminated strings end at the line end (before any closing parens there) and unterminated
+ * lists are closed at the end.
  */
-export function parseAll(text, first = false) {
+export function parseAll(text, first = false, onError = null) {
+  const fail = (message, pos) => {
+    const err = new SexprError(message, pos);
+    if (!onError) throw err;
+    onError(err);
+  };
   let i = 0;
   const n = text.length;
   const root = [];
@@ -34,7 +42,10 @@ export function parseAll(text, first = false) {
       stack.push(list);
       i++;
     } else if (c === 41) { // )
-      if (stack.length === 1) throw new SexprError('Unbalanced ")"', i);
+      if (stack.length === 1) {
+        fail('Unbalanced ")"', i++);
+        continue;
+      }
       stack.pop();
       i++;
       if (first && stack.length === 1) break;
@@ -44,8 +55,14 @@ export function parseAll(text, first = false) {
       let out = '';
       let j = ++i;
       for (;;) {
-        if (j >= n) throw new SexprError('Unterminated string', i - 1);
         const d = text.charCodeAt(j);
+        if (j >= n || (onError && d === 10)) {
+          fail('Unterminated string', i - 1);
+          // Give closing parens at the end of the line back to the list structure.
+          const tail = /\)[)\s]*$/.exec(text.slice(i, j));
+          if (tail) j = i + tail.index;
+          break;
+        }
         if (d === 34) break;
         if (d === 92) { // backslash
           out += text.slice(i, j);
@@ -59,7 +76,7 @@ export function parseAll(text, first = false) {
       }
       out += text.slice(i, j);
       stack[stack.length - 1].push({ str: out });
-      i = j + 1;
+      i = text.charCodeAt(j) === 34 ? j + 1 : j;
     } else {
       let j = i;
       while (j < n) {
@@ -71,14 +88,24 @@ export function parseAll(text, first = false) {
       i = j;
     }
   }
-  if (stack.length !== 1) throw new SexprError('Unterminated list', stack[stack.length - 1].pos);
+  if (stack.length !== 1) fail('Unterminated list', stack[stack.length - 1].pos);
   return root;
 }
 
-/** Parse the first top-level list of a file; anything after it is ignored, as KiCad does. */
-export function parse(text) {
-  const [list] = parseAll(text, true);
+/**
+ * Parse the first top-level list of a file; trailing text is ignored, as KiCad does.
+ * In lenient mode (with `onError`), lists found after a premature end of the top-level list
+ * (e.g. caused by a stray ')') are recovered into it.
+ */
+export function parse(text, onError = null) {
+  const all = parseAll(text, !onError, onError);
+  const list = all[0];
   if (!Array.isArray(list)) throw new SexprError('Expected a list', 0);
+  const orphans = all.slice(1).filter(Array.isArray);
+  if (orphans.length) {
+    onError(new SexprError('Content after the end of the file', orphans[0].pos));
+    list.push(...orphans);
+  }
   return list;
 }
 
