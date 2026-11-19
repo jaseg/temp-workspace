@@ -80,6 +80,13 @@ export class KicadDiff extends HTMLElement {
   }
 
   connectedCallback() {
+    // Browsers allow only a few WebGL contexts per page (think of a pull request with many KiCad
+    // files), so viewports are created only once the viewer scrolls into view.
+    this.io ??= new IntersectionObserver(entries => {
+      this.inView = entries.some(e => e.isIntersecting);
+      if (this.inView && this.pendingUpdate) this.update();
+    });
+    this.io.observe(this);
     if (!this.shell) {
       this.build();
       this.config = this._config;
@@ -463,12 +470,19 @@ export class KicadDiff extends HTMLElement {
     }
   }
 
+  disconnectedCallback() {
+    this.io?.disconnect();
+    this.io = null;
+  }
+
   /** (Re)create the viewports for the current mode. */
   update() {
     for (const b of this.el.modes.children) b.setAttribute('aria-pressed', String(b.dataset.mode === this.mode));
     this.el.overlay.classList.toggle('hidden', this.mode !== 'split');
     this.el.overlay.setAttribute('aria-pressed', String(this.overlay));
     if (!this.files.old && !this.files.new) return;
+    this.pendingUpdate = !this.inView;
+    if (this.pendingUpdate) return;
     const sides = this.mode === 'split' ? ['old', 'new'] : this.mode === 'left' ? ['old'] : this.mode === 'right' ? ['new'] : ['diff'];
     const prev = this.viewports?.[0]?.view;
     this.el.views.innerHTML = '';

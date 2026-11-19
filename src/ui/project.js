@@ -64,7 +64,8 @@ export class KicadDiffProject extends HTMLElement {
     this.built = true;
     this.root.innerHTML = `<style>${STYLE}${PROJECT_STYLE}</style><div class="project"><p class="muted">Loading project…</p></div><div class="viewer hidden"></div>`;
     this.el = { project: this.root.querySelector('.project'), viewer: this.root.querySelector('.viewer') };
-    this.dataset.uiTheme = this.getAttribute('ui-theme') === 'dark' || (this.getAttribute('ui-theme') !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    const ui = this.getAttribute('ui-theme') ?? this.config?.uiTheme ?? 'auto';
+    this.dataset.uiTheme = ui === 'dark' || (ui !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     const o = this.getAttribute('old-src'), n = this.getAttribute('new-src');
     if (o || n) {
       const entry = (n ?? o).split(/[?#]/)[0].split('/').pop();
