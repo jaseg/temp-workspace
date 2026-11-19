@@ -124,11 +124,14 @@ def main() -> None:
             save("waves.json", pool.map(strobe_shape, [(n, tr) for n in CASES for tr in FPGA_TR]))
         shapes = {(s["case"], s["fpga_tr"]): s for s in load("waves.json")}
         if "aperture" in what:
-            out = []
+            out = load("aperture.json") if os.path.exists(os.path.join(RES, "aperture.json")) else []
+            done = {(r["case"], r["fpga_tr"], r["overdrive"]) for r in out}
             for name in CASES:
                 for tr in FPGA_TR:
                     s = shapes[(name, tr)]
                     for od in OVERDRIVE if tr == 300e-12 else [0.65]:
+                        if (name, tr, od) in done:
+                            continue
                         r = aperture(pool, name, tr, (s["strobe_peak"] - od) / 2, s)
                         r["overdrive"] = od
                         out.append(r)

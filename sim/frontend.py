@@ -301,22 +301,29 @@ def build(p: Params, probes: list[str] | None = None, outfile: str | None = None
 
 
 def run(p: Params, probes: list[str] | None = None, outfile: str | None = None) -> dict[str, float]:
-    """Run one transient; returns the .meas results."""
-    deck = build(p, probes, outfile)
-    with tempfile.NamedTemporaryFile("w", suffix=".cir", delete=False) as f:
-        f.write(deck)
-        path = f.name
-    try:
-        r = subprocess.run(["ngspice", "-b", path], capture_output=True, text=True, timeout=1800)
-    finally:
-        os.unlink(path)
-    out = {}
-    for m in re.finditer(r"^(end_(?:ls|amp)_[pn])\s*=\s*([-+0-9.eE]+)", r.stdout, re.M):
-        out[m.group(1)] = float(m.group(2))
-    if len(out) != 4:
-        raise RuntimeError("ngspice failed:\n" + r.stdout[-2000:] + r.stderr[-2000:])
-    c1, c2 = p.c_hold + LS_C / 2, p.c_opamp + LS_C / 2
-    return {f"end_ls_{h}": (c1 * out[f"end_ls_{h}"] + c2 * out[f"end_amp_{h}"]) / (c1 + c2) for h in "pn"}
+    """Run one transient; returns the settled hold voltages end_ls_p / end_ls_n.
+
+    ngspice now and then gives up with "timestep too small" on this deck; the run
+    is then repeated with a slightly different maximum step, which moves the time
+    points and has always been enough."""
+    err = ""
+    for scale in (1.0, 0.83, 0.71, 0.5):
+        deck = build(dataclasses.replace(p, tmax=p.tmax * scale), probes, outfile)
+        with tempfile.NamedTemporaryFile("w", suffix=".cir", delete=False) as f:
+            f.write(deck)
+            path = f.name
+        try:
+            r = subprocess.run(["ngspice", "-b", path], capture_output=True, text=True, timeout=1800)
+        finally:
+            os.unlink(path)
+        out = {}
+        for m in re.finditer(r"^(end_(?:ls|amp)_[pn])\s*=\s*([-+0-9.eE]+)", r.stdout, re.M):
+            out[m.group(1)] = float(m.group(2))
+        if len(out) == 4:
+            c1, c2 = p.c_hold + LS_C / 2, p.c_opamp + LS_C / 2
+            return {f"end_ls_{h}": (c1 * out[f"end_ls_{h}"] + c2 * out[f"end_amp_{h}"]) / (c1 + c2) for h in "pn"}
+        err = r.stdout[-1500:] + r.stderr[-1500:]
+    raise RuntimeError("ngspice failed:\n" + err)
 
 
 def steady_state(p: Params, dv: float = 0.02) -> dict[str, float]:
