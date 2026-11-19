@@ -1,0 +1,20 @@
+{
+  "name": "kicad-diff",
+  "version": "0.1.0",
+  "description": "Semantic visual diff for KiCad schematics, symbols, footprints and boards",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "bin": { "kicad-diff": "bin/kicad-diff.js" },
+  "exports": {
+    ".": "./src/index.js",
+    "./ui": "./src/ui/kicad-diff.js"
+  },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test 'test/unit/**/*.test.js'",
+    "corpus:fetch": "node test/corpus/fetch.js",
+    "test:corpus": "node --test 'test/corpus/**/*.test.js'",
+    "test:corpus:full": "KICAD_CORPUS_FULL=1 node --test 'test/corpus/**/*.test.js'",
+    "test:e2e": "node --test 'test/e2e/**/*.test.js'"
+  }
+}
