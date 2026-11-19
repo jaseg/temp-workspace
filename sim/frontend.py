@@ -29,6 +29,7 @@ LS_C, LS_L = LS_TD / LS_Z0, LS_TD * LS_Z0
 @dataclasses.dataclass
 class Params:
     topology: str = "redriver"      # "redriver" | "direct"
+    strobe_bypass: bool = False     # redriver topology, but the strobe channel of U2 is linked through
     stim: str = "fpga"              # "fpga" | "ideal" (1 ps step straight into SPL_HS, test bench only)
     ideal_step: float = 0.2         # V, step height of the ideal source (open circuit)
 
@@ -186,7 +187,7 @@ def build(p: Params, probes: list[str] | None = None, outfile: str | None = None
 
     def redriver(name: str, pre: str) -> None:
         """U2 channel between <pre>_rc_* and <pre>_b_*."""
-        if p.topology == "redriver":
+        if p.topology == "redriver" and not (p.strobe_bypass and name == "u2b"):
             fp = p.rd_bw / 0.6436           # two identical poles: f3dB = fp * sqrt(sqrt(2) - 1)
             zb = gz(p.rd_eq_db)
             d.add(f"X{name} {pre}_rc_p {pre}_rc_n {pre}_b_p {pre}_b_n redrv "
@@ -280,7 +281,9 @@ def build(p: Params, probes: list[str] | None = None, outfile: str | None = None
         d.add(f"Ch{h} ls_{h} 0 {p.c_hold + LS_C / 2}")
         d.add(f"Lls{h} ls_{h} amp_{h} {LS_L}")
         d.add(f"Camp{h} amp_{h} 0 {p.c_opamp + LS_C / 2}")
-        d.add(f".ic v(ls_{h})={v0:.9g} v(amp_{h})={v0:.9g}")
+        # Only one end of Lls may be given an initial condition: with both ends forced, the
+        # inductor current of the DC solution is arbitrary and the hold node starts ringing.
+        d.add(f".ic v(ls_{h})={v0:.9g}")
 
     # always stop the same time after the strobe, so every delay point sees the same hold time
     tend = p.t_strobe + p.t_tail
