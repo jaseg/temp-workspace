@@ -7,7 +7,10 @@
 //   "colorTheme": "KiCad Default",      // name of the theme to start with
 //   "hiddenLayers": ["F.Fab", "B.Fab"], // layer names (boards) or object classes (schematics)
 //   "kinds": {"electrical": true, "metadata": true, "layout": true, "minor": true},
-//   "tone": {"old": 0.72, "new": 0.45}   // how much the versions are toned down in the diff view
+//   "tone": {                           // the diff view's muted colours: share of colourfulness
+//     "old": {"saturation": 0, "fade": 0.3},   // kept, and how far colours fade towards the
+//     "new": {"saturation": 0.35, "fade": 0}   // background (contrast stays otherwise)
+//   }
 // }
 // Colour themes are KiCad colour-theme JSON files. Only themes listed here can be selected.
 
@@ -18,7 +21,7 @@ export const DEFAULTS = {
   colorTheme: 'KiCad Default',
   hiddenLayers: [],
   kinds: { electrical: true, metadata: true, layout: true, minor: true },
-  tone: { old: 0.72, new: 0.45 },
+  tone: { old: { saturation: 0, fade: 0.3 }, new: { saturation: 0.35, fade: 0 } },
 };
 
 const isObject = v => v && typeof v === 'object' && !Array.isArray(v);

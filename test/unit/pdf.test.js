@@ -21,7 +21,7 @@ test('PDF with drawing, change list, annotations and attachment', async () => {
   ];
   const bytes = await buildPdf({
     title: 'test',
-    pages: [{ title: 'Diff', box: scene.bbox, background: [1, 1, 1], passes: [{ scene, layers }], shades: [{ area: scene.bbox, color: [1, 0, 0, 0.1] }], annotations }],
+    pages: [{ title: 'Diff', box: scene.bbox, background: [1, 1, 1], passes: [{ scene, layers, extraWidth: 1 }, { scene, layers }], annotations }],
     changes: diffFiles(old, nu),
     attachment: { name: 'annotations.json', json: { annotations } },
   });

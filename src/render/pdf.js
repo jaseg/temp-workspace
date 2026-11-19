@@ -13,7 +13,7 @@ const num = v => (Math.round(v * 1000) / 1000).toString();
 const rgbOp = (c, op) => `${num(c[0])} ${num(c[1])} ${num(c[2])} ${op}`;
 
 /** Content stream operators for one scene layer drawn in `color`. `gs(alpha)` names an ExtGState. */
-function layerOps(l, color, gs, font) {
+function layerOps(l, color, gs, font, extraWidth = 0) {
   const out = [];
   if (color[3] < 1) out.push(`/${gs(color[3])} gs`);
   out.push(rgbOp(color, 'rg'), rgbOp(color, 'RG'));
@@ -31,7 +31,7 @@ function layerOps(l, color, gs, font) {
   const byWidth = new Map();
   for (let i = 0; i < l.segments.length; i += 6) {
     const s = l.segments;
-    const w = num(Math.max(s[i + 4], 0.05));
+    const w = num(Math.max(s[i + 4], 0.05) + extraWidth);
     if (!byWidth.has(w)) byWidth.set(w, []);
     byWidth.get(w).push(`${num(s[i])} ${num(s[i + 1])} m ${num(s[i + 2])} ${num(s[i + 3])} l`);
   }
@@ -65,8 +65,8 @@ function pageTransform(box) {
 /**
  * Build a PDF.
  * @param {object} doc
- *   pages: [{title, box, background: [r,g,b], passes: [{scene, layers: [{name, color}]}],
- *            shades?: [{area, color}], annotations?: [...]}]
+ *   pages: [{title, box, background: [r,g,b], passes: [{scene, layers: [{name, color}], extraWidth?}],
+ *            annotations?: [...]}]   (extraWidth widens lines, in mm)
  *   changes: [{kind, minor, summary, details}] listed on the last pages
  *   attachment?: {name, json}  (annotations document)
  *   title: string
@@ -102,16 +102,10 @@ export async function buildPdf({ pages, changes = [], attachment, title = 'KiCad
       `${num(T.s)} 0 0 ${num(-T.s)} ${num(T.tx)} ${num(T.ty)} cm`,
       '1 J 1 j',
     ];
-    // Shades go underneath the drawing, opaque (pre-mixed with the background).
-    for (const sh of p.shades ?? []) {
-      const c = sh.color.slice(0, 3).map((v, i) => p.background[i] + (v - p.background[i]) * sh.color[3]);
-      const a = sh.area;
-      ops.push(rgbOp(c, 'rg'), `${num(a.x0)} ${num(a.y0)} ${num(a.x1 - a.x0)} ${num(a.y1 - a.y0)} re f`);
-    }
     for (const pass of p.passes) {
       for (const { name, color } of pass.layers) {
         const l = pass.scene?.layers.get(name);
-        if (l) ops.push(layerOps(l, color, gs, font));
+        if (l) ops.push(layerOps(l, color, gs, font, pass.extraWidth));
       }
     }
     ops.push('Q');
