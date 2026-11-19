@@ -8,6 +8,8 @@ test('version status', () => {
   assert.equal(versionStatus('board', 20260206), 'ok');
   assert.equal(versionStatus('board', 20261031), 'ok');
   assert.equal(versionStatus('board', 20240108), 'older');
+  assert.equal(versionStatus('board', 20241229), 'older'); // KiCad 9.0
+  assert.equal(versionStatus('schematic', 20260101), 'ok'); // 10.0 development
   assert.equal(versionStatus('schematic', 20990101), 'newer');
   assert.equal(versionStatus('schematic', undefined), 'unknown');
   assert.equal(readKicad('(kicad_sch (version 20990101))').versionStatus, 'newer');

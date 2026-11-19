@@ -1,8 +1,8 @@
 // <kd-viewport>: a pannable, zoomable view of one or more scenes.
 //
 // Three stacked layers: a WebGL canvas (geometry), a 2D canvas (native-font text) and an SVG
-// overlay (highlights, selection, annotations). What is drawn is described by "passes":
-//   {scene, handle?, layers: [{name, color: [r, g, b, a]}]}  drawn in order, back to front.
+// overlay (change shades, annotations). What is drawn is described by "passes", drawn in order:
+//   {scene, layers: [{name, color: [r, g, b, a]}], glowPx?: extra line width, texts?: false to skip text}
 
 import { createRenderer } from '../render/gl.js';
 import { layout } from '../render/text.js';
@@ -30,6 +30,7 @@ export class KdViewport extends HTMLElement {
     this.background = [1, 1, 1];
     this.view = { cx: 0, cy: 0, scale: 1 };
     this.widthCache = new Map();
+    this.handles = new WeakMap(); // scene → GPU buffers in this viewport's WebGL context
     this.onViewChange = null;
     this.frame = 0;
   }
@@ -51,12 +52,15 @@ export class KdViewport extends HTMLElement {
 
   disconnectedCallback() {
     this.resizeObserver?.disconnect();
+    // Browsers allow only a few WebGL contexts; release ours right away.
+    this.renderer?.gl.getExtension('WEBGL_lose_context')?.loseContext();
+    this.renderer = null;
   }
 
-  /** Set what to draw. Scenes are uploaded to the GPU once and cached on the pass's scene. */
+  /** Set what to draw. Scenes are uploaded to the GPU once per viewport. */
   setPasses(passes, background) {
     for (const p of passes) {
-      if (p.scene && !p.scene.glHandle && this.renderer) p.scene.glHandle = this.renderer.upload(p.scene);
+      if (p.scene && this.renderer && !this.handles.has(p.scene)) this.handles.set(p.scene, this.renderer.upload(p.scene));
     }
     this.passes = passes;
     if (background) this.background = background;
@@ -113,7 +117,7 @@ export class KdViewport extends HTMLElement {
   draw() {
     if (!this.renderer) return;
     this.renderer.begin(this.background);
-    for (const p of this.passes) if (p.scene) this.renderer.draw(p.scene.glHandle, this.view, p.layers);
+    for (const p of this.passes) if (p.scene) this.renderer.draw(this.handles.get(p.scene), this.view, p.layers, { extraWidthPx: (p.glowPx ?? 0) * devicePixelRatio });
     this.drawTexts();
     this.dispatchEvent(new CustomEvent('kd-draw'));
   }
@@ -126,7 +130,7 @@ export class KdViewport extends HTMLElement {
     ctx.clearRect(0, 0, W, H);
     const { cx, cy, scale } = this.view;
     for (const p of this.passes) {
-      if (!p.scene) continue;
+      if (!p.scene || p.texts === false) continue;
       for (const { name, color } of p.layers) {
         const l = p.scene.layers.get(name);
         if (!l?.texts.length) continue;

@@ -12,12 +12,13 @@ in float width;
 uniform vec3 view; // cx, cy, pixels per mm
 uniform vec2 size; // canvas size in pixels
 uniform float minWidth; // mm
+uniform float extraWidth; // mm, added to every width (highlight glow)
 out vec2 p;
 flat out vec4 s;
 flat out float r;
 void main() {
   float px = 1.0 / view.z;
-  float hw = max(width, minWidth) * 0.5;
+  float hw = (max(width, minWidth) + extraWidth) * 0.5;
   vec2 a = seg.xy, b = seg.zw, d = b - a;
   float len = length(d);
   vec2 dir = len > 0.0 ? d / len : vec2(1.0, 0.0);
@@ -163,8 +164,9 @@ export function createRenderer(canvas) {
   /**
    * Draw layers of an uploaded scene. `view` = {cx, cy, scale (px per mm)};
    * `layers` = [{name, color: [r, g, b, a] in 0..1}] back to front.
+   * `extraWidthPx` widens every segment (in device pixels), e.g. for a highlight glow.
    */
-  function draw(handle, view, layers, { minWidthPx = 1 } = {}) {
+  function draw(handle, view, layers, { minWidthPx = 1, extraWidthPx = 0 } = {}) {
     const size = [canvas.width, canvas.height];
     const viewVec = [view.cx, view.cy, view.scale];
     for (const { name, color } of layers) {
@@ -198,6 +200,7 @@ export function createRenderer(canvas) {
         gl.uniform3fv(segProg.uniforms.view, viewVec);
         gl.uniform2fv(segProg.uniforms.size, size);
         gl.uniform1f(segProg.uniforms.minWidth, minWidthPx / view.scale);
+        gl.uniform1f(segProg.uniforms.extraWidth, extraWidthPx / view.scale);
         gl.uniform4fv(segProg.uniforms.color, color);
         gl.bindVertexArray(l.segVao);
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, l.segCount);

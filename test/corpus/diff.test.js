@@ -39,10 +39,12 @@ function shuffled(text, r) {
   return print([...head, ...rest]);
 }
 
-/** Replace every UUID consistently (references to a UUID elsewhere in the file follow along). */
+/** Replace every element UUID consistently (references to it elsewhere in the file follow along). */
 function newUuids(text) {
+  const ids = new Set([...text.matchAll(/\((?:uuid|tstamp) "?([0-9a-f-]{36})"?\)/gi)].map(m => m[1]));
   const map = new Map();
   return text.replace(UUID, u => {
+    if (!ids.has(u)) return u;
     if (!map.has(u)) map.set(u, randomUUID());
     return map.get(u);
   });

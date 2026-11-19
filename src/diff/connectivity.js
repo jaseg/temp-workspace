@@ -60,13 +60,14 @@ export function connectivityChanges(oldG, newG, { changedWires = { old: new Set(
     const summary =
       g.op === 'connected' ? `${subject} connected to ${noun} ${g.to.name}` :
       g.op === 'disconnected' ? `${subject} disconnected from ${noun} ${g.from.name}` :
+      g.from.name === g.to.name ? `${subject} split off from ${noun} ${g.from.name}` :
       `${subject} moved from ${noun} ${g.from.name} to ${noun} ${g.to.name}`;
     const wires = (net, side) => (net?.wires ?? []).filter(w => changedWires[side].has(w));
     out.push(change('electrical', g.op === 'connected' ? 'added' : g.op === 'disconnected' ? 'removed' : 'modified', subject, summary, {
       details: g.pins.length > 1 ? [list] : [],
       old: [...g.pins.map(p => oldG.pins.get(p).itemKey), ...wires(g.from, 'old')],
       new: [...g.pins.map(p => newG.pins.get(p).itemKey), ...wires(g.to, 'new')],
-      net: g.to?.name ?? g.from?.name,
+      net: g.op === 'disconnected' ? g.from.name : g.to.name,
     }));
   }
 

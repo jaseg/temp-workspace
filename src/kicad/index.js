@@ -7,12 +7,15 @@ import { readSymbolLib } from './symbol.js';
 import { readFootprint } from './footprint.js';
 import { readBoard } from './board.js';
 
-/** Format versions written by the supported KiCad releases: [10.0, newest known 10.99]. */
+/**
+ * Supported format versions: [last version written by KiCad 9.0 (exclusive), newest known 10.99].
+ * Everything in between was written by KiCad 10.0 (including its development versions) or 10.99.
+ */
 export const VERSIONS = {
-  schematic: [20260306, 20261106],
-  symbol_lib: [20251024, 20261106],
-  footprint: [20260206, 20261031],
-  board: [20260206, 20261031],
+  schematic: [20250114, 20261106],
+  symbol_lib: [20241209, 20261106],
+  footprint: [20241229, 20261031],
+  board: [20241229, 20261031],
 };
 
 const READERS = {
@@ -27,7 +30,7 @@ const READERS = {
 export function versionStatus(type, version) {
   const range = VERSIONS[type];
   if (!range || !version) return 'unknown';
-  if (version < range[0]) return 'older';
+  if (version <= range[0]) return 'older';
   if (version > range[1]) return 'newer';
   return 'ok';
 }

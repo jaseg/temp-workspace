@@ -39,7 +39,7 @@ export function footprintChanges(fa, fb, ka, kb, out, { placed = true } = {}) {
   // Pads: numbering and nets are electrical, geometry is layout.
   const pa = fa.pads.map((p, i) => ({ p, key: padKey(ka, p, i) }));
   const pb = fb.pads.map((p, i) => ({ p, key: padKey(kb, p, i) }));
-  const pads = match(pa, pb, [e => e.p.uuid, e => `${e.p.number}|${fmtPoint(e.p.at)}`, e => e.p.number || undefined]);
+  const pads = match(pa, pb, [e => e.p.uuid, e => canon(e.p), e => `${e.p.number}|${fmtPoint(e.p.at)}`, e => e.p.number || undefined]);
   for (const e of pads.removed) out.push(change('electrical', 'removed', r, `${r} pad ${e.p.number || '(unnumbered)'} removed`, { old: [e.key] }));
   for (const e of pads.added) out.push(change('electrical', 'added', r, `${r} pad ${e.p.number || '(unnumbered)'} added`, { new: [e.key] }));
   for (const [ea, eb] of pads.pairs) {
