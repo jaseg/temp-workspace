@@ -16,6 +16,7 @@ import { isSchematicType, renderModel } from '../render/index.js';
 import { boardColor, boardLayerOrder, loadTheme, parseColor, SCHEMATIC_LAYERS, schematicColor, schematicKey } from '../theme/themes.js';
 import { diffFiles } from '../diff/index.js';
 import { boxContains, unionBox, isEmptyBox } from '../geom.js';
+import { createScene } from '../render/scene.js';
 import { changeArea, extract, isDark, itemIndices, PALETTE, tone } from './highlight.js';
 import { createChangeList, renderInspector } from './changes.js';
 import { annotationsSvg, exportAnnotations, hitAnnotation, importAnnotations, TOOLS } from './annotate.js';
@@ -294,11 +295,15 @@ export class KicadDiff extends HTMLElement {
     const { buildPdf } = await import('../render/pdf.js');
     const box = Object.values(this.scenes).filter(Boolean).map(s => s.bbox).reduce(unionBox);
     const bg = this.background();
-    const pal = this.palette();
-    const shades = this.list.visible().filter(c => c.area).map(c => ({ area: c.area, color: [...pal[c.kind].slice(0, 3), c.minor ? 0.06 : c.kind === 'layout' ? 0.1 : 0.16] }));
     const name = this.sources?.new?.name ?? this.sources?.old?.name ?? 'kicad-diff';
     const pages = [];
-    if (this.scenes.old && this.scenes.new) pages.push({ title: `${name} — changes`, box, background: bg, passes: this.passesFor('diff'), shades, annotations: this.annotations });
+    // PDF has no blur: halos become widened, pale copies of the changed shapes under the drawing.
+    const passes = this.passesFor('diff').flatMap(p => (p.halo ? p.halo.map(h => ({
+      scene: h.scene, extraWidth: (p.widthPx / 2) * (devicePixelRatio / (this.viewports?.[0]?.view.scale ?? 4)),
+      layers: h.layers.map(l => ({ ...l, color: [...l.color.slice(0, 3).map((v, i) => bg[i] + (v / (l.color[3] || 1) - bg[i]) * 0.25), 1] })),
+    })) : [p]));
+    const order = p => (p.extraWidth ? 0 : 1); // pale halos first, under everything
+    if (this.scenes.old && this.scenes.new) pages.push({ title: `${name} — changes`, box, background: bg, passes: [...passes].sort((a, b) => order(a) - order(b)), annotations: this.annotations });
     for (const side of ['old', 'new']) {
       if (this.scenes[side]) pages.push({ title: `${name} — ${side} version`, box, background: bg, passes: this.passesFor(side, { plain: true }) });
     }
@@ -394,6 +399,7 @@ export class KicadDiff extends HTMLElement {
     this.changes = (this.allChanges ?? []).filter(c => !c.entry || c.entry === this.entry);
     for (const c of this.changes) c.area = changeArea(c, this.scenes);
     this.highlights = this.buildHighlights();
+    this.buildValueEdits();
     this.selected = null;
     this.list.setChanges(this.changes);
     renderInspector(this.el.inspector, {});
@@ -404,18 +410,58 @@ export class KicadDiff extends HTMLElement {
   }
 
   /** Per version, one scene per change class holding the primitives of the changed elements. */
+  /**
+   * Per version and change class: the changed elements (drawn bright) and their halo shapes
+   * (blurred into a soft glow around the actual shape of the change).
+   */
   buildHighlights() {
-    const out = {};
+    const lines = {}, halos = {};
     for (const side of ['old', 'new']) {
-      out[side] = {};
+      lines[side] = {};
+      halos[side] = {};
       const scene = this.scenes[side];
       if (!scene) continue;
       for (const cls of CLASSES) {
-        const changes = this.changes.filter(c => classOf(c) === cls);
-        out[side][cls] = extract(scene, itemIndices(scene, changes.flatMap(c => c[side])), cls);
+        const indices = itemIndices(scene, this.changes.filter(c => classOf(c) === cls).flatMap(c => c[side]));
+        lines[side][cls] = extract(scene, indices, cls);
+        halos[side][cls] = extract(scene, indices, cls, { textBoxes: true });
       }
     }
-    return out;
+    this.halos = halos;
+    return lines;
+  }
+
+  /**
+   * For the diff view, where both versions are drawn on top of each other: the old version's text
+   * is hidden wherever the element still exists, and each changed field value becomes one text,
+   * "old" struck through followed by "new", at the field's new place.
+   */
+  buildValueEdits() {
+    const { old, new: nu } = this.scenes;
+    this.oldShared = new Set();
+    this.newReplaced = new Set();
+    this.valueScene = createScene();
+    if (!old || !nu) return;
+    old.items.forEach((it, i) => nu.byKey.has(it.key) && this.oldShared.add(i));
+    const textOf = scene => {
+      const m = new Map();
+      for (const l of scene.layers.values()) for (const t of l.texts) if (!m.has(t.item)) m.set(t.item, t);
+      return m;
+    };
+    const oldText = textOf(old), newText = textOf(nu);
+    const texts = [];
+    for (const c of this.changes.filter(c => c.kind === 'metadata')) {
+      const fields = keys => new Map(keys.filter(k => k.includes(':field:')).map(k => [k.slice(k.indexOf(':field:')), k]));
+      const fo = fields(c.old), fn = fields(c.new);
+      for (const name of new Set([...fo.keys(), ...fn.keys()])) {
+        const a = oldText.get(old.byKey.get(fo.get(name))), b = newText.get(nu.byKey.get(fn.get(name)));
+        if (!a && !b) continue;
+        const runs = [a && { str: a.str, strike: true, role: 'old' }, a && b && { str: ' ' }, b && { str: b.str, role: 'new' }].filter(Boolean);
+        texts.push({ ...(b ?? a), str: runs.map(r => r.str).join(''), rich: runs });
+        if (b) this.newReplaced.add(b.item);
+      }
+    }
+    this.valueScene.layers.set('values', { name: 'values', segments: [], triangles: [], fans: [], texts });
   }
 
   renderBanner() {
@@ -525,7 +571,7 @@ export class KicadDiff extends HTMLElement {
   passesFor(side, { plain = false } = {}) {
     const bg = this.background();
     const visible = this.layerNames().filter(n => !this.hiddenLayers.has(n));
-    const base = k => visible.map(name => ({ name, color: k ? tone(this.colorOf(name), bg, k) : this.colorOf(name) }));
+    const base = t => visible.map(name => ({ name, color: t ? tone(this.colorOf(name), bg, t) : this.colorOf(name) }));
     const shown = new Set(this.list.visible().map(classOf));
     const pal = this.palette();
     const colorOf = cls => {
@@ -535,54 +581,54 @@ export class KicadDiff extends HTMLElement {
     const highlight = (side, alpha = 1) => CLASSES.filter(cls => shown.has(cls)).map(cls => ({
       scene: this.highlights[side]?.[cls], layers: [{ name: cls, color: colorOf(cls).map((v, i) => (i === 3 ? v * alpha : v)) }],
     }));
-    const selection = side => (this.selectionScenes?.[side] ? [
-      { scene: this.selectionScenes[side], layers: [{ name: 'sel', color: [...pal[this.selected.kind].slice(0, 3), 0.35] }], glowPx: 6, texts: false },
-      { scene: this.selectionScenes[side], layers: [{ name: 'sel', color: pal[this.selected.kind] }] },
-    ] : []);
+    const selection = side => (this.selectionScenes?.[side] ? [{ scene: this.selectionScenes[side], layers: [{ name: 'sel', color: pal[this.selected.kind] }] }] : []);
+    // Halos: one soft glow per change in its class colour, composited once so overlaps don't add up.
+    const premultiplied = c => [c[0] * c[3], c[1] * c[3], c[2] * c[3], c[3]];
+    const halo = sides => ({
+      halo: sides.flatMap(s => CLASSES.filter(cls => shown.has(cls) && this.halos[s]?.[cls])
+        .map(cls => ({ scene: this.halos[s][cls], layers: [{ name: cls, color: premultiplied(colorOf(cls)) }] }))),
+      widthPx: 18, alpha: 0.5,
+    });
+    const selectedHalo = sides => ({
+      halo: sides.filter(s => this.selectionHalos?.[s]).map(s => ({ scene: this.selectionHalos[s], layers: [{ name: 'sel', color: pal[this.selected.kind] }] })),
+      widthPx: 30, alpha: 0.7,
+    });
 
     let passes;
     if (side === 'diff') {
+      // Old text only where the element is gone; changed values as "old → new" runs.
+      const skip = { old: this.oldShared, new: this.newReplaced };
+      const values = this.valueScene.layers.get('values');
+      const runColor = { old: pal.removed, new: pal.added };
+      for (const t of values?.texts ?? []) for (const r of t.rich) r.color = runColor[r.role];
       passes = [
-        { scene: this.scenes.old, layers: base(this._config.tone.old) },
-        { scene: this.scenes.new, layers: base(this._config.tone.new) },
-        ...highlight('old', 0.6), ...highlight('new'), ...selection('old'), ...selection('new'),
+        { scene: this.scenes.old, layers: base(this._config.tone.old), skipTexts: skip.old },
+        { scene: this.scenes.new, layers: base(this._config.tone.new), skipTexts: skip.new },
+        halo(['old', 'new']), selectedHalo(['old', 'new']),
+        ...highlight('old', 0.6).map(p => ({ ...p, skipTexts: skip.old })),
+        ...highlight('new').map(p => ({ ...p, skipTexts: skip.new })),
+        ...selection('old').map(p => ({ ...p, skipTexts: skip.old })),
+        ...selection('new').map(p => ({ ...p, skipTexts: skip.new })),
+        { scene: this.valueScene, layers: [{ name: 'values', color: pal.added }] },
       ];
     } else if (this.showsChanges() && !plain) {
-      passes = [{ scene: this.scenes[side], layers: base(this._config.tone.new) }, ...highlight(side), ...selection(side)];
+      passes = [{ scene: this.scenes[side], layers: base(this._config.tone.new) }, halo([side]), selectedHalo([side]), ...highlight(side), ...selection(side)];
     } else {
-      passes = [{ scene: this.scenes[side], layers: base(0) }, ...(plain ? [] : selection(side))];
+      passes = [{ scene: this.scenes[side], layers: base(0) }, ...(plain ? [] : [selectedHalo([side]), ...selection(side)])];
     }
-    return passes.filter(p => p.scene);
+    return passes.filter(p => p.scene || p.halo?.length);
   }
 
-  /** SVG overlay, redrawn with the view: soft shades over the areas of changes, and annotations. */
+  /** SVG overlay with the annotations, redrawn with the view. */
   drawOverlay(v) {
-    const svg = v.overlay;
-    const pal = this.palette();
-    const css = (c, a) => `rgba(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)}, ${a})`;
-    const rects = [];
-    const changes = this.showsChanges() ? this.list.visible() : this.selected ? [this.selected] : [];
-    const r = v.getBoundingClientRect();
-    for (const c of changes) {
-      if (!c.area) continue;
-      const a = v.toScreen(c.area.x0, c.area.y0), b = v.toScreen(c.area.x1, c.area.y1);
-      if (b.x < 0 || b.y < 0 || a.x > r.width || a.y > r.height) continue;
-      const sel = c === this.selected;
-      const alpha = sel ? 0.28 : c.minor ? 0.06 : c.kind === 'layout' ? 0.1 : 0.16;
-      const w = Math.max(6, b.x - a.x), h = Math.max(6, b.y - a.y);
-      const rad = Math.min(12, w / 4, h / 4);
-      rects.push(`<rect x="${a.x}" y="${a.y}" width="${w}" height="${h}" rx="${rad}" fill="${css(pal[c.kind], alpha)}"${sel ? ` stroke="${css(pal[c.kind], 0.9)}" stroke-width="2"` : ''}/>`);
-    }
-    const s = v.view.scale / devicePixelRatio;
-    svg.innerHTML = rects.join('') + annotationsSvg(this.annotations, (x, y) => v.toScreen(x, y), s);
+    v.overlay.innerHTML = annotationsSvg(this.annotations, (x, y) => v.toScreen(x, y), v.view.scale / devicePixelRatio);
   }
 
   selectChange(change) {
     this.selected = change;
-    this.selectionScenes = change ? {
-      old: this.scenes.old && extract(this.scenes.old, itemIndices(this.scenes.old, change.old), 'sel'),
-      new: this.scenes.new && extract(this.scenes.new, itemIndices(this.scenes.new, change.new), 'sel'),
-    } : null;
+    const pick = (side, opts) => this.scenes[side] && extract(this.scenes[side], itemIndices(this.scenes[side], change[side]), 'sel', opts);
+    this.selectionScenes = change ? { old: pick('old'), new: pick('new') } : null;
+    this.selectionHalos = change ? { old: pick('old', { textBoxes: true }), new: pick('new', { textBoxes: true }) } : null;
     renderInspector(this.el.inspector, { change });
     if (change?.entry && change.entry !== this.entry) {
       this.entry = change.entry;

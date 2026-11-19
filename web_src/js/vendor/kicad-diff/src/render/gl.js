@@ -61,6 +61,33 @@ uniform vec4 color;
 out vec4 frag;
 void main() { frag = color; }`;
 
+// Halo: a full-screen pass that blurs an offscreen image along one axis.
+const QUAD_VS = `#version 300 es
+in vec2 pos;
+out vec2 uv;
+void main() {
+  uv = pos * 0.5 + 0.5;
+  gl_Position = vec4(pos, 0.0, 1.0);
+}`;
+
+const BLUR_FS = `#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D image;
+uniform vec2 step;   // one texel along the blur axis
+uniform float alpha; // overall opacity (applied in the last pass)
+out vec4 frag;
+void main() {
+  vec4 sum = vec4(0.0);
+  float total = 0.0;
+  for (int i = -12; i <= 12; i++) {
+    float w = exp(-float(i * i) / 72.0);
+    sum += texture(image, uv + step * float(i)) * w;
+    total += w;
+  }
+  frag = sum / total * alpha;
+}`;
+
 function compile(gl, vs, fs) {
   const prog = gl.createProgram();
   for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
@@ -85,6 +112,16 @@ export function createRenderer(canvas) {
   if (!gl) throw new Error('WebGL2 is not available');
   const segProg = compile(gl, SEGMENT_VS, SEGMENT_FS);
   const fillProg = compile(gl, FILL_VS, FILL_FS);
+  const blurProg = compile(gl, QUAD_VS, BLUR_FS);
+  const quadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const quadVao = gl.createVertexArray();
+  gl.bindVertexArray(quadVao);
+  gl.enableVertexAttribArray(blurProg.attrib('pos'));
+  gl.vertexAttribPointer(blurProg.attrib('pos'), 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(null);
+  let targets = null; // two offscreen render targets for the halo, sized like the canvas
   const cornerBuf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
@@ -209,5 +246,66 @@ export function createRenderer(canvas) {
     gl.bindVertexArray(null);
   }
 
-  return { gl, upload, release, begin, draw };
+  /** Offscreen colour + stencil targets, recreated when the canvas size changes. */
+  function haloTargets() {
+    const w = canvas.width, h = canvas.height;
+    if (targets?.w === w && targets?.h === h) return targets;
+    for (const t of targets?.list ?? []) gl.deleteFramebuffer(t.fb), gl.deleteTexture(t.tex), gl.deleteRenderbuffer(t.rb);
+    const list = [0, 1].map(() => {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, p, gl.LINEAR);
+      for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE);
+      const rb = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, w, h);
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, rb);
+      return { fb, tex, rb };
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return (targets = { w, h, list });
+  }
+
+  /**
+   * Soft halo around geometry: `items` = [{handle, layers}] are drawn widened into an offscreen
+   * image without blending (where shapes overlap, the later one replaces the earlier, so nothing
+   * stacks up), then blurred and laid over the canvas with opacity `alpha`.
+   */
+  function drawHalo(items, view, { widthPx = 14, alpha = 0.5 } = {}) {
+    const [a, b] = haloTargets().list;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, a.fb);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clearStencil(0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+    gl.disable(gl.BLEND);
+    for (const it of items) draw(it.handle, view, it.layers, { extraWidthPx: widthPx });
+    // Blur along x into b, then along y onto the canvas.
+    gl.useProgram(blurProg.prog);
+    gl.bindVertexArray(quadVao);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(blurProg.uniforms.image, 0);
+    const spread = Math.max(1, widthPx / 8);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, b.fb);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindTexture(gl.TEXTURE_2D, a.tex);
+    gl.uniform2f(blurProg.uniforms.step, spread / canvas.width, 0);
+    gl.uniform1f(blurProg.uniforms.alpha, 1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // the blurred image is premultiplied
+    gl.bindTexture(gl.TEXTURE_2D, b.tex);
+    gl.uniform2f(blurProg.uniforms.step, 0, spread / canvas.height);
+    gl.uniform1f(blurProg.uniforms.alpha, alpha);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.bindVertexArray(null);
+  }
+
+  return { gl, upload, release, begin, draw, drawHalo };
 }

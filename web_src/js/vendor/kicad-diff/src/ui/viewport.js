@@ -1,13 +1,17 @@
 // <kd-viewport>: a pannable, zoomable view of one or more scenes.
 //
 // Three stacked layers: a WebGL canvas (geometry), a 2D canvas (native-font text) and an SVG
-// overlay (change shades, annotations). What is drawn is described by "passes", drawn in order:
-//   {scene, layers: [{name, color: [r, g, b, a]}], glowPx?: extra line width, texts?: false to skip text}
+// overlay (annotations). What is drawn is described by "passes", drawn in order:
+//   {scene, layers: [{name, color: [r, g, b, a]}], glowPx?: extra line width, texts?: false to skip text,
+//    skipTexts?: Set of scene item indices whose text is not drawn}
+//   {halo: [{scene, layers}], widthPx, alpha}: a soft blurred glow around the scenes' geometry
+// A text record with `rich: [{str, color?, strike?}]` is drawn as coloured runs (e.g. "old → new").
 
 import { createRenderer } from '../render/gl.js';
 import { layout } from '../render/text.js';
 import { boxContains } from '../geom.js';
 
+const rgba = c => `rgba(${c[0] * 255}, ${c[1] * 255}, ${c[2] * 255}, ${c[3] ?? 1})`;
 const FONT = 'ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace';
 const MIN_TEXT_PX = 3;
 
@@ -59,8 +63,8 @@ export class KdViewport extends HTMLElement {
 
   /** Set what to draw. Scenes are uploaded to the GPU once per viewport. */
   setPasses(passes, background) {
-    for (const p of passes) {
-      if (p.scene && this.renderer && !this.handles.has(p.scene)) this.handles.set(p.scene, this.renderer.upload(p.scene));
+    for (const s of passes.flatMap(p => [p.scene, ...(p.halo ?? []).map(h => h.scene)])) {
+      if (s && this.renderer && !this.handles.has(s)) this.handles.set(s, this.renderer.upload(s));
     }
     this.passes = passes;
     if (background) this.background = background;
@@ -117,7 +121,14 @@ export class KdViewport extends HTMLElement {
   draw() {
     if (!this.renderer) return;
     this.renderer.begin(this.background);
-    for (const p of this.passes) if (p.scene) this.renderer.draw(this.handles.get(p.scene), this.view, p.layers, { extraWidthPx: (p.glowPx ?? 0) * devicePixelRatio });
+    for (const p of this.passes) {
+      if (p.halo) {
+        const items = p.halo.map(h => ({ handle: this.handles.get(h.scene), layers: h.layers }));
+        this.renderer.drawHalo(items, this.view, { widthPx: p.widthPx * devicePixelRatio, alpha: p.alpha });
+      } else if (p.scene) {
+        this.renderer.draw(this.handles.get(p.scene), this.view, p.layers, { extraWidthPx: (p.glowPx ?? 0) * devicePixelRatio });
+      }
+    }
     this.drawTexts();
     this.dispatchEvent(new CustomEvent('kd-draw'));
   }
@@ -134,8 +145,9 @@ export class KdViewport extends HTMLElement {
       for (const { name, color } of p.layers) {
         const l = p.scene.layers.get(name);
         if (!l?.texts.length) continue;
-        ctx.fillStyle = `rgba(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255}, ${color[3]})`;
+        ctx.fillStyle = rgba(color);
         for (const t of l.texts) {
+          if (p.skipTexts?.has(t.item)) continue;
           const hPx = t.h * scale;
           if (hPx < MIN_TEXT_PX) continue;
           const sx = (t.x - cx) * scale + W / 2;
@@ -174,10 +186,23 @@ export class KdViewport extends HTMLElement {
       ctx.save();
       ctx.translate(line.x, line.y);
       ctx.scale((px / em) * (t.w / t.h), px / em);
-      ctx.fillText(line.str, 0, 0);
+      if (t.rich) this.fillRuns(ctx, t.rich, em);
+      else ctx.fillText(line.str, 0, 0);
       ctx.restore();
     }
     ctx.restore();
+  }
+
+  /** Coloured runs of one line, optionally struck through (in em units of the current transform). */
+  fillRuns(ctx, runs, em) {
+    let x = 0;
+    for (const run of runs) {
+      if (run.color) ctx.fillStyle = rgba(run.color);
+      ctx.fillText(run.str, x, 0);
+      const w = ctx.measureText(run.str).width;
+      if (run.strike) ctx.fillRect(x, -0.3 * em, w, 0.07 * em);
+      x += w;
+    }
   }
 
   /** Topmost item of a scene under a CSS-pixel position (smallest bounding box wins). */

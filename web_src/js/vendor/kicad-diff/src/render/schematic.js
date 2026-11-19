@@ -69,18 +69,18 @@ function shape(scene, s, layer, fillLayer) {
 // Symbols --------------------------------------------------------------------------------------
 
 /**
- * Field of a placed symbol. KiCad stores the field position in the symbol's unrotated frame; it is
- * shown at symbol.at + T·(pos − symbol.at), centred on its transformed bounding box, and kept
- * horizontal or vertical.
+ * Field of a placed symbol, drawn as KiCad does (SCH_FIELD::GetBoundingBox): the file stores the
+ * field's anchor where it is shown; the text box is laid out around the anchor in the field's own
+ * frame (justification, angle), its offsets from the anchor go through the symbol's orientation,
+ * and the text is drawn centred in the resulting box, kept horizontal or vertical.
  */
 function symbolField(scene, sym, f, layer, text) {
   const T = orientation(sym);
   const r = rec(text, f.at, f.effects);
-  const corners = cornersOf(r);
   const box = emptyBox();
-  for (const p of corners) {
-    const [x, y] = apply(T, p.x - sym.at.x, p.y - sym.at.y);
-    extendBox(box, x + sym.at.x, y + sym.at.y);
+  for (const p of cornersOf(r)) {
+    const [dx, dy] = apply(T, p.x - f.at.x, p.y - f.at.y);
+    extendBox(box, f.at.x + dx, f.at.y + dy);
   }
   const swapped = Math.abs(T[1]) > 0.5;
   const rot = (f.at.rot % 180 === 0) !== swapped ? 0 : 90;
@@ -197,7 +197,7 @@ function placedSymbol(scene, sch, sym, key, version) {
     }
   }
   sym.properties.forEach(f => {
-    if (f.hide || !f.value) return;
+    if (f.hide || f.private || !f.value) return;
     scene.beginItem(fieldKey(key, f.name), { kind: 'field', ref, field: f.name, parent: key });
     symbolField(scene, sym, f, fieldLayer(f.name), fieldText(f));
     scene.endItem();

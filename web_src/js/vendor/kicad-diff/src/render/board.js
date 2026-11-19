@@ -174,7 +174,21 @@ function expandVars(text, fp) {
   return text.replace(/\$\{(\w+)\}/g, (all, name) => fp.properties.find(p => p.name.toUpperCase() === name)?.value ?? all);
 }
 
+/**
+ * A footprint usually shows its reference twice (silkscreen and Fab layer). Pick one text to show
+ * it: on silkscreen if there is one there, else on a Fab layer, else the first.
+ */
+function referenceTexts(fp) {
+  const shown = [
+    ...fp.properties.filter(p => p.name === 'Reference' && !p.hide && p.layer),
+    ...fp.texts.filter(t => !t.hide && (t.kind === 'reference' || /\$\{REFERENCE\}/i.test(t.text))),
+  ];
+  const keep = shown.find(t => isSilk(t.layer)) ?? shown.find(t => /\.Fab$/.test(t.layer)) ?? shown[0];
+  return { keep, skip: new Set(shown.filter(t => t !== keep)) };
+}
+
 export function renderFootprint(scene, fp, key, copper) {
+  const refs = referenceTexts(fp);
   const fpTransform = [translate(fp.at.x, fp.at.y), rotate(fp.at.rot), scale(fp.at.scale?.x ?? 1, fp.at.scale?.y ?? 1)];
   const ref = fp.properties.find(p => p.name === 'Reference')?.value;
   const withFp = fn => scene.withTransform(fpTransform[0], () => scene.withTransform(fpTransform[1], () => scene.withTransform(fpTransform[2], fn)));
@@ -182,12 +196,12 @@ export function renderFootprint(scene, fp, key, copper) {
     scene.beginItem(key, { kind: 'footprint', ref });
     fp.graphics.forEach(g => graphic(scene, g));
     fp.textBoxes.forEach(t => boardText(scene, { ...t, at: { ...t.start, rot: t.angle } }));
-    fp.texts.forEach(t => boardText(scene, { ...t, text: expandVars(t.text, fp) }, true));
+    fp.texts.forEach(t => refs.skip.has(t) || boardText(scene, { ...t, text: expandVars(t.text, fp) }, true));
     fp.zones.forEach(z => zone(scene, z));
     fp.dimensions.forEach(d => dimension(scene, d));
     scene.endItem();
     fp.properties.forEach(p => {
-      if (p.hide || !p.layer) return;
+      if (p.hide || !p.layer || refs.skip.has(p)) return;
       scene.beginItem(fieldKey(key, p.name), { kind: 'field', ref, field: p.name, parent: key });
       boardText(scene, { ...p, text: expandVars(p.value, fp) }, true);
       scene.endItem();
