@@ -46,7 +46,7 @@ button, select, input { font: inherit; color: inherit; }
 .nav { display: flex; gap: 6px; margin-bottom: 6px; }
 .filters { display: flex; flex-direction: column; margin-bottom: 6px; }
 .filter { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--kd-muted); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--kd-muted); }
 .dot.electrical { background: var(--kd-electrical); }
 .dot.metadata { background: var(--kd-metadata); }
 .dot.layout { background: var(--kd-layout); }

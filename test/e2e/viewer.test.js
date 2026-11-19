@@ -26,7 +26,7 @@ async function open(query) {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(`${base}/web/index.html?${query}`);
-  await page.waitForFunction(() => document.querySelector('kicad-diff')?.viewports?.length);
+  await page.waitForFunction(() => document.querySelector('kicad-diff')?.viewports?.length || document.querySelector('kicad-diff-project'));
   return { page, errors };
 }
 
@@ -113,4 +113,16 @@ test('unsupported versions show a warning banner', async () => {
   const s = await state(page);
   assert.match(s.banner, /newer than this viewer supports/);
   assert.equal(s.mode, 'right');
+});
+
+test('project overview lists the hierarchy and opens a file', async () => {
+  const { page, errors } = await open('old=/test/pairs/project-old/demo.kicad_pro&new=/test/pairs/project-new/demo.kicad_pro');
+  await page.waitForFunction(() => /files compared/.test(document.querySelector('kicad-diff-project')?.shadowRoot.textContent));
+  const rows = await page.evaluate(() => [...document.querySelector('kicad-diff-project').shadowRoot.querySelectorAll('.file')].map(li => li.querySelector('.name').firstChild.textContent + ' ' + li.querySelector('.status').textContent));
+  assert.deepEqual(rows, ['demo (root sheet) unchanged', 'resistors changed']);
+  await page.evaluate(() => document.querySelector('kicad-diff-project').shadowRoot.querySelectorAll('.file')[1].click());
+  await page.waitForFunction(() => document.querySelector('kicad-diff-project').shadowRoot.querySelector('kicad-diff')?.changes?.length);
+  const n = await page.evaluate(() => document.querySelector('kicad-diff-project').shadowRoot.querySelector('kicad-diff').changes.length);
+  assert.equal(n, 5);
+  assert.deepEqual(errors, []);
 });

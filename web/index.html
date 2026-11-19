@@ -7,19 +7,22 @@
   <style>
     html, body { height: 100%; margin: 0; }
     body { padding: 8px; box-sizing: border-box; background: Canvas; color: CanvasText; }
-    kicad-diff { height: 100%; }
+    kicad-diff, kicad-diff-project { height: 100%; }
   </style>
   <script type="module" src="../src/ui/kicad-diff.js"></script>
+  <script type="module" src="../src/ui/project.js"></script>
 </head>
 <body>
-  <kicad-diff></kicad-diff>
   <script type="module">
-    // ?old=URL&new=URL&mode=split
+    // ?old=URL&new=URL[&mode=diff][&ui=dark][&project=1]
+    // A .kicad_pro URL (or project=1 with a top-level .kicad_sch) opens the project overview.
     const q = new URLSearchParams(location.search);
-    const el = document.querySelector('kicad-diff');
+    const project = q.get('project') === '1' || [q.get('old'), q.get('new')].some(u => u?.split(/[?#]/)[0].endsWith('.kicad_pro'));
+    const el = document.createElement(project ? 'kicad-diff-project' : 'kicad-diff');
     for (const [param, attr] of [['mode', 'mode'], ['ui', 'ui-theme'], ['old', 'old-src'], ['new', 'new-src']]) {
       if (q.has(param)) el.setAttribute(attr, q.get(param));
     }
+    document.body.append(el);
   </script>
 </body>
 </html>

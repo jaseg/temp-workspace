@@ -1,0 +1,5 @@
+(kicad_sch (version 20260306) (generator "kicad-diff-test") (paper "A4")
+	(sheet (at 50 50) (size 30 20) (stroke (width 0.1524) (type solid)) (fill (color 0 0 0 0)) (uuid "cccccccc-0000-4000-8000-000000000001")
+		(property "Sheetname" "resistors" (at 50 49.3 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
+		(property "Sheetfile" "resistors.kicad_sch" (at 50 70.6 0) (effects (font (size 1.27 1.27)) (justify left top))))
+)
