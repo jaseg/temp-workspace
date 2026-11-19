@@ -1,0 +1,8 @@
+{{/* Visual KiCad diff (kicaddiff build tag). Files are fetched from /media/ so that LFS works. */}}
+<tr>
+	<td colspan="2">
+		<lazy-webc tag="kicad-diff" class="kicad-diff"
+			{{- if .blobBase}} old-src="{{.root.KiCadBeforeMediaPath}}/{{PathEscapeSegments .file.OldName}}"{{end}}
+			{{- if .blobHead}} new-src="{{.root.KiCadMediaPath}}/{{PathEscapeSegments .file.Name}}"{{end}}></lazy-webc>
+	</td>
+</tr>

@@ -62,6 +62,14 @@ func DeclareGitRepos(t *testing.T) {
 		Filename: "testfile",
 		Versions: []string{"hello", "hallo", "hola", "native", "ubuntu-latest", "- runs-on: ubuntu-latest", "- runs-on: debian-latest"},
 	}}, nil)
+	// Visual KiCad diff (kicaddiff build tag): two versions of a schematic.
+	kicadVersions := []string{}
+	for _, name := range []string{"old", "new"} {
+		data, err := os.ReadFile(filepath.Join("tests", "e2e", "kicad-diff", name+".kicad_sch"))
+		require.NoError(t, err)
+		kicadVersions = append(kicadVersions, string(data))
+	}
+	newRepo(t, 2, "kicad-diff-test", nil, []FileChanges{{Filename: "resistors.kicad_sch", Versions: kicadVersions}}, nil)
 	newRepo(t, 2, "language-stats-test", nil, []FileChanges{{
 		Filename: "main.rs",
 		Versions: []string{"fn main() {", "println!(\"Hello World!\");", "}"},

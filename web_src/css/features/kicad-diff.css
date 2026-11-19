@@ -1,0 +1,16 @@
+/* Visual KiCad diff (kicaddiff build tag): map the viewer's colours onto Forgejo's theme. */
+kicad-diff {
+  --kd-bg: var(--color-box-body);
+  --kd-fg: var(--color-text);
+  --kd-muted: var(--color-text-light-2);
+  --kd-border: var(--color-secondary);
+  --kd-panel: var(--color-box-header);
+  --kd-accent: var(--color-primary);
+  --kd-hover: var(--color-hover);
+  --kd-warn-bg: var(--color-warning-bg);
+  --kd-warn-fg: var(--color-warning-text);
+  --kd-font: var(--fonts-regular);
+  height: 75vh;
+  border: 0;
+  border-radius: 0;
+}

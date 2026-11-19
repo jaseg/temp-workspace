@@ -44,6 +44,7 @@
 @import "./features/gitgraph.css";
 @import "./features/heatmap.css";
 @import "./features/imagediff.css";
+@import "./features/kicad-diff.css";
 @import "./features/codeeditor.css";
 @import "./features/projects.css";
 @import "./features/tribute.css";

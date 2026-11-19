@@ -110,7 +110,8 @@
 					{{$sniffedTypeHead := call $.GetSniffedTypeForBlob $blobHead}}
 					{{$isImage:= or (call $.IsSniffedTypeAnImage $sniffedTypeBase) (call $.IsSniffedTypeAnImage $sniffedTypeHead)}}
 					{{$isCsv := (call $.IsCsvFile $file)}}
-					{{$showFileViewToggle := or $isImage (and (not $file.IsIncomplete) $isCsv)}}
+					{{$isKiCad := and $.IsKiCadFile (call $.IsKiCadFile $file)}}
+					{{$showFileViewToggle := or $isImage (and (not $file.IsIncomplete) $isCsv) $isKiCad}}
 					{{$isExpandable := or (gt $file.Addition 0) (gt $file.Deletion 0) $file.IsBin}}
 					{{$isReviewFile := and $.IsSigned $.PageIsPullFiles (not $.IsArchived) $.IsShowingAllCommits}}
 					<div class="diff-file-box diff-box file-content {{TabSizeClass $.Editorconfig $file.Name}} tw-mt-0" id="diff-{{$file.NameHash}}" data-old-filename="{{$file.OldName}}" data-new-filename="{{$file.Name}}" {{if or ($file.ShouldBeHidden) (not $isExpandable)}}data-folded="true"{{end}}>
@@ -217,6 +218,8 @@
 									<table class="chroma tw-w-full">
 										{{if $isImage}}
 											{{template "repo/diff/image_diff" dict "file" . "root" $ "blobBase" $blobBase "blobHead" $blobHead "sniffedTypeBase" $sniffedTypeBase "sniffedTypeHead" $sniffedTypeHead}}
+										{{else if $isKiCad}}
+											{{template "repo/diff/kicad_diff" dict "file" . "root" $ "blobBase" $blobBase "blobHead" $blobHead}}
 										{{else}}
 											{{template "repo/diff/csv_diff" dict "file" . "root" $ "blobBase" $blobBase "blobHead" $blobHead "sniffedTypeBase" $sniffedTypeBase "sniffedTypeHead" $sniffedTypeHead}}
 										{{end}}

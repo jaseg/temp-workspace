@@ -28,6 +28,9 @@ const loadableComponents = {
   'citation-information': lazyPromise(() => {
     return import(/* webpackChunkName: "citation-information" */ './citation-information.js');
   }),
+  'kicad-diff': lazyPromise(() => {
+    return import(/* webpackChunkName: "kicad-diff" */ '../vendor/kicad-diff/src/ui/kicad-diff.js');
+  }),
 };
 
 /**
