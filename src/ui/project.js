@@ -26,7 +26,8 @@ const PROJECT_STYLE = `
 .file .type { font-size: 11px; color: var(--kd-muted); width: 64px; flex: none; }
 .file .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file .path { color: var(--kd-muted); margin-left: 6px; }
-.file .counts { display: flex; gap: 8px; flex: none; font-variant-numeric: tabular-nums; }
+.counts { display: inline-flex; gap: 8px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.file .counts { flex: none; margin: 0; }
 .file .counts span { display: inline-flex; align-items: center; gap: 3px; }
 .file .status { font-size: 11px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--kd-border); flex: none; }
 .file.unchanged .name { color: var(--kd-muted); }

@@ -163,3 +163,22 @@ async function streamText(stream, encoding = 'utf8') {
   for await (const c of stream) chunks.push(c);
   return Buffer.concat(chunks).toString(encoding);
 }
+
+test('offline HTML from the CLI works from file://', async () => {
+  const { buildHtml } = await import('../../cli/html.js');
+  const { resolveInput } = await import('../../cli/inputs.js');
+  const { writeFileSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const pairs = new URL('../pairs/resistors/', import.meta.url).pathname;
+  const html = await buildHtml({ old: await resolveInput(pairs + 'old.kicad_sch'), new: await resolveInput(pairs + 'new.kicad_sch'), config: { mode: 'split' } });
+  const file = join(mkdtempSync(join(tmpdir(), 'kicad-diff-')), 'diff.html');
+  writeFileSync(file, html);
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(`file://${file}`);
+  await page.waitForFunction(() => document.querySelector('kicad-diff')?.changes?.length);
+  assert.deepEqual(await page.evaluate(() => [document.querySelector('kicad-diff').mode, document.querySelector('kicad-diff').changes.length]), ['split', 5]);
+  assert.deepEqual(errors, []);
+});
