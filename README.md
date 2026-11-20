@@ -103,6 +103,11 @@ Changes on the board:
 | Strobe: connect STROBE_R to STROBE_C through one 220 nF, leaving U2 channels B and D unconnected | Bypass. In the model this is a 1 nH link across the U2 pads; a wire bodge will differ |
 | Bias: VBIAS_K ≈ 2.1 V, VBIAS_A ≈ 1.2 V | Tune per board: sweep the bias and take the fastest edge that still has enough amplitude |
 
+Diode reverse voltage at this operating point, simulated over both strobe edges with
+the stimulus on an open line (BAT15-04W rating: 4 V): 1.70 V worst case at a 300 ps
+FPGA edge, 1.91 V at 150 ps, and 2.17 V at 150 ps with the bias raised to 0.70 V. The
+peak falls on the non-sampling strobe edge.
+
 Not checked: the other pins of bank 1 at 3.3 V, the FPGA's drive into the 10 Ω strobe
 series resistors at 3.3 V, and R3–R6 (91 Ω), which were left as they are.
 

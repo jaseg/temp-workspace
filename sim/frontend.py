@@ -62,6 +62,7 @@ class Params:
     t_prep: float = 1e-9            # half-swing edge that puts the AC coupling caps in their mid-swing state
     t_stim: float = 12e-9           # stimulus edge at the FPGA pin
     t_strobe: float = 12e-9         # strobe edge at the FPGA pin
+    t_strobe_return: float = 0.0    # if set, the strobe pins go back to idle at this time (the non-sampling edge)
     t_tail: float = 4e-9
     tstep: float = 1e-12
     tmax: float = 2e-12
@@ -178,8 +179,10 @@ def build(p: Params, probes: list[str] | None = None, outfile: str | None = None
         50 % duty waveform would), steps to its idle level at t_prep and makes the
         edge under test at t_edge."""
         a, b = (lo, hi) if rising else (hi, lo)
+        ret = (f" {p.t_strobe_return:.6g} {b} {p.t_strobe_return + trf:.6g} {a}"
+               if p.t_strobe_return and name.startswith("fb") else "")
         d.add(f"V{name} {name}_e 0 pwl(0 {mid} {p.t_prep:.6g} {mid} {p.t_prep + trf / 2:.6g} {a} "
-              f"{t_edge:.6g} {a} {t_edge + trf:.6g} {b})")
+              f"{t_edge:.6g} {a} {t_edge + trf:.6g} {b}{ret})")
         d.add(f"R{name} {name}_e {node} {p.fpga_rout}")
         d.add(f"C{name} {node} 0 {p.fpga_cpin}")
 
@@ -287,7 +290,7 @@ def build(p: Params, probes: list[str] | None = None, outfile: str | None = None
         d.add(f".ic v(ls_{h})={v0:.9g}")
 
     # always stop the same time after the strobe, so every delay point sees the same hold time
-    tend = p.t_strobe + p.t_tail
+    tend = max(p.t_strobe, p.t_strobe_return) + p.t_tail
     d.add(".options klu reltol=3e-4 abstol=1e-12 vntol=1e-7")
     d.add(f".tran {p.tstep:.4g} {tend + 5e-12:.6g} 0 {p.tmax:.4g}")
     for h in "pn":
