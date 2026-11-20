@@ -785,3 +785,67 @@ stamp, 5000 ppm at 33 kHz, every strobe usable):
   inputs and needs a buffer.
 - The front end is unchanged: fast data still has to be squared up and divided before
   any of these chips.
+
+### Trigger path revised: sensitivity target, one comparator, switched inputs
+
+Targets added: triggering from the data has to work at amplitudes met when probing real
+circuits; with an external clock the signal may be smaller; the two modes are switched,
+and a costly comparator is not duplicated.
+
+**Sensitivity.** The comparator sees the input divided by about 5.2 (the 5:1 divider and
+the buffer gain). I take 200 mV peak-to-peak at the probe point as the minimum for data
+triggering, which covers single-ended probing of LVDS (350 mV) and of a closed-down
+far-end eye; that is ±19 mV at the comparator. Smaller signals need the external clock
+input, where only the sampler's noise limits the signal.
+
+**AD9508 input** (ADI datasheet Rev. G):
+
+| Item | Value |
+|---|---|
+| Sensitivity | 360 mV peak-to-peak differential minimum, 2.2 V maximum |
+| Bias | self-biased at 1.05 V, so AC coupling is supported; 7 kΩ per pin, 2 pF |
+| DC-coupled common mode | 0.58–1.67 V |
+| Frequency, pulse width | 0–1650 MHz, 303 ps minimum high and low |
+| Slew rate | specifications assume more than 1 V/ns |
+
+- An LVDS output (350 mV per side, 1.2 V common mode) meets this DC-coupled, with a
+  factor of two in amplitude. That keeps the path working down to DC for plain triggers.
+- A CML or limiter output has to be AC-coupled and, for the limiter, padded below 2.2 V.
+  The sensitivity is no obstacle, so the "limiter into AD9508" idea is valid for data,
+  but it loses DC coupling and the trigger level.
+
+**Comparator** (TI datasheets; DigiKey prices, single unit):
+
+| Part | Delay | Toggle rate, minimum pulse | Dispersion | Output | Price | Verdict |
+|---|---|---|---|---|---|---|
+| ADCMP572 | 150 ps | 12.5 Gbps, 80–100 ps | 15 ps | CML | 30.18 | More than needed; CML cannot be DC-coupled to the AD9508 |
+| TLV3901 | 125 ps | 20 Gbps, 60 ps | 5 ps | CML | about 10, reel only, not stocked | Same objections |
+| **TLV3801** | 225 ps | 6 Gbps, 240 ps | 5 ps from 20 to 100 mV overdrive, 15 ps from 10 mV to 1 V | LVDS | 5.20 | Best fit |
+| TLV3811 / TLV3811C | as TLV3801, 1.1 mV / no hysteresis | | | LVDS | 5.90 | BGA-type package only |
+| TLV3604 | 800 ps | 3 Gbps stated, but 600 ps minimum pulse, 350 ps dispersion | | LVDS | 7.01 | Slower and dearer than the TLV3801 |
+
+- The TLV3801 passes 333 ps pulses, has 2 mV hysteresis and ±0.5 mV offset, and its
+  dispersion is specified at the ±19 mV the sensitivity target gives it. The AD9508, at
+  303 ps, stays the limit of the chain.
+- Its input range starts 1.5 V above its negative supply, so for signals around 0 V it
+  needs a negative rail, for example +2.7 V and −2.5 V (5.25 V maximum across it). Its
+  output has a separate ground reference, which the datasheet provides for this.
+- At 5.20 the comparator is cheaper than a three-stage limiter is simple. It replaces
+  both the ADCMP572 and the limiter in front of the AD9508.
+
+**Input switch.** It has to pass DC to 3 GHz, bipolar, with little capacitance.
+
+| Option | Data | Verdict |
+|---|---|---|
+| TMUX136 (two-channel 2:1 CMOS switch) | 6.1 GHz, 5.7 Ω, 1.6 pF on; signal 0–3.6 V; supply 2.3–4.8 V | Best fit, if its ground pin sits on the comparator's −2.5 V rail and its supply on about +2 V, so that it passes ±0.5 V. Select line then needs a level shifter. Not a datasheet configuration; to be checked |
+| ADG918 / ADG919 | DC–2 GHz (−3 dB at 4 GHz), signal −0.5 V to supply, 5.17 | Slower, same rail trick needed |
+| RF relays (Omron G6K-2F-RF-T, TE HF3) | DC–3 GHz, 0.35–0.6 dB | 16–26, more than the comparator |
+| TMUXHS4212 (as on the yanartas board) | common mode 0–1.8 V, −1.3 dB at 5 GHz | Works the same way as the TMUX136; differential part, half unused |
+
+Modes: with the switch on the buffer pick-off, the AD9508 divides by 16 or more and the
+software fits the bit clock; on the external input it divides by 1 (or more for fast
+clocks) and the stamps are used directly. One threshold DAC serves both.
+
+Layout-critical: the pick-off must be low impedance. 10 Ω in series plus the switch into
+about 3 pF is about 50 ps; the 100 Ω shown on the block diagram would be far too slow
+for data and applied only to the slow comparators.
