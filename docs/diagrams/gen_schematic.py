@@ -4,7 +4,7 @@ Hand-placed SVG. Taps 2 to 14 are identical to the ones drawn and are abbreviate
 """
 import html
 
-W, H = 2920, 1000
+W, H = 2980, 1000
 INK, SUB, WIRE, STB, FILL = "#16181d", "#4a5160", "#1c2330", "#b3401c", "#ffffff"
 o = []
 
