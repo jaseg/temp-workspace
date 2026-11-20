@@ -30,7 +30,7 @@ simulation, datasheets or arithmetic, and prices are single-unit, November 2026.
 | Option | Precision per stamp | For | Against |
 |---|---|---|---|
 | FPGA input-delay converter, 16 pins | 31 ps (assumed tolerances) | Free; stamps every edge | Needs edges at least about 1.5 ns apart, so fast data needs a divider |
-| Tapped delay line with 16 diode gates | 23–38 ps | Measured against the real strobe; no fast logic; speed limit is the gate (55–70 ps) | About 17 with low-cost comparators, plus five strobe amplifiers (about 15); large; strobe distribution unproven; only ±13 to ±30 mV reaches the comparators; catches few edges below a few hundred Mbps |
+| Tapped delay line with 16 diode gates, driven by the TLV3801 | 23–38 ps | Measured against the real strobe; data limit is the comparator's 240 ps pulse, clear of 3 Gbps | About 26 including comparator, line driver and gate strobe amplifiers; large; strobe distribution unproven; only ±13 to ±30 mV reaches the comparators; catches few edges below a few hundred Mbps |
 | TDC7200, several armed in turn | 35 ps (specified) | About 1.50 each; self-calibrating | 0.3 million stamps per second per chip; 8 chips for 1.25 Gbps with spread spectrum; 3 Gbps with spread spectrum not solved |
 
 **Edge conditioning for data and triggers**
@@ -53,7 +53,7 @@ with or without spread spectrum.
 | Input and sampler | as above, OPA140, OPA656 | as above, OPA197, OPA810 |
 | Strobe driver | ADCMP572 edge into GVA-84+ finals | FPGA CMOS output into two amplifier stages (TRF37D73, then GVA-84+) |
 | Timebase | FPGA, free-running strobe | FPGA, free-running strobe |
-| Phase recovery | Tapped delay line with a limiter for data, plus TLV3801 + AD9508 into the FPGA converter for the external input and slow signals | FPGA input-delay converter behind TLV3801 + AD9508 |
+| Phase recovery | Tapped delay line driven by the TLV3801 through one gain block; the same comparator also feeds the AD9508 and FPGA converter for non-periodic triggers | FPGA input-delay converter behind TLV3801 + AD9508 |
 | Why | Only option with headroom at 3 Gbps and timing referred to the actual sampling instant | Fewest parts; 3 Gbps is at the divider's limit |
 | Trigger modes | Data-derived from 200 mV at the probe point, or external clock, selected by the input switch | same |
 | Main risk | Strobe distribution to 16 gates | Strobe edge from CMOS; AD9508 with irregular edges |
@@ -89,7 +89,7 @@ Prices are single-unit (DigiKey unless marked LCSC). "–" means the same part i
 | Trigger divider and fan-out | AD9508, 15.83 | – | 3.3 Gbps limit; 1.8 V outputs |
 | Trigger input switch | TMUX136 | – | On a shifted supply; to be verified. Price not checked |
 | Delay-line gate diodes | 16 × BAT15-04R pair, 0.38 | not fitted | 0.20 at 100 pieces |
-| Delay-line limiter | 2 × GVA-84+ | not fitted | 3 × TRF37D73 as alternative |
+| Delay-line driver | TLV3801 (shared with the trigger path) + one TRF37D73 | not fitted | Replaces the amplifier-chain limiter; not simulated |
 | Delay-line comparators | 8 × COS3502 dual, 0.36 (LCSC) | not fitted | TLV3502 (2.91) is the pin-compatible original; MX7219T (0.40) as single-channel alternative. Input capacitance near 6 pF halves the signal |
 | Split supply | LTC3261 + TPS7A39, 13.40 | TPS60403 with LC filters, 1.04 | |
 

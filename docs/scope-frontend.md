@@ -894,3 +894,28 @@ is fed through a 50 Ω leg into its 50 Ω input. Three stages therefore just mee
 driven directly and four are needed behind a split. The earlier statement that three
 stages limit "from a few millivolts" ignored the pads. Arithmetic from datasheet values
 at 2 GHz; gain is 22 dB at 400 MHz and 15.5 dB at 4 GHz.
+
+**Delay line driven by the comparator (replaces the amplifier-chain limiter).** The
+limiter made from gain blocks dates from when the fast comparator was the part to
+avoid. With the TLV3801 at 5.20 the better arrangement is:
+
+input switch → TLV3801 → one gain block → pad → delay line; gain blocks otherwise only
+in the strobe chains.
+
+- The comparator does the squaring, so sensitivity (±19 mV, 5 ps dispersion), a DC
+  trigger level and constant amplitude on the line come from one part, and the question
+  of how many amplifier stages are needed to limit disappears.
+- One gain block is still needed as line driver: an LVDS leg is only ±175 mV, and the
+  gates were simulated with ±0.5 V on the line. One LVDS leg, AC-coupled into a
+  TRF37D73 (about −5 dBm in, well inside its ratings), gives about ±1.6 V, padded to
+  ±0.5 V. The other leg is terminated in 50 Ω. Not simulated; the TLV3801's output edge
+  time was not checked.
+- Data now passes through the comparator, so its 240 ps minimum pulse is the limit
+  instead of the gate aperture. That is still clear of 333 ps at 3 Gbps and better than
+  the AD9508's 303 ps.
+- If the AD9508 is fitted as well, it can bridge the same LVDS pair with its
+  high-impedance inputs, so one comparator serves both.
+
+Delay-line block cost with this arrangement: diode pairs 6, comparators 3, passives 2,
+TLV3801 5, line driver 1–3, gate strobe amplifiers 8 (TRF37D73 pre-drivers, GVA-84+
+finals): about 26. The block diagram and schematic still show the two-stage limiter.
