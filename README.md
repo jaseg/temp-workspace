@@ -22,7 +22,7 @@ and back). An edge slower than that gives a pulse that is as wide as the edge an
 | Redriver, limiting | 134 / 133 / 134 ps (2.6 GHz) | 185 / 228 / 241 ps |
 | Redriver, linear | 167 / 236 / 488 ps (2.1 / 1.5 / 0.7 GHz) | 295 / 401 / 689 ps |
 | No redriver, 1.2 V | 156 / 283 / 656 ps (2.2 / 1.2 / 0.5 GHz) | 324 / 471 / 819 ps |
-| No redriver, 3.3 V | no usable result, see below | 326 / 421 / 791 ps |
+| No redriver, 3.3 V | 103 / 82 / 390 ps (at bias +0.93 / +0.53 / +0.20 V per rail) | 326 / 421 / 791 ps |
 
 - **The redriver only makes the front end faster if it limits.** A limiting redriver
   regenerates the edge, so the sampler is about 135 ps whatever the FPGA does. A linear
@@ -33,18 +33,68 @@ and back). An edge slower than that gives a pulse that is as wide as the edge an
   listener. I could not obtain the full datasheet (DS46192), so both are simulated.
 - **The FPGA edge rate is not known either.** Gowin publishes no slew rate or IBIS data
   for the GW1NZ-1, so it is swept from 150 to 600 ps (20–80 %).
-- **Without the redriver at 3.3 V** the strobe pulse is 1.1 to 2.5 V, which would allow a
-  proper reverse bias. But the stimulus then reaches the bridge with 4.3 V differential
-  (the BAT15 is rated 4 V reverse) and the method used here to find the held voltage
-  stops working, so I give no sampler figure. The topology would need an attenuator in
-  the stimulus path before it can be judged.
+- **Without the redriver at 3.3 V** the strobe pulse is 1.1 to 2.5 V, which allows a
+  real reverse bias, so only the tip of the pulse turns the bridge on. That gives the
+  fastest sampler of the four cases at FPGA edges up to 300 ps. The stimulus, however,
+  would then reach the bridge with 4.3 V differential (the BAT15 is rated 4 V reverse),
+  so the stimulus should stay on the redriver. The next section does that.
+
+## Optimised operating point
+
+Free choice of VCCIO1 and of whether the strobe passes through U2; the stimulus stays
+on U2. For each option the bridge bias was swept (`sim/optimize.py`,
+[all results](results/optimize.md)).
+
+![Rise time against efficiency](results/optimize.png)
+
+**Recommendation: VCCIO1 at 3.3 V, strobe bypassing U2, bias about +0.45 V per rail**
+(VBIAS_K − VBIAS_A ≈ 0.9 V).
+
+| FPGA edge | Operating point | Sampler 10–90 % | Gain | Efficiency | Overshoot |
+|---|---|---|---|---|---|
+| 150 ps | bypass, 3.3 V, bias +0.55 V | 99 ps | 0.27 | 24 % | 17 % |
+| 300 ps | bypass, 3.3 V, bias +0.45 V | 123 ps | 0.25 | 17 % | not recorded |
+| 300 ps | bypass, 3.3 V, bias +0.40 V | 152 ps | 0.30 | 23 % | 7 % |
+| 600 ps | bypass, 3.3 V, bias +0.30 V | 187 ps | 0.12 | 7 % | 13 % |
+| any | through U2 if it limits, bias 0 V | 141–142 ps | 0.15 | 9–10 % | 20–30 % |
+| 300 ps | as drawn: through U2 linear, 1.2 V, bias −0.13 V | 236 ps | 0.14 | 16 % | not recorded |
+
+- **Why it is better.** The bias is the speed control: raising it shortens the part of
+  the pulse that turns the bridge on, at the price of efficiency. Only a large strobe
+  leaves room to do that. Through U2 the pulse is 0.75 V at most and the bridge stops
+  working above about 0.1 V of bias.
+- **Reverse bias at last.** At +0.45 V per rail the diodes stay off for the ±0.26 V
+  that the stimulus puts on the bridge. In the TDR trace the baseline before the edge
+  is flat, where the as-drawn case sloped.
+- **Recorded TDR edge** (FPGA edge 300 ps): 294 ps incident with U2 linear in the
+  stimulus path, against 493 ps as drawn. With U2 limiting the reflected edge is 133 ps.
+- **When not to bypass.** At a 600 ps FPGA edge the bypassed strobe needs a low bias and
+  is slower than a limiting U2 (187 ps against 141 ps). If the FPGA turns out that slow
+  and U2 limits, keep the strobe on U2.
+- **VCCIO 2.5 V** is nearly as good (119 ps at +0.30 V and 300 ps, 10 % efficiency) if
+  3.3 V is a problem for the other pins of that bank.
+
+![TDR trace at the optimum](results/tdr-trace-optimum.png)
+
+Changes on the board:
+
+| Change | Why |
+|---|---|
+| Fit R55 instead of R54 | VCCIO1 = 3.3 V |
+| R78, R79, R82, R83: 10 Ω → about 220 Ω | The stimulus pins now swing 3.3 V; this keeps U2's input near 1.2 V differential. Value not optimised |
+| Strobe: connect STROBE_R to STROBE_C through one 220 nF, leaving U2 channels B and D unconnected | Bypass. In the model this is a 1 nH link across the U2 pads; a wire bodge will differ |
+| Bias: VBIAS_K ≈ 2.1 V, VBIAS_A ≈ 1.2 V | Tune per board: sweep the bias and take the fastest edge that still has enough amplitude |
+
+Not checked: the other pins of bank 1 at 3.3 V, the FPGA's drive into the 10 Ω strobe
+series resistors at 3.3 V, and R3–R6 (91 Ω), which were left as they are.
 
 ![Strobe pulse and stimulus edge](results/waveforms.png)
 ![Sampler step response](results/sampler-step-response.png)
 ![TDR trace](results/tdr-trace.png)
 
-In the recorded TDR trace (FPGA edge 300 ps), the incident edge takes 493 ps with the
-linear redriver and 541 ps without it at 1.2 V. The trace with the limiting redriver is
+In the recorded TDR trace of the four original cases (FPGA edge 300 ps), the incident
+edge takes 493 ps with the linear redriver and 541 ps without it at 1.2 V. The
+no-redriver 3.3 V trace is left out of that figure. The trace with the limiting redriver is
 too noisy to measure, because only 4 % of the error is removed per strobe there.
 All numbers are in [results/summary.md](results/summary.md).
 

@@ -30,6 +30,7 @@ LS_C, LS_L = LS_TD / LS_Z0, LS_TD * LS_Z0
 class Params:
     topology: str = "redriver"      # "redriver" | "direct"
     strobe_bypass: bool = False     # redriver topology, but the strobe channel of U2 is linked through
+    r_stim_series: float = 10.0     # R78/R79 (R82/R83): larger when VCCIO is raised, to keep U2's input in range
     stim: str = "fpga"              # "fpga" | "ideal" (1 ps step straight into SPL_HS, test bench only)
     ideal_step: float = 0.2         # V, step height of the ideal source (open circuit)
 
@@ -203,7 +204,7 @@ def build(p: Params, probes: list[str] | None = None, outfile: str | None = None
         if p.stim == "fpga":
             fpga_src(f"fs{h}", f"stim_a_{h}", p.t_stim, rising)
             d.trace(f"stim_a_{h}", f"r78_{h}", 8.53)
-            d.add(f"R78{h} r78_{h} stim_r_{h} 10")
+            d.add(f"R78{h} r78_{h} stim_r_{h} {p.r_stim_series}")
             d.cap0402(f"c24{h}", f"stim_r_{h}", f"c24o_{h}", "220n")
             d.trace(f"c24o_{h}", f"stim_rc_{h}", 5.72)
     if p.stim == "fpga":

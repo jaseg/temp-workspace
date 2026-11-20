@@ -106,6 +106,21 @@ def system(pool: mp.pool.Pool, name: str, tr: float, vbias: float, shape: dict) 
                 eff=[q["eff"] for q in pts])
 
 
+def system_optimum() -> None:
+    """TDR trace of the recommended operating point: VCCIO 3.3 V, strobe bypassing U2,
+    stimulus still through U2 with R78/R79 raised to 220 R, bias +/-0.45 V."""
+    out = []
+    with mp.Pool(4) as pool:
+        for label, kw in (("U2 linear", dict(rd_gain_db=0.0, rd_eq_db=5.6)), ("U2 limiting", dict(rd_gain_db=20.0, rd_eq_db=0.0))):
+            base = dataclasses.replace(f.Params(), topology="redriver", strobe_bypass=True, vccio=3.3, fpga_rout=12.0,
+                                       r_stim_series=220.0, fpga_tr=300e-12, vbias=0.45, t_stim=6e-9, mesh_td=1e-9, t_tail=4e-9, **kw)
+            xs = np.arange(-0.6e-9, 4.2001e-9, 0.05e-9)
+            pts = pool.map(sample_point, [(dataclasses.replace(base, t_strobe=base.t_stim + x - 0.68e-9), float(x)) for x in xs])
+            out.append(dict(case="optimum, stimulus through " + label, x=[q["x"] for q in pts], v=[q["v"] for q in pts], eff=[q["eff"] for q in pts]))
+            save("system-optimum.json", out)
+            print(label, flush=True)
+
+
 def save(name: str, obj) -> None:
     os.makedirs(RES, exist_ok=True)
     with open(os.path.join(RES, name), "w") as fh:
@@ -119,6 +134,9 @@ def load(name: str):
 
 def main() -> None:
     what = sys.argv[1:] or ["waves", "aperture", "system"]
+    if what == ["optimum"]:
+        system_optimum()
+        return
     with mp.Pool(4) as pool:
         if "waves" in what:
             save("waves.json", pool.map(strobe_shape, [(n, tr) for n in CASES for tr in FPGA_TR]))
