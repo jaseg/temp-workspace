@@ -619,7 +619,7 @@ each microamp of input bias current shifts the threshold by 2.4 mV.
 | TLV3501 | 1.96 | 2 pA | same | same | Same part, single |
 | LMV7219 | 0.77 | 0.2–0.45 µA | 1 mV typ, 6 max; 7.5 mV | 10–12 ns, 20 max; specified at 0 V common mode | Cheapest that works: 12.30 for 16 |
 | TLV3601 / TLV3603 | 4.25–4.65 | 1 µA | 5 mV; 1.5 mV | 2.5 ns | Works; speed not needed |
-| ADCMP600, LT1719, AD8561, AD8611, AD8564, LT1711 | 4.15–24 | 3–6 µA | – | – | 7–14 mV of bias-current shift per part, and dearer |
+| ADCMP600, LT1719, AD8561, AD8611, AD8564, LT1711 | 4.15–24 | 3–6 µA | – | – | 7–14 mV of bias-current shift per part, and more expensive |
 | MAX999, MAX962, TL3016 | 1.36–8.60 | 10–15 µA | – | – | No: 24–36 mV shift, as large as the signal |
 | LMH7220, TLV3604, ADCMP572 | – | – | – | – | Differential outputs; not for this |
 
@@ -822,7 +822,7 @@ input, where only the sampler's noise limits the signal.
 | TLV3901 | 125 ps | 20 Gbps, 60 ps | 5 ps | CML | about 10, reel only, not stocked | Same objections |
 | **TLV3801** | 225 ps | 6 Gbps, 240 ps | 5 ps from 20 to 100 mV overdrive, 15 ps from 10 mV to 1 V | LVDS | 5.20 | Best fit |
 | TLV3811 / TLV3811C | as TLV3801, 1.1 mV / no hysteresis | | | LVDS | 5.90 | BGA-type package only |
-| TLV3604 | 800 ps | 3 Gbps stated, but 600 ps minimum pulse, 350 ps dispersion | | LVDS | 7.01 | Slower and dearer than the TLV3801 |
+| TLV3604 | 800 ps | 3 Gbps stated, but 600 ps minimum pulse, 350 ps dispersion | | LVDS | 7.01 | Slower and more expensive than the TLV3801 |
 
 - The TLV3801 passes 333 ps pulses, has 2 mV hysteresis and ±0.5 mV offset, and its
   dispersion is specified at the ±19 mV the sensitivity target gives it. The AD9508, at
@@ -860,7 +860,7 @@ push-pull 3.3 V outputs, fixed hysteresis and no latch.
 | MX7219T (Maxin Micro) | single, SOT-23-5 | 5 / 8 ns at 20 mV; 7.5 / 12 ns at 5 mV | 1 / 6.5 mV | 6 mV | 2 pF common, 4 pF differential | 0.40 (0.23 at 500), 17 970 | Second choice; best documented, deepest stock |
 | AiP3214 (i-core) | quad, TSSOP-14 | only at 100 mV: 5.4–6.7 ns | 3 / 10 mV | 7.2 mV | 1 pF common, 2.5 pF differential | 0.10 (0.05 at 1000), 775 | Cheapest and lowest capacitance, but 10 mV offset and thin stock |
 | MS8911S (Ruimeng) | single, SOT-23-6 | 4 ns at 20 mV, 7 ns at 5 mV, typical only | 3 mV typ, no max | 7 mV | not stated | 0.99, 297 | No advantage for 2.5 times the price |
-| SGM8743 (SGMicro) | single | 11 ns at 10 mV; output edges 6–8 ns | 0.8 / 4.9 mV | 3 mV | not stated | 1.51, 1110 | Slow and dear |
+| SGM8743 (SGMicro) | single | 11 ns at 10 mV; output edges 6–8 ns | 0.8 / 4.9 mV | 3 mV | not stated | 1.51, 1110 | Slow and expensive |
 | GT8961 (GTIC) | single, dual, quad | only at 100 mV: 5.3–5.7 ns | 0.5 / 10 mV | 6 mV | not stated | not found at LCSC | No source |
 | TP1981 (3PEAK) | single, SC70-6 | only at 100 mV: 3.5 ns | 15 mV typ, 20 max as printed | 5 mV | 1.5 pF | not found at LCSC | Offset too large |
 

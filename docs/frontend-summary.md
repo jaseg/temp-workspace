@@ -30,7 +30,7 @@ simulation, datasheets or arithmetic, and prices are single-unit, November 2026.
 | Option | Precision per stamp | For | Against |
 |---|---|---|---|
 | FPGA input-delay converter, 16 pins | 31 ps (assumed tolerances) | Free; stamps every edge | Needs edges at least about 1.5 ns apart, so fast data needs a divider |
-| Tapped delay line with 16 diode gates | 23–38 ps | Measured against the real strobe; no fast logic; speed limit is the gate (55–70 ps) | 27–41 plus five strobe amplifiers; large; strobe distribution unproven; catches few edges below a few hundred Mbps |
+| Tapped delay line with 16 diode gates | 23–38 ps | Measured against the real strobe; no fast logic; speed limit is the gate (55–70 ps) | About 17 with low-cost comparators, plus five strobe amplifiers (about 15); large; strobe distribution unproven; only ±13 to ±30 mV reaches the comparators; catches few edges below a few hundred Mbps |
 | TDC7200, several armed in turn | 35 ps (specified) | About 1.50 each; self-calibrating | 0.3 million stamps per second per chip; 8 chips for 1.25 Gbps with spread spectrum; 3 Gbps with spread spectrum not solved |
 
 **Edge conditioning for data and triggers**
@@ -55,6 +55,7 @@ with or without spread spectrum.
 | Timebase | FPGA, free-running strobe | FPGA, free-running strobe |
 | Phase recovery | Tapped delay line with a limiter for data, plus TLV3801 + AD9508 into the FPGA converter for the external input and slow signals | FPGA input-delay converter behind TLV3801 + AD9508 |
 | Why | Only option with headroom at 3 Gbps and timing referred to the actual sampling instant | Fewest parts; 3 Gbps is at the divider's limit |
+| Trigger modes | Data-derived from 200 mV at the probe point, or external clock, selected by the input switch | same |
 | Main risk | Strobe distribution to 16 gates | Strobe edge from CMOS; AD9508 with irregular edges |
 
 For clock-like signals where a 1 ps time axis matters more than data, the Si5344 beat
@@ -89,6 +90,6 @@ Optional: Si5344 (about 30) for a 1 ps beat timebase on clock-like signals; TDC7
 
 1. Strobe driver: edge and amplitude from a saturating amplifier chain.
 2. FPGA: output edge rate, PLL jitter, delay-step tolerance.
-3. Delay line: strobe distribution, comparator input capacitance.
+3. Delay line: strobe distribution; comparator input capacitance (COS3502 does not state it).
 4. AD9508: behaviour with irregular edges. TMUX136 and TLV3801 on a shifted supply.
 5. Spread spectrum at 3 Gbps with the TDC7200 bank.
