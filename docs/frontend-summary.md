@@ -57,6 +57,16 @@ with or without spread spectrum.
 | Why | Only option with headroom at 3 Gbps and timing referred to the actual sampling instant | Fewest parts; 3 Gbps is at the divider's limit |
 | Trigger modes | Data-derived from 200 mV at the probe point, or external clock, selected by the input switch | same |
 | Main risk | Strobe distribution to 16 gates | Strobe edge from CMOS; AD9508 with irregular edges |
+| Rough parts cost | about 150 | about 55 |
+| Rough board area | about 55 cm², for example 60 × 90 mm | about 25 cm², for example 50 × 50 mm |
+
+Cost and area are for one channel, single-unit prices, without MCU, ADC, DACs and the
+bare board. Cost is the parts table below plus an allowance for passives and connectors
+(15 and 10) and my guesses for the unpriced parts (FPGA 2, TMUX136 1, oscillator 1). In
+the performance build the largest items are the ADCMP572 (30), five strobe amplifiers
+(16), the AD9508 (16), the OPA656 (14) and the supply (13). Area is my estimate from
+package sizes and line lengths, single-sided: about 28 cm² of the performance build is
+the delay line with its gates, comparators, limiter and strobe drivers.
 
 For clock-like signals where a 1 ps time axis matters more than data, the Si5344 beat
 timebase is the better instrument and can be fitted alongside.
