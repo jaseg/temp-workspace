@@ -60,6 +60,31 @@ with or without spread spectrum.
 For clock-like signals where a 1 ps time axis matters more than data, the Si5344 beat
 timebase is the better instrument and can be fitted alongside.
 
+## Recommended parts
+
+Prices are single-unit (DigiKey unless marked LCSC). "–" means the same part in both builds.
+
+| Function | Best performance | Lowest cost | Note |
+|---|---|---|---|
+| Input buffer | BUF802, 6.77 | – | Sets the 2 GHz bandwidth |
+| Low-frequency amplifier | OPA140, 4.29 | OPA197, 0.82 | Crossover must be re-trimmed for the OPA197 |
+| Bridge diodes | 2 × BAT15-04W, 0.52 | – | Cheaper diodes have too much capacitance |
+| Hold amplifier | OPA656, 14.45 | OPA810, 3.29 | OPA810 just settles in a 10 MHz strobe period |
+| Strobe edge source | ADCMP572, 30.18 | FPGA output, none | TLV3901 is an alternative, about 10 but reel only |
+| Strobe amplifiers | GVA-84+, 2.60–3.70 (LCSC) | TRF37D73 pre-driver, GVA-84+ final | TRF37D73 alone gives about ±2 V, short for the delay-line strobe |
+| Main-sampler balun | TCM1-83X+, 8.70 | common-mode choke, DLW21S type, 0.29 | Choke raises overshoot from 12 % to 26 % in simulation |
+| Timebase and time stamps | GW1NZ-LV1QN48 FPGA | – | Price not checked |
+| Trigger comparator | TLV3801, 5.20 | – | Needs a −2.5 V rail |
+| Trigger divider and fan-out | AD9508, 15.83 | – | 3.3 Gbps limit; 1.8 V outputs |
+| Trigger input switch | TMUX136 | – | On a shifted supply; to be verified. Price not checked |
+| Delay-line gate diodes | 16 × BAT15-04R pair, 0.38 | not fitted | 0.20 at 100 pieces |
+| Delay-line limiter | 2 × GVA-84+ | not fitted | 3 × TRF37D73 as alternative |
+| Delay-line comparators | 8 × TLV3502 dual, 2.91 (LCSC) | not fitted | LMV7219, 0.77 (LCSC), is the cheaper choice; Chinese alternatives under review |
+| Split supply | LTC3261 + TPS7A39, 13.40 | TPS60403 with LC filters, 1.04 | |
+
+Optional: Si5344 (about 30) for a 1 ps beat timebase on clock-like signals; TDC7200
+(about 1.50 at LCSC) as a specified reference time stamper on a first board.
+
 ## Open before layout
 
 1. Strobe driver: edge and amplitude from a saturating amplifier chain.
