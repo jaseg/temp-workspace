@@ -76,6 +76,24 @@ on U2. For each option the bridge bias was swept (`sim/optimize.py`,
 
 ![TDR trace at the optimum](results/tdr-trace-optimum.png)
 
+What limits the recorded incident edge at this operating point (FPGA edge 300 ps):
+
+| Stimulus path | Edge at the bridge input, 10–90 % | Sampler alone | Limit |
+|---|---|---|---|
+| U2 linear | 398 ps (409 ps at the FPGA pin) | 122–155 ps | The FPGA edge; U2 passes it on unchanged |
+| U2 limiting | 92 ps | 122–155 ps | The sampler for the main rise (about 150 ps in the trace), then a dip 200 ps after the edge |
+
+- The 294 ps read from the trace with U2 linear is shorter than the stimulus itself and
+  is not a faithful figure. With the open test line the stimulus rests at ±0.47 V per
+  side, as large as the 0.45 V bias, so the bridge compresses the lower end of the edge.
+  The ±0.26 V quoted above only holds for a terminated line. For an open or high-impedance
+  load the stimulus has to be smaller or the bias larger.
+- The sampler slows from 122 ps to 155 ps as the input step grows from 0.05 V to 0.52 V
+  per side, and its efficiency falls from 20 % to 11 %.
+- The dip with U2 limiting is a reflection from U10, 16.4 mm from the splitter. U10 is
+  modelled as 8 Ω with 0.5 pF on each side, which is an estimate, so the size of the dip
+  is uncertain. It turns the 10–90 % reading into 345 ps.
+
 Changes on the board:
 
 | Change | Why |
