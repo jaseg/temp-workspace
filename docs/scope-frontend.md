@@ -877,3 +877,20 @@ push-pull 3.3 V outputs, fixed hysteresis and no latch.
   to about ±13 to ±30 mV. The timing simulation at that level gave 27 ps rms with 6 mV
   offsets and 38 ps with 10 mV, so it still works, with less margin. The AiP3214 states
   3.5 pF.
+
+**Limiter stage count with the TRF37D73 (correction).** Each stage has about 19.5 dB at
+2 GHz and compresses at 16.5 dBm out, which is −2 dBm in. Its input may not exceed
++10 dBm, and a saturated stage delivers about +17 dBm, so every later stage needs a pad
+of at least 8 dB in front of it. The chain then limits for inputs above:
+
+| Stages, 8 dB pads | Input for limiting (50 Ω) |
+|---|---|
+| 2 | −13.5 dBm, ±67 mV |
+| 3 | −25 dBm, ±18 mV |
+| 4 | −36.5 dBm, ±4.7 mV |
+
+The 200 mV sensitivity target is ±19 mV at the buffer output, or ±10 mV if the limiter
+is fed through a 50 Ω leg into its 50 Ω input. Three stages therefore just meet it when
+driven directly and four are needed behind a split. The earlier statement that three
+stages limit "from a few millivolts" ignored the pads. Arithmetic from datasheet values
+at 2 GHz; gain is 22 dB at 400 MHz and 15.5 dB at 4 GHz.
