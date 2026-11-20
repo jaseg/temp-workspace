@@ -206,3 +206,56 @@ common-mode choke as the balun, lossless traces, and the BAT15 chip model with
 estimated package parasitics. The 12 % tail and the offsets depend on parasitics that
 are guesses. The figures show that the approach works and what it is sensitive to; they
 are not predictions of a built board.
+
+## Cost-down
+
+Schematic of this variant: [`schematic/scope-frontend-lowcost.kicad_sch`](../schematic/scope-frontend-lowcost.kicad_sch)
+([PDF](../schematic/scope-frontend-lowcost.pdf)).
+
+Prices are single-unit distributor prices in USD from search snapshots (November 2026),
+good to about ±15 %. Only the parts that differ are counted; passives, PCB, connectors,
+MCU, ADC and DACs are left out.
+
+| Function | Baseline | Price | Low-cost | Price |
+|---|---|---|---|---|
+| Timebase | Si5344 | about 30 | Si5351C | 5.01 |
+| Strobe edge | ADCMP572 + GVA-84+ | 26.81 + 3.10 | 2 × GVA-84+ driven from the PLL output | 6.20 |
+| Balun | TCM1-83X+ | 8.70 | USB 3 common-mode choke (DLW21S type) | 0.29 |
+| Trigger comparator | ADCMP572 | 26.81 | TLV3601 | 4.54 |
+| Hold amplifier | OPA656 | 14.45 | OPA810 | 3.29 |
+| Low-frequency amplifier | OPA140 | 4.29 | OPA197 | 0.82 |
+| Trigger clamp | BAT15-04W | 0.74 | BAT54S | 0.02 |
+| Split-rail supply | LTC3261 + TPS7A39 | 13.40 | TPS60403 with LC filters | 1.04 |
+| Unchanged | BUF802, 2 × BAT15-04W | 8.25 | same | 8.25 |
+| **Total of these parts** | | **about 137** | | **about 29** |
+
+Also removed: the 1.8 V rail, the separate clock connector and the calibrator connector
+(left as an option).
+
+### What the saving costs
+
+| Change | Consequence |
+|---|---|
+| Si5351C instead of Si5344 | Locks only to 10–100 MHz references; no lock below 10 MHz. It follows reference jitter instead of cleaning it. Period jitter is 40 ps typical and 95 ps maximum peak-to-peak, which adds little to a 175 ps system |
+| No comparator in the strobe path | The PLL output has about 1 ns edges. Two saturating amplifier stages have to sharpen it to about 120 ps. This is the least certain part of the variant |
+| Lower strobe amplitude and slower edge | Simulated with a 2 V step: 68–81 ps, gain 0.42–0.66. With a 120 ps edge, a 160 ps pulse and 1.6 V bias: 71 ps, gain 0.68, 90 % per strobe |
+| Common-mode choke as balun | Simulated with 150 nH and 1 nH leakage: 46 ps, but overshoot rises from 12 % to 26 %. The real part's differential bandwidth is not in its listing |
+| TLV3601 trigger comparator | 2.5 ns delay and CMOS output instead of 150 ps and CML. Adequate for a 10–100 MHz PLL reference; its jitter was not checked |
+| OPA810 hold amplifier | About 30 MHz at a gain of 2.2 instead of several hundred. Settles within a 10 MHz strobe period, with little margin |
+| OPA197 in the low-frequency path | Similar bandwidth to the OPA140 (10 MHz against 11 MHz). The crossover flatness must be re-trimmed; not simulated |
+| Charge pump without the low-noise regulator | More supply ripple at the buffer. The reference design estimated 5 mV of ripple on its pump before the regulator |
+
+Simulated with everything combined (choke, 2 V step, 80 ps edge, 160 ps pulse, 10 pF
+hold): 68 ps, 27 % overshoot, gain 0.71, 23 % per strobe. The system stays at about
+175 ps because the BUF802 sets it.
+
+### Further steps, not drawn
+
+- **No external trigger at all** (an instrument that only measures its own stimulus,
+  as on the yanartas board): drop the TLV3601 and use an Si5351A at 2.11, or the
+  MS5351M clone at about 1. Saves about 7 more.
+- **50 Ω input only**: drop the BUF802 and the OPA197, saving 7.60. The sampler alone is
+  faster than the buffer, but its kick-out (tens of millivolts) reaches the device
+  under test and the 1 MΩ input is lost.
+- **Not worth changing**: the BAT15-04W diodes and the GVA-84+. Cheaper gain blocks
+  found were obsolete or thinly stocked.
