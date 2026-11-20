@@ -634,3 +634,35 @@ compression at 2 GHz; 3.3 V, 53 mA; maximum input +10 dBm; external choke on the
   the gate strobe lines. The main sampler was simulated working with a 2 V step.
 - The datasheet circuit (100 nH, 1 nF) is for hundreds of megahertz; for 10 MHz it needs
   about 10 µH and 100 nF. Nothing is stated about operation in compression.
+
+**Calibrating comparator offsets in software.** Proposal: with no strobe, so that all
+gates block, sweep the threshold across about ±50 mV and record where each comparator
+flips; then correct each tap's edge time by its threshold shift divided by the slew rate.
+
+- It works, and it measures the right thing: the sweep goes through the real network, so
+  it captures offset, bias-current shift and, swept in both directions, hysteresis.
+  Sweeping the common threshold VTH is equivalent to sweeping both bias rails and needs
+  one DAC.
+- Correction to the comparator table above: the DC path of the comparator's bias current
+  is through the summing and bias resistors, (4.7 kΩ + 10 kΩ) / 2 = 7.35 kΩ, not 2.4 kΩ.
+  The shift is 7.35 mV per microamp: LMV7219 1.5–3.3 mV, TLV3601 7 mV, ADCMP600 and
+  similar 22–44 mV, MAX999 110 mV.
+- What software can and cannot absorb: a shift common to all channels is removed by
+  VTH; the calibration then handles the channel-to-channel remainder, as long as that
+  remainder is well below the ±20 to ±45 mV signal. For 10–15 µA parts the spread alone
+  (tens of millivolts) is as large as the signal, so they stay unusable; 3–6 µA parts
+  become usable.
+- It does not unlock a cheaper part: the cheapest comparator on the list, the LMV7219,
+  already works. Its value is elsewhere. The hold node rests at the threshold between
+  strobes, so the comparator's hysteresis makes the threshold depend on the previous bit
+  (±3 to ±4 mV, about ±6 to ±12 ps). With both trip points calibrated and the previous
+  bit known, that is correctable.
+- Slew rate: with the limiter the edge on the line is the same for every signal, so the
+  code-density calibration already folds each tap's offset into its position and no slew
+  estimate is needed. Without the limiter the slew follows the signal, and it can be
+  taken from the scope trace at the trigger level, times each tap's gain. The correction
+  error is the threshold shift over the slew, times the relative slew error: 10 mV at
+  0.3 mV/ps with 20 % slew error is 7 ps. Keeping the shift small with VTH keeps this
+  small.
+- Not simulated. Drift between calibrations for a bipolar input is of the order of
+  1 %/K of the shift (estimate).
