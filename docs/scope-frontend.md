@@ -745,3 +745,43 @@ Compared with the alternatives: the FPGA input-delay converter stamps every divi
 both follow spread spectrum without discarding samples. The TDC7201 fits data without
 spread spectrum, or spread-spectrum data if a 10–20 times slower acquisition is
 acceptable.
+
+**TDC7200 at its maximum rate, and several in parallel.** From the TDC7200 datasheet:
+mode 1 covers 12–500 ns with stops at least 67 ns apart, mode 2 covers 250 ns–8 ms;
+SPI runs at 20 MHz at most; every measurement has to be started by a register write and
+is followed by a calibration of at least three reference clock periods. The rates below
+are my arithmetic from those figures, assuming the calibration registers are read only
+occasionally; the datasheet states no rate.
+
+| One TDC7200 | Time per cycle | Stamps |
+|---|---|---|
+| One stop per measurement | about 3.1 µs (0.8 start, up to 0.5 window, 0.25 calibration, 1.6 read) | 0.32 million per second, evenly spaced |
+| Five stops, mode 1 | about 9.7 µs (five 32-bit reads) | 0.5 million per second, in bursts of five within 0.5 µs |
+| Five stops over 1.6 µs, mode 2 | about 15.6 µs (clock counts must be read too) | 0.32 million per second |
+
+Several chips help, and they need no steering: all stop inputs sit on the one divided
+edge line, and each chip ignores it until the FPGA has armed and started it. The FPGA
+arms them in turn. With one stop per measurement the stamps come out evenly spaced,
+which is what stitching across spread spectrum needs (`sim/tdc7201_track.py`, 35 ps per
+stamp, 5000 ppm at 33 kHz, every strobe usable):
+
+| Data rate | Chips | Stamps per second | Stamps with a wrong bit count | Clock error |
+|---|---|---|---|---|
+| 1.25 Gbps | 4 | 1.3 million | 170 of 1572 | – |
+| 1.25 Gbps | 6 | 2.0 million | 1 of 2360 | 24 ps |
+| 1.25 Gbps | 8 | 2.6 million | 0 of 3149 | 20 ps |
+| 1.25 Gbps | 12 | 3.9 million | 0 of 4724 | 18 ps |
+| 3 Gbps | 8 | 2.6 million | 143 of 3151 | – |
+| 3 Gbps | 16 | 5.3 million | 37 of 6306 | 16 ps |
+| 1.25 Gbps, no spread spectrum | 1 | 0.33 million | 0 of 388 | 22.5 ps |
+
+- Eight chips at about 1.50 each follow 1.25 Gbps with spread spectrum for about 12,
+  with all samples usable. Five-stop bursts from eight chips were worse (52 ps): bursts
+  leave gaps, even spacing does not.
+- At 3 Gbps the simple tracker still slips with 16 chips. A tracker that checks the fit
+  residual and backs up might close that; not tried.
+- Costs: per chip a chip select, a data output and a start line to the FPGA, and SPI
+  activity on one chip while another measures. The divided-edge line drives all stop
+  inputs and needs a buffer.
+- The front end is unchanged: fast data still has to be squared up and divided before
+  any of these chips.
