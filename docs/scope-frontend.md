@@ -542,3 +542,28 @@ and a strobe line with 220 Ω isolation as the first thing to prototype.
 
 Not simulated: the divider tree, line loss, snapshots containing more than one edge, the
 comparators, and sharing one strobe driver between this array and the main sampler.
+
+**Slow signals.** The window is only about 0.9 ns, so for a periodic signal of frequency
+f a free-running strobe catches an edge with probability 0.9 ns × f. Because strobes sit
+on the stable FPGA clock grid, the clock fit can carry the signal phase across strobes
+that caught nothing; the fit then acts like a recovery loop whose bandwidth is set by
+how often edges are caught. For 5 ps from 31 ps time stamps about 40 stamps are needed:
+
+| Signal | Stamps per second at 10 MHz strobe | Fit window for 5 ps | Follows phase changes slower than about |
+|---|---|---|---|
+| 1 GHz | 9 M | 4.4 µs | 230 kHz |
+| 100 MHz | 0.9 M | 44 µs | 23 kHz |
+| 10 MHz | 90 k | 0.44 ms | 2.3 kHz |
+| 1 MHz | 9 k | 4.4 ms | 230 Hz |
+| Any, with every fourth strobe aimed at an edge | 2.5 M (at most one per signal period) | 16 µs | 63 kHz |
+
+- Wander of the signal that is faster than the fit can follow appears as jitter on the
+  display, as with a narrow hardware loop. A crystal-derived signal is fine at 1 MHz; a
+  spread-spectrum signal needs megahertz stamp rates.
+- Aiming strobes at edges removes the dependence on signal frequency: once the phase is
+  roughly known, the FPGA places a share of the strobes within the window of a predicted
+  edge. Those strobes still deliver valid samples to the main channel, concentrated on
+  the edge.
+- The fit needs the frequency well enough to count cycles between stamps. The slow
+  comparator path into the FPGA gives that, and its input-delay converter can carry the
+  cycle count while the snapshots supply the fine, strobe-referenced correction.
