@@ -335,3 +335,61 @@ where the 1 ps time axis and jitter cleaning matter. I have no price for the GW1
 Open before committing to it: the FPGA's output edge rate and PLL jitter are both
 unpublished, and the IODELAY step has no tolerance. All three can be measured with the
 scope's own sampler on a first board.
+
+## Triggering on a serial data stream (clock recovery)
+
+For eye diagrams the strobe has to be timed against the bit clock of the data, which the
+signal itself does not carry as a periodic edge. With about 2 GHz of bandwidth the scope
+can show NRZ data up to roughly 2.5–3 Gbps, so the clock recovery has to cover about
+100 Mbps to 3 Gbps. Part data and prices are from datasheets and DigiKey (November 2026)
+unless marked.
+
+| Option | Rates | Spread spectrum (0.5 %, 30–33 kHz) | Added parts, single-unit price | Verdict |
+|---|---|---|---|---|
+| A. Clock from the device under test into the clock input | whatever the timebase accepts | Si5344: its loop is at most 4 kHz wide, so it does not follow; the eye smears. Si5351C and FPGA PLL follow | none | Use whenever a clock exists (HDMI, source-synchronous LVDS, MIPI) and the link has no spread spectrum |
+| B. Recovery IC, ADN2817 | 10 Mbps–2.7 Gbps, no reference needed, full-rate CML clock out | not verified; loss of lock is flagged at 1000 ppm | discontinued at DigiKey; ADN2812 about 91 at 1000 pieces (unverified); ADN2814 (to 675 Mbps only) 40.86 | Best fit on paper, but expensive and hard to buy. Loop bandwidth fixed by the chip |
+| B2. SY87701AL | 28 Mbps–1.3 Gbps in eight bands | no: data must be within about 1000 ppm of its reference | 54.89, plus a reference near the data rate | No |
+| C. FPGA with transceivers, ECP5UM | 270 Mbps–3.2 Gbps | lock window selectable up to ±4000/±7000 ppm; tracking not verified | 34.93, BGA, plus a reference within about 1000 ppm of the rate | Works for known standard rates; a second FPGA and a synthesiser for one function |
+| D. Software recovery from time-stamped edges | up to the limiting buffer, 3.125 Gbps | yes, 8.7 ps rms in simulation | about 15–18 | Recommended with the FPGA timebase |
+| E. Trigger on the data edges, no clock model | any | n/a | none | Fallback only: the eye is drawn relative to a neighbouring edge, which hides jitter |
+
+### Option D in detail
+
+It extends the free-running strobe with the FPGA input-delay converter.
+
+- **Front end.** Tap the signal after the BUF802. A limiting buffer squares it
+  (DS25BR100, DC to 3.125 Gbps, 7.58). A static divider counts rising edges
+  (SY100EP33V, ÷4, 4 GHz, 2.98; two in series for ÷16). A translator brings the divided
+  edges to CMOS (SN65EPT21, 300 MHz, 4.87) for the 1:4 buffer and the 16 FPGA pins.
+- **Why divide.** Every divided edge still coincides with a data edge, so it sits on the
+  bit grid, but the edge rate drops to what the converter handles: about 20 MHz on
+  average at 1.25 Gbps with ÷16.
+- **Recovery.** The FPGA time-stamps every divided edge against its own clock. Software
+  fits bit index against time and gives each sample its position in the unit interval.
+  The strobe times are exact in the same clock domain.
+- **Precision** (`sim/sw_cdr.py`: 1.25 Gbps, ÷16, 31 ps rms per time stamp, 3 ps source
+  jitter):
+
+  | Clock recovery | No spread spectrum | 5000 ppm at 33 kHz |
+  |---|---|---|
+  | Fit over 33 edges (1.7 µs), edges before and after the sample | 8.7 ps rms | 8.7 ps rms |
+  | Causal loop, natural frequency 1 MHz | 22 ps rms | 24 ps rms |
+  | Causal loop, 300 kHz | 11 ps rms | 91 ps rms |
+  | Causal loop, 100 kHz and below | 4–7 ps rms | loses lock |
+
+  Averaging over many edges makes the recovered clock better than a single time stamp.
+  Fitting after acquisition tracks spread spectrum without the lag of a real-time loop.
+- **Loop bandwidth is a software parameter**, so the bandwidth a standard prescribes for
+  jitter measurement can be emulated. SATA, for example, uses the bit rate divided by
+  1667 or by 500.
+- **Open points.** The dividers are static, but operation with irregular edges down to
+  DC is my inference, not a datasheet statement. LVDS into the PECL divider input needs
+  a bias network. The time stamps include the data-dependent jitter of the edges used.
+  The hold-node memory has to be undone, as in every free-running mode.
+
+### With the Si5344 baseline
+
+The beat-frequency timebase needs a hardware clock, so only A, B or C apply, and the
+Si5344 then filters whatever it is given at 4 kHz or less. That shows total jitter
+including wander and smears links with spread spectrum. If eye diagrams of such links
+matter, the FPGA timebase with option D is the better architecture.
