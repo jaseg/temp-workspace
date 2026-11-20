@@ -259,3 +259,79 @@ hold): 68 ps, 27 % overshoot, gain 0.71, 23 % per strobe. The system stays at ab
   under test and the 1 MΩ input is lost.
 - **Not worth changing**: the BAT15-04W diodes and the GVA-84+. Cheaper gain blocks
   found were obsolete or thinly stocked.
+
+## FPGA options (GW1NZ-1)
+
+Two questions: can the FPGA's input delay primitives recover the trigger phase, and can
+the FPGA replace the clock generator. Figures are from Gowin DS841-2.8E, UG286 and UG289.
+
+| Resource | GW1NZ-1, LV, C6/I5 | Consequence |
+|---|---|---|
+| IODELAY | every I/O; 30 ps typical per step, no minimum or maximum given; 128 steps; 450–550 ps offset; static or dynamic, input or output but not both on one pin | 3.8 ns range per pin; the step has to be calibrated |
+| Serialisers | IDES10 / OSER10 up to 1100 Mbps | 0.9–1 ns coarse bins in and out |
+| PLL | one rPLL; input 3–400 MHz, VCO 400–800 MHz; IDIV and FBDIV 1–64, ODIV even values to 128, all integer; phase in 22.5° steps, fine delay 0.125 ns steps | No small frequency offset between two outputs |
+| PLL jitter | not specified. The on-chip oscillator is 0.012 UI peak-to-peak typical | Unknown; must be measured |
+| I/O standards | no LVDS input, no true LVDS output | Comparator and strobe path must be CMOS |
+
+### Trigger phase recovery with IODELAY
+
+This is workable as a time-to-digital converter, and it gives the "free-running strobe
+with time measurement" mode (D in the trigger table) without a TDC chip.
+
+- **Circuit.** The trigger comparator output is fanned out to N input pins. Each pin has
+  a different static IODELAY code and feeds an IDES10 at 1 Gbps. The N pins form a
+  thermometer code that divides each 1 ns bin into N parts. A single pin is useless for
+  this: it gives one bit per event.
+- **Precision** (`sim/fpga_tdc.py`, Monte Carlo with a ±20 % unknown step, 40 ps rms
+  pin skew and 10 ps rms jitter, all three my assumptions):
+
+  | Pins | Nominal bin | rms error, uncalibrated | rms error, calibrated | Scope rise time |
+  |---|---|---|---|---|
+  | 4 | 250 ps | 95 ps | 78 ps | 265 ps |
+  | 8 | 125 ps | 64 ps | 48 ps | 215 ps |
+  | 16 | 62 ps | 48 ps | 31 ps | 192 ps |
+  | 24 | 42 ps | 40 ps | 24 ps | 186 ps |
+
+  For comparison: a TDC7200 (35 ps rms) gives 197 ps, the Si5351C beat mode about
+  177 ps, both on the 175 ps set by the BUF802.
+- **Calibration** is a code-density test: triggers that are asynchronous to the FPGA
+  clock land in each bin in proportion to its width. It runs continuously on the
+  measurement data, so drift of the delay step with temperature is tracked. Re-tuning the
+  codes afterwards for even bins would improve on the table; I did not simulate that.
+- **PLL jitter mostly cancels.** The strobe and the TDC sampling clock come from the
+  same clock, so only the jitter accumulated between trigger and strobe counts.
+- **Costs.** 16 pins of the 48-pin package, a fan-out that does not slow the comparator
+  edge (5 pF per pin), and the hold-node memory has to be undone because samples arrive
+  in random time order.
+- **Not evaluated:** a carry-chain TDC in the logic fabric, which would need one pin.
+
+### FPGA instead of the clock generator
+
+Yes for the low-cost variant, but as a different timebase, not as a drop-in.
+
+- **The beat-frequency scheme is not possible.** One PLL with integer dividers cannot
+  make two outputs a few parts per million apart.
+- **What it does instead.** Either delay stepping (strobe placed by OSER10 in 1 ns steps
+  plus IODELAY in 30 ps steps), as the yanartas board does, or a free-running strobe
+  with the TDC above.
+- **30 ps steps are enough.** That is about six points on a 175 ps edge.
+
+| | Si5344 (baseline) | Si5351C (low cost) | GW1NZ-1 |
+|---|---|---|---|
+| Own stimulus (TDR, calibrator) | beat, 1 ps steps | beat, 1 ps steps | delay stepping, 30 ps steps; PLL jitter is common to both edges |
+| External periodic signal | locks 8 kHz–750 MHz, cleans jitter | locks 10–100 MHz, follows jitter | free-running with TDC: any rate; or PLL lock from 3 MHz with unknown jitter |
+| Non-periodic repetitive signal | no | no | yes, with the TDC |
+| Timing error, rms | 0.1 ps class | about 10 ps (estimate) | 31 ps with 16 pins (simulated, assumptions above) |
+| Time axis accuracy | exact divider ratios | exact divider ratios | calibrated delay steps; needs self-calibration |
+| Strobe output | differential, needs a limiter | CMOS, about 1 ns edge | CMOS; edge rate not published |
+| Extra needs | 1.8 V rail | none | 1.2 V core rail, an external crystal oscillator, configuration |
+
+Recommendation: for the low-cost variant, replace the Si5351C with the GW1NZ-1 and use
+the free-running strobe with a 16-pin TDC for external signals and delay stepping for
+the instrument's own stimulus. It removes the 10–100 MHz trigger limit and handles
+non-periodic triggers, for about 15 ps more rise time than the Si5351C. Keep the Si5344
+where the 1 ps time axis and jitter cleaning matter. I have no price for the GW1NZ-1.
+
+Open before committing to it: the FPGA's output edge rate and PLL jitter are both
+unpublished, and the IODELAY step has no tolerance. All three can be measured with the
+scope's own sampler on a first board.
