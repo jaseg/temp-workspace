@@ -570,3 +570,20 @@ how often edges are caught. For 5 ps from 31 ps time stamps about 40 stamps are 
 - The fit needs the frequency well enough to count cycles between stamps. The slow
   comparator path into the FPGA gives that, and its input-delay converter can carry the
   cycle count while the snapshots supply the fine, strobe-referenced correction.
+
+**Cheaper gate diodes** (`sim/diode_options.py`; generic models by capacitance class,
+220 Ω isolation, ±3 V strobe, prices per diode at 100 pieces):
+
+| Diode | Price | One gate: swing, aperture | 16-tap array: swing of the inner taps | Peak reverse voltage |
+|---|---|---|---|---|
+| BAT15-04R / -04W (0.3 pF with package) | 0.10–0.14 | 53 %, 55 ps | 14–28 % | 2.0 V of 4 V rated |
+| NSR201MX (0.15 pF, 14 Ω) | 0.19 | 60 %, 66 ps | 10–31 % | 2.1 V of 2 V rated |
+| JDH2S02SL (0.25 pF) | 0.19 | 52 %, 65 ps | 13–31 % | 1.9 V of 10 V rated |
+| 0.5 pF class | – | 41 %, 51 ps | 1–25 % | – |
+| 1 pF class (BAT68, RB886, MMDL301) | 0.04–0.26 | 20 % | fails | – |
+| 2 pF class (BAS70) / 10 pF class (BAT54) | 0.01–0.02 | 2 % / none | fails | – |
+
+Nothing cheaper works. The diodes that cost less than the BAT15-04R have 1 pF or more,
+and two of them per tap load a 35 ps line section (0.6 pF) too heavily. The BAT15-04R
+pair is already the cheapest usable part; the NSR201MX would be run at its reverse
+rating. Only the BAT15 uses a manufacturer model; the others are generic.
