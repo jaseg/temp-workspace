@@ -24,7 +24,7 @@ rng = np.random.default_rng(3)
 K = 0.375
 
 
-def run(n=16, step=60e-12, a=0.3, rise=150e-12, off=25e-3, noise=3e-3, tap_tol=3e-12, cal_a=None, chips=30, ev=6000):
+def run(n=16, step=60e-12, a=0.3, rise=150e-12, off=25e-3, noise=3e-3, tap_tol=3e-12, cal_a=None, chips=30, ev=6000, k_gate=K):
     sig = np.hypot(rise, 70e-12) / 2.563
     win = n * step
     errs, valid = [], []
@@ -33,7 +33,7 @@ def run(n=16, step=60e-12, a=0.3, rise=150e-12, off=25e-3, noise=3e-3, tap_tol=3
         offs = rng.normal(0, off, n)
 
         def bits(T, amp):
-            held = K * amp * erf((taps[None, :] - T[:, None]) / (np.sqrt(2) * sig)) + offs[None, :] + rng.normal(0, noise, (len(T), n))
+            held = k_gate * amp * erf((taps[None, :] - T[:, None]) / (np.sqrt(2) * sig)) + offs[None, :] + rng.normal(0, noise, (len(T), n))
             return held > 0
 
         # calibration: edges uniform over a range wider than the window; P(bit=1) gives each tap's effective position
@@ -65,6 +65,9 @@ if __name__ == "__main__":
         ("limiter, 100 ps taps", dict(step=100e-12)),
         ("limiter, 50 ps taps", dict(step=50e-12)),
         ("limiter, 1-diode gates (offset 60 mV)", dict(off=60e-3)),
+        ("limiter, travelling strobe line (gate swing 20 % -> k 0.15)", dict(k_gate=0.15, step=72e-12)),
+        ("limiter, travelling strobe, +/-0.5 V on the line", dict(k_gate=0.15, step=72e-12, a=0.5)),
+        ("limiter, travelling strobe, offsets 10 mV", dict(k_gate=0.15, step=72e-12, off=10e-3)),
         ("no limiter, +/-0.3 V signal", dict(rise=175e-12)),
         ("no limiter, +/-0.1 V signal", dict(a=0.1, rise=175e-12)),
         ("no limiter, +/-0.1 V, calibrated at +/-0.3 V", dict(a=0.1, rise=175e-12, cal_a=0.3)),
