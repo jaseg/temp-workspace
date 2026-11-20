@@ -1,0 +1,66 @@
+# Sampling scope front end: summary
+
+Target: 2 GHz analog bandwidth, eye diagrams on NRZ data up to 3 Gbps including
+spread-spectrum links. Details, sources and simulations are in
+[scope-frontend.md](scope-frontend.md). Nothing here has been built; figures are from
+simulation, datasheets or arithmetic, and prices are single-unit, November 2026.
+
+## Fixed parts of the design
+
+| Block | Choice | Result |
+|---|---|---|
+| Input | BUF802 in composite loop with a precision op amp, 1 MΩ, 5:1 divider | Sets the bandwidth: about 2 GHz, 175 ps rise time |
+| Sampler | Four-diode BAT15-04W bridge, fixed ±1 V bias, driven through 10 Ω, 2.2 pF hold, gain made up by an op amp | 73 ps, gain 0.46, 72 % per strobe |
+| Strobe | Fast limited edge, amplified to 2–3 V, clipped to 100–160 ps by a shorted stub | Needs an edge under about 120 ps; unproven |
+
+## Options
+
+**Timebase**
+
+| Option | For | Against |
+|---|---|---|
+| Si5344, two outputs at a beat frequency | 1 ps time axis, cleans jitter, locks 8 kHz–750 MHz | About 30; cannot follow spread spectrum or lock to data |
+| Si5351C, same scheme | About 5 | Locks only to 10–100 MHz; follows jitter |
+| FPGA (GW1NZ-1), free-running strobe plus time stamps | Any signal incl. data and spread spectrum; strobe placement in 30 ps steps | No beat mode; delays need self-calibration; PLL jitter and edge rate unpublished |
+
+**Time stamping (needed with a free-running strobe)**
+
+| Option | Precision per stamp | For | Against |
+|---|---|---|---|
+| FPGA input-delay converter, 16 pins | 31 ps (assumed tolerances) | Free; stamps every edge | Needs edges at least about 1.5 ns apart, so fast data needs a divider |
+| Tapped delay line with 16 diode gates | 23–38 ps | Measured against the real strobe; no fast logic; speed limit is the gate (55–70 ps) | 27–41 plus five strobe amplifiers; large; strobe distribution unproven; catches few edges below a few hundred Mbps |
+| TDC7200, several armed in turn | 35 ps (specified) | About 1.50 each; self-calibrating | 0.3 million stamps per second per chip; 8 chips for 1.25 Gbps with spread spectrum; 3 Gbps with spread spectrum not solved |
+
+**Edge conditioning for data**
+
+| Option | For | Against |
+|---|---|---|
+| Fast comparator (ADCMP572) + AD9508 divider | Verified parts; divider also fans out and passes plain triggers at ÷1 | About 43; 3.3 Gbps limit with no margin; needs LVDS-level input and a 1.8 V FPGA bank |
+| Limiter (three TRF37D73 or two GVA-84+) + AD9508, AC coupled | About 19 | AD9508 input sensitivity not checked |
+| Slow comparators only (TLV3602) | Cheap | Clocks to about 300 MHz, data to a few hundred Mbps |
+| Hardware clock-recovery ICs | – | Expensive, hard to buy, or cannot follow spread spectrum |
+
+Clock recovery itself is a software fit over the time stamps: 9–12 ps rms at 1.25 Gbps,
+with or without spread spectrum.
+
+## Recommended builds
+
+| | Best performance | Lowest cost |
+|---|---|---|
+| Input and sampler | as above, OPA140, OPA656 | as above, OPA197, OPA810 |
+| Strobe driver | ADCMP572 edge into GVA-84+ finals | FPGA CMOS output into two amplifier stages (TRF37D73, then GVA-84+) |
+| Timebase | FPGA, free-running strobe | FPGA, free-running strobe |
+| Phase recovery | Tapped delay line with a limiter, plus the FPGA converter on a TLV3602 for slow signals | FPGA input-delay converter behind a limiter and AD9508 |
+| Why | Only option with headroom at 3 Gbps and timing referred to the actual sampling instant | Fewest parts; 3 Gbps is at the divider's limit |
+| Main risk | Strobe distribution to 16 gates | Strobe edge from CMOS; AD9508 driven from a limiter |
+
+For clock-like signals where a 1 ps time axis matters more than data, the Si5344 beat
+timebase is the better instrument and can be fitted alongside.
+
+## Open before layout
+
+1. Strobe driver: edge and amplitude from a saturating amplifier chain.
+2. FPGA: output edge rate, PLL jitter, delay-step tolerance.
+3. Delay line: strobe distribution, comparator input capacitance.
+4. AD9508: behaviour with irregular edges and with an AC-coupled limiter.
+5. Spread spectrum at 3 Gbps with the TDC7200 bank.
