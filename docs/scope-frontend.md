@@ -587,3 +587,50 @@ Nothing cheaper works. The diodes that cost less than the BAT15-04R have 1 pF or
 and two of them per tap load a 35 ps line section (0.6 pF) too heavily. The BAT15-04R
 pair is already the cheapest usable part; the NSR201MX would be run at its reverse
 rating. Only the BAT15 uses a manufacturer model; the others are generic.
+
+**Readout loading (correction).** The first readout network (43 kΩ bias, 2 × 20 kΩ
+summing) was wrong on two counts, found with `sim/readout_load.py`:
+
+- The summing resistors sit across the bias, so ±0.5 V rails left only about ±0.16 V on
+  the hold nodes, less than the signal on the line.
+- The comparator input capacitance (3 pF assumed; the datasheets do not give it) is
+  several times the 2 × 0.47 pF hold capacitance, so the comparator sees a fraction of
+  the held voltage, late.
+
+| Network (one gate, ideal strobe) | Peak at the comparator, % of line voltage | After 100 ns |
+|---|---|---|
+| 43 kΩ bias, 2 × 20 kΩ, rails raised to keep ±0.5 V, Cin 3 pF | 16 % at 24 ns | 57 % of the peak left |
+| Same, Cin 6 pF / 1 pF | 10 % / 31 % | – |
+| **10 kΩ bias, 2 × 4.7 kΩ, rails ±1.56 V, Cin 3 pF** | 15 % at 6 ns | 4 % left |
+| 22 kΩ bias, 2 × 4.7 kΩ, Cin 1 pF | 34 % at 4 ns | 4 % left |
+
+In the array the taps hold about a third to a half of what a single gate does, so the
+comparator sees about ±20 to ±45 mV for ±0.5 V on the line, not the ±60 to ±115 mV
+stated before. The timing precision survives, because real comparator offsets are much
+smaller than the 25 mV assumed earlier: 23–27 ps rms with 6 mV offsets, 27–38 ps with
+10 mV. The drawings carry the corrected values.
+
+**Comparator choice** from the LCSC list of parts under 10 ns. With a 2.4 kΩ source,
+each microamp of input bias current shifts the threshold by 2.4 mV.
+
+| Part | Price per channel | Bias current | Offset, hysteresis | Delay at small overdrive | Verdict |
+|---|---|---|---|---|---|
+| TLV3502 (dual) | 1.46 | 2 pA | 1 mV typ, 6.5 max; 6 mV | 4.5 ns at 20 mV, 7.5 ns at 5 mV | Best fit: 23.30 for 16 channels |
+| TLV3501 | 1.96 | 2 pA | same | same | Same part, single |
+| LMV7219 | 0.77 | 0.2–0.45 µA | 1 mV typ, 6 max; 7.5 mV | 10–12 ns, 20 max; specified at 0 V common mode | Cheapest that works: 12.30 for 16 |
+| TLV3601 / TLV3603 | 4.25–4.65 | 1 µA | 5 mV; 1.5 mV | 2.5 ns | Works; speed not needed |
+| ADCMP600, LT1719, AD8561, AD8611, AD8564, LT1711 | 4.15–24 | 3–6 µA | – | – | 7–14 mV of bias-current shift per part, and dearer |
+| MAX999, MAX962, TL3016 | 1.36–8.60 | 10–15 µA | – | – | No: 24–36 mV shift, as large as the signal |
+| LMH7220, TLV3604, ADCMP572 | – | – | – | – | Differential outputs; not for this |
+
+**TRF37D73 as the amplifier** (TI datasheet SLASE43): 1 MHz–6 GHz, gain 22 dB at
+400 MHz, 19.5 dB at 2 GHz, 18 dB at 3 GHz, 15.5 dB at 4 GHz; 16.5 dBm at 1 dB
+compression at 2 GHz; 3.3 V, 53 mA; maximum input +10 dBm; external choke on the output.
+
+- Good for the limiter and the pre-drivers. Two stages need about 10 dB between them to
+  respect the input limit and then limit for inputs above about ±85 mV at 2 GHz (my
+  arithmetic); three stages limit from a few millivolts.
+- Short for the strobe finals: 16.5 dBm is about ±2 V, against the ±3 V simulated for
+  the gate strobe lines. The main sampler was simulated working with a 2 V step.
+- The datasheet circuit (100 nH, 1 nF) is for hundreds of megahertz; for 10 MHz it needs
+  about 10 µH and 100 nF. Nothing is stated about operation in compression.

@@ -36,6 +36,8 @@ class G:
     t_s: float = 2e-9
     imbalance: float = 0.0    # two-diode gate: relative strobe amplitude error of the negative side
     c_out: float = 2e-12      # comparator input
+    rsum: float = 20e3        # two-diode gate: summing resistors from the hold nodes to the comparator
+    ideal_bias: bool = True   # True: bias sources as simulated first; False: rails raised so the nodes still sit at +/-vb
 
 
 def build(g: G) -> str:
@@ -58,12 +60,13 @@ def build(g: G) -> str:
         d.add("Xd2 s k dpk")
         d.add(f"Ca a stp {g.c}")
         d.add(f"Ck k stn {g.c}")
-        d.add(f"Vba vba 0 {-g.vb}")
-        d.add(f"Vbk vbk 0 {g.vb}")
+        k = 1.0 if g.ideal_bias else (g.rb + g.rsum) / g.rsum
+        d.add(f"Vba vba 0 {-g.vb * k}")
+        d.add(f"Vbk vbk 0 {g.vb * k}")
         d.add(f"Rba a vba {g.rb}")
         d.add(f"Rbk k vbk {g.rb}")
-        d.add("Roa a out 20k")
-        d.add("Rok k out 20k")
+        d.add(f"Roa a out {g.rsum}")
+        d.add(f"Rok k out {g.rsum}")
     else:
         strobe("sn", "stn", -2 * g.vp)
         d.add("Xd1 s h dpk")

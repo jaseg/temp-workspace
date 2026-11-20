@@ -233,11 +233,11 @@ for xt, nm in zip(XT, NAMES):
     diode((xk, 340), (xk, 404), "Dk", "(series pair)" if full else "", "a")
     wire([(xa, 404), (xa, 420)]); wire([(xk, 404), (xk, 420)])
     dot(xa, 420); dot(xk, 420); dot(xt, 420)
-    res((xa, 420), (xt, 420), "", "20k", "b")
-    res((xt, 420), (xk, 420), "", "20k", "b")
+    res((xa, 420), (xt, 420), "", "4.7k", "b")
+    res((xt, 420), (xk, 420), "", "4.7k", "b")
     # bias and bleed
-    res((xa, 420), (xa - 80, 420), "", "43k", "a"); flag(xa - 80, 420, "−VB")
-    res((xk, 420), (xk + 80, 420), "", "43k", "a"); flag(xk + 80, 420, "+VB")
+    res((xa, 420), (xa - 80, 420), "", "10k", "a"); flag(xa - 80, 420, "−VB")
+    res((xk, 420), (xk + 80, 420), "", "10k", "a"); flag(xk + 80, 420, "+VB")
     # hold capacitors and isolation to the strobe lines
     cap((xa, 420), (xa, 480), "Ca", "0.47p", "b"); res((xa, 480), (xa, YP), "", "220", "b", STB); dot(xa, YP, STB)
     cap((xk, 420), (xk, 480), "Ck", "0.47p", "a"); res((xk, 480), (xk, YN), "", "220", "a", STB); dot(xk, YN, STB)
@@ -249,7 +249,7 @@ for xt, nm in zip(XT, NAMES):
     wire([(xt + 16, 800), (xt + 16, 838)])
     o.append(f'<path d="M{xt + 16},850 L{xt + 8},838 L{xt + 24},838 Z" fill="{WIRE}"/>')
     text(xt + 16, 868, f"TDC{nm} → FPGA", 11.5, "middle", INK, True)
-    text(xt + 66, 772, "comparator, 5–10 ns" if full else "", 10.5)
+    text(xt + 66, 772, "TLV3502 or LMV7219" if full else "", 10.5)
     text(xt, YS - 12, f"tap {nm}", 12, "middle", INK, True)
 
 # ============================================================ strobe drivers
@@ -297,9 +297,9 @@ notes = [
     "Tap spacing in signal time = signal section + strobe section = 70 ps (simulated: 72 ps mean).",
     "Signal line 15 × 5.8 mm = 87 mm; strobe pair the same length, run in the opposite direction.",
     "Gate: aperture 55–70 ps; captures 16–31 % of the line voltage with 220 Ω isolation and ±3 V strobe.",
-    "Hold nodes return to ±VB through 43 kΩ (20 ns); read the comparators 5–8 ns after the strobe.",
-    "±VB = ±0.5 V reverse bias. VTH = common threshold, about 0 V, trimmed by a DAC.",
-    "Comparator: CMOS input, offset below about 10 mV, 3.3 V CMOS output, 22 Ω series to the FPGA.",
+    "Comparator input: about ±20 to ±45 mV, peaking 6 ns after the strobe, gone after 100 ns. Latch 15–25 ns after the strobe.",
+    "±VB rails = ±1.56 V: with 10 kΩ and 2 × 4.7 kΩ this leaves ±0.5 V reverse bias on the hold nodes. VTH about 0 V, from a DAC.",
+    "Comparator: TLV3502 or LMV7219. Input capacitance sets the signal: 3 pF assumed, 6 pF halves it. Bias current under 1 µA.",
     "Tap stubs under 1 mm; Da/Dk, Ca/Ck and the 220 Ω resistors placed symmetrically about the tap.",
 ]
 for i, s in enumerate(notes):
