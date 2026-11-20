@@ -427,3 +427,118 @@ Recommendation: AD9508, with the 16 FPGA time-stamp pins in a bank at 1.8 V.
 - **To verify.** The datasheet says the divider "contains duty cycle correction that
   guarantees 50 %" without saying how. Whether that behaves with irregular edges is
   unknown; input is specified from 0 Hz. Datasheet read from a mirror (Rev. G).
+
+### Discrete alternative: tapped delay line with diode gates
+
+Idea: the BUF802 output is split; one leg goes to the sampler, the other runs down a
+delay line that is tapped every 50–100 ps by small diode gates. All gates fire on the
+strobe, so the hold nodes contain a snapshot of the signal along the line. A cheap
+comparator per tap turns it into a bit pattern for the FPGA; an edge shows up as the
+place where the bits change.
+
+What it buys:
+
+- **No fast logic in the path.** Nothing has to toggle at the data rate. The speed limit
+  is the gate aperture (55–70 ps simulated), which is that of the scope itself.
+- **Timing is measured against the real sampling instant.** The gates share the main
+  sampler's strobe, so strobe-driver delay, FPGA clock jitter and PLL jitter drop out.
+
+Simulations: `sim/tap_gate.py` (one gate), `sim/tap_array.py` (16 taps on loaded lines),
+`sim/snapshot_tdc.py` (timing precision, Monte Carlo).
+
+**Gate type** (1.5 V strobe per side, 1 pF hold, one shot from reset):
+
+| Gate | Captured swing | Aperture 10–90 % | Offset on the hold node | Kick-out onto the line |
+|---|---|---|---|---|
+| Two diodes, balanced strobe | 52 % | 70 ps | 0 mV; 18 mV at 5 % strobe imbalance | 0 mV; 27 mV at 5 % imbalance |
+| One diode | 54 % | 58 ps | 263 mV, about 8 mV per 1 % of strobe amplitude | 477 mV |
+
+Use two diodes. The one-diode gate's offset depends on the strobe amplitude at each tap
+and its kick-out, times 16, lands on the signal line.
+
+**Strobe distribution** is the hard part.
+
+| Scheme | Captured swing per tap | Tap spacing | Needs |
+|---|---|---|---|
+| Divider tree, 1:16 per polarity (the Wilkinson proposal) | 44–50 %, equal by symmetry | set by the signal line | 3–5 V per side at the root for 0.6–1.0 V at each gate (12 dB split plus about 2 dB loss); two trees of 15 dividers |
+| Strobe line running past the taps against the signal, no isolation, 3 V | 2–53 %, first taps fail | irregular | – |
+| Same with 220 Ω between strobe line and each hold capacitor, 3 V | 16–31 % (end tap 10 %) | 72 ps mean, 53–83 ps | full driver amplitude reaches the line; no dividers |
+
+- The gates load a travelling strobe line heavily; without isolation the pulse is used
+  up after a few taps. With 220 Ω it works, at less than half the swing of a tree.
+- With the strobe travelling against the signal, neighbouring taps are one signal delay
+  plus one strobe delay apart, so each line is half as long. That matters on FR-4: about
+  0.2–0.27 dB/cm at 3 GHz means 3–4 dB over the 16 cm a co-located line would need.
+- I did not simulate the divider tree itself. A single-section Wilkinson covers about
+  an octave and a 100 ps pulse spans DC to 5 GHz, so reflections inside the tree are a
+  risk. A middle way is a 1:4 tree feeding four 4-tap line segments.
+
+**Timing precision**, 16 taps, 25 mV rms offset per tap and 3 mV noise (assumptions),
+positions calibrated by code density:
+
+| Case | rms error | Scope rise time |
+|---|---|---|
+| Limiting amp, ±0.3 V on the line, tree strobe, 60 ps taps | 22 ps | 184 ps |
+| Limiting amp, 100 ps taps | 32 ps | 193 ps |
+| Limiting amp, travelling strobe (72 ps taps, 20 % swing) | 43 ps | 207 ps |
+| Same, ±0.5 V on the line | 31 ps | 192 ps |
+| Same, offsets 10 mV | 26 ps | 187 ps |
+| No limiting amp, ±0.3 V signal | 23 ps | 184 ps |
+| No limiting amp, ±0.1 V signal | 49 ps, 10 % of taps stuck | 216 ps |
+| No limiting amp, ±0.03 V signal | 151 ps, half the taps stuck | unusable |
+| No limiting amp, per-tap thresholds trimmed to 2 mV, ±0.03 V | 32 ps | 193 ps |
+
+A software clock fit over 9–17 captured edges brings the recovered bit clock to about
+10–12 ps rms at 1.25 Gbps, with or without spread spectrum (`sim/sw_cdr.py`). The window
+is short (about 0.85–1 ns), so the fraction of strobes that catch an edge falls with
+the data rate: 83 % at 3 Gbps, 52 % at 1.25 Gbps, 6 % at 100 Mbps. Below a few hundred
+megabits the FPGA input-delay converter is the better tool.
+
+**With or without the limiting amplifier**
+
+| | Without | With |
+|---|---|---|
+| Works for | signals of about ±0.3 V on the line, more than the sampler's ±0.5 V range leaves after a 6 dB split; or any signal if each tap has a threshold trim (16 more control lines) | any signal above the amplifier's sensitivity |
+| Calibration | tap positions shift with signal amplitude and edge shape | fixed: amplitude and edge on the line are constant |
+| Kick-out from 16 gates | reaches the splitter and the main sampler path (after the sample is taken) | isolated |
+| Trigger level | per-tap threshold | one offset at the amplifier input |
+| Adds | nothing | a stage that must pass the data rate; its delay drift (common to all taps, removed by the clock fit); duty-cycle distortion if single-ended (use one edge polarity) |
+
+The limiting amplifier is worth having.
+
+**Low-cost limiting stage**
+
+| Option | Data | Price | Verdict |
+|---|---|---|---|
+| Two GVA-84+ in series, saturating | DC–7 GHz, +20 dBm; AC-coupled | 6.20 | Recommended: same part as the strobe driver, in production |
+| SN65LVDS20 | 4 Gbps, 80 mV sensitivity, DC-coupled, LVDS out (340 mV) | 7.37 | DC-coupled alternative; small swing, wants a differential line |
+| SY89327L | not verified | 3.83 | Check the datasheet |
+| Optical post-amplifiers (MAX3748, ONET8501PB) | 4–5 mV sensitivity, CML out | 4–5 at LCSC | Obsolete or out of stock |
+| Discrete BJT differential pair (BFP740F, BFU730F, …) | 40–55 GHz fT | 0.3–0.6 each | Not advisable: every Infineon RF transistor checked is on last-time-buy (May 2027) and the NXP ones are obsolete. BFR93A is plentiful but only 6 GHz |
+
+The same sourcing problem applies to a BJT strobe driver.
+
+**Parts and cost** for 16 taps, single-unit prices:
+
+| Item | Part | Cost |
+|---|---|---|
+| Gate diodes, 16 series pairs | BAT15-04R (0.38; 0.20 at 100) | 6.10 |
+| Readout, 16 channels | CMOS-input comparator of about 5–10 ns: TP1961 (0.58 at LCSC, specifications not verified) or TLV3502 dual (2.91 at LCSC) | 9–23 |
+| Limiting stage | 2 × GVA-84+ | 6.20 |
+| Extra strobe drive | one more GVA-84+ and a balun choke | 3.40 |
+| Passives | about 10 per tap | 2 |
+| **Total** | | **about 27–41** |
+
+- Quad LVDS receivers looked attractive as cheap comparators but are unsuitable: their
+  threshold is only guaranteed within ±100 mV and their inputs draw up to 10–20 µA.
+- For comparison, the fast comparator plus AD9508 route is about 43 in two ICs.
+
+**Verdict.** It works on paper and its timing reference is better than any of the other
+options, but it is not much cheaper than the two specialty ICs, it needs 16 more FPGA
+inputs and a lot of board area, and its strobe distribution is unproven. I would choose
+it if avoiding single-source fast logic matters more than board area, with: a limiting
+stage from two GVA-84+, two-diode gates, about 16 taps at 60–70 ps, ±0.5 V on the line,
+and a strobe line with 220 Ω isolation as the first thing to prototype.
+
+Not simulated: the divider tree, line loss, snapshots containing more than one edge, the
+comparators, and sharing one strobe driver between this array and the main sampler.
