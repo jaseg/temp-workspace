@@ -706,3 +706,42 @@ From the TI datasheet (SNAS686) and DigiKey, November 2026.
 Verdict: a good low-risk reference, for a first board and for checking the FPGA or
 delay-line converter against a specified part, as a TDC7200. Not the main time stamper,
 because of its rate.
+
+**TDC7201 on fast data.** The part needs stop pulses at least 10 ns wide and 67 ns apart,
+so data edges have to be thinned out first; and it delivers stamps in bursts with gaps.
+Simulated with `sim/tdc7201_track.py` and `sim/tdc7201_burst.py` (35 ps rms per stamp,
+12 µs per measurement cycle, which is my estimate).
+
+How to use the stamps:
+
+| Scheme | 1.25 Gbps, no spread spectrum | 1.25 Gbps, 5000 ppm at 33 kHz |
+|---|---|---|
+| Stitch stamps across measurements, interpolate everywhere | works: 15 ps rms, every strobe usable | fails: nearly every stamp gets a wrong bit count |
+| Solve each burst alone, use only samples taken during a burst | 17 ps rms | 17.5 ps rms with 10 stamps per burst, all bursts solved; 24 ps with 5 stamps, 10 % of bursts unsolved |
+
+- Stitching fails with spread spectrum because the bit rate moves by about 2000 ppm
+  during a 6 µs gap and reverses twice per modulation period, while every stamp needs
+  its bit count predicted to half a bit.
+- A burst is 5 stops per converter inside the 2 µs range. With both converters started
+  together on alternate divided edges that is 10 stamps over about 1 µs, enough to find
+  the bit rate and its slope for that burst by search and fit.
+- The price is coverage: a 1 µs burst every 12 µs covers 8 % of the strobes (5–10 % in
+  the cases simulated). The scope acquires 10–20 times slower, with good timing on the
+  samples it keeps.
+- At 3 Gbps 42 of 396 bursts were solved wrongly even with 10 stamps. They would have to
+  be detected from the fit residual; not simulated.
+
+How to get suitable edges:
+
+| Front end | Notes |
+|---|---|
+| Fast comparator + AD9508, ÷32 to ÷128, two outputs half a period apart to the two stop inputs | Most solid. The AD9508's 1.8 V CMOS outputs need the TDC7201 at about 2.0 V supply (input high threshold 0.7 × supply) or a level shifter |
+| Limiter chain + AD9508, AC coupled, no comparator | Saves the comparator. AD9508 input sensitivity not checked; long runs shift the baseline |
+| Limiter chain + a PLL prescaler IC | Possibly the cheapest; I have not checked which prescalers are available or work with irregular edges |
+| Arm-and-catch: the FPGA arms a fast flip-flop, the next data edge sets it | No divider, but needs two fast flip-flops for a clean hand-over, one re-arm per stamp, and it prefers edges followed by long runs |
+
+Compared with the alternatives: the FPGA input-delay converter stamps every divided edge
+(about 20 million per second) and the delay line stamps about half of all strobes, so
+both follow spread spectrum without discarding samples. The TDC7201 fits data without
+spread spectrum, or spread-spectrum data if a 10–20 times slower acquisition is
+acceptable.
