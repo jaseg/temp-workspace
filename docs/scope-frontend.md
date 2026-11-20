@@ -849,3 +849,31 @@ clocks) and the stamps are used directly. One threshold DAC serves both.
 Layout-critical: the pick-off must be low impedance. 10 Ω in series plus the switch into
 about 3 pF is about 50 ps; the 100 Ω shown on the block diagram would be far too slow
 for data and applied only to the slow comparators.
+
+**Low-cost comparators for the tap readout.** Datasheets read for all seven; LCSC prices
+of November 2026. All have CMOS inputs with picoamp bias current where it is stated,
+push-pull 3.3 V outputs, fixed hysteresis and no latch.
+
+| Part | Channels, package | Delay at small overdrive | Offset typ / max | Hysteresis | Input capacitance | Price per channel, stock | Verdict |
+|---|---|---|---|---|---|---|---|
+| COS3502 (Cosine) | dual, SOP-8 | 4.5 ns typ, 7 max at 20 mV | 1 / 5 mV | 1.6 mV | not stated | 0.18 (0.10 at 500), 3710 | First choice |
+| MX7219T (Maxin Micro) | single, SOT-23-5 | 5 / 8 ns at 20 mV; 7.5 / 12 ns at 5 mV | 1 / 6.5 mV | 6 mV | 2 pF common, 4 pF differential | 0.40 (0.23 at 500), 17 970 | Second choice; best documented, deepest stock |
+| AiP3214 (i-core) | quad, TSSOP-14 | only at 100 mV: 5.4–6.7 ns | 3 / 10 mV | 7.2 mV | 1 pF common, 2.5 pF differential | 0.10 (0.05 at 1000), 775 | Cheapest and lowest capacitance, but 10 mV offset and thin stock |
+| MS8911S (Ruimeng) | single, SOT-23-6 | 4 ns at 20 mV, 7 ns at 5 mV, typical only | 3 mV typ, no max | 7 mV | not stated | 0.99, 297 | No advantage for 2.5 times the price |
+| SGM8743 (SGMicro) | single | 11 ns at 10 mV; output edges 6–8 ns | 0.8 / 4.9 mV | 3 mV | not stated | 1.51, 1110 | Slow and dear |
+| GT8961 (GTIC) | single, dual, quad | only at 100 mV: 5.3–5.7 ns | 0.5 / 10 mV | 6 mV | not stated | not found at LCSC | No source |
+| TP1981 (3PEAK) | single, SC70-6 | only at 100 mV: 3.5 ns | 15 mV typ, 20 max as printed | 5 mV | 1.5 pF | not found at LCSC | Offset too large |
+
+- The COS3502 and MX7219T are TLV3502/TLV3501-class parts at a tenth of the price:
+  sixteen channels cost about 3 to 6 instead of 23. The COS3502 has the tightest offset
+  and the lowest hysteresis, which removes most of the previous-bit effect.
+- Lay the board out for the TLV3502's SOIC-8 pinout; the COS3502 is its clone and either
+  can then be fitted.
+- All run on a single 3.3 V supply with the input at 0 V, within their −0.1 to −0.2 V
+  range, and drive the FPGA directly.
+- Input capacitance is the open point for every candidate. The MX7219T states 2 pF plus
+  4 pF differential, about 6 pF at the driven input, and a TLV3501 clone will be
+  similar. That is twice the 3 pF assumed above and brings the comparator signal down
+  to about ±13 to ±30 mV. The timing simulation at that level gave 27 ps rms with 6 mV
+  offsets and 38 ps with 10 mV, so it still works, with less margin. The AiP3214 states
+  3.5 pF.

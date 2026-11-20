@@ -79,7 +79,7 @@ Prices are single-unit (DigiKey unless marked LCSC). "–" means the same part i
 | Trigger input switch | TMUX136 | – | On a shifted supply; to be verified. Price not checked |
 | Delay-line gate diodes | 16 × BAT15-04R pair, 0.38 | not fitted | 0.20 at 100 pieces |
 | Delay-line limiter | 2 × GVA-84+ | not fitted | 3 × TRF37D73 as alternative |
-| Delay-line comparators | 8 × TLV3502 dual, 2.91 (LCSC) | not fitted | LMV7219, 0.77 (LCSC), is the cheaper choice; Chinese alternatives under review |
+| Delay-line comparators | 8 × COS3502 dual, 0.36 (LCSC) | not fitted | TLV3502 (2.91) is the pin-compatible original; MX7219T (0.40) as single-channel alternative. Input capacitance near 6 pF halves the signal |
 | Split supply | LTC3261 + TPS7A39, 13.40 | TPS60403 with LC filters, 1.04 | |
 
 Optional: Si5344 (about 30) for a 1 ps beat timebase on clock-like signals; TDC7200
