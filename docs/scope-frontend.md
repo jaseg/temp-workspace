@@ -393,3 +393,37 @@ The beat-frequency timebase needs a hardware clock, so only A, B or C apply, and
 Si5344 then filters whatever it is given at 4 kHz or less. That shows total jitter
 including wander and smears links with spread spectrum. If eye diagrams of such links
 matter, the FPGA timebase with option D is the better architecture.
+
+### One IC for the divider chain
+
+Assuming a fast comparator already follows the BUF802, the limiting buffer goes away and
+the question is whether one IC can replace the two dividers, the translator and the 1:4
+buffer. Constraint from the FPGA: the GW1NZ-1 has only plain CMOS input standards (no
+referenced and no differential inputs), so LVDS, CML or PECL swings cannot be made
+reliable for it with resistors alone. The IC has to have CMOS outputs.
+
+| Part | Input | Ratios | Outputs | Price, stock (DigiKey) | Fit |
+|---|---|---|---|---|---|
+| **AD9508** | 0–1650 MHz, minimum pulse 303 ps; common mode 0.58–1.67 V | 1–1024 by SPI or I²C; 1, 2, 3, 4, 5, 6, 8, 16 by pin strap | 4 × LVDS/HSTL or **8 × 1.8 V CMOS**, 250 MHz, 1.18 ns edge typ at 10 pF | 15.83, 3746 | Best: divider, bypass and fan-out in one |
+| AD9513 | 0–1.6 GHz; common mode 1.3–1.8 V, "should be ac-coupled" | 1–32, 4-level strap pins | 3 × 3.3 V CMOS, 650 ps edge typ at 3 pF | 19.36, 396 | Only one with 3.3 V CMOS; awkward to reconfigure, still needs fan-out |
+| CDCM1804 | 0–800 MHz | 1, 2, 4, 8, 16 by pins | 3 × LVPECL + 1 × 3.3 V CMOS | 19.17 | Limits data to 1.6 Gbps |
+| SY89874U / SY89873L | 3.2 GHz, any logic family DC-coupled | 1, 2, 4, 8, 16 by pins | LVPECL / LVDS only | 10.40 / 9.35 | Fastest, but needs a translator, so not one IC |
+| CDCE18005 | 1500 MHz | 1–80 by SPI | 5 × 3.3 V CMOS among others | 21.88, 630 | 1.3–1.6 W; no margin |
+
+Recommendation: AD9508, with the 16 FPGA time-stamp pins in a bank at 1.8 V.
+
+- **It replaces four parts.** Its eight CMOS outputs drive two FPGA pins each, so the
+  1:4 buffer is not needed either. The chain it replaces costs about 11.40; the AD9508
+  is 15.83.
+- **Trigger mode comes for free.** Ratio 1 passes the comparator edges through, and the
+  ratio is set over the bus that is there anyway.
+- **Comparator.** Its input window (0.58–1.67 V common mode) takes LVDS or 2.5 V LVPECL
+  DC-coupled. 3.3 V CML or LVPECL, which is what the ADCMP572 delivers, is listed as not
+  allowed. So this choice goes with an LVDS-output comparator, or a resistive divider on
+  both legs of a CML output, which costs half the swing and was not checked against the
+  AD9508's input sensitivity.
+- **Speed.** A 303 ps minimum pulse is a 3.3 Gbps limit, about as far as the scope's
+  bandwidth goes, with no margin.
+- **To verify.** The datasheet says the divider "contains duty cycle correction that
+  guarantees 50 %" without saying how. Whether that behaves with irregular edges is
+  unknown; input is specified from 0 Hz. Datasheet read from a mirror (Rev. G).
