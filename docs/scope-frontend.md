@@ -666,3 +666,43 @@ flips; then correct each tap's edge time by its threshold shift divided by the s
   small.
 - Not simulated. Drift between calibrations for a bipolar input is of the order of
   1 %/K of the shift (estimate).
+
+### TDC7201 as the time stamper
+
+From the TI datasheet (SNAS686) and DigiKey, November 2026.
+
+| Item | TDC7201 |
+|---|---|
+| Resolution, noise | 55 ps LSB; 35 ps rms at 1 µs measured time, 50 ps at 100 µs |
+| Range | one converter: 12 ns–2 µs (mode 1), 250 ns–8 ms (mode 2); both combined: from 0.25 ns |
+| Inputs | CMOS levels, edges ≤ 1 ns (20–80 %), pulses ≥ 10 ns, 4 pF; up to 5 stops per converter, ≥ 67 ns apart |
+| Reference clock | 1–16 MHz; 16 MHz recommended (243 ps rms at 1 MHz); specified with < 1 ps jitter |
+| Calibration | built in, after every measurement |
+| Interface | SPI, 20–25 MHz; one start command and three 24-bit reads per measurement |
+| Supply | 2–3.6 V, 2.7 mA |
+| Package, price | 25-ball BGA, 4 × 4 mm, 0.65 mm pitch, no other package; 5.77 (3.71 at 100); only the 2000-piece reel type is active |
+| TDC7200 (one converter, TSSOP-14) | 3.69 (2.29 at 100), 22 000 in stock |
+
+- **Precision is in the same class as the other options.** 35 ps rms gives a scope rise
+  time of about 197 ps, against 192 ps for the 16-pin FPGA converter and 185–200 ps for
+  the delay line. It is a known quantity where the other two rest on my assumptions.
+- **Rate is the limit.** Each measurement needs a start command, the conversion, the
+  built-in calibration and three register reads. I estimate 7–10 µs per measurement, so
+  about 100 000 time stamps per second. The datasheet gives no rate. At a 10 MHz strobe
+  that is one stamp per hundred strobes.
+- **What that allows.** For a stable periodic signal the clock fit bridges the gaps:
+  40 stamps for about 5 ps take 0.4 ms, so the fit follows phase changes slower than
+  about 2 kHz. That is the same as the delay line on a 10 MHz signal. It is too slow for
+  spread spectrum, and a mode that needs a stamp for every sample runs a hundred times
+  slower.
+- **It does not need the dual part.** The second converter is only needed for intervals
+  under 12 ns. The FPGA can always use a strobe that is at least 12 ns after the trigger
+  as the stop, so the single TDC7200 in TSSOP does the job for less.
+- **What it measures.** Start is the comparator output, stop is the strobe as it leaves
+  the FPGA. FPGA clock jitter cancels; the delay of the strobe amplifiers does not.
+- **Input conditions.** Trigger pulses under 10 ns need stretching, and data edges still
+  need the fast comparator and a divider, as for the FPGA converter.
+
+Verdict: a good low-risk reference, for a first board and for checking the FPGA or
+delay-line converter against a specified part, as a TDC7200. Not the main time stamper,
+because of its rate.
