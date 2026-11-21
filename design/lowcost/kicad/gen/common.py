@@ -8,20 +8,19 @@ from schlib import Sheet, g  # noqa: F401
 # sheet name -> (title, ref_base, page, left pins [(net, shape)], right pins)
 TAPS = [f"TAP{i}" for i in range(16)]
 SHEETS = {
-    "input": ("Input stage: SMA, 50R relay, 5:1 divider, BUF802 + OPA197 servo, splitter", 100, 2,
+    "input": ("Input: 50R relay, 5:1 divider, BUF802 + OPA197 servo", 100, 2,
               [("VOFS", "input"), ("TERM_50", "input")],
               [("BUF_OUT_S", "output"), ("BUF_OUT_T", "output"), ("EXT_CLK", "output")]),
-    "sampler": ("Sampler: diode bridge, hold, TPH2501 hold amp and level shift", 200, 3,
+    "sampler": ("Sampler: diode bridge, hold, TPH2501 hold amp, level shift", 200, 3,
                 [("BUF_OUT_S", "input"), ("STRB_A", "input"), ("STRB_K", "input"), ("VBIAS_A", "input"),
                  ("VBIAS_K", "input"), ("ADC_REF_MID", "input")],
                 [("ADC_IN", "output")]),
-    "trigger_phase": ("Trigger and phase recovery: TMUX136, TLV3801, line driver, 16-tap delay line, "
-                      "COS3502, SN65LVDS2", 300, 4,
+    "trigger_phase": ("Trigger + phase recovery: TLV3801, 16-tap line, COS3502", 300, 4,
                       [("BUF_OUT_T", "input"), ("EXT_CLK", "input"), ("TRIG_SEL", "input"),
                        ("TRIG_LEVEL", "input"), ("PSTRB_A", "input"), ("PSTRB_K", "input"), ("VTAP_P", "input"),
                        ("VTAP_N", "input"), ("VTAP_TH", "input")],
                       [("COARSE", "output")] + [(t, "output") for t in TAPS]),
-    "strobe": ("Strobe drivers: sampler strobe (TRF37D73 x2 + balun), phase strobe (TRF37D73 + GVA-84+ x2)",
+    "strobe": ("Strobe drivers: sampler (2x TRF37D73), phase (TRF + GVA-84+)",
                400, 5,
                [("S_STROBE_P", "input"), ("S_STROBE_N", "input"), ("PH_STROBE_P", "input"),
                 ("PH_STROBE_N", "input")],
@@ -35,7 +34,7 @@ SHEETS = {
                    [("PH_STROBE_P", "output"), ("PH_STROBE_N", "output"), ("S_STROBE_P", "output"),
                     ("S_STROBE_N", "output"), None, ("ADC_TRIG", "output"), ("MCU_CLK", "output")]),
     "power": ("Power: USB-C 5 V in, +3V3, +1V2, +5V, -5V, +2V5, -2V5", 600, 7, [], []),
-    "mcu_if": ("MCU interface: STM32G474 header, DAC scaling, relay driver", 700, 8,
+    "mcu_if": ("MCU interface: STM32G474 header, DAC scaling, relay", 700, 8,
                [("ADC_IN", "input"), ("ADC_TRIG", "input"), ("MCU_CLK", "input"), ("FPGA_DONE", "input"),
                 ("SPI_MISO", "input"), None, ("SPI_SCK", "output"), ("SPI_MOSI", "output"), ("SPI_CS", "output"),
                 ("FPGA_RECONFIG", "output"), ("I2C_SCL", "output"), ("I2C_SDA", "bidirectional")],

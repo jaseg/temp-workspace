@@ -150,7 +150,8 @@ def main():
             "Gain hold/input 0.69, efficiency 69 % per strobe; 10-90 % 109 ps behind the BUF802 (65 ps ideal step).\n"
             "Noise ~0.35 mV rms at the bridge input after deconvolution; pedestal +49 mV (null with rail CM via DACs).\n"
             "Software: x_k = (v_k - 0.31 v_(k-1)) / 0.48 (calibrate per board). No bootstrap.\n"
-            "ADC trigger 40 ns after the strobe (any 0-212 ns settles), synchronous ADC clock.",
+            "ADC trigger 40 ns after the strobe (any 0-212 ns settles), synchronous ADC clock; the ADC must sample\n"
+            "BEFORE the S_STROBE falling edge (+160 ns): its reverse pulse shifts the hold by -13 mV (phase_array RESULT).",
             P(16, 14), size=T)
     sh.text("INPUT LEG: R201 0402 within 3 mm of the BUF802 OUT pin;\n"
             "R201 -> bridge input <= 3 mm (~18 ps), 0.18 mm trace\n"
@@ -170,8 +171,8 @@ def main():
             "strobe; 47 pF rails recover in 47 ns.\n"
             "Strobe kick: 174 mVpp at bridge input,\n"
             "113 mVpp at BUF802 pin, 19 mVpp trigger end.", P(40, 150), size=T)
-    sh.text("BIAS (mcu_if): VBIAS_A = -1.00 V (0..-2.0 V),\n"
-            "VBIAS_K = +1.00 V (0..+2.0 V): reverse-biases the\n"
+    sh.text("BIAS (mcu_if): VBIAS_A = -1.00 V (-0.4..-1.6 V),\n"
+            "VBIAS_K = +1.00 V (+0.4..+1.6 V): reverse-biases the\n"
             "bridge between strobes. 1 k x 47 pF: tau 47 ns.\n"
             "10 nF at the cold end of each 1 k feed.", P(108, 36), size=T)
     sh.text("HOLD NODE: C205 2.2 pF C0G + U201 Cin (1 pF CM) + pad.\n"

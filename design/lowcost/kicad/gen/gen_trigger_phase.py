@@ -399,7 +399,7 @@ def main():
         sh.power("+3V3", u["8"], dy=-2.54)
         sh.wire(u["5"], (u["5"][0], u["5"][1] + g(3)))
         sh.gnd((u["5"][0], u["5"][1] + g(3)))
-        c = C(sh, "100n", (u["8"][0] + g(7), u["8"][1] + g(3)))
+        c = C(sh, "100n", (u["8"][0] + g(10), u["8"][1] + g(3)))
         sh.path([u["8"], (c["1"][0], u["8"][1]), c["1"]])
         sh.gnd(c["2"])
     sh.text("COS3502 (U305-U312) on +3V3/GND, 100 nF X7R at each pin 8. Pinout NOT TLV3502: 1 +INA, 2 -INA,\n"
@@ -446,11 +446,12 @@ def main():
             "taps, loaded to ~50 R by each gate ~0.37 pF); strobe lines PSTRB_A/K 35 ps per tap (73 R trace,\n"
             "3.5 mm pitch, loaded); effective tap spacing 70 - 35 = 35 ps, 16 taps = 560 ps window.\n"
             "Gate: BAT15-04W pin 3 on the line (stub < 0.3 mm), 0.47 pF C0G hold caps to PSTRB_A (anode)\n"
-            "/ PSTRB_K (cathode). Strobe >= 2.0 V per side (25 R Thevenin), FWHM 150-250 ps, imbalance < 5 %.",
+            "/ PSTRB_K (cathode). Strobe >= 2.75 V per side with the 80 ps launch stub (~4 V launch), FWHM 220-320 ps.\n"
+            "phase_array RESULT: line measured 75.7 ps/tap with the 70 ps design -> make the meander ~5 ps shorter.",
             P(232, 26), size=T)
     sh.text("READOUT: 2.2 k to VTAP_N (A node) / VTAP_P (K node),\n2 x 1 k summing to COS3502 IN+, IN- = VTH (VTAP_TH).\n"
-            "Hold nodes and the 1 k < 2 mm from the diode; comparator\nnext to its gate. Rising edges only, VTAP_TH ~ +15 mV.\n"
-            "FPGA samples TAP[15:0] at strobe + 12 ns (10-22 ns).", P(232, 54), size=T)
+            "Hold nodes and the 1 k < 2 mm from the diode; comparator\nnext to its gate. Rising edges only, VTAP_TH ~ +17 mV.\n"
+            "FPGA samples TAP[15:0] at strobe + 12 ns (10-22 ns); 50 % duty OK\n(reverse pulse < 0.5 mV; 70 % optional).", P(232, 54), size=T)
     sh.text("line 70 ps/tap", P(X0 + 11, YL[0] + 1), size=T)
     sh.text("strobe lines PSTRB_A / PSTRB_K: 35 ps/tap each", P(X0 + 12, YL[0] - 14.5), size=T)
 

@@ -176,20 +176,20 @@ def main():
     sh.wire(P(127, Y), c4["1"])
     sh.wire(c4["2"], P(142, Y))
     stub(sh, 142, Y, "TL401", 80, 13.2)
-    bal = sh.add("Device:L_Ferrite_Coupled_Small", "T", "DLW21SN900HQ2L", P(170, Y + 1),
+    bal = sh.add("Device:L_Ferrite_Coupled_Small", "T", "DLW21SN900HQ2L", P(180, Y + 1),
                  fp="Inductor_SMD:L_CommonModeChoke_Coilcraft_0805USB", lcsc="C97855", mpn="DLW21SN900HQ2L",
                  fields={"Price": "~0.29 USD", "Note": "CM choke as 1:1 TL balun; check pad map vs Murata drawing"})
     sh.wire(P(142, Y), bal["1"])
     # BAT15 shunt clamp at the launch node, fitted (sim/phase_array/RESULT.md (3): bridge reverse 3.27 -> 1.90 V)
     for rot in (90, 270):
-        dc = sh.add("Device:D_Schottky", "D", "BAT15-03W", P(164, Y + 4), rot=rot, fp="Diode_SMD:D_SOD-323",
+        dc = sh.add("Device:D_Schottky", "D", "BAT15-03W", P(168, Y + 4), rot=rot, fp="Diode_SMD:D_SOD-323",
                     mpn="BAT1503WE6327HTSA1",
                     fields={"Note": "FITTED: clamps the wrong-polarity pulse of the falling edge (K to node, A to GND)"})
         if dc["1"][1] < dc["2"][1]:
             break
         sh.symbols.remove(dc)
         sh._refn["D"] -= 1
-    sh.wire(P(164, Y), dc["1"])
+    sh.wire(P(168, Y), dc["1"])
     sh.gnd(dc["2"])
     sh.gnd(bal["3"])
     sh.wire(bal["2"], P(196, Y))

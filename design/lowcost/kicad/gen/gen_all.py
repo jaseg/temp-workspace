@@ -21,8 +21,12 @@ def run_generators():
     for n in ("fpga_clock", "power", "mcu_if", "root"):
         subprocess.run([sys.executable, os.path.join(HERE, f"gen_{n}.py")], check=True)
     # custom symbols are embedded in each sheet; also collect them into the project library
-    import gen_fpga_clock
-    gen_fpga_clock.fpga_symbol()
+    # (the generators run as subprocesses: collect their embedded "scope-fe:" symbols from the sheet files)
+    for n in SHEETS:
+        tree = schlib.parse_sexpr(open(os.path.join(OUT, n + ".kicad_sch"), encoding="utf-8").read())
+        for sym in schlib.find(schlib.find(tree, "lib_symbols")[0], "symbol"):
+            if str(sym[1]).startswith(schlib.PROJECT + ":"):
+                schlib.CUSTOM.setdefault(str(sym[1]), sym)
     schlib.write_custom_lib(os.path.join(OUT, "scope-fe.kicad_sym"))
     schlib.write_project(OUT, list(SHEETS))
 
@@ -44,10 +48,35 @@ def check(n):
         except AssertionError as e:
             bad += 1
             print("NET CHECK FAILED:", e)
+    # two-pin parts with both pins on one net (a wire drawn through the body after split_wires)
+    pins = {}
+    for k, v in n.items():
+        for r, p in v:
+            pins.setdefault(r, {})[p] = k
+    for r, d in sorted(pins.items()):
+        if len(d) == 2 and len(set(d.values())) == 1:
+            bad += 1
+            print("SHORTED two-pin part:", r, d)
+    for net, m in {"VBIAS_A": {("U702", "7"), ("R717", "2"), ("R205", "1")},
+                   "VBIAS_K": {("U703", "1"), ("R722", "2"), ("R206", "2")},
+                   "STRB_A": {("T401", "2"), ("C201", "1")}, "STRB_K": {("T401", "4"), ("C202", "1")},
+                   "BUF_OUT_S": {("U101", "11"), ("R201", "1")}, "BUF_OUT_T": {("R113", "2"), ("U301", "1")},
+                   "EXT_CLK": {("J102", "1"), ("U301", "3")}, "TRIG_LEVEL": {("U701", "7"), ("U302", "4")},
+                   "TERM_50": {("Q701", "3"), ("K101", "12")}, "VOFS": {("U702", "1"), ("R119", "1")},
+                   "ADC_IN": {("R211", "2"), ("J701", "3")}, "ADC_REF_MID": {("R703", "2"), ("U202", "3")}}.items():
+        try:
+            schlib.assert_net(n, net, m)
+        except AssertionError as e:
+            bad += 1
+            print("NET CHECK FAILED:", e)
     singles = sorted(k for k, v in n.items() if len(v) == 1 and not k.startswith("unconnected"))
-    print(f"netlist: {len(n)} nets, {bad} failed checks; single-node nets: {len(singles)}")
+    nc = sorted(k for k in n if k.startswith("unconnected"))
+    print(f"netlist: {len(n)} nets, {bad} failed checks; single-node nets: {len(singles)}; "
+          f"unconnected (NC-flagged) pins: {len(nc)}")
     for s in singles:
         print("   single:", s, sorted(n[s]))
+    for s in nc:
+        print("   nc:", s)
     return bad
 
 

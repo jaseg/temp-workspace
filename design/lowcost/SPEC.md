@@ -75,6 +75,9 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23; HFD3 relay 1.74.
    the TLV3801 outputs (`sim/phase/RESULT.md`).
 7. **Input stage** as in `sim/input/RESULT.md` (fixed 5:1, HFD3 relay 50 R termination, OPA197 integrator servo).
 8. Power tree, FPGA pins, MCU interface: `kicad/README.md`.
-9. PCB for the layout fragments: 4 layers, JLCPCB JLC04161H-3313 class stack-up (outer prepreg about 0.1 mm,
-   so 50 R microstrip is about 0.17-0.2 mm wide; compute it), layer 2 solid ground, 0402 passives
-   (0201 allowed where a simulation asks for it), 1.6 mm board, SMA edge-launch connectors.
+9. PCB for the layout fragments (revised on user request): **JLCPCB standard 4-layer stack-up JLC04161H-7628**
+   (L1 0.035 mm, prepreg 7628 0.2104 mm er about 4.4, core 1.065 mm, prepreg 0.2104 mm, L4 0.035 mm; 1.6 mm board).
+   50 R outer-layer microstrip with solder mask is about 0.36 mm wide over the L2 ground (compute and state it);
+   every RF trace must have its calculated width for its target impedance over its whole length, with ground
+   pour clearance large enough (>= 2 x trace width, or the coplanar effect included in the calculation).
+   Layer 2 solid ground, 0402 passives (0201 where a simulation asks for it), SMA edge-launch connectors.

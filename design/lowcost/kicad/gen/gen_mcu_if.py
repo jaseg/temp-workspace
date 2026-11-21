@@ -43,19 +43,19 @@ def diffamp(sh, u, x, y, dac, out, r1, r2, ra=None, rb=None, rail=None, note="")
         ra_ = R(sh, ra, (N[0], N[1] - g(5)))
         sh.wire(ra_["2"], N)
         sh.power(rail, ra_["1"], dy=-2.54)
-        rb_ = R(sh, rb, (N[0] - g(4), N[1] - g(5)))
+        rb_ = R(sh, rb, (N[0] - g(6), N[1] - g(5)))
         sh.wire(rb_["2"], (rb_["2"][0], N[1]))
-        sh.power("GND", rb_["1"], dy=-2.54)
+        sh.power("GND", rb_["1"], dy=-2.54, rot=180)
     else:
         rg = R(sh, r2, (N[0], N[1] - g(5)))
         sh.wire(rg["2"], N)
-        sh.power("GND", rg["1"], dy=-2.54)
+        sh.power("GND", rg["1"], dy=-2.54, rot=180)
     M = (x - g(8), minus[1])
     sh.wire(minus, M)
     rm = R(sh, r1, (x - g(18), minus[1]), rot=90)          # VMID -> - (R1)
     sh.wire(rm["2"], M)
     sh.stub(rm, "1", "VMID")
-    rf = R(sh, r2, (x, minus[1] + g(4)), rot=90)            # feedback R2
+    rf = R(sh, r2, (x, minus[1] + g(6)), rot=90)            # feedback R2
     sh.path([M, (M[0], rf["1"][1]), rf["1"]])
     X = o[0] + g(2)
     sh.path([rf["2"], (X, rf["2"][1]), (X, o[1])])
@@ -69,7 +69,7 @@ def diffamp(sh, u, x, y, dac, out, r1, r2, ra=None, rb=None, rail=None, note="")
 def opamp_power(sh, ref, at):
     p = sh.add(OPAMP, ref, "TP2272", at, unit=3, fp=OPA_FP)
     sh.stub(p, "8", "+2V5", kind="power")
-    sh.stub(p, "4", "-2V5", kind="power")
+    sh.power("-2V5", p["4"], dy=5.08, rot=180)
     return p
 
 
@@ -185,7 +185,7 @@ def main():
     sh.gnd(q["2"])
     d = sh.add("Device:D", "D", "1N4148W", (g(226), g(160)), rot=90, fp="Diode_SMD:D_SOD-123", lcsc="C81598")
     sh.wire(q["3"], d["2"], via="vh")
-    sh.power("VBUS", d["1"], dy=-2.54)
+    sh.power("VBUS", d["1"], dy=-5.08)
     sh.path([(q["3"][0], d["2"][1]), (q["3"][0] + g(10), d["2"][1])])
     sh.hlabel("TERM_50", (q["3"][0] + g(10), d["2"][1]), "output")
     sh.text("Relay driver: TERM_50 is the low side of the HFD3/5 coil (coil top on VBUS, input sheet).\n"
@@ -193,7 +193,7 @@ def main():
 
     # I2C pull-ups
     for k, net in enumerate(("I2C_SCL", "I2C_SDA")):
-        r = R(sh, "4.7k", (g(270 + 6 * k), g(160)))
+        r = R(sh, "4.7k", (g(268 + 12 * k), g(160)))
         sh.power("+3V3", r["1"], dy=-2.54)
         sh.stub(r, "2", net)
     sh.text("I2C pull-ups 4.7k (MS5351M at 0x60)", (g(262), g(150)), size=1.0)
