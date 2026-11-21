@@ -227,16 +227,16 @@ for k in range(NT // 2):
     # +3V3 pin 8: pad-wide copper to the 100 n left of the pin, via pair to In2; GND pin 5 via
     p8, p5 = P(ref, "8"), P(ref, "5")
     cref = f"C{346 + k}"
-    xcap = p8[0] - 0.85
-    place2(cref, xcap, p8[1] - 0.05, "v", "+3V3")
+    xcap = p8[0] - 1.30
+    place2(cref, xcap, p8[1] - 0.6, "v", "GND")
     cp = P(cref, "@+3V3")
     cg = P(cref, "@GND")
     T("+3V3", 0.5, [(p8[0], cp[1]), cp], ch=0)
-    for dy in (0.75, 1.4):
-        V(xcap, cp[1] - dy, "+3V3")
-    T("+3V3", 0.45, [cp, (xcap, cp[1] - 1.4)], ch=0)
-    gv(xcap, cg[1] + 0.62)
-    T("GND", W_GND, [cg, (xcap, cg[1] + 0.62)], ch=0)
+    for dy in (0.0, -0.65):
+        V(xcap - 0.7, cp[1] + dy, "+3V3")
+    T("+3V3", 0.45, [cp, (xcap - 0.7, cp[1]), (xcap - 0.7, cp[1] - 0.65)], ch=0.2)
+    gv(xcap, cg[1] - 0.62)
+    T("GND", W_GND, [cg, (xcap, cg[1] - 0.62)], ch=0)
     gv(p5[0], p5[1] - 1.3)
     T("GND", 0.6, [p5, (p5[0], p5[1] - 1.3)], ch=0)
     # outputs: via at the pin, B.Cu stub to the north edge
@@ -260,9 +260,10 @@ T("/trigger_phase/VTH2", 0.3, [P("R381", "@/trigger_phase/VTH2"), (VTH_X["/trigg
 T("/VTAP_TH", 0.25, [P("R380", "@/VTAP_TH"), P("R381", "@/VTAP_TH")], layer="B.Cu", ch=0)
 for cref, rref, net in (("C354", "R380", "/trigger_phase/VTH1"), ("C355", "R381", "/trigger_phase/VTH2")):
     rp = P(rref, "@" + net)
-    place2(cref, rp[0], VTH_Y - 1.15, "v", "GND", side="B")
+    place2(cref, rp[0], VTH_Y - 1.45, "v", "GND", side="B")
     g = P(cref, "@GND")
-    T(net, 0.3, [rp, P(cref, "@" + net)], layer="B.Cu", ch=0)
+    cq = P(cref, "@" + net)
+    T(net, 0.3, [rp, cq], layer="B.Cu", ch=0)
     gx = g[0] + (-0.75 if net.endswith("1") else 0.75)
     gv(gx, g[1])
     T("GND", W_GND, [g, (gx, g[1])], layer="B.Cu", ch=0)
@@ -345,7 +346,7 @@ bplace("TP301", 7.5, YU1 + 0.4, 0, side="B")
 # SEL: pin 9 -> R303 (to -2V5) / R302 (from TRIG_SEL), top side right of the TMUX
 p9 = P("U301", "9")
 place2("R303", 7.5, 2.0, "v", "-2V5")
-place2("R302", 8.4, 2.0, "v", "/TRIG_SEL")
+place2("R302", 8.46, 2.0, "v", "/TRIG_SEL")
 s3 = P("R303", "@Net-(U301-SEL)")
 T("Net-(U301-SEL)", W_SIG, [p9, (s3[0] - 0.49, p9[1]), s3], ch=0)
 T("Net-(U301-SEL)", 0.25, [s3, P("R302", "@Net-(U301-SEL)")], ch=0)
@@ -372,7 +373,8 @@ T("+2V5", 0.25, [q6, (q6[0], ym), (XU2, ym - 0.25)], ch=0)
 V(XU2, ym - 0.25, "+2V5")
 V(XU2, ym - 0.9, "+2V5")
 T("+2V5", 0.3, [(XU2, ym - 0.25), (XU2, ym - 0.9)], ch=0)
-for ref, yy in (("C305", ym - 0.9), ("C306", ym - 0.25)):
+T("+2V5", 0.3, [(XU2, ym - 0.9), (XU2, ym - 1.22)], layer="B.Cu", ch=0)
+for ref, yy in (("C305", ym - 1.22), ("C306", ym - 0.25)):
     place2(ref, XU2 + 0.48, yy, "h", "+2V5", side="B")
     g = P(ref, "@GND")
     gv(g[0] + 0.55, g[1])
@@ -394,15 +396,25 @@ q4 = P("U302", "4")
 V(q4[0], q4[1] + 0.62, "/TRIG_LEVEL")
 T("/TRIG_LEVEL", W_SIG, [q4, (q4[0], q4[1] + 0.62)], ch=0)
 XTL, XTS = 8.75, 9.25
+YTB = 20.8                                 # B.Cu TRIG_LEVEL bus to the passive level network (R383-R385, B side)
 T("/TRIG_LEVEL", W_SIG, [(q4[0], q4[1] + 0.62), (q4[0] + 0.3, q4[1] + 0.92), (XTL - 0.2, q4[1] + 0.92),
-                         (XTL, q4[1] + 1.12), (XTL, BH)], layer="B.Cu")
+                         (XTL, q4[1] + 1.12), (XTL, YTB - 0.4), (XTL - 0.4, YTB), (1.4, YTB)], layer="B.Cu")
+for ref, xr, other in (("R383", 4.6, "/DAC_TRIG"), ("R384", 3.0, "-2V5"), ("R385", 1.4, "GND")):
+    place2(ref, xr, YTB + 0.51, "v", "/trigger_phase/TRIG_LEVEL", side="B")
+    op = P(ref, "@" + other)
+    if other == "/DAC_TRIG":
+        T(other, W_SIG, [op, (op[0], BH)], layer="B.Cu", ch=0)
+        blk.iface("/DAC_TRIG", op[0], BH, "B.Cu", "S", "slow", W_SIG,
+                  "R383 5.1 k to TRIG_LEVEL (passive level network: R384 8.87 k to -2V5, R385 2 k to GND, C304)")
+    else:
+        V(op[0] + 0.8, op[1], other)
+        T(other, 0.3, [op, (op[0] + 0.8, op[1])], layer="B.Cu", ch=0)
 place2("C304", XTL - 0.55, q4[1] + 2.2, "h", "GND", side="B")
 T("/TRIG_LEVEL", W_SIG, [P("C304", "@/TRIG_LEVEL"), (XTL, P("C304", "@/TRIG_LEVEL")[1])], layer="B.Cu", ch=0)
 g = P("C304", "@GND")
 gv(g[0], g[1] + 0.6)
 T("GND", 0.3, [g, (g[0], g[1] + 0.6)], layer="B.Cu", ch=0)
 bplace("TP302", XTL - 0.55, 17.0, 0, side="B")
-blk.iface("/TRIG_LEVEL", XTL, BH, "B.Cu", "S", "slow", W_SIG, "U302 IN- (10 nF C304 at the pin)")
 # TRIG_SEL B.Cu to the south edge
 T("/TRIG_SEL", W_SIG, [ts, (XTS - 0.3, ts[1]), (XTS, ts[1] + 0.3), (XTS, BH)], layer="B.Cu")
 blk.iface("/TRIG_SEL", XTS, BH, "B.Cu", "S", "slow", W_SIG, "R302 10 k to U301 SEL")
@@ -476,11 +488,11 @@ for dx in (-0.3, 0.3):
 T("+3V3", 0.5, [(cpx - 0.3, VIA_Y), (cpx + 0.3, VIA_Y)], ch=0)
 T("+3V3", 0.56, [(cpx, cpy), (cpx, VIA_Y)], ch=0)
 # --- C311 1 u, 12 dB pi pad R307 82 / R308 91 / R309 82, PH_LINE launch
-XC311 = 9.33
+XC311 = 9.42
 place2("C311", XC311, AX, "h", "Net-(U303-RFOUT)")
 T("Net-(U303-RFOUT)", W50, [P("U303", "7"), P("C311", "@Net-(U303-RFOUT)")], name="RFOUT: U303.7 -> FB301 -> C311",
   z=50, rf=True)
-XR307, XR308, XR309 = 10.6, 11.85, 13.1
+XR307, XR308, XR309 = 10.82, 12.24, 13.66
 place2("R307", XR307, AX + 0.51, "v", "Net-(C311-Pad2)")
 place2("R308", XR308, AX, "h", "Net-(C311-Pad2)")
 place2("R309", XR309, AX + 0.51, "v", "Net-(D301-common)")

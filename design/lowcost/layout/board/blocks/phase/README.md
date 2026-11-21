@@ -1,7 +1,7 @@
 # Block "phase": trigger front chain (folded) and 16-tap phase delay line
 To run: `python3 gen_phase.py [--render]`. Outputs: `phase.kicad_pcb`, `phase.ifaces.json`, `phase.png` (F red / B blue) and `phase_detail.png` (front chain, local x 0-14). KiCad 7.0.11. kicad-cli 7 has no DRC or ERC, so the checks below are boardlib's scripted ones.
 **Size**: 99.5 x 22.5 mm at board (0, 22.5), as in FLOORPLAN, with the pstrobe cut-out (local x 9.5-26.5, y 3.5-22.5, except the corridor y 12-18) kept free. The block did not grow.
-The script contains 178 parts: the whole trigger_phase sheet (176) plus J102 and R122, all placed with `Block.place`.
+181 parts: the whole trigger_phase sheet (179, incl. the new R383-R385 level network on B) plus J102 and R122, all with `Block.place`.
 
 **check_board results (refs = this block)**:
 - 0 missing / extra / footprint / value / pad-net / no-net; 0 clearance; 0 corners above 45 deg; 0 RF width deviations; 0 RF pour-gap violations.
@@ -30,7 +30,7 @@ The script contains 178 parts: the whole trigger_phase sheet (176) plus J102 and
 | /PSTRB_A, /PSTRB_K | 26.5, 12.25 / 17.75 | F.Cu W, rf50 | **Deviation**: axis ±2.75, not ±4.4. pstrobe must make the 45° jog (1.65 mm in x) inside its own block. The 0.16 mm section starts on the boundary. |
 | /TAP0-15 | x 29.27-93.74, y 0 | B.Cu N, slow | Via at each comparator pin. |
 | /COARSE | 4.45, 0 | B.Cu N | |
-| /TRIG_LEVEL, /TRIG_SEL | 8.75 / 9.25, 22.5 | B.Cu S | |
+| /DAC_TRIG, /TRIG_SEL | 4.6 / 9.25, 22.5 | B.Cu S | DAC_TRIG via R383 (TRIG_LEVEL is now block-internal) |
 | /VTAP_N, /VTAP_P, /VTAP_TH | 44.15 / 48.66 / 62.22, 22.5 | B.Cu S | VTAP_TH feeds R380 / R381 (on B) between U308 and U309. |
 
 Supplies use via pairs to In2: +3V3 at U303, U304, the comparators and C313; +2V5 at U301 / U302; -2V5 at the U302 EP, R303 and R305. The integrator must provide In2 islands for these. The **VTAP_N / VTAP_P In2 strips are drawn by this block**: merge without `skip_planes`, or redraw them. The In1 GND zone, the In1 cut-outs and an F.Cu GND pour with the RF keep-outs are also in the file.
@@ -42,6 +42,8 @@ Supplies use via pairs to In2: +3V3 at U303, U304, the comparators and C313; +2V
 - **R303 / R302** (SEL divider) are on top, next to the TMUX.
 
 ## Open points
+- **NOT DONE: 24 courtyard overlaps remain** (DRC courtyards_overlap 24): front chain J102/R301/R122/U301/C301, R306/R311/R312/C308/C312/R310/U302, U303/FB301/L302, B-side C302/C303/R304/R305/TP301, J102/TP303/C310 (B); far end R377/TP304/D316 (no 0402 fits inside x 99.5). Fix = shift U301 cluster east 2.2 mm (shunts staggered at x 5.17/6.11), U302 to x 8.2, VSW network to the top strip on B, R377 needs ~0.3 mm block growth or TP304 on B.
+- Silk text 0.3-0.5 mm (DRC text_height/line_width 18 warnings): move refs to F.Fab.
 - The netlist has **both R122 and R301** (49.9 R from EXT_CLK to GND), giving 25 R at the SMA. Both are placed at the pin. Check the schematic.
 - TP304 (LINE_IN) sits after R377 at the far end: a 1.2 mm stub behind the termination.
 - U304 has one +3V3 via (the board edge is too close for a pair).

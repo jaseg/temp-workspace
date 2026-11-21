@@ -14,7 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board"
 W, H = 24.5, 22.0                 # main rectangle
 SX, SY = 29.6, 7.4                # strip for J501 (x W..SX, y 0..SY)
-W50, WS = bl.W50, 0.2
+W50, WS = bl.W50, 0.15
 blk = bl.Block("fpga")
 NL = blk.nl
 REFS = sorted(r for r, c in NL.comps.items() if c["sheet"] == "/fpga_clock/") + ["R407", "R411"]
@@ -177,7 +177,7 @@ def free_maps(code, w):
         occ = (own[li] != -1) & (own[li] != code)
         d = ndimage.distance_transform_edt(~occ) * G
         dists.append(d)
-        ok = (d >= w / 2 + CLR + 0.005) & inside
+        ok = (d >= w / 2 + CLR + 0.015) & inside
         # keep w/2 + 0.05 from the block outline (iface stubs end on it)
         ok &= ndimage.distance_transform_edt(inside) * G >= w / 2 + 0.05 - 1e-9
         out.append(ok)
@@ -452,7 +452,7 @@ TAPX = {i: 8.3 + 0.62 * i for i in range(16)}
 TAPPIN = {NL.net_of("U501", p): p for p in [str(k) for k in list(range(9, 12)) + list(range(13, 25)) + [27]]}
 for i in range(16):
     net = f"/TAP{i}"
-    job("tap%d" % i, lambda net=net, i=i: to_edge(net, ("U501", TAPPIN[net]), TAPX[i] - 0.2, TAPX[i] + 0.2,
+    job("tap%d" % i, lambda net=net, i=i: to_edge(net, ("U501", TAPPIN[net]), 7.0, 17.6,
                                                     note=f"U501.{TAPPIN[net]}"))
 job("clk0", lambda: route("Net-(U502-CLK0)", ("U502", "10"), [("R508", "@Net-(U502-CLK0)")]))
 job("clk1", lambda: route("Net-(U502-CLK1)", ("U502", "9"), [("R509", "@Net-(U502-CLK1)")]))
@@ -484,16 +484,16 @@ job("done", lambda: to_edge("/FPGA_DONE", ("R502", "@FPGA_DONE"), 1.8, 8.0, note
 job("reconf", lambda: to_edge("/FPGA_RECONFIG", ("R501", "@FPGA_RECONFIG"), 1.8, 8.0, note="R501 4.7k pull-up; MCU open-drain"))
 job("adct", lambda: to_edge("/ADC_TRIG", ("U501", "41"), 1.8, 8.0, note="U501.41 -> STM32 PB11"))
 for pin in ("28", "29", "30", "31"):
-    job("spi" + pin, lambda pin=pin: to_edge(NL.net_of("U501", pin), ("U501", pin), 17.9, 24.3, note=f"U501.{pin}"))
-job("mclk", lambda: to_edge("/MCU_CLK", ("R509", "@MCU_CLK"), 17.9, 24.3, note="MS5351M CLK1 via 33 R -> STM32 PF0"))
-job("scl", lambda: to_edge("/I2C_SCL", ("U502", "4"), 17.9, 24.3, note="MS5351M (pull-ups in mcuif)"))
-job("sda", lambda: to_edge("/I2C_SDA", ("U502", "5"), 17.9, 24.3, note="MS5351M"))
+    job("spi" + pin, lambda pin=pin: to_edge(NL.net_of("U501", pin), ("U501", pin), 16.8, 24.3, note=f"U501.{pin}"))
+job("mclk", lambda: to_edge("/MCU_CLK", ("R509", "@MCU_CLK"), 16.8, 24.3, note="MS5351M CLK1 via 33 R -> STM32 PF0"))
+job("scl", lambda: to_edge("/I2C_SCL", ("U502", "4"), 16.8, 24.3, note="MS5351M (pull-ups in mcuif)"))
+job("sda", lambda: to_edge("/I2C_SDA", ("U502", "5"), 16.8, 24.3, note="MS5351M"))
 job("j2", lambda: route("Net-(J501-Pin_2)", ("J501", "2"), [("R511", "@Net-(J501-Pin_2)")]))
 job("j4", lambda: route("Net-(J501-Pin_4)", ("J501", "4"), [("R512", "@Net-(J501-Pin_4)")]))
-job("hrx", lambda: to_edge("/HOST_RX", ("R511", "@HOST_RX"), 17.9, 24.3, note="J501.2 via R511 100 R -> STM32 PA10"))
-job("htx", lambda: to_edge("/HOST_TX", ("R512", "@HOST_TX"), 17.9, 24.3, note="J501.4 via R512 100 R <- STM32 PA9"))
+job("hrx", lambda: to_edge("/HOST_RX", ("R511", "@HOST_RX"), 16.8, 24.3, note="J501.2 via R511 100 R -> STM32 PA10"))
+job("htx", lambda: to_edge("/HOST_TX", ("R512", "@HOST_TX"), 16.8, 24.3, note="J501.4 via R512 100 R <- STM32 PA9"))
 for jp in ("8", "10", "12", "14"):
-    job("j" + jp, lambda jp=jp: to_edge(NL.net_of("J501", jp), ("J501", jp), 17.9, 24.3, note=f"J501.{jp} -> STM32"))
+    job("j" + jp, lambda jp=jp: to_edge(NL.net_of("J501", jp), ("J501", jp), 16.8, 24.3, note=f"J501.{jp} -> STM32"))
 
 
 def vbus():

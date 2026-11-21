@@ -223,14 +223,14 @@
    "note": "from the input stage (BUF802 trigger output)"
   },
   {
-   "net": "/trigger_phase/TRIG_LEVEL",
-   "x": 8.75,
+   "net": "/DAC_TRIG",
+   "x": 4.6,
    "y": 22.5,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.2,
-   "note": "U302 IN- (10 nF C304 at the pin)"
+   "note": "R383 5.1 k to TRIG_LEVEL (passive level network: R384 8.87 k to -2V5, R385 2 k to GND, C304)"
   },
   {
    "net": "/TRIG_SEL",

@@ -62,11 +62,15 @@ class Frame:
     def track(s, net, w, pts, layer="F.Cu", name=None, z=None, ch=0.2):
         pts = [(p[0], ("@" + A(p[1][1:])) if str(p[1]).startswith("@") else p[1]) if isinstance(p[0], str) else p
                for p in pts]
-        q = blk.track(A(net), w, [s.T(p) for p in pts], layer, name=name, z=z, ch=ch)
-        if z:
-            RFPOLY.append((q, w))
-        return q
-
+        q = [blk.pad(*p) if isinstance(p[0], str) else s.T(p) for p in pts]
+        out = []
+        for piece in split_at_pads(A(net), q, layer):
+            piece, ch_ = pad_escape(A(net), piece, layer, ch)
+            r = blk.track(A(net), w, piece, layer, name=name, z=z, ch=ch_)
+            if z:
+                RFPOLY.append((r, w))
+            out += r if not out else r[1:]
+        return out
     def via(s, x, y, net, dia=bl.VIA_D, drill=bl.VIA_DRILL):
         return blk.via(x + s.dx, y + s.dy, A(net), dia, drill)
 
@@ -106,158 +110,227 @@ class Frame:
         blk.zone(A(net), layers, [s.T(p) for p in pts], clearance, prio, minw)
 
 
+def _pad_at(net, p, layer):
+    """local helper: the pad of net under point p (block-local) on layer, with its half extents"""
+    lay = pcbnew.F_Cu if layer == "F.Cu" else pcbnew.B_Cu if layer == "B.Cu" else None
+    if lay is None:
+        return None
+    v = blk.P(*p)
+    for f in blk.fps.values():
+        for pd in f.Pads():
+            if pd.GetNetname() == net and pd.IsOnLayer(lay) and pd.HitTest(v):
+                bb = pd.GetBoundingBox()
+                return (pcbnew.ToMM(bb.GetWidth()) / 2, pcbnew.ToMM(bb.GetHeight()) / 2,
+                        blk.loc(pd.GetPosition()))
+    return None
+
+
+def split_at_pads(net, q, layer):
+    """local helper: split a polyline at interior points that lie on a pad of the same net"""
+    pieces, cur = [], [q[0]]
+    for i, p in enumerate(q[1:], 1):
+        cur.append(p)
+        if i < len(q) - 1 and _pad_at(net, p, layer):
+            pieces.append(cur)
+            cur = [p]
+    pieces.append(cur)
+    return [c for c in pieces if len(c) > 1]
+
+
+def pad_escape(net, q, layer, ch):
+    """local helper (boardlib.Block.track has no pad-axis escape): a track that starts / ends on a pad leaves
+    it along a pad axis; insert an escape point beyond the pad edge and shorten the chamfer leg so that no
+    diagonal starts inside the pad"""
+    q = list(q)
+    for end in (0, 1):
+        if end:
+            q.reverse()
+        pp = _pad_at(net, q[0], layer)
+        if pp and len(q) >= 2:
+            hx, hy, _c = pp
+            P, Q = q[0], q[1]
+            dx, dy = Q[0] - P[0], Q[1] - P[1]
+            if abs(dx) > 1e-4 and abs(dy) > 1e-4:
+                cands = []
+                for ax in ((0, 1) if abs(dx) >= abs(dy) else (1, 0)):
+                    d, o, h = (dx, dy, hx) if ax == 0 else (dy, dx, hy)
+                    for e in (h + 0.05, h + 0.05 + ch):
+                        if abs(d) - e >= abs(o) - 1e-6 or (e == h + 0.05 + ch and abs(d) > e + 0.05):
+                            E = (P[0] + math.copysign(e, d), P[1]) if ax == 0 else (P[0], P[1] + math.copysign(e, d))
+                            cands.append(E)
+                            break
+                    if cands:
+                        break
+                if cands:
+                    q.insert(1, cands[0])
+            # chamfer leg: the first corner's chamfer must start outside the pad
+            if len(q) > 2:
+                L0 = math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1])
+                ch = max(0.03, min(ch, L0 - max(hx, hy) - 0.02))
+        if end:
+            q.reverse()
+    return q, ch
+
+
 RFPOLY = []
 gv = lambda fr, x, y: fr.via(x, y, "GND")
 rect = bl.rect_pts
 
-# ============================================================================= INPUT STAGE (frame FI)
-OYI = 4.0                                  # input fragment origin at block (0, 4.0): SMA clear of the M3 hole
-FI = Frame(0.0, OYI)
-Y0 = 6.3
+# ============================================================================= INPUT STAGE (block-local mm)
+# Fragment geometry (SMA launch, divider, BUF802, OUT -> R201) re-placed so that no two courtyards overlap:
+# C101 moved 0.26 mm right of the J101 courtyard (SMA pad end -> C101 1.15 mm), 0402 columns at courtyard pitch.
+OYI = 4.0                                  # fragment origin offset (kept for the clamp rows / launch)
+FI = Frame(0.0, OYI)                       # fragment frame (launch, clamp rows)
+FL = Frame(0.0, 0.0)                       # block-local frame
+Y0 = 6.3                                   # line axis, fragment frame (local 10.30)
+YL0 = Y0 + OYI
 X_PAD_END = 3.7
 X_TAPER = X_PAD_END + 0.8
-X_CT = X_TAPER + 0.07 + 0.78
-XA = 5.05
-x_ga = X_CT + 0.88
-x_rg = x_ga + 0.88
-x_bi = x_rg + 0.51
-XU = x_bi + 3.125
-YU = Y0 + 0.25
-TAP_DY = W / 2 - 0.08 + 0.27 + 0.51
-V = lambda ref, x, y, top, side="F": FI.two(ref, x, y, "v", top, side)
-Hz = lambda ref, x, y, left, side="F": FI.two(ref, x, y, "h", left, side)
+X_CT = 4.70 + 0.91                         # C101 courtyard touches the J101 courtyard (x 4.70)
+XA = 5.17                                  # alpha-string column (courtyard touches J101's)
+X_RG = X_CT + 0.91 + 0.93                  # R104 (Rg)
+x_ga = 6.50
+X_BI = 7.85                                # R105 / R106 column
+XU = 10.75
+YU = YL0 + 0.25
+W_ = W
+VL = lambda ref, x, y, top, side="F": FL.two(ref, x, y, "v", top, side)
+HL = lambda ref, x, y, left, side="F": FL.two(ref, x, y, "h", left, side)
+gl = lambda x, y: FL.via(x, y, "GND")
 
 FI.place("J101", 2.1, Y0, 270)
-Hz("C101", X_CT, Y0, "VIN")
-V("R114", XA, Y0 + TAP_DY, "VIN")
-Hz("R104", x_rg, Y0, "GA")
-V("C102", x_ga, Y0 + 1.3, "GA")
-V("R105", x_bi, Y0 + 1.3, "BUF_IN")
-V("R106", x_bi, Y0 + 2.9, "IN_BIAS_MID")
-FI.place("U101", XU, YU, 0)
+HL("C101", X_CT, YL0, "VIN")
+VL("R114", XA, YL0 + 1.40, "VIN")
+VL("R115", XA, YL0 + 3.26, "S1")
+VL("R116", XA, YL0 + 5.12, "S2")
+HL("R104", X_RG, YL0, "GA")
+VL("C102", x_ga, YL0 + 1.40, "GA")
+VL("R105", X_BI, YL0 + 1.40, "BUF_IN")
+VL("R106", X_BI, YL0 + 3.26, "IN_BIAS_MID")
+FL.place("U101", XU, YU, 0)
 X_P11 = XU + 1.875
-x_sp = X_P11 + 0.67 + 0.32
-V("R112", x_sp, Y0 + TAP_DY, "BUF_OUT_S")
-V("R113", x_sp, Y0 + TAP_DY + 1.6, "RT_MID")
-X_R118 = x_sp + 0.75                       # pulled 0.2 mm left (fragment 0.95) so R201 sits 2.8 mm from OUT
-V("R118", X_R118, Y0 - TAP_DY, "FB")
-V("C108", XU - 2.4, Y0 - 1.36, "GND")      # VS+ pin 1
-V("C109", x_sp, Y0 - 1.36, "GND")          # VSO+ pin 12 (fragment C117)
-y_bot_cap = YU + 1.875 + 0.2 + 0.27 + 0.51
-V("C112", XU - 0.65, y_bot_cap, "-5V")     # VS- pins 5/6 (fragment C110)
-V("R107", XU + 0.25, y_bot_cap, "R_BIAS")
-V("C113", XU + 1.15, y_bot_cap, "-5V")     # pins 8/10 (fragment C111)
+XTAPR, XTAPF = 13.80, 14.27                # R112 (down) / R118 (up) taps on BUF_OUT_S
+VL("R112", XTAPR, YL0 + 0.93, "BUF_OUT_S")
+VL("R113", XTAPR, YL0 + 2.79, "RT_MID")
+VL("R118", XTAPF, YL0 - 0.93, "FB")
+X_R118 = XTAPF
+VL("C108", 8.16, 8.90, "GND")              # VS+ pin 1
+VL("C109", 13.34, YL0 - 1.30, "GND")       # VSO+ pin 12
+YBC = 12.68 + 0.93                         # bottom row under U101 (courtyards touch U101's)
+VL("C112", XU - 0.95, YBC, "-5V")          # VS- pins 5 / 6
+VL("R107", XU, YBC, "R_BIAS")
+VL("C113", XU + 0.95, YBC, "-5V")          # pins 8 / 10
 Y_CL = Y0 - 3.4
 for ref, x, top in (("R109", XU - 3.1, "GND"), ("R108", XU - 2.15, "+2V5"), ("C103", XU - 1.2, "GND"),
                     ("C104", XU + 1.2, "GND"), ("R110", XU + 2.15, "-2V5"), ("R111", XU + 3.1, "GND")):
-    V(ref, x, Y_CL - 0.51, top)
-FI.place("TP101", XU - 4.3, Y_CL - 1.2)
-FI.place("TP102", XU + 4.3, Y_CL - 1.2)
-V("R115", XA, Y0 + TAP_DY + 1.6, "S1")
-V("R116", XA, Y0 + TAP_DY + 3.2, "S2")
-XO, YO = XA + 0.95, Y0 + 6.8
-FI.place("U102", XO, YO, 270)
-Y_P3O = YO - 1.1375
-Hz("R117", XA - 1.13, YO - 2.05, "GND")
-Hz("C105", XA - 1.13, Y_P3O, "GND")
-V("C114", XO, YO - 1.1, "-5V", side="B")           # OPA V- (fragment C113)
-V("C110", XO + 0.95, YO + 1.0, "GND", side="B")    # OPA V+ (fragment C112)
-x_p1o = XO + 0.95
-Hz("R121", x_p1o + 0.51, Y0 + 4.3, "OPA_OUT")
-V("C107", x_bi + 1.02, Y0 + 4.81, "IN_AUX")
-FI.place("TP103", XA + 1.25, Y0 + 3.4)
-X_CI = XO + 1.9
-V("C106", X_CI, YO - 0.2, "OPA_OUT")
-Y_FB = YO + 2.25
-Hz("R120", X_CI + 0.27, Y_FB, "FB")
-V("R119", XO + 0.5, Y_FB + 0.51, "FB")
-WI = 15.3
-FI.place("RV101", WI - 3.25, YO + 1.75, 90)
-YJ = 17.6 - 0.9
-V("C116", 1.15, YJ - 2.4, "GND", side="B")         # 10u -5V bulk (bottom)
-V("C111", 2.9, YJ - 2.4, "GND", side="B")          # 10u +5V bulk (bottom, fragment C115)
-V("C115", X_P11 + 0.3, Y0 + 2.45, "-5V", side="B") # 100n -5V at the pin-10 via (bottom)
-FI.place("TP104", 4.2, YJ + 0.2)
+    FI.two(ref, x, Y_CL - 0.51, "v", top)
+FI.place("TP101", XU - 4.6, Y_CL - 1.2)
+FI.place("TP102", XU + 4.6, Y_CL - 1.2)
+# servo (OPA197) bottom-left: U102 rot 180, TAP top right, OPA_OUT bottom right, FB / +5V left
+XO, YO = 2.45, 16.20
+FL.place("U102", XO, YO, 180)
+VL("R117", XA, 17.28, "TAP")
+VL("C105", XA + 0.93, 17.28, "TAP")
+VL("C107", X_BI, 15.42, "IN_AUX")
+VL("R119", 1.00, 19.40, "VOFS")
+VL("R123", 1.94, 19.40, "VNEG_REF")
+VL("C106", 3.59, 19.40, "OPA_OUT")
+HL("R121", 5.60, 18.90, "OPA_OUT")
+HL("R120", 7.85, 20.20, "FB")
+FL.place("RV101", 12.05, 18.85, 90)
+# bottom side: U102 decoupling, bulk, test points
+VL("C114", 1.60, 15.72, "GND", side="B")
+HL("C110", 3.40, 17.15, "+5V", side="B")
+HL("C116", 11.70, 15.60, "-5V", side="B")
+HL("C111", 11.70, 17.65, "+5V", side="B")
+VL("C115", 13.25, 12.60, "-5V", side="B")
+FL.place("TP103", 5.40, 20.40, 0, "B")
+FL.place("TP104", 3.20, 20.45, 0, "B")
 
-# --- routing (fragment geometry)
+# --- launch, divider
 FI.zone("VIN", ["F.Cu"], [(X_PAD_END - 0.3, Y0 - 0.635), (X_PAD_END, Y0 - 0.635), (X_TAPER, Y0 - W / 2),
                           (X_TAPER, Y0 + W / 2), (X_PAD_END, Y0 + 0.635), (X_PAD_END - 0.3, Y0 + 0.635)],
         clearance=0.25, prio=5, minw=0.1)
-FI.track("VIN", W, [(X_TAPER - 0.05, Y0), ("C101", "1")], name="VIN: SMA taper -> Ctop")
-FI.track("VIN", W, [("R114", "@VIN"), (XA, Y0)])
-FI.keepout(rect(XA - 0.93, Y0 + 0.2, XA + 0.93, FI.pad("R114", "@VIN")[1] + 0.93))
+FL.track("VIN", W, [(X_TAPER - 0.05, YL0), ("C101", "1")], name="VIN: SMA taper -> Ctop")
+FL.track("VIN", W, [("R114", "@VIN"), (XA, YL0)])
+FL.keepout(rect(XA - 0.93, YL0 + 0.2, XA + 0.93, FL.pad("R114", "@VIN")[1] + 0.93))
 for sy in (-1, 1):
     gv(FI, 3.9, Y0 + sy * 3.8)
-FI.track("GA", 0.3, [("C101", "2"), ("R104", "@GA")])
-FI.track("GA", 0.3, [(x_ga, Y0), ("C102", "@GA")])
-y_cbv = FI.pad("C102", "@GND")[1] + 0.64
-gv(FI, x_ga, y_cbv)
-FI.track("GND", W_GND, [("C102", "@GND"), (x_ga, y_cbv)])
-p2, p3, p4 = FI.pad("U101", "2"), FI.pad("U101", "3"), FI.pad("U101", "4")
-FI.track("BUF_IN", W_HZ, [("R104", "@BUF_IN"), p2])
-FI.track("BUF_IN", 0.3, [("R104", "@BUF_IN"), ("R105", "@BUF_IN")])
-FI.track("IN_BIAS_MID", 0.3, [("R105", "@IN_BIAS_MID"), ("R106", "@IN_BIAS_MID")])
-xb = x_bi + 0.67
-r1062 = FI.pad("R106", "@IN_BIAS")
-FI.track("IN_BIAS", W_HZ, [p3, (XU - 2.0, p3[1]), (xb, p3[1] + XU - 2.0 - xb), (xb, Y0 + 2.95),
-                          (xb - (r1062[1] - Y0 - 2.95), r1062[1]), r1062])
-xa_ = xb + 0.35
-c107 = FI.pad("C107", "@IN_AUX")
-FI.track("IN_AUX", W_SIG, [p4, (xa_ + 0.2, p4[1]), (xa_, p4[1] + 0.2), (xa_, c107[1]), c107])
-FI.track("IN_AUX", 0.3, [("R121", "@IN_AUX"), c107])
-c1072 = FI.pad("C107", "@GND")
-gv(FI, c1072[0], c1072[1] + 0.7)
-FI.track("GND", W_GND, [c1072, (c1072[0], c1072[1] + 0.7)])
+FL.track("GA", 0.3, [("C101", "2"), ("R104", "@GA")])
+FL.track("GA", 0.3, [(x_ga, YL0), ("C102", "@GA")])
+x, y = FL.pad("C102", "@GND")
+gl(x, y + 0.64)
+FL.track("GND", W_GND, [(x, y), (x, y + 0.64)])
+p2, p3, p4 = FL.pad("U101", "2"), FL.pad("U101", "3"), FL.pad("U101", "4")
+FL.track("BUF_IN", W_HZ, [("R104", "@BUF_IN"), p2])
+rb = FL.pad("R104", "@BUF_IN")
+r105 = FL.pad("R105", "@BUF_IN")
+FL.track("BUF_IN", 0.3, [rb, (rb[0], rb[1] + 0.35), (r105[0], r105[1] - 0.45), r105])
+FL.track("IN_BIAS_MID", 0.3, [("R105", "@IN_BIAS_MID"), ("R106", "@IN_BIAS_MID")])
+# IN_BIAS: pin 3 -> via in the channel -> B.Cu -> via left of R106 -> R106
+XCH = 8.52
+FL.track("IN_BIAS", W_HZ, [p3, (XCH, p3[1])])
+FL.via(XCH, p3[1], "IN_BIAS")
+r106 = FL.pad("R106", "@IN_BIAS")
+FL.via(7.0, r106[1], "IN_BIAS")
+FL.track("IN_BIAS", W_HZ, [(7.0, r106[1]), r106])
+FL.track("IN_BIAS", W_HZ, [(XCH, p3[1]), (XCH, 13.3), (XCH - 0.77, 14.07), (7.0, r106[1])], layer="B.Cu")
+# IN_AUX: pin 4 -> channel x 8.55 -> C107 (100p at the pin) -> R121
+XIA = 8.55
+c107 = FL.pad("C107", "@IN_AUX")
+r121 = FL.pad("R121", "@IN_AUX")
+FL.track("IN_AUX", W_SIG, [p4, (XIA, p4[1]), (XIA, r121[1]), r121])
+FL.track("IN_AUX", W_SIG, [(XIA, c107[1]), c107])
+x, y = FL.pad("C107", "@GND")
+gl(x, y + 0.70)
+FL.track("GND", W_GND, [(x, y), (x, y + 0.70)])
 # U101 supplies
-p1, p12 = FI.pad("U101", "1"), FI.pad("U101", "12")
-c108 = FI.pad("C108", "@+5V")
-FI.track("+5V", 0.25, [p1, (c108[0] + 0.55, p1[1]), (c108[0] + 0.3, c108[1] + 0.05)])
-for y in (Y0 - 1.15, Y0 - 1.7):
-    FI.via(XU - 1.55, y, "+5V")
-FI.zone("+5V", ["F.Cu"], rect(c108[0] - 0.32, Y0 - 1.95, XU - 1.33, Y0 - 0.68))
-c1081 = FI.pad("C108", "@GND")
-gv(FI, c108[0], Y0 - 2.55)
-FI.track("GND", W_GND, [c1081, (c108[0], Y0 - 2.55)])
-c117 = FI.pad("C109", "@+5V")
-FI.track("+5V", 0.25, [p12, (X_P11 + 0.12, p12[1]), (X_P11 + 0.12 + p12[1] - c117[1], c117[1]), c117])
-for xy in ((XU + 1.5, Y0 - 1.2), (XU + 1.75, Y0 - 1.85)):
-    FI.via(*xy, "+5V")
-FI.zone("+5V", ["F.Cu"], [(XU + 1.2, Y0 - 0.85), (XU + 1.2, Y0 - 2.15), (XU + 2.05, Y0 - 2.15), (XU + 2.05, Y0 - 1.15),
-                          (c117[0] + 0.32, Y0 - 1.15), (c117[0] + 0.32, Y0 - 0.85), (XU + 1.95, Y0 - 0.85),
-                          (XU + 1.95, Y0 - 0.85)])
-gv(FI, c117[0], Y0 - 2.55)
-FI.track("GND", W_GND, [("C109", "@GND"), (c117[0], Y0 - 2.55)])
-p5, p6, p7, p8, p10 = (FI.pad("U101", n) for n in ("5", "6", "7", "8", "10"))
-c110, c111 = FI.pad("C112", "@-5V"), FI.pad("C113", "@-5V")
-FI.zone("-5V", ["F.Cu"], [(p5[0] - 0.13, YU + 1.3), (p6[0] + 0.13, YU + 1.3), (p6[0] + 0.13, YU + 2.05),
-                          (c110[0] + 0.32, c110[1] - 0.2), (c110[0] + 0.32, c110[1] + 0.3), (XU - 1.65, c110[1] + 0.6),
-                          (XU - 1.65, YU + 1.95), (p5[0] - 0.13, YU + 1.95)])
-FI.track("-5V", 0.25, [p5, (p5[0], YU + 2.0), c110])
-FI.track("-5V", 0.25, [p6, (p6[0], YU + 1.95), c110])
-for y in (Y0 + 2.45, Y0 + 3.05):
-    FI.via(XU - 1.35, y, "-5V")
-FI.zone("-5V", ["F.Cu"], [(p8[0] - 0.13, YU + 1.3), (p8[0] + 0.13, YU + 1.3), (XU + 1.75, YU + 1.3),
-                          (XU + 1.75, YU + 2.45), (c111[0] + 0.32, YU + 2.45), (c111[0] + 0.32, c111[1] + 0.3),
-                          (c111[0] - 0.32, c111[1] + 0.3), (p8[0] - 0.13, YU + 2.0)])
-FI.track("-5V", 0.25, [p8, (p8[0], YU + 1.95), c111])
-FI.track("-5V", 0.25, [p10, (X_P11 + 0.05, p10[1]), (X_P11 + 0.3, p10[1] + 0.25), (X_P11 + 0.3, Y0 + 1.45)])
-FI.via(X_P11 + 0.3, Y0 + 1.45, "-5V")
-FI.track("-5V", 0.4, [(X_P11 + 0.3, Y0 + 1.45), ("C115", "@-5V")], layer="B.Cu")
-c1152 = FI.pad("C115", "@GND")
-gv(FI, c1152[0], c1152[1] + 0.65)
-FI.track("GND", W_GND, [c1152, (c1152[0], c1152[1] + 0.65)], layer="B.Cu")
-for xy in ((XU + 1.5, Y0 + 1.7), (XU + 1.75, Y0 + 2.35)):
-    FI.via(*xy, "-5V")
-FI.track("R_BIAS", 0.25, [p7, ("R107", "@R_BIAS")])
-yv = FI.pad("C112", "@GND")[1] + 0.68
+p1, p12 = FL.pad("U101", "1"), FL.pad("U101", "12")
+c108 = FL.pad("C108", "@+5V")
+FL.track("+5V", 0.25, [p1, (8.75, p1[1]), (8.55, 9.60), (c108[0], 9.60)])
+for y in (YL0 - 1.15, YL0 - 1.7):
+    FL.via(XU - 1.55, y, "+5V")
+FL.zone("+5V", ["F.Cu"], rect(c108[0] - 0.32, YL0 - 1.95, XU - 1.33, YL0 - 0.68))
+c1081 = FL.pad("C108", "@GND")
+gl(c108[0], 7.75)
+FL.track("GND", W_GND, [c1081, (c108[0], 7.75)])
+c117 = FL.pad("C109", "@+5V")
+FL.track("+5V", 0.25, [p12, (c117[0], p12[1]), c117])
+for xy in ((XU + 1.5, YL0 - 1.2), (XU + 1.75, YL0 - 1.85)):
+    FL.via(*xy, "+5V")
+FL.zone("+5V", ["F.Cu"], [(XU + 1.2, YL0 - 0.85), (XU + 1.2, YL0 - 2.15), (XU + 2.05, YL0 - 2.15),
+                          (XU + 2.05, YL0 - 1.15), (c117[0] + 0.32, YL0 - 1.15), (c117[0] + 0.32, YL0 - 0.85)])
+gl(c117[0], 7.75)
+FL.track("GND", W_GND, [("C109", "@GND"), (c117[0], 7.75)])
+p5, p6, p7, p8, p10 = (FL.pad("U101", n) for n in ("5", "6", "7", "8", "10"))
+c112, c113 = FL.pad("C112", "@-5V"), FL.pad("C113", "@-5V")
+YP = 12.60
+FL.track("-5V", 0.25, [p5, (p5[0], YP), c112])
+FL.track("-5V", 0.25, [p6, (p6[0], 12.50), (p5[0], 12.50)])
+FL.zone("-5V", ["F.Cu"], [(p5[0] - 0.13, 12.0), (p6[0] + 0.13, 12.0), (p6[0] + 0.13, 12.45), (10.27, 12.68),
+                          (10.27, 13.50), (8.80, 13.50), (8.80, 12.55), (p5[0] - 0.13, 12.55)])
+for y in (12.80, 13.45):
+    FL.via(9.0, y, "-5V")
+FL.track("-5V", 0.25, [p8, (p8[0], YP), c113])
+FL.zone("-5V", ["F.Cu"], [(p8[0] - 0.13, 12.0), (12.80, 12.0), (12.80, 12.95), (12.05, 12.95), (12.05, 13.45),
+                          (11.37, 13.45), (11.37, 12.55), (p8[0] - 0.13, 12.55)])
+for xy in ((12.25, 12.0), (12.5, 12.65)):
+    FL.via(*xy, "-5V")
+FL.track("-5V", 0.25, [p10, (12.75, p10[1]), (13.0, 11.05)])
+FL.via(13.0, 11.05, "-5V")
+FL.track("-5V", 0.4, [(13.0, 11.05), ("C115", "@-5V")], layer="B.Cu")
+x, y = FL.pad("C115", "@GND")
+gl(12.65, 13.60)
+FL.track("GND", W_GND, [(x, y), (x, y + 0.45), (12.65, 13.60)], layer="B.Cu")
+FL.track("R_BIAS", 0.25, [p7, (p7[0], 12.55), (XU, 12.795), ("R107", "@R_BIAS")])
 for ref, net in (("C112", "GND"), ("R107", "-5V"), ("C113", "GND")):
-    x, y = FI.pad(ref, "@" + net)
-    FI.via(x, yv, net)
-    FI.track(net, W_GND, [(x, y), (x, yv)])
+    x, y = FL.pad(ref, "@" + net)
+    FL.via(x, y + 0.68, net)
+    FL.track(net, W_GND, [(x, y), (x, y + 0.68)])
 for dx in (-0.42, 0.42):
     for dy in (-0.42, 0.42):
-        FI.via(XU + dx, YU + dy, "GND")
-# clamp dividers
+        FL.via(XU + dx, YU + dy, "GND")
+# clamp dividers (fragment frame)
 p14, p15 = FI.pad("U101", "14"), FI.pad("U101", "15")
 for p_, ref, net in ((p15, "C103", "CLH"), (p14, "C104", "CLL")):
     xc = FI.pad(ref, "@" + net)[0]
@@ -275,99 +348,102 @@ for ref, top in (("R109", "GND"), ("R108", "+2V5"), ("C103", "GND"), ("C104", "G
     x, y = FI.pad(ref, "@" + top)
     FI.via(x, YCV, top)
     FI.track(top, W_GND, [(x, y), (x, YCV)])
-# outputs: OUT pin -> BUF_OUT_S -> R201 (sampler, below); 49.9R + 0R -> BUF_OUT_T to the south boundary
-p11 = FI.pad("U101", "11")
-FI.track("BUF_OUT_S", W, [("R112", "@BUF_OUT_S"), (x_sp, Y0)], name="R112 tap", z=50)
-FI.track("BUF_OUT_S", W, [("R118", "@BUF_OUT_S"), (X_R118, Y0)], name="R118 tap", z=50)
-FI.track("RT_MID", 0.4, [("R112", "@RT_MID"), ("R113", "@RT_MID")])
-xt, yt0 = FI.pad("R113", "@BUF_OUT_T")
-X_T = 15.75                                  # BUF_OUT_T exit column (FLOORPLAN: analog S, x 15.3)
-Y_SOUTH = BH - OYI
-q_t = FI.track("BUF_OUT_T", W, [(xt, yt0), (xt, yt0 + 0.9), (X_T, yt0 + 0.9 + X_T - xt), (X_T, Y_SOUTH)],
+# outputs: taps on BUF_OUT_S; 49.9R + 0R -> BUF_OUT_T to the south boundary
+FL.track("BUF_OUT_S", W, [("R112", "@BUF_OUT_S"), (XTAPR, YL0)], name="R112 tap", z=50)
+FL.track("BUF_OUT_S", W, [("R118", "@BUF_OUT_S"), (XTAPF, YL0)], name="R118 tap", z=50)
+FL.track("RT_MID", 0.4, [("R112", "@RT_MID"), ("R113", "@RT_MID")])
+xt, yt0 = FL.pad("R113", "@BUF_OUT_T")
+X_T = 15.75
+q_t = FL.track("BUF_OUT_T", W, [(xt, yt0), (xt, 14.5), (X_T, 14.5 + X_T - xt), (X_T, BH)],
                name="BUF_OUT_T: 0R -> south boundary", z=50, ch=0.3)
-# Rf1 sense: FB via above R118, B.Cu down the right side to the Cint drop
-r118 = FI.pad("R118", "@FB")
-FI.via(r118[0], Y0 - 2.1, "FB")
-FI.track("FB", W_SIG, [r118, (r118[0], Y0 - 2.1)])
-Y_FBB = YO + 1.1
-FI.track("FB", W_SIG, [(r118[0], Y0 - 2.1), (r118[0], Y_FBB - 0.7), (r118[0] - 0.7, Y_FBB), (X_CI, Y_FBB)],
-         layer="B.Cu")
-FI.via(X_CI, Y_FBB, "FB")
-# alpha string, servo
-FI.track("S1", 0.3, [("R114", "@S1"), ("R115", "@S1")])
-FI.track("S2", 0.3, [("R115", "@S2"), ("R116", "@S2")])
-p3o = FI.pad("U102", "3")
-FI.track("TAP", 0.3, [("R116", "@TAP"), p3o])
-r1172 = FI.pad("R117", "@TAP")
-FI.track("TAP", W_SIG, [r1172, (XA, r1172[1])])
-FI.track("TAP", 0.3, [("C105", "@TAP"), p3o])
-for ref in ("R117", "C105"):
-    x, y = FI.pad(ref, "@GND")
-    gv(FI, x - 0.7, y)
-    FI.track("GND", W_GND, [(x, y), (x - 0.7, y)])
-p2o, p5o, p1o, p4o = FI.pad("U102", "2"), FI.pad("U102", "5"), FI.pad("U102", "1"), FI.pad("U102", "4")
-FI.via(p2o[0], YO - 2.2, "-5V")
-FI.track("-5V", 0.6, [p2o, (p2o[0], YO - 2.2)])
-FI.track("-5V", 0.5, [(p2o[0], YO - 2.2), ("C114", "@-5V")], layer="B.Cu")
-gv(FI, XO, YO)
-FI.track("GND", 0.5, [("C114", "@GND"), (XO, YO)], layer="B.Cu")
-c112 = FI.pad("C110", "@GND")
-FI.track("GND", 0.5, [c112, (c112[0], c112[1] - 0.05), (c112[0] - (c112[1] - 0.05 - YO), YO), (XO + 0.05, YO)], layer="B.Cu")
-FI.via(XO, p5o[1], "+5V")
-FI.track("+5V", 0.6, [p5o, (XO, p5o[1])])
-c1122 = FI.pad("C110", "@+5V")
-FI.track("+5V", 0.5, [(XO, p5o[1]), (XO + c1122[1] - p5o[1], c1122[1]), c1122], layer="B.Cu")
-r121 = FI.pad("R121", "@OPA_OUT")
-FI.track("OPA_OUT", W_SIG, [p1o, r121])
-tp3 = FI.pad("TP103", "1")
-FI.track("OPA_OUT", W_SIG, [tp3, (r121[0], tp3[1] + r121[0] - tp3[0]), r121])
-c106 = FI.pad("C106", "@OPA_OUT")
-FI.track("OPA_OUT", W_SIG, [p1o, (c106[0] - (c106[1] - p1o[1]), p1o[1]), c106])
-FI.track("FB", W_SIG, [p4o, (p4o[0], Y_FB - 0.4), (p4o[0] + 0.4, Y_FB), ("R120", "@FB")])
-FI.track("FB", 0.25, [("C106", "@FB"), (X_CI, Y_FBB)])
-FI.track("FB", 0.25, [(X_CI, Y_FBB), (X_CI, Y_FB)])
-rv1 = FI.pad("RV101", "1")
-r1202 = FI.pad("R120", "@RF2_MID")
-FI.track("RF2_MID", 0.3, [r1202, (r1202[0] + rv1[1] - r1202[1], rv1[1]), rv1])
-x, y = FI.pad("RV101", "3")
-gv(FI, x + 1.5, y)
-FI.track("GND", W_GND, [(x, y), (x + 1.5, y)])
-x, y = FI.pad("RV101", "2")
-gv(FI, x, y + 1.5)
-FI.track("GND", W_GND, [(x, y), (x, y + 1.5)])
-# VOFS: Rofs pad -> via -> B.Cu stub to the south boundary
-r1192 = FI.pad("R119", "@VOFS")
-X_VOFS = r1192[0] - 0.6
-FI.track("VOFS", W_SIG, [r1192, (r1192[0], r1192[1] + 0.3), (X_VOFS, r1192[1] + 0.9)])
-FI.via(X_VOFS, r1192[1] + 0.9, "VOFS")
-FI.track("VOFS", W_SIG, [(X_VOFS, r1192[1] + 0.9), (X_VOFS, Y_SOUTH)], layer="B.Cu")
-# bulk caps (bottom): supply pad -> via pair to In2, GND pad -> via
-for ref, net in (("C116", "-5V"), ("C111", "+5V")):
-    x, y = FI.pad(ref, "@" + net)
-    FI.via(x - 0.35, y + 0.95, net)
-    FI.via(x + 0.35, y + 0.95, net)
-    FI.track(net, 0.6, [(x, y), (x, y + 0.95)], layer="B.Cu")
-    FI.track(net, 0.6, [(x - 0.35, y + 0.95), (x + 0.35, y + 0.95)], layer="B.Cu")
-    x, y = FI.pad(ref, "@GND")
-    gv(FI, x, y - 0.95)
-    FI.track("GND", 0.6, [(x, y), (x, y - 0.95)], layer="B.Cu")
-x, y = FI.pad("TP104", "1")
-gv(FI, x + 0.95, y)
-FI.track("GND", W_GND, [(x, y), (x + 0.95, y)])
+# FB (Rf1 sense): via above R118, B.Cu down x 14.6 and west along y 20.9 to R120 / the FB row
+r118 = FL.pad("R118", "@FB")
+FL.via(r118[0], 8.2, "FB")
+FL.track("FB", W_SIG, [r118, (r118[0], 8.2)])
+XFBB, YFBB = 6.75, 20.90
+FL.track("FB", W_SIG, [(r118[0], 8.2), (14.6, 8.53), (14.6, 20.4), (14.1, YFBB), (XFBB, YFBB)], layer="B.Cu")
+FL.via(XFBB, YFBB, "FB")
+r120 = FL.pad("R120", "@FB")
+FL.track("FB", W_SIG, [(XFBB, YFBB), (XFBB, r120[1] + 0.3), (XFBB + 0.3, r120[1]), r120])
+# FB row: U102.4 -> left edge -> R119 / R123 / C106 bottom pads -> R120
+p4o = FL.pad("U102", "4")
+yfr = FL.pad("C106", "@FB")[1]
+FL.track("FB", 0.15, [p4o, (0.40, p4o[1]), (0.40, yfr), ("R119", "@FB")])
+FL.track("FB", W_SIG, [("R119", "@FB"), ("C106", "@FB"), (6.45, yfr), (XFBB, yfr + 0.3), (XFBB, r120[1] + 0.3)])
+for ref, net in (("R119", "VOFS"), ("R123", "VNEG_REF")):
+    x, y = FL.pad(ref, "@" + net)
+    FL.track(net, W_SIG, [(x, y), (x, 18.2)])
+    FL.via(x, 18.2, net)
+    FL.track(net, W_SIG, [(x, 18.2), (x, BH)], layer="B.Cu")
+X_VOFS = FL.pad("R119", "@VOFS")[0]
+X_VNEG = FL.pad("R123", "@VNEG_REF")[0]
+# alpha string, TAP
+FL.track("S1", 0.3, [("R114", "@S1"), ("R115", "@S1")])
+FL.track("S2", 0.3, [("R115", "@S2"), ("R116", "@S2")])
+p3o = FL.pad("U102", "3")
+r116 = FL.pad("R116", "@TAP")
+FL.track("TAP", 0.25, [p3o, (4.55, p3o[1]), (4.85, p3o[1] + 0.3), (4.85, r116[1]), r116])
+FL.track("TAP", 0.3, [r116, ("R117", "@TAP")])
+FL.track("TAP", 0.3, [("R117", "@TAP"), ("C105", "@TAP")])
+g1, g2 = FL.pad("R117", "@GND"), FL.pad("C105", "@GND")
+FL.track("GND", W_GND, [g1, g2, (6.75, g2[1])])
+gl(6.75, g2[1])
+# OPA_OUT: pin 1 down to C106, R121; via + TP103 on B.Cu
+p1o = FL.pad("U102", "1")
+FL.track("OPA_OUT", W_SIG, [p1o, ("C106", "@OPA_OUT"), ("R121", "@OPA_OUT")])
+FL.via(4.36, FL.pad("R121", "@OPA_OUT")[1], "OPA_OUT")
+FL.track("OPA_OUT", W_SIG, [(4.36, FL.pad("R121", "@OPA_OUT")[1]), ("TP103", "1")], layer="B.Cu")
+# U102 supplies: vias in the body column x 2.45; C114 / C110 on B.Cu
+p2o, p5o = FL.pad("U102", "2"), FL.pad("U102", "5")
+FL.track("-5V", 0.5, [p2o, (XO, p2o[1])])
+FL.via(XO, p2o[1], "-5V")
+FL.track("+5V", 0.5, [p5o, (XO, p5o[1])])
+FL.via(XO, p5o[1], "+5V")
+gl(XO, 15.25)
+FL.track("-5V", 0.5, [("C114", "@-5V"), (XO, p2o[1])], layer="B.Cu")
+FL.track("GND", 0.5, [("C114", "@GND"), (XO, 15.25)], layer="B.Cu")
+FL.track("+5V", 0.5, [("C110", "@+5V"), (XO, p5o[1])], layer="B.Cu")
+x, y = FL.pad("C110", "@GND")
+FL.track("GND", 0.4, [(x, y), (4.4, y), (4.4, 17.9)], layer="B.Cu")
+gl(4.4, 17.9)
+# bulk (B.Cu): -5V at the R107 via, +5V via pair between the RV101 pads, shared GND via
+x, y = FL.pad("C116", "@-5V")
+FL.track("-5V", 0.6, [(x, y), (x, 14.77)], layer="B.Cu")
+ga, gb = FL.pad("C116", "@GND"), FL.pad("C111", "@GND")
+FL.track("GND", 0.6, [ga, gb], layer="B.Cu")
+gl(ga[0], 16.62)
+x, y = FL.pad("C111", "@+5V")
+FL.track("+5V", 0.6, [(x, y), (x, 18.85)], layer="B.Cu")
+FL.track("+5V", 0.6, [(10.40, 18.85), (11.10, 18.85)], layer="B.Cu")
+for xv in (10.40, 11.10):
+    FL.via(xv, 18.85, "+5V")
+# RV101: RF2_MID from R120, GND pads to vias
+rv1 = FL.pad("RV101", "1")
+r1202 = FL.pad("R120", "@RF2_MID")
+FL.track("RF2_MID", 0.3, [r1202, (rv1[0] - 1.25, r1202[1]), (rv1[0] - 1.05, rv1[1]), rv1])
+x, y = FL.pad("RV101", "3")
+FL.track("GND", W_GND, [(x, y), (x - 0.5, y), (x - 0.5, 18.85)])
+gl(x - 0.5, 18.85)
+x, y = FL.pad("RV101", "2")
+FL.track("GND", W_GND, [(x, y), (x, y + 1.0), (13.55, 20.35)])
+gl(13.55, 20.35)
+for tp, dx, dy in (("TP104", 0, 0.2),):
+    x, y = FL.pad(tp, "1")
+    gl(x + dx, y + dy)
 # keep-outs / cut-outs of the input stage
-FI.keepout(rect(0, Y0 - 0.9, X_PAD_END, Y0 + 0.9), ("In1.Cu",))
-CUT_HZ = (FI.pad("C101", "2")[0] - 0.3, Y0 - 0.45, XU - 1.1, Y0 + 1.1)
-FI.keepout(rect(*CUT_HZ), ("F.Cu", "In1.Cu", "In2.Cu", "B.Cu"))
+FL.keepout(rect(0, YL0 - 0.9, X_PAD_END, YL0 + 0.9), ("In1.Cu",))
+CUT_HZ = (FL.pad("C101", "2")[0] - 0.3, YL0 - 0.45, XU - 1.1, YL0 + 1.1)
+FL.keepout(rect(*CUT_HZ), ("F.Cu", "In1.Cu", "In2.Cu", "B.Cu"))
 g = W / 2 + 0.75
-FI.keepout(rect(X_TAPER - 0.05, Y0 - g, FI.pad("C101", "2")[0], Y0 + g))
-for sg in (-1, 1):                             # beside the launch taper (the taper polygon itself is VIN copper)
-    FI.keepout(rect(X_PAD_END, Y0 + sg * 0.65, X_TAPER, Y0 + sg * g))
+FL.keepout(rect(X_TAPER - 0.05, YL0 - g, FL.pad("C101", "2")[0], YL0 + g))
+for sg in (-1, 1):
+    FL.keepout(rect(X_PAD_END, YL0 + sg * 0.65, X_TAPER, YL0 + sg * g))
 
 # ============================================================================= SAMPLER (frame FS, bridge centre)
 D1X, D2X = -1.7, 1.7
-XR201 = X_R118 + 0.32 + 0.05 + 0.78       # R201 pad 1 abuts the R118 tap pad (same net)
+XR201 = X_R118 + 0.47 + 0.93               # R201 courtyard touches the R118 courtyard
 XBR = XR201 - (D1X - 1.7 - 0.93)
-YBR = Y0 + OYI
+YBR = YL0
 FS = Frame(XBR, YBR)
 FS.place("D201", D1X, 0, 0)
 FS.place("D202", D2X, 0, 0)
@@ -519,7 +595,7 @@ for rot in (0, 90, 180, 270):
     blk.b.Remove(blk.fps["T401"])
     del blk.fps["T401"]
 pA, pK, pG = FS.pad("T401", "2"), FS.pad("T401", "4"), FS.pad("T401", "3")
-FS.two("R204", XV + 0.55, 0.0, "v", "STRB_A")
+FS.two("R204", XV + 0.75, 0.0, "v", "STRB_A")
 FS.shift_to("R204", "@STRB_A", y=pA[1])
 
 
@@ -579,8 +655,15 @@ def trf(XT, U, FB, L, RD, CCOLD, C1N, C10U, TP, out_net, bias_net, in_net):
     for net_, sgn in ((bias_net, 1), ("+3V3", -1)):
         rx, ry = FS.pad(RD, "@" + net_)
         lx, ly = FS.pad(L, "@" + net_)
-        d_ = rx - (lx + 1.325 - 0.18)
-        FS.track(net_, 0.5, [(rx, ry), (rx - d_, ry + sgn * d_)])
+        pdl = [q_ for q_ in blk.fps[L].Pads() if q_.GetNetname() == A(net_)][0].GetBoundingBox()
+        y0_ = pcbnew.ToMM(pdl.GetTop()) - YBR - 100 + 0.35
+        y1_ = pcbnew.ToMM(pdl.GetBottom()) - YBR - 100 - 0.35
+        yt_ = min(max(ry, y0_), y1_)
+        xe_ = pcbnew.ToMM(pdl.GetRight()) - XBR - 100      # L pad inner edge
+        if abs(yt_ - ry) < 1e-3:
+            FS.track(net_, 0.5, [(rx, ry), (xe_ - 0.3, ry)])
+        else:
+            FS.track(net_, 0.5, [(rx, ry), (rx, yt_), (xe_ - 0.3, yt_)], ch=0.1)
     # test point (B.Cu) on the bias node, via on the bead -> choke link
     ytp = (yfb + lb[1]) / 2
     FS.via(XFB, ytp, bias_net)
@@ -638,11 +721,11 @@ gv(FS, x, y - 0.65)
 # input network of TRF #2: 100 nF, 12 dB pi pad (82 / 91 / 82), 100 nF
 a = XT2 + 2.51
 FS.two("C406", a, YL, "h", "TRF2_RFIN")
-FS.two("R403", a + 1.0, YL - 0.5, "v", "GND")
-FS.shift_to("R403", "@TRF2_IN", y=YL)
+# shunts above the line (courtyards touch the series parts'), 50 R stub from the line to the shunt pad
+for r, xs, net_ in (("R403", a + 1.0, "TRF2_IN"), ("R402", a + 3.0, "PADN")):
+    FS.two(r, xs, YL - 1.40, "v", "GND")
+    FS.track(net_, W, [(xs, YL), (r, "@" + A(net_))], name=f"{r} shunt stub", z=50)
 FS.two("R404", a + 2.0, YL, "h", "TRF2_IN")
-FS.two("R402", a + 3.0, YL - 0.5, "v", "GND")
-FS.shift_to("R402", "@PADN", y=YL)
 FS.two("C405", a + 4.0, YL, "h", "PADN")
 for r in ("R403", "R402"):
     x, y = FS.pad(r, "@GND")
@@ -656,7 +739,7 @@ FS.track("PADN", W, [("R404", "@PADN"), ("C405", "@PADN")], name="PADN: R404 -> 
 FS.track("TRF1_OUT", W, [("C405", "@TRF1_OUT"), FS.pad("U401", "7")], name="TRF1_OUT: C405 -> FB401 -> U401.7",
          z=50)
 FS.two("C401", XT1 + 2.51, YL, "h", "TRF1_RFIN")
-FS.two("R401", XT1 + 3.51, YL, "h", "TRF1_IN")
+FS.two("R401", XT1 + 2.51 + 1.84, YL, "h", "TRF1_IN")
 FS.track("TRF1_RFIN", W, [FS.pad("U401", "2"), ("C401", "@TRF1_RFIN")], name="TRF1_RFIN: U401.2 -> C401", z=50)
 FS.track("TRF1_IN", W, [("C401", "@TRF1_IN"), ("R401", "@TRF1_IN")], name="TRF1_IN: C401 -> R401", z=50)
 XE = BW - XBR
@@ -666,8 +749,9 @@ XN = XE - 0.57
 YN = YL + 1.0
 FS.two("R405", XN, YN + 0.51, "v", "S_STROBE_N")
 FS.shift_to("R405", "@S_STROBE_N", y=YN)
-FS.two("C411", XN, YN + 2.0, "v", "N1")
-FS.two("R406", XN, YN + 3.5, "v", "N2")
+_yr = blk.fps["R405"].GetPosition().y / 1e6 - 100 - YBR
+FS.two("C411", XN, _yr + 1.84, "v", "N1")
+FS.two("R406", XN, _yr + 3.68, "v", "N2")
 FS.track("S_STROBE_N", W, [("R405", "@S_STROBE_N"), (XE, YN)], name="S_STROBE_N: R405 -> east boundary", z=50)
 FS.track("N1", 0.3, [("R405", "@N1"), ("C411", "@N1")])
 FS.track("N2", 0.3, [("C411", "@N2"), ("R406", "@N2")])
@@ -717,7 +801,8 @@ YLl = YL + YBR
 blk.iface("S_STROBE_P", BW, YLl, "F.Cu", "E", "pair", W, "from U501 pin 38 (FPGA); 50 R, R401 47 R in this block")
 blk.iface("S_STROBE_N", BW, YLl + 1.0, "F.Cu", "E", "pair", W, "from U501 pin 35; dummy load R405/C411/R406 here")
 blk.iface("BUF_OUT_T", X_T, BH, "F.Cu", "S", "rf50", W, "to U301.1 (phase block)")
-blk.iface("VOFS", X_VOFS, BH, "B.Cu", "S", "slow", W_SIG, "R119")
+blk.iface("VOFS", X_VOFS, BH, "B.Cu", "S", "slow", W_SIG, "R119 (FB offset)")
+blk.iface("VNEG_REF", X_VNEG, BH, "B.Cu", "S", "slow", W_SIG, "R123 (FB offset)")
 for vb, s_ in (("VBIAS_A", -1), ("VBIAS_K", 1)):
     blk.iface(vb, VB_X[s_] + XBR, BH, "B.Cu", "S", "slow", W_SIG, "R205 / R206 via B.Cu column")
 blk.iface("ADC_IN", xa + XBR, BH, "B.Cu", "S", "slow", W_SIG, "R211 / C207")
@@ -727,8 +812,34 @@ for net, note in (("+5V", "U101 / U102, In2 via pairs x 2-15"), ("-5V", "U101 / 
                   ("+3V3", "U202, TRF bias tees and VCC via pairs x 23-56")):
     blk.iface(net, 0, 0, "In2.Cu", "-", "supply", None, note)
 blk.edge_rect(0, 0, BW, BH, layer="Dwgs.User")
-blk.text("ANALOG", 30.0, 20.8, 0.6)
-blk.text("SIG_IN", 0.8, YBR + 4.6, 0.4)
+blk.text("ANALOG", 33.0, 20.6, 0.8)
+for d_ in blk.b.GetDrawings():                   # board texts: 0.8 mm / 0.15 mm (JLC legibility)
+    if d_.GetClass() == "PCB_TEXT":
+        d_.SetTextThickness(bl.mm(0.15))
+
+
+def strip_silk_over_pads(margin=0.1):
+    """local helper: remove footprint silkscreen segments that run over (or within margin of) any copper pad
+    on the same side (library silk outlines of J101 / U102 / 0402s next to tightly placed parts)"""
+    pads = [(p, p.GetBoundingBox()) for f in blk.b.GetFootprints() for p in f.Pads()]
+    n = 0
+    for f in blk.b.GetFootprints():
+        for g in list(f.GraphicalItems()):
+            if g.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS) or g.GetClass() not in ("PCB_SHAPE", "FP_SHAPE", "MGRAPHIC"):
+                continue
+            cu = pcbnew.F_Cu if g.GetLayer() == pcbnew.F_SilkS else pcbnew.B_Cu
+            bb = g.GetBoundingBox()
+            bb.Inflate(bl.mm(margin) + g.GetWidth() // 2)
+            for p, pb in pads:
+                if p.GetParent().GetReference() != f.GetReference() and p.IsOnLayer(cu) and bb.Intersects(pb) \
+                        and p.GetEffectiveShape(cu).Collide(g.GetEffectiveShape(), bl.mm(margin) + g.GetWidth() // 2):
+                    f.Remove(g)
+                    n += 1
+                    break
+    return n
+
+
+print("silk segments removed over pads:", strip_silk_over_pads())
 
 for fp_ in blk.fps.values():                     # library fab texts small (as in the fragments)
     for g_ in fp_.GraphicalItems():
@@ -761,6 +872,37 @@ RF = {A(n): W for n in ("VIN", "BUF_OUT_S", "BUF_OUT_T", "BRG_IN", "BRG_A", "BRG
                         "TRF2_OUT", "TRF2_RFIN", "TRF2_IN", "PADN", "TRF1_OUT", "TRF1_RFIN", "TRF1_IN",
                         "S_STROBE_P", "S_STROBE_N")}
 res = bl.check_board(out, refs=REFS, rf_widths=RF, verbose=12)
+if os.environ.get("DETAIL"):
+    for k_ in ("pad_axis", "clearance", "corner"):
+        print(k_, res["details"][k_])
+
+
+def courtyard_overlaps(pcb, min_area=0.005):
+    """courtyard rule: no two footprints on the same side with overlapping courtyards (area > min_area mm2)"""
+    b_ = pcbnew.LoadBoard(pcb)
+    cs = []
+    for f in b_.GetFootprints():
+        f.BuildCourtyardCaches()
+        for lay in (pcbnew.F_CrtYd, pcbnew.B_CrtYd):
+            ps = f.GetCourtyard(lay)
+            if ps.OutlineCount():
+                cs.append((f.GetReference(), lay, ps, ps.BBox()))
+    hits = []
+    for i in range(len(cs)):
+        for j in range(i + 1, len(cs)):
+            a_, c_ = cs[i], cs[j]
+            if a_[1] != c_[1] or not a_[3].Intersects(c_[3]):
+                continue
+            x_ = pcbnew.SHAPE_POLY_SET(a_[2])
+            x_.BooleanIntersection(c_[2], pcbnew.SHAPE_POLY_SET.PM_FAST)
+            ar = x_.Area() / 1e12
+            if ar > min_area:
+                hits.append(f"{a_[0]}/{c_[0]} {ar:.3f} mm2")
+    return hits
+
+
+_crt = courtyard_overlaps(out)
+print(f"courtyard overlaps (> 0.005 mm2, same side): {len(_crt)}", _crt[:20])
 _bb = pcbnew.LoadBoard(out).ComputeBoundingBox(False)
 _ox, _oy = pcbnew.ToMM(_bb.GetX()), pcbnew.ToMM(_bb.GetY())
 
@@ -775,5 +917,5 @@ def render(png, layers, crop):
 if os.environ.get("RENDER", "1") == "1":
     lay = ("F.Cu", "F.SilkS", "F.Fab", "Dwgs.User")
     render(os.path.join(HERE, "analog.png"), lay, (99.5, 99.5, 156.5, 122.0))
-    render(os.path.join(HERE, "analog_detail.png"), lay, (127.0, 104.0, 150.0, 119.0))
+    render(os.path.join(HERE, "analog_detail.png"), lay, (99.5, 103.5, 117.5, 122.0))
     render(os.path.join(SCR, "analog_b.png"), ("B.Cu", "B.Fab", "Dwgs.User"), (99.5, 99.5, 156.5, 122.0))

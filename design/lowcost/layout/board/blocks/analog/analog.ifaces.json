@@ -34,17 +34,27 @@
   },
   {
    "net": "/VOFS",
-   "x": 5.9,
+   "x": 1.0,
    "y": 21.5,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.2,
-   "note": "R119"
+   "note": "R119 (FB offset)"
+  },
+  {
+   "net": "/VNEG_REF",
+   "x": 1.94,
+   "y": 21.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R123 (FB offset)"
   },
   {
    "net": "/VBIAS_A",
-   "x": 15.24,
+   "x": 15.4,
    "y": 21.5,
    "layer": "B.Cu",
    "side": "S",
@@ -54,7 +64,7 @@
   },
   {
    "net": "/VBIAS_K",
-   "x": 16.24,
+   "x": 16.4,
    "y": 21.5,
    "layer": "B.Cu",
    "side": "S",
@@ -64,7 +74,7 @@
   },
   {
    "net": "/ADC_IN",
-   "x": 18.9,
+   "x": 19.06,
    "y": 21.5,
    "layer": "B.Cu",
    "side": "S",
@@ -74,7 +84,7 @@
   },
   {
    "net": "/ADC_REF_MID",
-   "x": 21.49,
+   "x": 21.65,
    "y": 21.5,
    "layer": "B.Cu",
    "side": "S",
