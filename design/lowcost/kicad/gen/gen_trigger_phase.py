@@ -306,7 +306,7 @@ def main():
              (g(xl_launch), g(YL[0])), (g(X0), g(YL[0]))])
     sh.add(TP, "TP", "LINE_IN", (xb + g(6), po[1]), fp=TP_FP)
     sh.text("LINE LAUNCH: pad R303-R305 at the first tap; 50 R microstrip\n"
-            "(~0.18 mm on L1 over L2 GND). Drawn long here only.", (g(186), g(LINE_CH) - g(9)), size=T)
+            "(0.36 mm on L1 over L2 GND). Drawn long here only.", (g(186), g(LINE_CH) - g(9)), size=T)
     # strobe line launch
     yA0, yK0 = YL[0] - 12, YL[0] - 9
     sh.hlabel("PSTRB_A", (g(26), g(yA0)), "input", side="left")
@@ -442,9 +442,9 @@ def main():
             P(165, 10), size=T)
     sh.text("COARSE: 2 x 470 R bridge (high-Z tap,\nTRF input drop < 5 %). SN65LVDS2 at 3V3\n"
             "-> FPGA pin 47. Good to ~100-150 MHz edges.", P(148, 72), size=T)
-    sh.text("DELAY LINE (SPEC decision 4, co-propagating): signal line 70 ps per tap (73 R trace, meander between\n"
-            "taps, loaded to ~50 R by each gate ~0.37 pF); strobe lines PSTRB_A/K 35 ps per tap (73 R trace,\n"
-            "3.5 mm pitch, loaded); effective tap spacing 70 - 35 = 35 ps, 16 taps = 560 ps window.\n"
+    sh.text("DELAY LINE (SPEC decision 4, co-propagating): signal line 70 ps per tap (0.25 mm / 60 R trace, meander\n"
+            "9.083 mm between taps, loaded to ~50 R by each gate ~0.37 pF); strobe lines PSTRB_A/K 35 ps per tap\n"
+            "(0.16 mm / 72.8 R trace, 3.737 mm pitch, loaded); effective tap spacing 70 - 35 = 35 ps, 16 taps = 560 ps window.\n"
             "Gate: BAT15-04W pin 3 on the line (stub < 0.3 mm), 0.47 pF C0G hold caps to PSTRB_A (anode)\n"
             "/ PSTRB_K (cathode). Strobe >= 2.75 V per side with the 80 ps launch stub (~4 V launch), FWHM 220-320 ps.\n"
             "phase_array RESULT: line measured 75.7 ps/tap with the 70 ps design -> make the meander ~5 ps shorter.",

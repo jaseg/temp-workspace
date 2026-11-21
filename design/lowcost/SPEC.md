@@ -66,8 +66,9 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23; HFD3 relay 1.74.
    A Schottky clamp (BAT15) at each strobe launch point removes the wrong-polarity pulse of the second
    edge if the verification run shows the diodes need it.
 4. **Tap geometry: co-propagating lines.** Strobe lines PSTRB_A/PSTRB_K run along the 16 gates at
-   35 ps per tap (loaded; about 73 R trace, 3.5 mm pitch) and end in 50 R terminations; the signal line
-   takes 70 ps per tap (meander between taps), launched from the same end, so the effective tap spacing is
+   35 ps per tap (loaded; 0.16 mm / 72.8 R trace, 3.737 mm pitch on JLC04161H-7628) and end in 50 R terminations;
+   the signal line takes 70 ps per tap (meander between taps; 0.25 mm / 60 R trace, 9.083 mm, drawn 65 ps per tap
+   loaded to 50 R), launched from the same end, so the effective tap spacing is
    70 - 35 = 35 ps. Being verified in `sim/phase_array/`.
 5. **Tap readout**: 2.2 k to VTAP_P/VTAP_N (+/-2.5 V), 2 x 1 k summing to the comparator, threshold
    VTAP_TH 0..+80 mV; rising edges only (line feed-through, see `sim/phase/RESULT.md`).

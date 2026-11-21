@@ -154,7 +154,7 @@ def main():
             "BEFORE the S_STROBE falling edge (+160 ns): its reverse pulse shifts the hold by -13 mV (phase_array RESULT).",
             P(16, 14), size=T)
     sh.text("INPUT LEG: R201 0402 within 3 mm of the BUF802 OUT pin;\n"
-            "R201 -> bridge input <= 3 mm (~18 ps), 0.18 mm trace\n"
+            "R201 -> bridge input <= 3 mm (~18 ps), 0.36 mm trace\n"
             "over solid L2 GND. BUF_OUT_S is the BUF802 OUT node\n"
             "itself (49.9 R trigger leg is on the input sheet).\n"
             "Input network rings for ideal edges: keep it short.", P(40, 140), size=T)

@@ -186,7 +186,7 @@ def write_md(rows, total, first, est, nparts):
         "| Budget (SPEC, MCU and PCB excluded) | 80.00 |",
         f"| **Margin** | **{80 - total:.2f}** ({(80 - total) / 80 * 100:.0f} %) |",
         f"| First order incl. minimum order quantities (passives 20-100 pcs, ICs 5 pcs) | {first:.2f} |", "",
-        "Not included: STM32G474 board (user's), PCB (4-layer JLC04161H-3313 class, impedance control), assembly, "
+        "Not included: STM32G474 board (user's), PCB (4-layer JLC04161H-7628, impedance control), assembly, "
         "shipping, USB-C supply.", "",
         "## Ten most expensive lines", "",
         "| Line USD | Qty | Part | Source | Status |", "|---|---|---|---|---|"]

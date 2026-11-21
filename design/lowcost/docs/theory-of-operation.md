@@ -125,8 +125,8 @@ common-mode-choke balun (DLW21SN) -> STRB_A/STRB_K. S_STROBE_N is terminated in 
 choke) -> 80 ps shorted stub -> PSTRB_A resp. PSTRB_K. With the 80 ps stub the pulse is +4.14 V / 221 ps at tap 0 and
 +2.87 / -2.75 V / 286-319 ps at tap 15; every gate gets at least 2.75 V against the 2.0 V it needs. The reverse pulse
 reaches at most 2.95 V on a tap diode (74 % of BV) and moves the comparator inputs by less than 0.5 mV, so the PSTRB
-clamps are not fitted (footprints kept). The stub length is 13.2 mm at 6.05 ps/mm; on the 3313 stack-up of the layout
-fragments 80 ps is 13.6 mm.
+clamps are not fitted (footprints kept). The stub length is 13.2 mm at 6.057 ps/mm (50 ohm microstrip, 0.36 mm on
+JLC04161H-7628); the sampler layout fragment draws it at 13.207 mm.
 
 **Bias adjustment.** The sampler bridge only conducts if the strobe overcomes the reverse bias. At +/-1 V bias it
 stops at about -35 % strobe amplitude; a -40 % strobe still works at +/-0.6 V (gain 0.70, 93 %). VBIAS_A and VBIAS_K
@@ -150,7 +150,9 @@ at that instant.
 the strobe lines run along the taps at about 35 ps per tap (loaded) and the signal line, launched from the same end,
 takes 70 ps per tap (meander). A signal edge and a strobe that start together separate by 35 ps per tap: the effective
 spacing is the difference. Simulated: strobe 34.2 ps/tap, signal 75.7 ps/tap (aim the meander about 5 ps shorter),
-effective 34.7 +/- 3.1 ps. Counter-propagation gave 69.8 ps and weak far taps.
+effective 34.7 +/- 3.1 ps. Counter-propagation gave 69.8 ps and weak far taps. On JLC04161H-7628 the signal line
+PH_LINE is a 0.25 mm (60 ohm) F.Cu meander of 9.083 mm per tap, 65 ps loaded to 50 ohm; the strobe lines PSTRB_A/K
+are 0.16 mm (72.8 ohm) at a 3.737 mm tap pitch, 35 ps per tap loaded.
 
 **Readout.** Each hold node goes through 2.2 k to VTAP_N / VTAP_P (-/+2.5 V), and 2 x 1 k sum the two nodes into the
 IN+ of one COS3502 comparator half (8 dual parts, 3.3 V). IN- is VTAP_TH. The comparator input peaks 1-2 ns after the
@@ -278,7 +280,7 @@ us/V.
 | Phase array | full 16-tap deck with both strobe chains, signal chain, gates and readout | co-propagation, spacing, threshold, reverse pulse, 50 % duty | COS3502 Cin, delay and hysteresis at 10-30 mV (Cin 3 / 6 pF bracket only), 0.5 pF hold caps, feed-through on a real board |
 | FPGA, firmware | none | - | tracking loop, dither, aiming, LUT fit, OSER10/IDES placement |
 | Schematic | generated netlist, 242 nets, own checks (no single-node nets, no shorted two-pin parts) | connectivity | KiCad ERC not run |
-| Layout | three fragments, scripted geometry checks | clearance, courtyards, line delays | DRC, merge, stack-up (below) |
+| Layout | three fragments, scripted geometry checks | clearance, courtyards, line delays | DRC, merge, via stitching (below) |
 
 Open risks, most severe first:
 
@@ -287,10 +289,11 @@ Open risks, most severe first:
    amplitude at +/-1 V bias. Measure one chain of each kind first.
 2. **BUF802 model.** The 3.4 GHz bandwidth, the 13 % overshoot and the 113 mVpp kick-out all rest on an idealised
    model; the real part is expected at 2-2.4 GHz.
-3. **Layout stack-up mismatch.** SPEC decision 9 sets JLC04161H-7628 (50 ohm about 0.36 mm); all three fragments are
-   drawn for JLC04161H-3313 (0.17 mm). Widths, tap pitch (3.815 mm), meanders and stubs must be recomputed. The
-   phase_trigger fragment also still has the old phase-strobe launch, the 70 ps meander (not 5 ps shorter), and a 42
-   ohm loaded strobe line against 49.9 ohm terminations. Fragments are not merged; no DRC.
+3. **Layout open points.** The three fragments (JLC04161H-7628) are not merged and have only scripted checks; no DRC
+   has been run (kicad-cli 7 has none). The PH_LINE meander legs are 0.244 mm apart (self-coupling, check by TDR).
+   Pad excess capacitances are noted, not compensated (up to 0.13 pF on the BUF802 output node); the loaded strobe
+   lines are 45.5 ohm against 49.9 ohm terminations. Relay (HFD3) and balun (DLW21SN) footprints are unverified. Via
+   stitching and fences are left to board integration.
 4. **Strobe kick-out into the trigger** (19 mVpp) is as large as the smallest trigger signal; the series ferrite/100
    ohm option is unproven.
 5. **Tap comparator and feed-through.** COS3502 Cin, delay and hysteresis at small overdrive are unknown; Cin 6 pF
@@ -331,8 +334,9 @@ Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and layout fragments:
 ![Sampler](../kicad/export/scope-fe-sampler.png) ![Strobe](../kicad/export/scope-fe-strobe.png)
 ![Trigger and phase](../kicad/export/scope-fe-trigger_phase.png) ![FPGA and clock](../kicad/export/scope-fe-fpga_clock.png)
 ![Power](../kicad/export/scope-fe-power.png) ![MCU interface](../kicad/export/scope-fe-mcu_if.png)
-![Input stage layout](../layout/input_stage/input_stage.png) ![Sampler layout](../layout/sampler/sampler.png)
-![Phase trigger layout](../layout/phase_trigger/phase_trigger.png)
+![Input stage layout](../layout/input_stage/input_stage.png) ![Input stage layout detail](../layout/input_stage/input_stage_detail.png)
+![Sampler layout](../layout/sampler/sampler.png) ![Sampler layout detail](../layout/sampler/sampler_detail.png)
+![Phase trigger layout](../layout/phase_trigger/phase_trigger.png) ![Phase trigger layout detail](../layout/phase_trigger/phase_trigger_detail.png)
 
 ## 10. Bring-up order
 

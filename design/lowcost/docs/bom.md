@@ -13,7 +13,7 @@ From the root netlist `kicad/export/scope-fe.net` (424 fitted parts, 123 lines).
 | **Margin** | **18.39** (23 %) |
 | First order incl. minimum order quantities (passives 20-100 pcs, ICs 5 pcs) | 88.57 |
 
-Not included: STM32G474 board (user's), PCB (4-layer JLC04161H-3313 class, impedance control), assembly, shipping, USB-C supply.
+Not included: STM32G474 board (user's), PCB (4-layer JLC04161H-7628, impedance control), assembly, shipping, USB-C supply.
 
 ## Ten most expensive lines
 

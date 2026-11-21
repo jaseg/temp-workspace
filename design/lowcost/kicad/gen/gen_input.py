@@ -73,7 +73,7 @@ def split_wires(sh):
 def main():
     sh = new_sheet("input", comments=[
         "Values: sim/input/RESULT.md (final network), SPEC decisions 1 and 7.",
-        "Refs 1xx. PCB: 4 layers JLC04161H-3313, L2 solid GND, 0402 unless noted."])
+        "Refs 1xx. PCB: 4 layers JLC04161H-7628, L2 solid GND, 0402 unless noted."])
     Y0 = g(46)                     # HF signal row
     Ys = Y0 + g(42)                # servo row
 
@@ -85,7 +85,7 @@ def main():
     sh.wire(j1["1"], (VINX, Y0))
     sh.label("VIN", (g(18), Y0))
     sh.text("J101 SIG_IN, edge-launch SMA.\nVIN: 50R microstrip on L1 over L2 GND,\n"
-            "w ~0.18 mm (0.1 mm prepreg, compute),\n6 mm (~37 ps) to K1/Ctop pads.\n"
+            "w 0.36 mm (7628 prepreg 0.21 mm),\n6 mm (~37 ps) to K1/Ctop pads.\n"
             "GND stitching vias along the line.", (g(4), Y0 - g(22)), size=TS)
 
     # ------------------------------------------------------------------ K1 50R termination
@@ -213,7 +213,7 @@ def main():
     sh.text("BUF_OUT_S = U101 OUT node: 10R + sampler bridge on the sampler\n"
             "sheet, bridge within 3 mm of the OUT pin (Zout 1.2R + 0.3 nH).\n"
             "49.9R directly at the OUT pin, then 0R/ferrite/100R position.\n"
-            "BUF_OUT_T: 50R microstrip (~0.18 mm, ~6 ps/mm) to TMUX136\n"
+            "BUF_OUT_T: 50R microstrip (0.36 mm, 6.06 ps/mm) to TMUX136\n"
             "(high-impedance end, trigger_phase): no termination at the far\n"
             "end, keep it short (< 30 mm, ~180 ps), no stubs.",
             (g(156), Y0 - g(22)), size=TS)
