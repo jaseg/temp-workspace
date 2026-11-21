@@ -1,0 +1,117 @@
+{
+ "trim": {
+  "hf_gain_pin": 0.19971256025358736,
+  "lf_gain_pin_untrimmed": 0.2000943283583074,
+  "Rf2_trimmed": 20255.44145719376
+ },
+ "ac": {
+  "OPA197, trimmed, 50R": {
+   "f3db_GHz": 3.41454887,
+   "lf_err_pct": 0.000835152521139193,
+   "max_dev_1Hz_100MHz_pct": 0.6696497936255597,
+   "gain_10MHz_bout": 0.04997647002027384,
+   "peak_dB": 0.057971156083813535
+  },
+  "TP2272 (7 MHz), same trim": {
+   "f3db_GHz": 3.41454887,
+   "lf_err_pct": 0.0016408412275570328,
+   "max_dev_1Hz_100MHz_pct": 0.6685308214243069,
+   "gain_10MHz_bout": 0.04997606737210611,
+   "peak_dB": 0.05787460937798204
+  },
+  "Cin +0.3 pF, not re-trimmed": {
+   "f3db_GHz": 3.54813389,
+   "lf_err_pct": 4.033061304840424,
+   "max_dev_1Hz_100MHz_pct": 4.279656479272886,
+   "gain_10MHz_bout": 0.048039427921456226,
+   "peak_dB": 0.36399183669185275
+  },
+  "Cin -0.3 pF, not re-trimmed": {
+   "f3db_GHz": 3.41454887,
+   "lf_err_pct": -4.031361801853539,
+   "max_dev_1Hz_100MHz_pct": 4.773721539236487,
+   "gain_10MHz_bout": 0.052076270163213007,
+   "peak_dB": 0.038790627848699744
+  },
+  "OPA197, 1 Mohm mode (50R source)": {
+   "f3db_GHz": 1.12201845,
+   "lf_err_pct": 0.005839716871536282,
+   "max_dev_1Hz_100MHz_pct": 0.6746595160087576,
+   "gain_10MHz_bout": 0.09994543956934956,
+   "peak_dB": 0.05840338976249043
+  }
+ },
+ "relay": {
+  "Lrelay 1.5 nH, Ltune 0.0 nH": {
+   "S11_worst_to_2GHz_dB": -9.279895756348393,
+   "f3db_GHz": 3.28599325,
+   "peak_dB": 0.05798692469090548
+  },
+  "Lrelay 2.0 nH, Ltune 0.0 nH": {
+   "S11_worst_to_2GHz_dB": -9.224176693238192,
+   "f3db_GHz": 3.41454887,
+   "peak_dB": 0.057971156083813535
+  },
+  "Lrelay 3.0 nH, Ltune 0.0 nH": {
+   "S11_worst_to_2GHz_dB": -7.444083176756023,
+   "f3db_GHz": 3.54813389,
+   "peak_dB": 0.8677999809786262
+  },
+  "Lrelay 4.0 nH, Ltune 0.0 nH": {
+   "S11_worst_to_2GHz_dB": -5.131001563462747,
+   "f3db_GHz": 3.41454887,
+   "peak_dB": 1.7161918363653041
+  }
+ },
+ "lfstep": {
+  "OPA197 trimmed": {
+   "final": 0.0504778282,
+   "max_dev_pct": 0.5073629534640078
+  },
+  "TP2272": {
+   "final": 0.0504778339,
+   "max_dev_pct": 0.5057368359065118
+  },
+  "Cin +0.3 pF untrimmed": {
+   "final": 0.050486441,
+   "max_dev_pct": 2.4022788613679458
+  },
+  "1 Mohm mode": {
+   "final": 0.100449714,
+   "max_dev_pct": 0.5072607772681259
+  }
+ },
+ "hfstep": {
+  "50R mode": {
+   "tr_out_ps": 119.84059300000006,
+   "tr_gate_ps": 56.000000000000014,
+   "overshoot_pct": 12.781397392577798
+  },
+  "1 Mohm mode, 50R source": {
+   "tr_out_ps": 344.52652300000005,
+   "tr_gate_ps": 336.739837,
+   "overshoot_pct": 0.0
+  },
+  "50R, Lrelay 4 nH (one pole only)": {
+   "tr_out_ps": 107.49616499999996,
+   "tr_gate_ps": 50.000000000000036,
+   "overshoot_pct": 24.73154508368689
+  }
+ },
+ "offset_outp_vs_VOFS": {
+  "0.0": 0.501005841,
+  "1.65": 0.00100590712,
+  "3.3": -0.498994027
+ },
+ "overload_recovery_to_10mV_us": 48.298345700000006,
+ "overload_gate_peak_V": 2.27676587,
+ "noise_input_referred_uVrms_2GHz": {
+  "BUF802": 491.6217105316586,
+  "alpha_network": 42.76823775412818,
+  "servo": 6.4757594826669935,
+  "back_term_and_splitter": 280.41553855863435,
+  "total": 567.6229718331297
+ },
+ "input_C_pF_at_10MHz_1M_mode": 3.229646145426979,
+ "input_R_Mohm_at_1Hz": 0.9999992014793351
+}

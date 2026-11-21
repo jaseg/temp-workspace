@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "filename": "scope-fe.kicad_pro",
+    "version": 1
+  },
+  "schematic": {
+    "legacy_lib_dir": "",
+    "legacy_lib_list": []
+  },
+  "sheets": [
+    [
+      "5e23f493-b3c9-5738-8419-f17d1e307037",
+      "Root"
+    ],
+    [
+      "55297c72-aa8b-526d-a7a4-c3933d6a3405",
+      "input"
+    ],
+    [
+      "7254890a-3350-5a40-8279-79e31d820a86",
+      "sampler"
+    ],
+    [
+      "5de296a9-797d-5eeb-99d0-7e19448f4002",
+      "trigger_phase"
+    ],
+    [
+      "01cc9075-5c63-5460-96a7-633b14c9c292",
+      "strobe"
+    ],
+    [
+      "765ea63d-9451-55a2-a617-96db488f03d8",
+      "fpga_clock"
+    ],
+    [
+      "1678cd83-bf01-5d9d-8825-3adf71d9020a",
+      "power"
+    ],
+    [
+      "81b759a6-45ca-5c80-9d34-b444cee6c404",
+      "mcu_if"
+    ]
+  ],
+  "boards": [],
+  "text_variables": {}
+}

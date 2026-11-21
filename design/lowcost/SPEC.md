@@ -53,3 +53,28 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23; HFD3 relay 1.74.
 - `design/lowcost/kicad/` KiCad 7 project (hierarchical), generators in `design/lowcost/kicad/gen/`.
 - `design/lowcost/layout/<fragment>/` layout fragments (pcbnew-scripted `.kicad_pcb`).
 - `design/lowcost/docs/` theory of operation, BOM.
+
+## Decisions after the first simulation round (these override the text above)
+1. **Splitter**: BUF802 OUT pin -> 10 R -> sampler bridge input (bridge within 3 mm of the BUF802);
+   BUF802 OUT pin -> 49.9 R -> 50 R line `BUF_OUT_T` -> TMUX136 (high-impedance end). A series position
+   (0 R, optionally ferrite or 100 R) sits in the trigger leg against strobe kick-out. `BUF_OUT_S` is the
+   BUF802 output node itself; the 10 R belongs to the sampler sheet/fragment, the 49.9 R to the input one.
+2. **Hold amplifier gain +3** (1.00 k / 499 R), level shifter and ADC network as in `sim/sampler/RESULT.md`.
+3. **Strobes are 50 % duty square waves** from complementary LVCMOS33 FPGA pin pairs (GW1NZ-1 has no
+   true LVDS). Sampler strobe: 2x TRF37D73 + 12 dB pad + shorted stub (80 ps) + balun, bias adjustable
+   (`sim/strobe/RESULT.md`). Phase strobe: per polarity TRF37D73 + 10 dB pad + GVA-84+ + stub.
+   A Schottky clamp (BAT15) at each strobe launch point removes the wrong-polarity pulse of the second
+   edge if the verification run shows the diodes need it.
+4. **Tap geometry: co-propagating lines.** Strobe lines PSTRB_A/PSTRB_K run along the 16 gates at
+   35 ps per tap (loaded; about 73 R trace, 3.5 mm pitch) and end in 50 R terminations; the signal line
+   takes 70 ps per tap (meander between taps), launched from the same end, so the effective tap spacing is
+   70 - 35 = 35 ps. Being verified in `sim/phase_array/`.
+5. **Tap readout**: 2.2 k to VTAP_P/VTAP_N (+/-2.5 V), 2 x 1 k summing to the comparator, threshold
+   VTAP_TH 0..+80 mV; rising edges only (line feed-through, see `sim/phase/RESULT.md`).
+6. **TMUX136** on a local -0.9 V ground; **SN65LVDS2** coarse receiver bridged with 2 x 470 R; 100 R across
+   the TLV3801 outputs (`sim/phase/RESULT.md`).
+7. **Input stage** as in `sim/input/RESULT.md` (fixed 5:1, HFD3 relay 50 R termination, OPA197 integrator servo).
+8. Power tree, FPGA pins, MCU interface: `kicad/README.md`.
+9. PCB for the layout fragments: 4 layers, JLCPCB JLC04161H-3313 class stack-up (outer prepreg about 0.1 mm,
+   so 50 R microstrip is about 0.17-0.2 mm wide; compute it), layer 2 solid ground, 0402 passives
+   (0201 allowed where a simulation asks for it), 1.6 mm board, SMA edge-launch connectors.
