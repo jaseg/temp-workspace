@@ -12,6 +12,7 @@ EXP = os.path.join(OUT, "export")
 
 def run_generators():
     import gen_placeholders
+    subprocess.run([sys.executable, os.path.join(HERE, "gen_footprints.py")], check=True)   # lib/scope-fe.pretty
     for n in CRITICAL:
         own = os.path.join(HERE, f"gen_{n}.py")
         if os.path.exists(own):
@@ -38,8 +39,16 @@ def check(n):
         "I2C_SCL": {("U502", "4"), ("J701", "20")}, "I2C_SDA": {("U502", "5"), ("J701", "21")},
         "FPGA_RECONFIG": {("U501", "48"), ("J701", "19")}, "FPGA_DONE": {("U501", "46"), ("J701", "18")},
         "SPI_MISO": {("U501", "30"), ("J701", "24")}, "ADC_TRIG": {("U501", "41"), ("J701", "13")},
-        "MCU_CLK": {("J701", "14")}, "+3V3": {("U501", "36"), ("U501", "1"), ("U501", "25")},
-        "+1V2": {("U501", "12"), ("U501", "37")}, "GND": {("U501", "2"), ("U501", "26"), ("U501", "49")},
+        "MCU_CLK": {("J701", "14")},
+        # programming header J501 (yanartas sensing board J3 pinout) -> J701 pins 27-32
+        "UC_SWDIO": {("J501", "8"), ("J701", "27")}, "UC_SWCLK": {("J501", "10"), ("J701", "28")},
+        "UC_NRST": {("J501", "14"), ("J701", "29"), ("C511", "1")}, "DBG1": {("J501", "12"), ("J701", "30")},
+        "HOST_RX": {("R511", "2"), ("J701", "31")}, "HOST_TX": {("R512", "2"), ("J701", "32")},
+        "VBUS": {("J501", "1")}, "JTAG_TCK": {("J501", "7"), ("U501", "3"), ("R507", "1")},
+        "JTAG_TMS": {("J501", "9"), ("U501", "4")}, "JTAG_TDI": {("J501", "11"), ("U501", "5")},
+        "JTAG_TDO": {("J501", "13"), ("U501", "7")}, "DBG2": {("J501", "5"), ("U501", "6")}, "+3V3": {("U501", "36"), ("U501", "1"), ("U501", "25")},
+        "+1V2": {("U501", "12"), ("U501", "37")}, "GND": {("U501", "2"), ("U501", "26"), ("U501", "49"),
+                                                    ("J501", "6"), ("J501", "15"), ("J501", "16")},
     }
     bad = 0
     for net, m in members.items():

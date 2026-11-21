@@ -7,6 +7,14 @@ from schlib import Sheet, g  # noqa: F401
 
 # sheet name -> (title, ref_base, page, left pins [(net, shape)], right pins)
 TAPS = [f"TAP{i}" for i in range(16)]
+# MCU debug / console nets of the programming header J501 (fpga_clock; yanartas sensing board J3 pinout) to the
+# MCU header J701 pins 27-32 (mcu_if). HOST_RX / HOST_TX are named as seen from the host (debug adapter):
+# HOST_RX = MCU UART TX, HOST_TX = MCU UART RX.
+MCU_DBG = [("UC_SWDIO", "bidirectional", "bidirectional"), ("UC_SWCLK", "output", "input"),
+           ("UC_NRST", "bidirectional", "bidirectional"), ("DBG1", "bidirectional", "bidirectional"),
+           ("HOST_RX", "input", "output"), ("HOST_TX", "output", "input")]
+MCU_DBG_FPGA = [(n, a) for n, a, _b in MCU_DBG]      # shapes as seen from fpga_clock
+MCU_DBG_MCU = [(n, b) for n, _a, b in MCU_DBG]       # shapes as seen from mcu_if
 SHEETS = {
     "input": ("Input: 5:1 divider, BUF802 + OPA197 servo", 100, 2,
               [("VOFS", "input")],
@@ -32,12 +40,14 @@ SHEETS = {
                                                   ("I2C_SDA", "bidirectional"), ("FPGA_RECONFIG", "input"),
                                                   ("FPGA_DONE", "output")],
                    [("PH_STROBE_P", "output"), ("PH_STROBE_N", "output"), ("S_STROBE_P", "output"),
-                    ("S_STROBE_N", "output"), None, ("ADC_TRIG", "output"), ("MCU_CLK", "output")]),
+                    ("S_STROBE_N", "output"), None, ("ADC_TRIG", "output"), ("MCU_CLK", "output"), None]
+                   + MCU_DBG_FPGA),
     "power": ("Power: USB-C 5 V in, +3V3, +1V2, +5V, -5V, +2V5, -2V5", 600, 7, [], []),
     "mcu_if": ("MCU interface: STM32G474 header, DAC scaling", 700, 8,
                [("ADC_IN", "input"), ("ADC_TRIG", "input"), ("MCU_CLK", "input"), ("FPGA_DONE", "input"),
                 ("SPI_MISO", "input"), None, ("SPI_SCK", "output"), ("SPI_MOSI", "output"), ("SPI_CS", "output"),
-                ("FPGA_RECONFIG", "output"), ("I2C_SCL", "output"), ("I2C_SDA", "bidirectional")],
+                ("FPGA_RECONFIG", "output"), ("I2C_SCL", "output"), ("I2C_SDA", "bidirectional"), None]
+               + MCU_DBG_MCU,
                [("ADC_REF_MID", "output"), ("VOFS", "output"), ("TRIG_LEVEL", "output"), ("TRIG_SEL", "output"),
                 ("VBIAS_A", "output"), ("VBIAS_K", "output"), ("VTAP_P", "output"), ("VTAP_N", "output"),
                 ("VTAP_TH", "output")]),

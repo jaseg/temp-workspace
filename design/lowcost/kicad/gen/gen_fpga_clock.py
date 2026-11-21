@@ -1,5 +1,6 @@
 """fpga_clock.kicad_sch: GW1NZ-LV1QN48C6/I5 FPGA, MS5351M clock generator with 25 MHz crystal, JTAG,
-configuration straps, decoupling.
+configuration straps, decoupling, programming header J501 (Würth WR-WST 490107671612, yanartas sensing
+board J3 pinout: FPGA JTAG + DBG2 and the MCU SWD/UART/NRST/DBG1 nets, which continue to mcu_if J701).
 
 Pinout source: Gowin UG842-1.6.8E "GW1NZ-1 Pinout" (pin list, QN48 column) and UG843-1.8.7E figure 3-6
 (QN48 top view): Bank0 = pins 3-8, 35, 38-48; Bank1 = pins 9-11, 13-24, 27-34; VCC 12, 37; VCCIO0 1;
@@ -11,7 +12,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import schlib
 from schlib import g
-from common import new_sheet, R, C, decoupler
+from common import new_sheet, R, C, decoupler, MCU_DBG_FPGA
 
 IO, PWR = "bidirectional", "power_in"
 
@@ -32,7 +33,7 @@ BANK0 = [(40, "IOT16A", "PH_STROBE_P", "h"), (39, "IOT16B", "PH_STROBE_N", "h"),
          (45, "IOT12B/READY", "FPGA_READY", "l"), (44, "IOT13A/JTAGSEL_N", "JTAGSEL_N", "l"),
          (43, "IOT14A/MODE0", "FPGA_MODE0", "l"), (42, "IOT14B/MODE1", "FPGA_MODE1", "l"),
          (3, "IOT7B/TCK", "JTAG_TCK", "l"), (4, "IOT7A/TMS", "JTAG_TMS", "l"), (5, "IOT8A/TDI", "JTAG_TDI", "l"),
-         (7, "IOT8B/TDO", "JTAG_TDO", "l"), (6, "IOT9A/SCLK", None, "nc"), (8, "IOT10B/GCLKC_0", None, "nc")]
+         (7, "IOT8B/TDO", "JTAG_TDO", "l"), (6, "IOT9A/SCLK", "DBG2", "l"), (8, "IOT10B/GCLKC_0", None, "nc")]
 TOP = [(12, "VCC", "+1V2"), (37, "VCC", "+1V2"), (36, "VCCX", "+3V3"), (1, "VCCIO0", "+3V3"),
        (25, "VCCIO1", "+3V3")]
 BOT = [(2, "VSS"), (26, "VSS"), (49, "EPAD")]
@@ -127,15 +128,43 @@ def main():
     pull(sh, "FPGA_MODE1", (x0 + g(16), y0 + g(22)), to="GND")
     pull(sh, "JTAG_TCK", (x0 + g(32), y0 + g(22)), to="GND")
 
-    # JTAG header (1x6, 2.54 mm): 3V3, TMS, TCK, TDO, TDI, GND
-    j = sh.add("Connector_Generic:Conn_01x06", "J", "JTAG", (g(300), g(90)),
-               fp="Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical", lcsc="C40877")
-    sh.stub(j, "1", "+3V3", kind="power")
-    for pin, net in (("2", "JTAG_TMS"), ("3", "JTAG_TCK"), ("4", "JTAG_TDO"), ("5", "JTAG_TDI")):
-        sh.stub(j, pin, net, length=5.08)
-    sh.stub(j, "6", "GND", kind="gnd")
-    sh.text("JTAG 1x6: 1 3V3, 2 TMS, 3 TCK, 4 TDO, 5 TDI, 6 GND\n(wire to a Gowin USB cable / FT2232 adapter)",
-            (g(268), g(105)))
+    # programming header J501: Würth WR-WST 490107671612 (2x08 Redfit IDC direct-to-board, footprint only),
+    # same part and pinout as the yanartas sensing board J3 (odd pins left, even pins right):
+    #  1 VBUS (5 V)  2 HOST_RX (100 R)  3 +3V3  4 HOST_TX (100 R)  5 DBG2 (FPGA pin 6)  6 GND
+    #  7 TCK  8 UC_SWDIO  9 TMS  10 UC_SWCLK  11 TDI  12 DBG1  13 TDO  14 UC_NRST (100 nF)  15 GND  16 GND
+    j = sh.add("Connector_Generic:Conn_02x08_Odd_Even", "J501", "WR-WST 490107671612", (g(280), g(130)),
+               fp="scope-fe:Würth_WR-WST_debug_490107671612_2x08_P2.54mm_Vertical", lcsc="NA",
+               mpn="Würth 490107671612",
+               fields={"Note": "footprint only; same part and pinout as the yanartas sensing board J3"})
+    p1, p3 = j["1"], j["3"]
+    sh.stub(j, "1", "VBUS", kind="power")                       # VBUS (USB 5 V) up, short stub
+    xr = p3[0] - g(12)                                         # +3V3: further left, then up past pin 1
+    sh.path([p3, (xr, p3[1])])
+    sh.power("+3V3", (xr, p3[1]), dy=p1[1] - p3[1] - 2.54)
+    for pin, rot in (("15", 270), ("6", 90), ("16", 90)):     # GND symbols pointing away from the body
+        p, d = j[pin], j.pin_dir(pin)
+        e = (p[0] + d[0] * 2.54, p[1])
+        sh.wire(p, e)
+        sh.power("GND", e, rot=rot)
+    for pin, net in (("5", "DBG2"), ("7", "JTAG_TCK"), ("9", "JTAG_TMS"), ("11", "JTAG_TDI"), ("13", "JTAG_TDO")):
+        sh.stub(j, pin, net, length=g(6))
+    xl = j["2"][0] + g(20)                                     # right-hand hierarchical labels aligned here
+    for pin, net, ref, xc in (("2", "HOST_RX", "R511", g(6)), ("4", "HOST_TX", "R512", g(12))):
+        p = j[pin]
+        r = R(sh, "100", (p[0] + xc, p[1]), rot=90, ref=ref, lcsc="C25076")   # staggered: texts do not collide
+        sh.wire(p, r["1"])
+        sh.wire(r["2"], (xl, p[1]))
+        sh.hlabel(net, (xl, p[1]), dict(MCU_DBG_FPGA)[net])
+    for pin, net in (("8", "UC_SWDIO"), ("10", "UC_SWCLK"), ("12", "DBG1"), ("14", "UC_NRST")):
+        sh.stub(j, pin, net, length=g(20), kind="hlabel", shape=dict(MCU_DBG_FPGA)[net])
+    cn = C(sh, "100n", (j["14"][0] + g(16), j["14"][1] + 3.81), ref="C511")
+    sh.gnd(cn["2"])
+    sh.text("J501 programming header: Würth WR-WST 490107671612 (Redfit IDC, footprint only),\n"
+            "pinout of the yanartas sensing board J3. FPGA JTAG (TCK/TMS/TDI/TDO, DBG2 = FPGA pin 6)\n"
+            "and the STM32 SWD / UART / NRST / DBG1, which go on to the MCU header J701 pins 27-32.\n"
+            "HOST_RX/HOST_TX named as seen from the host (debug adapter): HOST_RX = MCU UART TX.\n"
+            "1 VBUS 2 HOST_RX 3 +3V3 4 HOST_TX 5 DBG2 6 GND 7 TCK 8 SWDIO\n"
+            "9 TMS 10 SWCLK 11 TDI 12 DBG1 13 TDO 14 NRST 15 GND 16 GND", (g(255), g(150)), size=1.0)
 
     # MS5351M clock generator (pin-compatible with Si5351A-B-GT, MSOP-10) + 25 MHz crystal
     ck = sh.add("Oscillator:Si5351A-B-GT", "U", "MS5351M", (g(70), g(60)),
@@ -161,9 +190,10 @@ def main():
             "CLK2 -> FPGA pin 34 (spare clock / beat mode). One 100 nF each at VDD and VDDO.",
             (g(25), g(98)))
     sh.text("Pin plan (UG842): Bank1 = TAP0..15 (COS3502 outputs, LVCMOS33 in), SPI slave, FPGA_CLK;\n"
-            "Bank0 = strobes (OSER10, pairs IOT16A/B and IOT17A/B), ADC_TRIG, COARSE (GCLKT_0), config, JTAG.\n"
+            "Bank0 = strobes (OSER10, pairs IOT16A/B and IOT17A/B), ADC_TRIG, COARSE (GCLKT_0), config, JTAG,\n"
+            "DBG2 (pin 6, IOT9A/SCLK, to J501 pin 5).\n"
             "TAP pins may be swapped within Bank1 for routing (update this table).\n"
-            "Unused: 6 (IOT9A/SCLK), 8 (IOT10B/GCLKC_0), 32 (GCLKC_2).", (g(150), g(200)))
+            "Unused: 8 (IOT10B/GCLKC_0), 32 (GCLKC_2).", (g(150), g(200)))
     sh.save()
 
 

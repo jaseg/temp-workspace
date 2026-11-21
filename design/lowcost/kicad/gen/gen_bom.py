@@ -6,7 +6,8 @@ LCSC come from the symbol fields, prices from the PRICE table below (USD, qty 1 
 Price sources (21 Nov 2026): lcsc.com product pages read in this session ("LCSC"), docs/research/prices.md
 (LCSC / DigiKey / Mouser via Octopart), docs/research/opamps.md, kicad/README.md. "est" = estimate (typical
 LCSC price for the class or an out-of-stock listing), not a quote. Not counted: MCU (user's STM32G474 board),
-PCB, assembly. PCB-only items (test pads, net ties, solder jumper, TLINE stubs) are listed at 0.
+PCB, assembly. PCB-only items (test pads, net ties, solder jumper, TLINE stubs) and the footprint-only programming
+header J501 (Würth WR-WST 490107671612, no part fitted) are listed at 0 and not counted as fitted parts.
 Usage: python3 gen_bom.py  (after gen_all.py)"""
 import csv, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +19,7 @@ DOCS = os.path.abspath(os.path.join(schlib.OUTDIR, "..", "docs"))
 
 # key: MPN-ish value (symbol value) -> (unit USD at the qty used on one board, source, status, MOQ, note)
 L, PM, ES = "LCSC", "prices.md", "est"
+FOOT = "footprint only"
 PRICE = {
     "BUF802IRGTR": (5.89, "LCSC C4370628", "ok", 1, "72 in stock"),
     "GW1NZ-LV1QN48C6/I5": (6.68, "LCSC C5799569", "ok", 1, ""),
@@ -49,8 +51,9 @@ PRICE = {
     "220R@100MHz 2A": (0.0277, "LCSC C85840", "no stock", 20, "BLM21PG221SN1D, 0 in stock"),
     "600R@100MHz 1A": (0.02, ES, "est", 50, "0805 1 A bead, LCSC # to assign"),
     "4.7uH 2A": (0.10, ES, "est", 5, "SRN4018-class, LCSC # to assign"),
-    "JTAG": (0.0925, "LCSC C40877 (5+)", "ok", 5, ""),
-    "MCU 2x13": (0.1468, "LCSC C53207345 (5+)", "low stock", 5, "10 in stock"),
+    # programming header J501: plated holes only, the WR-WST cable connector plugs into the board (no part)
+    "WR-WST 490107671612": (0.0, FOOT, "n/a", 0, "footprint only (Würth Redfit IDC, yanartas J3 pinout), no part"),
+    "MCU 2x16": (0.18, ES, "est", 5, "2x16 2.54 mm male header, LCSC # to assign"),
     "SIG_IN": (1.99, "LCSC C5356059 CON-SMA-EDGE-S", "est", 1, "0 in stock; Samtec/TE branded 4.47 (prices.md)"),
     "EXT_CLK": (1.99, "LCSC C5356059 CON-SMA-EDGE-S", "est", 1, "as SIG_IN"),
     "50k": (1.50, ES, "est", 1, "Bourns 3314J trimmer, distributor price not checked"),
@@ -147,7 +150,8 @@ def main():
         for r in rows:
             w.writerow({**r, "unit": f"{r['unit']:.4f}", "line": f"{r['line']:.3f}",
                         "first_order": f"{r['first_order']:.3f}"})
-    nparts = sum(r["qty"] for r in rows if not r["refs"].startswith(PCB_ONLY) and r["status"] != "DNP")
+    nparts = sum(r["qty"] for r in rows if not r["refs"].startswith(PCB_ONLY) and r["status"] != "DNP"
+                 and r["source"] != FOOT)
     write_md(rows, total, first, est, nparts)
     print(f"BOM: {len(rows)} lines, {nparts} fitted parts, total {total:.2f} USD (est part {est:.2f}), "
           f"first order with MOQs {first:.2f} USD")
@@ -159,7 +163,7 @@ def write_md(rows, total, first, est, nparts):
         v, fp, ref = r["value"], r["footprint"], r["refs"]
         if r["status"] == "DNP":
             return "DNP"
-        if ref.startswith(PCB_ONLY):
+        if ref.startswith(PCB_ONLY) or r["source"] == FOOT:
             return "PCB only"
         if ref[0] in "RC" and not ref.startswith("CON") and r["unit"] < 0.2:
             return "R/C passives"
