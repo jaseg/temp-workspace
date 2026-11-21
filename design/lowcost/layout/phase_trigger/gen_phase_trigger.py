@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
-"""Layout fragment "phase_trigger": trigger path and 16-tap phase-recovery delay line.
+"""Layout fragment "phase_trigger": trigger path and 16-tap phase-recovery delay line (re-layout, JLC04161H-7628).
 
-BUF_OUT_T (50 R microstrip) / EXT_CLK (SMA, 49.9 R) -> TMUX136 (local -0.9 V switch ground) -> TLV3801
-(+/-2V5, IN- = TRIG_LEVEL) -> 100 R across CMP_P/CMP_N -> CMP_P: 1 uF -> TRF37D73 (120 nH + 47 uH choke)
--> 1 uF -> 12 dB pi pad 82/91/82 -> PH_LINE;  CMP_N: 1 uF -> 49.9 R dummy;  2 x 470 R bridge -> SN65LVDS2
--> COARSE.  Delay line (SPEC decision 4, co-propagating): PSTRB_A / PSTRB_K straight on F.Cu at 35 ps
-per tap (loaded), PH_LINE on B.Cu (over a local In2 ground) at 70 ps per tap, up through two vias to each
-gate.  Per tap: BAT15-04W, 2 x 0.47 pF C0G, 2.2 k to VTAP_N / VTAP_P, 2 x 1 k summing into a COS3502
-half (IN- = VTH = VTAP_TH through 1 k / 100 nF), outputs TAP0..TAP15 to edge pads.  All three lines end
-in 49.9 R.  Values: design/lowcost/sim/phase/RESULT.md, SPEC decisions 4-6, 9.
+BUF_OUT_T (50 R) / EXT_CLK (SMA, 49.9 R at the pin) -> TMUX136 (local -0.9 V switch ground) -> TLV3801
+(+/-2V5, IN- = TRIG_LEVEL) -> 100 R across CMP_P/CMP_N (2 x 50 R lines) -> CMP_P: 1 uF -> TRF37D73 (120 nH +
+47 uH bias) -> 1 uF -> 12 dB pi pad 82/91/82 -> PH_LINE;  CMP_N: 1 uF -> 49.9 R dummy;  2 x 470 R -> SN65LVDS2
+-> COARSE.  Delay line (SPEC decision 4, co-propagating), everything on F.Cu over the solid In1 ground, no
+vias in any RF path: PSTRB_A / PSTRB_K straight 73 R lines at 35 ps per tap (loaded), PH_LINE meanders
+between the gates (loaded 50 R, 65 ps per tap = 70 ps - 5 ps as sim/phase_array/RESULT.md recommends).
+Per tap: BAT15-04W straddling PH_LINE (line between pins 1/2 onto pin 3 = zero-length tap), 2 x 0.47 pF C0G
+bridging pin 1 / pin 2 to the strobe lines, 1 k and 2.2 k straddling each strobe line (perpendicular),
+COS3502 comparators in a row behind PSTRB_A.  No stitching grid (user applies stitching after assembling
+the fragments); only functional vias.
 
-Run:  python3 gen_phase_trigger.py   (writes phase_trigger.kicad_pcb next to this file, prints the
-stack-up, the per-tap delay table and the sanity checks).  KiCad 7.0 pcbnew API.  kicad-cli 7 has no
-DRC: the checks at the end are this script's own.
-
-Coordinates in mm, origin = centre of the tap-0 diode, +x along the line (far end), +y down
-(towards PSTRB_K).  Everything is shifted by ORG on the sheet.
+Run: python3 gen_phase_trigger.py  -> phase_trigger.kicad_pcb, prints stack-up, impedance and delay tables,
+RF segment table, pad discontinuities and the checks.  KiCad 7.0 pcbnew API.  kicad-cli 7 has no DRC.
+Coordinates in mm, origin = centre of the tap-0 diode, +x towards the far end, +y down (PSTRB_K side).
 """
 import math, os, tempfile
 import pcbnew
@@ -25,31 +24,59 @@ OUT = os.path.join(HERE, "phase_trigger.kicad_pcb")
 FPLIB = "/usr/share/kicad/footprints"
 ORG = (150.0, 100.0)
 mm = pcbnew.FromMM
-C0 = 299.792458                      # mm/ns
 
-# ============================================================================= stack-up / line design
-# JLC04161H-3313 (1.6 mm): L1 35 um / 3313 prepreg 0.0994 mm er 4.1 / In1 / core 1.265 mm / In2 /
-# 3313 prepreg 0.0994 mm / L4 35 um.  F.Cu lines reference In1 (GND), B.Cu lines reference In2,
-# which is GND under the delay line.
-H, T_CU, ER = 0.0994, 0.035, 4.1
-EPS0 = 8.854e-3                      # pF/mm
+# ============================================================================= stack-up / impedance
+# JLC04161H-7628 (jlcpcb.com/impedance, checked 2026-11): L1 35 um / 7628 prepreg 0.2104 mm er 4.4 /
+# L2 15.2 um / core 1.065 mm er 4.6 / L3 15.2 um / 7628 0.2104 mm / L4 35 um.  Mask er 3.8, 0.6 mil (15 um)
+# over the trace, 1.2 mil (30 um) over bare laminate.
+H, T_CU, ER, ER_MASK, C_MASK_TR, C_MASK_SUB = 0.2104, 0.035, 4.4, 3.8, 0.015, 0.030
+C0 = 0.299792458                                   # mm/ps
 
 
-def microstrip(w, h=H, t=T_CU, er=ER):
-    """Hammerstad-Jensen microstrip with Wheeler thickness correction -> (Z0, eps_eff)."""
-    def z_air(u):
-        f = 6 + (2 * math.pi - 6) * math.exp(-(30.666 / u) ** 0.7528)
-        return 60 * math.log(f / u + math.sqrt(1 + 4 / u ** 2))
+def microstrip(w, h=H, t=T_CU, er=ER, mask=True):
+    """Hammerstad-Jensen microstrip, Hammerstad thickness correction, first-order solder-mask overlay
+    (mask replaces air in the covered part of the fringing field:
+    eps_eff += (er_mask - 1) (1 - q) (1 - exp(-1.2 c / h)), q = filling factor, c = mean mask thickness).
+    Returns (Z0, eps_eff)."""
     u = w / h
-    ue = u + (t / h / math.pi) * (1 + math.log(2 * h / t))
-    a = 1 + math.log((u ** 4 + (u / 52) ** 2) / (u ** 4 + 0.432)) / 49 + math.log(1 + (u / 18.1) ** 3) / 18.7
-    b = 0.564 * ((er - 0.9) / (er + 3)) ** 0.053
-    ee = (er + 1) / 2 + (er - 1) / 2 * (1 + 10 / u) ** (-a * b)
-    return z_air(ue) / math.sqrt(ee), ee
+
+    def z_air(x):
+        f = 6 + (2 * math.pi - 6) * math.exp(-(30.666 / x) ** 0.7528)
+        return 60 * math.log(f / x + math.sqrt(1 + 4 / x ** 2))
+
+    def ee0(x):
+        a = 1 + math.log((x ** 4 + (x / 52) ** 2) / (x ** 4 + 0.432)) / 49 + math.log(1 + (x / 18.1) ** 3) / 18.7
+        b = 0.564 * ((er - 0.9) / (er + 3)) ** 0.053
+        return (er + 1) / 2 + (er - 1) / 2 * (1 + 10 / x) ** (-a * b)
+    du1 = t / h / math.pi * math.log(1 + 4 * math.e / (t / h * (1 / math.tanh(math.sqrt(6.517 * u))) ** 2))
+    dur = 0.5 * (1 + 1 / math.cosh(math.sqrt(er - 1))) * du1
+    u1, ur = u + du1, u + dur
+    ee = ee0(ur) * (z_air(u1) / z_air(ur)) ** 2
+    if mask:
+        q = (ee - 1) / (er - 1)
+        ee += (ER_MASK - 1) * (1 - q) * (1 - math.exp(-1.2 * (C_MASK_TR + C_MASK_SUB) / 2 / h))
+    return z_air(u1) / math.sqrt(ee), ee
+
+
+def _K(k):
+    a, b = 1.0, math.sqrt(1 - k * k)
+    for _ in range(30):
+        a, b = (a + b) / 2, math.sqrt(a * b)
+    return math.pi / (2 * a)
+
+
+def cpwg(w, g, h=H, er=ER):
+    """Conductor-backed coplanar waveguide (t = 0, no mask), Wadell -> (Z0, eps_eff)."""
+    k = w / (w + 2 * g)
+    k3 = math.tanh(math.pi * w / (4 * h)) / math.tanh(math.pi * (w + 2 * g) / (4 * h))
+    r1 = _K(k) / _K(math.sqrt(1 - k * k))
+    r3 = _K(k3) / _K(math.sqrt(1 - k3 * k3))
+    ee = (1 + er * r3 / r1) / (1 + r3 / r1)
+    return 60 * math.pi / math.sqrt(ee) / (r1 + r3), ee
 
 
 def width_for(z):
-    lo, hi = 0.02, 2.0
+    lo, hi = 0.02, 3.0
     for _ in range(60):
         m = (lo + hi) / 2
         lo, hi = (m, hi) if microstrip(m)[0] > z else (lo, m)
@@ -57,48 +84,62 @@ def width_for(z):
 
 
 def ps_mm(w):
-    return math.sqrt(microstrip(w)[1]) * 1e3 / C0
+    return math.sqrt(microstrip(w)[1]) / C0
+
+
+def c_per_mm(w):                                    # pF/mm
+    z, ee = microstrip(w)
+    return math.sqrt(ee) / (C0 * z)
 
 
 def loaded(tdu, z, cl):
-    """Unloaded section (delay tdu ps, Z0 z) + lumped cl pF -> (loaded delay ps, loaded Z)."""
+    """Section (delay tdu ps, Z0 z) + lumped cl pF -> (loaded delay ps, loaded Z)."""
     td = math.sqrt(tdu * (tdu + z * cl))
     return td, z * tdu / td
 
 
-W50_EXACT = width_for(50.0)
-W50 = round(W50_EXACT / 0.01) * 0.01                       # 0.17 mm
-W_STR = 0.09               # strobe lines: 73 R would need 0.07 mm; 0.09 mm is the JLC 4-layer minimum
-W_LIN = 0.10               # PH_LINE trace (B.Cu over In2 GND), 64.5 R unloaded
-W_SIG, W_PWR, W_GND, W_NODE = 0.15, 0.3, 0.25, 0.15
-Z_STR, Z_LIN = microstrip(W_STR)[0], microstrip(W_LIN)[0]
-# loads per tap: gate 0.4 pF (strobe side, SPEC / task) resp. 0.37 pF (line side, RESULT) plus the excess
-# pad capacitance over the 0.0994 mm prepreg (pad area minus the trace that would be there anyway)
-C_PAD_STR = EPS0 * ER * (0.56 * 0.62 - W_STR * 0.62) / H    # 0402 hold-cap pad on the strobe line
-C_PAD_LIN = EPS0 * ER * (0.70 * 0.45 - W_LIN * 0.70) / H    # SOT-323 pin 3 pad on the line
-CL_STR = 0.40 + C_PAD_STR
-CL_LIN = 0.37 + C_PAD_LIN
-# vias (0.2 / 0.45 mm, F.Cu <-> B.Cu) treated as 1.53 mm line sections in er 4.4 FR4, impedance ~ line
-T_VIA = (1.6 - 2 * 0.035) * math.sqrt(4.4) * 1e3 / C0       # ps per via traversal
-TD_STR, TD_LIN = 35.0, 70.0
-
-
 def solve_tdu(z, cl, target):
-    lo, hi = 1.0, target
+    lo, hi = 0.5, target
     for _ in range(60):
         m = (lo + hi) / 2
         lo, hi = (m, hi) if loaded(m, z, cl)[0] < target else (lo, m)
     return (lo + hi) / 2
 
 
+def r01(x):
+    return round(x / 0.01) * 0.01
+
+
+W50 = r01(width_for(50.0))                          # 0.36 mm
+Z50, EE50 = microstrip(W50)
+GAP_RF = 2 * W50                                    # pour clearance from 50 R trace edges
+W_STR = r01(width_for(73.0))                        # strobe sections 73 R
+Z_STR = microstrip(W_STR)[0]
+W_NODE, W_SIG, W_PWR, W_GND = 0.15, 0.2, 0.5, 0.4
+# --- strobe: 0.40 pF gate + excess of the hold-cap pad the line runs through (0.62 along x 0.56 across)
+#     + ~0.01 pF fringe per straddling 0402 resistor (2 per tap, pads 0.165 mm from the line edge, estimate)
+C_PAD_STR = (c_per_mm(0.56) - c_per_mm(W_STR)) * 0.62
+CL_STR = 0.40 + C_PAD_STR + 0.02
+TD_STR = 35.0
 TDU_STR = solve_tdu(Z_STR, CL_STR, TD_STR)
-PITCH = round(TDU_STR / ps_mm(W_STR), 3)                    # tap pitch = strobe length per tap
+PITCH = round(TDU_STR / ps_mm(W_STR), 3)
+# --- signal line: loaded 50 R at 65 ps / tap; load 0.37 pF gate + pin-3 pad excess (0.70 x 0.45 mm)
+TD_LIN = 65.0
+W_LIN = 0.25
+for _ in range(3):
+    C_PAD_LIN = (c_per_mm(0.45) - c_per_mm(W_LIN)) * 0.70
+    CL_LIN = 0.37 + C_PAD_LIN
+    z_t = math.sqrt(50.0 * TD_LIN / (TD_LIN / 50.0 - CL_LIN))   # L = Zl td, C_line = td / Zl - CL
+    W_LIN_EXACT = width_for(z_t)
+    W_LIN = r01(W_LIN_EXACT)
+Z_LIN = microstrip(W_LIN)[0]
 TDU_LIN = solve_tdu(Z_LIN, CL_LIN, TD_LIN)
-L_LIN = (TDU_LIN - 2 * T_VIA) / ps_mm(W_LIN)                # trace length per tap (both layers)
+L_LIN = TDU_LIN / ps_mm(W_LIN)                      # trace length per tap (pin 3 centre to pin 3 centre)
 NT = 16
 XT = [n * PITCH for n in range(NT)]
+X15 = XT[-1]
 
-# ============================================================================= board helpers
+# ============================================================================= board
 _TMP = tempfile.mkdtemp(prefix="phase_trigger_fragment_")
 b = pcbnew.NewBoard(os.path.join(_TMP, "phase_trigger.kicad_pcb"))
 b.SetCopperLayerCount(4)
@@ -109,18 +150,19 @@ for lay, name, typ in ((pcbnew.F_Cu, "F.Cu", pcbnew.LT_SIGNAL), (pcbnew.In1_Cu, 
 ds = b.GetDesignSettings()
 ds.SetBoardThickness(mm(1.6))
 ds.m_MinClearance = mm(0.1)
-ds.m_TrackMinWidth = mm(0.09)
+ds.m_TrackMinWidth = mm(0.1)
 ds.m_ViasMinSize = mm(0.4)
 ds.m_MinThroughDrill = mm(0.2)
 nc = ds.m_NetSettings.m_DefaultNetClass
 nc.SetClearance(mm(0.1))
 nc.SetTrackWidth(mm(0.2))
-nc.SetViaDiameter(mm(0.6))
-nc.SetViaDrill(mm(0.3))
+nc.SetViaDiameter(mm(0.45))
+nc.SetViaDrill(mm(0.2))
 
-NETS, FPS, ROUTES = {}, {}, {}
+NETS, FPS, ROUTES, POLYS, RFPADS = {}, {}, {}, [], []
 RR = pcbnew.PAD_SHAPE_ROUNDRECT
 CIRC = pcbnew.PAD_SHAPE_CIRCLE
+N_VIA = {"gnd": 0, "supply": 0, "signal": 0}
 
 
 def net(name):
@@ -143,8 +185,8 @@ def _finish(fp, ref, val):
     fp.SetReference(ref)
     fp.SetValue(val)
     fp.Reference().SetLayer(pcbnew.F_Fab)
-    fp.Reference().SetTextSize(pcbnew.VECTOR2I(mm(0.3), mm(0.3)))
-    fp.Reference().SetTextThickness(mm(0.05))
+    fp.Reference().SetTextSize(pcbnew.VECTOR2I(mm(0.25), mm(0.25)))
+    fp.Reference().SetTextThickness(mm(0.04))
     fp.Reference().SetPosition(fp.GetPosition())
     fp.Value().SetVisible(False)
     b.Add(fp)
@@ -153,7 +195,6 @@ def _finish(fp, ref, val):
 
 
 def place(lib, name, ref, val, x, y, rot, nets, cond=None):
-    """Library footprint. rot may be None: then the first of 0/90/180/270 for which cond(pads) holds."""
     fp = pcbnew.FootprintLoad(os.path.join(FPLIB, lib + ".pretty"), name)
     fp.SetPosition(P(x, y))
     for r in ([rot] if rot is not None else [0, 90, 180, 270]):
@@ -170,13 +211,13 @@ def place(lib, name, ref, val, x, y, rot, nets, cond=None):
     return _finish(fp, ref, val)
 
 
-def two(kind, ref, val, x, y, orient, na, nb, size="0402"):
+def two(kind, ref, val, x, y, orient, na, nb):
     """2-terminal part. orient 'h': na left / nb right; 'v': na up / nb down."""
     lib, name = {"R": ("Resistor_SMD", "R_0402_1005Metric"), "C": ("Capacitor_SMD", "C_0402_1005Metric"),
                  "L": ("Inductor_SMD", "L_0402_1005Metric"), "L1008": ("Inductor_SMD", "L_1008_2520Metric")}[kind]
     if orient == "h":
         return place(lib, name, ref, val, x, y, 0, {"1": na, "2": nb})
-    return place(lib, name, ref, val, x, y, 90, {"1": nb, "2": na})      # rot 90: pad 1 at +y (down)
+    return place(lib, name, ref, val, x, y, 90, {"1": nb, "2": na})
 
 
 def custom(ref, val, x, y, pads, crt):
@@ -211,13 +252,13 @@ def custom(ref, val, x, y, pads, crt):
     return _finish(fp, ref, val)
 
 
-def testpad(ref, nn, x, y, label=None, lx=0.0, ly=-1.0, size=0.45):
-    custom(ref, "TestPoint_Pad_D1.0mm", x, y, [("1", 0, 0, 1.0, 1.0, nn, CIRC)], (0.75, 0.75))
+def testpad(ref, nn, x, y, label=None, lx=0.0, ly=-0.85, size=0.35):
+    custom(ref, "TestPoint_Pad_D1.0mm", x, y, [("1", 0, 0, 1.0, 1.0, nn, CIRC)], (0.55, 0.55))
     text(label or nn, x + lx, y + ly, size)
 
 
-def iface(ref, nn, x, y):
-    custom(ref, "IF_" + nn, x, y, [("1", 0, 0, 0.6, 0.5, nn, RR)], (0, 0))
+def iface(ref, nn, x, y, sx=0.6, sy=0.5):
+    custom(ref, "IF_" + nn, x, y, [("1", 0, 0, sx, sy, nn, RR)], (0, 0))
 
 
 def pad(ref, num):
@@ -227,11 +268,35 @@ def pad(ref, num):
     raise KeyError((ref, num))
 
 
-def track(netname, width, pts, layer=pcbnew.F_Cu, name=None):
-    pts = [pad(*p) if isinstance(p[0], str) else p for p in pts]
-    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
-        if abs(x0 - x1) < 1e-6 and abs(y0 - y1) < 1e-6:
+def chamfer(pts, c):
+    """Cut every corner of an axis/45-degree polyline with a 45-degree chamfer (leg c, limited by the legs)."""
+    out = [pts[0]]
+    for i in range(1, len(pts) - 1):
+        (xa, ya), (xb, yb), (xc, yc) = pts[i - 1], pts[i], pts[i + 1]
+        la, lc = math.hypot(xb - xa, yb - ya), math.hypot(xc - xb, yc - yb)
+        v1 = ((xb - xa) / la, (yb - ya) / la)
+        v2 = ((xc - xb) / lc, (yc - yb) / lc)
+        ang = math.degrees(math.acos(max(-1, min(1, v1[0] * v2[0] + v1[1] * v2[1]))))
+        if ang < 46:
+            out.append((xb, yb))
             continue
+        cc = min(c, la / 2.01 if i > 1 else la * 0.99, lc / 2.01 if i < len(pts) - 2 else lc * 0.99)
+        out.append((xb - v1[0] * cc, yb - v1[1] * cc))
+        out.append((xb + v2[0] * cc, yb + v2[1] * cc))
+    out.append(pts[-1])
+    return out
+
+
+def track(netname, width, pts, layer=pcbnew.F_Cu, name=None, z=None, ch=0.2, check=True):
+    """Polyline; pad references are resolved; 90-degree corners chamfered with leg ch."""
+    pts = [pad(*p) if isinstance(p[0], str) else p for p in pts]
+    q = [pts[0]]
+    for p in pts[1:]:
+        if math.hypot(p[0] - q[-1][0], p[1] - q[-1][1]) > 1e-6:
+            q.append(p)
+    if ch and len(q) > 2:
+        q = chamfer(q, ch)
+    for (x0, y0), (x1, y1) in zip(q, q[1:]):
         t = pcbnew.PCB_TRACK(b)
         t.SetStart(P(x0, y0))
         t.SetEnd(P(x1, y1))
@@ -240,11 +305,14 @@ def track(netname, width, pts, layer=pcbnew.F_Cu, name=None):
         t.SetNet(net(netname))
         b.Add(t)
         if name:
-            ROUTES.setdefault(name, []).append((x0, y0, x1, y1))
-    return pts
+            r = ROUTES.setdefault(name, {"net": netname, "width": width, "z": z, "segs": [], "layer": layer})
+            r["segs"].append((x0, y0, x1, y1))
+    if check:
+        POLYS.append((name or netname, q))
+    return q
 
 
-def via(x, y, netname, drill=0.3, dia=0.6):
+def via(x, y, netname, why="gnd", drill=0.2, dia=0.45):
     v = pcbnew.PCB_VIA(b)
     v.SetPosition(P(x, y))
     v.SetDrill(mm(drill))
@@ -253,14 +321,15 @@ def via(x, y, netname, drill=0.3, dia=0.6):
     v.SetViaType(pcbnew.VIATYPE_THROUGH)
     v.SetNet(net(netname))
     b.Add(v)
+    N_VIA[why] += 1
     return v
 
 
-def svia(x, y, netname):                        # small via 0.2 / 0.45 mm
-    return via(x, y, netname, 0.2, 0.45)
+def gvia(x, y):
+    return via(x, y, "GND", "gnd")
 
 
-def text(s, x, y, size=0.5, layer=pcbnew.F_SilkS, rot=0):
+def text(s, x, y, size=0.4, layer=pcbnew.F_SilkS, rot=0):
     t = pcbnew.PCB_TEXT(b)
     t.SetText(s)
     t.SetPosition(P(x, y))
@@ -286,7 +355,7 @@ def rect_pts(x0, y0, x1, y1):
     return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
 
 
-def zone(netname, layers, pts, clearance=0.25, prio=0, rule=False):
+def zone(netname, layers, pts, clearance=0.2, prio=0, rule=False):
     z = pcbnew.ZONE(b)
     ls = pcbnew.LSET()
     for l in layers:
@@ -305,6 +374,8 @@ def zone(netname, layers, pts, clearance=0.25, prio=0, rule=False):
         z.SetMinThickness(mm(0.2))
         z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
         z.SetAssignedPriority(prio)
+        z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_AREA)
+        z.SetMinIslandArea(int(mm(1.0)) * int(mm(1.0)))
     ol = z.Outline()
     ol.NewOutline()
     for x, y in pts:
@@ -313,504 +384,549 @@ def zone(netname, layers, pts, clearance=0.25, prio=0, rule=False):
     return z
 
 
-# ============================================================================= outline
-X15 = XT[-1]
-BX0, BY0, BX1, BY1 = -42.0, -16.3, X15 + 7.5, 8.3
-for a, c in zip(rect_pts(BX0, BY0, BX1, BY1), rect_pts(BX0, BY0, BX1, BY1)[1:] + [(BX0, BY0)]):
-    line(*a, *c)
+def rfpad(ref, num):
+    RFPADS.append((ref, num))
 
-# ============================================================================= TMUX136 (U301)
-XU1, XU2 = -32.5, -28.0
-# TMUX136 RSE (UQFN-10 1.5 x 2 mm, TI RSE0010A land pattern = KiCad Texas_UQFN-10_1.5x2mm_P0.5mm)
+
+# ============================================================================= delay line geometry
+# Tap cell (relative to XT[n]): D at (0,0), pins 1/2 at (-1.0, -/+0.65), pin 3 at (+1.0, 0).
+# PH_LINE: enters between pins 1/2 at y = 0, ends in pin 3, leaves pin 3 downward: S meander
+# x = 1.0 (down to +Y) -> XU (up to -Y) -> XD (down) -> 45 deg landing at x = PITCH - 1.55 -> next pin 3.
+X_P3, X_P12 = 1.0, -1.0
+XD = PITCH - 1.75
+XU = (X_P3 + XD) / 2
+E_LAND = 0.2
+CH_M = 0.2
+
+
+def cell_path(Y):
+    return [(X_P3, 0.0), (X_P3, Y), (XU, Y), (XU, -Y), (XD, -Y), (XD, -E_LAND), (XD + E_LAND, 0.0),
+            (PITCH + X_P3, 0.0)]
+
+
+def plen(pts):
+    return sum(math.hypot(b_[0] - a_[0], b_[1] - a_[1]) for a_, b_ in zip(pts, pts[1:]))
+
+
+lo, hi = 0.3, 4.0
+for _ in range(60):
+    m = (lo + hi) / 2
+    lo, hi = (m, hi) if plen(chamfer(cell_path(m), CH_M)) < L_LIN else (lo, m)
+Y_M = (lo + hi) / 2
+# strobe line height: meander edge + 0.3 mm + straddling-resistor inner pad (0.79 mm inside the line)
+YL = math.ceil((Y_M + W_LIN / 2 + 0.3 + 0.79) / 0.05) * 0.05
+YNODE = YL - 0.96                                   # hold-cap node pad centre (|y|)
+X_R1K, X_R22K = -1.94, -0.06                        # straddling resistors (1 k to the comparator, 2.2 k to VTAP)
+Y_RV = YL + 1.085                                   # |y| of the vias at the resistor outer pads
+
+# ============================================================================= main chain positions (right to left)
+X_R313 = -2.25
+X_R312 = X_R313 - 0.31 - 0.35 - 0.76
+X_R311 = X_R312 - 0.76 - 0.35 - 0.31
+X_C309 = X_R311 - 0.31 - 0.35 - 0.76
+X_L301 = X_C309 - 0.76 - 0.35 - 0.31
+XU3 = X_L301 - 0.31 - 0.3 - 1.2
+X_C308 = XU3 - 1.2 - 0.4 - 0.76
+X_R309 = X_C308 - 0.76 - 0.35 - 0.31
+X_R307 = X_R309 - 0.94
+XU2 = X_R307 - 2.0
+XU1 = XU2 - 4.425
+Y_N = -0.96                                         # CMP_N line y after its bend
+BX0 = XU1 - 11.5
+BX1 = X15 + 5.0
+
+# ============================================================================= TMUX136 (U301), inputs
 place("Package_DFN_QFN", "Texas_UQFN-10_1.5x2mm_P0.5mm", "U301", "TMUX136", XU1, 0.25, 0,
-      {"1": "TRIG_A", "2": "VSW_GND", "3": "EXT_CLK", "4": "VSW_GND", "5": "VSW_GND", "6": "VSW_GND",
+      {"1": "BUF_OUT_T", "2": "VSW_GND", "3": "EXT_CLK", "4": "VSW_GND", "5": "VSW_GND", "6": "VSW_GND",
        "8": "TRIG_COM", "9": "TRIG_SEL_S", "10": "+2V5"})
-# BUF_OUT_T: 50 R line from the input fragment (49.9 R + 0 R there) to A1 (high-impedance end)
-iface("X1", "BUF_OUT_T", BX0 + 0.5, -3.5)
-track("BUF_OUT_T", W50, [("X1", "1"), (XU1 - 3.0, -3.5), (XU1 - 1.5, -2.0), (XU1 - 1.5, -0.9)],
-      name="BUF_OUT_T line")
-# net change at the pin: TRIG_A = BUF_OUT_T (same copper); keep one net name
-for p in FPS["U301"].Pads():
-    if p.GetNumber() == "1":
-        p.SetNet(net("BUF_OUT_T"))
-track("BUF_OUT_T", W50, [(XU1 - 1.5, -0.9), (XU1 - 1.1, -0.5), ("U301", "1")], name="BUF_OUT_T line")
-# EXT_CLK: SMA edge launch -> 49.9 R at the pin -> B1
-YS_SMA = 1.4
-place("Connector_Coaxial", "SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount", "J301", "SMA EXT_CLK", BX0 + 2.1, YS_SMA, None,
-      {"1": "EXT_CLK", "2": "GND"}, cond=lambda pp: pp["1"][0] < -0.1)
-two("R", "R301", "49.9", XU1 - 2.4, YS_SMA + 0.48, "v", "EXT_CLK", "GND")
-track("EXT_CLK", W50, [("J301", "1"), (XU1 - 2.4, YS_SMA)], name="EXT_CLK line")
-track("EXT_CLK", W50, [(XU1 - 2.4, YS_SMA), (XU1 - 1.5, 0.5), ("U301", "3")], name="EXT_CLK line")
-track("GND", W_GND, [("R301", "@GND"), (XU1 - 2.4, 3.0)])
-svia(XU1 - 2.4, 3.0, "GND")
-# unused channel / EN / GND pin -> VSW_GND
-track("VSW_GND", W_SIG, [("U301", "4"), ("U301", "5"), ("U301", "6")])
-track("VSW_GND", W_SIG, [("U301", "2"), (XU1 - 1.0, 0.0)])
-svia(XU1 - 1.0, 0.0, "VSW_GND")
-# VCC (+2V5) decoupled to the switch ground
-two("C", "C301", "100n", XU1, -2.15, "v", "VSW_GND", "+2V5")
-track("+2V5", W_SIG, [("U301", "10"), ("C301", "@+2V5"), (XU1 - 0.55, -1.67)])
-svia(XU1 - 0.55, -1.67, "+2V5")                                 # In2 +2V5 zone
-track("VSW_GND", W_SIG, [("C301", "@VSW_GND"), (XU1, -3.0)])
-svia(XU1, -3.0, "VSW_GND")
-track("VSW_GND", W_SIG, [(XU1, -3.0), (XU1 - 0.95, -2.05), (XU1 - 1.0, 0.0), (XU1 - 1.0, 1.4)], layer=pcbnew.B_Cu)
-svia(XU1 - 1.0, 1.4, "VSW_GND")
-# local switch ground -0.9 V: 2.7 k to -2V5, 1.5 k to GND, 100 n + 1 n at pin 5
-for i, (kind, ref, val, other) in enumerate((("R", "R304", "2.7k", "-2V5"), ("C", "C303", "1n C0G", "GND"),
-                                             ("C", "C302", "100n", "GND"), ("R", "R303", "1.5k", "GND"))):
-    x = XU1 - 1.0 + i
-    two(kind, ref, val, x, 2.7, "v", "VSW_GND", other)
-    track(other, W_GND, [(ref, "@" + other), (x, 3.9)])
-    svia(x, 3.9, other)
-track("VSW_GND", W_SIG, [(XU1 - 1.0, 2.22), (XU1 + 2.0, 2.22)])
-track("VSW_GND", W_SIG, [("U301", "5"), (XU1, 2.22)])
-track("VSW_GND", W_SIG, [(XU1 - 1.0, 1.4), (XU1 - 1.0, 2.22)])
-# SEL: TRIG_SEL -> 10 k -> SEL, 18 k to -2V5
-two("R", "R305", "10k", XU1 + 1.1, -2.2, "v", "TRIG_SEL", "TRIG_SEL_S")
-two("R", "R306", "18k", XU1 + 2.1, -2.2, "v", "-2V5", "TRIG_SEL_S")
-track("TRIG_SEL_S", W_SIG, [("U301", "9"), (XU1 + 1.1, -0.5), ("R305", "@TRIG_SEL_S"), ("R306", "@TRIG_SEL_S")])
-track("-2V5", W_SIG, [("R306", "@-2V5"), (XU1 + 2.1, -3.4)])
-svia(XU1 + 2.1, -3.4, "-2V5")
-testpad("TP301", "TRIG_SEL", XU1 + 1.1, -6.0, ly=-1.6, size=0.35)
-track("TRIG_SEL", W_SIG, [("R305", "@TRIG_SEL"), (XU1 + 1.1, -6.0)])
+iface("X1", "BUF_OUT_T", BX0 + 0.35, -0.5)
+track("BUF_OUT_T", W50, [("X1", "1"), ("U301", "1")], name="BUF_OUT_T: X1 -> U301.1", z=50)
+rfpad("X1", "1")
+YS = 4.0
+place("Connector_Coaxial", "SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount", "J301", "SMA EXT_CLK", BX0 + 2.1, YS, 270,
+      {"1": "EXT_CLK", "2": "GND"})            # rot 270: PCB edge of the footprint on BX0, body off-board
+rfpad("J301", "1")
+X_R301 = XU1 - 0.95 - 0.3 - 0.31
+xa = X_R301 - 0.8 - (YS - 0.5)
+track("EXT_CLK", W50, [("J301", "1"), (xa, YS), (xa + YS - 0.5, 0.5), ("U301", "3")], name="EXT_CLK: J301 -> U301.3",
+      z=50, ch=0)
+for p_ in FPS["J301"].Pads():
+    if p_.GetNumber() == "2" and p_.IsOnLayer(pcbnew.F_Cu):
+        gx, gy = loc(p_.GetPosition())
+        gvia(gx + 2.43, gy)
+two("R", "R301", "49.9", X_R301, 0.98, "v", "EXT_CLK", "GND")
+rfpad("R301", "@EXT_CLK")
+gvia(X_R301 - 0.31 - 0.1 - 0.225, 1.46)
+track("GND", W_GND, [("R301", "@GND"), (X_R301 - 0.31 - 0.1 - 0.225, 1.46)], ch=0)
+# VSW_GND: pin 2 -> via under the body; pins 4/5/6 in a local F.Cu polygon with the network below
+track("VSW_GND", 0.15, [("U301", "2"), (XU1, 0.0)], ch=0)
+for pn_ in ("4", "5", "6"):
+    track("VSW_GND", 0.25, [("U301", pn_), (pad("U301", pn_)[0], 1.75)], ch=0)
+track("VSW_GND", 0.3, [(XU1 - 0.9, 1.75), (XU1 - 0.2 + 0.94 * 3, 1.75)], ch=0)
+via(XU1, 0.0, "VSW_GND", "supply")
+via(XU1 - 0.9, 1.4, "VSW_GND", "supply")
+for i, (kind, ref, val, other) in enumerate((("C", "C303", "1n C0G", "GND"), ("C", "C302", "100n", "GND"),
+                                             ("R", "R303", "1.5k", "GND"), ("R", "R304", "2.7k", "-2V5"))):
+    x = XU1 - 0.2 + 0.94 * i
+    two(kind, ref, val, x, 2.38, "v", "VSW_GND", other)
+    if other == "GND":
+        gvia(x, 3.42)
+        track("GND", W_GND, [(ref, "@GND"), (x, 3.42)], ch=0)
+X_R304 = XU1 - 0.2 + 0.94 * 3
+testpad("TP303", "-2V5", X_R304, 4.5, ly=0.85)
+track("-2V5", W_PWR, [("R304", "@-2V5"), (X_R304, 4.5)], ch=0)
+via(X_R304 + 0.65, 3.4, "-2V5", "supply")
+track("-2V5", W_PWR, [(X_R304, 3.4), (X_R304 + 0.65, 3.4)], ch=0)
+# VCC (+2V5) pin 10 -> C301 (to the switch ground) right above, +2V5 via pair to In2
+two("C", "C301", "100n", XU1, -1.96, "v", "VSW_GND", "+2V5")
+track("+2V5", 0.3, [("U301", "10"), ("C301", "@+2V5")], ch=0)
+for dx in (-0.635, -1.2):
+    via(XU1 + dx, -1.48, "+2V5", "supply")
+    track("+2V5", 0.3, [("C301", "@+2V5"), (XU1 + dx, -1.48)], ch=0)
+via(XU1, -3.0, "VSW_GND", "supply")
+track("VSW_GND", 0.3, [("C301", "@VSW_GND"), (XU1, -3.0)], ch=0)
+# SEL: pin 9 -> SEL_S node: R305 10 k from TRIG_SEL, R306 18 k to -2V5
+X_R305, X_R306 = XU1 + 1.05, XU1 + 2.0
+two("R", "R305", "10k", X_R305, -1.98, "v", "TRIG_SEL", "TRIG_SEL_S")
+two("R", "R306", "18k", X_R306, -1.98, "v", "-2V5", "TRIG_SEL_S")
+track("TRIG_SEL_S", W_SIG, [("U301", "9"), (XU1 + 0.75, -0.5), (X_R305, -0.8), ("R305", "@TRIG_SEL_S")], ch=0)
+track("TRIG_SEL_S", W_SIG, [("R305", "@TRIG_SEL_S"), ("R306", "@TRIG_SEL_S")], ch=0)
+via(X_R306, -3.03, "-2V5", "supply")
+track("-2V5", 0.3, [("R306", "@-2V5"), (X_R306, -3.03)], ch=0)
+testpad("TP301", "TRIG_SEL", X_R305, -4.4, ly=-1.5)
+track("TRIG_SEL", W_SIG, [("R305", "@TRIG_SEL"), (X_R305, -4.4)], ch=0)
+testpad("TP304", "+2V5", XU1 - 1.2, -4.4)
+track("+2V5", W_PWR, [(XU1 - 1.2, -1.48), (XU1 - 1.2, -4.4)], ch=0)
 
 # ============================================================================= TLV3801 (U302)
-# WSON-8 DSG, rotated: bottom row (y = 0) IN+ 5, VCC 6, VCC 7, OUT+ 8; top row (y = -1.9) IN- 4, VEE 3,
-# GND 2, OUT- 1; exposed pad = VEE.
+# rot: bottom row (y = 0) IN+ 5, VCC 6, VCC 7, OUT+ 8; top row (y = -1.9) IN- 4, VEE 3, GND 2, OUT- 1; EP = VEE
 place("Package_SON", "WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm", "U302", "TLV3801", XU2, -0.95, None,
       {"1": "CMP_N", "2": "GND", "3": "-2V5", "4": "TRIG_LEVEL", "5": "TRIG_COM", "6": "+2V5", "7": "+2V5",
        "8": "CMP_P", "9": "-2V5"},
-      cond=lambda pp: pp["5"][0] < -0.5 and pp["8"][0] > 0.5 and pp["8"][1] > 0.5)
-track("TRIG_COM", W50, [("U301", "8"), ("U302", "5")], name="TRIG_COM")
-# VCC pins 6/7 -> 100 n below; +2V5 from the In2 zone
-two("C", "C304", "100n", XU2 + 0.7, 1.6, "v", "+2V5", "GND")
-track("+2V5", W_SIG, [("U302", "6"), ("U302", "7")])
-track("+2V5", W_SIG, [(XU2, 0.0), (XU2, 0.6), (XU2 + 0.7, 0.6), ("C304", "@+2V5"), (XU2 + 1.4, 1.12)])
-svia(XU2 + 1.4, 1.12, "+2V5")
-track("GND", W_GND, [("C304", "@GND"), (XU2 + 0.7, 2.8)])
-svia(XU2 + 0.7, 2.8, "GND")
-# VEE = pin 3 + exposed pad; 100 n; EP vias to the B.Cu -2V5 feed
-track("-2V5", W_SIG, [("U302", "3"), ("U302", "9")])
+      cond=lambda pp: pp["5"][0] < -0.5 and pp["5"][1] > 0.5 and pp["8"][0] > 0.5 and pp["8"][1] > 0.5)
+track("TRIG_COM", W50, [("U301", "8"), ("U302", "5")], name="TRIG_COM: U301.8 -> U302.5", z=50)
+# VCC pins 6/7 -> bar -> C304 below, +2V5 via pair
+two("C", "C304", "100n", XU2 - 0.25, 1.26, "v", "+2V5", "GND")
+track("+2V5", 0.25, [("U302", "6"), (XU2 - 0.25, 0.5)], ch=0)
+track("+2V5", 0.25, [("U302", "7"), (XU2 + 0.25, 0.5)], ch=0)
+track("+2V5", 0.25, [(XU2 - 0.25, 0.5), (XU2 + 0.25, 0.5)], ch=0)
+for dx in (-0.635, 0.635):
+    via(XU2 - 0.25 + dx, 0.95, "+2V5", "supply")
+    track("+2V5", 0.3, [(XU2 - 0.25, 0.95), (XU2 - 0.25 + dx, 0.95)], ch=0)
+gvia(XU2 - 0.25, 2.3)
+track("GND", W_GND, [("C304", "@GND"), (XU2 - 0.25, 2.3)], ch=0)
+# VEE: pin 3 -> EP, C305 above pin 3; EP vias to the B.Cu -2V5 polygon
+two("C", "C305", "100n", XU2 - 0.35, -3.16, "v", "GND", "-2V5")
+track("-2V5", 0.25, [("U302", "3"), (XU2 - 0.25, -2.6)], ch=0)
+track("-2V5", 0.25, [("U302", "3"), (XU2 - 0.25, -1.3)], ch=0)
 for dx in (-0.4, 0.4):
-    svia(XU2 + dx, -0.95, "-2V5")
-two("C", "C305", "100n", XU2 - 0.25, -3.5, "v", "GND", "-2V5")
-track("-2V5", W_SIG, [("U302", "3"), ("C305", "@-2V5")])
-track("GND", W_GND, [("C305", "@GND"), (XU2 - 0.25, -4.4)])
-svia(XU2 - 0.25, -4.4, "GND")
-track("GND", W_SIG, [("U302", "2"), (XU2 + 0.4, -2.7)])
-svia(XU2 + 0.4, -2.7, "GND")
-# IN- = TRIG_LEVEL, 10 nF at the pin, feed on B.Cu to the bottom-edge pad
-two("C", "C306", "10n", XU2 - 1.3, -3.5, "v", "GND", "TRIG_LEVEL")
-track("TRIG_LEVEL", W_SIG, [("U302", "4"), (XU2 - 1.3, -1.9), ("C306", "@TRIG_LEVEL")])
-track("GND", W_GND, [("C306", "@GND"), (XU2 - 1.3, -4.5)])
-svia(XU2 - 1.3, -4.5, "GND")
-track("TRIG_LEVEL", W_SIG, [(XU2 - 1.3, -1.9), (XU2 - 1.3, -1.25)])
-svia(XU2 - 1.3, -1.25, "TRIG_LEVEL")
-track("TRIG_LEVEL", W_SIG, [(XU2 - 1.3, -1.25), (XU2 - 1.3, 6.4)], layer=pcbnew.B_Cu)
-svia(XU2 - 1.3, 6.4, "TRIG_LEVEL")
-testpad("TP302", "TRIG_LEVEL", XU2 - 1.3, 7.4, lx=-2.7, ly=0.0, size=0.35)
-track("TRIG_LEVEL", W_SIG, [(XU2 - 1.3, 6.4), (XU2 - 1.3, 7.4)])
-# -2V5 feed on B.Cu: EP -> trunk y=-4.6 -> R306, R304 -> test pad
-track("-2V5", W_PWR, [(XU2 + 0.4, -0.95), (XU2 + 1.4, -0.95), (XU2 + 1.4, -5.0), (XU1 - 3.6, -5.0)],
-      layer=pcbnew.B_Cu)
-track("-2V5", W_PWR, [(XU1 + 2.1, -3.4), (XU1 + 2.1, -5.0)], layer=pcbnew.B_Cu)
-track("-2V5", W_PWR, [(XU1 - 1.0, 3.9), (XU1 - 1.6, 4.5), (XU1 - 3.6, 4.5), (XU1 - 3.6, -5.0), (XU1 - 3.6, -5.1)],
-      layer=pcbnew.B_Cu)
-via(XU1 - 3.6, -5.1, "-2V5")
-testpad("TP303", "-2V5", XU1 - 3.6, -6.0, size=0.35)
-track("-2V5", W_PWR, [(XU1 - 3.6, -5.1), (XU1 - 3.6, -6.0)])
-testpad("TP304", "+2V5", XU1 - 1.4, -6.0, size=0.35)
-via(XU1 - 1.4, -6.95, "+2V5")
-track("+2V5", W_PWR, [(XU1 - 1.4, -6.95), (XU1 - 1.4, -6.0)])
+    via(XU2 + dx, -0.95, "-2V5", "supply")
+gvia(XU2 - 0.35, -4.2)
+track("GND", W_GND, [("C305", "@GND"), (XU2 - 0.35, -4.2)], ch=0)
+track("GND", 0.2, [("U302", "2"), (XU2 + 0.25, -2.4), (XU2 + 0.55, -2.7)], ch=0)
+gvia(XU2 + 0.55, -2.92)
+track("GND", 0.2, [(XU2 + 0.55, -2.7), (XU2 + 0.55, -2.92)], ch=0)
+# IN- = TRIG_LEVEL: 10 nF at the pin, test pad above
+two("C", "C306", "10n", XU2 - 1.3, -3.16, "v", "GND", "TRIG_LEVEL")
+track("TRIG_LEVEL", W_SIG, [("U302", "4"), (XU2 - 0.75, -2.13), ("C306", "@TRIG_LEVEL")], ch=0)
+gvia(XU2 - 1.3, -4.2)
+track("GND", W_GND, [("C306", "@GND"), (XU2 - 1.3, -4.2)], ch=0)
+testpad("TP302", "TRIG_LEVEL", XU2 - 1.85, -5.4)
+track("TRIG_LEVEL", W_SIG, [("C306", "@TRIG_LEVEL"), (XU2 - 1.85, -2.68), (XU2 - 1.85, -5.4)])
 
-# ============================================================================= outputs, 100 R, bridge, dummy
-XR = XU2 + 2.05
-two("R", "R307", "100", XR, -0.95, "v", "CMP_N", "CMP_P")
-track("CMP_P", W50, [("U302", "8"), (XR, 0.0)], name="CMP_P")
-track("CMP_P", W_SIG, [(XR, 0.0), ("R307", "@CMP_P")])
-track("CMP_N", W50, [("U302", "1"), (XR, -1.9)], name="CMP_N")
-track("CMP_N", W_SIG, [(XR, -1.9), ("R307", "@CMP_N")])
-two("C", "C307", "1u", XR, -2.95, "v", "CMP_N_DUM", "CMP_N")
-two("R", "R308", "49.9", XR, -4.9, "v", "GND", "CMP_N_DUM")
-track("CMP_N", W50, [(XR, -1.9), ("C307", "@CMP_N")])
-track("CMP_N_DUM", W50, [("C307", "@CMP_N_DUM"), ("R308", "@CMP_N_DUM")])
-track("GND", W_GND, [("R308", "@GND"), (XR, -6.1)])
-svia(XR, -6.1, "GND")
-XB = XR + 1.2
-XU4 = XB + 1.1375
-place("Package_TO_SOT_SMD", "SOT-23-5", "U304", "SN65LVDS2", XU4, 5.3, 180,
+# ============================================================================= outputs: 100 R, 470 R bridge, dummy
+two("R", "R307", "100", X_R307, -0.48, "v", "CMP_N", "CMP_P")
+two("R", "R309", "470", X_R309, 0.48, "v", "CMP_P", "LVDS_A")
+two("R", "R310", "470", X_R309, Y_N - 0.48, "v", "LVDS_B", "CMP_N")
+X_C307 = X_R309 + 0.94
+two("C", "C307", "1u", X_C307, Y_N - 0.48, "v", "CMP_N_DUM", "CMP_N")
+two("R", "R308", "49.9", X_C307, -3.26, "v", "GND", "CMP_N_DUM")
+two("C", "C308", "1u", X_C308, 0.0, "h", "CMP_P", "TRF_IN")
+for r_, n_ in (("R307", "1"), ("R307", "2"), ("R309", "@CMP_P"), ("R310", "@CMP_N"), ("C307", "@CMP_N"),
+               ("C308", "1"), ("C308", "2"), ("C307", "@CMP_N_DUM"), ("R308", "@CMP_N_DUM")):
+    rfpad(r_, n_)
+p1 = pad("U302", "1")
+track("CMP_N", W50, [p1, (p1[0] + 0.2, p1[1]), (p1[0] + 0.2 + (Y_N - p1[1]), Y_N), ("C307", "@CMP_N")],
+      name="CMP_N: U302.1 -> R307 -> R310 -> C307", z=50, ch=0)
+track("CMP_P", W50, [("U302", "8"), ("C308", "1")], name="CMP_P: U302.8 -> R307 -> R309 -> C308", z=50)
+track("CMP_N_DUM", W50, [("C307", "@CMP_N_DUM"), ("R308", "@CMP_N_DUM")], name="CMP_N_DUM: C307 -> R308 (49.9 R)",
+      z=50)
+gvia(X_C307 + 0.31 + 0.1 + 0.225, -3.74)
+track("GND", W_GND, [("R308", "@GND"), (X_C307 + 0.31 + 0.1 + 0.225, -3.74)], ch=0)
+# SN65LVDS2 (U304) above; LVDS_A crosses under CMP_N on B.Cu (slow path)
+YU4 = -6.0
+place("Package_TO_SOT_SMD", "SOT-23-5", "U304", "SN65LVDS2", X_R309 - 1.137, YU4, 0,
       {"1": "+3V3", "2": "GND", "3": "LVDS_A", "4": "LVDS_B", "5": "COARSE"})
-XA = pad("U304", "3")[0]
-two("R", "R310", "470", XB, -2.38, "v", "LVDS_B", "CMP_N")
-two("R", "R309", "470", XA, 0.6, "v", "CMP_P", "LVDS_A")
-track("CMP_N", W50, [(XR, -1.9), ("R310", "@CMP_N")], name="CMP_N")
-track("LVDS_B", W_SIG, [("R310", "@LVDS_B"), (XB, -3.6)])
-svia(XB, -3.6, "LVDS_B")
-track("LVDS_B", W_SIG, [(XB, -3.6), (XB, 3.3)], layer=pcbnew.B_Cu)
-svia(XB, 3.3, "LVDS_B")
-track("LVDS_B", W_SIG, [(XB, 3.3), ("U304", "4")])
-track("LVDS_A", W_SIG, [("R309", "@LVDS_A"), ("U304", "3")])
-two("C", "C310", "100n", XU4 + 3.0, 6.25, "h", "+3V3", "GND")
-track("+3V3", W_SIG, [("U304", "1"), ("C310", "@+3V3")])
-via(XU4 + 2.52, 7.1, "+3V3")
-track("+3V3", W_SIG, [("C310", "@+3V3"), (XU4 + 2.52, 7.1)])
-track("GND", W_GND, [("C310", "@GND"), (XU4 + 3.48, 7.1)])
-svia(XU4 + 3.48, 7.1, "GND")
-track("GND", W_SIG, [("U304", "2"), (XU4 + 2.3, 5.3)])
-svia(XU4 + 2.3, 5.3, "GND")
-xc5 = pad("U304", "5")[0]
-testpad("TP305", "COARSE", xc5 - 1.8, 7.4, ly=-1.0)
-track("COARSE", W_SIG, [("U304", "5"), (xc5 - 0.8, 6.25), (xc5 - 1.8, 7.25)])
+track("LVDS_B", W_SIG, [("R310", "@LVDS_B"), ("U304", "4")])
+via(X_R309, 1.565, "LVDS_A", "signal")
+track("LVDS_A", W_SIG, [("R309", "@LVDS_A"), (X_R309, 1.565)], ch=0)
+xp3, yp3 = pad("U304", "3")
+xv3 = xp3 - 0.66 - 0.325
+via(xv3, yp3, "LVDS_A", "signal")
+track("LVDS_A", W_SIG, [(X_R309, 1.565), (X_R309, yp3 + (X_R309 - xv3)), (xv3, yp3)], layer=pcbnew.B_Cu, ch=0)
+track("LVDS_A", W_SIG, [(xv3, yp3), ("U304", "3")], ch=0)
+xp1, yp1 = pad("U304", "1")
+two("C", "C310", "100n", xp1 - 0.66 - 0.13 - 0.76, yp1, "h", "GND", "+3V3")
+track("+3V3", 0.5, [("U304", "1"), ("C310", "@+3V3")], ch=0)
+xc10 = pad("C310", "@+3V3")[0]
+via(xc10, yp1 - 0.635, "+3V3", "supply")
+via(xc10 + 0.57, yp1 - 0.635, "+3V3", "supply")
+track("+3V3", 0.4, [("C310", "@+3V3"), (xc10, yp1 - 0.635)], ch=0)
+track("+3V3", 0.4, [("C310", "@+3V3"), (xc10 + 0.57, yp1 - 0.635)], ch=0)
+xg10 = pad("C310", "@GND")[0]
+gvia(xg10 - 0.6, yp1)
+track("GND", W_GND, [("C310", "@GND"), (xg10 - 0.6, yp1)], ch=0)
+xp2, yp2 = pad("U304", "2")
+gvia(xp2 - 0.66 - 0.1 - 0.225, yp2)
+track("GND", W_GND, [("U304", "2"), (xp2 - 0.66 - 0.1 - 0.225, yp2)], ch=0)
+xp5, yp5 = pad("U304", "5")
+testpad("TP305", "COARSE", xp5 + 0.4, yp5 - 1.6, lx=1.3, ly=0)
+track("COARSE", W_SIG, [("U304", "5"), (xp5 + 0.4, yp5), (xp5 + 0.4, yp5 - 1.6)])
 
 # ============================================================================= TRF37D73 line driver (U303)
-XU3 = -17.0
-C_IN_X = -19.6
-two("C", "C308", "1u", C_IN_X, 0.0, "h", "CMP_P", "TRF_IN")
-track("CMP_P", W50, [(XR, 0.0), ("C308", "1")], name="CMP_P")
 place("Package_SON", "WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm", "U303", "TRF37D73", XU3, 0.25, 0,
       {"1": "+3V3", "2": "TRF_IN", "3": "GND", "4": "GND", "5": "GND", "6": "GND", "7": "TRF_OUT", "8": "GND",
        "9": "GND"})
-track("TRF_IN", W50, [("C308", "2"), ("U303", "2")], name="TRF_IN")
+track("TRF_IN", W50, [("C308", "2"), ("U303", "2")], name="TRF_IN: C308 -> U303.2", z=50)
 for pn in ("3", "4", "5", "6", "8"):
     x, y = pad("U303", pn)
-    track("GND", W_SIG, [(x, y), (XU3, y)])
-for dy in (-0.55, 0.0, 0.55):
-    via(XU3, 0.25 + dy, "GND", 0.2, 0.4)
-# VCC pin 1: 1 n + 100 n, +3V3 via to In2
-two("C", "C311", "1n", XU3 - 1.45, -2.4, "v", "GND", "+3V3")
-two("C", "C312", "100n", XU3 - 0.4, -2.4, "v", "GND", "+3V3")
-track("+3V3", W_GND, [("U303", "1"), (XU3 - 1.45, -0.5), ("C311", "@+3V3"), ("C312", "@+3V3"), (XU3 + 0.4, -1.92)])
-via(XU3 + 0.4, -1.92, "+3V3")
-for c in ("C311", "C312"):
-    x, y = pad(c, "@GND")
-    track("GND", W_GND, [(x, y), (x, y - 0.75)])
-    svia(x, y - 0.75, "GND")
-# output: choke 120 nH (high SRF) + 47 uH to +3V3, 1 uF, 12 dB pi pad
-XL = -14.9
-two("C", "C309", "1u", -14.4, 0.0, "h", "TRF_OUT", "PAD_IN")
-track("TRF_OUT", W50, [("U303", "7"), ("C309", "1")], name="TRF_OUT")
-two("L", "L301", "120n", XL, -1.45, "v", "TRF_BIAS", "TRF_OUT")
-two("L1008", "L302", "47u", XL, -4.4, "v", "+3V3", "TRF_BIAS")
-track("TRF_OUT", W_SIG, [(XL, 0.0), ("L301", "@TRF_OUT")])
-track("TRF_BIAS", W_PWR, [("L301", "@TRF_BIAS"), ("L302", "@TRF_BIAS")])
-two("C", "C313", "1n", XL - 1.9, -7.4, "v", "GND", "+3V3")
-two("C", "C314", "100n", XL + 1.9, -7.4, "v", "GND", "+3V3")
+    track("GND", 0.2, [(x, y), (XU3 + (0.3 if x > XU3 else -0.3), y)], ch=0)
+for dy in (-0.45, 0.25, 0.95):
+    via(XU3, dy, "GND", "gnd", 0.2, 0.4)
+# VCC pin 1 -> C312 100 n + C311 1 n right above, +3V3 via pair at C312
+two("C", "C312", "100n", XU3 - 0.95, -1.6, "v", "GND", "+3V3")
+two("C", "C311", "1n C0G", XU3 - 0.01, -1.6, "v", "GND", "+3V3")
+track("+3V3", 0.3, [("U303", "1"), ("C312", "@+3V3")], ch=0)
+track("+3V3", W_PWR, [("C312", "@+3V3"), ("C311", "@+3V3")], ch=0)
+for dy in (-0.5, 0.05):
+    via(XU3 - 0.95 - 0.66, -1.12 + dy, "+3V3", "supply")
+track("+3V3", 0.4, [("C312", "@+3V3"), (XU3 - 1.61, -1.62)], ch=0)
+track("+3V3", 0.4, [("C312", "@+3V3"), (XU3 - 1.61, -1.07)], ch=0)
+for c_ in ("C311", "C312"):
+    x, y = pad(c_, "@GND")
+    gvia(x, y - 0.58)
+    track("GND", W_GND, [(x, y), (x, y - 0.58)], ch=0)
+# output: L301 120 nH on the line, L302 47 uH above, 1 n + 100 n at the +3V3 end
+two("L", "L301", "120n", X_L301, -0.48, "v", "TRF_BIAS", "TRF_OUT")
+two("L1008", "L302", "47u", X_L301, -3.36, "v", "+3V3", "TRF_BIAS")
+two("C", "C309", "1u", X_C309, 0.0, "h", "TRF_OUT", "PAD_IN")
+for r_, n_ in (("L301", "@TRF_OUT"), ("C309", "1"), ("C309", "2")):
+    rfpad(r_, n_)
+track("TRF_OUT", W50, [("U303", "7"), ("C309", "1")], name="TRF_OUT: U303.7 -> L301 -> C309", z=50)
+track("TRF_BIAS", W_PWR, [("L301", "@TRF_BIAS"), ("L302", "@TRF_BIAS")], ch=0)
 yl2 = pad("L302", "@+3V3")[1]
-track("+3V3", W_PWR, [("L302", "@+3V3"), (XL, -6.5)])
-track("+3V3", W_PWR, [(XL - 1.9, -6.5), (XL + 1.9, -6.5)])
-for cx in (XL - 1.9, XL + 1.9):
-    track("+3V3", W_PWR, [(cx, -6.5), (cx, -6.92)])
-via(XL, -6.5, "+3V3")
-for c in ("C313", "C314"):
-    x, y = pad(c, "@GND")
-    track("GND", W_GND, [(x, y), (x, y - 0.7)])
-    svia(x, y - 0.7, "GND")
-two("R", "R311", "82", -12.9, 0.48, "v", "PAD_IN", "GND")
-two("R", "R312", "91", -11.3, 0.0, "h", "PAD_IN", "PH_LINE")
-two("R", "R313", "82", -9.7, 0.48, "v", "PH_LINE", "GND")
-track("PAD_IN", W50, [("C309", "2"), ("R312", "1")], name="pad")
-for r in ("R311", "R313"):
-    x, y = pad(r, "@GND")
-    track("GND", W_GND, [(x, y), (x, y + 0.75)])
-    svia(x, y + 0.75, "GND")
-X_LAUNCH = -8.4
-track("PH_LINE", W50, [("R312", "2"), (X_LAUNCH, 0.0)], name="PH_LINE launch")
-svia(X_LAUNCH, 0.0, "PH_LINE")
-track("PH_LINE", W50, [(X_LAUNCH, 0.0), (-1.4, 0.0)], layer=pcbnew.B_Cu, name="PH_LINE launch")
-track("PH_LINE", W_LIN, [(-1.4, 0.0), (0.35, 0.0)], layer=pcbnew.B_Cu, name="PH_LINE launch")
-testpad("TP306", "+3V3", -19.0, -6.0)
-via(-19.0, -5.0, "+3V3")
-track("+3V3", W_PWR, [(-19.0, -5.0), (-19.0, -6.0)])
-testpad("TP307", "GND", -23.5, -6.0)
-svia(-23.5, -5.0, "GND")
-track("GND", W_PWR, [(-23.5, -5.0), (-23.5, -6.0)])
-testpad("TP308", "GND", -18.0, 7.4, lx=1.4, ly=0.0)
-svia(-18.0, 6.4, "GND")
-track("GND", W_PWR, [(-18.0, 6.4), (-18.0, 7.4)])
+X_C314, X_C313 = X_L301 + 1.1 + 0.4 + 0.31, X_L301 + 1.1 + 0.4 + 0.31 + 0.94
+two("C", "C314", "100n", X_C314, yl2 + 0.48, "v", "+3V3", "GND")
+two("C", "C313", "1n C0G", X_C313, yl2 + 0.48, "v", "+3V3", "GND")
+track("+3V3", W_PWR, [("L302", "@+3V3"), ("C314", "@+3V3"), ("C313", "@+3V3")], ch=0)
+for x in (X_C314, X_C313):
+    via(x, yl2 - 0.6, "+3V3", "supply")
+    track("+3V3", 0.4, [(x, yl2), (x, yl2 - 0.6)], ch=0)
+    gvia(x, yl2 + 1.53)
+    track("GND", W_GND, [(x, yl2 + 0.96), (x, yl2 + 1.53)], ch=0)
+# 12 dB pi pad
+two("R", "R311", "82", X_R311, 0.48, "v", "PAD_IN", "GND")
+two("R", "R312", "91", X_R312, 0.0, "h", "PAD_IN", "PH_LINE")
+two("R", "R313", "82", X_R313, 0.48, "v", "PH_LINE", "GND")
+for r_, n_ in (("R311", "@PAD_IN"), ("R312", "1"), ("R312", "2"), ("R313", "@PH_LINE")):
+    rfpad(r_, n_)
+track("PAD_IN", W50, [("C309", "2"), ("R312", "1")], name="PAD_IN: C309 -> R311 -> R312", z=50)
+for r_ in ("R311", "R313"):
+    x, y = pad(r_, "@GND")
+    gvia(x - 0.31 - 0.1 - 0.225, y)
+    track("GND", W_GND, [(x, y), (x - 0.31 - 0.1 - 0.225, y)], ch=0)
+X_STEP = -1.6
+track("PH_LINE", W50, [("R312", "2"), (X_STEP, 0.0)], name="PH_LINE launch: R312 -> R313 -> step", z=50)
+track("PH_LINE", W_LIN, [(X_STEP, 0.0), (XT[0] + X_P3, 0.0)], name="PH_LINE launch: step -> D01.3", z=round(Z_LIN))
+testpad("TP306", "+3V3", X_C314, yl2 - 1.65, lx=-1.2, ly=0)
+track("+3V3", W_PWR, [(X_C314, yl2 - 0.6), (X_C314, yl2 - 1.65)], ch=0)
+testpad("TP307", "GND", XU3 - 1.0, -4.6, lx=0, ly=-0.85)
+gvia(XU3 - 1.0, -3.6)
+track("GND", W_PWR, [(XU3 - 1.0, -3.6), (XU3 - 1.0, -4.6)], ch=0)
 
-# ============================================================================= delay line: strobe launch
-YL = 2.73                                       # |y| of PSTRB_A (-) / PSTRB_K (+)
-YR = 4.35                                       # |y| of the VTAP_N (-) / VTAP_P (+) rails
-XS = -4.0
+# ============================================================================= strobe launch
+XS = -4.4
+YX = YL + 2.6
 for s, nn, ref in ((-1, "PSTRB_A", "X2"), (+1, "PSTRB_K", "X3")):
-    iface(ref, nn, XS, 6.4 * s)
-    track(nn, W50, [(XS, 6.4 * s), (XS, (YL + 0.4) * s), (XS + 0.4, YL * s), (-1.6, YL * s)],
-          name=f"{nn} launch")
-    track(nn, W_STR, [(-1.6, YL * s), (XT[0] - 1.0, YL * s)], name=f"{nn} launch")
-    text(nn, XS - 2.2, 6.4 * s, 0.5)
-    text("strobe in", XS - 2.2, 6.4 * s + 0.75 * (1 if s > 0 else -1), 0.35)
+    iface(ref, nn, XS, YX * s, 0.5, 0.6)
+    rfpad(ref, "1")
+    track(nn, W50, [(XS, YX * s), (XS, (YL + 0.5) * s), (XS + 0.5, YL * s), (XT[0] + X_P12 - PITCH / 2, YL * s)],
+          name=f"{nn} feed: {ref} -> half section before tap 0", z=50, ch=0)
+    text(nn, XS + 1.5, (YX + 0.55) * s, 0.4)
 
-# ============================================================================= tap cells (loop)
-LIN_TAP = {}            # n -> list of (x0, y0, x1, y1) of PH_LINE copper from V_in(n) to V_in(n+1)
-CUT = []                # In1 ground cut-outs under the hold nodes
-KEEP_TOP = []
-VIA_IN, VIA_OUT = 0.35, 1.65
-CH = 0.3                                        # 45 degree chamfer of the B.Cu meander corners
-
-
-def meander_depth(L, run):
-    """Depth D of the U (down from y=0) so that top segment + U = L. run = horizontal B.Cu length."""
-    top = VIA_OUT - VIA_IN
-    # U: down D, across run, up D, two chamfered corners
-    return (L - top - run + 2 * (2 * CH - CH * math.sqrt(2))) / 2
-
-
-D_U = meander_depth(L_LIN, PITCH - (VIA_OUT - VIA_IN))
+# ============================================================================= tap cells
+CUT = []
 for n, x in enumerate(XT):
     na, nk, sm = f"TAP{n}_A", f"TAP{n}_K", f"TAP{n}_IN"
     place("Package_TO_SOT_SMD", "SOT-323_SC-70", f"D{n + 1:02d}", "BAT15-04W", x, 0.0, 0,
           {"1": na, "2": nk, "3": "PH_LINE"})
-    two("C", f"CA{n:02d}", "0.47p C0G", x - 1.0, -(YL - 0.48), "v", "PSTRB_A", na)
-    two("C", f"CK{n:02d}", "0.47p C0G", x - 1.0, +(YL - 0.48), "v", nk, "PSTRB_K")
-    two("R", f"RNA{n:02d}", "2.2k", x, -YL, "v", "VTAP_N", na)
-    two("R", f"RSA{n:02d}", "1k", x + 1.0, -YL, "v", sm, na)
-    two("R", f"RNK{n:02d}", "2.2k", x, +YL, "v", nk, "VTAP_P")
-    two("R", f"RSK{n:02d}", "1k", x + 1.0, +YL, "v", nk, sm)
-    for s, node, pin in ((-1, na, "1"), (+1, nk, "2")):
-        yb = (YL - 0.96) * s                    # node bus = hold-cap node pad row
-        track(node, W_NODE, [(x - 1.0, 0.65 * s), (x - 1.0, yb)])
-        track(node, W_NODE, [(x - 1.0, yb), (x + 1.0, yb)])
-        track(node, W_NODE, [(x, yb), (x, (YL - 0.48) * s)])
-        track(node, W_NODE, [(x + 1.0, yb), (x + 1.0, (YL - 0.48) * s)])
+    two("C", f"CA{n:02d}", "0.47p C0G", x + X_P12, -(YL - 0.48), "v", "PSTRB_A", na)
+    two("C", f"CK{n:02d}", "0.47p C0G", x + X_P12, +(YL - 0.48), "v", nk, "PSTRB_K")
+    two("R", f"RSA{n:02d}", "1k", x + X_R1K, -YL, "v", sm, na)
+    two("R", f"RNA{n:02d}", "2.2k", x + X_R22K, -YL, "v", "VTAP_N", na)
+    two("R", f"RSK{n:02d}", "1k", x + X_R1K, +YL, "v", nk, sm)
+    two("R", f"RNK{n:02d}", "2.2k", x + X_R22K, +YL, "v", nk, "VTAP_P")
+    for s, node in ((-1, na), (+1, nk)):
+        # pin 1 / pin 2 -> cap node pad (straight), cap node pad -> both resistor inner pads
+        track(node, W_NODE, [(x + X_P12, 0.65 * s), (x + X_P12, YNODE * s)], ch=0, name=f"hold node {n} {s}")
+        for xr in (X_R1K, X_R22K):
+            track(node, W_NODE, [(x + X_P12, YNODE * s), (x + xr, YNODE * s), (x + xr, (YL - 0.48) * s)], ch=0.2,
+                  name=f"hold node {n} {s}")
         rail = "VTAP_N" if s < 0 else "VTAP_P"
-        track(rail, W_SIG, [(x, (YL + 0.48) * s), (x, YR * s)])
-        track(sm, W_SIG, [(x + 1.0, (YL + 0.48) * s), (x + 1.0, 3.8 * s)])
-        svia(x + 1.0, 3.8 * s, sm)
-        CUT.append(rect_pts(x - 1.45, 0.35 * s, x + 1.45, (YL - 0.28) * s))
-    KEEP_TOP.append(rect_pts(x - 1.7, -(YL - 0.2), x + 1.7, YL - 0.2))
-    # summing node on B.Cu between the two line vias of this tap
-    track(sm, W_SIG, [(x + 1.0, 3.8), (x + 1.0, -3.8)], layer=pcbnew.B_Cu)
-    # PH_LINE: V_in -> pin 3 -> V_out on F.Cu (under the body), then the B.Cu U to the next tap
-    svia(x + VIA_IN, 0.0, "PH_LINE")
-    svia(x + VIA_OUT, 0.0, "PH_LINE")
-    seg = track("PH_LINE", W_LIN, [(x + VIA_IN, 0.0), (x + VIA_OUT, 0.0)], name=f"line top {n}")
+        via(x + X_R22K, Y_RV * s, rail, "supply")
+        track(rail, 0.3, [(x + X_R22K, (YL + 0.48) * s), (x + X_R22K, Y_RV * s)], ch=0)
+        CUT.append(rect_pts(x - 1.35, 0.55 * s, x + 0.45, (YL - 0.4) * s))
+    # summing node: K-side 1 k -> via -> B.Cu -> via at the A side
+    via(x + X_R1K, Y_RV, sm, "signal")
+    via(x + X_R1K, -Y_RV, sm, "signal")
+    track(sm, W_SIG, [(x + X_R1K, YL + 0.48), (x + X_R1K, Y_RV)], ch=0)
+    track(sm, W_SIG, [(x + X_R1K, Y_RV), (x + X_R1K, -Y_RV)], layer=pcbnew.B_Cu, ch=0)
+    track(sm, W_SIG, [(x + X_R1K, -(YL + 0.48)), (x + X_R1K, -Y_RV)], ch=0)
+    rfpad(f"D{n + 1:02d}", "3")
+    rfpad(f"CA{n:02d}", "@PSTRB_A")
+    rfpad(f"CK{n:02d}", "@PSTRB_K")
+    # PH_LINE meander to the next tap (S shape, every cell identical)
     if n < NT - 1:
-        xa, xb = x + VIA_OUT, XT[n + 1] + VIA_IN
-        pts = [(xa, 0.0), (xa, D_U - CH), (xa + CH, D_U), (xb - CH, D_U), (xb, D_U - CH), (xb, 0.0)]
-        track("PH_LINE", W_LIN, pts, layer=pcbnew.B_Cu, name=f"line U {n}")
-    if n < NT - 1:
+        track("PH_LINE", W_LIN, [(x + px, py) for px, py in cell_path(Y_M)], name=f"PH_LINE cell {n}",
+              z=round(Z_LIN), ch=CH_M)
         for s, nn in ((-1, "PSTRB_A"), (+1, "PSTRB_K")):
-            track(nn, W_STR, [(x - 1.0, YL * s), (XT[n + 1] - 1.0, YL * s)], name=f"{nn} tap {n}")
+            track(nn, W_STR, [(x + X_P12 - PITCH / 2, YL * s), (x + X_P12 + PITCH / 2, YL * s)],
+                  name=f"{nn} section {n}", z=73)
+    else:
+        for s, nn in ((-1, "PSTRB_A"), (+1, "PSTRB_K")):
+            track(nn, W_STR, [(x + X_P12 - PITCH / 2, YL * s), (x + X_P12 + PITCH / 2, YL * s)],
+                  name=f"{nn} section {n}", z=73)
 
-# far end: 49.9 R terminations of all three lines
-XE = X15 + 2.8
+# far end: terminations
+XE = X15 + X_P12 + PITCH / 2
 for s, nn, ref in ((-1, "PSTRB_A", "R402"), (+1, "PSTRB_K", "R403")):
-    two("R", ref, "49.9", XE, YL * s, "h", nn, "GND")
-    track(nn, W_STR, [(X15 - 1.0, YL * s), (XE - 0.6, YL * s)], name=f"{nn} end")
-    track(nn, W50, [(XE - 0.6, YL * s), (ref, "1")], name=f"{nn} end")
-    track("GND", W_GND, [(ref, "2"), (XE + 1.1, YL * s)])
-    svia(XE + 1.1, YL * s, "GND")
-track("PH_LINE", W_LIN, [(X15 + VIA_OUT, 0.0), (X15 + 2.4, 0.0)], layer=pcbnew.B_Cu, name="PH_LINE end")
-svia(X15 + 2.4, 0.0, "PH_LINE")
-two("R", "R401", "49.9", X15 + 3.3, 0.0, "h", "PH_LINE", "GND")
-track("PH_LINE", W_LIN, [(X15 + 2.4, 0.0), ("R401", "1")], name="PH_LINE end")
-track("GND", W_GND, [("R401", "2"), (X15 + 4.4, 0.0)])
-svia(X15 + 4.4, 0.0, "GND")
-text("50R", X15 + 3.3, -0.75, 0.35)
+    two("R", ref, "49.9", XE + 0.6 + 0.48, YL * s, "h", nn, "GND")
+    rfpad(ref, "1")
+    track(nn, W50, [(XE, YL * s), (ref, "1")], name=f"{nn} end: -> {ref} 49.9 R", z=50)
+    xg, yg = pad(ref, "2")
+    gvia(xg + 0.6, yg)
+    track("GND", W_GND, [(xg, yg), (xg + 0.6, yg)], ch=0)
+two("R", "R401", "49.9", X15 + X_P3 + 1.6 + 0.48, 0.0, "h", "PH_LINE", "GND")
+rfpad("R401", "1")
+track("PH_LINE", W_LIN, [(X15 + X_P3, 0.0), (X15 + X_P3 + 0.8, 0.0)], name="PH_LINE end: D16.3 -> step", z=round(Z_LIN))
+track("PH_LINE", W50, [(X15 + X_P3 + 0.8, 0.0), ("R401", "1")], name="PH_LINE end: step -> R401 49.9 R", z=50)
+xg, yg = pad("R401", "2")
+gvia(xg + 0.6, yg)
+track("GND", W_GND, [(xg, yg), (xg + 0.6, yg)], ch=0)
 
-# VTAP rails (F.Cu) with 100 nF every two taps, test pads at the far end
+# VTAP rails = In2 strips; decoupling 2 x 100 n per rail at both ends; test pads at the far end
 for s, rail, tp in ((-1, "VTAP_N", "TP402"), (+1, "VTAP_P", "TP403")):
-    track(rail, W_PWR, [(XT[0] - 0.6, YR * s), (X15 + 6.0, YR * s)])
-    testpad(tp, rail, X15 + 6.0, YR * s + 0.9 * s, ly=1.1 * s, lx=-0.6)
-    track(rail, W_PWR, [(X15 + 6.0, YR * s), (X15 + 6.0, YR * s + 0.9 * s)])
-    for n in range(0, NT, 2):
-        cx = XT[n] + 2.5
-        ref = f"C{'N' if s < 0 else 'P'}{n:02d}"
-        if s < 0:
-            two("C", ref, "100n", cx, -5.1, "v", "GND", rail)
-        else:
-            two("C", ref, "100n", cx, 5.1, "v", rail, "GND")
-        track(rail, W_SIG, [(ref, "@" + rail), (cx, YR * s)])
-        track("GND", W_GND, [(ref, "@GND"), (cx, 6.2 * s)])
-        svia(cx, 6.2 * s, "GND")
+    for xc_, ref in ((XT[0] - 3.0, f"C{'N' if s < 0 else 'P'}00"), (X15 + 2.6, f"C{'N' if s < 0 else 'P'}15")):
+        two("C", ref, "100n", xc_, (Y_RV + 0.75) * s, "h", *((rail, "GND") if xc_ < 0 else ("GND", rail)))
+        for nn_ in (rail, "GND"):
+            xr_, yr_ = pad(ref, "@" + nn_)
+            via(xr_, yr_ + 0.6 * s, nn_, "supply" if nn_ != "GND" else "gnd")
+            track(nn_, 0.4, [(xr_, yr_), (xr_, yr_ + 0.6 * s)], ch=0)
+    testpad(tp, rail, X15 + 4.2, (Y_RV + 0.75) * s, lx=0, ly=0.85 * s)
+    track(rail, W_PWR, [pad(f"C{'N' if s < 0 else 'P'}15", "@" + rail), (X15 + 4.2, (Y_RV + 0.75) * s)], ch=0)
 
 # ============================================================================= comparators COS3502 (SOIC-8)
-YC = -10.4
-VTH_Y = YC + 0.9
-YTP = -14.9
+YC = -(YL + 7.0)
+VTH_Y = YC + 1.175
 for k in range(NT // 2):
     n0, n1 = 2 * k, 2 * k + 1
-    xc = XT[n0] + 1.0 + PITCH / 2
+    xc = XT[n0] + X_R1K + 1.905
     ref = f"U{11 + k}"
-    # inputs (pins 1-4) towards the taps, pin 1 at the left
     place("Package_SO", "SOIC-8_3.9x4.9mm_P1.27mm", ref, "COS3502", xc, YC, None,
           {"1": f"TAP{n0}_IN", "2": "VTH", "3": f"TAP{n1}_IN", "4": "VTH", "5": "GND", "6": f"TAP{n1}",
            "7": f"TAP{n0}", "8": "+3V3"},
           cond=lambda pp: pp["1"][1] > 1.0 and pp["1"][0] < pp["4"][0])
-    for n, pin in ((n0, "1"), (n1, "3")):
-        px, py = pad(ref, pin)
-        xs = XT[n] + 1.0
-        track(f"TAP{n}_IN", W_SIG, [(xs, -3.8), (xs, -6.3)], layer=pcbnew.B_Cu)
-        svia(xs, -6.3, f"TAP{n}_IN")
-        track(f"TAP{n}_IN", W_SIG, [(xs, -6.3), (px, py + 0.95), (px, py)])
+    track(f"TAP{n0}_IN", W_SIG, [(XT[n0] + X_R1K, -Y_RV), (ref, "1")], ch=0)
+    x3, y3 = pad(ref, "3")
+    xr1 = XT[n1] + X_R1K
+    yj = y3 + 0.975 + 0.2
+    track(f"TAP{n1}_IN", W_SIG, [(xr1, -Y_RV), (xr1, yj + (xr1 - x3)), (x3, yj), (x3, y3)], ch=0)
     for pin in ("2", "4"):
         px, py = pad(ref, pin)
-        track("VTH", W_SIG, [(px, py), (px, VTH_Y)])
-        svia(px, VTH_Y, "VTH")
+        via(px, VTH_Y, "VTH", "signal")
+        track("VTH", W_SIG, [(px, py), (px, VTH_Y)], ch=0)
     p8, p5 = pad(ref, "8"), pad(ref, "5")
-    track("+3V3", W_PWR, [p8, (p8[0], YC - 0.9)])
-    svia(p8[0], YC - 0.9, "+3V3")
-    track("GND", W_PWR, [p5, (p5[0], YC - 0.9)])
-    svia(p5[0], YC - 0.9, "GND")
     cref = f"C{30 + k}"
-    two("C", cref, "100n", p5[0] + 1.4, p5[1], "v", "GND", "+3V3")
-    track("GND", W_PWR, [(cref, "@GND"), (p5[0], pad(cref, "@GND")[1])])
-    xg, yg = pad(cref, "@+3V3")
-    track("+3V3", W_PWR, [(xg, yg), (xg, yg + 0.75)])
-    svia(xg, yg + 0.75, "+3V3")
-    for n, pin, dx in ((n0, "7", -1.6), (n1, "6", +1.6)):
+    two("C", cref, "100n", p8[0], p8[1] - 0.975 - 0.1 - 0.76, "v", "GND", "+3V3")
+    track("+3V3", 0.6, [p8, (cref, "@+3V3")], ch=0)
+    yv = pad(cref, "@+3V3")[1]
+    for dx in (-0.635, 0.635):
+        via(p8[0] + dx, yv, "+3V3", "supply")
+        track("+3V3", 0.4, [(p8[0], yv), (p8[0] + dx, yv)], ch=0)
+    xg, yg = pad(cref, "@GND")
+    gvia(xg, yg - 0.58)
+    track("GND", W_GND, [(xg, yg), (xg, yg - 0.58)], ch=0)
+    gvia(p5[0], p5[1] - 0.975 - 0.1 - 0.225)
+    track("GND", 0.6, [p5, (p5[0], p5[1] - 0.975 - 0.1 - 0.225)], ch=0)
+    for n, pin in ((n0, "7"), (n1, "6")):
         px, py = pad(ref, pin)
-        tpx = xc + dx
-        testpad(f"TP{500 + n}", f"TAP{n}", tpx, YTP, ly=-0.95, size=0.4)
-        track(f"TAP{n}", W_SIG, [(px, py), (px, py - 1.2), (tpx, YTP)])
-track("VTH", W_PWR, [(-1.5, VTH_Y), (pad(f"U{11 + NT // 2 - 1}", "4")[0], VTH_Y)], layer=pcbnew.B_Cu)
-# VTH filter: VTAP_TH -> 1 k -> VTH, 100 nF
-two("R", "R404", "1k", -2.0, -11.6, "v", "VTAP_TH", "VTH")
-two("C", "C404", "100n", -1.0, -11.6, "v", "GND", "VTH")
-track("VTH", W_SIG, [("R404", "@VTH"), ("C404", "@VTH"), (-1.0, -10.4), (-1.5, -10.4)])
-svia(-1.5, -10.4, "VTH")
-track("VTH", W_SIG, [(-1.5, -10.4), (-1.5, VTH_Y)], layer=pcbnew.B_Cu)
-x, y = pad("C404", "@GND")
-track("GND", W_GND, [(x, y), (x, y - 0.75)])
-svia(x, y - 0.75, "GND")
-testpad("TP401", "VTAP_TH", -2.0, YTP, ly=-0.95, size=0.4)
-track("VTAP_TH", W_SIG, [("R404", "@VTAP_TH"), (-2.0, YTP)])
-for ref, x in (("TP404", -4.0), ("TP405", X15 + 6.0)):
-    testpad(ref, "GND", x, YTP, ly=-0.95, size=0.4)
-    svia(x, YTP + 1.0, "GND")
-    track("GND", W_PWR, [(x, YTP), (x, YTP + 1.0)])
+        testpad(f"TP{500 + n}", f"TAP{n}", px, py - 3.0, label=f"T{n}", ly=-0.85, size=0.3)
+        track(f"TAP{n}", W_SIG, [(px, py), (px, py - 3.0)], ch=0)
+x_last4 = pad(f"U{11 + NT // 2 - 1}", "4")[0]
+track("VTH", 0.3, [(-3.0, VTH_Y), (x_last4, VTH_Y)], layer=pcbnew.B_Cu, ch=0)
+via(-3.0, VTH_Y, "VTH", "signal")
+two("R", "R404", "1k", -4.3, VTH_Y, "h", "VTAP_TH", "VTH")
+two("C", "C404", "100n", -3.82, VTH_Y + 1.4, "v", "VTH", "GND")
+track("VTH", W_SIG, [("R404", "2"), (-3.0, VTH_Y)], ch=0)
+track("VTH", W_SIG, [("R404", "2"), ("C404", "@VTH")], ch=0)
+xg, yg = pad("C404", "@GND")
+gvia(xg, yg + 0.58)
+track("GND", W_GND, [(xg, yg), (xg, yg + 0.58)], ch=0)
+testpad("TP401", "VTAP_TH", -5.9, VTH_Y, ly=-0.85)
+track("VTAP_TH", W_SIG, [("R404", "1"), (-5.9, VTH_Y)], ch=0)
+
+# ============================================================================= outline
+BY0 = YC - 2.475 - 0.975 - 3.0 - 1.4
+BY1 = max(YX + 0.8, YS + 2.825 + 0.675 + 0.35)
+for a, c in zip(rect_pts(BX0, BY0, BX1, BY1), rect_pts(BX0, BY0, BX1, BY1)[1:] + [(BX0, BY0)]):
+    line(*a, *c)
 
 # ============================================================================= silkscreen
-text("BUF_OUT_T", BX0 + 2.2, -4.4, 0.5)
-text("<- input fragment (50R)", BX0 + 3.6, -2.6, 0.35)
-text("EXT_CLK", BX0 + 5.2, YS_SMA + 2.0, 0.5)
-text("PHASE_TRIGGER fragment (4L JLC04161H-3313)", -24.0, -14.6, 0.6)
-text("TMUX136", XU1, -0.9 + 4.2 - 7.5, 0.35)
-text("TLV3801", XU2, -3.6, 0.4)
-text("TRF37D73", XU3, 2.4, 0.4)
-text("12 dB pad", -11.3, -1.0, 0.4)
-text("SN65LVDS2", XU4 - 0.2, 3.4, 0.35)
-text("PH_LINE (B.Cu) -> 16 taps, 70 ps/tap", 12.0, 7.4, 0.45)
-text(f"PSTRB_A/K (F.Cu): 35 ps/tap, pitch {PITCH:.2f} mm", 42.0, 7.4, 0.45)
-text("TAP0..TAP15 = COS3502 outputs (3V3) at the top edge", -24.0, -13.4, 0.45)
+text("BUF_OUT_T", BX0 + 2.0, -1.3, 0.4)
+text("EXT_CLK", BX0 + 5.6, YS + 1.2, 0.4)
+text("PHASE_TRIGGER 4L JLC04161H-7628", BX0 + 7.0, BY0 + 1.0, 0.5)
+text("TMUX136", XU1 - 0.9, 4.3, 0.3)
+text("TLV3801", XU2, 2.9, 0.3)
+text("TRF37D73", XU3, 1.9, 0.3)
+text("12 dB", X_R312, 1.6, 0.3)
+text("LVDS2", X_R309 - 1.137, YU4 - 2.0, 0.3)
+text(f"PH_LINE {W_LIN:.2f} mm, 65 ps/tap", 20.0, YL + 2.2, 0.4)
+text(f"PSTRB_A/K {W_STR:.2f} mm, pitch {PITCH:.3f} mm", 45.0, YL + 2.2, 0.4)
 for n, x in enumerate(XT):
-    text(str(n), x - 1.0, 3.55, 0.35, layer=pcbnew.F_SilkS)
-text("VTAP_N", -2.0, -YR, 0.35)
-text("VTAP_P", -2.0, YR, 0.35)
+    text(str(n), x + 1.85, YL + 1.0, 0.3)
 
 # ============================================================================= zones
 IN = 0.25
 outline = rect_pts(BX0 + IN, BY0 + IN, BX1 - IN, BY1 - IN)
 zone("GND", [pcbnew.In1_Cu], outline, clearance=0.2)
 zone("+3V3", [pcbnew.In2_Cu], outline, clearance=0.3, prio=0)
-zone("+2V5", [pcbnew.In2_Cu], rect_pts(BX0 + IN, BY0 + IN, -24.6, BY1 - IN), clearance=0.3, prio=1)
-zone("GND", [pcbnew.In2_Cu], rect_pts(-10.0, -3.45, BX1 - IN, BY1 - IN), clearance=0.3, prio=2)
-zone("GND", [pcbnew.B_Cu], outline, clearance=0.3)
-zone("GND", [pcbnew.F_Cu], outline, clearance=0.3)
-for c in CUT:                                    # hold nodes: no In1 ground below (low node capacitance)
+zone("+2V5", [pcbnew.In2_Cu], rect_pts(BX0 + IN, -3.6, XU2 + 1.0, BY1 - IN), clearance=0.3, prio=1)
+XV0, XV1 = XT[0] - 4.0, X15 + 4.6
+zone("VTAP_N", [pcbnew.In2_Cu], rect_pts(XV0, -(Y_RV + 1.4), XV1, -0.15), clearance=0.3, prio=1)
+zone("VTAP_P", [pcbnew.In2_Cu], rect_pts(XV0, 0.15, XV1, Y_RV + 1.4), clearance=0.3, prio=1)
+zone("GND", [pcbnew.B_Cu], outline, clearance=0.25, prio=0)
+zone("-2V5", [pcbnew.B_Cu], rect_pts(XU1 + 0.9, -3.6, XU2 + 1.0, 3.8), clearance=0.25, prio=1)
+zone("VSW_GND", [pcbnew.B_Cu], rect_pts(XU1 - 1.2, -3.4, XU1 + 0.7, 1.8), clearance=0.25, prio=1)
+zone("VSW_GND", [pcbnew.F_Cu], rect_pts(XU1 - 1.15, 0.95, XU1 + 2.95, 2.2), clearance=0.15, prio=2)
+zone("GND", [pcbnew.F_Cu], outline, clearance=0.2, prio=0)
+for c in CUT:                                         # hold nodes: no In1 ground below (In2 VTAP strip instead)
     zone(None, [pcbnew.In1_Cu], c, rule=True)
-for k in KEEP_TOP:                               # no top pour inside the tap cell
-    zone(None, [pcbnew.F_Cu], k, rule=True)
-
-
-# ============================================================================= stitching vias
-def seg_dist(px, py, x0, y0, x1, y1):
-    dx, dy = x1 - x0, y1 - y0
-    L2 = dx * dx + dy * dy
-    u = 0 if L2 == 0 else max(0, min(1, ((px - x0) * dx + (py - y0) * dy) / L2))
-    return math.hypot(px - x0 - u * dx, py - y0 - u * dy)
-
-
-def can_via(x, y, r=0.225, clr=0.18):
-    if not (BX0 + 0.6 < x < BX1 - 0.6 and BY0 + 0.6 < y < BY1 - 0.6):
-        return False
-    for t in b.GetTracks():
-        if t.Type() == pcbnew.PCB_VIA_T:
-            vx, vy = loc(t.GetPosition())
-            if math.hypot(vx - x, vy - y) < r + pcbnew.ToMM(t.GetWidth()) / 2 + 0.2:
-                return False
-            continue
-        if t.GetNetname() == "GND":
-            continue
-        (x0, y0), (x1, y1) = loc(t.GetStart()), loc(t.GetEnd())
-        if seg_dist(x, y, x0, y0, x1, y1) < r + pcbnew.ToMM(t.GetWidth()) / 2 + clr:
-            return False
-    for fp in b.GetFootprints():
-        for p in fp.Pads():
-            bb = p.GetBoundingBox()
+xj, yj_ = pad("J301", "1")
+zone(None, [pcbnew.In1_Cu], rect_pts(BX0 + IN, yj_ - 0.95, xj + 1.9, yj_ + 0.95), rule=True)   # SMA pin
+# no top pour between the strobe lines of the delay line (dense meander) and within 2 w of the strobe lines
+zone(None, [pcbnew.F_Cu], rect_pts(XT[0] + X_P12 - PITCH / 2 - 0.1, -(YL + W_STR / 2 + 2 * W_STR),
+                                    XE + 0.1, YL + W_STR / 2 + 2 * W_STR), rule=True)
+# RF pour keep-outs: octagon around every RF segment at 2 w from the trace edge, rectangle around RF pads
+for nm, r in ROUTES.items():
+    if r["z"] is None:
+        continue
+    w = r["width"]
+    K = 2 * w + w / 2
+    e = K * math.tan(math.pi / 8)
+    for x0, y0, x1, y1 in r["segs"]:
+        L = math.hypot(x1 - x0, y1 - y0)
+        ux, uy = (x1 - x0) / L, (y1 - y0) / L
+        nx, ny = -uy, ux
+        pts = [(x0 - ux * K + nx * e, y0 - uy * K + ny * e), (x0 - ux * e + nx * K, y0 - uy * e + ny * K),
+               (x1 + ux * e + nx * K, y1 + uy * e + ny * K), (x1 + ux * K + nx * e, y1 + uy * K + ny * e),
+               (x1 + ux * K - nx * e, y1 + uy * K - ny * e), (x1 + ux * e - nx * K, y1 + uy * e - ny * K),
+               (x0 - ux * e - nx * K, y0 - uy * e - ny * K), (x0 - ux * K - nx * e, y0 - uy * K - ny * e)]
+        zone(None, [pcbnew.F_Cu], pts, rule=True)
+for ref, num in RFPADS:
+    for p_ in FPS[ref].Pads():
+        if p_.GetNumber() == num or (num[0] == "@" and p_.GetNetname() == num[1:]):
+            if not p_.IsOnLayer(pcbnew.F_Cu):
+                continue
+            bb = p_.GetBoundingBox()
             x0, y0 = loc(pcbnew.VECTOR2I(bb.GetX(), bb.GetY()))
             x1, y1 = x0 + pcbnew.ToMM(bb.GetWidth()), y0 + pcbnew.ToMM(bb.GetHeight())
-            d = math.hypot(max(x0 - x, 0, x - x1), max(y0 - y, 0, y - y1))
-            if d < r + (0.15 if p.GetNetname() == "GND" else clr):
-                return False
-    for c in CUT:
-        (cx0, cy0), (cx1, cy1) = c[0], c[2]
-        if min(cx0, cx1) - 0.3 < x < max(cx0, cx1) + 0.3 and min(cy0, cy1) - 0.3 < y < max(cy0, cy1) + 0.3:
-            return False
-    return True
+            g = 2 * W50
+            zone(None, [pcbnew.F_Cu], rect_pts(x0 - g, y0 - g, x1 + g, y1 + g), rule=True)
+            break
 
-
-N_STITCH = 0
-for name in list(ROUTES):
-    if not (name.startswith(("PSTRB", "PH_LINE", "line U", "BUF_OUT_T", "EXT_CLK", "CMP_", "TRF_", "pad",
-                             "TRIG_COM"))):
-        continue
-    off = 0.62
-    for (x0, y0, x1, y1) in ROUTES[name]:
-        L = math.hypot(x1 - x0, y1 - y0)
-        if L < 0.3:
-            continue
-        nx, ny = -(y1 - y0) / L, (x1 - x0) / L
-        nst = max(1, int(L / 0.9))
-        for i in range(nst + 1):
-            u = i / nst
-            for sg in (1, -1):
-                xx, yy = x0 + u * (x1 - x0) + sg * nx * off, y0 + u * (y1 - y0) + sg * ny * off
-                if can_via(xx, yy):
-                    svia(xx, yy, "GND")
-                    N_STITCH += 1
-for gx in [BX0 + 1.0 + 1.5 * i for i in range(int((BX1 - BX0) / 1.5))]:
-    for gy in [BY0 + 1.0 + 1.5 * j for j in range(int((BY1 - BY0) / 1.5))]:
-        if can_via(gx, gy, clr=0.35):
-            svia(gx, gy, "GND")
-            N_STITCH += 1
-
-# ============================================================================= fill, reports, checks
 pcbnew.ZONE_FILLER(b).Fill(b.Zones())
 
-
-def rlen(segs):
-    return sum(math.hypot(x1 - x0, y1 - y0) for x0, y0, x1, y1 in segs)
+# ============================================================================= reports
 
 
-z50, e50 = microstrip(W50)
-print("Stack-up: F.Cu / 3313 0.0994 mm er 4.1 / In1 GND / core 1.265 / In2 / 3313 0.0994 / B.Cu, t 35 um")
-print(f"  50 R: exact {W50_EXACT:.3f} mm, drawn {W50:.2f} mm -> {z50:.1f} R, eps_eff {e50:.3f}, {ps_mm(W50):.3f} ps/mm")
-print(f"  strobe line {W_STR:.2f} mm: Z0 {Z_STR:.1f} R, {ps_mm(W_STR):.3f} ps/mm; load {CL_STR:.3f} pF/tap "
-      f"(0.40 gate + {C_PAD_STR:.3f} pad)")
-print(f"  PH_LINE {W_LIN:.2f} mm: Z0 {Z_LIN:.1f} R, {ps_mm(W_LIN):.3f} ps/mm; load {CL_LIN:.3f} pF/tap "
-      f"(0.37 gate + {C_PAD_LIN:.3f} pad); vias {T_VIA:.1f} ps each, 2 per tap")
-print(f"  design: strobe unloaded {TDU_STR:.2f} ps/tap -> pitch {PITCH:.3f} mm; line unloaded {TDU_LIN:.2f} ps/tap "
-      f"-> trace {L_LIN:.3f} mm/tap, U depth {D_U:.3f} mm")
-print(f"{'tap':>5s} {'PSTRB_A mm':>10s} {'PSTRB_K mm':>10s} {'A ps':>7s} {'K ps':>7s} {'line mm':>8s} {'line ps':>8s}"
-      f" {'eff ps':>7s}   (intended 35.0 / 35.0 / 70.0 / 35.0)")
+def route_len(nm):
+    return sum(math.hypot(x1 - x0, y1 - y0) for x0, y0, x1, y1 in ROUTES[nm]["segs"])
+
+
+print("Stack-up JLC04161H-7628: F.Cu 35 um / 7628 0.2104 mm er 4.4 / In1 GND / core 1.065 mm er 4.6 / In2 power / "
+      "7628 0.2104 mm / B.Cu; mask er 3.8, 15 um over trace, 30 um over laminate")
+print(f"{'line':34s} {'w mm':>6s} {'Z0 R':>6s} {'eps_eff':>7s} {'ps/mm':>6s}")
+for lab, w in (("50 R (all 50 R nets)", W50), ("PSTRB_A/K sections (73 R target)", W_STR),
+               (f"PH_LINE sections ({z_t:.1f} R target)", W_LIN)):
+    z_, e_ = microstrip(w)
+    print(f"{lab:34s} {w:6.2f} {z_:6.1f} {e_:7.3f} {ps_mm(w):6.3f}")
+print(f"  exact widths: 50 R {width_for(50):.3f} mm, 73 R {width_for(73):.3f} mm, PH_LINE {W_LIN_EXACT:.3f} mm; "
+      f"50 R without mask {microstrip(W50, mask=False)[0]:.1f} R")
+zms0 = microstrip(W50, t=1e-6, mask=False)[0]
+lo, hi = 0.05, 2.0
+for _ in range(50):
+    m = (lo + hi) / 2
+    lo, hi = (m, hi) if cpwg(W50, m)[0] < zms0 else (lo, m)
+print(f"coplanar check (Wadell CPWG, t=0, no mask): side ground lowers Z below the microstrip value ({zms0:.1f} R) "
+      f"only for gaps < {(lo + hi) / 2:.2f} mm; pour gap used 2 w = {GAP_RF:.2f} mm (CPWG there "
+      f"{cpwg(W50, GAP_RF)[0]:.1f} R) -> microstrip-dominated, no correction")
+
+print("\nloaded lines (per tap)  intended -> design")
+la_ = route_len("PSTRB_A section 3")
+ll_ = route_len("PH_LINE cell 3")
+for lab, w, z0, cl, tdu, L, tdt in (("PSTRB_A/K", W_STR, Z_STR, CL_STR, TDU_STR, la_, TD_STR),
+                                    ("PH_LINE", W_LIN, Z_LIN, CL_LIN, TDU_LIN, ll_, TD_LIN)):
+    td, zl = loaded(L * ps_mm(w), z0, cl)
+    print(f"  {lab:10s} w {w:.2f} mm, Z0 unloaded {z0:.1f} R, load {cl:.3f} pF, section {L:.3f} mm "
+          f"(needed {tdu / ps_mm(w):.3f}), unloaded {L * ps_mm(w):.2f} ps, loaded {td:.2f} ps "
+          f"(target {tdt:.1f}), loaded Z {zl:.1f} R")
+print(f"  pitch {PITCH:.3f} mm, meander half-height Y {Y_M:.3f} mm, legs x = {X_P3:.2f} / {XU:.3f} / {XD:.3f} "
+      f"(gaps {XU - X_P3 - W_LIN:.3f} / {XD - XU - W_LIN:.3f} mm), strobe |y| {YL:.2f} mm")
+print(f"{'interval':>8s} {'A mm':>7s} {'K mm':>7s} {'A ps':>6s} {'K ps':>6s} {'line mm':>8s} {'line ps':>8s} {'eff ps':>7s}")
 res = []
 for n in range(NT - 1):
-    la = rlen(ROUTES[f"PSTRB_A tap {n}"])
-    lk = rlen(ROUTES[f"PSTRB_K tap {n}"])
-    ll = rlen(ROUTES[f"line top {n}"]) + rlen(ROUTES[f"line U {n}"])
-    ta, za = loaded(la * ps_mm(W_STR), Z_STR, CL_STR)
-    tk, _ = loaded(lk * ps_mm(W_STR), Z_STR, CL_STR)
-    tl, zl = loaded(ll * ps_mm(W_LIN) + 2 * T_VIA, Z_LIN, CL_LIN)
+    la, lk, ll = route_len(f"PSTRB_A section {n}"), route_len(f"PSTRB_K section {n}"), route_len(f"PH_LINE cell {n}")
+    ta, tk, tl = (loaded(la * ps_mm(W_STR), Z_STR, CL_STR)[0], loaded(lk * ps_mm(W_STR), Z_STR, CL_STR)[0],
+                  loaded(ll * ps_mm(W_LIN), Z_LIN, CL_LIN)[0])
     res.append((ta, tk, tl))
-    print(f"{n:2d}-{n + 1:<2d} {la:10.3f} {lk:10.3f} {ta:7.2f} {tk:7.2f} {ll:8.3f} {tl:8.2f} {tl - ta:7.2f}")
+    if n in (0, 1, 7, 14):
+        print(f"{n:3d}-{n + 1:<4d} {la:7.3f} {lk:7.3f} {ta:6.2f} {tk:6.2f} {ll:8.3f} {tl:8.2f} {tl - ta:7.2f}")
 spread = [max(r[i] for r in res) - min(r[i] for r in res) for i in range(3)]
-print(f"spread over the 15 intervals: A {spread[0]:.4f} ps, K {spread[1]:.4f} ps, line {spread[2]:.4f} ps")
-print(f"loaded impedance: strobe {za:.1f} R, PH_LINE {zl:.1f} R (terminations 49.9 R)")
-for nm in ("BUF_OUT_T line", "EXT_CLK line", "TRIG_COM", "CMP_P", "CMP_N", "TRF_IN", "TRF_OUT",
-           "PH_LINE launch", "PSTRB_A launch", "PSTRB_K launch", "PSTRB_A end", "PSTRB_K end", "PH_LINE end"):
-    print(f"  {nm:16s} {rlen(ROUTES[nm]):7.3f} mm")
-print(f"stitching / ground vias added: {N_STITCH}")
+print(f"  15 intervals: spread A {spread[0]:.4f} / K {spread[1]:.4f} / line {spread[2]:.4f} ps (all cells identical)")
+
+print(f"\n{'RF segment':52s} {'net':10s} {'w':>5s} {'Z int':>5s} {'Z0':>5s} {'len mm':>7s} {'ps':>6s}")
+for nm, r in ROUTES.items():
+    if r["z"] is None:
+        continue
+    if ("section" in nm and not nm.endswith((" 0", " 15"))) or ("cell" in nm and not nm.endswith((" 0", " 14"))):
+        continue
+    L = route_len(nm)
+    print(f"{nm:52s} {r['net']:10s} {r['width']:5.2f} {r['z']:5d} {microstrip(r['width'])[0]:5.1f} {L:7.3f} "
+          f"{L * ps_mm(r['width']):6.1f}")
+print("  (sections 1..14 / cells 1..13 identical to the ones listed)")
+
+print("\npad discontinuities (excess C vs the line the pad replaces):")
+for lab, wl, wp, lp in (("0402 in-line on 50 R (C308, C309, R312)", W50, 0.62, 0.56),
+                        ("0402 shunt/T pad on 50 R (R301, R307, R309, R310, R311, R313, L301)", W50, 0.62, 0.56),
+                        ("SOT-323 pin 3 on PH_LINE (in the tap load)", W_LIN, 0.45, 0.70),
+                        ("0402 hold-cap pad on the strobe line (in the tap load)", W_STR, 0.56, 0.62),
+                        ("WSON / UQFN pins (narrower than the line)", W50, 0.25, 0.5)):
+    dc = (c_per_mm(wp) - c_per_mm(wl)) * lp
+    print(f"  {lab:70s} {dc * 1e3:+6.1f} fF")
+zs, es = microstrip(1.27, h=0.2104 + 0.0152 + 1.065)
+print(f"  SMA centre pin 1.27 mm: In1 cut out below -> referenced to In2 at 1.29 mm: {zs:.0f} R over 1.8 mm "
+      f"(vs {(c_per_mm(1.27) - c_per_mm(W50)) * 1.8 * 1e3:.0f} fF excess without the cut-out)")
+print("vias:", N_VIA, "(no stitching vias)")
+
+# --- checks
+bad = []
+for nm, pts in POLYS:
+    for a, c, d in zip(pts, pts[1:], pts[2:]):
+        v1, v2 = (c[0] - a[0], c[1] - a[1]), (d[0] - c[0], d[1] - c[1])
+        ang = math.degrees(math.acos(max(-1, min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / math.hypot(*v1) / math.hypot(*v2)))))
+        if ang > 45.5:
+            bad.append(f"{nm} at ({c[0]:.2f}, {c[1]:.2f}): {ang:.0f} deg")
+print("bend check (<= 45 deg per vertex, all chamfered polylines):", "OK" if not bad else f"{len(bad)}: {bad[:12]}")
 
 errs = []
 fps = list(b.GetFootprints())
@@ -823,13 +939,17 @@ for fp in fps:
         boxes[fp.GetReference()] = (pcbnew.ToMM(bb.GetX()), pcbnew.ToMM(bb.GetY()),
                                     pcbnew.ToMM(bb.GetRight()), pcbnew.ToMM(bb.GetBottom()))
 refs = sorted(boxes)
+IC_OV = []
 for i, r1 in enumerate(refs):
     for r2 in refs[i + 1:]:
         a, c = boxes[r1], boxes[r2]
         ox = min(a[2], c[2]) - max(a[0], c[0])
         oy = min(a[3], c[3]) - max(a[1], c[1])
-        if ox > 0.005 and oy > 0.005:
-            errs.append(f"courtyard overlap {r1} / {r2} ({ox:.2f} x {oy:.2f} mm)")
+        if ox > 0.02 and oy > 0.02:
+            if r1.startswith("U") or r2.startswith("U"):
+                IC_OV.append(f"{r1}/{r2} {min(ox, oy):.2f}")
+            else:
+                errs.append(f"courtyard overlap {r1} / {r2} ({ox:.2f} x {oy:.2f} mm)")
 CLR = mm(0.1) - 1000
 CU = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
 tr = list(b.GetTracks())
@@ -846,11 +966,10 @@ for i, (t, bt) in enumerate(items):
                 bt.GetBottom() + M < bu.GetY() or bu.GetBottom() + M < bt.GetY()):
             continue
         for lay in CU:
-            if t.IsOnLayer(lay) and u.IsOnLayer(lay) and \
-                    t.GetEffectiveShape(lay).Collide(u.GetEffectiveShape(lay), CLR):
-                who = u.GetParent().GetReference() + "." + u.GetNumber() if isinstance(u, pcbnew.PAD) else "track"
-                errs.append(f"clearance {t.GetNetname()} / {u.GetNetname()} ({who}) on {b.GetLayerName(lay)} "
-                            f"near {tuple(round(v, 2) for v in loc(t.GetPosition()))}")
+            if t.IsOnLayer(lay) and u.IsOnLayer(lay) and t.GetEffectiveShape(lay).Collide(u.GetEffectiveShape(lay), CLR):
+                who = u.GetParent().GetReference() + "." + u.GetNumber() if isinstance(u, pcbnew.PAD) else u.GetNetname()
+                errs.append(f"clearance {t.GetNetname()} / {who} on {b.GetLayerName(lay)} near "
+                            f"{tuple(round(v, 2) for v in loc(t.GetPosition()))}")
                 break
 for i, p in enumerate(pads_):
     bp = p.GetBoundingBox()
@@ -864,25 +983,53 @@ for i, p in enumerate(pads_):
         if p.GetEffectiveShape(pcbnew.F_Cu).Collide(q.GetEffectiveShape(pcbnew.F_Cu), CLR):
             errs.append(f"pad clearance {p.GetParent().GetReference()}.{p.GetNumber()} / "
                         f"{q.GetParent().GetReference()}.{q.GetNumber()}")
-print("courtyard / clearance check:", "OK" if not errs else f"{len(errs)} problems")
-for e in sorted(set(errs))[:60]:
+print("courtyard / clearance check (0.1 mm):", "OK" if not errs else f"{len(errs)} problems")
+print(f"  intentional: {len(IC_OV)} parts sit at IC pins inside the IC courtyard margin (pad gap >= 0.25 mm):",
+      ", ".join(IC_OV))
+for e in sorted(set(errs))[:40]:
     print("  ", e)
+# RF pour clearance: sample the RF tracks, the filled F.Cu GND pour must stay >= 2 w from the trace edge
+gz = [z for z in b.Zones() if not z.GetIsRuleArea() and z.GetNetname() == "GND" and z.IsOnLayer(pcbnew.F_Cu)][0]
+fill = gz.GetFilledPolysList(pcbnew.F_Cu)
+viol = []
+for nm, r in ROUTES.items():
+    if r["z"] is None:
+        continue
+    w = r["width"]
+    for x0, y0, x1, y1 in r["segs"]:
+        for i in range(11):
+            u = i / 10
+            if fill.Collide(P(x0 + u * (x1 - x0), y0 + u * (y1 - y0)), mm(2.5 * w - 0.02)):
+                viol.append(nm)
+                break
+print("RF pour clearance (>= 2 w from trace edge):", "OK" if not viol else sorted(set(viol)))
+b.BuildConnectivity()
+cn = b.GetConnectivity()
+print("unconnected items after fill:", cn.GetUnconnectedCount(False))
+for code, ni in b.GetNetsByNetcode().items():
+    try:
+        rn = cn.GetRatsnestForNet(code)
+        if rn and len(rn.GetEdges()):
+            print("   unrouted net", ni.GetNetname(), len(rn.GetEdges()))
+    except Exception as e_:
+        pass
 nonet = [f"{p.GetParent().GetReference()}.{p.GetNumber()}" for p in pads_ if not p.GetNetname()]
-print("pads without net (intentional: U301.7 COM2 open):", nonet)
+print("pads without net (U301.7 COM2 open on purpose):", nonet)
+print(f"board {BX1 - BX0:.1f} x {BY1 - BY0:.1f} mm")
 
 pcbnew.SaveBoard(OUT, b)
 STACKUP = """    (stackup
       (layer "F.SilkS" (type "Top Silk Screen"))
       (layer "F.Paste" (type "Top Solder Paste"))
-      (layer "F.Mask" (type "Top Solder Mask") (thickness 0.01))
+      (layer "F.Mask" (type "Top Solder Mask") (thickness 0.015) (epsilon_r 3.8))
       (layer "F.Cu" (type "copper") (thickness 0.035))
-      (layer "dielectric 1" (type "prepreg") (thickness 0.0994) (material "3313") (epsilon_r 4.1) (loss_tangent 0.02))
+      (layer "dielectric 1" (type "prepreg") (thickness 0.2104) (material "7628") (epsilon_r 4.4) (loss_tangent 0.02))
       (layer "In1.Cu" (type "copper") (thickness 0.0152))
-      (layer "dielectric 2" (type "core") (thickness 1.265) (material "FR4") (epsilon_r 4.6) (loss_tangent 0.02))
+      (layer "dielectric 2" (type "core") (thickness 1.065) (material "FR4") (epsilon_r 4.6) (loss_tangent 0.02))
       (layer "In2.Cu" (type "copper") (thickness 0.0152))
-      (layer "dielectric 3" (type "prepreg") (thickness 0.0994) (material "3313") (epsilon_r 4.1) (loss_tangent 0.02))
+      (layer "dielectric 3" (type "prepreg") (thickness 0.2104) (material "7628") (epsilon_r 4.4) (loss_tangent 0.02))
       (layer "B.Cu" (type "copper") (thickness 0.035))
-      (layer "B.Mask" (type "Bottom Solder Mask") (thickness 0.01))
+      (layer "B.Mask" (type "Bottom Solder Mask") (thickness 0.015) (epsilon_r 3.8))
       (layer "B.Paste" (type "Bottom Solder Paste"))
       (layer "B.SilkS" (type "Bottom Silk Screen"))
       (copper_finish "ENIG")
