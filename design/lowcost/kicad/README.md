@@ -100,7 +100,7 @@ into the board, no part is fitted (LCSC `NA`, BOM line at 0 USD, not counted as 
 | 5 | DBG2 (FPGA pin 6) | | 6 | GND |
 | 7 | JTAG_TCK (FPGA 3) | | 8 | UC_SWDIO (PA13) |
 | 9 | JTAG_TMS (FPGA 4) | | 10 | UC_SWCLK (PA14) |
-| 11 | JTAG_TDI (FPGA 5) | | 12 | DBG1 (PB9) |
+| 11 | JTAG_TDI (FPGA 5) | | 12 | DBG1 (PF1) |
 | 13 | JTAG_TDO (FPGA 7) | | 14 | UC_NRST (100 nF C719 at the MCU) |
 | 15 | GND | | 16 | GND |
 
@@ -148,18 +148,18 @@ as in DS12288 (LQFP48: PG10 = NRST, PB8 = BOOT0, VREF+ separate pin 20).
 | 17 | PB1 | DAC_BIAS_K | OPAMP3_VOUT (DAC3_CH2 follower) -> 5.1k -> VBIAS_K (100k pull-down) |
 | 20 | VREF+ | VREFP | VREFBUF 2.9 V (1 uF + 100 nF); feeds ADC_REF_MID divider and the VNEG_REF inverter (0.27 mA) |
 | 25 | PB11 | ADC_TRIG | EXTI11 = ADC12 regular external trigger (EXTI11 on port B; PA11 is USB) |
-| 5 | PF0 | MCU_CLK | OSC_IN, HSE bypass from MS5351M CLK1 (PF1 NC) |
-| 40 / 41 / 42 / 22 | PB3 / PB4 / PB5 / PB10 | SPI_SCK / MISO / MOSI / CS | SPI1 master AF5, CS as GPIO |
+| 5 | PF0 | MCU_CLK | OSC_IN, HSE bypass from MS5351M CLK1 (PF1 free, used as DBG1) |
+| 40 / 41 / 42 / 46 | PB3 / PB4 / PB5 / PB9 | SPI_SCK / MISO / MOSI / CS | SPI1 master AF5, CS as GPIO (layout swap: was PB10) |
 | 39 / 44 | PA15 / PB7 | I2C_SCL / I2C_SDA | I2C1 AF4 (pull-ups R727/R728) |
-| 16 / 18 / 43 | PB0 / PB2 / PB6 | FPGA_DONE / FPGA_RECONFIG / TRIG_SEL | GPIO in / open-drain / out |
+| 43 / 27 / 9 | PB6 / PB13 / PA1 | FPGA_DONE / FPGA_RECONFIG / TRIG_SEL | GPIO in / open-drain / out (layout swaps: were PB0 / PB2 / PB6) |
 | 33 / 34 | PA11 / PA12 | USB_DM / USB_DP | USB FS (internal D+ pull-up) to J601 on the power sheet |
 | 37 / 38 / 7 | PA13 / PA14 / PG10 | UC_SWDIO / UC_SWCLK / UC_NRST | SWD + reset to J501 (NRST 100 nF C719) |
 | 31 / 32 | PA9 / PA10 | HOST_TX / HOST_RX | USART1 TX / RX to J501 pins 4 / 2 via R512 / R511 |
-| 46 | PB9 | DBG1 | GPIO to J501 pin 12 |
+| 6 | PF1 | DBG1 | GPIO to J501 pin 12 (layout swap: was PB9) |
 | 45 | PB8 | BOOT0 | 10k R729 to GND, JP701 to +3V3 (bootloader: USB DFU or USART1) |
-| 2 | PC13 | LED | green LED D701 + 1k R730 from +3V3, active low |
+| 28 | PB14 | LED | green LED D701 + 1k R730 from +3V3, active low (layout swap: was PC13) |
 | 1, 24, 36, 48 / 21 / 23, 19 | VBAT, VDD / VDDA / VSS, VSSA | +3V3 / VDDA / GND | 4x 100 nF + 10 uF; VDDA via BLM15HD102 FB701, 1 uF + 10 nF |
-| 9, 11, 15, 3, 4, 6, 27-29 | PA1, PA3, PA7, PC14, PC15, PF1, PB13-15 | NC | spare |
+| 2, 3, 4, 11, 15, 16, 18, 22, 29 | PC13, PC14, PC15, PA3, PA7, PB0, PB2, PB10, PB15 | NC | spare |
 | 30 / 26 | PA8 / PB12 | NC | reserved: OPAMP5 / OPAMP4 follower outputs (spare analog, ADC_REF_MID trim) |
 
 **Control voltages (21 Nov 2026, user instruction "generate what can be generated in software directly and only use
@@ -223,10 +223,10 @@ TVS, PTC) or removed (several resistor values) on 21 Nov 2026.
 
 Integration (21 Nov 2026):
 - Root netlist (after the control-voltage simplification): 251 nets, 0 failed checks, no single-node nets; 21 NC-flagged pins, all intended (BUF802 NC 9/13/16,
-  FPGA 8/32 unused, STM32 spares PA1/PA3/PA7/PA8/PB12-15/PC14/PC15/PF1, USB-C SBU1/2, NC pins of
+  FPGA 8/32 unused, STM32 spares PA3/PA7/PA8/PB0/PB2/PB10/PB12/PB15/PC13-15, USB-C SBU1/2, NC pins of
   AP2112K/MT3608/LP5907). Not a KiCad ERC: run ERC in eeschema.
 - STM32 (21 Nov 2026): ADC12 external trigger EXTI11 from PB11 is from adc.md (RM0440 not read, verify); the OPAMP/DAC3-4
-  mapping is from the ST HAL OPAMP header (stm32g4xx_hal_opamp.h). PB4 (SPI1_MISO) and PB6 (TRIG_SEL) carry the UCPD dead-battery pull-downs until
+  mapping is from the ST HAL OPAMP header (stm32g4xx_hal_opamp.h). PB4 (SPI1_MISO) and PB6 (FPGA_DONE, an input) carry the UCPD dead-battery pull-downs until
   firmware sets PWR_CR3.UCPD_DBDIS. USB-C 16P, USBLC6-2SC6 and the LED are price estimates; check the STM32G474CBT6
   price on the LCSC page (only search snapshots read).
 - Stock: BAT15-03W (C5310874) 0 at LCSC; TRF37D73 25 at LCSC (Mouser has stock); SMA

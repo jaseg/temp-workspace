@@ -1,40 +1,40 @@
-# mcuif block: STM32G474 U704 + control-voltage networks (36 /mcu_if/ parts) + J501, R511, R512 (from fpga_clock)
-Run `python3 gen_mcuif.py [--render]` to write mcuif.kicad_pcb, mcuif.ifaces.json, mcuif.png and mcuif_detail.png. The routing order is in prio.json.
-Block membership: J501, R511 and R512 are in this script's REFS. The integrator must also move them in floorplan.py / boardlib.
-**Size**: 66.5 x 12 mm at board (27, 45), with the bottom edge on the board edge y 57. Copper stays >= 0.5 mm from y 57, and only interface stubs reach the N edge.
-Placement:
-- J501 at board (42, 53.2), rotation 90: pin 1 west, odd row (FPGA and supplies) south. Its courtyard ends at y 56.5.
-- R511 / R512 on B.Cu above J501.2 and J501.4.
-- U704 at (75, 51). Its courtyard is fully inside the block (y 45.85..56.15).
-- VDD decoupling caps sit in the LQFP courtyard notches on F.Cu, with pad-wide copper to the pins and via pairs: C713 / C710 at pins 1 / 48, C711 at pin 36, C712 at pin 24.
-- VREF+ (C718 / C717) and VDDA (C716 / C715, FB701) on B.Cu directly above the pin-20 / pin-21 vias.
-- Divider columns: inputs on the east pads, outputs on one west column joined by straight verticals.
-- I2C pull-ups R727 / R728 on B.Cu beside their own lanes.
-West routing, drawn by hand:
-- JTAG and DBG2 run straight north on B.Cu between the J501 pins.
-- The MCU bus (HOST_RX/TX, SWDIO, SWCLK, DBG1, NRST) runs on F.Cu lanes y 47.9..49.9 at 0.4 mm pitch, steps to B.Cu at x 49.6 / 50.2 and runs to x 67.4. The router does the last hop.
-USB: w 0.295 / s 0.205 mm, Zdiff 90.1 R. DP 9.272 mm and DM 9.272 mm in the block (a 1 mm bump on DP); pour gap 2 w.
+# mcuif block: STM32G474 U704, control-voltage networks, U701, J501 + R511 / R512 (39 refs)
+`python3 gen_mcuif.py [--render]` writes mcuif.kicad_pcb / .ifaces.json / .png / _detail.png. Hand-drawn, explicit coordinates, no router.
+Block 66.5 x 12 mm at board (27, 45); copper >= 0.5 mm from y 57; only interface stubs reach y 45. J501 at board x 31..53, courtyard to y 56.5.
+The integrator must move J501, R511 and R512 into mcuif in floorplan.py / boardlib.
 
-## Interfaces (N edge y 45, board x; B.Cu unless stated)
-| group | nets (board x) |
+## Pin-escape plan (U704 rot 0, centre board (79, 51.3))
+- N: 39-44, 46 inward vias (two staggered rows), B.Cu straight north = FPGA bus. 37 / 38 SWD outward onto two F.Cu lanes (y 45.7 / 46.05) to J501.8 / .10 from above.
+  45 BOOT0 inward via, then the top B lane to JP701 / R729 (B). 47 GND via; 48 + 1 into C713 (NW notch), C710 on B.
+- E: 33 / 34 USB east then north (w 0.295 / s 0.205, 90.1 R, DP = DM 9.572 mm). 25 / 27 east to vias, B.Cu north. 28 LED east to R730 / D701.
+  31 / 32 UART inward vias. 35 GND via, 36 into C711 (NE notch).
+- W: 5 CLK, 8 ADC_IN, 9 TRIG_SEL go F.Cu west then north in columns. 10 TAPTH runs F.Cu west to its divider column. 12 DAC_TRIG has a via onto a B lane.
+  6 DBG1 / 7 NRST inward vias (C719 on F at pin 7).
+- S: 13 / 14 / 17 DACs, 20 VREF+ and 21 VDDA inward vias. C717 / C718 (VREF+) and C715 / C716 / FB701 (VDDA) on B at the vias. 24 into C712 (SE notch).
+- B lanes leaving W (N->S): BOOT0, RX, TX, DBG1, NRST, VREFP, BIAS_K, BIAS_A, VOFS, DAC_TRIG. No same-layer crossings.
+  The J501 bus jogs up 0.85 at x 60 and drops into the north-row pins from above. R511 / R512 sit inline on B. JTAG leaves the south row on F.Cu, then via + B stub.
+- Analog on F west of U704: one column per output (series R inline, shunt parts hanging west, via + B stub at the top).
+  VREFP: B lane to the R703 column, then along the bottom channel (y 56.1, under J501) to U701 / R731 / R732 / C722 / C720 at board x 28..37 (C721 on B).
+- R725 / R726 (VTAP links) and C714 are east of the USB pair.
+
+## Swaps (gen_mcu_if.py, gen_all.py checks, kicad/README.md; gen_all: 0 failed checks, 0 single-node nets)
+TRIG_SEL PB6->PA1 (9), FPGA_DONE PB0->PB6 (43), SPI_CS PB10->PB9 (46), DBG1 PB9->PF1 (6), FPGA_RECONFIG PB2->PB13 (27), LED PC13->PB14 (28).
+
+## Interfaces (N edge y 45, board x, B.Cu unless noted)
+| group | nets |
 |---|---|
-| fpga JTAG (J501) | DBG2 37.55, TCK 40.09, TMS 42.63, TDI 45.17, TDO 47.72 |
-| phase VTAP (0 R links, w 0.4) | VTAP_N 44.15, VTAP_P 48.66, VTAP_TH 62.22 (w 0.25) |
-| analog dividers | VBIAS_A 50.90, VBIAS_K 51.60, ADC_REF_MID 56.30 |
-| analog / trigger from U704 / U701 | VNEG_REF 60.05, VOFS 60.50, DAC_TRIG 60.90, ADC_IN 61.15, TRIG_SEL 61.40 |
-| fpga bus | MCU_CLK 71.60, I2C_SDA 74.25, SPI_MOSI 75.25, SPI_MISO 75.75, SPI_SCK 76.25, I2C_SCL 76.75, FPGA_DONE 78.60, FPGA_RECONFIG 78.85, SPI_CS 79.10, ADC_TRIG 79.70 |
-| power (USB-C) | USB_DP 84.00 / USB_DM 84.50, F.Cu, 90 R pair |
-| supplies | +3V3, +2V5, -2V5, VBUS: via pairs to In2 (In2 regions by the integrator); GND to In1 and the F / B pours |
+| U701 / J501 JTAG | VNEG_REF 36.95, DBG2 37.55, TCK 40.09, TMS 42.63, TDI 45.17, TDO 47.72 |
+| analog | ADC_REF_MID 55.29, DAC_TRIG 58.60, VOFS 59.50, VBIAS_A 63.00, VBIAS_K 66.50, VTAP_TH 70.30 (w 0.25), TRIG_SEL 71.00, ADC_IN 71.50 |
+| fpga bus | MCU_CLK 73.35, SPI_CS 77.25, I2C_SDA 78.25, FPGA_DONE 78.75, MOSI 79.25, MISO 79.75, SCK 80.25, I2C_SCL 80.75, FPGA_RECONFIG 85.10, ADC_TRIG 85.80 |
+| USB / VTAP | USB_DP 88.00 / USB_DM 88.50 F.Cu 90 R pair; VTAP_P 90.60, VTAP_N 92.45 (w 0.4, class supply) |
+| supplies | +3V3, +2V5, -2V5, VBUS to In2 (via pairs, J501 THT pins); GND In1 + F / B pours |
 
 ## Checks (last run)
-- check_board (39 refs): 0 missing / extra / footprint / value / pad-net, 0 clearance, 0 corners, 0 courtyard overlaps, RF width / gap 0.
-  2 off-axis exits (U701.3, C722.2).
-  Unrouted: the plane nets, plus HOST_TX, UC_SWCLK, UC_SWDIO, BOOT0, VREFP (C717 -> R703 / R731) and 1 GND.
-- DRC (nightly, jlc4): total 130, error 18 (17 unconnected, 1 outline), warning 112. 0 hole / clearance / courtyard / silk.
+- check_board (39 refs): 0 missing / extra / footprint / value / pad-net, 0 clearance, 0 corners, 0 off-axis, 0 courtyard, RF 0. Unrouted: only +3V3 (8), +2V5 (1), -2V5 (2) (plane-fed).
+- DRC nightly jlc4: total 101, error 12 (11 unconnected +3V3 / +-2V5, 1 outline), warning 89 (38 lib_footprint_mismatch, 1 lib issues,
+  28 track_dangling = the 28 interface stubs, 14 via_dangling = supply plane vias, 8 isolated GND fill). 0 hole / clearance / courtyard / width / silk.
 
 ## Open points
-- NOT DONE: the router cannot reach the NE-side SWD vias (pins 37 / 38) or pin 31 (TX) through the area under the body.
-  Planned fix: a hand-drawn B.Cu bus below the S pads (y 54.4..55.1) up the east side, with TX entering pin 31 from a via at x 80.6.
-- VREFP to R703 / R731 and the BOOT0 jumper tie are still open. The 2 off-axis exits at U701 / C722 are still open.
-- The router-routed analog interfaces sit at x 60.05..61.40, east of the accepted 49.6..56.4 range: the integrator must route them from there.
-- The J501 silk outline is redrawn (clipped at the NPTH pegs). The U704 pin-1 silk wedge is removed; F.Fab keeps the pin-1 marker.
+- TRIG_SEL on PA1 has no reset pull-down (PB6 had the UCPD one). Add one at R302, or set it in firmware early.
+- C721 sits on its two vias (via-in-pad on B: plugged vias, or move it). C719 GND reaches its via through a 0.3 mm F track.
+- VNEG_REF / ADC_REF_MID moved west (36.95 / 55.29), RECONFIG / ADC_TRIG / USB / VTAP moved east. The integrator routes to these.

@@ -127,23 +127,23 @@ place("C713", 47.9, 2.05, "h", "GND")             # pins 48 / 1
 place("C710", 48.6, 2.3, "h", "+3V3", "B")        # second 100 nF at pins 48 / 1 (B, at the inner vias)
 place("C711", 56.1, 2.05, "h", "+3V3")            # pin 36
 place("C712", 56.1, 10.6, "h", "+3V3")            # pin 24
-place("C714", 60.0, 10.5, "h", "GND")             # 10 uF bulk
+place("C714", 60.0, 10.6, "h", "GND")             # 10 uF bulk
 place("C719", 45.9, 6.55, "h", "GND")             # NRST at pin 7
 # VREF+ / VDDA on B at the pin vias
 place("C717", 53.23, 7.0, "h", "/mcu_if/VREFP", "B")
 place("C718", 53.23, 7.95, "h", "/mcu_if/VREFP", "B")
 place("C716", 53.75, 10.5, "h", "/mcu_if/VDDA", "B")
-place("C715", 51.9, 10.5, "h", "GND", "B")
-place("FB701", 49.9, 10.5, "h", "+3V3", "B")
+place("C715", 51.85, 10.5, "h", "/mcu_if/VDDA", "B")
+place("FB701", 49.95, 10.5, "h", "+3V3", "B")
 # I2C pull-ups on B beside their lanes (fpga bus, top)
-place("R727", 54.6, 2.3, "v", "+3V3", "B")       # SCL (lane x 53.75)
-place("R728", 50.4, 2.3, "v", "+3V3", "B")        # SDA (lane x 51.25)
+place("R727", 56.1, 3.3, "h", "/I2C_SCL", "B")    # SCL: east of its inner via, B under the E pads
+place("R728", 52.2, 6.0, "h", "/I2C_SDA", "B")    # SDA: under the body (F drop from the pin-44 via)
 # BOOT0 (B, north of the bus lanes)
-place("JP701", 44.3, 3.0, "h", "+3V3", "B")
-place("R729", 46.0, 2.75, "v", "GND", "B")
+place("JP701", 45.5, 3.0, "h", "/mcu_if/BOOT0", "B")
+place("R729", 42.1, 2.9, "v", "GND", "B")
 # LED (E side)
 place("R730", 59.6, 7.55, "h", "/mcu_if/LED")
-place("D701", 61.9, 7.55, "h", "Net-(D701-K)")
+place("D701", 62.1, 7.55, "h", "Net-(D701-K)")
 # VTAP 0 R links (east of the USB pair)
 place("R725", 63.6, 2.6, "v", "/VTAP_P")
 place("R726", 65.45, 2.6, "v", "/VTAP_N")
@@ -166,7 +166,7 @@ place("R731", 2.4, 1.55, "h", "/mcu_if/VREFP")
 place("C720", 2.4, 3.45, "h", "GND")
 place("R732", 8.25, 1.9, "v", "Net-(U701--)")
 place("C722", 9.25, 1.9, "v", "Net-(U701--)")
-place("C721", 6.9, 2.5, "h", "-2V5", "B")         # -2V5 at pin 2, B under the package
+place("C721", 7.54, 2.03, "v", "GND", "B")        # pin 2 / 3 decoupling on B, pads on the two vias
 for r in REFS:
     assert r in blk.fps, r
 
@@ -182,16 +182,16 @@ V("GND", (c2[0], 2.85))
 T("GND", 0.25, [UP(47), (nx(47), 3.3)])
 V("GND", (nx(47), 3.3))
 a, g = P("C710", "@+3V3"), P("C710", "@GND")
-T("+3V3", WP, [a, (a[0], 2.9), (XW_IN + 0.45, wy(1))], "B.Cu")
-T("GND", WP, [g, (g[0], 2.65), (nx(47), 3.3)], "B.Cu")
+T("+3V3", WP, [a, (a[0], 3.0), (a[0] + 0.55, wy(1)), (XW_IN + 0.45, wy(1))], "B.Cu")
+T("GND", WP, [g, (g[0], 2.85), (nx(47), 3.3)], "B.Cu")
 # NE: pin 36 north into C711.1, inner +3V3 via; C711.2 -> 2 GND vias; pin 35 GND east via
 c1, c2 = P("C711", "@+3V3"), P("C711", "@GND")
 T("+3V3", WP, [(c1[0], ey(36)), c1])
-T("+3V3", 0.25, [UP(36), (XE_IN - 0.45, ey(36))])
-V("+3V3", (XE_IN - 0.45, ey(36)))
-T("GND", WP, [c2, (c2[0], 1.35)])
+T("+3V3", WP, [c1, (c1[0], 1.25)])
+V("+3V3", (c1[0], 1.25))
+T("GND", WP, [c2, (c2[0], 1.25)])
 T("GND", WP, [c2, (57.3, c2[1])])
-V("GND", (c2[0], 1.35), (57.3, c2[1]))
+V("GND", (c2[0], 1.25), (57.3, c2[1]))
 T("GND", 0.25, [UP(35), (57.4, ey(35))])
 V("GND", (57.4, ey(35)))
 # SE: pin 24 east into C712.1, inner +3V3 via; C712.2 -> GND via pair -> C714
@@ -202,7 +202,7 @@ V("+3V3", (sx(24), YS_IN - 0.45))
 T("GND", WP, [c2, (58.0, c2[1])])
 V("GND", (57.3, c2[1]), (58.0, c2[1]))
 b1, b2 = P("C714", "@GND"), P("C714", "@+3V3")
-T("GND", 0.5, [(58.0, c2[1]), (58.6, b1[1]), b1])
+T("GND", 0.5, [(58.0, c2[1]), b1])
 T("+3V3", 0.5, [b2, (62.6, b2[1])])
 V("+3V3", (61.9, b2[1]), (62.6, b2[1]))
 # S side GND pins 19 / 23: inward vias
@@ -223,15 +223,14 @@ vd = (sx(21), YS_IN - 0.45)
 T("/mcu_if/VDDA", 0.25, [UP(21), vd])
 V("/mcu_if/VDDA", vd)
 d6, d5, fbv = P("C716", "@VDDA"), P("C715", "@VDDA"), P("FB701", "@VDDA")
-T("/mcu_if/VDDA", WP, [vd, (vd[0], d6[1] - 0.3), d6], "B.Cu")
-T("/mcu_if/VDDA", WP, [vd, (vd[0] - 0.45, 9.75), (d5[0], 9.75), d5], "B.Cu")
+T("/mcu_if/VDDA", WP, [vd, d6], "B.Cu")
+T("/mcu_if/VDDA", 0.2, [(vd[0], 9.75), (d5[0], 9.75), d5], "B.Cu")
 T("/mcu_if/VDDA", WP, [d5, fbv], "B.Cu")
 g6, g5, f3 = P("C716", "@GND"), P("C715", "@GND"), P("FB701", "@+3V3")
 T("GND", WP, [g6, (g6[0], 9.65), (sx(23), YS_IN - 1.05)], "B.Cu")
-T("GND", WP, [g5, (g5[0], 11.15)], "B.Cu")
-V("GND", (g5[0], 11.15))
-T("+3V3", WP, [f3, (f3[0] - 0.7, f3[1])], "B.Cu")
-V("+3V3", (f3[0] - 0.7, f3[1]))
+T("GND", WP, [g5, (g5[0], 11.15), (g6[0], 11.15), g6], "B.Cu")
+T("+3V3", WP, [f3, (48.75, f3[1])], "B.Cu")
+V("+3V3", (48.75, f3[1]))
 
 # ============================================================ N side: FPGA bus (inward vias, B.Cu north)
 NOTE = {"/I2C_SCL": "MS5351M; 4.7k R727 here", "/SPI_SCK": "U501.28", "/SPI_MISO": "U501.30",
@@ -246,12 +245,17 @@ for k in (39, 40, 41, 42, 43, 44, 46):
     T(net, WS, [(nx(k), yv), (nx(k), 0.0)], "B.Cu")
     IF(net, nx(k), WS, f"U704.{k}; {NOTE[net]}")
     VIA_N[k] = (nx(k), yv)
-for ref, k in (("R727", 39), ("R728", 44)):       # pull-ups: signal pad -> lane, +3V3 pad -> via
-    net = NL.net_of("U704", str(k))
-    s, v = P(ref, "@" + net), P(ref, "@+3V3")
-    T(net, WS, [s, (nx(k), s[1])], "B.Cu")
-    T("+3V3", WP, [v, (v[0], 1.1)], "B.Cu")
-    V("+3V3", (v[0], 1.1))
+T("/I2C_SCL", WS, [(nx(39), 2.9), (nx(39) + 0.4, 3.3), P("R727", "@I2C_SCL")], "B.Cu")
+v = P("R727", "@+3V3")
+T("+3V3", WP, [v, (57.3, v[1])], "B.Cu")
+V("+3V3", (57.3, v[1]))
+vs = (nx(44), 6.0)                                 # SDA: F under the body to a via in the free pocket
+T("/I2C_SDA", WS, [VIA_N[44], vs])
+V("/I2C_SDA", vs)
+T("/I2C_SDA", WS, [vs, P("R728", "@I2C_SDA")], "B.Cu")
+v = P("R728", "@+3V3")
+T("+3V3", WP, [v, (53.4, v[1])], "B.Cu")
+V("+3V3", (53.4, v[1]))
 
 # ============================================================ SWD: outward, top F.Cu lanes to J501 pins 8 / 10
 T("/UC_SWDIO", WS, [UP(37), (nx(37), 0.7), (P("J501", "8")[0], 0.7), P("J501", "8")])
@@ -268,12 +272,10 @@ T("/mcu_if/BOOT0", WS, [UP(45), vb])
 V("/mcu_if/BOOT0", vb)
 jb, rb = P("JP701", "@BOOT0"), P("R729", "@BOOT0")
 T("/mcu_if/BOOT0", WS, [vb, (vb[0], YL["BOOT0"]), (jb[0], YL["BOOT0"]), jb], "B.Cu")
-T("/mcu_if/BOOT0", WS, [rb, (rb[0], YL["BOOT0"])], "B.Cu")
+T("/mcu_if/BOOT0", WS, [rb, (rb[0], YL["BOOT0"]), (jb[0], YL["BOOT0"])], "B.Cu")
 j3, rg = P("JP701", "@+3V3"), P("R729", "@GND")
-T("+3V3", WP, [j3, (j3[0] - 0.95, j3[1])], "B.Cu")
-V("+3V3", (j3[0] - 0.95, j3[1]))
-T("GND", WP, [rg, (rg[0], 1.6)], "B.Cu")
-V("GND", (rg[0], 1.6))
+T("+3V3", WP, [j3, (j3[0] + 0.55, j3[1]), (47.25, 3.55), (P("C710", "@+3V3")[0] + 0.55, wy(1))], "B.Cu")
+T("GND", WP, [rg, (rg[0], 1.75), (41.05, 1.75), (40.75, 2.05)], "B.Cu")
 # UART (pins 32 RX / 31 TX): inward vias
 vrx, vtx = (XE_IN - 0.325, ey(32)), (XE_IN - 0.925, ey(31))
 T("/HOST_RX", WS, [UP(32), vrx])
@@ -288,8 +290,8 @@ V("/DBG1", vdb)
 V("/UC_NRST", vnr)
 T("/UC_NRST", WS, [UP(7), P("C719", "@UC_NRST")])
 cg = P("C719", "@GND")
-T("GND", WP, [cg, (cg[0], 5.85)])
-V("GND", (cg[0], 5.85))
+T("GND", WP, [cg, (cg[0], 1.9)])                   # F.Cu up between the CLK / ADC_IN columns (B lanes below)
+V("GND", (cg[0], 1.9))
 # J501 targets (north row, entered from above) with R511 / R512 inline on B
 J = {k: P("J501", str(k)) for k in range(1, 17)}
 r1a, r1b = P("R511", "@Net-(J501-Pin_2)"), P("R511", "@HOST_RX")
@@ -330,12 +332,12 @@ V("/DAC_TRIG", (COLX["DAC_TRIG"], YL["DAC_TRIG"]))
 
 # ============================================================ W side F.Cu columns north
 YIF = 1.5                   # column-top interface vias (under the SWD lanes)
-for k, xc, note in ((5, 46.35, "U704.5 PF0 HSE bypass <- MS5351M CLK1 (R509 33 R in fpga)"),
-                    (8, 44.5, "U704.8 PA0 ADC in; RC R211 / C207 in the analog block"),
-                    (9, 44.0, "U704.9 PA1 -> R302 / TMUX136 select (phase)")):
+for k, xc, yv, note in ((5, 46.35, YIF, "U704.5 PF0 HSE bypass <- MS5351M CLK1 (R509 33 R in fpga)"),
+                        (8, 44.5, YIF, "U704.8 PA0 ADC in; RC R211 / C207 in the analog block"),
+                        (9, 44.0, YIF + 0.6, "U704.9 PA1 -> R302 / TMUX136 select (phase)")):
     net = NL.net_of("U704", str(k))
-    T(net, WS, [UP(k), (xc, wy(k)), (xc, YIF)])
-    stub(net, xc, YIF, WS, note)
+    T(net, WS, [UP(k), (xc, wy(k)), (xc, yv)])
+    stub(net, xc, yv, WS, note)
 # straight DAC columns from the B lanes
 for key, net, note in (("VOFS", "/VOFS", "U704.13 DAC1_OUT2 -> R119 (input block)"),
                        ("DAC_TRIG", "/DAC_TRIG", "U704.12 DAC1_OUT1 -> R383 (phase)")):
@@ -344,19 +346,19 @@ for key, net, note in (("VOFS", "/VOFS", "U704.13 DAC1_OUT2 -> R119 (input block
     stub(net, x, YIF, WS, note)
 
 
-def column(xc, y_in, src_net, rs, out_net, w=WS, note=""):
+def column(xc, y_in, src_net, rs, out_net, w=WS, note="", src=None):
     """series R rs vertical at xc: input from (xc, y_in) up into its south pad; output from its north pad to the
     column-top via and interface"""
     a, b = P(rs, "@" + src_net), P(rs, "@" + out_net)
-    T(src_net, WS, [(xc, y_in), a])
+    T(src_net, WS, (src or []) + [(xc, y_in), a])
     T(out_net, w, [b, (xc, YIF)])
     stub(out_net, xc, YIF, w, note)
 
 
 # TAPTH: pin 10 F west at its own y to x 43.3, north into R723; R724 / C709 hang west at the output node
 xt = 43.3
-T("/mcu_if/DAC_TAPTH", WS, [UP(10), (xt, wy(10))])
-column(xt, wy(10), "/mcu_if/DAC_TAPTH", "R723", "/VTAP_TH", 0.25, "R723 / R724 / C709 -> R380 / R381 (phase)")
+column(xt, wy(10), "/mcu_if/DAC_TAPTH", "R723", "/VTAP_TH", 0.25, "R723 / R724 / C709 -> R380 / R381 (phase)",
+       src=[UP(10)])
 for ref in ("R724", "C709"):
     a, g = P(ref, "@VTAP_TH"), P(ref, "@GND")
     T("/VTAP_TH", 0.25, [a, (xt, a[1])])
@@ -412,9 +414,7 @@ V("GND", v3)
 v2 = (u(2)[0] + 0.9, u(2)[1])
 T("-2V5", WP, [u(2), v2])
 V("-2V5", v2)
-c21m, c21g = P("C721", "@-2V5"), P("C721", "@GND")
-T("-2V5", WP, [v2, c21m], "B.Cu")
-T("GND", WP, [c21g, (c21g[0], v3[1]), v3], "B.Cu")
+
 
 # ============================================================ JTAG: J501 south row north on F.Cu, via, B stub
 JNOTE = {5: "DBG2 -> U501", 7: "JTAG TCK -> U501.3", 9: "JTAG TMS", 11: "JTAG TDI", 13: "JTAG TDO"}
