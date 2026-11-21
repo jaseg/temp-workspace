@@ -5,9 +5,37 @@ Script: `input_stage.py` (ngspice AC and transient, about 5 s). Plots: `input_ac
 - BUF802 model: G=0.983 unloaded (0.971 into 100 Ω), two poles giving 3.1 GHz, Cin 2.4 pF behind 0.5 nH, Zout 1.2 Ω + 0.3 nH.
 - BUF802 aux path: Ga = 0.26 with an 800 MHz pole. In_Bias connects to the internal source through 100 k (RHF). Output is clamped to CLH/CLL. Input diodes go to CLH and VS-.
 - Op amps: gm-C single pole with GBW 10 MHz (OPA197) or 7 MHz (TP2272), 20 V/us, Ccm 6.4 pF and Cdiff 1.6 pF (OPA197 datasheet; the same values are assumed for the TP2272).
-- K1 (HFD3) contact inductance is assumed (4 nH per pole) because no RF data was found.
+- K1 (HFD3) contact inductance is assumed (4 nH per pole) because no RF data was found. (K1 removed, see above.)
 
-## Final network
+## No switchable termination (21 Nov 2026, supersedes the relay figures below)
+User decision (SPEC decision 10): K1 HFD3, the 49.9 R / 2 x 100 R termination and TERM_50 are removed.
+Network now: SMA -- 3 mm 50 R line -- VIN (Ctop, 300k string); everything after VIN is unchanged. A user who needs
+50 Ω fits an external SMA feed-through terminator. `input_stage.py` default `term="ext"` (ideal 50 Ω at the SMA,
+source side) and `term="none"`; `term="relay"` keeps the old model. 50 Ω source, 20 ps step, same behavioural BUF802.
+`results.json` and both plots now hold this run (the relay numbers below survive only in this file).
+
+| Item | (a) ext. 50 Ω feed-through | (b) no terminator |
+|---|---|---|
+| -3 dB at BUF802 input (die) | 3.8 GHz, +1.2 dB peak | 2.15 GHz, no peak |
+| -3 dB at output (splitter) | 3.3 GHz model, peak +0.06 dB (real BUF802 about 2 GHz) | 1.7 GHz |
+| Rise 10-90 % at BUF802 input / output | 90 ps / 130 ps | 153 ps / 191 ps |
+| Overshoot at BUF802 input / output | 20 % / 12.6 % | 2.4 % / 0.5 % |
+| S11 at the SMA | -16 dB at 0.5 GHz, -9.8 dB at 1 GHz, -3.4 dB at 2 GHz | open (1 MΩ) |
+| Input impedance of the board | 1.000 MΩ; 2.0 pF at 10-100 MHz (apparent 2.2 pF at 1 GHz, 3.0 pF at 2 GHz incl. line and ESL) | same |
+
+- Without the relay pads the board input is 2.0 pF instead of 3.2 pF, so the unterminated case is faster (1.7 GHz
+  instead of 1.1 GHz, 191 ps instead of 345 ps).
+- With an external terminator the ~2 pF board load sits behind the SMA and 3 mm of line instead of across a 50 Ω
+  node: S11 is worse than with the on-board termination (-3.4 dB vs -9 dB at 2 GHz) and the BUF802 input sees a
+  +1.2 dB / 20 % peak. The output overshoot (12.6 %) is about as before (13 %).
+- Line length matters: 6 mm gives +1.1 dB at 2 GHz at the output, 20 % output overshoot, S11 -1.4 dB at 2 GHz;
+  2 mm gives S11 -4.2 dB. Keep SMA pad to Ctop/300k pad as short as possible (3 mm or less).
+- Unchanged: crossover flatness, trim, offset, noise 0.57 mV rms. Overload recovery (+20 V, 10 us, no terminator)
+  48 us to 10 mV.
+- Real feed-through terminators add their own length and mismatch (typically -20 to -30 dB return loss at 2 GHz);
+  not modelled.
+
+## Final network (superseded for the termination: no K1 / R50, VIN line 3 mm)
 ```
 SIG_IN SMA -- 6 mm 50R -- VIN
 VIN -- R50 49.9R 0603 (or 2x100R, one per K1 pole) -- K1 HFD3, BOTH poles in parallel -- GND   (TERM_50 drives coil)
@@ -29,7 +57,7 @@ The servo is a **differential integrator**. Its loop bandwidth is Ga/(2 pi Rf1 C
 - The bandwidth does not depend on the op-amp GBW. In simulation the OPA197 and the TP2272 give identical curves.
 - A plain non-inverting servo following TI Fig 8-1 passed the alpha tap through the op amp's unity-gain zero. That gave a +5 % bump at 100 kHz in my first run. Cp (the tap RC) cancels it.
 
-## Key numbers (sim)
+## Key numbers (sim; 50 Ω mode, K1 and 1 MΩ-mode rows superseded by the section above)
 | Item | Value |
 |---|---|
 | Crossover flatness (trimmed, OPA197 or TP2272), 1 Hz-100 MHz | -0.25 % ... +0.67 % (largest near 30 kHz); 1 V step: 0.5 % peak deviation, settled in 50 us |
@@ -52,16 +80,16 @@ The servo is a **differential integrator**. Its loop bandwidth is Ga/(2 pi Rf1 C
   - 10:1 would halve the trigger margin.
   - A relay-switched 1:1 would put a second relay with about 4 nH into the HF path at GHz frequencies, and the result above shows that inductance costs flatness. It would also cost about 2 USD, and the 1:1 range (+/-0.5 V) is too small for 3.3 V logic.
   - If more sensitivity is needed later, add gain in the trigger branch, not at the input.
-- **Relay.** Keep the HFD3, use both poles in parallel and keep the stub under 2 mm. A cheaper relay would only be acceptable if its contact inductance is at or below about 2 nH; I checked none.
+- **Relay (superseded: removed, SPEC decision 10).** Keep the HFD3, use both poles in parallel and keep the stub under 2 mm. A cheaper relay would only be acceptable if its contact inductance is at or below about 2 nH; I checked none.
 
 ## Sensitivities
 - Cin of the BUF802 (typical value only): +/-0.3 pF gives +/-4 % HF gain. Ctop +/-0.05 pF gives +/-2.6 %. G spread gives +/-1 %. All of these are covered by the trimmer.
 - Cp, OPA Ccm: a 20 % change in Ccm gives about 1.3 % on the tap RC, and the residual crossover bump stays below about 0.3 % (estimated, not swept).
-- K1 inductance: 1.5-2 nH is flat. 3 nH gives +0.9 dB and 4 nH +1.7 dB at 2 GHz.
+- K1 inductance (superseded): 1.5-2 nH is flat. 3 nH gives +0.9 dB and 4 nH +1.7 dB at 2 GHz.
 
 ## Open points (unproven)
 1. The 13 % step overshoot comes from the Cbot/Lin ESL resonance and the idealised BUF802. To try: Rg 22-33 Ω, or a 0201 Cbot. In one AC run with the 4 nH relay, Rg = 33 Ω removed the +1.7 dB peak; the cost was -0.4 dB at 2 GHz and -6 dB at 3 GHz.
 2. Overload recovery: clamp the servo output, for example with an output limiter or diodes at In_Aux, and/or lower the bias resistor to 2-5 MΩ as the TI datasheet suggests. Not simulated.
-3. HFD3 RF parameters (contact inductance, open capacitance) are assumed. Measure them or find data. S11 is -9 dB at 2 GHz.
+3. (Superseded: relay removed.) HFD3 RF parameters (contact inductance, open capacitance) are assumed. Measure them or find data. S11 is -9 dB at 2 GHz.
 4. The BUF802 model has no real aux-path dynamics, no Cin tolerance data, no slew or THD, and no 1/f noise beyond the 18 kHz corner. Validate against the TI EVM or a TINA model if one can be obtained.
 5. The noise figure excludes the sampler and hold amplifier. The -2V5 rail drives the offset through Rmid (gain 0.2 at OUT), so it must be clean below 10 kHz.

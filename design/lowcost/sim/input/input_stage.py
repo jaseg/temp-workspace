@@ -1,7 +1,11 @@
-"""Input stage of the low-cost sampling front end: SMA -> K1 50R termination -> 5:1 divider
+"""Input stage of the low-cost sampling front end: SMA -> short 50R line -> 5:1 divider
 (separate HF capacitive divider into BUF802 IN, 900k/100k resistive alpha divider into the servo)
 -> BUF802 composite loop (CL mode, In_Aux) with an integrating OPA197/TP2272 servo -> 49.9R
 back-termination -> splitter (modelled as 50R || 0.3 pF).
+
+Termination (SPEC decision 10, 21 Nov 2026): no switchable on-board termination. term="ext" puts an ideal
+external 50R feed-through terminator at the SMA (source side of the connector), term="none" leaves the
+input at 1 Mohm || ~3 pF. term="relay" keeps the superseded K1 HFD3 model (49.9R + relay) for reference.
 
 All active parts are BEHAVIOURAL (no vendor models were used):
   BUF802: main path G*V(IN) with two real poles (3.1 GHz -3 dB), aux path Ga*(V(In_Aux)-Va0) with an
@@ -23,11 +27,13 @@ PS_PER_MM = 6.05e-12
 TMP = tempfile.mkdtemp(prefix="inp_", dir=os.environ.get("SCR", "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad"))
 
 NOM = dict(
-    mode50=True,      # K1 closed (50R) or open (1 Mohm)
+    term="ext",       # "ext": ideal external 50R feed-through at the SMA; "none": 1 Mohm; "relay": old K1
+    line_mm=3.0,      # SMA pad -> divider node (VIN), 50R microstrip; short without the relay
+    mode50=True,      # term="relay" only (superseded): K1 closed (50R) or open (1 Mohm)
     Rs=50.0,          # source resistance
-    Lrelay=2e-9,      # K1 both poles in parallel, each 100R + ~4 nH (assumed; HFD3 RF data not available)
-    Copen=0.5e-12,    # K1 open-contact capacitance (assumed)
-    Ltune=0.0,        # series inductor in the termination leg (constant-R compensation)
+    Lrelay=2e-9,      # term="relay" only: K1 both poles in parallel, each 100R + ~4 nH (assumed)
+    Copen=0.5e-12,    # term="relay" only: K1 open-contact capacitance (assumed)
+    Ltune=0.0,        # term="relay" only: series inductor in the termination leg
     Ctop=1.5e-12, Cbot=3.3e-12, Cin=2.4e-12, Rg=10.0,
     Cp=18e-12,        # C0G at the alpha tap: tap RC (90k x 26 pF) = Rpar x Cint -> differential integrator
     G0=0.983,          # BUF802 unloaded main-path gain -> 0.971 into 101R
@@ -73,14 +79,16 @@ def deck(p, analysis, src):
          "Bo o0 0 V=min(max(V(n2),-4.85),4.85)", "Ro o0 out 20", ".ends",
          src,
          f"Rs src s1 {q['Rs']}", "Lsma s1 s2 0.2n", "Csma s2 0 0.25p"]
-    L += trace("s2", "vin", 6, tag="tin")
-    # termination: 49.9R at the input node, Ltune, relay contact to ground
-    L += [f"R50 vin rt1 49.9", "C50p vin rt1 0.06p", "L50 rt1 rt 0.15n",
-          f"Ltun rt rt2 {q['Ltune']:.3g}", "Ctun rt2 0 0.05p", "Crp rt2 0 0.3p"]
-    if q["mode50"]:
-        L += [f"Lk rt2 rk {q['Lrelay']:.3g}", "Rk rk 0 0.1"]
-    else:
-        L += [f"Ck rt2 0 {q['Copen']:.3g}"]
+    if q["term"] == "ext":            # ideal feed-through terminator on the SMA, outside the board
+        L += ["Rext s1 0 50"]
+    L += trace("s2", "vin", 6 if q["term"] == "relay" else q["line_mm"], tag="tin")
+    if q["term"] == "relay":          # superseded: 49.9R at the input node, Ltune, relay contact to ground
+        L += [f"R50 vin rt1 49.9", "C50p vin rt1 0.06p", "L50 rt1 rt 0.15n",
+              f"Ltun rt rt2 {q['Ltune']:.3g}", "Ctun rt2 0 0.05p", "Crp rt2 0 0.3p"]
+        if q["mode50"]:
+            L += [f"Lk rt2 rk {q['Lrelay']:.3g}", "Rk rk 0 0.1"]
+        else:
+            L += [f"Ck rt2 0 {q['Copen']:.3g}"]
     L += ["Cvin vin 0 0.15p"]  # node pad + via to the divider parts
     # HF capacitive divider -> BUF802 IN
     L += cap("top", "vin", "ga", q["Ctop"], q["esl"]) + ["Cst vin ga 0.03p", f"Cpga ga 0 {q['pad']}"]
@@ -175,18 +183,17 @@ if __name__ == "__main__":
 
     # --- 2. AC cases
     cases = {
-        "OPA197, trimmed, 50R": dict(base),
+        "OPA197, trimmed, ext. 50R terminator": dict(base),
         "TP2272 (7 MHz), same trim": dict(base, gbw=7e6),
         "Cin +0.3 pF, not re-trimmed": dict(base, Cin=2.7e-12),
         "Cin -0.3 pF, not re-trimmed": dict(base, Cin=2.1e-12),
-        "OPA197, 1 Mohm mode (50R source)": dict(base, mode50=False),
+        "OPA197, no terminator (50R source)": dict(base, term="none"),
     }
     acr = {k: ac(v, f"ac{i}") for i, (k, v) in enumerate(cases.items())}
-    # Ltune / relay sensitivity (S11 and BW)
+    # SMA -> divider line length with the external terminator (S11 and BW)
     lt = {}
-    for i, (lr, ltn) in enumerate([(1.5e-9, 0), (2e-9, 0), (3e-9, 0), (4e-9, 0)]):
-        a = ac(dict(base, Lrelay=lr, Ltune=ltn), f"lt{i}")
-        lt[f"Lrelay {lr*1e9:.1f} nH, Ltune {ltn*1e9:.1f} nH"] = a
+    for i, mm in enumerate((2.0, 3.0, 6.0)):
+        lt[f"ext. 50R, line {mm:.0f} mm"] = ac(dict(base, line_mm=mm), f"lt{i}")
     fig, ax = plt.subplots(2, 2, figsize=(13, 9))
     for k, a in acr.items():
         g = np.abs(a["bout"]); gn = g / np.interp(10e6, a["f"], g)
@@ -197,7 +204,10 @@ if __name__ == "__main__":
                                         lf_err_pct=float(100 * (gn[0] - 1)),
                                         max_dev_1Hz_100MHz_pct=float(100 * np.max(np.abs(gn[m] - 1))),
                                         gain_10MHz_bout=float(np.interp(10e6, a["f"], g)),
-                                        peak_dB=float(20 * np.log10(np.max(gn))))
+                                        peak_dB=float(20 * np.log10(np.max(gn))),
+                                        f3db_BUF802_in_GHz=f3db(a["f"], a["gd"]) / 1e9,
+                                        peak_BUF802_in_dB=float(20 * np.log10(np.max(np.abs(a["gd"]) /
+                                                                np.interp(10e6, a["f"], np.abs(a["gd"]))))))
     ax[0, 0].set_ylim(-9, 3); ax[0, 0].set_xlim(1e6, 1e10); ax[0, 0].axhline(-3, color="0.6", lw=0.7)
     ax[0, 0].set_title("Gain at splitter input, normalised to 10 MHz"); ax[0, 0].set_ylabel("dB")
     ax[0, 1].set_title("Crossover flatness 1 Hz-100 MHz"); ax[0, 1].set_ylabel("gain error, %")
@@ -208,11 +218,11 @@ if __name__ == "__main__":
         g = np.abs(a["bout"]); gn = g / np.interp(10e6, a["f"], g)
         ax[1, 1].semilogx(a["f"], 20 * np.log10(gn), label=k)
         m = (a["f"] > 1e8) & (a["f"] < 2e9)
-        R.setdefault("relay", {})[k] = dict(S11_worst_to_2GHz_dB=float(20 * np.log10(np.max(np.abs(s11[m])))),
+        R.setdefault("line", {})[k] = dict(S11_worst_to_2GHz_dB=float(20 * np.log10(np.max(np.abs(s11[m])))),
                                            f3db_GHz=f3db(a["f"], a["bout"]) / 1e9,
                                            peak_dB=float(20 * np.log10(np.max(gn))))
-    ax[1, 0].set_xlim(1e8, 1e10); ax[1, 0].set_ylim(-40, 0); ax[1, 0].set_title("S11 at the SMA, 50R mode"); ax[1, 0].set_ylabel("dB")
-    ax[1, 1].set_xlim(1e8, 1e10); ax[1, 1].set_ylim(-9, 3); ax[1, 1].set_title("Gain vs relay / tuning inductance"); ax[1, 1].set_ylabel("dB")
+    ax[1, 0].set_xlim(1e8, 1e10); ax[1, 0].set_ylim(-40, 0); ax[1, 0].set_title("S11 at the SMA, ext. 50R feed-through terminator"); ax[1, 0].set_ylabel("dB")
+    ax[1, 1].set_xlim(1e8, 1e10); ax[1, 1].set_ylim(-9, 3); ax[1, 1].set_title("Gain vs SMA-divider line length (ext. 50R)"); ax[1, 1].set_ylabel("dB")
     for a_ in ax.flat:
         a_.grid(True, which="both", alpha=0.3); a_.legend(fontsize=8); a_.set_xlabel("Hz")
     fig.tight_layout(); fig.savefig(os.path.join(HERE, "input_ac.png"), dpi=100)
@@ -221,7 +231,7 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(1, 3, figsize=(15, 5))
     src_lf = "Vs src 0 dc 0 pulse(0 1 20u 10n 10n 1 2)"
     for k, p in [("OPA197 trimmed", base), ("TP2272", dict(base, gbw=7e6)),
-                 ("Cin +0.3 pF untrimmed", dict(base, Cin=2.7e-12)), ("1 Mohm mode", dict(base, mode50=False))]:
+                 ("Cin +0.3 pF untrimmed", dict(base, Cin=2.7e-12)), ("no terminator", dict(base, term="none"))]:
         d = tran(p, "tlf", src_lf, 300e-6, 20e-9, 50e-9)
         t, v = d[:, 0], d[:, 1]
         vf = v[-1]
@@ -231,14 +241,15 @@ if __name__ == "__main__":
     ax[0].set_ylim(0.9, 1.1); ax[0].set_title("1 V step, 0-300 us (servo/HF crossover)"); ax[0].set_xlabel("us")
     ax[0].set_ylabel("V(splitter) / final")
     src_hf = "Vs src 0 dc 0 pulse(0 1 0.2n 20p 20p 1u 2u)"
-    for k, p in [("50R mode", base), ("1 Mohm mode, 50R source", dict(base, mode50=False)),
-                 ("50R, Lrelay 4 nH (one pole only)", dict(base, Lrelay=4e-9))]:
+    for k, p in [("ext. 50R terminator", base), ("no terminator, 50R source", dict(base, term="none")),
+                 ("ext. 50R, line 6 mm", dict(base, line_mm=6.0))]:
         d = tran(p, "thf", src_hf, 3e-9, 1e-12, 2e-12)
         t, vb, vg = d[:, 0], d[:, 1], d[:, 3]
         ax[1].plot(t * 1e9, vb / vb[-1], label=k + " (splitter)")
         ax[1].plot(t * 1e9, vg / vg[-1], "--", label=k + " (BUF802 die)")
         R.setdefault("hfstep", {})[k] = dict(tr_out_ps=rise(t, vb) * 1e12, tr_gate_ps=rise(t, vg) * 1e12,
-                                            overshoot_pct=float(100 * (vb.max() / vb[-1] - 1)))
+                                            overshoot_pct=float(100 * (vb.max() / vb[-1] - 1)),
+                                            overshoot_gate_pct=float(100 * (vg.max() / vg[-1] - 1)))
     ax[1].set_title("20 ps step: passive part (dashed) and output"); ax[1].set_xlabel("ns"); ax[1].set_xlim(0, 2)
     # offset sweep check: VOFS 0 and 3.3 V, input 0
     offs = {}
@@ -246,14 +257,14 @@ if __name__ == "__main__":
         d = tran(dict(base, vofs=v), "tof", "Vs src 0 dc 0", 1e-6, 10e-9, 20e-9)
         offs[v] = float(d[-1, 2])
     R["offset_outp_vs_VOFS"] = offs
-    # overload: 20 V, 10 us pulse in 1 Mohm mode, recovery
-    d = tran(dict(base, mode50=False), "tov", "Vs src 0 dc 0 pulse(0 20 10u 1n 1n 10u 1)", 80e-6, 20e-9, 50e-9,
+    # overload: 20 V, 10 us pulse without terminator, recovery
+    d = tran(dict(base, term="none"), "tov", "Vs src 0 dc 0 pulse(0 20 10u 1n 1n 10u 1)", 80e-6, 20e-9, 50e-9,
              vecs=("v(bout)", "v(outp)", "v(gd)", "v(aux)", "v(opo)"))
     t = d[:, 0]
     ax[2].plot(t * 1e6, d[:, 2], label="BUF802 OUT")
     ax[2].plot(t * 1e6, d[:, 3], label="BUF802 IN (die)")
     ax[2].plot(t * 1e6, d[:, 5], label="servo out")
-    ax[2].set_ylim(-6, 6); ax[2].set_title("+20 V, 10 us overload (1 Mohm mode)"); ax[2].set_xlabel("us")
+    ax[2].set_ylim(-6, 6); ax[2].set_title("+20 V, 10 us overload (no terminator)"); ax[2].set_xlabel("us")
     rec = t[(t > 20e-6) & (np.abs(d[:, 2] - d[-1, 2]) > 0.01)]
     R["overload_recovery_to_10mV_us"] = float((rec.max() - 20e-6) * 1e6) if len(rec) else 0.0
     R["overload_gate_peak_V"] = float(d[:, 3].max())
@@ -262,7 +273,7 @@ if __name__ == "__main__":
     fig.tight_layout(); fig.savefig(os.path.join(HERE, "input_steps.png"), dpi=100)
 
     # --- 4. noise referred to the input, 2 GHz (analytic from AC transfer)
-    a = acr["OPA197, trimmed, 50R"]
+    a = acr["OPA197, trimmed, ext. 50R terminator"]
     f = a["f"]; A = np.abs(a["outp"] / a["vin"]); Ag = np.abs(a["gd"])
     kT4 = 4 * 1.38e-23 * 300
     en_buf = 2.3e-9 * np.sqrt(1 + 18e3 / f)
@@ -279,13 +290,20 @@ if __name__ == "__main__":
     R["noise_input_referred_uVrms_2GHz"] = {k: integ(v) / gmid * 1e6 for k, v in
                                            dict(BUF802=n_buf, alpha_network=n_alpha, servo=n_opa, back_term_and_splitter=n_bt * A / np.interp(10e6, f, np.abs(a["bout"] / a["vin"]))).items()}
     R["noise_input_referred_uVrms_2GHz"]["total"] = float(np.sqrt(sum(v ** 2 for v in R["noise_input_referred_uVrms_2GHz"].values())))
-    R["input_C_pF_at_10MHz_1M_mode"] = None
-    a1 = acr["OPA197, 1 Mohm mode (50R source)"]
+    R["input_C_pF_at_10MHz_no_term"] = None
+    a1 = acr["OPA197, no terminator (50R source)"]
     zin = a1["s1"] / a1["i"]
     i10 = np.argmin(np.abs(a1["f"] - 10e6))
-    R["input_C_pF_at_10MHz_1M_mode"] = float(-1 / (2 * np.pi * a1["f"][i10] * np.imag(1 / (1 / zin[i10]))) * 1e12) if False else \
+    R["input_C_pF_at_10MHz_no_term"] = float(-1 / (2 * np.pi * a1["f"][i10] * np.imag(1 / (1 / zin[i10]))) * 1e12) if False else \
         float(np.imag(1 / zin[i10]) / (2 * np.pi * a1["f"][i10]) * 1e12)
     i1 = np.argmin(np.abs(a1["f"] - 1))
     R["input_R_Mohm_at_1Hz"] = float(np.real(zin[i1]) / 1e6)
+    for fx in (100e6, 1e9, 2e9):     # board input capacitance (no terminator) vs frequency
+        ix = np.argmin(np.abs(a1["f"] - fx))
+        R.setdefault("input_C_pF_no_term", {})[f"{fx/1e9:g} GHz"] = float(np.imag(1 / zin[ix]) / (2 * np.pi * a1["f"][ix]) * 1e12)
+    a = acr["OPA197, trimmed, ext. 50R terminator"]
+    zin = a["s1"] / a["i"]; s11 = (zin - 50) / (zin + 50)
+    R["S11_ext_term_dB"] = {f"{fx/1e9:g} GHz": float(20 * np.log10(np.abs(s11[np.argmin(np.abs(a["f"] - fx))])))
+                            for fx in (0.5e9, 1e9, 2e9, 3e9)}
     json.dump(R, open(os.path.join(HERE, "results.json"), "w"), indent=1, default=float)
     print(json.dumps(R, indent=1, default=float))

@@ -1,4 +1,4 @@
-"""input.kicad_sch: SIG_IN SMA, K1 50R termination relay, fixed 5:1 compensated divider (1 Mohm),
+"""input.kicad_sch: SIG_IN SMA (no on-board termination), fixed 5:1 compensated divider (1 Mohm),
 BUF802 in composite-loop (CL) mode with OPA197 differential-integrator servo, output 49.9R to BUF_OUT_T,
 EXT_CLK SMA.
 
@@ -9,8 +9,8 @@ resistor Rmid is dropped and Rofs/Rf2 are re-computed to keep Gsum = 2/Rf1 (LF g
 BUF802 pinout (TI SBOS998E, Table 4-1, RGT VQFN-16 3x3, EP 1.68 mm isolated from the die):
 1 VS+, 2 IN, 3 In_Bias, 4 In_Aux, 5 VS-, 6 Aux_Bias, 7 R_Bias, 8 VS-, 9 NC, 10 VSO-, 11 OUT,
 12 VSO+, 13 NC, 14 CLL, 15 CLH, 16 NC. R_Bias resistor goes to VS-.
-K1: HFD3 uses the 15 x 7.5 mm telecom-relay pin layout (pins 1, 3, 4, 5, 8, 9, 10, 12), drawn with the
-KiCad Kemet EC2 symbol: coil 1(+)/12, COM 4/9, NC 3/10, NO 5/8 (verify against the HFD3 drawing)."""
+No switchable 50R termination (SPEC decision 10): a user who needs 50R fits an external SMA feed-through
+terminator. R101..R103 and K101 are unused references (removed termination)."""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from schlib import g, ic_symbol, nets, assert_net, OUTDIR
@@ -85,36 +85,15 @@ def main():
     sh.wire(j1["1"], (VINX, Y0))
     sh.label("VIN", (g(18), Y0))
     sh.text("J101 SIG_IN, edge-launch SMA.\nVIN: 50R microstrip on L1 over L2 GND,\n"
-            "w 0.36 mm (7628 prepreg 0.21 mm),\n6 mm (~37 ps) to K1/Ctop pads.\n"
+            "w 0.36 mm (7628 prepreg 0.21 mm),\n6 mm (~37 ps) to the Ctop pad.\n"
             "GND stitching vias along the line.", (g(4), Y0 - g(22)), size=TS)
 
-    # ------------------------------------------------------------------ K1 50R termination
-    Kx, Ky = g(40), Y0 + g(22)
-    k1 = sh.add("Relay:EC2-3NU", "K", "HFD3/3", (Kx, Ky), rot=180,
-                fp="Relay_THT:Relay_DPDT_Kemet_EC2", lcsc="C340658",
-                mpn="HFD3/3 (Hongfa, 3 V polarised coil, 64.3R)",
-                fields={"Price": "~1.7 USD (HFD3/12-SR 1.74, prices.md; 3 V variant not re-checked)",
-                        "Note": "both poles in parallel; footprint = telecom 15x7.5 layout, verify"})
-    for com, col in (("4", Kx), ("9", Kx - g(8))):
-        r = R(sh, "100", (col, Y0 + g(8)), size="0603", lcsc="C22775")
-        sh.wire((col, Y0), r["1"])
-        sh.wire(r["2"], k1[com])
-    for no in ("5", "8"):
-        sh.gnd(k1[no])
-    for ncp in ("3", "10"):
-        sh.nc(k1[ncp])
-    # coil: VBUS -> 39R -> coil+ (1); coil- (12) -> TERM_50 (2N7002 low side on mcu_if)
-    p12 = k1["12"]
-    sh.wire(p12, (g(52), p12[1]))
-    sh.hlabel("TERM_50", (g(52), p12[1]), "input", side="right")
-    rc = sh.add("Device:R", "R", "39", (g(70), Y0 + g(24)), fp="Resistor_SMD:R_0805_2012Metric",
-           fields={"Note": "0805, 95 mW"})
-    sh.power("VBUS", rc["1"], dy=-2.54)
-    p1 = k1["1"]
-    sh.path([rc["2"], (rc["2"][0], p1[1]), p1])
-    sh.text("K1 on (TERM_50 low) = 50R:\n2 x 100R 0603 (3 Vrms), one\nper pole, poles in parallel\n"
-            "(4 nH/pole assumed; one pole\n= +1.7 dB @ 2 GHz).\nVIN-R-K1 stub < 2 mm.\n"
-            "Coil 3 V: 39R from VBUS -> 3.1 V, 49 mA.", (g(76), Y0 + g(17)), size=TS)
+    # ------------------------------------------------------------------ no termination (user decision)
+    # The switchable 50R termination (K101 HFD3/3, 2 x 100R, coil 39R) was removed: SMA -> divider directly.
+    # R101..R103 stay unused so the remaining references (and the layout fragment) do not shift.
+    sh._refn["R"] = 3
+    sh.text("No on-board 50R termination.\n50 ohm: use an external SMA feed-through\n"
+            "terminator; input is 1 Mohm || ~3 pF.", (g(26), Y0 + g(8)), size=TS)
 
     # ------------------------------------------------------------------ HF divider and BUF802
     buf = buf802_symbol()
@@ -331,8 +310,8 @@ def main():
     sh.text("Protection: no external TVS (0.3-1 pF). U101 input clamp diodes to CLH / VS- (100 mA);\n"
             "Ctop limits the current (100 V/ns -> 150 mA for < 1 ns); 900k string limits servo input current.\n"
             "Overload recovery > 60 us (servo winds up, gate re-biases through 10 Mohm): RESULT open point 2.\n"
-            "Max input: 1 Mohm +/-50 V peak; 50R mode 3 Vrms. Linear range +/-2.5 V around the offset.\n"
-            "Noise (sim): 0.57 mV rms referred to the input, 10 Hz-2 GHz. -3 dB (50R mode) ~2-2.4 GHz (real BUF802).",
+            "Max input: 1 Mohm +/-50 V peak (with an external 50R terminator: its rating). Linear range +/-2.5 V around the offset.\n"
+            "Noise (sim): 0.57 mV rms referred to the input, 10 Hz-2 GHz. -3 dB ~2 GHz, 50R source + external terminator (real BUF802).",
             (g(100), g(186)), size=TS)
 
     split_wires(sh)
@@ -354,10 +333,10 @@ def check(fn):
         assert len(ns) == 1 and None not in ns, (members, ns)
         return ns.pop()
 
-    assert same(("J101", "1"), ("R101", "1"), ("R102", "1"), ("C101", "1"), ("R114", "1")).endswith("VIN")
-    same(("R101", "2"), ("K101", "4")); same(("R102", "2"), ("K101", "9"))
-    assert same(("K101", "5"), ("K101", "8"), ("J101", "2"), ("U101", "17")) == "GND"
-    assert same(("K101", "12"),).endswith("TERM_50")
+    assert same(("J101", "1"), ("C101", "1"), ("R114", "1")).endswith("VIN")
+    assert len(n[net_of(n, "J101", "1")]) == 3, "VIN: SMA, Ctop and the 300k string only"
+    assert same(("J101", "2"), ("U101", "17")) == "GND"
+    assert not any(r.startswith("K") or r in ("R101", "R102", "R103") for v in n.values() for r, _ in v)
     same(("C101", "2"), ("C102", "1"), ("R104", "1"))                       # GA
     same(("R104", "2"), ("U101", "2"), ("R105", "1"))                       # IN
     same(("R106", "2"), ("U101", "3"))                                      # In_Bias
@@ -375,7 +354,7 @@ def check(fn):
     same(("U101", "14"), ("R110", "1"), ("R111", "1"), ("C104", "1"))
     assert same(("J102", "1"),).endswith("EXT_CLK")
     single = [k for k, v in n.items() if len(v) == 1 and not k.startswith("unconnected")
-              and not any(h in k for h in ("TERM_50", "BUF_OUT_T", "VOFS", "+2V5", "-2V5", "VBUS"))]
+              and not any(h in k for h in ("BUF_OUT_T", "VOFS", "+2V5", "-2V5"))]
     assert not single, single
     print("input.kicad_sch: netlist checks passed")
 

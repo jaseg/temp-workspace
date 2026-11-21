@@ -1,5 +1,6 @@
 """mcu_if.kicad_sch: 2x13 header to the user's STM32G474 board, DAC scaling stages (difference
-amplifiers on +/-2.5 V), ADC reference divider, tap threshold divider, relay driver, I2C pull-ups.
+amplifiers on +/-2.5 V), ADC reference divider, tap threshold divider, I2C pull-ups.
+Header pin 17 (was RELAY_CTL for the removed 50R termination relay) is a spare, NC-flagged pin.
 
 DAC plan (docs/research/adc.md, "Analog control voltages"): PA4 DAC1_OUT1 -> TRIG_LEVEL, PA5 DAC1_OUT2 ->
 VOFS, PA6 DAC2_OUT1 -> VTAP_TH, PA2 (DAC3_CH1 via OPAMP1) -> VBIAS_A, PB1 (DAC3_CH2 via OPAMP3) -> VBIAS_K.
@@ -18,12 +19,12 @@ OPA_F = {"Price": "0.50 USD (LCSC C39487549)", "MPN": "TP2272-SO1R (3PEAK), any 
 
 HEADER = {1: "GND", 2: "GND", 3: "ADC_IN", 4: "GND", 5: "VREFP", 6: "GND", 7: "DAC_TRIG", 8: "DAC_OFS",
           9: "DAC_TAPTH", 10: "DAC_BIAS_A", 11: "DAC_BIAS_K", 12: "GND", 13: "ADC_TRIG", 14: "MCU_CLK",
-          15: "GND", 16: "TRIG_SEL", 17: "RELAY_CTL", 18: "FPGA_DONE", 19: "FPGA_RECONFIG", 20: "I2C_SCL",
+          15: "GND", 16: "TRIG_SEL", 17: "NC", 18: "FPGA_DONE", 19: "FPGA_RECONFIG", 20: "I2C_SCL",
           21: "I2C_SDA", 22: "SPI_SCK", 23: "SPI_MOSI", 24: "SPI_MISO", 25: "SPI_CS", 26: "GND"}
 MCU_PIN = {"ADC_IN": "PA0 ADC12_IN1", "VREFP": "VREF+ (VREFBUF 2.9 V)", "DAC_TRIG": "PA4 DAC1_OUT1",
            "DAC_OFS": "PA5 DAC1_OUT2", "DAC_TAPTH": "PA6 DAC2_OUT1", "DAC_BIAS_A": "PA2 OPAMP1 (DAC3_CH1)",
            "DAC_BIAS_K": "PB1 OPAMP3 (DAC3_CH2)", "ADC_TRIG": "EXTI11 pin (ADC12 ext. trigger)",
-           "MCU_CLK": "PF0 OSC_IN (HSE bypass)", "TRIG_SEL": "GPIO", "RELAY_CTL": "GPIO",
+           "MCU_CLK": "PF0 OSC_IN (HSE bypass)", "TRIG_SEL": "GPIO", "NC": "spare, not connected",
            "FPGA_DONE": "GPIO in", "FPGA_RECONFIG": "GPIO open-drain", "I2C_SCL": "I2C SCL",
            "I2C_SDA": "I2C SDA", "SPI_SCK": "SPI SCK", "SPI_MOSI": "SPI MOSI", "SPI_MISO": "SPI MISO",
            "SPI_CS": "SPI NSS / GPIO"}
@@ -83,6 +84,8 @@ def main():
     for pin, net in HEADER.items():
         if net == "GND":
             sh.stub(j, str(pin), "GND_H", length=g(4))
+        elif net == "NC":
+            sh.nc(j[str(pin)])
         elif net in HIER_IN:
             sh.stub(j, str(pin), net, length=g(4), kind="hlabel", shape="output")
         elif net in HIER_OUT:
@@ -173,24 +176,6 @@ def main():
         sh.stub(r, "2", net, kind="hlabel", shape="output", length=g(3))
     sh.text("VTAP_P/N = +2V5/-2V5 (phase RESULT: 12.5 mA per rail, fixed).\n"
             "0R links: replace by a DAC-driven stage if a trim turns out to be needed.", (g(135), g(150)), size=1.0)
-
-    # relay driver
-    q = sh.add("Device:Q_NMOS_GSD", "Q", "2N7002", (g(220), g(170)), fp="Package_TO_SOT_SMD:SOT-23",
-               lcsc="C8545")
-    rg = R(sh, "1k", (g(205), g(170)), rot=90)
-    sh.wire(rg["2"], q["1"])
-    sh.stub(rg, "1", "RELAY_CTL")
-    rpd = R(sh, "100k", (g(212), g(176)))
-    sh.wire(rpd["1"], (rpd["1"][0], q["1"][1]))
-    sh.gnd(rpd["2"])
-    sh.gnd(q["2"])
-    d = sh.add("Device:D", "D", "1N4148W", (g(226), g(160)), rot=270, fp="Diode_SMD:D_SOD-123", lcsc="C81598")
-    sh.wire(q["3"], d["2"], via="vh")
-    sh.power("VBUS", d["1"], dy=-2.54)
-    sh.path([(q["3"][0], d["2"][1]), (q["3"][0] + g(10), d["2"][1])])
-    sh.hlabel("TERM_50", (q["3"][0] + g(10), d["2"][1]), "output")
-    sh.text("Relay driver: TERM_50 is the low side of the HFD3/3 coil (coil top on VBUS, input sheet).\n"
-            "Flyback diode here; RELAY_CTL high = 50R termination on.", (g(195), g(185)), size=1.0)
 
     # I2C pull-ups
     for k, net in enumerate(("I2C_SCL", "I2C_SDA")):

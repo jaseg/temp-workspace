@@ -8,8 +8,8 @@ from schlib import Sheet, g  # noqa: F401
 # sheet name -> (title, ref_base, page, left pins [(net, shape)], right pins)
 TAPS = [f"TAP{i}" for i in range(16)]
 SHEETS = {
-    "input": ("Input: 50R relay, 5:1 divider, BUF802 + OPA197 servo", 100, 2,
-              [("VOFS", "input"), ("TERM_50", "input")],
+    "input": ("Input: 5:1 divider, BUF802 + OPA197 servo", 100, 2,
+              [("VOFS", "input")],
               [("BUF_OUT_S", "output"), ("BUF_OUT_T", "output"), ("EXT_CLK", "output")]),
     "sampler": ("Sampler: diode bridge, hold, TPH2501 hold amp, level shift", 200, 3,
                 [("BUF_OUT_S", "input"), ("STRB_A", "input"), ("STRB_K", "input"), ("VBIAS_A", "input"),
@@ -34,13 +34,13 @@ SHEETS = {
                    [("PH_STROBE_P", "output"), ("PH_STROBE_N", "output"), ("S_STROBE_P", "output"),
                     ("S_STROBE_N", "output"), None, ("ADC_TRIG", "output"), ("MCU_CLK", "output")]),
     "power": ("Power: USB-C 5 V in, +3V3, +1V2, +5V, -5V, +2V5, -2V5", 600, 7, [], []),
-    "mcu_if": ("MCU interface: STM32G474 header, DAC scaling, relay", 700, 8,
+    "mcu_if": ("MCU interface: STM32G474 header, DAC scaling", 700, 8,
                [("ADC_IN", "input"), ("ADC_TRIG", "input"), ("MCU_CLK", "input"), ("FPGA_DONE", "input"),
                 ("SPI_MISO", "input"), None, ("SPI_SCK", "output"), ("SPI_MOSI", "output"), ("SPI_CS", "output"),
                 ("FPGA_RECONFIG", "output"), ("I2C_SCL", "output"), ("I2C_SDA", "bidirectional")],
                [("ADC_REF_MID", "output"), ("VOFS", "output"), ("TRIG_LEVEL", "output"), ("TRIG_SEL", "output"),
                 ("VBIAS_A", "output"), ("VBIAS_K", "output"), ("VTAP_P", "output"), ("VTAP_N", "output"),
-                ("VTAP_TH", "output"), ("TERM_50", "output")]),
+                ("VTAP_TH", "output")]),
 }
 CRITICAL = ["input", "sampler", "trigger_phase", "strobe"]
 

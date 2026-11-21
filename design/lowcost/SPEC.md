@@ -11,7 +11,7 @@ values in `design/lowcost/sim/<area>/RESULT.md`. Those RESULT files take precede
 ## Signal chain
 
 ```
-SIG_IN (SMA) -- K1 50R termination relay -- 5:1 compensated divider (1 Mohm) -- BUF802 (+OPA197 servo)
+SIG_IN (SMA, no termination) -- 5:1 compensated divider (1 Mohm) -- BUF802 (+OPA197 servo)
    -- BUF_OUT 50R --+-- resistive splitter --> SAMPLER: 4-diode bridge (2x BAT15-04W), 2.2 pF hold,
                     |                           TPH2501 hold amp (G=+5), TPH2501 inverting level shift -> ADC_IN (MCU PA0)
                     +--> TRIG: TMUX136 (A = signal, B = EXT_CLK SMA) -> TLV3801 (VCC +2.5, VEE -2.5, LVDS out ref. GND)
@@ -40,13 +40,13 @@ the strobe clock; the coarse LVDS path tells which edge it was. Software fits th
 `S_STROBE_P`/`S_STROBE_N` (FPGA pins to sampler strobe driver),
 `STRB_A`/`STRB_K` (sampler strobe pulses at the bridge), `PSTRB_A`/`PSTRB_K` (strobe lines along the taps),
 `VBIAS_A`/`VBIAS_K` (bridge bias), `VTAP_P`/`VTAP_N` (tap readout rails), `VTAP_TH` (tap threshold),
-`VOFS` (input offset), `ADC_IN`, `ADC_TRIG`, `ADC_REF_MID`, `TERM_50` (relay drive),
+`VOFS` (input offset), `ADC_IN`, `ADC_TRIG`, `ADC_REF_MID`,
 `SPI_SCK/MOSI/MISO/CS`, `I2C_SCL/SDA`, `FPGA_CLK`, `MCU_CLK`, `FPGA_DONE`, `FPGA_RECONFIG`, JTAG.
 
 ## Parts already chosen (lowest verified price, USD)
 BUF802IRGTR 5.89; OPA197 0.75; TPH2501 0.43 (TPH2502 dual 0.58); TP2272 dual 0.50; TP1541A 0.38;
 BAT15-04W 0.37 @10; TLV3801DSGR 5.13; TMUX136MRSER 1.22; TRF37D73IDSGR 1.50; GVA-84+ 2.99;
-COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23; HFD3 relay 1.74.
+COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
 
 ## Files
 - `design/lowcost/sim/<area>/` simulations (ngspice + Python, reuse `sim/` helpers), `RESULT.md` each.
@@ -74,7 +74,7 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23; HFD3 relay 1.74.
    VTAP_TH 0..+80 mV; rising edges only (line feed-through, see `sim/phase/RESULT.md`).
 6. **TMUX136** on a local -0.9 V ground; **SN65LVDS2** coarse receiver bridged with 2 x 470 R; 100 R across
    the TLV3801 outputs (`sim/phase/RESULT.md`).
-7. **Input stage** as in `sim/input/RESULT.md` (fixed 5:1, HFD3 relay 50 R termination, OPA197 integrator servo).
+7. **Input stage** as in `sim/input/RESULT.md` (fixed 5:1, OPA197 integrator servo; termination: decision 10).
 8. Power tree, FPGA pins, MCU interface: `kicad/README.md`.
 9. PCB for the layout fragments (revised on user request): **JLCPCB standard 4-layer stack-up JLC04161H-7628**
    (L1 0.035 mm, prepreg 7628 0.2104 mm er about 4.4, core 1.065 mm, prepreg 0.2104 mm, L4 0.035 mm; 1.6 mm board).
@@ -82,3 +82,4 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23; HFD3 relay 1.74.
    every RF trace must have its calculated width for its target impedance over its whole length, with ground
    pour clearance large enough (>= 2 x trace width, or the coplanar effect included in the calculation).
    Layer 2 solid ground, 0402 passives (0201 where a simulation asks for it), SMA edge-launch connectors.
+10. No switchable termination (user decision): external feed-through terminator.

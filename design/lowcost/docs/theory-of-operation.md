@@ -9,8 +9,8 @@ Every number in this document is a simulation result or a design value; no board
 ## 1. Overview
 
 ```
-              K101 50R relay    5:1 C/R divider, 1 Mohm
-SIG_IN SMA ──┬──[term]───────── Ctop/Cbot + 900k/100k ── BUF802 (G 0.98) ── OUT pin
+              (no termination)  5:1 C/R divider, 1 Mohm
+SIG_IN SMA ──┬─────────────────── Ctop/Cbot + 900k/100k ── BUF802 (G 0.98) ── OUT pin
              │                  OPA197 integrator servo ◄─ VOFS (DAC)        │
              │                                                     ┌─────────┴──────────┐
              │                                                  10 R (sampler)   49.9 R + 50R line
@@ -43,23 +43,25 @@ Key figures (simulated, behavioural amplifier models; see section 9):
 
 | Item | Value |
 |---|---|
-| Input | 1 Mohm // 3.2 pF, or 50 ohm (relay); fixed 5:1; linear range +/-2.5 V around the offset |
-| Input -3 dB | 3.4 GHz with the ideal BUF802 model; a real BUF802 is expected to give about 2-2.4 GHz |
-| Input S11, 50 ohm mode | below -16 dB to 1 GHz, -9 dB at 2 GHz |
-| Step at the splitter (20 ps input) | 120 ps 10-90 %, 13 % overshoot |
+| Input | 1 Mohm // 2.0 pF (sim; about 3 pF apparent at 2 GHz), no on-board termination: for 50 ohm use an external SMA feed-through terminator; fixed 5:1; linear range +/-2.5 V around the offset |
+| Input -3 dB | external 50 ohm terminator: 3.3 GHz with the ideal BUF802 model (a real BUF802 is expected to give about 2 GHz); unterminated from a 50 ohm source: 1.7 GHz |
+| Input S11, external 50 ohm terminator | -16 dB at 0.5 GHz, -10 dB at 1 GHz, -3.4 dB at 2 GHz (ideal terminator, 3 mm SMA-divider line) |
+| Step at the splitter (20 ps input) | external terminator 130 ps 10-90 %, 13 % overshoot; unterminated 191 ps, 0.5 % |
 | Sampler aperture | 84 ps (2x TRF37D73 strobe, 80 ps stub); 109 ps 10-90 % behind a 2 GHz first-order input |
 | Noise, referred to the input tip | input stage 0.57 mV rms; sampler + ADC 0.35 mV rms at the bridge = about 1.75 mV at the tip, per deconvolved point |
 | Sample rate | 3.125 MS/s (S_STROBE = PH_STROBE / 16) |
 | Phase detector | 16 taps, 34.7 +/- 3.1 ps spacing (31-44 ps), window 58-579 ps; 19 ps rms per snapshot (22 ps with 6.5 mV comparator offsets) |
 | Trigger | down to 200 mVpp at the tip (+/-20 mV at the comparator); TRIG_LEVEL +/-0.30 V at the comparator |
 | Power | USB-C 5 V, about 0.85 A |
-| Parts cost | 61.61 USD per board (MCU and PCB excluded), 5.84 USD of it estimates |
+| Parts cost | 60.02 USD per board (MCU and PCB excluded), 5.84 USD of it estimates |
 
 ## 2. Input stage
 
-SIG_IN goes over 6 mm of 50 ohm line to VIN. The HFD3 relay K101 switches 49.9 ohm (built as 2 x 100 ohm, one per
-pole) to ground; both poles are used in parallel because one pole (about 4 nH, assumed) gives +1.7 dB peaking and 25 %
-overshoot at 2 GHz.
+SIG_IN goes over a short (3 mm, as short as possible) 50 ohm line straight to VIN. There is no on-board termination
+(SPEC decision 10): the input is 1 Mohm // about 2-3 pF, and a user who needs 50 ohm plugs an external SMA feed-through
+terminator onto SIG_IN. With an ideal terminator the board load behind the SMA gives S11 -10 dB at 1 GHz and -3.4 dB
+at 2 GHz, +1.2 dB peaking at the BUF802 input and 13 % step overshoot at the output; a 6 mm line would raise the
+output peaking to +1.1 dB at 2 GHz (`sim/input/RESULT.md`).
 
 The HF path is a C0G divider: Ctop 1.5 pF from VIN to the gate node, Cbot 3.3 pF to ground, then Rg 10 ohm into the
 BUF802. With the BUF802 input capacitance (2.4 pF typical) the ratio is 0.206 and the HF gain 0.200. The LF path is a
@@ -75,7 +77,7 @@ The simulated network took VOFS from 0-3.3 V and gave +/-2.5 V of input offset. 
 -0.70 x VOFS = +/-0.33 V, i.e. +/-1.7 V at the input. This recomputation is arithmetic, not simulated.
 
 CLH/CLL = +/-1.5 V limit the BUF802 output and so the bridge input. Protection is the BUF802's internal clamps; Ctop
-limits the current. Recovery from a +20 V overload takes more than 60 us (servo wind-up).
+limits the current. Recovery from a +20 V overload takes about 50 us (servo wind-up).
 
 The BUF802 output pin feeds two legs: 10 ohm directly into the sampler bridge (bridge within about 3 mm), and 49.9 ohm
 into a 50 ohm line to the TMUX136 (high-impedance end, full amplitude after one round trip). A 0 ohm series position
@@ -231,7 +233,7 @@ on +/-2.5 V around VMID = VREF+/2:
 | PA2 OPAMP1 (DAC3_CH1) | VBIAS_A = -1.0 V + 0.5 (Vdac - VMID) | -0.4 ... -1.6 V |
 | PB1 OPAMP3 (DAC3_CH2) | VBIAS_K = +1.0 V + 0.5 (Vdac - VMID) | +0.4 ... +1.6 V |
 
-GPIOs drive TRIG_SEL and the relay (2N7002, TERM_50), read FPGA_DONE and pull FPGA_RECONFIG. The MCU pairs ADC results
+GPIOs drive TRIG_SEL, read FPGA_DONE and pull FPGA_RECONFIG; header pin 17 is a spare (NC). The MCU pairs ADC results
 with FPGA records by count, applies the efficiency correction and all calibration tables, and builds the
 equivalent-time record. ADC_REF_MID (0.725 V) is VREF+ / 4 by divider.
 
@@ -248,7 +250,7 @@ negotiation).
 | +5V | LP2985-5.0 from +5V4F | BUF802, OPA197 |
 | -5V | LM27761 inverter from +5V4F | BUF802, OPA197, -2V5 |
 | +2V5 / -2V5 | LP5907-2.5 / LM337 | TLV3801, TMUX136, hold amp, TP2272, VTAP rails (12.5 mA each) |
-| VBUS | direct | GVA-84+ x2 (own chokes), relay coil |
+| VBUS | direct | GVA-84+ x2 (own chokes) |
 
 The boost exists because the LM27761 cannot hold the BUF802's -4.5 V minimum from a 4.75 V USB input. The -2V5 rail
 feeds the offset network and VTAP_N, so it must be quiet below 10 kHz. The TMUX136 needs a VCC-to-GND ramp of 100-1000
@@ -271,17 +273,20 @@ us/V.
 8. **Sampler-to-phase-strobe offset**: measure the same edge with the sampler and the phase detector; one board
    constant.
 9. **Trigger level**: TLV3801 offset against TRIG_LEVEL code, per input (signal and EXT_CLK).
+10. **50 ohm use**: the board cannot detect an external feed-through terminator. The voltage at SIG_IN is the same
+   either way (the gain calibration holds), but the firmware should let the user state that a terminator is fitted
+   (displayed source EMF x2, 50 ohm input limits).
 
 ## 9. Verification status
 
 | Area | Simulated with | Verified | Not verified |
 |---|---|---|---|
-| Input stage | ngspice; BUF802 behavioural (3.1 GHz two-pole, aux path simplified), gm-C op amps, relay 4 nH assumed | network, flatness, noise, S11, clamp levels | real BUF802 bandwidth, slew, THD, Cin spread, overload recovery, relay RF data; schematic offset network after VOFS change |
+| Input stage | ngspice; BUF802 behavioural (3.1 GHz two-pole, aux path simplified), gm-C op amps, ideal external 50 ohm terminator | network, flatness, noise, S11, clamp levels | real BUF802 bandwidth, slew, THD, Cin spread, overload recovery, real feed-through terminator; schematic offset network after VOFS change |
 | Sampler | Infineon BAT15 model + SOT323 package; TPH2501 behavioural | gain, efficiency, settling, droop, kick-out, noise | real diode leakage and mismatch, TPH2501 vendor model, 1/f noise |
 | Strobes | behavioural gain blocks (tanh limiter, nominal and pessimistic filter split); FPGA pin as ramp | 50 % duty, amplitudes, edges, aperture | saturated edge speed of TRF37D73/GVA-84+, clipping asymmetry, 47 uH choke SRF; bridge rails 24.9 ohm / 47 pF combined with the final chain |
 | Phase array | full 16-tap deck with both strobe chains, signal chain, gates and readout | co-propagation, spacing, threshold, reverse pulse, 50 % duty | COS3502 Cin, delay and hysteresis at 10-30 mV (Cin 3 / 6 pF bracket only), 0.5 pF hold caps, feed-through on a real board |
 | FPGA, firmware | none | - | tracking loop, dither, aiming, LUT fit, OSER10/IDES placement |
-| Schematic | generated netlist, 242 nets, own checks (no single-node nets, no shorted two-pin parts) | connectivity | KiCad ERC not run |
+| Schematic | generated netlist, 235 nets, own checks (no single-node nets, no shorted two-pin parts) | connectivity | KiCad ERC not run |
 | Layout | three fragments, scripted geometry checks | clearance, courtyards, line delays | DRC, merge, via stitching (below) |
 
 Open risks, most severe first:
@@ -289,12 +294,13 @@ Open risks, most severe first:
 1. **Strobe amplitude.** All gain blocks are behavioural. The pessimistic GVA-84+ case gives 2.0-2.3 V at the phase
    launch, which leaves tap 15 below the 2.0 V it needs even with the 80 ps stub; the sampler bridge stops at -35 %
    amplitude at +/-1 V bias. Measure one chain of each kind first.
-2. **BUF802 model.** The 3.4 GHz bandwidth, the 13 % overshoot and the 113 mVpp kick-out all rest on an idealised
-   model; the real part is expected at 2-2.4 GHz.
+2. **BUF802 model and 50 ohm input.** The 3.3 GHz bandwidth, the 13 % overshoot and the 113 mVpp kick-out all rest on an idealised
+   model; the real part is expected at about 2 GHz. Without on-board termination, 50 ohm S11 depends on the external
+   feed-through terminator and the SMA-divider line (-3.4 dB at 2 GHz even with an ideal terminator).
 3. **Layout open points.** The three fragments (JLC04161H-7628) are not merged and have only scripted checks; no DRC
    has been run (kicad-cli 7 has none). The delay line is laid out at 40 / 75 ps per tap, which is not re-simulated (the verification used 35 / 70 ps).
    Pad excess capacitances are noted, not compensated (up to 0.13 pF on the BUF802 output node); the loaded strobe
-   lines are 45.5 ohm against 49.9 ohm terminations. Relay (HFD3) and balun (DLW21SN) footprints are unverified. Via
+   lines are 45.5 ohm against 49.9 ohm terminations. The balun (DLW21SN) footprint is unverified. Via
    stitching and fences are left to board integration.
 4. **Strobe kick-out into the trigger** (19 mVpp) is as large as the smallest trigger signal; the series ferrite/100
    ohm option is unproven.
@@ -302,11 +308,11 @@ Open risks, most severe first:
    costs 40 % of the signal. The feed-through model rests on the BAT15 package capacitance.
 6. **Unverified pin features**: OSER10 on IOT16/IOT17 and IDES on pin 47; MODE pins for autoboot; EXTI11 as ADC12
    trigger and the DAC3 -> OPAMP1/3 mapping (RM0440 not read); TMUX136 Ron at 0.4-1.4 V above its GND; MS5351M
-   register equivalence; LM337S (XBLW) pinout; HFD3 footprint; balun pad map.
+   register equivalence; LM337S (XBLW) pinout; balun pad map.
 7. **Firmware and FPGA logic** do not exist; dither, aiming and the tracking loop are arithmetic only, and the
    1152-LUT budget is tight.
 8. **Power**: 0.85 A needs a 1.5 A USB-C supply; LM337 stability with ceramics; AMS1117 dissipation.
-9. **Sourcing**: HFD3/3 and BAT15-03W out of stock at LCSC; TRF37D73 25 pcs at LCSC (Mouser has stock); SMA connectors
+9. **Sourcing**: BAT15-03W out of stock at LCSC; TRF37D73 25 pcs at LCSC (Mouser has stock); SMA connectors
    and about 30 passives have no part number.
 
 Simulation plots:
@@ -349,7 +355,7 @@ Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and layout fragments:
    strobe runs.
 4. **Strobe chains**: S_STROBE and PH_STROBE patterns; measure step, edge and stub pulse of one chain each (risk 1);
    check the reverse pulse with the clamp.
-5. **Input stage**: relay, 1 Mohm and 50 ohm modes, servo, RV101 trim, offset range, overload behaviour.
+5. **Input stage**: 1 Mohm input and with an external 50 ohm feed-through terminator, servo, RV101 trim, offset range, overload behaviour.
 6. **Sampler**: hold chain and ADC timing (ADC_TRIG at +40 ns), bias sweep, pedestal, efficiency.
 7. **Trigger path**: TMUX136 both inputs, TLV3801 level, line driver output, COARSE.
 8. **Delay line**: VTAP_TH sweep, code density, tap positions, latch timing (+12 ns).

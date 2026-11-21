@@ -16,7 +16,7 @@ python3 gen_all.py --no-export
 `gen_placeholders.py` (which never overwrites a non-placeholder file), then `gen_fpga_clock.py`,
 `gen_power.py`, `gen_mcu_if.py`, `gen_root.py`, and collects every embedded `scope-fe:` symbol into
 `scope-fe.kicad_sym`. It then exports the netlist (`export/scope-fe.net`), asserts key inter-sheet connections
-(FPGA/MCU pins, VBIAS_A/K, STRB_A/K, BUF_OUT_S/T, EXT_CLK, TRIG_LEVEL, TERM_50, VOFS, ADC_IN, ADC_REF_MID),
+(FPGA/MCU pins, VBIAS_A/K, STRB_A/K, BUF_OUT_S/T, EXT_CLK, TRIG_LEVEL, VOFS, ADC_IN, ADC_REF_MID),
 fails on any two-pin part with both pins on one net, lists single-node and NC-flagged nets, writes
 `export/scope-fe.pdf` plus one SVG/PNG per sheet (PNG via `gen/svg2png.js`, node + playwright/chromium), and
 finally runs `gen_bom.py` (`docs/bom.csv`, `docs/bom.md`). Each critical sheet also has its own check:
@@ -24,7 +24,7 @@ finally runs `gen_bom.py` (`docs/bom.csv`, `docs/bom.md`). Each critical sheet a
 
 `Sheet.render()` splits every wire at each pin, wire end and label lying on its interior (`split_wires`):
 KiCad 7 connects only at wire ends. Before this was in the library, mcu_if had 9 false opens (VOFS, VBIAS_A/K,
-TRIG_LEVEL feedback/divider resistors, relay gate pull-down) and the split exposed three real shorts that are now
+TRIG_LEVEL feedback/divider resistors, the since-removed relay gate pull-down) and the split exposed three real shorts that are now
 fixed (strobe bias tees drawn with the wire through the bead and choke; crystal XB on the GND symbol).
 Requires KiCad 7.0.x `kicad-cli` and `/usr/share/kicad/symbols`.
 
@@ -35,7 +35,7 @@ Requires KiCad 7.0.x `kicad-cli` and `/usr/share/kicad/symbols`.
 | `gen/schlib.py` | library (API in its docstring) | infrastructure |
 | `gen/common.py` | sheet table (`SHEETS`: names, ref bases, sheet pins), passive helpers | infrastructure; change sheet pins here only |
 | `scope-fe.kicad_sch`, `.kicad_pro`, `scope-fe.kicad_sym`, `sym-lib-table` | `gen_root.py`, `gen_all.py` | infrastructure |
-| `input.kicad_sch` | `gen_input.py` | input stage (SMA, HFD3/3 relay, 5:1, BUF802, OPA197 servo, splitter, EXT_CLK SMA), refs 1xx |
+| `input.kicad_sch` | `gen_input.py` | input stage (SMA without termination, 5:1, BUF802, OPA197 servo, splitter, EXT_CLK SMA), refs 1xx (R101-R103, K101 unused since the termination was removed) |
 | `sampler.kicad_sch` | `gen_sampler.py` | bridge 2x BAT15-04W, 2.2 pF hold, TPH2501 x2, refs 2xx |
 | `trigger_phase.kicad_sch` | `gen_trigger_phase.py` | TMUX136, TLV3801, TRF37D73 line driver, 16 taps, COS3502 x8, SN65LVDS2, refs 3xx |
 | `strobe.kicad_sch` | `gen_strobe.py` | sampler strobe (2x TRF37D73, balun, fitted BAT15-03W clamp), phase strobes (TRF + GVA-84+ x2, 80 ps stubs), refs 4xx |
@@ -55,7 +55,7 @@ net in `common.hier_pins("<name>")` (same name and shape), draw the signal path 
 
 - Units mm, Y down, 1.27 mm grid (`g(n)`). Rotation counter-clockwise, `mirror="x"|"y"` as in KiCad.
 - Power: global power symbols only: `+5V -5V +3V3 +2V5 -2V5 +1V2 VBUS GND`. Local intermediate rails on the
-  power sheet are labels (`+5V4`, `+5V4F`, `-5V_LDO`). `VBUS` is the filtered USB 5 V (relay coil, GVA-84+).
+  power sheet are labels (`+5V4`, `+5V4F`, `-5V_LDO`). `VBUS` is the filtered USB 5 V (GVA-84+).
 - Inter-sheet nets: SPEC names as hierarchical labels; the root connects equal names via local labels at
   the sheet pins. `CMP_P/CMP_N` stay inside `trigger_phase` (TLV3801 -> line driver and LVDS receiver).
 - Fields: `Footprint` (KiCad standard library, checked to exist at generation), `LCSC`, optional `MPN`,
@@ -113,28 +113,28 @@ VMID = VREF+/2 buffered): TRIG_LEVEL = 0.25 (Vdac - VMID) (+/-0.30 V), VOFS = 0.
 VMID) (cathode rail, +0.4..+1.6 V); offset from a Thevenin divider (24.9k/16.5k to -2V5 resp. +2V5) on the
 + input, R1 20k / R2 10k. (Signs corrected at integration: the earlier +1 V on the anode rail forward-biased the
 bridge.) VTAP_TH = DAC/31 (8-85 mV). VTAP_P/N = +2V5/-2V5 through 0 R links.
-ADC_REF_MID = VREF+ x 1/4 = 0.725 V. Relay: 2N7002 low-side, flyback 1N4148W to VBUS; TERM_50 = coil low end.
+ADC_REF_MID = VREF+ x 1/4 = 0.725 V. Pin 17 (was RELAY_CTL) is a spare, NC-flagged pin: the relay driver was removed
+with the switchable 50 R termination (SPEC decision 10) and the pin kept so the other header pins do not move.
 
 ## BOM
 
-`docs/bom.md` (generated): **61.6 USD for one board** (MCU, PCB excluded) against the 80 USD budget, 5.8 USD of it
+`docs/bom.md` (generated): **60.0 USD for one board** (MCU, PCB excluded) against the 80 USD budget, 5.8 USD of it
 estimates. Largest lines: TRF37D73 x5 7.50, GW1NZ-1 6.68, BAT15-04W x18 6.58, GVA-84+ x2 5.98, BUF802 5.89,
-TLV3801 5.13. First order with LCSC minimum quantities ~89 USD. LCSC numbers that pointed at other parts were
+TLV3801 5.13. First order with LCSC minimum quantities ~85 USD. LCSC numbers that pointed at other parts were
 corrected (power LDOs, TVS, PTC, 2x13 header) or removed (several resistor values) on 21 Nov 2026.
 
 ## Open points
 
 Integration (21 Nov 2026):
-- Root netlist: 242 nets, no single-node nets; 11 NC-flagged pins, all intended (K101 3/10 unused NC contacts,
+- Root netlist: 235 nets, no single-node nets; 10 NC-flagged pins, all intended (J701 pin 17 spare,
   BUF802 NC 9/13/16, FPGA 6/8/32 unused, NC pins of AP2112K/MT3608/LP5907). Not a KiCad ERC: run ERC in eeschema.
-- Stock: HFD3/3 (C340658) and BAT15-03W (C5310874) 0 at LCSC; TRF37D73 25 at LCSC (Mouser has stock); SMA
+- Stock: BAT15-03W (C5310874) 0 at LCSC; TRF37D73 25 at LCSC (Mouser has stock); SMA
   edge connectors not sourced (2 x ~2 USD estimate); TP2272 changed to TP2272-SO1R (TP2272-SR out of stock).
 - LCSC numbers missing (BOM `est`): 1.5p, 2.2p, 3.3p, 100p, 470p, 220p, 2.2u 0402, 4.7u 0603, 1% values (4.99M,
   300k, 17.8k, 14.3k, 22.1k, 24.9, 499, 82, 91, 68, 47, 470, 49.9, 24.9k, 40.2k, 30k, 16.5k, 78.7k, 499k, 1.54M,
   18k, 2.7k), 600R beads, 47 uH 1008, 120 nH 0402, 4.7 uH SRN4018, 50k trimmer.
 - Tap hold caps are 0.5 pF (nearest stocked C0G value, LCSC C1544) instead of 0.47 pF.
-- HFD3 relay footprint/pinout (Kemet EC2 used) to check against the Hongfa drawing; LM337S (XBLW) SOT-223
-  pinout to check against the TI pinout used in the symbol.
+- LM337S (XBLW) SOT-223 pinout to check against the TI pinout used in the symbol.
 - Sampler ADC must sample before the S_STROBE falling edge (+160 ns) - FPGA/MCU firmware timing.
 - Phase strobe stubs now 80 ps (13.2 mm) per sim/phase_array (strobe sheet; not part of the phase_trigger fragment,
   which takes PSTRB_A/K from its X2/X3 interfaces); signal-line meander drawn 70 ps per tap for 75 ps, strobe lines 40 ps per tap (layout pitch 4.514 mm).
@@ -151,4 +151,4 @@ Earlier:
 5. LM337 output-capacitor stability with ceramics, minimum-load 10 mA: check; a low-noise negative LDO
    (e.g. TPS7A30) would be better but costs ~2 USD more.
 6. MS5351M exact equivalence to Si5351A (register map, crystal load) assumed from its datasheet claim.
-7. GVA-84+ chains (strobe sheet) are expected on VBUS via their own chokes; HFD3 relay coil on VBUS.
+7. GVA-84+ chains (strobe sheet) are expected on VBUS via their own chokes.
