@@ -26,6 +26,25 @@ User-set rules (all mandatory)
 9. Silkscreen text at least 0.8 mm high, 0.15 mm line; if a reference does not fit, hide it on F.Fab. No silk
    over pads.
 
+10. Four layers only, so return paths are planned (user review of the first merged board):
+    - In1 (L2) is solid ground under everything on F.Cu.
+    - In2 (L3) is GROUND BY DEFAULT. Power zones on In2 are local islands sized to the pins they feed
+      (plus the feed from the regulator); the rest of In2 is a ground zone stitched to In1.
+    - Any RF, clock or fast-edge trace on B.Cu (L4) must have ground on In2 directly above it over its whole
+      length: a ground reference strip on L3 placed between the power zones, at least 3 x the trace width
+      wide (1 mm minimum), stitched to In1 at both ends and every 5 mm or so. This applies to: FPGA_CLK,
+      MCU_CLK, CLK lines of the clock generator, SPI_SCK and the other SPI lines, ADC_TRIG, COARSE, TAP0..TAP15,
+      JTAG_TCK, the strobe lines S_STROBE / PH_STROBE if any part of them is on B.Cu (avoid that), and USB if
+      any part is on B.Cu (avoid that). No such trace may cross a gap between two In2 zones or run under a
+      power island; route around or move the island boundary.
+    - Slow control voltages and static lines on B.Cu should also stay over In2 ground where practical, and
+      must not run under or beside the hold node, the divider node, the comparator inputs or ADC_IN.
+    - gen_board.py must check this: for every net in the list above, sample its B.Cu segments and verify
+      that the filled In2 copper above each sample point is GND; report violations (count must be 0).
+11. Clocking (for routing): FPGA_CLK and MCU_CLK come from the same MS5351M and must stay clean: series
+    resistor at the source, short, over ground, away from the analog block. ADC_TRIG (FPGA pin 41 to MCU PB11)
+    is a timing-critical line that firmware may drive in either direction: route it like a clock.
+
 Checks (the authority is KiCad's own DRC)
 - `design/lowcost/tools/run_drc.sh --rules jlc4 <board.kicad_pcb>` (KiCad nightly CLI; runs on a scratch copy;
   never open or save project files with the nightly). For a block the DRC must end with 0 violations other

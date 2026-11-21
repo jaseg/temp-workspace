@@ -118,7 +118,7 @@ def stitch(B, m, R, rf_tracks):
             return False
         if any(abs(x - px) < 0.7 and abs(y - py) < 0.7 for px, py in placed[-400:]):
             return False
-        v = m.via(round(x, 3), round(y, 3), "GND")
+        v = m.via(round(float(x), 3), round(float(y), 3), "GND")
         R.add_item(v)
         placed.append((x, y))
         r = int(0.7 / br.F)

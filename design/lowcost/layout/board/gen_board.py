@@ -92,7 +92,7 @@ def endpoint(net, i, strip=True):
         return (x, y, ly, "*")
     t, (ox, oy) = ts[0]
     if strip and via_at(net, ox, oy) is not None and len(tracks_at(net, ox, oy, ly)) == 1 and \
-            math.hypot(x - ox, y - oy) < 2.5:
+            (math.hypot(x - ox, y - oy) < 2.5 or i["block"] == "analog"):
         B.Remove(t)
         return (ox, oy, "*", "*")
     return (x, y, ly, compass(x - ox, y - oy))
@@ -128,11 +128,6 @@ def rt(net, a, b, **kw):
 # ---------------------------------------------------------------- 1. RF / matched nets on F.Cu
 RF = {}
 # S_STROBE_P / N and PSTRB_A / K: the block interfaces abut (analog / fpga, pstrobe / phase): nothing to route
-# BUF_OUT_T: analog S (15.75, 22.5) -> phase N (8.79, 22.5), 50 R on F.Cu
-a, b = [endpoint("/BUF_OUT_T", i, strip=False) for i in IF["/BUF_OUT_T"]]
-rt("/BUF_OUT_T", a, b, w=bl.W50, layers=("F.Cu",), clr=0.3)
-RF["/BUF_OUT_T"] = bl.W50
-
 # PH_STROBE_P / N: fpga W -> pstrobe N (P) / S (N); the fpga stubs end on the analog R405 / C411 column, so
 # they are cut back to their last bend
 for net in ("/PH_STROBE_P", "/PH_STROBE_N"):
@@ -148,8 +143,13 @@ m.track("/PH_STROBE_N", bl.W50, [(10.02, 50.0), (10.02, 49.9)], "F.Cu")
 php = (57.9, 13.58, "F.Cu", "SW")
 phn = (57.25, 13.1, "F.Cu", "SW")
 for net, a, b in (("/PH_STROBE_N", phn, (10.02, 49.9, "*", "*")), ("/PH_STROBE_P", php, (10.02, 25.1, "*", "*"))):
-    r = rt(net, a, b, w=bl.W50, layers=("F.Cu", "B.Cu"), lcost={"F.Cu": 1.5}, clr=0.2, via_cost=6.0, margin=12)
+    r = rt(net, a, b, w=bl.W50, layers=("F.Cu", "B.Cu"), clr=0.2, via_cost=6.0, margin=12, maxn=3_000_000)
 RF["/PH_STROBE_P"] = RF["/PH_STROBE_N"] = bl.W50
+
+# BUF_OUT_T: analog S (15.75, 22.5) -> phase N (8.79, 22.5), 50 R on F.Cu
+a, b = [endpoint("/BUF_OUT_T", i, strip=False) for i in IF["/BUF_OUT_T"]]
+rt("/BUF_OUT_T", a, b, w=bl.W50, layers=("F.Cu",), clr=0.3)
+RF["/BUF_OUT_T"] = bl.W50
 
 # fpga SPI / I2C / MCU_CLK comb (0.25 mm pitch at the S edge): continue the comb straight down into the free
 # B.Cu strip of the phase block with staggered ends (east line ends first) so that every line can turn off
@@ -174,9 +174,29 @@ rest = [n for n in SLOW if n not in taps]
 # phase seam and the comparator row); everything that crosses the phase block runs on B.Cu in the free columns
 # between the tap cells and hops the VTH rail (B.Cu, y 28.9) on In2 in the band y 27.4..32.0
 TAP_AVOID = [("In2.Cu", 0, 0, W, 20.5), ("In2.Cu", 0, 27.0, W, H)]
-X_AVOID = [("In2.Cu", 0, 0, W, 27.4), ("In2.Cu", 0, 32.0, W, H)]
+X_AVOID = [("In2.Cu", 0, 0, W, 23.4), ("In2.Cu", 0, 45.0, W, H), ("B.Cu", 0, 22.5, 9.5, 45.0)]
 first = [n for n in rest if "JTAG" in n or "DBG" in n] + [n for n in reversed(COMB) if n in rest]
-order = sorted(taps[:-1], key=lambda n: int(n[4:])) + ["/COARSE"] + first + [n for n in rest if n not in first]
+ANA = [n for n in rest if n in ("/VOFS", "/VNEG_REF", "/VBIAS_A", "/VBIAS_K", "/ADC_IN", "/ADC_REF_MID")]
+order = [f"/TAP{k}" for k in (0, 1, 2, 3, 4, 5, 7, 6, 8, 9, 15, 14, 13, 12, 11, 10)] + ["/COARSE"] + ANA + first + \
+    [n for n in rest if n not in first and n not in ANA]
+# explicit In2 lanes for the far west taps (nested ribbon: TAP0 on top), w 0.1 / pitch 0.2
+LANE_W = 0.1
+for k in range(6):
+    net = f"/TAP{k}"
+    ef = [i for i in IF[net] if i["block"] == "fpga"][0]
+    ep = [i for i in IF[net] if i["block"] == "phase"][0]
+    a = endpoint(net, ef)
+    b = endpoint(net, ep)
+    fx, fy = a[0], a[1]
+    px, py = b[0], b[1]
+    Y = round(21.55 + 0.2 * k, 3)
+    c = 0.2
+    pts = [(fx, fy), (fx, Y - c), (fx - c, Y), (px + (py - Y), Y), (px, py)]
+    m.track(net, LANE_W, pts, "In2.Cu", ch=0.0)
+    for p, q in zip(pts, pts[1:]):
+        R.mark_seg("In2.Cu", p[0], p[1], q[0], q[1], LANE_W / 2, m.net(net).GetNetCode())
+    LOG.append((net, round(bl.plen(pts), 3), 0))
+    order.remove(net)
 for net in order:
     v = IF[net]
     if len(v) != 2:
@@ -189,10 +209,12 @@ for net in order:
         w = 0.12
         a, b = [COMB_END[net] if i["block"] == "fpga" else e for i, e in zip(v, (a, b))]
     if net in taps:
-        kw = dict(w=w, layers=("In2.Cu",) if a[2] == "*" and b[2] == "*" else ("B.Cu", "In2.Cu"),
-                  lcost={"B.Cu": 3.0}, via_cost=1.5, clr=0.15, avoid=TAP_AVOID)
+        kw = dict(w=0.1, layers=("In2.Cu",) if a[2] == "*" and b[2] == "*" else ("B.Cu", "In2.Cu"),
+                  lcost={"B.Cu": 3.0}, via_cost=1.5, clr=0.1, avoid=TAP_AVOID)
     else:
         kw = dict(w=w, layers=("B.Cu", "In2.Cu"), lcost={"In2.Cu": 1.5}, via_cost=1.0, clr=0.15, avoid=X_AVOID)
+    if net == "/COARSE":
+        kw = dict(w=w, layers=("B.Cu",), clr=0.15)
     if rt(net, a, b, margin=6, maxn=200_000, **kw) is None:
         LOG.pop()
         rt(net, a, b, margin=25, maxn=600_000, **kw)
@@ -203,3 +225,27 @@ print("routes:")
 for r in LOG:
     print("  ", r)
 print("\n".join(R.log))
+
+# ---------------------------------------------------------------- 3. supplies, planes, stitching, silk
+import board_finish as bf
+SUP = []
+bf.route_supplies(B, m, R, SUP)
+print("supply links:", sum(1 for s in SUP if s[-1]), "routed,", [s for s in SUP if not s[-1]], "failed")
+rf_tr = []
+for t in B.GetTracks():
+    if t.GetClass() == "PCB_TRACK" and t.GetNetname() in RF and t.GetLayerName() == "F.Cu":
+        rf_tr.append((loc(t.GetStart()), loc(t.GetEnd()), pcbnew.ToMM(t.GetWidth())))
+for p0, p1, w_ in rf_tr:                         # F.Cu pour keep-out 2 w around the inter-block RF lines
+    m.rf_keepout([p0, p1], w_)
+bf.planes(B, m)
+nst = bf.stitch(B, m, R, rf_tr)
+print("GND stitching vias:", nst)
+bf.silk(B, m)
+pcbnew.ZONE_FILLER(B).Fill(B.Zones())
+bl.save_board(B, OUT)
+bf.write_pro(OUT.replace(".kicad_pcb", ".kicad_pro"), sorted(RF))
+json.dump({"log": LOG, "fail": R.log, "rf": RF, "supply": SUP, "stitch": nst},
+          open(os.path.join(HERE, "routes.json"), "w"), indent=1)
+c = bl.check_board(OUT, rf_widths=RF, verbose=8)
+json.dump({k: v for k, v in c.items() if k != "details"}, open(os.path.join(SCR, "check.json"), "w"), indent=1)
+json.dump(c["details"], open(os.path.join(SCR, "check_details.json"), "w"), indent=1)
