@@ -29,30 +29,32 @@ User-set rules (all mandatory)
 10. SIX layers (user decision after the first merged 4-layer board; JLCPCB JLC06161H-3313, 1.6 mm):
     L1 F.Cu 0.035 / prepreg 3313 0.0994 / L2 In1 0.0152 / core 0.55 / L3 In2 0.0152 / prepreg 2116 0.1088 /
     L4 In3 0.0152 / core 0.55 / L5 In4 0.0152 / prepreg 3313 0.0994 / L6 B.Cu 0.035 (mm).
-    Layer assignment:
-    - L1 F.Cu: components, all RF and analog routing.
-    - L2 In1: solid GROUND (reference for L1). Only the deliberate cut-outs (hold nodes, divider node, SMA pads).
-    - L3 In2: signal layer: the fast inter-block digital nets (TAP0..15, COARSE, FPGA_CLK, MCU_CLK, SPI,
-      ADC_TRIG, JTAG) and the bias / control voltages (VBIAS_A/K, VOFS, VNEG_REF, TRIG_LEVEL / DAC_TRIG,
-      VTAP_TH, ADC_REF_MID, ADC_IN), kept apart from each other (bias lines flanked by ground pour, not next
-      to clocks). Unused L3 area is ground pour stitched to L2 / L4.
-    - L4 In3: solid GROUND (reference for L3, 0.109 mm below it). No splits under L3 traces.
-    - L5 In4: POWER planes: contiguous zones per rail with proper width from regulator to loads; no thin
-      power tracks anywhere.
-    - L6 B.Cu: bottom-side components (decoupling, chokes, bulk, slow parts) and short slow connections only.
-      L6 lies next to the power layer, so NO RF, clock or fast-edge net may run on L6 beyond a via fan-out
-      stub of 2 mm; move it to L3.
+    Layer assignment (signal / ground / signal / power / ground / signal, the user's choice: inter-block
+    routing stays on an OUTER layer so it can be probed and reworked; the bottom has few pads):
+    - L1 F.Cu: components, all RF and analog routing. Reference: L2.
+    - L2 In1: solid GROUND. Only the deliberate cut-outs (hold nodes, divider node, SMA pads).
+    - L3 In2: slow layer: bias and control voltages (VBIAS_A/K, VOFS, VNEG_REF, TRIG_LEVEL / DAC_TRIG,
+      VTAP_TH, ADC_REF_MID, TRIG_SEL) and other static or slow lines, flanked by ground pour. L3 lies
+      0.109 mm above the power layer and 0.55 mm below L2, so NO RF, clock or fast-edge net runs on L3.
+      Unused L3 area is ground pour stitched to L2 / L5.
+    - L4 In3: POWER planes: contiguous zones per rail with proper width from regulator to loads (including
+      VTAP_P / VTAP_N under the tap row); no thin power tracks anywhere.
+    - L5 In4: solid GROUND (reference for L6, 0.0994 mm above it). No splits.
+    - L6 B.Cu: the inter-block routing layer: fast digital nets (TAP0..15, COARSE, FPGA_CLK, MCU_CLK, SPI,
+      ADC_TRIG, JTAG, DBG2, FPGA_DONE / RECONFIG, I2C) as tidy buses over L5 ground, plus the bottom-side
+      components (decoupling, chokes, bulk, slow parts). ADC_IN also runs here or on L1, shielded by ground
+      pour, away from clocks. Controlled impedance on L6 uses the same microstrip geometry as L1.
     - Fast or RF signals never run over a power plane or cross a gap between planes; only slow static lines may.
     - RF geometry on L1 over the 0.0994 mm prepreg: 50 R microstrip is about 0.17 mm (compute with the
       impedance function for this stack-up; solder-mask corrected). PHASE ONE of the conversion keeps the
       block geometries drawn for the old 0.21 mm prepreg and settles layer use and routing topology;
       PHASE TWO re-derives every RF width, the delay-line and strobe-line sections, stub lengths, pad
       compensation and plane cut-outs for this stack-up.
-    - gen_board.py checks: every net in the fast list has no L6 segment longer than 2 mm, and every L3 segment
-      of those nets has filled GND on L4 below and L2 above at sampled points (count of violations 0);
-      every L5 zone is a contiguous region reaching its regulator.
+    - gen_board.py checks: no net of the fast list has any segment on L3; every L6 and L1 segment of those
+      nets has filled GND on the adjacent plane (L5 / L2) at sampled points (violations 0); every L4 zone is
+      a contiguous region reaching its regulator.
 11. Clocking (for routing): FPGA_CLK and MCU_CLK come from the same MS5351M and must stay clean: series
-    resistor at the source, short, on L3 between grounds, away from the analog block. ADC_TRIG (FPGA pin 41 to
+    resistor at the source, short, on L6 over L5 ground (or L1), away from the analog block. ADC_TRIG (FPGA pin 41 to
     MCU PB11) is a timing-critical line that firmware may drive in either direction: route it like a clock.
 
 Checks (the authority is KiCad's own DRC)
