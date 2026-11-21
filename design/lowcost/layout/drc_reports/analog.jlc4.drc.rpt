@@ -1,0 +1,696 @@
+** Drc report for analog.kicad_pcb **
+** Created on 2026-11-21T17:27:28 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 187 DRC violations **
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(111.8950 mm, 113.4050 mm): Footprint C113
+    @(110.9950 mm, 113.4050 mm): Footprint R107
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(111.8950 mm, 113.4050 mm): Footprint C113
+    @(110.7450 mm, 110.5500 mm): Footprint U101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(143.0200 mm, 109.8650 mm): Footprint C406
+    @(144.0200 mm, 109.3550 mm): Footprint R403
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(103.9200 mm, 115.9625 mm): Footprint C105
+    @(106.0000 mm, 117.1000 mm): Footprint U102
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(103.9200 mm, 115.9625 mm): Footprint C105
+    @(103.9200 mm, 115.0500 mm): Footprint R117
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(108.6400 mm, 115.1100 mm): Footprint C107
+    @(107.4600 mm, 114.6000 mm): Footprint R121
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(108.6400 mm, 115.1100 mm): Footprint C107
+    @(107.9000 mm, 116.9000 mm): Footprint C106
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.1100 mm, 110.3000 mm): Footprint R104
+    @(108.3450 mm, 108.9400 mm): Footprint C108
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.1100 mm, 110.3000 mm): Footprint R104
+    @(106.2300 mm, 111.6000 mm): Footprint C102
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.1100 mm, 110.3000 mm): Footprint R104
+    @(107.6200 mm, 111.6000 mm): Footprint R105
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.1100 mm, 110.3000 mm): Footprint R104
+    @(105.3500 mm, 110.3000 mm): Footprint C101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(115.0450 mm, 105.7000 mm): Footprint TP102
+    @(113.8450 mm, 106.3900 mm): Footprint R111
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.0000 mm, 117.1000 mm): Footprint U102
+    @(108.1700 mm, 119.3500 mm): Footprint R120
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.0000 mm, 117.1000 mm): Footprint U102
+    @(107.4600 mm, 114.6000 mm): Footprint R121
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.0000 mm, 117.1000 mm): Footprint U102
+    @(103.9200 mm, 115.0500 mm): Footprint R117
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.0000 mm, 117.1000 mm): Footprint U102
+    @(106.5000 mm, 119.8600 mm): Footprint R119
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.0000 mm, 117.1000 mm): Footprint U102
+    @(105.0500 mm, 114.3800 mm): Footprint R116
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.0000 mm, 117.1000 mm): Footprint U102
+    @(107.9000 mm, 116.9000 mm): Footprint C106
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(113.6100 mm, 112.7800 mm): Footprint R113
+    @(113.6100 mm, 111.1800 mm): Footprint R112
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(146.0200 mm, 109.3550 mm): Footprint R402
+    @(145.0200 mm, 109.8650 mm): Footprint R404
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(146.0200 mm, 109.3550 mm): Footprint R402
+    @(147.0200 mm, 109.8650 mm): Footprint C405
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.1000 mm, 110.3000 mm): Footprint J101
+    @(105.0500 mm, 111.1800 mm): Footprint R114
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.1000 mm, 110.3000 mm): Footprint J101
+    @(105.0500 mm, 114.3800 mm): Footprint R116
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.1000 mm, 110.3000 mm): Footprint J101
+    @(105.0500 mm, 112.7800 mm): Footprint R115
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.1000 mm, 110.3000 mm): Footprint J101
+    @(105.3500 mm, 110.3000 mm): Footprint C101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.4450 mm, 105.7000 mm): Footprint TP101
+    @(107.6450 mm, 106.3900 mm): Footprint R109
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(105.0500 mm, 111.1800 mm): Footprint R114
+    @(105.0500 mm, 112.7800 mm): Footprint R115
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(105.0500 mm, 111.1800 mm): Footprint R114
+    @(105.3500 mm, 110.3000 mm): Footprint C101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(155.4300 mm, 112.8650 mm): Footprint C411
+    @(155.4300 mm, 111.3750 mm): Footprint R405
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(155.4300 mm, 112.8650 mm): Footprint C411
+    @(155.4300 mm, 114.3650 mm): Footprint R406
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(144.0200 mm, 109.3550 mm): Footprint R403
+    @(145.0200 mm, 109.8650 mm): Footprint R404
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(113.6100 mm, 111.1800 mm): Footprint R112
+    @(114.3600 mm, 109.4200 mm): Footprint R118
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(108.1700 mm, 119.3500 mm): Footprint R120
+    @(112.0500 mm, 118.8500 mm): Footprint RV101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(108.3450 mm, 108.9400 mm): Footprint C108
+    @(110.7450 mm, 110.5500 mm): Footprint U101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(110.9950 mm, 113.4050 mm): Footprint R107
+    @(110.0950 mm, 113.4050 mm): Footprint C112
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(110.9950 mm, 113.4050 mm): Footprint R107
+    @(110.7450 mm, 110.5500 mm): Footprint U101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(110.0950 mm, 113.4050 mm): Footprint C112
+    @(110.7450 mm, 110.5500 mm): Footprint U101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(152.9800 mm, 109.8650 mm): Footprint C401
+    @(153.9800 mm, 109.8650 mm): Footprint R401
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.2300 mm, 111.6000 mm): Footprint C102
+    @(105.3500 mm, 110.3000 mm): Footprint C101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.4600 mm, 114.6000 mm): Footprint R121
+    @(106.3000 mm, 113.7000 mm): Footprint TP103
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.3000 mm, 113.7000 mm): Footprint TP103
+    @(105.0500 mm, 114.3800 mm): Footprint R116
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.3000 mm, 113.7000 mm): Footprint TP103
+    @(107.6200 mm, 113.2000 mm): Footprint R106
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.3000 mm, 113.7000 mm): Footprint TP103
+    @(105.0500 mm, 112.7800 mm): Footprint R115
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(103.9200 mm, 115.0500 mm): Footprint R117
+    @(105.0500 mm, 114.3800 mm): Footprint R116
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.6200 mm, 111.6000 mm): Footprint R105
+    @(107.6200 mm, 113.2000 mm): Footprint R106
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(113.6100 mm, 108.9400 mm): Footprint C109
+    @(114.3600 mm, 109.4200 mm): Footprint R118
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(105.0500 mm, 114.3800 mm): Footprint R116
+    @(105.0500 mm, 112.7800 mm): Footprint R115
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(115.5100 mm, 110.3000 mm): Footprint R201
+    @(114.3600 mm, 109.4200 mm): Footprint R118
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.9000 mm, 118.3000 mm): Footprint C111
+    @(101.1500 mm, 118.3000 mm): Footprint C116
+[invalid_outline]: Board has malformed outline (no edges found on Edge.Cuts layer)
+    Local override; error
+    @(0.0000 mm, 0.0000 mm): PCB
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(102.5500 mm, 120.2000 mm): Via [+5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(112.2450 mm, 109.1000 mm): Via [+5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(103.2500 mm, 120.2000 mm): Via [+5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(109.1950 mm, 108.6000 mm): Via [+5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(109.1950 mm, 109.1500 mm): Via [+5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(112.4950 mm, 108.4500 mm): Via [+5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(110.9950 mm, 114.5650 mm): Via [-5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(100.8000 mm, 120.2000 mm): Via [-5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(101.5000 mm, 120.2000 mm): Via [-5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(109.3950 mm, 113.3500 mm): Via [-5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(109.3950 mm, 112.7500 mm): Via [-5V] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(112.2450 mm, 112.0000 mm): Via [-5V] on F.Cu - B.Cu
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(115.7500 mm, 116.3300 mm): Track [/BUF_OUT_T] on F.Cu, length 5.1700 mm
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(127.6387 mm, 107.7000 mm): Via [+2V5] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(108.5950 mm, 104.5500 mm): Via [+2V5] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(126.9887 mm, 107.7000 mm): Via [+2V5] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(112.8950 mm, 104.5500 mm): Via [-2V5] on F.Cu - B.Cu
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(115.2400 mm, 107.1300 mm): Track [/VBIAS_A] on B.Cu, length 14.3700 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(116.2400 mm, 113.4700 mm): Track [/VBIAS_K] on B.Cu, length 8.0300 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(121.4900 mm, 119.8000 mm): Track [/ADC_REF_MID] on B.Cu, length 1.7000 mm
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(125.7200 mm, 115.2000 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(138.8000 mm, 102.5800 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(138.0800 mm, 102.5800 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(148.7600 mm, 102.5800 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(126.3700 mm, 115.2000 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(148.0400 mm, 102.5800 mm): Via [+3V3] on F.Cu - B.Cu
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(118.9000 mm, 119.0000 mm): Track [/ADC_IN] on B.Cu, length 2.5000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(154.4900 mm, 109.8650 mm): Track [/S_STROBE_P] on F.Cu, length 1.5100 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(155.4300 mm, 110.8650 mm): Track [/S_STROBE_N] on F.Cu, length 0.5700 mm
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(111.8950 mm, 113.4050 mm): Footprint C113
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(143.0200 mm, 109.8650 mm): Footprint C406
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(103.9200 mm, 115.9625 mm): Footprint C105
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(109.5450 mm, 106.3900 mm): Footprint C103
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(108.6400 mm, 115.1100 mm): Footprint C107
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(119.3200 mm, 106.2300 mm): Footprint C201
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(107.1100 mm, 110.3000 mm): Footprint R104
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(120.2800 mm, 117.7500 mm): Footprint C206
+[lib_footprint_mismatch]: Footprint 'L_1210_3225Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(138.4400 mm, 106.0800 mm): Footprint L402
+[lib_footprint_mismatch]: Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(148.4000 mm, 109.3800 mm): Footprint FB401
+[lib_footprint_mismatch]: Footprint 'SOT-23-5' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(106.0000 mm, 117.1000 mm): Footprint U102
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(113.6100 mm, 112.7800 mm): Footprint R113
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(146.0200 mm, 109.3550 mm): Footprint R402
+[lib_footprint_issues]: Footprint 'SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount' not found in library 'Connector_Coaxial'
+    Local override; warning
+    @(102.1000 mm, 110.3000 mm): Footprint J101
+[lib_footprint_mismatch]: Footprint 'SOT-23-5' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(123.2400 mm, 116.8000 mm): Footprint U202
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(105.0500 mm, 111.1800 mm): Footprint R114
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(155.4300 mm, 112.8650 mm): Footprint C411
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(144.0200 mm, 109.3550 mm): Footprint R403
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(128.2500 mm, 108.4000 mm): Footprint C208
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(113.6100 mm, 111.1800 mm): Footprint R112
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(108.1700 mm, 119.3500 mm): Footprint R120
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(122.3100 mm, 108.4000 mm): Footprint R207
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(118.4200 mm, 115.8500 mm): Footprint C207
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(137.0600 mm, 109.8650 mm): Footprint C410
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(108.3450 mm, 108.9400 mm): Footprint C108
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(110.9950 mm, 113.4050 mm): Footprint R107
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(145.0200 mm, 109.8650 mm): Footprint R404
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(117.4400 mm, 107.1300 mm): Footprint R205
+[lib_footprint_mismatch]: Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(138.4400 mm, 109.3800 mm): Footprint FB402
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(110.0950 mm, 113.4050 mm): Footprint C112
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(118.8400 mm, 108.0700 mm): Footprint R202
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(152.9800 mm, 109.8650 mm): Footprint C401
+[lib_footprint_mismatch]: Footprint 'Potentiometer_Bourns_3314J_Vertical' does not match copy in library 'Potentiometer_SMD'
+    Local override; warning
+    @(112.0500 mm, 118.8500 mm): Footprint RV101
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(142.5700 mm, 111.7750 mm): Footprint C409
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(116.9300 mm, 105.7500 mm): Footprint C203
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(147.0200 mm, 109.8650 mm): Footprint C405
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(120.2600 mm, 115.8500 mm): Footprint R211
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(106.2300 mm, 111.6000 mm): Footprint C102
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(107.4600 mm, 114.6000 mm): Footprint R121
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(125.0900 mm, 111.9600 mm): Footprint R208
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(119.3200 mm, 114.3700 mm): Footprint C202
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(117.4400 mm, 113.4700 mm): Footprint R206
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(152.5300 mm, 111.7750 mm): Footprint C404
+[lib_footprint_mismatch]: Footprint 'VQFN-16-1EP_3x3mm_P0.5mm_EP1.68x1.68mm' does not match copy in library 'Package_DFN_QFN'
+    Local override; warning
+    @(110.7450 mm, 110.5500 mm): Footprint U101
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(150.4500 mm, 106.0800 mm): Footprint R415
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(118.1400 mm, 110.3000 mm): Footprint D201
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(103.9200 mm, 115.0500 mm): Footprint R117
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(123.2400 mm, 118.9700 mm): Footprint R210
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(121.5400 mm, 110.3000 mm): Footprint D202
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(107.6200 mm, 111.6000 mm): Footprint R105
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(148.8800 mm, 103.3400 mm): Footprint C403
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(113.6100 mm, 108.9400 mm): Footprint C109
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(106.5000 mm, 119.8600 mm): Footprint R119
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(105.0500 mm, 114.3800 mm): Footprint R116
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(107.6200 mm, 113.2000 mm): Footprint R106
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(153.9800 mm, 109.8650 mm): Footprint R401
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(155.4300 mm, 111.3750 mm): Footprint R405
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(108.5950 mm, 106.3900 mm): Footprint R108
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(105.0500 mm, 112.7800 mm): Footprint R115
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(111.9450 mm, 106.3900 mm): Footprint C104
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(112.8950 mm, 106.3900 mm): Footprint R110
+[lib_footprint_mismatch]: Footprint 'SOT-23-5' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(125.2900 mm, 109.3500 mm): Footprint U201
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(107.6450 mm, 106.3900 mm): Footprint R109
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(107.9000 mm, 116.9000 mm): Footprint C106
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(115.5100 mm, 110.3000 mm): Footprint R201
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(123.7000 mm, 111.9600 mm): Footprint C205
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(113.8450 mm, 106.3900 mm): Footprint R111
+[lib_footprint_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    Local override; warning
+    @(150.4700 mm, 109.6150 mm): Footprint U401
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(114.3600 mm, 109.4200 mm): Footprint R118
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(116.9300 mm, 114.8500 mm): Footprint C204
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(155.4300 mm, 114.3650 mm): Footprint R406
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(105.3500 mm, 110.3000 mm): Footprint C101
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(130.2900 mm, 110.3750 mm): Footprint R204
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(118.8400 mm, 112.5300 mm): Footprint R203
+[lib_footprint_issues]: The current configuration does not include the footprint library 'board'
+    Local override; warning
+    @(135.2000 mm, 109.8650 mm): Footprint TL401
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(126.2200 mm, 117.7500 mm): Footprint R209
+[lib_footprint_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    Local override; warning
+    @(140.5100 mm, 109.6150 mm): Footprint U402
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(138.9200 mm, 103.3400 mm): Footprint C408
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(140.4900 mm, 106.0800 mm): Footprint R416
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(126.2000 mm, 115.8500 mm): Footprint C210
+[lib_footprint_mismatch]: Footprint 'L_1210_3225Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(148.4000 mm, 106.0800 mm): Footprint L401
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(106.0000 mm, 116.0000 mm): Footprint C114
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(153.4500 mm, 112.6950 mm): Footprint C402
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(106.9500 mm, 118.1000 mm): Footprint C110
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(112.9200 mm, 112.7500 mm): Footprint C115
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(143.4900 mm, 112.6950 mm): Footprint C407
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(123.1400 mm, 108.3500 mm): Footprint C209
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(102.9000 mm, 118.3000 mm): Footprint C111
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(101.1500 mm, 118.3000 mm): Footprint C116
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.6000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(130.0000 mm, 120.8000 mm): PCB text 'ANALOG' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(100.8000 mm, 114.9000 mm): PCB text 'SIG_IN' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(100.8000 mm, 114.9000 mm): PCB text 'SIG_IN' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(107.5600 mm, 117.1000 mm): Segment of U102 on F.Silkscreen
+    @(107.5400 mm, 117.0078 mm): Segment of C106 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(107.5400 mm, 117.0078 mm): Segment of C106 on F.Silkscreen
+    @(107.5600 mm, 117.1000 mm): Segment of U102 on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(104.8600 mm, 110.0500 mm): Segment of J101 on F.Silkscreen
+    @(104.8700 mm, 110.3000 mm): Pad 1 [/input/VIN] of C101 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(104.8600 mm, 110.5500 mm): Segment of J101 on F.Silkscreen
+    @(105.0500 mm, 110.6700 mm): Pad 1 [/input/VIN] of R114 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(104.8600 mm, 110.5500 mm): Segment of J101 on F.Silkscreen
+    @(104.8700 mm, 110.3000 mm): Pad 1 [/input/VIN] of C101 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(105.2422 mm, 110.6600 mm): Segment of C101 on F.Silkscreen
+    @(105.0500 mm, 110.6700 mm): Pad 1 [/input/VIN] of R114 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(104.3600 mm, 110.3000 mm): Segment of J101 on F.Silkscreen
+    @(105.0500 mm, 110.6700 mm): Pad 1 [/input/VIN] of R114 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(104.3600 mm, 110.3000 mm): Segment of J101 on F.Silkscreen
+    @(104.8700 mm, 110.3000 mm): Pad 1 [/input/VIN] of C101 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(104.4400 mm, 117.1000 mm): Segment of U102 on F.Silkscreen
+    @(104.4000 mm, 115.9625 mm): Pad 1 [/input/TAP] of C105 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(107.5600 mm, 117.1000 mm): Segment of U102 on F.Silkscreen
+    @(107.9000 mm, 117.3800 mm): Pad 1 [/input/FB] of C106 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(107.5600 mm, 117.1000 mm): Segment of U102 on F.Silkscreen
+    @(107.9000 mm, 116.4200 mm): Pad 2 [Net-(C106-Pad2)] of C106 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(145.6400 mm, 109.5086 mm): Segment of R402 on F.Silkscreen
+    @(145.5300 mm, 109.8650 mm): Pad 1 [Net-(C405-Pad2)] of R404 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(146.4000 mm, 109.5086 mm): Segment of R402 on F.Silkscreen
+    @(146.5400 mm, 109.8650 mm): Pad 2 [Net-(C405-Pad2)] of C405 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(143.6400 mm, 109.5086 mm): Segment of R403 on F.Silkscreen
+    @(143.5000 mm, 109.8650 mm): Pad 1 [Net-(C406-Pad1)] of C406 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(144.4000 mm, 109.5086 mm): Segment of R403 on F.Silkscreen
+    @(144.5100 mm, 109.8650 mm): Pad 2 [Net-(C406-Pad1)] of R404 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(134.3500 mm, 110.0250 mm): Segment of D401 on F.Silkscreen
+    @(135.2000 mm, 109.8650 mm): Pad 1 [Net-(D401-K)] of TL401 on F.Cu
+
+** Found 13 unconnected pads **
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(106.9500 mm, 118.2375 mm): Track [+5V] on F.Cu, length 0.9500 mm
+    @(102.9000 mm, 119.2500 mm): Track [+5V] on B.Cu, length 0.9500 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(109.0950 mm, 109.8000 mm): Track [+5V] on F.Cu, length 0.3582 mm
+    @(106.9500 mm, 118.2375 mm): Track [+5V] on F.Cu, length 0.9500 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(112.2075 mm, 109.8000 mm): Track [+5V] on F.Cu, length 0.5325 mm
+    @(109.2825 mm, 109.8000 mm): Track [+5V] on F.Cu, length 0.1875 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(101.1500 mm, 119.2500 mm): Track [-5V] on B.Cu, length 0.9500 mm
+    @(106.0000 mm, 115.9625 mm): Track [-5V] on F.Cu, length 1.0625 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(109.3950 mm, 113.3500 mm): Via [-5V] on F.Cu - B.Cu
+    @(106.0000 mm, 115.9625 mm): Track [-5V] on F.Cu, length 1.0625 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(110.9950 mm, 113.9150 mm): Track [-5V] on F.Cu, length 0.6500 mm
+    @(109.9950 mm, 112.5500 mm): Track [-5V] on F.Cu, length 0.3881 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(111.3650 mm, 111.8500 mm): Zone [-5V] on F.Cu, priority 3
+    @(109.8650 mm, 111.8500 mm): Zone [-5V] on F.Cu, priority 3
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(108.5950 mm, 105.8800 mm): Track [+2V5] on F.Cu, length 1.3300 mm
+    @(126.4275 mm, 108.4000 mm): Track [+2V5] on F.Cu, length 1.3425 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(123.1400 mm, 109.3500 mm): Track [-2V5] on B.Cu, length 0.5200 mm
+    @(112.8950 mm, 105.8800 mm): Track [-2V5] on F.Cu, length 1.3300 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(125.7700 mm, 115.2000 mm): Track [+3V3] on F.Cu, length 0.6000 mm
+    @(141.4600 mm, 110.3650 mm): Track [+3V3] on F.Cu, length 0.1800 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(140.4900 mm, 105.5700 mm): Track [+3V3] on F.Cu, length 1.2799 mm
+    @(141.4600 mm, 110.3650 mm): Track [+3V3] on F.Cu, length 0.1800 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(142.5700 mm, 111.2950 mm): Track [+3V3] on F.Cu, length 1.2200 mm
+    @(151.4200 mm, 110.3650 mm): Track [+3V3] on F.Cu, length 0.1800 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(151.4200 mm, 110.3650 mm): Track [+3V3] on F.Cu, length 0.1800 mm
+    @(150.4500 mm, 105.5700 mm): Track [+3V3] on F.Cu, length 1.2799 mm
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

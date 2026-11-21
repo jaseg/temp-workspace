@@ -1,0 +1,4484 @@
+{
+    "$schema": "https://schemas.kicad.org/drc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-21T17:27:12",
+    "ignored_checks": [
+        {
+            "description": "Footprint has no courtyard defined",
+            "key": "missing_courtyard"
+        },
+        {
+            "description": "Track endpoint not centered on via",
+            "key": "track_not_centered_on_via"
+        },
+        {
+            "description": "Tuning profile track geometries",
+            "key": "tuning_profile_track_geometries"
+        },
+        {
+            "description": "Footprint doesn't match symbol's footprint filters",
+            "key": "footprint_filters_mismatch"
+        },
+        {
+            "description": "Footprint component type doesn't match footprint pads",
+            "key": "footprint_type_mismatch"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "10.99.0",
+    "schematic_parity": [],
+    "source": "phase_trigger.kicad_pcb",
+    "unconnected_items": [],
+    "violations": [
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C307",
+                    "pos": {
+                        "x": 137.42,
+                        "y": 98.56
+                    },
+                    "uuid": "09e60059-1095-4cc1-ae8b-a8f5a17ccf5d"
+                },
+                {
+                    "description": "Footprint R308",
+                    "pos": {
+                        "x": 137.42,
+                        "y": 96.74
+                    },
+                    "uuid": "200c9ab0-4ff7-4864-a0e5-9a161fea952a"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 136.965,
+                "y": 97.665
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C37",
+                    "pos": {
+                        "x": 211.443,
+                        "y": 85.94
+                    },
+                    "uuid": "0d56ce9f-6089-4543-895a-f31e772027d2"
+                },
+                {
+                    "description": "Footprint U18",
+                    "pos": {
+                        "x": 213.348,
+                        "y": 90.25
+                    },
+                    "uuid": "9b28c4b0-0175-47c7-8063-7480ac76531c"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 210.988,
+                "y": 86.845
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C33",
+                    "pos": {
+                        "x": 175.331,
+                        "y": 85.94
+                    },
+                    "uuid": "1728a7ff-d47f-4a89-a315-fa7d80735e2d"
+                },
+                {
+                    "description": "Footprint U14",
+                    "pos": {
+                        "x": 177.236,
+                        "y": 90.25
+                    },
+                    "uuid": "95aea4ea-c523-4167-bc64-f9cd319ec376"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 174.876,
+                "y": 86.845
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C36",
+                    "pos": {
+                        "x": 202.415,
+                        "y": 85.94
+                    },
+                    "uuid": "176e9374-2283-4d01-a3f4-56a93e297f81"
+                },
+                {
+                    "description": "Footprint U17",
+                    "pos": {
+                        "x": 204.32,
+                        "y": 90.25
+                    },
+                    "uuid": "7190f121-a3f1-48b7-87f4-3e1b2919af46"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 201.96,
+                "y": 86.845
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint R305",
+                    "pos": {
+                        "x": 130.165,
+                        "y": 98.02
+                    },
+                    "uuid": "1f498b61-cfab-4975-8c58-01d2bf8aeeae"
+                },
+                {
+                    "description": "Footprint U301",
+                    "pos": {
+                        "x": 129.115,
+                        "y": 100.25
+                    },
+                    "uuid": "953a47c9-11cd-4e09-8201-0cd0c231e152"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 129.7,
+                "y": 98.945
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C301",
+                    "pos": {
+                        "x": 129.115,
+                        "y": 98.04
+                    },
+                    "uuid": "2245d29b-7538-4965-88d7-48745940ae60"
+                },
+                {
+                    "description": "Footprint U301",
+                    "pos": {
+                        "x": 129.115,
+                        "y": 100.25
+                    },
+                    "uuid": "953a47c9-11cd-4e09-8201-0cd0c231e152"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 128.66,
+                "y": 98.945
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint U13",
+                    "pos": {
+                        "x": 168.208,
+                        "y": 90.25
+                    },
+                    "uuid": "22b28b70-f839-4f0b-b9a1-9b2d421d8928"
+                },
+                {
+                    "description": "Footprint C32",
+                    "pos": {
+                        "x": 166.303,
+                        "y": 85.94
+                    },
+                    "uuid": "7dc17727-fd9f-4b93-b472-a702c58bd25a"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 165.848,
+                "y": 86.845
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C303",
+                    "pos": {
+                        "x": 128.915,
+                        "y": 102.38
+                    },
+                    "uuid": "2dcc87bb-67b4-4497-8fe7-3c31fb9bf34f"
+                },
+                {
+                    "description": "Footprint U301",
+                    "pos": {
+                        "x": 129.115,
+                        "y": 100.25
+                    },
+                    "uuid": "953a47c9-11cd-4e09-8201-0cd0c231e152"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 128.46,
+                "y": 101.695
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C306",
+                    "pos": {
+                        "x": 132.24,
+                        "y": 96.84
+                    },
+                    "uuid": "4596b6a0-6fd1-4f32-9658-fd1d99bfd641"
+                },
+                {
+                    "description": "Footprint U302",
+                    "pos": {
+                        "x": 133.54,
+                        "y": 99.05
+                    },
+                    "uuid": "83e252d2-e5ff-4d48-8826-39fc5c2d98a1"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 132.695,
+                "y": 97.455
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C304",
+                    "pos": {
+                        "x": 133.29,
+                        "y": 101.26
+                    },
+                    "uuid": "4dffbb2f-7188-48ac-85f1-29783d0d1aeb"
+                },
+                {
+                    "description": "Footprint U302",
+                    "pos": {
+                        "x": 133.54,
+                        "y": 99.05
+                    },
+                    "uuid": "83e252d2-e5ff-4d48-8826-39fc5c2d98a1"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 132.835,
+                "y": 100.645
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint U11",
+                    "pos": {
+                        "x": 150.152,
+                        "y": 90.25
+                    },
+                    "uuid": "56b27c2d-f404-4844-9a21-d32f29b496e2"
+                },
+                {
+                    "description": "Footprint C30",
+                    "pos": {
+                        "x": 148.247,
+                        "y": 85.94
+                    },
+                    "uuid": "bfb2693d-6814-4f20-9f9f-2e1ad0de4be5"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 147.792,
+                "y": 86.845
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C305",
+                    "pos": {
+                        "x": 133.19,
+                        "y": 96.84
+                    },
+                    "uuid": "616bd216-485d-431d-8ef9-c3e7cac32c5f"
+                },
+                {
+                    "description": "Footprint U302",
+                    "pos": {
+                        "x": 133.54,
+                        "y": 99.05
+                    },
+                    "uuid": "83e252d2-e5ff-4d48-8826-39fc5c2d98a1"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 132.735,
+                "y": 97.745
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C31",
+                    "pos": {
+                        "x": 157.275,
+                        "y": 85.94
+                    },
+                    "uuid": "65982918-4670-4590-bbde-11a8e2cc678d"
+                },
+                {
+                    "description": "Footprint U12",
+                    "pos": {
+                        "x": 159.18,
+                        "y": 90.25
+                    },
+                    "uuid": "d5cba924-4331-45b4-9c06-c9ba0425790f"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 156.82,
+                "y": 86.845
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C311",
+                    "pos": {
+                        "x": 140.0,
+                        "y": 98.4
+                    },
+                    "uuid": "6717f4b2-8191-4942-8288-b62cc8d89c49"
+                },
+                {
+                    "description": "Footprint U303",
+                    "pos": {
+                        "x": 140.26,
+                        "y": 100.25
+                    },
+                    "uuid": "b00eaaa7-fa9f-4e04-9291-4eaa3facf85b"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 139.545,
+                "y": 99.305
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C302",
+                    "pos": {
+                        "x": 129.855,
+                        "y": 102.38
+                    },
+                    "uuid": "6f6c48cb-aabe-4936-90c1-cee34ca3da9c"
+                },
+                {
+                    "description": "Footprint U301",
+                    "pos": {
+                        "x": 129.115,
+                        "y": 100.25
+                    },
+                    "uuid": "953a47c9-11cd-4e09-8201-0cd0c231e152"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 130.31,
+                "y": 101.475
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint R301",
+                    "pos": {
+                        "x": 127.555,
+                        "y": 100.98
+                    },
+                    "uuid": "791c1471-cec4-4a15-9f9e-9c3144cfe650"
+                },
+                {
+                    "description": "Footprint U301",
+                    "pos": {
+                        "x": 129.115,
+                        "y": 100.25
+                    },
+                    "uuid": "953a47c9-11cd-4e09-8201-0cd0c231e152"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 127.92,
+                "y": 100.055
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint U15",
+                    "pos": {
+                        "x": 186.264,
+                        "y": 90.25
+                    },
+                    "uuid": "a1229e56-6f27-4c75-b92a-8220cdebdc39"
+                },
+                {
+                    "description": "Footprint C34",
+                    "pos": {
+                        "x": 184.359,
+                        "y": 85.94
+                    },
+                    "uuid": "d22cdfe8-4b30-4f94-bc51-c3fc360b6f1c"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 183.904,
+                "y": 86.845
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint C35",
+                    "pos": {
+                        "x": 193.387,
+                        "y": 85.94
+                    },
+                    "uuid": "a6be56c9-b1b5-426a-9c42-dcb797b46a41"
+                },
+                {
+                    "description": "Footprint U16",
+                    "pos": {
+                        "x": 195.292,
+                        "y": 90.25
+                    },
+                    "uuid": "f39f4d57-47a8-4af7-8239-4a55cf472cea"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 192.932,
+                "y": 86.845
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint U303",
+                    "pos": {
+                        "x": 140.26,
+                        "y": 100.25
+                    },
+                    "uuid": "b00eaaa7-fa9f-4e04-9291-4eaa3facf85b"
+                },
+                {
+                    "description": "Footprint FB301",
+                    "pos": {
+                        "x": 142.07,
+                        "y": 99.515
+                    },
+                    "uuid": "ba6a8287-0138-4536-be15-db20da179adf"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 141.605,
+                "y": 99.005
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint U303",
+                    "pos": {
+                        "x": 140.26,
+                        "y": 100.25
+                    },
+                    "uuid": "b00eaaa7-fa9f-4e04-9291-4eaa3facf85b"
+                },
+                {
+                    "description": "Footprint C312",
+                    "pos": {
+                        "x": 139.06,
+                        "y": 98.4
+                    },
+                    "uuid": "dc7cca78-c247-4860-adca-79fa52d794d1"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 138.755829,
+                "y": 99.005
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint U303",
+                    "pos": {
+                        "x": 140.26,
+                        "y": 100.25
+                    },
+                    "uuid": "b00eaaa7-fa9f-4e04-9291-4eaa3facf85b"
+                },
+                {
+                    "description": "Footprint C308",
+                    "pos": {
+                        "x": 137.9,
+                        "y": 100.0
+                    },
+                    "uuid": "fbe42e59-8906-4480-af91-3fcb6e47f47b"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 138.665,
+                "y": 99.545
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Courtyards overlap",
+            "items": [
+                {
+                    "description": "Footprint U304",
+                    "pos": {
+                        "x": 135.343,
+                        "y": 94.0
+                    },
+                    "uuid": "ca1202da-5209-4182-bff8-21560b2bff7b"
+                },
+                {
+                    "description": "Footprint C310",
+                    "pos": {
+                        "x": 132.655499,
+                        "y": 93.05
+                    },
+                    "uuid": "f5981426-95ca-424b-bf19-e7168c76f366"
+                }
+            ],
+            "layer": "F.Courtyard",
+            "pos": {
+                "x": 133.298,
+                "y": 92.595
+            },
+            "severity": "error",
+            "type": "courtyards_overlap"
+        },
+        {
+            "description": "Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.1700 mm)",
+            "items": [
+                {
+                    "description": "Segment on Edge.Cuts",
+                    "pos": {
+                        "x": 117.615,
+                        "y": 107.85
+                    },
+                    "uuid": "9eef6162-3a7d-41d8-9694-12c5221ac339"
+                },
+                {
+                    "description": "Track [BUF_OUT_T] on F.Cu, length 10.4750 mm",
+                    "pos": {
+                        "x": 117.965,
+                        "y": 99.5
+                    },
+                    "uuid": "0ec5f1ac-fd10-4c4b-8146-f820a0f24786"
+                }
+            ],
+            "pos": {
+                "x": 117.965,
+                "y": 99.5
+            },
+            "severity": "error",
+            "type": "copper_edge_clearance"
+        },
+        {
+            "description": "Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0500 mm)",
+            "items": [
+                {
+                    "description": "Segment on Edge.Cuts",
+                    "pos": {
+                        "x": 117.615,
+                        "y": 107.85
+                    },
+                    "uuid": "9eef6162-3a7d-41d8-9694-12c5221ac339"
+                },
+                {
+                    "description": "Pad 1 [BUF_OUT_T] of X1 on F.Cu",
+                    "pos": {
+                        "x": 117.965,
+                        "y": 99.5
+                    },
+                    "uuid": "cdc39edd-4735-4eda-9aa8-7a8f954e4a4e"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 117.715,
+                "y": 99.7
+            },
+            "severity": "error",
+            "type": "copper_edge_clearance"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on F.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "86caae39-1b7d-42e7-9ff3-8e14c75181d1"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 144.653761,
+                "y": 97.016706
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 215.447368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 210.933368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 206.419368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 201.905368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 197.391368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 192.877368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 188.363368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 183.849368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 174.821368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 179.335368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 147.737368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 152.251368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 156.765368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 161.279368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 165.793368,
+                "y": 96.219612
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Isolated copper fill",
+            "items": [
+                {
+                    "description": "Zone [GND] on B.Cu, priority 0",
+                    "pos": {
+                        "x": 117.865,
+                        "y": 82.65
+                    },
+                    "uuid": "95bafca9-0b8f-491b-a1d2-4ad256079bda"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 170.30736,
+                "y": 96.219601
+            },
+            "severity": "warning",
+            "type": "isolated_copper"
+        },
+        {
+            "description": "Silkscreen clipped by board edge",
+            "items": [
+                {
+                    "description": "Segment on Edge.Cuts",
+                    "pos": {
+                        "x": 222.71,
+                        "y": 82.4
+                    },
+                    "uuid": "46edef34-a3c4-4ced-91d0-edec9d49b785"
+                },
+                {
+                    "description": "PCB text 'VTAP_P' on F.Silkscreen",
+                    "pos": {
+                        "x": 221.91,
+                        "y": 105.435
+                    },
+                    "uuid": "a623e303-c8bb-4fcf-9269-6ec2c91ab781"
+                }
+            ],
+            "pos": {
+                "x": 222.693333,
+                "y": 105.244186
+            },
+            "severity": "warning",
+            "type": "silk_edge_clearance"
+        },
+        {
+            "description": "Silkscreen clipped by board edge",
+            "items": [
+                {
+                    "description": "Segment on Edge.Cuts",
+                    "pos": {
+                        "x": 117.615,
+                        "y": 107.85
+                    },
+                    "uuid": "9eef6162-3a7d-41d8-9694-12c5221ac339"
+                },
+                {
+                    "description": "PCB text 'PHASE_TRIGGER 4L JLC04161H-7628' on F.Silkscreen",
+                    "pos": {
+                        "x": 124.615,
+                        "y": 83.4
+                    },
+                    "uuid": "3d180103-7482-471c-aacf-18c44082782d"
+                }
+            ],
+            "pos": {
+                "x": 117.638812,
+                "y": 83.627409
+            },
+            "severity": "warning",
+            "type": "silk_edge_clearance"
+        },
+        {
+            "description": "Silkscreen clipped by board edge",
+            "items": [
+                {
+                    "description": "Segment on Edge.Cuts",
+                    "pos": {
+                        "x": 222.71,
+                        "y": 82.4
+                    },
+                    "uuid": "46edef34-a3c4-4ced-91d0-edec9d49b785"
+                },
+                {
+                    "description": "PCB text 'VTAP_N' on F.Silkscreen",
+                    "pos": {
+                        "x": 221.91,
+                        "y": 94.565
+                    },
+                    "uuid": "3b4fbe40-9c14-4561-add4-a4b12f9a9110"
+                }
+            ],
+            "pos": {
+                "x": 222.71,
+                "y": 94.651269
+            },
+            "severity": "warning",
+            "type": "silk_edge_clearance"
+        },
+        {
+            "description": "Drilled hole too close to other hole (board setup constraints min 0.2500 mm; actual 0.1774 mm)",
+            "items": [
+                {
+                    "description": "Via [GND] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 146.5,
+                        "y": 94.085
+                    },
+                    "uuid": "08528d6e-e76b-43e2-a197-81a337244e9c"
+                },
+                {
+                    "description": "Via [GND] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 146.18,
+                        "y": 93.885
+                    },
+                    "uuid": "544d81e1-72af-4a56-a457-73bcc836243d"
+                }
+            ],
+            "pos": {
+                "x": 146.5,
+                "y": 94.085
+            },
+            "severity": "warning",
+            "type": "hole_to_hole"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP503",
+                    "pos": {
+                        "x": 159.815,
+                        "y": 84.775
+                    },
+                    "uuid": "0d3e0f6b-2f61-4168-817e-9b0da3c0527a"
+                }
+            ],
+            "pos": {
+                "x": 159.815,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP505",
+                    "pos": {
+                        "x": 168.843,
+                        "y": 84.775
+                    },
+                    "uuid": "0e01af06-7d25-4530-ade2-e279f0041889"
+                }
+            ],
+            "pos": {
+                "x": 168.843,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint X1",
+                    "pos": {
+                        "x": 117.965,
+                        "y": 99.5
+                    },
+                    "uuid": "1031b579-58ec-48be-a356-b0c0d7bc1fbd"
+                }
+            ],
+            "pos": {
+                "x": 117.965,
+                "y": 99.5
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP402",
+                    "pos": {
+                        "x": 221.91,
+                        "y": 95.415
+                    },
+                    "uuid": "15931a35-2408-4702-b0f5-30b95a232d4b"
+                }
+            ],
+            "pos": {
+                "x": 221.91,
+                "y": 95.415
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP501",
+                    "pos": {
+                        "x": 150.787,
+                        "y": 84.775
+                    },
+                    "uuid": "1b516254-9211-40bf-8333-0069417ab39f"
+                }
+            ],
+            "pos": {
+                "x": 150.787,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP303",
+                    "pos": {
+                        "x": 131.735,
+                        "y": 104.5
+                    },
+                    "uuid": "1b905805-c9cb-43cd-8c10-c36fc203bfd6"
+                }
+            ],
+            "pos": {
+                "x": 131.735,
+                "y": 104.5
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP510",
+                    "pos": {
+                        "x": 194.657,
+                        "y": 84.775
+                    },
+                    "uuid": "1e0f1719-4dee-4677-97d0-64e265b3415f"
+                }
+            ],
+            "pos": {
+                "x": 194.657,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP509",
+                    "pos": {
+                        "x": 186.899,
+                        "y": 84.775
+                    },
+                    "uuid": "2dce7cf3-4201-413a-92f6-0790b033025f"
+                }
+            ],
+            "pos": {
+                "x": 186.899,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP306",
+                    "pos": {
+                        "x": 140.57,
+                        "y": 92.88
+                    },
+                    "uuid": "431262ad-8c48-4bd1-90af-5ac559568f7a"
+                }
+            ],
+            "pos": {
+                "x": 140.57,
+                "y": 92.88
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint X3",
+                    "pos": {
+                        "x": 145.6,
+                        "y": 105.35
+                    },
+                    "uuid": "47c4969b-d88d-4a18-a962-62d762d9feb9"
+                }
+            ],
+            "pos": {
+                "x": 145.6,
+                "y": 105.35
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP515",
+                    "pos": {
+                        "x": 213.983,
+                        "y": 84.775
+                    },
+                    "uuid": "5d05fdb1-f513-4321-bc6a-acdf380eaa48"
+                }
+            ],
+            "pos": {
+                "x": 213.983,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP507",
+                    "pos": {
+                        "x": 177.871,
+                        "y": 84.775
+                    },
+                    "uuid": "5fd47904-31c3-441d-adaa-e230fd09a669"
+                }
+            ],
+            "pos": {
+                "x": 177.871,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP401",
+                    "pos": {
+                        "x": 144.1,
+                        "y": 91.425
+                    },
+                    "uuid": "60590b81-3121-4d8d-87ba-567d8a448c8e"
+                }
+            ],
+            "pos": {
+                "x": 144.1,
+                "y": 91.425
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP506",
+                    "pos": {
+                        "x": 176.601,
+                        "y": 84.775
+                    },
+                    "uuid": "6e10fb3f-4c63-460b-b8f7-5f55ce83b9aa"
+                }
+            ],
+            "pos": {
+                "x": 176.601,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP504",
+                    "pos": {
+                        "x": 167.573,
+                        "y": 84.775
+                    },
+                    "uuid": "76a493e3-4495-4ce6-966b-39b64ab19fbe"
+                }
+            ],
+            "pos": {
+                "x": 167.573,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP304",
+                    "pos": {
+                        "x": 127.915,
+                        "y": 95.6
+                    },
+                    "uuid": "795b94c6-d00c-4a2a-9563-485d8fd14c6e"
+                }
+            ],
+            "pos": {
+                "x": 127.915,
+                "y": 95.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP514",
+                    "pos": {
+                        "x": 212.713,
+                        "y": 84.775
+                    },
+                    "uuid": "8379ef03-920f-4d53-a93d-29be4da1e183"
+                }
+            ],
+            "pos": {
+                "x": 212.713,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP511",
+                    "pos": {
+                        "x": 195.927,
+                        "y": 84.775
+                    },
+                    "uuid": "8c3d77c1-0a95-4a8e-878d-65aac46e633b"
+                }
+            ],
+            "pos": {
+                "x": 195.927,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP302",
+                    "pos": {
+                        "x": 131.69,
+                        "y": 94.6
+                    },
+                    "uuid": "a3638722-25d6-44c9-82f8-636da460b37d"
+                }
+            ],
+            "pos": {
+                "x": 131.69,
+                "y": 94.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP502",
+                    "pos": {
+                        "x": 158.545,
+                        "y": 84.775
+                    },
+                    "uuid": "a947e656-210e-45b9-a48c-ddeec87ed05e"
+                }
+            ],
+            "pos": {
+                "x": 158.545,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP301",
+                    "pos": {
+                        "x": 130.165,
+                        "y": 95.6
+                    },
+                    "uuid": "ad315fb8-44a5-4bf0-8933-97321ade55f9"
+                }
+            ],
+            "pos": {
+                "x": 130.165,
+                "y": 95.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP403",
+                    "pos": {
+                        "x": 221.91,
+                        "y": 104.585
+                    },
+                    "uuid": "b0c6cb43-4af7-4b2a-93ba-a058d0961289"
+                }
+            ],
+            "pos": {
+                "x": 221.91,
+                "y": 104.585
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint X2",
+                    "pos": {
+                        "x": 145.6,
+                        "y": 94.65
+                    },
+                    "uuid": "b758108e-751a-4b0b-9dd3-ea87fa7b1cf4"
+                }
+            ],
+            "pos": {
+                "x": 145.6,
+                "y": 94.65
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP513",
+                    "pos": {
+                        "x": 204.955,
+                        "y": 84.775
+                    },
+                    "uuid": "e0e0a089-c0a4-4e2f-baef-55eda7a3f1e6"
+                }
+            ],
+            "pos": {
+                "x": 204.955,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP307",
+                    "pos": {
+                        "x": 139.26,
+                        "y": 95.4
+                    },
+                    "uuid": "e78f7517-9f78-4789-b5a2-b6e3cf01020f"
+                }
+            ],
+            "pos": {
+                "x": 139.26,
+                "y": 95.4
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP500",
+                    "pos": {
+                        "x": 149.517,
+                        "y": 84.775
+                    },
+                    "uuid": "eae01434-c05e-4840-9859-6b69ebc17e8a"
+                }
+            ],
+            "pos": {
+                "x": 149.517,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP512",
+                    "pos": {
+                        "x": 203.685,
+                        "y": 84.775
+                    },
+                    "uuid": "ebdf7044-2fe3-4e9c-9477-bb1d32c62e2f"
+                }
+            ],
+            "pos": {
+                "x": 203.685,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP305",
+                    "pos": {
+                        "x": 136.8805,
+                        "y": 91.45
+                    },
+                    "uuid": "ed187466-a9fc-4bac-b4e0-6f042627670b"
+                }
+            ],
+            "pos": {
+                "x": 136.8805,
+                "y": 91.45
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'phase_trigger_fragment'",
+            "items": [
+                {
+                    "description": "Footprint TP508",
+                    "pos": {
+                        "x": 185.629,
+                        "y": 84.775
+                    },
+                    "uuid": "f687c7bc-ae6b-4572-878b-6ae9568d8209"
+                }
+            ],
+            "pos": {
+                "x": 185.629,
+                "y": 84.775
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TRF37D73' on F.Silkscreen",
+                    "pos": {
+                        "x": 140.26,
+                        "y": 101.9
+                    },
+                    "uuid": "018bfc2a-9c5c-458d-bdf6-70161500053a"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 140.26,
+                "y": 101.9
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TRF37D73' on F.Silkscreen",
+                    "pos": {
+                        "x": 140.26,
+                        "y": 101.9
+                    },
+                    "uuid": "018bfc2a-9c5c-458d-bdf6-70161500053a"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 140.26,
+                "y": 101.9
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TRIG_SEL' on F.Silkscreen",
+                    "pos": {
+                        "x": 130.165,
+                        "y": 94.1
+                    },
+                    "uuid": "0baea5fb-c57d-46e3-9492-81dffacf954b"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 130.165,
+                "y": 94.1
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TRIG_SEL' on F.Silkscreen",
+                    "pos": {
+                        "x": 130.165,
+                        "y": 94.1
+                    },
+                    "uuid": "0baea5fb-c57d-46e3-9492-81dffacf954b"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 130.165,
+                "y": 94.1
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TLV3801' on F.Silkscreen",
+                    "pos": {
+                        "x": 133.54,
+                        "y": 102.9
+                    },
+                    "uuid": "119ac206-99a5-4b25-abfc-b29068baa283"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 133.54,
+                "y": 102.9
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TLV3801' on F.Silkscreen",
+                    "pos": {
+                        "x": 133.54,
+                        "y": 102.9
+                    },
+                    "uuid": "119ac206-99a5-4b25-abfc-b29068baa283"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 133.54,
+                "y": 102.9
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '0' on F.Silkscreen",
+                    "pos": {
+                        "x": 151.85,
+                        "y": 103.75
+                    },
+                    "uuid": "1598467b-7b68-44d9-aecf-64108af49b7d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 151.85,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '0' on F.Silkscreen",
+                    "pos": {
+                        "x": 151.85,
+                        "y": 103.75
+                    },
+                    "uuid": "1598467b-7b68-44d9-aecf-64108af49b7d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 151.85,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text '-2V5' on F.Silkscreen",
+                    "pos": {
+                        "x": 131.735,
+                        "y": 105.35
+                    },
+                    "uuid": "22c4fd77-e777-4001-8612-7d99338a3396"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 131.735,
+                "y": 105.35
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text '-2V5' on F.Silkscreen",
+                    "pos": {
+                        "x": 131.735,
+                        "y": 105.35
+                    },
+                    "uuid": "22c4fd77-e777-4001-8612-7d99338a3396"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 131.735,
+                "y": 105.35
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T6' on F.Silkscreen",
+                    "pos": {
+                        "x": 176.601,
+                        "y": 83.925
+                    },
+                    "uuid": "272a02d2-6248-45cd-b304-9939160dccfe"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 176.601,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T6' on F.Silkscreen",
+                    "pos": {
+                        "x": 176.601,
+                        "y": 83.925
+                    },
+                    "uuid": "272a02d2-6248-45cd-b304-9939160dccfe"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 176.601,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '7' on F.Silkscreen",
+                    "pos": {
+                        "x": 183.448,
+                        "y": 103.75
+                    },
+                    "uuid": "33dad3c6-96d3-459f-bb01-0c6f03c998fe"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 183.448,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '7' on F.Silkscreen",
+                    "pos": {
+                        "x": 183.448,
+                        "y": 103.75
+                    },
+                    "uuid": "33dad3c6-96d3-459f-bb01-0c6f03c998fe"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 183.448,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'VTAP_N' on F.Silkscreen",
+                    "pos": {
+                        "x": 221.91,
+                        "y": 94.565
+                    },
+                    "uuid": "3b4fbe40-9c14-4561-add4-a4b12f9a9110"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 221.91,
+                "y": 94.565
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'VTAP_N' on F.Silkscreen",
+                    "pos": {
+                        "x": 221.91,
+                        "y": 94.565
+                    },
+                    "uuid": "3b4fbe40-9c14-4561-add4-a4b12f9a9110"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 221.91,
+                "y": 94.565
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '13' on F.Silkscreen",
+                    "pos": {
+                        "x": 210.532,
+                        "y": 103.75
+                    },
+                    "uuid": "3c7d89e0-6d32-441e-b62b-2d6964271651"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 210.532,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '13' on F.Silkscreen",
+                    "pos": {
+                        "x": 210.532,
+                        "y": 103.75
+                    },
+                    "uuid": "3c7d89e0-6d32-441e-b62b-2d6964271651"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 210.532,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0750 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PHASE_TRIGGER 4L JLC04161H-7628' on F.Silkscreen",
+                    "pos": {
+                        "x": 124.615,
+                        "y": 83.4
+                    },
+                    "uuid": "3d180103-7482-471c-aacf-18c44082782d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 124.615,
+                "y": 83.4
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.5000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PHASE_TRIGGER 4L JLC04161H-7628' on F.Silkscreen",
+                    "pos": {
+                        "x": 124.615,
+                        "y": 83.4
+                    },
+                    "uuid": "3d180103-7482-471c-aacf-18c44082782d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 124.615,
+                "y": 83.4
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T7' on F.Silkscreen",
+                    "pos": {
+                        "x": 177.871,
+                        "y": 83.925
+                    },
+                    "uuid": "43483559-e083-4e4b-84d3-8d600e0d298b"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 177.871,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T7' on F.Silkscreen",
+                    "pos": {
+                        "x": 177.871,
+                        "y": 83.925
+                    },
+                    "uuid": "43483559-e083-4e4b-84d3-8d600e0d298b"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 177.871,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '5' on F.Silkscreen",
+                    "pos": {
+                        "x": 174.42,
+                        "y": 103.75
+                    },
+                    "uuid": "484e4fa7-5c5f-4c1f-a651-723f19e2e42d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 174.42,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '5' on F.Silkscreen",
+                    "pos": {
+                        "x": 174.42,
+                        "y": 103.75
+                    },
+                    "uuid": "484e4fa7-5c5f-4c1f-a651-723f19e2e42d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 174.42,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PSTRB_A' on F.Silkscreen",
+                    "pos": {
+                        "x": 147.1,
+                        "y": 94.1
+                    },
+                    "uuid": "4c7e5028-fe4f-40ec-aa3a-432551b103b4"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 147.1,
+                "y": 94.1
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PSTRB_A' on F.Silkscreen",
+                    "pos": {
+                        "x": 147.1,
+                        "y": 94.1
+                    },
+                    "uuid": "4c7e5028-fe4f-40ec-aa3a-432551b103b4"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 147.1,
+                "y": 94.1
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'BUF_OUT_T' on F.Silkscreen",
+                    "pos": {
+                        "x": 119.615,
+                        "y": 98.7
+                    },
+                    "uuid": "567d3caa-3e70-4ff8-9674-94f5e487b129"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 119.615,
+                "y": 98.7
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'BUF_OUT_T' on F.Silkscreen",
+                    "pos": {
+                        "x": 119.615,
+                        "y": 98.7
+                    },
+                    "uuid": "567d3caa-3e70-4ff8-9674-94f5e487b129"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 119.615,
+                "y": 98.7
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T3' on F.Silkscreen",
+                    "pos": {
+                        "x": 159.815,
+                        "y": 83.925
+                    },
+                    "uuid": "5bfdbe8c-1c06-4cfd-adb9-c36dc21d52e2"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 159.815,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T3' on F.Silkscreen",
+                    "pos": {
+                        "x": 159.815,
+                        "y": 83.925
+                    },
+                    "uuid": "5bfdbe8c-1c06-4cfd-adb9-c36dc21d52e2"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 159.815,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T4' on F.Silkscreen",
+                    "pos": {
+                        "x": 167.573,
+                        "y": 83.925
+                    },
+                    "uuid": "5c89bbed-0c42-4316-8d4b-3dbe2b74a036"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 167.573,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T4' on F.Silkscreen",
+                    "pos": {
+                        "x": 167.573,
+                        "y": 83.925
+                    },
+                    "uuid": "5c89bbed-0c42-4316-8d4b-3dbe2b74a036"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 167.573,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text '+3V3' on F.Silkscreen",
+                    "pos": {
+                        "x": 139.37,
+                        "y": 92.88
+                    },
+                    "uuid": "5d73e6f9-7307-4585-9f77-eeb7318e8a7b"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 139.37,
+                "y": 92.88
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text '+3V3' on F.Silkscreen",
+                    "pos": {
+                        "x": 139.37,
+                        "y": 92.88
+                    },
+                    "uuid": "5d73e6f9-7307-4585-9f77-eeb7318e8a7b"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 139.37,
+                "y": 92.88
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T13' on F.Silkscreen",
+                    "pos": {
+                        "x": 204.955,
+                        "y": 83.925
+                    },
+                    "uuid": "672ae2b5-b6b6-4ee3-bf11-1c8e1d72d004"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 204.955,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T13' on F.Silkscreen",
+                    "pos": {
+                        "x": 204.955,
+                        "y": 83.925
+                    },
+                    "uuid": "672ae2b5-b6b6-4ee3-bf11-1c8e1d72d004"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 204.955,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '1' on F.Silkscreen",
+                    "pos": {
+                        "x": 156.364,
+                        "y": 103.75
+                    },
+                    "uuid": "6bbf4534-0659-4db4-915f-19603dea6386"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 156.364,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '1' on F.Silkscreen",
+                    "pos": {
+                        "x": 156.364,
+                        "y": 103.75
+                    },
+                    "uuid": "6bbf4534-0659-4db4-915f-19603dea6386"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 156.364,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'EXT_CLK' on F.Silkscreen",
+                    "pos": {
+                        "x": 123.215,
+                        "y": 105.2
+                    },
+                    "uuid": "6f38d4ba-dfeb-4492-94ec-37ff7039fa5a"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 123.215,
+                "y": 105.2
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'EXT_CLK' on F.Silkscreen",
+                    "pos": {
+                        "x": 123.215,
+                        "y": 105.2
+                    },
+                    "uuid": "6f38d4ba-dfeb-4492-94ec-37ff7039fa5a"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 123.215,
+                "y": 105.2
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TRIG_LEVEL' on F.Silkscreen",
+                    "pos": {
+                        "x": 131.69,
+                        "y": 93.75
+                    },
+                    "uuid": "706429c8-ff46-43a9-881b-5a7e71666629"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 131.69,
+                "y": 93.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TRIG_LEVEL' on F.Silkscreen",
+                    "pos": {
+                        "x": 131.69,
+                        "y": 93.75
+                    },
+                    "uuid": "706429c8-ff46-43a9-881b-5a7e71666629"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 131.69,
+                "y": 93.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '3' on F.Silkscreen",
+                    "pos": {
+                        "x": 165.392,
+                        "y": 103.75
+                    },
+                    "uuid": "71351be7-b4a9-4e9f-820e-e809ea684114"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 165.392,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '3' on F.Silkscreen",
+                    "pos": {
+                        "x": 165.392,
+                        "y": 103.75
+                    },
+                    "uuid": "71351be7-b4a9-4e9f-820e-e809ea684114"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 165.392,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PSTRB_A/K 0.16 mm, pitch 4.514 mm' on F.Silkscreen",
+                    "pos": {
+                        "x": 195.0,
+                        "y": 104.95
+                    },
+                    "uuid": "757946ec-a74c-4991-a174-9d8295824483"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 195.0,
+                "y": 104.95
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PSTRB_A/K 0.16 mm, pitch 4.514 mm' on F.Silkscreen",
+                    "pos": {
+                        "x": 195.0,
+                        "y": 104.95
+                    },
+                    "uuid": "757946ec-a74c-4991-a174-9d8295824483"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 195.0,
+                "y": 104.95
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T10' on F.Silkscreen",
+                    "pos": {
+                        "x": 194.657,
+                        "y": 83.925
+                    },
+                    "uuid": "758de369-9f42-4272-a6a0-dc1a02176879"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 194.657,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T10' on F.Silkscreen",
+                    "pos": {
+                        "x": 194.657,
+                        "y": 83.925
+                    },
+                    "uuid": "758de369-9f42-4272-a6a0-dc1a02176879"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 194.657,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T8' on F.Silkscreen",
+                    "pos": {
+                        "x": 185.629,
+                        "y": 83.925
+                    },
+                    "uuid": "8a90ac35-5ca6-4f54-a333-7fd0761a47b0"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 185.629,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T8' on F.Silkscreen",
+                    "pos": {
+                        "x": 185.629,
+                        "y": 83.925
+                    },
+                    "uuid": "8a90ac35-5ca6-4f54-a333-7fd0761a47b0"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 185.629,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T15' on F.Silkscreen",
+                    "pos": {
+                        "x": 213.983,
+                        "y": 83.925
+                    },
+                    "uuid": "8da8c54e-62ad-4287-b802-c1cfd6879adc"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 213.983,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T15' on F.Silkscreen",
+                    "pos": {
+                        "x": 213.983,
+                        "y": 83.925
+                    },
+                    "uuid": "8da8c54e-62ad-4287-b802-c1cfd6879adc"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 213.983,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T2' on F.Silkscreen",
+                    "pos": {
+                        "x": 158.545,
+                        "y": 83.925
+                    },
+                    "uuid": "945d582f-1f12-41aa-b1ac-46d4cf0122e9"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 158.545,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T2' on F.Silkscreen",
+                    "pos": {
+                        "x": 158.545,
+                        "y": 83.925
+                    },
+                    "uuid": "945d582f-1f12-41aa-b1ac-46d4cf0122e9"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 158.545,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '15' on F.Silkscreen",
+                    "pos": {
+                        "x": 219.56,
+                        "y": 103.75
+                    },
+                    "uuid": "96131f6b-744e-45a4-bb84-ce784b75cacf"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 219.56,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '15' on F.Silkscreen",
+                    "pos": {
+                        "x": 219.56,
+                        "y": 103.75
+                    },
+                    "uuid": "96131f6b-744e-45a4-bb84-ce784b75cacf"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 219.56,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '6' on F.Silkscreen",
+                    "pos": {
+                        "x": 178.934,
+                        "y": 103.75
+                    },
+                    "uuid": "96ea8462-2daa-4583-b61b-cb497f97bd21"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 178.934,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '6' on F.Silkscreen",
+                    "pos": {
+                        "x": 178.934,
+                        "y": 103.75
+                    },
+                    "uuid": "96ea8462-2daa-4583-b61b-cb497f97bd21"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 178.934,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '4' on F.Silkscreen",
+                    "pos": {
+                        "x": 169.906,
+                        "y": 103.75
+                    },
+                    "uuid": "9aa336f0-411f-4ed0-bdbf-c1538f481670"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 169.906,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '4' on F.Silkscreen",
+                    "pos": {
+                        "x": 169.906,
+                        "y": 103.75
+                    },
+                    "uuid": "9aa336f0-411f-4ed0-bdbf-c1538f481670"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 169.906,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '8' on F.Silkscreen",
+                    "pos": {
+                        "x": 187.962,
+                        "y": 103.75
+                    },
+                    "uuid": "9af98e63-8b62-43dd-815b-cd1dd824e0cb"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 187.962,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '8' on F.Silkscreen",
+                    "pos": {
+                        "x": 187.962,
+                        "y": 103.75
+                    },
+                    "uuid": "9af98e63-8b62-43dd-815b-cd1dd824e0cb"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 187.962,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T11' on F.Silkscreen",
+                    "pos": {
+                        "x": 195.927,
+                        "y": 83.925
+                    },
+                    "uuid": "a18f16ee-5571-4bdb-a81b-d074168590bd"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 195.927,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T11' on F.Silkscreen",
+                    "pos": {
+                        "x": 195.927,
+                        "y": 83.925
+                    },
+                    "uuid": "a18f16ee-5571-4bdb-a81b-d074168590bd"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 195.927,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'VTAP_P' on F.Silkscreen",
+                    "pos": {
+                        "x": 221.91,
+                        "y": 105.435
+                    },
+                    "uuid": "a623e303-c8bb-4fcf-9269-6ec2c91ab781"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 221.91,
+                "y": 105.435
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'VTAP_P' on F.Silkscreen",
+                    "pos": {
+                        "x": 221.91,
+                        "y": 105.435
+                    },
+                    "uuid": "a623e303-c8bb-4fcf-9269-6ec2c91ab781"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 221.91,
+                "y": 105.435
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '10' on F.Silkscreen",
+                    "pos": {
+                        "x": 196.99,
+                        "y": 103.75
+                    },
+                    "uuid": "aa089c6f-a68f-4285-8cf6-17c86adc0840"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 196.99,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '10' on F.Silkscreen",
+                    "pos": {
+                        "x": 196.99,
+                        "y": 103.75
+                    },
+                    "uuid": "aa089c6f-a68f-4285-8cf6-17c86adc0840"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 196.99,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T12' on F.Silkscreen",
+                    "pos": {
+                        "x": 203.685,
+                        "y": 83.925
+                    },
+                    "uuid": "ba357a7c-e391-4b9b-a196-2621e9339ffe"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 203.685,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T12' on F.Silkscreen",
+                    "pos": {
+                        "x": 203.685,
+                        "y": 83.925
+                    },
+                    "uuid": "ba357a7c-e391-4b9b-a196-2621e9339ffe"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 203.685,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T9' on F.Silkscreen",
+                    "pos": {
+                        "x": 186.899,
+                        "y": 83.925
+                    },
+                    "uuid": "bd0594d4-430e-4e54-9396-c0f8fc7300b3"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 186.899,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T9' on F.Silkscreen",
+                    "pos": {
+                        "x": 186.899,
+                        "y": 83.925
+                    },
+                    "uuid": "bd0594d4-430e-4e54-9396-c0f8fc7300b3"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 186.899,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PSTRB_K' on F.Silkscreen",
+                    "pos": {
+                        "x": 147.1,
+                        "y": 105.9
+                    },
+                    "uuid": "be99fb19-e17c-41d2-9143-38591b25399d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 147.1,
+                "y": 105.9
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PSTRB_K' on F.Silkscreen",
+                    "pos": {
+                        "x": 147.1,
+                        "y": 105.9
+                    },
+                    "uuid": "be99fb19-e17c-41d2-9143-38591b25399d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 147.1,
+                "y": 105.9
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'GND' on F.Silkscreen",
+                    "pos": {
+                        "x": 139.26,
+                        "y": 94.55
+                    },
+                    "uuid": "c36aa112-c779-4781-ae7f-dbb8fe0d48e8"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 139.26,
+                "y": 94.55
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'GND' on F.Silkscreen",
+                    "pos": {
+                        "x": 139.26,
+                        "y": 94.55
+                    },
+                    "uuid": "c36aa112-c779-4781-ae7f-dbb8fe0d48e8"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 139.26,
+                "y": 94.55
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '2' on F.Silkscreen",
+                    "pos": {
+                        "x": 160.878,
+                        "y": 103.75
+                    },
+                    "uuid": "c45bb96d-80cd-41d7-bc29-fd0cecbc71b8"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 160.878,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '2' on F.Silkscreen",
+                    "pos": {
+                        "x": 160.878,
+                        "y": 103.75
+                    },
+                    "uuid": "c45bb96d-80cd-41d7-bc29-fd0cecbc71b8"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 160.878,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'LVDS2' on F.Silkscreen",
+                    "pos": {
+                        "x": 135.343,
+                        "y": 92.0
+                    },
+                    "uuid": "c49c052b-7e5c-4a2a-830b-a60ee76ea4fb"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 135.343,
+                "y": 92.0
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'LVDS2' on F.Silkscreen",
+                    "pos": {
+                        "x": 135.343,
+                        "y": 92.0
+                    },
+                    "uuid": "c49c052b-7e5c-4a2a-830b-a60ee76ea4fb"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 135.343,
+                "y": 92.0
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'COARSE' on F.Silkscreen",
+                    "pos": {
+                        "x": 138.1805,
+                        "y": 91.45
+                    },
+                    "uuid": "cc2f2814-d469-4558-98e4-c4247f132f8c"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 138.1805,
+                "y": 91.45
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'COARSE' on F.Silkscreen",
+                    "pos": {
+                        "x": 138.1805,
+                        "y": 91.45
+                    },
+                    "uuid": "cc2f2814-d469-4558-98e4-c4247f132f8c"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 138.1805,
+                "y": 91.45
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TMUX136' on F.Silkscreen",
+                    "pos": {
+                        "x": 128.215,
+                        "y": 104.3
+                    },
+                    "uuid": "d0008ae8-ee6d-4fb0-9b31-70b4210cea32"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 128.215,
+                "y": 104.3
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'TMUX136' on F.Silkscreen",
+                    "pos": {
+                        "x": 128.215,
+                        "y": 104.3
+                    },
+                    "uuid": "d0008ae8-ee6d-4fb0-9b31-70b4210cea32"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 128.215,
+                "y": 104.3
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '12' on F.Silkscreen",
+                    "pos": {
+                        "x": 206.018,
+                        "y": 103.75
+                    },
+                    "uuid": "d0921da7-3cab-425d-aa13-8c3ae9c22d1d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 206.018,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '12' on F.Silkscreen",
+                    "pos": {
+                        "x": 206.018,
+                        "y": 103.75
+                    },
+                    "uuid": "d0921da7-3cab-425d-aa13-8c3ae9c22d1d"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 206.018,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '9' on F.Silkscreen",
+                    "pos": {
+                        "x": 192.476,
+                        "y": 103.75
+                    },
+                    "uuid": "d301dae2-2d25-4bf6-a265-27cdc0476b7c"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 192.476,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '9' on F.Silkscreen",
+                    "pos": {
+                        "x": 192.476,
+                        "y": 103.75
+                    },
+                    "uuid": "d301dae2-2d25-4bf6-a265-27cdc0476b7c"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 192.476,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'VTAP_TH' on F.Silkscreen",
+                    "pos": {
+                        "x": 144.1,
+                        "y": 90.575
+                    },
+                    "uuid": "d42a487f-07ba-4159-a2a0-4ceb16c34878"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 144.1,
+                "y": 90.575
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'VTAP_TH' on F.Silkscreen",
+                    "pos": {
+                        "x": 144.1,
+                        "y": 90.575
+                    },
+                    "uuid": "d42a487f-07ba-4159-a2a0-4ceb16c34878"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 144.1,
+                "y": 90.575
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T14' on F.Silkscreen",
+                    "pos": {
+                        "x": 212.713,
+                        "y": 83.925
+                    },
+                    "uuid": "db35006d-893c-4340-9156-4d02cd3f0055"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 212.713,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T14' on F.Silkscreen",
+                    "pos": {
+                        "x": 212.713,
+                        "y": 83.925
+                    },
+                    "uuid": "db35006d-893c-4340-9156-4d02cd3f0055"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 212.713,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '14' on F.Silkscreen",
+                    "pos": {
+                        "x": 215.046,
+                        "y": 103.75
+                    },
+                    "uuid": "e2fab2e0-a626-4e23-a934-fc183a235146"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 215.046,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '14' on F.Silkscreen",
+                    "pos": {
+                        "x": 215.046,
+                        "y": 103.75
+                    },
+                    "uuid": "e2fab2e0-a626-4e23-a934-fc183a235146"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 215.046,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T0' on F.Silkscreen",
+                    "pos": {
+                        "x": 149.517,
+                        "y": 83.925
+                    },
+                    "uuid": "ebeb3493-30de-435c-ba36-5052014bc045"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 149.517,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T0' on F.Silkscreen",
+                    "pos": {
+                        "x": 149.517,
+                        "y": 83.925
+                    },
+                    "uuid": "ebeb3493-30de-435c-ba36-5052014bc045"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 149.517,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T5' on F.Silkscreen",
+                    "pos": {
+                        "x": 168.843,
+                        "y": 83.925
+                    },
+                    "uuid": "ee43ed5f-56a5-4466-879f-68db0d4cd055"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 168.843,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T5' on F.Silkscreen",
+                    "pos": {
+                        "x": 168.843,
+                        "y": 83.925
+                    },
+                    "uuid": "ee43ed5f-56a5-4466-879f-68db0d4cd055"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 168.843,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)",
+            "items": [
+                {
+                    "description": "PCB text '+2V5' on F.Silkscreen",
+                    "pos": {
+                        "x": 127.915,
+                        "y": 94.75
+                    },
+                    "uuid": "f1491e79-fc38-4d25-92c5-dc18bd4cc935"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 127.915,
+                "y": 94.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)",
+            "items": [
+                {
+                    "description": "PCB text '+2V5' on F.Silkscreen",
+                    "pos": {
+                        "x": 127.915,
+                        "y": 94.75
+                    },
+                    "uuid": "f1491e79-fc38-4d25-92c5-dc18bd4cc935"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 127.915,
+                "y": 94.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '11' on F.Silkscreen",
+                    "pos": {
+                        "x": 201.504,
+                        "y": 103.75
+                    },
+                    "uuid": "f45c0b83-0808-4902-aacc-936e76f345dc"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 201.504,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '11' on F.Silkscreen",
+                    "pos": {
+                        "x": 201.504,
+                        "y": 103.75
+                    },
+                    "uuid": "f45c0b83-0808-4902-aacc-936e76f345dc"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 201.504,
+                "y": 103.75
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PH_LINE 0.26 mm, 70 ps/tap' on F.Silkscreen",
+                    "pos": {
+                        "x": 170.0,
+                        "y": 104.95
+                    },
+                    "uuid": "f6f39cc7-0ced-4329-9ff9-b5ff3390cd41"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 170.0,
+                "y": 104.95
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'PH_LINE 0.26 mm, 70 ps/tap' on F.Silkscreen",
+                    "pos": {
+                        "x": 170.0,
+                        "y": 104.95
+                    },
+                    "uuid": "f6f39cc7-0ced-4329-9ff9-b5ff3390cd41"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 170.0,
+                "y": 104.95
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text '12 dB' on F.Silkscreen",
+                    "pos": {
+                        "x": 146.33,
+                        "y": 101.6
+                    },
+                    "uuid": "f9eb24c6-8c96-4c0b-a232-c9dc189865fa"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 146.33,
+                "y": 101.6
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text '12 dB' on F.Silkscreen",
+                    "pos": {
+                        "x": 146.33,
+                        "y": 101.6
+                    },
+                    "uuid": "f9eb24c6-8c96-4c0b-a232-c9dc189865fa"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 146.33,
+                "y": 101.6
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T1' on F.Silkscreen",
+                    "pos": {
+                        "x": 150.787,
+                        "y": 83.925
+                    },
+                    "uuid": "fa5a2821-aa4c-4340-ad9f-4d6cfd7c7e04"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 150.787,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "line_width"
+        },
+        {
+            "description": "Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)",
+            "items": [
+                {
+                    "description": "PCB text 'T1' on F.Silkscreen",
+                    "pos": {
+                        "x": 150.787,
+                        "y": 83.925
+                    },
+                    "uuid": "fa5a2821-aa4c-4340-ad9f-4d6cfd7c7e04"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 150.787,
+                "y": 83.925
+            },
+            "severity": "warning",
+            "type": "text_height"
+        },
+        {
+            "description": "Silkscreen clearance",
+            "items": [
+                {
+                    "description": "PCB text 'TRIG_SEL' on F.Silkscreen",
+                    "pos": {
+                        "x": 130.165,
+                        "y": 94.1
+                    },
+                    "uuid": "0baea5fb-c57d-46e3-9492-81dffacf954b"
+                },
+                {
+                    "description": "PCB text 'TRIG_LEVEL' on F.Silkscreen",
+                    "pos": {
+                        "x": 131.69,
+                        "y": 93.75
+                    },
+                    "uuid": "706429c8-ff46-43a9-881b-5a7e71666629"
+                }
+            ],
+            "layer": "F.Silkscreen",
+            "pos": {
+                "x": 131.131667,
+                "y": 93.909186
+            },
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "PCB text 'TRIG_SEL' on F.Silkscreen",
+                    "pos": {
+                        "x": 130.165,
+                        "y": 94.1
+                    },
+                    "uuid": "0baea5fb-c57d-46e3-9492-81dffacf954b"
+                },
+                {
+                    "description": "Pad 1 [TRIG_LEVEL] of TP302 on F.Cu",
+                    "pos": {
+                        "x": 131.69,
+                        "y": 94.6
+                    },
+                    "uuid": "e6238ea9-ada4-4ceb-949c-c81ecac2eddf"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 131.298334,
+                "y": 94.259186
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "PCB text 'COARSE' on F.Silkscreen",
+                    "pos": {
+                        "x": 138.1805,
+                        "y": 91.45
+                    },
+                    "uuid": "cc2f2814-d469-4558-98e4-c4247f132f8c"
+                },
+                {
+                    "description": "Pad 1 [COARSE] of TP305 on F.Cu",
+                    "pos": {
+                        "x": 136.8805,
+                        "y": 91.45
+                    },
+                    "uuid": "42bc5fac-2734-4e99-8f4e-ee136528bd30"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 137.3555,
+                "y": 91.609186
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of U303 on F.Silkscreen",
+                    "pos": {
+                        "x": 138.89,
+                        "y": 99.18
+                    },
+                    "uuid": "5046b1cc-3a18-44a8-a0f9-d11a76dfc953"
+                },
+                {
+                    "description": "Pad 1 [+3V3] of C312 on F.Cu",
+                    "pos": {
+                        "x": 139.06,
+                        "y": 98.88
+                    },
+                    "uuid": "b7fb5816-bebe-4071-a766-1e3ff15ae10f"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 138.83,
+                "y": 98.96
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Segment of U303 on F.Silkscreen",
+                    "pos": {
+                        "x": 139.25,
+                        "y": 99.11
+                    },
+                    "uuid": "a00b8004-c30d-4ccc-8a5f-9236a8d19d4c"
+                },
+                {
+                    "description": "Pad 1 [+3V3] of C312 on F.Cu",
+                    "pos": {
+                        "x": 139.06,
+                        "y": 98.88
+                    },
+                    "uuid": "b7fb5816-bebe-4071-a766-1e3ff15ae10f"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 139.25,
+                "y": 99.11
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Segment of U303 on F.Silkscreen",
+                    "pos": {
+                        "x": 139.25,
+                        "y": 99.11
+                    },
+                    "uuid": "a00b8004-c30d-4ccc-8a5f-9236a8d19d4c"
+                },
+                {
+                    "description": "Pad 1 [+3V3] of C311 on F.Cu",
+                    "pos": {
+                        "x": 140.0,
+                        "y": 98.88
+                    },
+                    "uuid": "73bac6e8-c84a-48d6-9e7e-3d2d45711f0f"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 139.83,
+                "y": 99.11
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D05 on F.Silkscreen",
+                    "pos": {
+                        "x": 167.006,
+                        "y": 98.86
+                    },
+                    "uuid": "519083ce-c88c-4ff3-a39c-2830957370d2"
+                },
+                {
+                    "description": "Pad 1 [TAP4_A] of CA04 on F.Cu",
+                    "pos": {
+                        "x": 167.056,
+                        "y": 98.21
+                    },
+                    "uuid": "7291957d-cf63-40d4-93be-8fd495440413"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 167.246,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D04 on F.Silkscreen",
+                    "pos": {
+                        "x": 162.492,
+                        "y": 98.86
+                    },
+                    "uuid": "3cbc6ed2-9f0a-4531-9d26-ed971c301a1d"
+                },
+                {
+                    "description": "Pad 1 [TAP3_A] of CA03 on F.Cu",
+                    "pos": {
+                        "x": 162.542,
+                        "y": 98.21
+                    },
+                    "uuid": "9055495d-db09-4372-8f33-47980f494ae9"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 162.732,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D03 on F.Silkscreen",
+                    "pos": {
+                        "x": 157.978,
+                        "y": 98.86
+                    },
+                    "uuid": "3dda8a84-163c-468b-b6dd-4c69351ac213"
+                },
+                {
+                    "description": "Pad 1 [TAP2_A] of CA02 on F.Cu",
+                    "pos": {
+                        "x": 158.028,
+                        "y": 98.21
+                    },
+                    "uuid": "18399861-2740-4a30-b654-086b75de2ae4"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 158.198,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D01 on F.Silkscreen",
+                    "pos": {
+                        "x": 148.95,
+                        "y": 98.86
+                    },
+                    "uuid": "5646c9f0-08ac-4314-885d-044fd2c90a27"
+                },
+                {
+                    "description": "Pad 1 [TAP0_A] of CA00 on F.Cu",
+                    "pos": {
+                        "x": 149.0,
+                        "y": 98.21
+                    },
+                    "uuid": "2b2054f8-e181-4e0c-b933-0fe9d8d52995"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 149.19,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D02 on F.Silkscreen",
+                    "pos": {
+                        "x": 153.464,
+                        "y": 98.86
+                    },
+                    "uuid": "8eb4d51f-178a-470f-bd43-9b49eb3c019c"
+                },
+                {
+                    "description": "Pad 1 [TAP1_A] of CA01 on F.Cu",
+                    "pos": {
+                        "x": 153.514,
+                        "y": 98.21
+                    },
+                    "uuid": "5309579e-612e-451b-9eb3-a2e39fea13c5"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 153.704,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D09 on F.Silkscreen",
+                    "pos": {
+                        "x": 185.062,
+                        "y": 98.86
+                    },
+                    "uuid": "0fe9bba1-48f7-492f-8ee9-9914ac6d0a16"
+                },
+                {
+                    "description": "Pad 1 [TAP8_A] of CA08 on F.Cu",
+                    "pos": {
+                        "x": 185.112,
+                        "y": 98.21
+                    },
+                    "uuid": "84a34b26-34c3-4c6e-989c-6b15d66bd367"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 185.302,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D10 on F.Silkscreen",
+                    "pos": {
+                        "x": 189.576,
+                        "y": 98.86
+                    },
+                    "uuid": "8cb59437-10d9-46e2-b0b1-63275ca69f8b"
+                },
+                {
+                    "description": "Pad 1 [TAP9_A] of CA09 on F.Cu",
+                    "pos": {
+                        "x": 189.626,
+                        "y": 98.21
+                    },
+                    "uuid": "4c7468be-ba2c-4b3f-b147-38b3b81b6cb3"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 189.816,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D11 on F.Silkscreen",
+                    "pos": {
+                        "x": 194.09,
+                        "y": 98.86
+                    },
+                    "uuid": "5bb560d6-97de-4fe9-9041-0ce9564188aa"
+                },
+                {
+                    "description": "Pad 1 [TAP10_A] of CA10 on F.Cu",
+                    "pos": {
+                        "x": 194.14,
+                        "y": 98.21
+                    },
+                    "uuid": "594330f7-8521-431c-92b8-91479fa51436"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 193.97,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D08 on F.Silkscreen",
+                    "pos": {
+                        "x": 180.548,
+                        "y": 98.86
+                    },
+                    "uuid": "963b4099-96fe-4e44-ae7e-f62e2d9adf33"
+                },
+                {
+                    "description": "Pad 1 [TAP7_A] of CA07 on F.Cu",
+                    "pos": {
+                        "x": 180.598,
+                        "y": 98.21
+                    },
+                    "uuid": "6ffa99d4-c517-4535-9b99-e5fa83b6c9dd"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 180.788,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D07 on F.Silkscreen",
+                    "pos": {
+                        "x": 176.034,
+                        "y": 98.86
+                    },
+                    "uuid": "0ada8d11-312a-4a11-ab50-03d850ab7742"
+                },
+                {
+                    "description": "Pad 1 [TAP6_A] of CA06 on F.Cu",
+                    "pos": {
+                        "x": 176.084,
+                        "y": 98.21
+                    },
+                    "uuid": "b8e44815-6e81-4b85-8962-d46c40def951"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 176.274,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D06 on F.Silkscreen",
+                    "pos": {
+                        "x": 171.52,
+                        "y": 98.86
+                    },
+                    "uuid": "72948727-48b3-4f05-9963-272c4dced938"
+                },
+                {
+                    "description": "Pad 1 [TAP5_A] of CA05 on F.Cu",
+                    "pos": {
+                        "x": 171.57,
+                        "y": 98.21
+                    },
+                    "uuid": "e730f2a1-a582-4ad6-aa50-c10351da0a59"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 171.4,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D16 on F.Silkscreen",
+                    "pos": {
+                        "x": 216.66,
+                        "y": 98.86
+                    },
+                    "uuid": "7c7facd6-1013-4704-b381-762effd4b0f0"
+                },
+                {
+                    "description": "Pad 1 [TAP15_A] of CA15 on F.Cu",
+                    "pos": {
+                        "x": 216.71,
+                        "y": 98.21
+                    },
+                    "uuid": "ad2e41d1-9d5d-4aa6-b689-10825078fa49"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 216.88,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D15 on F.Silkscreen",
+                    "pos": {
+                        "x": 212.146,
+                        "y": 98.86
+                    },
+                    "uuid": "641fe2f8-09a3-467c-81b2-a4c2b9f7cd48"
+                },
+                {
+                    "description": "Pad 1 [TAP14_A] of CA14 on F.Cu",
+                    "pos": {
+                        "x": 212.196,
+                        "y": 98.21
+                    },
+                    "uuid": "0407fe10-1feb-4a15-8de0-65801d5699e2"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 212.026,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D12 on F.Silkscreen",
+                    "pos": {
+                        "x": 198.604,
+                        "y": 98.86
+                    },
+                    "uuid": "f7a6f034-35ef-4400-b4d3-f6ff64e5f3e5"
+                },
+                {
+                    "description": "Pad 1 [TAP11_A] of CA11 on F.Cu",
+                    "pos": {
+                        "x": 198.654,
+                        "y": 98.21
+                    },
+                    "uuid": "58da8801-0285-426b-8e83-6d8ebb0bb796"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 198.844,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D13 on F.Silkscreen",
+                    "pos": {
+                        "x": 203.118,
+                        "y": 98.86
+                    },
+                    "uuid": "141c12d9-75c7-4802-81bb-496a0f88b5e9"
+                },
+                {
+                    "description": "Pad 1 [TAP12_A] of CA12 on F.Cu",
+                    "pos": {
+                        "x": 203.168,
+                        "y": 98.21
+                    },
+                    "uuid": "5861f110-69e2-4c1c-ba3d-60016f3948b0"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 202.998,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Polygon of D14 on F.Silkscreen",
+                    "pos": {
+                        "x": 207.632,
+                        "y": 98.86
+                    },
+                    "uuid": "284f814c-fedb-4499-a295-d60bf59f4c0f"
+                },
+                {
+                    "description": "Pad 1 [TAP13_A] of CA13 on F.Cu",
+                    "pos": {
+                        "x": 207.682,
+                        "y": 98.21
+                    },
+                    "uuid": "d250bf43-3f15-4372-9f8b-3cf50d70cd17"
+                }
+            ],
+            "layer": "F.Mask",
+            "pos": {
+                "x": 207.512,
+                "y": 98.53
+            },
+            "severity": "warning",
+            "type": "silk_over_copper"
+        }
+    ]
+}

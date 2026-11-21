@@ -1,0 +1,180 @@
+** Drc report for sampler.kicad_pcb **
+** Created on 2026-11-21T17:26:45 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 51 DRC violations **
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.1200 mm)
+    Rule: board setup constraints edge; error
+    @(144.8400 mm, 91.1000 mm): Segment on Edge.Cuts
+    @(143.6600 mm, 99.5650 mm): Track [TRF2_IN] on F.Cu, length 0.8800 mm
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(144.8400 mm, 91.1000 mm): Segment on Edge.Cuts
+    @(144.3400 mm, 95.4000 mm): Pad 1 [+3V3] of TP401 on B.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.1200 mm)
+    Rule: board setup constraints edge; error
+    @(114.0600 mm, 110.4500 mm): Segment on Edge.Cuts
+    @(114.3600 mm, 100.0000 mm): Track [BUF_OUT_S] on F.Cu, length 0.8000 mm
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(114.0600 mm, 110.4500 mm): Segment on Edge.Cuts
+    @(114.3600 mm, 100.0000 mm): Pad 1 [BUF_OUT_S] of X1 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(144.8400 mm, 91.1000 mm): Segment on Edge.Cuts
+    @(144.5400 mm, 99.5650 mm): Pad 1 [TRF2_IN] of X2 on F.Cu
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(114.0600 mm, 110.4500 mm): Segment on Edge.Cuts
+    @(114.9000 mm, 104.2500 mm): PCB text 'VBIAS_K' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(114.0600 mm, 110.4500 mm): Segment on Edge.Cuts
+    @(115.2600 mm, 99.2000 mm): PCB text 'BUF_OUT_S' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(114.0600 mm, 110.4500 mm): Segment on Edge.Cuts
+    @(114.9000 mm, 95.7500 mm): PCB text 'VBIAS_A' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(144.8400 mm, 91.1000 mm): Segment on Edge.Cuts
+    @(144.3400 mm, 94.4000 mm): PCB text '+3V3' on B.Silkscreen
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(114.9000 mm, 96.8300 mm): Footprint TP201
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(144.5400 mm, 99.5650 mm): Footprint X2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(142.6200 mm, 106.5393 mm): Footprint NT401
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(121.6500 mm, 109.5000 mm): Footprint TP206
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(119.0600 mm, 108.7000 mm): Footprint TP205
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(114.3600 mm, 100.0000 mm): Footprint X1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(114.9000 mm, 103.1700 mm): Footprint TP202
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(132.9400 mm, 100.0000 mm): Footprint T401
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(114.9000 mm, 106.2000 mm): Footprint TP207
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(127.4488 mm, 95.0000 mm): Footprint TP204
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(121.6000 mm, 95.0000 mm): Footprint TP203
+[lib_footprint_issues]: The current configuration does not include the footprint library 'sampler_fragment'
+    Local override; warning
+    @(144.3400 mm, 95.4000 mm): Footprint TP401
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0675 mm)
+    Rule: board setup constraints silk line width; warning
+    @(144.3400 mm, 94.4000 mm): PCB text '+3V3' on B.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(144.3400 mm, 94.4000 mm): PCB text '+3V3' on B.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0675 mm)
+    Rule: board setup constraints silk line width; warning
+    @(127.4488 mm, 93.9500 mm): PCB text '+2V5' on B.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(127.4488 mm, 93.9500 mm): PCB text '+2V5' on B.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0675 mm)
+    Rule: board setup constraints silk line width; warning
+    @(114.9000 mm, 107.2500 mm): PCB text 'GND' on B.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(114.9000 mm, 107.2500 mm): PCB text 'GND' on B.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0675 mm)
+    Rule: board setup constraints silk line width; warning
+    @(121.6000 mm, 93.9500 mm): PCB text '-2V5' on B.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(121.6000 mm, 93.9500 mm): PCB text '-2V5' on B.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(139.4200 mm, 104.6500 mm): PCB text '80 ps stub' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(139.4200 mm, 104.6500 mm): PCB text '80 ps stub' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(119.0600 mm, 109.6000 mm): PCB text 'ADC_IN' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(119.0600 mm, 109.6000 mm): PCB text 'ADC_IN' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(143.6400 mm, 98.6650 mm): PCB text 'TRF2_IN' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(143.6400 mm, 98.6650 mm): PCB text 'TRF2_IN' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0675 mm)
+    Rule: board setup constraints silk line width; warning
+    @(114.9000 mm, 104.2500 mm): PCB text 'VBIAS_K' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(114.9000 mm, 104.2500 mm): PCB text 'VBIAS_K' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(126.4000 mm, 108.8000 mm): PCB text 'U202 shift' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(126.4000 mm, 108.8000 mm): PCB text 'U202 shift' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0675 mm)
+    Rule: board setup constraints silk line width; warning
+    @(114.9000 mm, 95.7500 mm): PCB text 'VBIAS_A' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(114.9000 mm, 95.7500 mm): PCB text 'VBIAS_A' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(134.5000 mm, 109.9500 mm): PCB text 'SAMPLER fragment 4L JLC04161H-7628' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(134.5000 mm, 109.9500 mm): PCB text 'SAMPLER fragment 4L JLC04161H-7628' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(128.3000 mm, 96.5300 mm): PCB text 'STRB_A' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(128.3000 mm, 96.5300 mm): PCB text 'STRB_A' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(123.3000 mm, 109.5000 mm): PCB text 'REF_MID' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(123.3000 mm, 109.5000 mm): PCB text 'REF_MID' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(115.2600 mm, 99.2000 mm): PCB text 'BUF_OUT_S' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(115.2600 mm, 99.2000 mm): PCB text 'BUF_OUT_S' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(128.3000 mm, 103.4700 mm): PCB text 'STRB_K' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(128.3000 mm, 103.4700 mm): PCB text 'STRB_K' on F.Silkscreen
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

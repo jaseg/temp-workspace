@@ -1,0 +1,2692 @@
+** Drc report for phase_trigger.kicad_pcb **
+** Created on 2026-11-21T17:26:55 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 844 DRC violations **
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(162.5420 mm, 98.2100 mm): Track [TAP3_A] on F.Cu, length 0.7400 mm
+    @(161.5920 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(152.7740 mm, 98.2100 mm): Track [TAP1_A] on F.Cu, length 0.2828 mm
+    @(152.5640 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(216.7100 mm, 98.2100 mm): Track [TAP15_A] on F.Cu, length 0.7400 mm
+    @(215.7600 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(215.9700 mm, 98.2100 mm): Track [TAP15_A] on F.Cu, length 0.2828 mm
+    @(215.3880 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(211.4560 mm, 98.2100 mm): Track [TAP14_A] on F.Cu, length 0.2828 mm
+    @(210.8740 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(212.1960 mm, 98.2100 mm): Track [TAP14_A] on F.Cu, length 0.7400 mm
+    @(211.2460 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(203.1680 mm, 98.2100 mm): Track [TAP12_A] on F.Cu, length 0.7400 mm
+    @(202.2180 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(202.4280 mm, 98.2100 mm): Track [TAP12_A] on F.Cu, length 0.2828 mm
+    @(201.8460 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(197.9140 mm, 98.2100 mm): Track [TAP11_A] on F.Cu, length 0.2828 mm
+    @(197.7040 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(193.4000 mm, 98.2100 mm): Track [TAP10_A] on F.Cu, length 0.2828 mm
+    @(192.8180 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(194.1400 mm, 98.2100 mm): Track [TAP10_A] on F.Cu, length 0.7400 mm
+    @(192.8180 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(188.8860 mm, 98.2100 mm): Track [TAP9_A] on F.Cu, length 0.2828 mm
+    @(188.3040 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(185.1120 mm, 98.2100 mm): Track [TAP8_A] on F.Cu, length 0.7400 mm
+    @(183.7900 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(184.3720 mm, 98.2100 mm): Track [TAP8_A] on F.Cu, length 0.2828 mm
+    @(183.7900 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(179.8580 mm, 98.2100 mm): Track [TAP7_A] on F.Cu, length 0.2828 mm
+    @(179.2760 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(180.5980 mm, 98.2100 mm): Track [TAP7_A] on F.Cu, length 0.7400 mm
+    @(179.2760 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(176.0840 mm, 98.2100 mm): Track [TAP6_A] on F.Cu, length 0.7400 mm
+    @(174.7620 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(171.5700 mm, 98.2100 mm): Track [TAP5_A] on F.Cu, length 0.7400 mm
+    @(170.2480 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(170.8300 mm, 98.2100 mm): Track [TAP5_A] on F.Cu, length 0.2828 mm
+    @(170.2480 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(166.3160 mm, 98.2100 mm): Track [TAP4_A] on F.Cu, length 0.2828 mm
+    @(165.7340 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(161.8020 mm, 98.2100 mm): Track [TAP3_A] on F.Cu, length 0.2828 mm
+    @(161.5920 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(153.5140 mm, 98.2100 mm): Track [TAP1_A] on F.Cu, length 0.7400 mm
+    @(152.5640 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(157.2880 mm, 98.2100 mm): Track [TAP2_A] on F.Cu, length 0.2828 mm
+    @(157.0780 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(206.7420 mm, 102.2400 mm): Pad 2 [TAP13_K] of RSK13 on F.Cu
+    @(205.4250 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(213.1360 mm, 103.2600 mm): Pad 1 [VTAP_P] of RNK14 on F.Cu
+    @(209.9390 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(167.9960 mm, 103.2600 mm): Pad 1 [VTAP_P] of RNK04 on F.Cu
+    @(164.7990 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(175.1440 mm, 102.2400 mm): Pad 2 [TAP6_K] of RSK06 on F.Cu
+    @(173.8270 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(146.7430 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+    @(148.0600 mm, 102.2400 mm): Pad 2 [TAP0_K] of RSK00 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(190.5660 mm, 103.2600 mm): Pad 1 [VTAP_P] of RNK09 on F.Cu
+    @(187.3690 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(157.0880 mm, 103.2600 mm): Pad 1 [TAP2_IN] of RSK02 on F.Cu
+    @(155.7710 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(160.2850 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+    @(163.4820 mm, 103.2600 mm): Pad 1 [VTAP_P] of RNK03 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(193.2000 mm, 103.2600 mm): Pad 1 [TAP10_IN] of RSK10 on F.Cu
+    @(191.8830 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(196.3970 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+    @(197.7140 mm, 102.2400 mm): Pad 2 [TAP11_K] of RSK11 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(151.2570 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+    @(154.4540 mm, 102.2400 mm): Pad 2 [TAP1_K] of RNK01 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(169.3130 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+    @(170.6300 mm, 102.2400 mm): Pad 2 [TAP5_K] of RSK05 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(214.4530 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+    @(217.6500 mm, 103.2600 mm): Pad 1 [VTAP_P] of RNK15 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(202.2280 mm, 102.2400 mm): Pad 2 [TAP12_K] of RSK12 on F.Cu
+    @(200.9110 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(178.3410 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+    @(179.6580 mm, 102.2400 mm): Pad 2 [TAP7_K] of RSK07 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(182.8550 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+    @(184.1720 mm, 103.2600 mm): Pad 1 [TAP8_IN] of RSK08 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(154.4540 mm, 97.7600 mm): Pad 1 [TAP1_A] of RNA01 on F.Cu
+    @(151.2570 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(182.8550 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+    @(184.1720 mm, 96.7400 mm): Pad 2 [TAP8_IN] of RSA08 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(217.6500 mm, 97.7600 mm): Pad 1 [TAP15_A] of RNA15 on F.Cu
+    @(214.4530 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(196.3970 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+    @(199.5940 mm, 97.7600 mm): Pad 1 [TAP11_A] of RNA11 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(179.6580 mm, 97.7600 mm): Pad 1 [TAP7_A] of RSA07 on F.Cu
+    @(178.3410 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(204.1080 mm, 97.7600 mm): Pad 1 [TAP12_A] of RNA12 on F.Cu
+    @(200.9110 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(193.2000 mm, 96.7400 mm): Pad 2 [TAP10_IN] of RSA10 on F.Cu
+    @(191.8830 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(188.6860 mm, 96.7400 mm): Pad 2 [TAP9_IN] of RSA09 on F.Cu
+    @(187.3690 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(173.8270 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+    @(175.1440 mm, 96.7400 mm): Pad 2 [TAP6_IN] of RSA06 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(161.6020 mm, 96.7400 mm): Pad 2 [TAP3_IN] of RSA03 on F.Cu
+    @(160.2850 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(166.1160 mm, 97.7600 mm): Pad 1 [TAP4_A] of RSA04 on F.Cu
+    @(164.7990 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(205.4250 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+    @(206.7420 mm, 97.7600 mm): Pad 1 [TAP13_A] of RSA13 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(155.7710 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+    @(158.9680 mm, 96.7400 mm): Pad 2 [VTAP_N] of RNA02 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(169.3130 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+    @(172.5100 mm, 96.7400 mm): Pad 2 [VTAP_N] of RNA05 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(146.7430 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+    @(149.9400 mm, 97.7600 mm): Pad 1 [TAP0_A] of RNA00 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(209.9390 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+    @(213.1360 mm, 96.7400 mm): Pad 2 [VTAP_N] of RNA14 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(215.7600 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(215.9700 mm, 98.2100 mm): Track [TAP15_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(197.3320 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+    @(198.6540 mm, 98.2100 mm): Track [TAP11_A] on F.Cu, length 0.7400 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(188.3040 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+    @(189.6260 mm, 98.2100 mm): Track [TAP9_A] on F.Cu, length 0.7400 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(206.3600 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+    @(206.9420 mm, 98.2100 mm): Track [TAP13_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(157.0780 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(158.0280 mm, 98.2100 mm): Track [TAP2_A] on F.Cu, length 0.7400 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(211.2460 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(211.4560 mm, 98.2100 mm): Track [TAP14_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(197.7040 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(198.6540 mm, 98.2100 mm): Track [TAP11_A] on F.Cu, length 0.7400 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(165.7340 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+    @(167.0560 mm, 98.2100 mm): Track [TAP4_A] on F.Cu, length 0.7400 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(175.1340 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(175.3440 mm, 98.2100 mm): Track [TAP6_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(156.7060 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+    @(158.0280 mm, 98.2100 mm): Track [TAP2_A] on F.Cu, length 0.7400 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(174.7620 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.3720 mm
+    @(175.3440 mm, 98.2100 mm): Track [TAP6_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(202.2180 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(202.4280 mm, 98.2100 mm): Track [TAP12_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(206.7320 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(206.9420 mm, 98.2100 mm): Track [TAP13_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(166.1060 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(166.3160 mm, 98.2100 mm): Track [TAP4_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(188.6760 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(188.8860 mm, 98.2100 mm): Track [TAP9_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1529 mm)
+    Rule: netclass 'Default'; error
+    @(184.1620 mm, 98.4998 mm): Track [PH_LINE] on F.Cu, length 0.2828 mm
+    @(184.3720 mm, 98.2100 mm): Track [TAP8_A] on F.Cu, length 0.2828 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(141.2100 mm, 99.5000 mm): Pad 8 [GND] of U303 on F.Cu
+    @(141.2100 mm, 100.0000 mm): Track [TRF_OUT] on F.Cu, length 1.8000 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1700 mm)
+    Rule: netclass 'Default'; error
+    @(139.3100 mm, 99.5000 mm): Track [+3V3] on F.Cu, length 0.6685 mm
+    @(138.3800 mm, 100.0000 mm): Track [TRF_IN] on F.Cu, length 0.9300 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(139.3100 mm, 99.5000 mm): Pad 1 [+3V3] of U303 on F.Cu
+    @(138.3800 mm, 100.0000 mm): Track [TRF_IN] on F.Cu, length 0.9300 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(134.2900 mm, 100.0000 mm): Track [CMP_P] on F.Cu, length 3.1300 mm
+    @(133.7900 mm, 100.0000 mm): Pad 7 [+2V5] of U302 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1400 mm)
+    Rule: netclass 'Default'; error
+    @(132.2400 mm, 96.3600 mm): Pad 2 [GND] of C306 on F.Cu
+    @(131.6900 mm, 97.1200 mm): Track [TRIG_LEVEL] on F.Cu, length 2.5200 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(134.2900 mm, 98.1000 mm): Track [CMP_N] on F.Cu, length 0.2000 mm
+    @(133.7900 mm, 98.1000 mm): Pad 2 [GND] of U302 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1976 mm)
+    Rule: netclass 'Default'; error
+    @(140.2600 mm, 99.5500 mm): Via [GND] on F.Cu - B.Cu
+    @(140.0000 mm, 98.8800 mm): Pad 1 [+3V3] of C311 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(133.2900 mm, 100.0000 mm): Track [+2V5] on F.Cu, length 0.5000 mm
+    @(129.7900 mm, 100.0000 mm): Track [TRIG_COM] on F.Cu, length 3.0000 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(133.2900 mm, 100.0000 mm): Pad 6 [+2V5] of U302 on F.Cu
+    @(129.7900 mm, 100.0000 mm): Track [TRIG_COM] on F.Cu, length 3.0000 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1150 mm)
+    Rule: netclass 'Default'; error
+    @(127.5550 mm, 101.4900 mm): Pad 1 [GND] of R301 on F.Cu
+    @(128.2150 mm, 101.4000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1750 mm)
+    Rule: netclass 'Default'; error
+    @(129.7900 mm, 100.0000 mm): Pad 8 [TRIG_COM] of U301 on F.Cu
+    @(129.1150 mm, 100.0000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(128.4400 mm, 101.0000 mm): Pad 4 [VSW_GND] of U301 on F.Cu
+    @(126.7550 mm, 100.5000 mm): Track [EXT_CLK] on F.Cu, length 1.6850 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(128.4400 mm, 101.0000 mm): Track [VSW_GND] on F.Cu, length 0.7500 mm
+    @(126.7550 mm, 100.5000 mm): Track [EXT_CLK] on F.Cu, length 1.6850 mm
+[hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.2400 mm)
+    Rule: board setup constraints hole; error
+    @(127.5550 mm, 101.4900 mm): Pad 1 [GND] of R301 on F.Cu
+    @(128.2150 mm, 101.4000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(137.4200 mm, 98.5600 mm): Footprint C307
+    @(137.4200 mm, 96.7400 mm): Footprint R308
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(211.4430 mm, 85.9400 mm): Footprint C37
+    @(213.3480 mm, 90.2500 mm): Footprint U18
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(175.3310 mm, 85.9400 mm): Footprint C33
+    @(177.2360 mm, 90.2500 mm): Footprint U14
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(202.4150 mm, 85.9400 mm): Footprint C36
+    @(204.3200 mm, 90.2500 mm): Footprint U17
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(130.1650 mm, 98.0200 mm): Footprint R305
+    @(129.1150 mm, 100.2500 mm): Footprint U301
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(129.1150 mm, 98.0400 mm): Footprint C301
+    @(129.1150 mm, 100.2500 mm): Footprint U301
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(168.2080 mm, 90.2500 mm): Footprint U13
+    @(166.3030 mm, 85.9400 mm): Footprint C32
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(128.9150 mm, 102.3800 mm): Footprint C303
+    @(129.1150 mm, 100.2500 mm): Footprint U301
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(132.2400 mm, 96.8400 mm): Footprint C306
+    @(133.5400 mm, 99.0500 mm): Footprint U302
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(133.2900 mm, 101.2600 mm): Footprint C304
+    @(133.5400 mm, 99.0500 mm): Footprint U302
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(150.1520 mm, 90.2500 mm): Footprint U11
+    @(148.2470 mm, 85.9400 mm): Footprint C30
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(133.1900 mm, 96.8400 mm): Footprint C305
+    @(133.5400 mm, 99.0500 mm): Footprint U302
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(157.2750 mm, 85.9400 mm): Footprint C31
+    @(159.1800 mm, 90.2500 mm): Footprint U12
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(140.0000 mm, 98.4000 mm): Footprint C311
+    @(140.2600 mm, 100.2500 mm): Footprint U303
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(129.8550 mm, 102.3800 mm): Footprint C302
+    @(129.1150 mm, 100.2500 mm): Footprint U301
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(127.5550 mm, 100.9800 mm): Footprint R301
+    @(129.1150 mm, 100.2500 mm): Footprint U301
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(186.2640 mm, 90.2500 mm): Footprint U15
+    @(184.3590 mm, 85.9400 mm): Footprint C34
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(193.3870 mm, 85.9400 mm): Footprint C35
+    @(195.2920 mm, 90.2500 mm): Footprint U16
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(140.2600 mm, 100.2500 mm): Footprint U303
+    @(142.0700 mm, 99.5150 mm): Footprint FB301
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(140.2600 mm, 100.2500 mm): Footprint U303
+    @(139.0600 mm, 98.4000 mm): Footprint C312
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(140.2600 mm, 100.2500 mm): Footprint U303
+    @(137.9000 mm, 100.0000 mm): Footprint C308
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(135.3430 mm, 94.0000 mm): Footprint U304
+    @(132.6555 mm, 93.0500 mm): Footprint C310
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.1700 mm)
+    Rule: board setup constraints edge; error
+    @(117.6150 mm, 107.8500 mm): Segment on Edge.Cuts
+    @(117.9650 mm, 99.5000 mm): Track [BUF_OUT_T] on F.Cu, length 10.4750 mm
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.3000 mm)
+    Rule: board setup constraints edge; error
+    @(222.7100 mm, 82.4000 mm): Segment on Edge.Cuts
+    @(221.9100 mm, 104.5850 mm): Pad 1 [VTAP_P] of TP403 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(117.6150 mm, 107.8500 mm): Segment on Edge.Cuts
+    @(119.7150 mm, 101.1750 mm): Pad 2 [GND] of J301 on B.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(117.6150 mm, 107.8500 mm): Segment on Edge.Cuts
+    @(119.7150 mm, 106.8250 mm): Pad 2 [GND] of J301 on B.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(117.6150 mm, 107.8500 mm): Segment on Edge.Cuts
+    @(119.7150 mm, 101.1750 mm): Pad 2 [GND] of J301 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.1000 mm)
+    Rule: board setup constraints edge; error
+    @(117.6150 mm, 107.8500 mm): Segment on Edge.Cuts
+    @(119.5150 mm, 104.0000 mm): Pad 1 [EXT_CLK] of J301 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(117.6150 mm, 107.8500 mm): Segment on Edge.Cuts
+    @(119.7150 mm, 106.8250 mm): Pad 2 [GND] of J301 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.3000 mm)
+    Rule: board setup constraints edge; error
+    @(222.7100 mm, 82.4000 mm): Segment on Edge.Cuts
+    @(221.9100 mm, 95.4150 mm): Pad 1 [VTAP_N] of TP402 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0500 mm)
+    Rule: board setup constraints edge; error
+    @(117.6150 mm, 107.8500 mm): Segment on Edge.Cuts
+    @(117.9650 mm, 99.5000 mm): Pad 1 [BUF_OUT_T] of X1 on F.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(129.1150 mm, 97.0000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(128.2150 mm, 101.4000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(129.1150 mm, 100.0000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(132.6550 mm, 100.9500 mm): Via [+2V5] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(128.4800 mm, 98.5200 mm): Via [+2V5] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(127.9150 mm, 98.5200 mm): Via [+2V5] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.9250 mm, 100.9500 mm): Via [+2V5] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(221.9000 mm, 100.0000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(146.5000 mm, 94.0850 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(170.1130 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(148.2470 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(134.0900 mm, 97.0800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(146.5000 mm, 105.9150 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(157.2750 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.2900 mm, 102.3000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(215.2530 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(129.8550 mm, 103.4200 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(143.6300 mm, 93.5650 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(219.8300 mm, 94.8150 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(140.0000 mm, 97.3400 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(152.0570 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(197.1970 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(140.2600 mm, 99.5500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(122.1450 mm, 106.8250 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(206.2250 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(146.1800 mm, 93.8850 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(193.3870 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(131.5755 mm, 93.0500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(139.0600 mm, 97.3400 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.2205 mm, 94.0000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(140.2600 mm, 100.2500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(188.1690 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(130.7950 mm, 103.4200 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(202.4150 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(219.8300 mm, 105.1850 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(179.1410 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(132.2400 mm, 95.8000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(126.9200 mm, 101.4600 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(175.3310 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.1900 mm, 95.8000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(211.4430 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(161.0850 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(138.0550 mm, 96.2600 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(221.1570 mm, 102.7500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(166.3030 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(147.1150 mm, 100.9900 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(140.2600 mm, 100.9500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(128.9150 mm, 103.4200 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(122.1450 mm, 101.1750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(184.3590 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(144.2750 mm, 100.9900 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(221.1570 mm, 97.2500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(139.2600 mm, 96.4000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.1400 mm, 99.0500 mm): Via [-2V5] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(132.3850 mm, 103.4000 mm): Via [-2V5] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(131.1150 mm, 96.9700 mm): Via [-2V5] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.9400 mm, 99.0500 mm): Via [-2V5] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.2205 mm, 94.9500 mm): Via [LVDS_A] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(136.4800 mm, 101.5650 mm): Via [LVDS_A] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(148.8820 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.1355 mm, 92.4150 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(192.7520 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(142.3700 mm, 92.8800 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(175.9660 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(147.6120 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(174.6960 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(138.4000 mm, 98.9300 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(212.0780 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(194.0220 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(210.8080 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(183.7240 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(133.7055 mm, 92.4150 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(165.6680 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(157.9100 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(201.7800 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(138.4000 mm, 98.3800 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(166.9380 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(184.9940 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(203.0500 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(141.7700 mm, 92.8800 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(156.6400 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(148.0600 mm, 103.8350 mm): Via [TAP0_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(147.2600 mm, 96.1650 mm): Via [TAP0_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(148.0600 mm, 96.1650 mm): Via [TAP0_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(217.6500 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(204.1080 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(186.0520 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(208.6220 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(163.4820 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(190.5660 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(199.5940 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(149.9400 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(220.7900 mm, 94.8150 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(154.4540 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(181.5380 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(177.0240 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(172.5100 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(158.9680 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(167.9960 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(213.1360 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(146.5000 mm, 96.2450 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(195.0800 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(177.0240 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(154.4540 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(220.7900 mm, 105.1850 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(146.5000 mm, 103.7550 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(172.5100 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(204.1080 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(158.9680 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(208.6220 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(190.5660 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(217.6500 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(167.9960 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(149.9400 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(213.1360 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(195.0800 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(163.4820 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(181.5380 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(186.0520 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(199.5940 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(151.7740 mm, 96.1650 mm): Via [TAP1_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(152.5740 mm, 96.1650 mm): Via [TAP1_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(152.5740 mm, 103.8350 mm): Via [TAP1_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(157.0880 mm, 96.1650 mm): Via [TAP2_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(157.0880 mm, 103.8350 mm): Via [TAP2_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(156.2880 mm, 96.1650 mm): Via [TAP2_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(161.6020 mm, 96.1650 mm): Via [TAP3_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(161.6020 mm, 103.8350 mm): Via [TAP3_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(160.8020 mm, 96.1650 mm): Via [TAP3_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(166.1160 mm, 103.8350 mm): Via [TAP4_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(166.1160 mm, 96.1650 mm): Via [TAP4_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(165.3160 mm, 96.1650 mm): Via [TAP4_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(169.8300 mm, 96.1650 mm): Via [TAP5_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(170.6300 mm, 103.8350 mm): Via [TAP5_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(170.6300 mm, 96.1650 mm): Via [TAP5_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(175.1440 mm, 103.8350 mm): Via [TAP6_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(175.1440 mm, 96.1650 mm): Via [TAP6_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(174.3440 mm, 96.1650 mm): Via [TAP6_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(178.8580 mm, 96.1650 mm): Via [TAP7_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(179.6580 mm, 103.8350 mm): Via [TAP7_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(179.6580 mm, 96.1650 mm): Via [TAP7_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(183.3720 mm, 96.1650 mm): Via [TAP8_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(184.1720 mm, 96.1650 mm): Via [TAP8_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(184.1720 mm, 103.8350 mm): Via [TAP8_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(187.8860 mm, 96.1650 mm): Via [TAP9_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(188.6860 mm, 96.1650 mm): Via [TAP9_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(188.6860 mm, 103.8350 mm): Via [TAP9_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(193.2000 mm, 103.8350 mm): Via [TAP10_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(193.2000 mm, 96.1650 mm): Via [TAP10_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(192.4000 mm, 96.1650 mm): Via [TAP10_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(196.9140 mm, 96.1650 mm): Via [TAP11_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(197.7140 mm, 103.8350 mm): Via [TAP11_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(197.7140 mm, 96.1650 mm): Via [TAP11_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(202.2280 mm, 103.8350 mm): Via [TAP12_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(202.2280 mm, 96.1650 mm): Via [TAP12_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(201.4280 mm, 96.1650 mm): Via [TAP12_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(205.9420 mm, 96.1650 mm): Via [TAP13_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(206.7420 mm, 103.8350 mm): Via [TAP13_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(206.7420 mm, 96.1650 mm): Via [TAP13_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(211.2560 mm, 103.8350 mm): Via [TAP14_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(211.2560 mm, 96.1650 mm): Via [TAP14_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(210.4560 mm, 96.1650 mm): Via [TAP14_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(215.7700 mm, 103.8350 mm): Via [TAP15_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(215.7700 mm, 96.1650 mm): Via [TAP15_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(214.9700 mm, 96.1650 mm): Via [TAP15_IN] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(147.0000 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(215.2530 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(170.1130 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(206.2250 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(152.0570 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(203.6850 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(158.5450 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(179.1410 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(197.1970 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(188.1690 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(167.5730 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(161.0850 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(212.7130 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(185.6290 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(176.6010 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(194.6570 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(149.5170 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(128.4400 mm, 100.0000 mm): Track [VSW_GND] on F.Cu, length 0.6750 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(209.9390 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(146.7430 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(169.3130 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(205.4250 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(155.7710 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(164.7990 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(173.8270 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(187.3690 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(200.9110 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(160.2850 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(178.3410 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(196.3970 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(191.8830 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(182.8550 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(151.2570 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(214.4530 mm, 97.2500 mm): Track [PSTRB_A] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(182.8550 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(214.4530 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(200.9110 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(151.2570 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(169.3130 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(196.3970 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(178.3410 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(160.2850 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(191.8830 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(155.7710 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(173.8270 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(187.3690 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(146.7430 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(209.9390 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(205.4250 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1600 mm)
+    Rule: netclass 'Default'; error
+    @(164.7990 mm, 102.7500 mm): Track [PSTRB_K] on F.Cu, length 4.5140 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(148.0600 mm, 98.0100 mm): Track [TAP0_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.7400 mm, 98.2100 mm): Track [TAP0_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.0000 mm, 98.2100 mm): Track [TAP0_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(148.2600 mm, 98.2100 mm): Track [TAP0_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.0000 mm, 99.3500 mm): Track [TAP0_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.9400 mm, 98.0100 mm): Track [TAP0_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.0000 mm, 98.2100 mm): Track [TAP0_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(148.0600 mm, 101.9900 mm): Track [TAP0_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.0000 mm, 100.6500 mm): Track [TAP0_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.0000 mm, 101.7900 mm): Track [TAP0_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.9400 mm, 101.9900 mm): Track [TAP0_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.0000 mm, 101.7900 mm): Track [TAP0_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(149.7400 mm, 101.7900 mm): Track [TAP0_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(148.2600 mm, 101.7900 mm): Track [TAP0_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(152.7740 mm, 98.2100 mm): Track [TAP1_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(153.5140 mm, 99.3500 mm): Track [TAP1_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(154.4540 mm, 98.0100 mm): Track [TAP1_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(153.5140 mm, 98.2100 mm): Track [TAP1_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(153.5140 mm, 98.2100 mm): Track [TAP1_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(152.5740 mm, 98.0100 mm): Track [TAP1_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(154.2540 mm, 98.2100 mm): Track [TAP1_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(153.5140 mm, 100.6500 mm): Track [TAP1_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(154.4540 mm, 101.9900 mm): Track [TAP1_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(154.2540 mm, 101.7900 mm): Track [TAP1_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(152.7740 mm, 101.7900 mm): Track [TAP1_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(153.5140 mm, 101.7900 mm): Track [TAP1_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(152.5740 mm, 101.9900 mm): Track [TAP1_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(153.5140 mm, 101.7900 mm): Track [TAP1_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.9680 mm, 98.0100 mm): Track [TAP2_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(157.0880 mm, 98.0100 mm): Track [TAP2_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(157.2880 mm, 98.2100 mm): Track [TAP2_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.0280 mm, 99.3500 mm): Track [TAP2_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.0280 mm, 98.2100 mm): Track [TAP2_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.7680 mm, 98.2100 mm): Track [TAP2_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.0280 mm, 98.2100 mm): Track [TAP2_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.0280 mm, 101.7900 mm): Track [TAP2_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.0280 mm, 100.6500 mm): Track [TAP2_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(157.2880 mm, 101.7900 mm): Track [TAP2_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.9680 mm, 101.9900 mm): Track [TAP2_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.0280 mm, 101.7900 mm): Track [TAP2_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(158.7680 mm, 101.7900 mm): Track [TAP2_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(157.0880 mm, 101.9900 mm): Track [TAP2_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(162.5420 mm, 98.2100 mm): Track [TAP3_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(163.2820 mm, 98.2100 mm): Track [TAP3_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(162.5420 mm, 99.3500 mm): Track [TAP3_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(161.8020 mm, 98.2100 mm): Track [TAP3_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(162.5420 mm, 98.2100 mm): Track [TAP3_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(163.4820 mm, 98.0100 mm): Track [TAP3_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(161.6020 mm, 98.0100 mm): Track [TAP3_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(162.5420 mm, 100.6500 mm): Track [TAP3_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(163.4820 mm, 101.9900 mm): Track [TAP3_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(161.8020 mm, 101.7900 mm): Track [TAP3_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(163.2820 mm, 101.7900 mm): Track [TAP3_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(162.5420 mm, 101.7900 mm): Track [TAP3_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(162.5420 mm, 101.7900 mm): Track [TAP3_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(161.6020 mm, 101.9900 mm): Track [TAP3_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(166.3160 mm, 98.2100 mm): Track [TAP4_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.9960 mm, 98.0100 mm): Track [TAP4_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.0560 mm, 99.3500 mm): Track [TAP4_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.0560 mm, 98.2100 mm): Track [TAP4_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(166.1160 mm, 98.0100 mm): Track [TAP4_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.0560 mm, 98.2100 mm): Track [TAP4_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.7960 mm, 98.2100 mm): Track [TAP4_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.9960 mm, 101.9900 mm): Track [TAP4_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.0560 mm, 100.6500 mm): Track [TAP4_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(166.1160 mm, 101.9900 mm): Track [TAP4_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.0560 mm, 101.7900 mm): Track [TAP4_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.0560 mm, 101.7900 mm): Track [TAP4_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(167.7960 mm, 101.7900 mm): Track [TAP4_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(166.3160 mm, 101.7900 mm): Track [TAP4_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(170.8300 mm, 98.2100 mm): Track [TAP5_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(171.5700 mm, 99.3500 mm): Track [TAP5_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(171.5700 mm, 98.2100 mm): Track [TAP5_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(170.6300 mm, 98.0100 mm): Track [TAP5_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(171.5700 mm, 98.2100 mm): Track [TAP5_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(172.5100 mm, 98.0100 mm): Track [TAP5_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(172.3100 mm, 98.2100 mm): Track [TAP5_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(171.5700 mm, 101.7900 mm): Track [TAP5_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(172.5100 mm, 101.9900 mm): Track [TAP5_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(170.8300 mm, 101.7900 mm): Track [TAP5_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(171.5700 mm, 101.7900 mm): Track [TAP5_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(171.5700 mm, 100.6500 mm): Track [TAP5_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(170.6300 mm, 101.9900 mm): Track [TAP5_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(172.3100 mm, 101.7900 mm): Track [TAP5_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(176.0840 mm, 98.2100 mm): Track [TAP6_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(176.0840 mm, 99.3500 mm): Track [TAP6_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(177.0240 mm, 98.0100 mm): Track [TAP6_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(175.1440 mm, 98.0100 mm): Track [TAP6_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(176.0840 mm, 98.2100 mm): Track [TAP6_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(175.3440 mm, 98.2100 mm): Track [TAP6_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(176.8240 mm, 98.2100 mm): Track [TAP6_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(177.0240 mm, 101.9900 mm): Track [TAP6_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(176.0840 mm, 101.7900 mm): Track [TAP6_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(176.8240 mm, 101.7900 mm): Track [TAP6_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(175.3440 mm, 101.7900 mm): Track [TAP6_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(175.1440 mm, 101.9900 mm): Track [TAP6_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(176.0840 mm, 100.6500 mm): Track [TAP6_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(176.0840 mm, 101.7900 mm): Track [TAP6_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(180.5980 mm, 98.2100 mm): Track [TAP7_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(180.5980 mm, 99.3500 mm): Track [TAP7_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(180.5980 mm, 98.2100 mm): Track [TAP7_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(179.6580 mm, 98.0100 mm): Track [TAP7_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(181.3380 mm, 98.2100 mm): Track [TAP7_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(179.8580 mm, 98.2100 mm): Track [TAP7_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(181.5380 mm, 98.0100 mm): Track [TAP7_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(181.3380 mm, 101.7900 mm): Track [TAP7_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(179.6580 mm, 101.9900 mm): Track [TAP7_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(180.5980 mm, 101.7900 mm): Track [TAP7_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(180.5980 mm, 101.7900 mm): Track [TAP7_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(181.5380 mm, 101.9900 mm): Track [TAP7_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(180.5980 mm, 100.6500 mm): Track [TAP7_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(179.8580 mm, 101.7900 mm): Track [TAP7_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(185.8520 mm, 98.2100 mm): Track [TAP8_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(185.1120 mm, 99.3500 mm): Track [TAP8_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(185.1120 mm, 98.2100 mm): Track [TAP8_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(184.3720 mm, 98.2100 mm): Track [TAP8_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(185.1120 mm, 98.2100 mm): Track [TAP8_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(184.1720 mm, 98.0100 mm): Track [TAP8_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(186.0520 mm, 98.0100 mm): Track [TAP8_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(186.0520 mm, 101.9900 mm): Track [TAP8_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(184.1720 mm, 101.9900 mm): Track [TAP8_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(185.1120 mm, 100.6500 mm): Track [TAP8_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(184.3720 mm, 101.7900 mm): Track [TAP8_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(185.8520 mm, 101.7900 mm): Track [TAP8_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(185.1120 mm, 101.7900 mm): Track [TAP8_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(185.1120 mm, 101.7900 mm): Track [TAP8_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(188.6860 mm, 98.0100 mm): Track [TAP9_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(189.6260 mm, 99.3500 mm): Track [TAP9_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(189.6260 mm, 98.2100 mm): Track [TAP9_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(188.8860 mm, 98.2100 mm): Track [TAP9_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(190.3660 mm, 98.2100 mm): Track [TAP9_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(190.5660 mm, 98.0100 mm): Track [TAP9_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(189.6260 mm, 98.2100 mm): Track [TAP9_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(190.3660 mm, 101.7900 mm): Track [TAP9_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(189.6260 mm, 101.7900 mm): Track [TAP9_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(188.6860 mm, 101.9900 mm): Track [TAP9_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(189.6260 mm, 101.7900 mm): Track [TAP9_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(190.5660 mm, 101.9900 mm): Track [TAP9_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(189.6260 mm, 100.6500 mm): Track [TAP9_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(188.8860 mm, 101.7900 mm): Track [TAP9_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(194.1400 mm, 98.2100 mm): Track [TAP10_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(194.1400 mm, 98.2100 mm): Track [TAP10_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(193.4000 mm, 98.2100 mm): Track [TAP10_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(194.1400 mm, 99.3500 mm): Track [TAP10_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(195.0800 mm, 98.0100 mm): Track [TAP10_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(193.2000 mm, 98.0100 mm): Track [TAP10_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(194.8800 mm, 98.2100 mm): Track [TAP10_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(194.1400 mm, 101.7900 mm): Track [TAP10_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(194.1400 mm, 101.7900 mm): Track [TAP10_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(195.0800 mm, 101.9900 mm): Track [TAP10_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(194.1400 mm, 100.6500 mm): Track [TAP10_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(193.2000 mm, 101.9900 mm): Track [TAP10_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(193.4000 mm, 101.7900 mm): Track [TAP10_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(194.8800 mm, 101.7900 mm): Track [TAP10_K] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(198.6540 mm, 99.3500 mm): Track [TAP11_A] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(197.7140 mm, 98.0100 mm): Track [TAP11_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(199.3940 mm, 98.2100 mm): Track [TAP11_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(197.9140 mm, 98.2100 mm): Track [TAP11_A] on F.Cu, length 0.2828 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(199.5940 mm, 98.0100 mm): Track [TAP11_A] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(198.6540 mm, 98.2100 mm): Track [TAP11_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(198.6540 mm, 98.2100 mm): Track [TAP11_A] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(197.7140 mm, 101.9900 mm): Track [TAP11_K] on F.Cu, length 0.2800 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(198.6540 mm, 101.7900 mm): Track [TAP11_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(198.6540 mm, 101.7900 mm): Track [TAP11_K] on F.Cu, length 0.7400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(198.6540 mm, 100.6500 mm): Track [TAP11_K] on F.Cu, length 1.1400 mm
+[track_width]: Track width (board setup constraints min width 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(199.3940 mm, 101.7900 mm): Track [TAP11_K] on F.Cu, length 0.2828 mm
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(129.1150 mm, 97.0000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(128.2150 mm, 101.4000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(129.1150 mm, 100.0000 mm): Via [VSW_GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(132.6550 mm, 100.9500 mm): Via [+2V5] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(128.4800 mm, 98.5200 mm): Via [+2V5] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(127.9150 mm, 98.5200 mm): Via [+2V5] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.9250 mm, 100.9500 mm): Via [+2V5] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(221.9000 mm, 100.0000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(146.5000 mm, 94.0850 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(170.1130 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(148.2470 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(134.0900 mm, 97.0800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(146.5000 mm, 105.9150 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(157.2750 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.2900 mm, 102.3000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(215.2530 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(129.8550 mm, 103.4200 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(143.6300 mm, 93.5650 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(219.8300 mm, 94.8150 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(140.0000 mm, 97.3400 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(152.0570 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(197.1970 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4000 mm)
+    Rule: netclass 'Default'; error
+    @(140.2600 mm, 99.5500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(122.1450 mm, 106.8250 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(206.2250 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(146.1800 mm, 93.8850 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(193.3870 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(131.5755 mm, 93.0500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(139.0600 mm, 97.3400 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.2205 mm, 94.0000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4000 mm)
+    Rule: netclass 'Default'; error
+    @(140.2600 mm, 100.2500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(188.1690 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(130.7950 mm, 103.4200 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(202.4150 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(219.8300 mm, 105.1850 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(179.1410 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(132.2400 mm, 95.8000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(126.9200 mm, 101.4600 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(175.3310 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.1900 mm, 95.8000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(211.4430 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(161.0850 mm, 86.4750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(138.0550 mm, 96.2600 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(221.1570 mm, 102.7500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(166.3030 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(147.1150 mm, 100.9900 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4000 mm)
+    Rule: netclass 'Default'; error
+    @(140.2600 mm, 100.9500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(128.9150 mm, 103.4200 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(122.1450 mm, 101.1750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(184.3590 mm, 84.8800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(144.2750 mm, 100.9900 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(221.1570 mm, 97.2500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(139.2600 mm, 96.4000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.1400 mm, 99.0500 mm): Via [-2V5] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(132.3850 mm, 103.4000 mm): Via [-2V5] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(131.1150 mm, 96.9700 mm): Via [-2V5] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.9400 mm, 99.0500 mm): Via [-2V5] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.2205 mm, 94.9500 mm): Via [LVDS_A] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(136.4800 mm, 101.5650 mm): Via [LVDS_A] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(148.8820 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.1355 mm, 92.4150 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(192.7520 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(142.3700 mm, 92.8800 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(175.9660 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(147.6120 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(174.6960 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(138.4000 mm, 98.9300 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(212.0780 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(194.0220 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(210.8080 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(183.7240 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(133.7055 mm, 92.4150 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(165.6680 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(157.9100 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(201.7800 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(138.4000 mm, 98.3800 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(166.9380 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(184.9940 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(203.0500 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(141.7700 mm, 92.8800 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(156.6400 mm, 86.4200 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(148.0600 mm, 103.8350 mm): Via [TAP0_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(147.2600 mm, 96.1650 mm): Via [TAP0_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(148.0600 mm, 96.1650 mm): Via [TAP0_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(217.6500 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(204.1080 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(186.0520 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(208.6220 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(163.4820 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(190.5660 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(199.5940 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(149.9400 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(220.7900 mm, 94.8150 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(154.4540 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(181.5380 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(177.0240 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(172.5100 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(158.9680 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(167.9960 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(213.1360 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(146.5000 mm, 96.2450 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(195.0800 mm, 96.1650 mm): Via [VTAP_N] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(177.0240 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(154.4540 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(220.7900 mm, 105.1850 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(146.5000 mm, 103.7550 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(172.5100 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(204.1080 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(158.9680 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(208.6220 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(190.5660 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(217.6500 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(167.9960 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(149.9400 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(213.1360 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(195.0800 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(163.4820 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(181.5380 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(186.0520 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(199.5940 mm, 103.8350 mm): Via [VTAP_P] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(151.7740 mm, 96.1650 mm): Via [TAP1_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(152.5740 mm, 96.1650 mm): Via [TAP1_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(152.5740 mm, 103.8350 mm): Via [TAP1_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(157.0880 mm, 96.1650 mm): Via [TAP2_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(157.0880 mm, 103.8350 mm): Via [TAP2_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(156.2880 mm, 96.1650 mm): Via [TAP2_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(161.6020 mm, 96.1650 mm): Via [TAP3_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(161.6020 mm, 103.8350 mm): Via [TAP3_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(160.8020 mm, 96.1650 mm): Via [TAP3_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(166.1160 mm, 103.8350 mm): Via [TAP4_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(166.1160 mm, 96.1650 mm): Via [TAP4_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(165.3160 mm, 96.1650 mm): Via [TAP4_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(169.8300 mm, 96.1650 mm): Via [TAP5_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(170.6300 mm, 103.8350 mm): Via [TAP5_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(170.6300 mm, 96.1650 mm): Via [TAP5_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(175.1440 mm, 103.8350 mm): Via [TAP6_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(175.1440 mm, 96.1650 mm): Via [TAP6_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(174.3440 mm, 96.1650 mm): Via [TAP6_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(178.8580 mm, 96.1650 mm): Via [TAP7_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(179.6580 mm, 103.8350 mm): Via [TAP7_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(179.6580 mm, 96.1650 mm): Via [TAP7_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(183.3720 mm, 96.1650 mm): Via [TAP8_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(184.1720 mm, 96.1650 mm): Via [TAP8_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(184.1720 mm, 103.8350 mm): Via [TAP8_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(187.8860 mm, 96.1650 mm): Via [TAP9_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(188.6860 mm, 96.1650 mm): Via [TAP9_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(188.6860 mm, 103.8350 mm): Via [TAP9_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(193.2000 mm, 103.8350 mm): Via [TAP10_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(193.2000 mm, 96.1650 mm): Via [TAP10_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(192.4000 mm, 96.1650 mm): Via [TAP10_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(196.9140 mm, 96.1650 mm): Via [TAP11_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(197.7140 mm, 103.8350 mm): Via [TAP11_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(197.7140 mm, 96.1650 mm): Via [TAP11_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(202.2280 mm, 103.8350 mm): Via [TAP12_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(202.2280 mm, 96.1650 mm): Via [TAP12_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(201.4280 mm, 96.1650 mm): Via [TAP12_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(205.9420 mm, 96.1650 mm): Via [TAP13_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(206.7420 mm, 103.8350 mm): Via [TAP13_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(206.7420 mm, 96.1650 mm): Via [TAP13_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(211.2560 mm, 103.8350 mm): Via [TAP14_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(211.2560 mm, 96.1650 mm): Via [TAP14_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(210.4560 mm, 96.1650 mm): Via [TAP14_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(215.7700 mm, 103.8350 mm): Via [TAP15_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(215.7700 mm, 96.1650 mm): Via [TAP15_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(214.9700 mm, 96.1650 mm): Via [TAP15_IN] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(147.0000 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(215.2530 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(170.1130 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(206.2250 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(152.0570 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(203.6850 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(158.5450 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(179.1410 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(197.1970 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(188.1690 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(167.5730 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(161.0850 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(212.7130 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(185.6290 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(176.6010 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(194.6570 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(149.5170 mm, 91.4250 mm): Via [VTH] on F.Cu - B.Cu
+[isolated_copper]: Isolated copper fill
+    Local override; warning
+    @(117.8650 mm, 82.6500 mm): Zone [GND] on F.Cu, priority 0
+[isolated_copper]: Isolated copper fill
+    Local override; warning
+    @(117.8650 mm, 82.6500 mm): Zone [GND] on F.Cu, priority 0
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(222.7100 mm, 82.4000 mm): Segment on Edge.Cuts
+    @(221.9100 mm, 94.5650 mm): PCB text 'VTAP_N' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(222.7100 mm, 82.4000 mm): Segment on Edge.Cuts
+    @(221.9100 mm, 105.4350 mm): PCB text 'VTAP_P' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(117.6150 mm, 107.8500 mm): Segment on Edge.Cuts
+    @(124.6150 mm, 83.4000 mm): PCB text 'PHASE_TRIGGER 4L JLC04161H-7628' on F.Silkscreen
+[hole_to_hole]: Drilled hole too close to other hole (board setup constraints min 0.2500 mm; actual 0.1774 mm)
+    Rule: board setup constraints; warning
+    @(146.5000 mm, 94.0850 mm): Via [GND] on F.Cu - B.Cu
+    @(146.1800 mm, 93.8850 mm): Via [GND] on F.Cu - B.Cu
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(159.8150 mm, 84.7750 mm): Footprint TP503
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(168.8430 mm, 84.7750 mm): Footprint TP505
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(117.9650 mm, 99.5000 mm): Footprint X1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(221.9100 mm, 95.4150 mm): Footprint TP402
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(150.7870 mm, 84.7750 mm): Footprint TP501
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(131.7350 mm, 104.5000 mm): Footprint TP303
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(194.6570 mm, 84.7750 mm): Footprint TP510
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(186.8990 mm, 84.7750 mm): Footprint TP509
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(140.5700 mm, 92.8800 mm): Footprint TP306
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(145.6000 mm, 105.3500 mm): Footprint X3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(213.9830 mm, 84.7750 mm): Footprint TP515
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(177.8710 mm, 84.7750 mm): Footprint TP507
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(144.1000 mm, 91.4250 mm): Footprint TP401
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(176.6010 mm, 84.7750 mm): Footprint TP506
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(167.5730 mm, 84.7750 mm): Footprint TP504
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(127.9150 mm, 95.6000 mm): Footprint TP304
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(212.7130 mm, 84.7750 mm): Footprint TP514
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(195.9270 mm, 84.7750 mm): Footprint TP511
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(131.6900 mm, 94.6000 mm): Footprint TP302
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(158.5450 mm, 84.7750 mm): Footprint TP502
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(130.1650 mm, 95.6000 mm): Footprint TP301
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(221.9100 mm, 104.5850 mm): Footprint TP403
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(145.6000 mm, 94.6500 mm): Footprint X2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(204.9550 mm, 84.7750 mm): Footprint TP513
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(139.2600 mm, 95.4000 mm): Footprint TP307
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(149.5170 mm, 84.7750 mm): Footprint TP500
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(203.6850 mm, 84.7750 mm): Footprint TP512
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(136.8805 mm, 91.4500 mm): Footprint TP305
+[lib_footprint_issues]: The current configuration does not include the footprint library 'phase_trigger_fragment'
+    Local override; warning
+    @(185.6290 mm, 84.7750 mm): Footprint TP508
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(140.2600 mm, 101.9000 mm): PCB text 'TRF37D73' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(140.2600 mm, 101.9000 mm): PCB text 'TRF37D73' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(130.1650 mm, 94.1000 mm): PCB text 'TRIG_SEL' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(130.1650 mm, 94.1000 mm): PCB text 'TRIG_SEL' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(133.5400 mm, 102.9000 mm): PCB text 'TLV3801' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(133.5400 mm, 102.9000 mm): PCB text 'TLV3801' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(151.8500 mm, 103.7500 mm): PCB text '0' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(151.8500 mm, 103.7500 mm): PCB text '0' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(131.7350 mm, 105.3500 mm): PCB text '-2V5' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(131.7350 mm, 105.3500 mm): PCB text '-2V5' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(176.6010 mm, 83.9250 mm): PCB text 'T6' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(176.6010 mm, 83.9250 mm): PCB text 'T6' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(183.4480 mm, 103.7500 mm): PCB text '7' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(183.4480 mm, 103.7500 mm): PCB text '7' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(221.9100 mm, 94.5650 mm): PCB text 'VTAP_N' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(221.9100 mm, 94.5650 mm): PCB text 'VTAP_N' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(210.5320 mm, 103.7500 mm): PCB text '13' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(210.5320 mm, 103.7500 mm): PCB text '13' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0750 mm)
+    Rule: board setup constraints silk line width; warning
+    @(124.6150 mm, 83.4000 mm): PCB text 'PHASE_TRIGGER 4L JLC04161H-7628' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.5000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(124.6150 mm, 83.4000 mm): PCB text 'PHASE_TRIGGER 4L JLC04161H-7628' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(177.8710 mm, 83.9250 mm): PCB text 'T7' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(177.8710 mm, 83.9250 mm): PCB text 'T7' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(174.4200 mm, 103.7500 mm): PCB text '5' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(174.4200 mm, 103.7500 mm): PCB text '5' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(147.1000 mm, 94.1000 mm): PCB text 'PSTRB_A' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(147.1000 mm, 94.1000 mm): PCB text 'PSTRB_A' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(119.6150 mm, 98.7000 mm): PCB text 'BUF_OUT_T' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(119.6150 mm, 98.7000 mm): PCB text 'BUF_OUT_T' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(159.8150 mm, 83.9250 mm): PCB text 'T3' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(159.8150 mm, 83.9250 mm): PCB text 'T3' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(167.5730 mm, 83.9250 mm): PCB text 'T4' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(167.5730 mm, 83.9250 mm): PCB text 'T4' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(139.3700 mm, 92.8800 mm): PCB text '+3V3' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(139.3700 mm, 92.8800 mm): PCB text '+3V3' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(204.9550 mm, 83.9250 mm): PCB text 'T13' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(204.9550 mm, 83.9250 mm): PCB text 'T13' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(156.3640 mm, 103.7500 mm): PCB text '1' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(156.3640 mm, 103.7500 mm): PCB text '1' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(123.2150 mm, 105.2000 mm): PCB text 'EXT_CLK' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(123.2150 mm, 105.2000 mm): PCB text 'EXT_CLK' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(131.6900 mm, 93.7500 mm): PCB text 'TRIG_LEVEL' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(131.6900 mm, 93.7500 mm): PCB text 'TRIG_LEVEL' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(165.3920 mm, 103.7500 mm): PCB text '3' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(165.3920 mm, 103.7500 mm): PCB text '3' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(195.0000 mm, 104.9500 mm): PCB text 'PSTRB_A/K 0.16 mm, pitch 4.514 mm' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(195.0000 mm, 104.9500 mm): PCB text 'PSTRB_A/K 0.16 mm, pitch 4.514 mm' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(194.6570 mm, 83.9250 mm): PCB text 'T10' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(194.6570 mm, 83.9250 mm): PCB text 'T10' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(185.6290 mm, 83.9250 mm): PCB text 'T8' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(185.6290 mm, 83.9250 mm): PCB text 'T8' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(213.9830 mm, 83.9250 mm): PCB text 'T15' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(213.9830 mm, 83.9250 mm): PCB text 'T15' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(158.5450 mm, 83.9250 mm): PCB text 'T2' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(158.5450 mm, 83.9250 mm): PCB text 'T2' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(219.5600 mm, 103.7500 mm): PCB text '15' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(219.5600 mm, 103.7500 mm): PCB text '15' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(178.9340 mm, 103.7500 mm): PCB text '6' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(178.9340 mm, 103.7500 mm): PCB text '6' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(169.9060 mm, 103.7500 mm): PCB text '4' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(169.9060 mm, 103.7500 mm): PCB text '4' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(187.9620 mm, 103.7500 mm): PCB text '8' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(187.9620 mm, 103.7500 mm): PCB text '8' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(195.9270 mm, 83.9250 mm): PCB text 'T11' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(195.9270 mm, 83.9250 mm): PCB text 'T11' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(221.9100 mm, 105.4350 mm): PCB text 'VTAP_P' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(221.9100 mm, 105.4350 mm): PCB text 'VTAP_P' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(196.9900 mm, 103.7500 mm): PCB text '10' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(196.9900 mm, 103.7500 mm): PCB text '10' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(203.6850 mm, 83.9250 mm): PCB text 'T12' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(203.6850 mm, 83.9250 mm): PCB text 'T12' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(186.8990 mm, 83.9250 mm): PCB text 'T9' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(186.8990 mm, 83.9250 mm): PCB text 'T9' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(147.1000 mm, 105.9000 mm): PCB text 'PSTRB_K' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(147.1000 mm, 105.9000 mm): PCB text 'PSTRB_K' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(139.2600 mm, 94.5500 mm): PCB text 'GND' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(139.2600 mm, 94.5500 mm): PCB text 'GND' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(160.8780 mm, 103.7500 mm): PCB text '2' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(160.8780 mm, 103.7500 mm): PCB text '2' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(135.3430 mm, 92.0000 mm): PCB text 'LVDS2' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(135.3430 mm, 92.0000 mm): PCB text 'LVDS2' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(138.1805 mm, 91.4500 mm): PCB text 'COARSE' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(138.1805 mm, 91.4500 mm): PCB text 'COARSE' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(128.2150 mm, 104.3000 mm): PCB text 'TMUX136' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(128.2150 mm, 104.3000 mm): PCB text 'TMUX136' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(206.0180 mm, 103.7500 mm): PCB text '12' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(206.0180 mm, 103.7500 mm): PCB text '12' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(192.4760 mm, 103.7500 mm): PCB text '9' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(192.4760 mm, 103.7500 mm): PCB text '9' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(144.1000 mm, 90.5750 mm): PCB text 'VTAP_TH' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(144.1000 mm, 90.5750 mm): PCB text 'VTAP_TH' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(212.7130 mm, 83.9250 mm): PCB text 'T14' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(212.7130 mm, 83.9250 mm): PCB text 'T14' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(215.0460 mm, 103.7500 mm): PCB text '14' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(215.0460 mm, 103.7500 mm): PCB text '14' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(149.5170 mm, 83.9250 mm): PCB text 'T0' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(149.5170 mm, 83.9250 mm): PCB text 'T0' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(168.8430 mm, 83.9250 mm): PCB text 'T5' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(168.8430 mm, 83.9250 mm): PCB text 'T5' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(127.9150 mm, 94.7500 mm): PCB text '+2V5' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(127.9150 mm, 94.7500 mm): PCB text '+2V5' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(201.5040 mm, 103.7500 mm): PCB text '11' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(201.5040 mm, 103.7500 mm): PCB text '11' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(170.0000 mm, 104.9500 mm): PCB text 'PH_LINE 0.26 mm, 70 ps/tap' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(170.0000 mm, 104.9500 mm): PCB text 'PH_LINE 0.26 mm, 70 ps/tap' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(146.3300 mm, 101.6000 mm): PCB text '12 dB' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(146.3300 mm, 101.6000 mm): PCB text '12 dB' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(150.7870 mm, 83.9250 mm): PCB text 'T1' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(150.7870 mm, 83.9250 mm): PCB text 'T1' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(130.1650 mm, 94.1000 mm): PCB text 'TRIG_SEL' on F.Silkscreen
+    @(131.6900 mm, 93.7500 mm): PCB text 'TRIG_LEVEL' on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(130.1650 mm, 94.1000 mm): PCB text 'TRIG_SEL' on F.Silkscreen
+    @(131.6900 mm, 94.6000 mm): Pad 1 [TRIG_LEVEL] of TP302 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(138.1805 mm, 91.4500 mm): PCB text 'COARSE' on F.Silkscreen
+    @(136.8805 mm, 91.4500 mm): Pad 1 [COARSE] of TP305 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(138.8900 mm, 99.1800 mm): Polygon of U303 on F.Silkscreen
+    @(139.0600 mm, 98.8800 mm): Pad 1 [+3V3] of C312 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(139.2500 mm, 99.1100 mm): Segment of U303 on F.Silkscreen
+    @(139.0600 mm, 98.8800 mm): Pad 1 [+3V3] of C312 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(139.2500 mm, 99.1100 mm): Segment of U303 on F.Silkscreen
+    @(140.0000 mm, 98.8800 mm): Pad 1 [+3V3] of C311 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(167.0060 mm, 98.8600 mm): Polygon of D05 on F.Silkscreen
+    @(167.0560 mm, 98.2100 mm): Pad 1 [TAP4_A] of CA04 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(162.4920 mm, 98.8600 mm): Polygon of D04 on F.Silkscreen
+    @(162.5420 mm, 98.2100 mm): Pad 1 [TAP3_A] of CA03 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(157.9780 mm, 98.8600 mm): Polygon of D03 on F.Silkscreen
+    @(158.0280 mm, 98.2100 mm): Pad 1 [TAP2_A] of CA02 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(148.9500 mm, 98.8600 mm): Polygon of D01 on F.Silkscreen
+    @(149.0000 mm, 98.2100 mm): Pad 1 [TAP0_A] of CA00 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(153.4640 mm, 98.8600 mm): Polygon of D02 on F.Silkscreen
+    @(153.5140 mm, 98.2100 mm): Pad 1 [TAP1_A] of CA01 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(185.0620 mm, 98.8600 mm): Polygon of D09 on F.Silkscreen
+    @(185.1120 mm, 98.2100 mm): Pad 1 [TAP8_A] of CA08 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(189.5760 mm, 98.8600 mm): Polygon of D10 on F.Silkscreen
+    @(189.6260 mm, 98.2100 mm): Pad 1 [TAP9_A] of CA09 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(194.0900 mm, 98.8600 mm): Polygon of D11 on F.Silkscreen
+    @(194.1400 mm, 98.2100 mm): Pad 1 [TAP10_A] of CA10 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(180.5480 mm, 98.8600 mm): Polygon of D08 on F.Silkscreen
+    @(180.5980 mm, 98.2100 mm): Pad 1 [TAP7_A] of CA07 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(176.0340 mm, 98.8600 mm): Polygon of D07 on F.Silkscreen
+    @(176.0840 mm, 98.2100 mm): Pad 1 [TAP6_A] of CA06 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(171.5200 mm, 98.8600 mm): Polygon of D06 on F.Silkscreen
+    @(171.5700 mm, 98.2100 mm): Pad 1 [TAP5_A] of CA05 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(216.6600 mm, 98.8600 mm): Polygon of D16 on F.Silkscreen
+    @(216.7100 mm, 98.2100 mm): Pad 1 [TAP15_A] of CA15 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(212.1460 mm, 98.8600 mm): Polygon of D15 on F.Silkscreen
+    @(212.1960 mm, 98.2100 mm): Pad 1 [TAP14_A] of CA14 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(198.6040 mm, 98.8600 mm): Polygon of D12 on F.Silkscreen
+    @(198.6540 mm, 98.2100 mm): Pad 1 [TAP11_A] of CA11 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(203.1180 mm, 98.8600 mm): Polygon of D13 on F.Silkscreen
+    @(203.1680 mm, 98.2100 mm): Pad 1 [TAP12_A] of CA12 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(207.6320 mm, 98.8600 mm): Polygon of D14 on F.Silkscreen
+    @(207.6820 mm, 98.2100 mm): Pad 1 [TAP13_A] of CA13 on F.Cu
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

@@ -1,8 +1,8 @@
 ** Drc report for input_stage.kicad_pcb **
-** Created on 2026-11-21T17:25:33 **
+** Created on 2026-11-21T17:26:24 **
 ** Report includes: Errors, Warnings, Exclusions **
 
-** Found 92 DRC violations **
+** Found 86 DRC violations **
 [courtyards_overlap]: Courtyards overlap
     Rule: board setup constraints courtyard; error
     @(6.5000 mm, 15.8600 mm): Footprint R119
@@ -175,30 +175,6 @@
     Rule: board setup constraints edge; error
     @(15.3000 mm, 0.0000 mm): Segment on Edge.Cuts
     @(14.1100 mm, 10.0900 mm): Track [BUF_OUT_T] on F.Cu, length 1.1400 mm
-[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)
-    Rule: board setup constraints edge; error
-    @(15.3000 mm, 0.0000 mm): Segment on Edge.Cuts
-    @(15.1000 mm, 6.3000 mm): Pad 1 [BUF_OUT_S] of IF1 on F.Cu
-[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)
-    Rule: board setup constraints edge; error
-    @(15.3000 mm, 0.0000 mm): Segment on Edge.Cuts
-    @(15.1000 mm, 10.0900 mm): Pad 1 [BUF_OUT_T] of IF2 on F.Cu
-[copper_edge_clearance]: Board edge clearance violation
-    Rule: edge-launch SMA to edge; error
-    @(0.0000 mm, 17.6000 mm): Segment on Edge.Cuts
-    @(2.1000 mm, 9.1250 mm): Pad 2 [GND] of J101 on F.Cu
-[copper_edge_clearance]: Board edge clearance violation
-    Rule: edge-launch SMA to edge; error
-    @(0.0000 mm, 17.6000 mm): Segment on Edge.Cuts
-    @(2.1000 mm, 9.1250 mm): Pad 2 [GND] of J101 on B.Cu
-[copper_edge_clearance]: Board edge clearance violation
-    Rule: edge-launch SMA to edge; error
-    @(0.0000 mm, 17.6000 mm): Segment on Edge.Cuts
-    @(2.1000 mm, 3.4750 mm): Pad 2 [GND] of J101 on B.Cu
-[copper_edge_clearance]: Board edge clearance violation
-    Rule: edge-launch SMA to edge; error
-    @(0.0000 mm, 17.6000 mm): Segment on Edge.Cuts
-    @(2.1000 mm, 3.4750 mm): Pad 2 [GND] of J101 on F.Cu
 [silk_edge_clearance]: Silkscreen clipped by board edge
     Rule: board setup constraints silk; warning
     @(0.0000 mm, 0.0000 mm): Segment on Edge.Cuts
@@ -210,15 +186,15 @@
 [silk_edge_clearance]: Silkscreen clipped by board edge
     Rule: board setup constraints silk; warning
     @(15.3000 mm, 17.6000 mm): Segment on Edge.Cuts
-    @(5.6550 mm, 17.8100 mm): Segment of J2 on F.Silkscreen
-[silk_edge_clearance]: Silkscreen clipped by board edge
-    Rule: board setup constraints silk; warning
-    @(15.3000 mm, 17.6000 mm): Segment on Edge.Cuts
     @(1.9100 mm, 17.8100 mm): Segment of J2 on F.Silkscreen
 [silk_edge_clearance]: Silkscreen clipped by board edge
     Rule: board setup constraints silk; warning
     @(15.3000 mm, 17.6000 mm): Segment on Edge.Cuts
     @(0.3900 mm, 17.8100 mm): Segment of J2 on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(15.3000 mm, 17.6000 mm): Segment on Edge.Cuts
+    @(5.6550 mm, 17.8100 mm): Segment of J2 on F.Silkscreen
 [lib_footprint_issues]: The current configuration does not include the footprint library 'input_stage'
     Local override; warning
     @(15.1000 mm, 10.0900 mm): Footprint IF2

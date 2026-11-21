@@ -1,0 +1,935 @@
+** Drc report for pstrobe.kicad_pcb **
+** Created on 2026-11-21T17:28:21 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 271 DRC violations **
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1109 mm)
+    Rule: netclass 'Default'; error
+    @(102.6300 mm, 120.6000 mm): Pad 2 [Net-(U405-RFIN)] of C422 on F.Cu
+    @(102.9500 mm, 120.1000 mm): Track [+3V3] on F.Cu, length 0.4667 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(102.9500 mm, 103.9000 mm): Track [+3V3] on F.Cu, length 0.4667 mm
+    @(102.6300 mm, 104.4000 mm): Track [Net-(U403-RFIN)] on F.Cu, length 0.7200 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(103.3500 mm, 103.9000 mm): Pad 1 [+3V3] of U403 on F.Cu
+    @(102.6300 mm, 104.4000 mm): Track [Net-(U403-RFIN)] on F.Cu, length 0.7200 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(105.2500 mm, 120.6000 mm): Track [Net-(U405-RFOUT)] on F.Cu, length 0.8000 mm
+    @(105.2500 mm, 120.1000 mm): Pad 8 [GND] of U405 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(102.6300 mm, 120.6000 mm): Track [Net-(U405-RFIN)] on F.Cu, length 0.7200 mm
+    @(103.3500 mm, 120.1000 mm): Pad 1 [+3V3] of U405 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1785 mm)
+    Rule: netclass 'Default'; error
+    @(114.1100 mm, 104.3125 mm): Pad 2 [GND] of U404 on F.Cu
+    @(115.3800 mm, 101.6750 mm): Via [VBUS] on F.Cu - B.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1785 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 100.9750 mm): Via [VBUS] on F.Cu - B.Cu
+    @(114.1100 mm, 104.3125 mm): Pad 2 [GND] of U404 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(105.2500 mm, 104.9000 mm): Pad 6 [GND] of U403 on F.Cu
+    @(105.2500 mm, 104.4000 mm): Track [Net-(U403-RFOUT)] on F.Cu, length 0.8000 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1250 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 115.7500 mm): Segment [<no net>] of TL403 on F.Cu
+    @(113.6300 mm, 116.2800 mm): Via [GND] on F.Cu - B.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1250 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 109.2500 mm): Segment [<no net>] of TL402 on F.Cu
+    @(113.6300 mm, 108.7200 mm): Via [GND] on F.Cu - B.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 115.7500 mm): Segment [<no net>] of TL403 on F.Cu
+    @(114.3500 mm, 116.2800 mm): Track [GND] on F.Cu, length 0.7200 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(105.2500 mm, 121.1000 mm): Track [GND] on F.Cu, length 0.9500 mm
+    @(105.2500 mm, 120.6000 mm): Track [Net-(U405-RFOUT)] on F.Cu, length 0.8000 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(105.2500 mm, 103.9000 mm): Track [GND] on F.Cu, length 0.9500 mm
+    @(105.2500 mm, 104.4000 mm): Track [Net-(U403-RFOUT)] on F.Cu, length 0.8000 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(105.2500 mm, 104.9000 mm): Track [GND] on F.Cu, length 0.9500 mm
+    @(105.2500 mm, 104.4000 mm): Track [Net-(U403-RFOUT)] on F.Cu, length 0.8000 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1950 mm)
+    Rule: netclass 'Default'; error
+    @(103.3500 mm, 104.9000 mm): Track [GND] on F.Cu, length 0.9500 mm
+    @(102.6300 mm, 104.4000 mm): Track [Net-(U403-RFIN)] on F.Cu, length 0.7200 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1500 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 109.2500 mm): Segment [<no net>] of TL402 on F.Cu
+    @(114.3500 mm, 108.7200 mm): Track [GND] on F.Cu, length 0.7200 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1109 mm)
+    Rule: netclass 'Default'; error
+    @(102.6300 mm, 104.4000 mm): Pad 2 [Net-(U403-RFIN)] of C412 on F.Cu
+    @(103.3500 mm, 103.9000 mm): Track [+3V3] on F.Cu, length 0.4000 mm
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1109 mm)
+    Rule: netclass 'Default'; error
+    @(103.3500 mm, 120.1000 mm): Track [+3V3] on F.Cu, length 0.4000 mm
+    @(102.6300 mm, 120.6000 mm): Pad 2 [Net-(U405-RFIN)] of C422 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1250 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 115.7500 mm): Segment [<no net>] of TL403 on F.Cu
+    @(114.3500 mm, 116.2800 mm): Pad 1 [GND] of D403 on F.Cu
+[clearance]: Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1250 mm)
+    Rule: netclass 'Default'; error
+    @(114.3500 mm, 108.7200 mm): Pad 2 [GND] of D402 on F.Cu
+    @(116.4500 mm, 109.2500 mm): Segment [<no net>] of TL402 on F.Cu
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(116.4500 mm, 121.0850 mm): Footprint FB406
+    @(114.1100 mm, 118.6500 mm): Footprint U406
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(116.3500 mm, 123.5125 mm): Footprint L406
+    @(114.9000 mm, 124.5750 mm): Footprint C428
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(116.3500 mm, 123.5125 mm): Footprint L406
+    @(116.4500 mm, 121.2500 mm): Footprint TP406
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.4500 mm, 122.4000 mm): Footprint L405
+    @(104.7000 mm, 122.4000 mm): Footprint TP405
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.4500 mm, 122.4000 mm): Footprint L405
+    @(110.3000 mm, 122.4000 mm): Footprint C435
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.4500 mm, 122.4000 mm): Footprint L405
+    @(107.4500 mm, 124.0000 mm): Footprint R418
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(109.1000 mm, 104.4000 mm): Footprint R410
+    @(108.1000 mm, 104.9100 mm): Footprint R408
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(109.1000 mm, 104.4000 mm): Footprint R410
+    @(110.1000 mm, 104.9100 mm): Footprint R409
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(115.4000 mm, 116.2800 mm): Footprint D403
+    @(114.1100 mm, 118.6500 mm): Footprint U406
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(116.3500 mm, 101.4875 mm): Footprint L404
+    @(116.4500 mm, 103.7500 mm): Footprint TP404
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(116.3500 mm, 101.4875 mm): Footprint L404
+    @(114.9000 mm, 100.4250 mm): Footprint C418
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(110.3000 mm, 102.6000 mm): Footprint C434
+    @(107.4500 mm, 102.6000 mm): Footprint L403
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.1500 mm, 120.6000 mm): Footprint C422
+    @(104.3000 mm, 120.8500 mm): Footprint U405
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.1500 mm, 120.6000 mm): Footprint C422
+    @(101.0000 mm, 120.6000 mm): Footprint R411
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.1000 mm, 104.4000 mm): Footprint C416
+    @(108.1000 mm, 104.9100 mm): Footprint R408
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.1000 mm, 104.4000 mm): Footprint C416
+    @(106.0500 mm, 103.9150 mm): Footprint FB403
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(111.1000 mm, 104.4000 mm): Footprint C417
+    @(110.1000 mm, 104.9100 mm): Footprint R409
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(111.1000 mm, 104.4000 mm): Footprint C417
+    @(114.1100 mm, 102.4500 mm): Footprint U404
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(101.0000 mm, 104.4000 mm): Footprint R407
+    @(102.1500 mm, 104.4000 mm): Footprint C412
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.4500 mm, 102.6000 mm): Footprint L403
+    @(104.7000 mm, 102.6000 mm): Footprint TP403
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.4500 mm, 102.6000 mm): Footprint L403
+    @(107.4500 mm, 101.0000 mm): Footprint R417
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(116.4500 mm, 105.8000 mm): Footprint C421
+    @(114.1100 mm, 102.4500 mm): Footprint U404
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(109.1000 mm, 120.6000 mm): Footprint R414
+    @(108.1000 mm, 120.0900 mm): Footprint R412
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(109.1000 mm, 120.6000 mm): Footprint R414
+    @(110.1000 mm, 120.0900 mm): Footprint R413
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.1000 mm, 120.6000 mm): Footprint C426
+    @(108.1000 mm, 120.0900 mm): Footprint R412
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(107.1000 mm, 120.6000 mm): Footprint C426
+    @(106.0500 mm, 121.0850 mm): Footprint FB405
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.1500 mm, 104.4000 mm): Footprint C412
+    @(104.3000 mm, 104.6500 mm): Footprint U403
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(111.1000 mm, 120.6000 mm): Footprint C427
+    @(114.1100 mm, 118.6500 mm): Footprint U406
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(111.1000 mm, 120.6000 mm): Footprint C427
+    @(110.1000 mm, 120.0900 mm): Footprint R413
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(114.1100 mm, 118.6500 mm): Footprint U406
+    @(116.4500 mm, 119.2000 mm): Footprint C431
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(104.3000 mm, 120.8500 mm): Footprint U405
+    @(106.0500 mm, 121.0850 mm): Footprint FB405
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(104.7000 mm, 102.6000 mm): Footprint TP403
+    @(103.5500 mm, 103.6000 mm): Footprint C432
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(116.4500 mm, 103.9150 mm): Footprint FB404
+    @(114.1100 mm, 102.4500 mm): Footprint U404
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(102.6200 mm, 102.5000 mm): Footprint C415
+    @(104.3000 mm, 104.6500 mm): Footprint U403
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(106.0500 mm, 103.9150 mm): Footprint FB403
+    @(104.3000 mm, 104.6500 mm): Footprint U403
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(109.8200 mm, 123.1500 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(101.5700 mm, 119.8000 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(102.5700 mm, 103.6000 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(109.8200 mm, 101.8500 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(102.5700 mm, 119.8000 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(101.5700 mm, 103.6000 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(109.8200 mm, 121.6500 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(109.8200 mm, 103.3500 mm): Via [+3V3] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.8200 mm, 124.5750 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 121.4000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.8300 mm, 118.8500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(100.9430 mm, 109.2500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(102.6200 mm, 101.4700 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(104.5800 mm, 103.6000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 120.3000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(110.1000 mm, 118.9600 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(101.6200 mm, 101.4700 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 104.6500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(110.7800 mm, 121.7500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(104.5800 mm, 119.8000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(101.6230 mm, 115.7500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(114.5600 mm, 118.6500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.6300 mm, 108.7200 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.6300 mm, 116.2800 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 105.2000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(108.1000 mm, 106.0400 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 120.8500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.8200 mm, 100.4250 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(114.5000 mm, 117.1500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.6600 mm, 118.6500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(114.5600 mm, 101.2500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(114.5600 mm, 117.4500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 104.1000 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(101.6230 mm, 109.2500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.6600 mm, 101.2500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(100.9430 mm, 115.7500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(114.5600 mm, 102.4500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(102.6200 mm, 117.6700 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(110.1000 mm, 106.0400 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.8300 mm, 106.1500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.6600 mm, 117.4500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(113.6600 mm, 102.4500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(101.6200 mm, 117.6700 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(114.5000 mm, 107.8500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(108.1000 mm, 118.9600 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(110.7800 mm, 103.2500 mm): Via [GND] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(106.0500 mm, 102.6000 mm): Via [Net-(FB403-Pad2)] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 102.5500 mm): Via [Net-(FB404-Pad2)] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(111.9200 mm, 118.2300 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(111.6500 mm, 117.7700 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(111.9200 mm, 105.5300 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(111.6500 mm, 116.5300 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(111.6500 mm, 108.4700 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 124.0250 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 100.9750 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(111.6500 mm, 107.2300 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(111.9200 mm, 119.4700 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 123.3250 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(111.9200 mm, 106.7700 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 101.6750 mm): Via [VBUS] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(106.0500 mm, 122.4000 mm): Via [Net-(FB405-Pad2)] on F.Cu - B.Cu
+[drill_out_of_range]: Hole size out of range (board setup constraints min hole 0.3000 mm; actual 0.2000 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 122.4500 mm): Via [Net-(FB406-Pad2)] on F.Cu - B.Cu
+[invalid_outline]: Board has malformed outline (no edges found on Edge.Cuts layer)
+    Local override; error
+    @(0.0000 mm, 0.0000 mm): PCB
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(109.8200 mm, 123.1500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(101.5700 mm, 119.8000 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(102.5700 mm, 103.6000 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(109.8200 mm, 101.8500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(102.5700 mm, 119.8000 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(101.5700 mm, 103.6000 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(109.8200 mm, 121.6500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(109.8200 mm, 103.3500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.8200 mm, 124.5750 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 121.4000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.8300 mm, 118.8500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(100.9430 mm, 109.2500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(102.6200 mm, 101.4700 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(104.5800 mm, 103.6000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 120.3000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(110.1000 mm, 118.9600 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(101.6200 mm, 101.4700 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 104.6500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(110.7800 mm, 121.7500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(104.5800 mm, 119.8000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(101.6230 mm, 115.7500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(114.5600 mm, 118.6500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.6300 mm, 108.7200 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.6300 mm, 116.2800 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 105.2000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(108.1000 mm, 106.0400 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 120.8500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.8200 mm, 100.4250 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(114.5000 mm, 117.1500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.6600 mm, 118.6500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(114.5600 mm, 101.2500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(114.5600 mm, 117.4500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(104.3000 mm, 104.1000 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(101.6230 mm, 109.2500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.6600 mm, 101.2500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(100.9430 mm, 115.7500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(114.5600 mm, 102.4500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(102.6200 mm, 117.6700 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(110.1000 mm, 106.0400 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.8300 mm, 106.1500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.6600 mm, 117.4500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(113.6600 mm, 102.4500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(101.6200 mm, 117.6700 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(114.5000 mm, 107.8500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(108.1000 mm, 118.9600 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(110.7800 mm, 103.2500 mm): Via [GND] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(106.0500 mm, 102.6000 mm): Via [Net-(FB403-Pad2)] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 102.5500 mm): Via [Net-(FB404-Pad2)] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(111.9200 mm, 118.2300 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(111.6500 mm, 117.7700 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(111.9200 mm, 105.5300 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(111.6500 mm, 116.5300 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(111.6500 mm, 108.4700 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 124.0250 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 100.9750 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(111.6500 mm, 107.2300 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(111.9200 mm, 119.4700 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 123.3250 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(111.9200 mm, 106.7700 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(115.3800 mm, 101.6750 mm): Via [VBUS] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(106.0500 mm, 122.4000 mm): Via [Net-(FB405-Pad2)] on F.Cu - B.Cu
+[via_diameter]: Via diameter (board setup constraints min diameter 0.5000 mm; actual 0.4500 mm)
+    Rule: netclass 'Default'; error
+    @(116.4500 mm, 122.4500 mm): Via [Net-(FB406-Pad2)] on F.Cu - B.Cu
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(100.5200 mm, 100.0000 mm): Track [/PH_STROBE_P] on F.Cu, length 4.4001 mm
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(109.8200 mm, 123.1500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(109.8200 mm, 101.8500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(109.8200 mm, 121.6500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(109.8200 mm, 103.3500 mm): Via [+3V3] on F.Cu - B.Cu
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(116.9500 mm, 109.7500 mm): Track [/PSTRB_A] on F.Cu, length 0.0500 mm
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.9200 mm, 118.2300 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.6500 mm, 117.7700 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.9200 mm, 105.5300 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.6500 mm, 116.5300 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.6500 mm, 108.4700 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(115.3800 mm, 124.0250 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(115.3800 mm, 100.9750 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.6500 mm, 107.2300 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.9200 mm, 119.4700 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(115.3800 mm, 123.3250 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.9200 mm, 106.7700 mm): Via [VBUS] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(115.3800 mm, 101.6750 mm): Via [VBUS] on F.Cu - B.Cu
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(100.5200 mm, 125.0000 mm): Track [/PH_STROBE_N] on F.Cu, length 4.4001 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(116.9500 mm, 115.2500 mm): Track [/PSTRB_K] on F.Cu, length 0.0500 mm
+[hole_to_hole]: Drilled hole too close to other hole (board setup constraints min 0.2500 mm; actual 0.0625 mm)
+    Rule: board setup constraints; warning
+    @(113.8300 mm, 118.8500 mm): Via [GND] on F.Cu - B.Cu
+    @(113.6600 mm, 118.6500 mm): Via [GND] on F.Cu - B.Cu
+[hole_to_hole]: Drilled hole too close to other hole (board setup constraints min 0.2500 mm; actual 0.1059 mm)
+    Rule: board setup constraints; warning
+    @(114.5000 mm, 117.1500 mm): Via [GND] on F.Cu - B.Cu
+    @(114.5600 mm, 117.4500 mm): Via [GND] on F.Cu - B.Cu
+[lib_footprint_mismatch]: Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(116.4500 mm, 121.0850 mm): Footprint FB406
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(109.1000 mm, 104.4000 mm): Footprint R410
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(102.1500 mm, 120.6000 mm): Footprint C422
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(107.1000 mm, 104.4000 mm): Footprint C416
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(108.1000 mm, 104.9100 mm): Footprint R408
+[lib_footprint_issues]: The current configuration does not include the footprint library 'board'
+    Local override; warning
+    @(116.4500 mm, 109.2500 mm): Footprint TL402
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(111.1000 mm, 104.4000 mm): Footprint C417
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(110.1000 mm, 104.9100 mm): Footprint R409
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(101.0000 mm, 104.4000 mm): Footprint R407
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(116.4500 mm, 105.8000 mm): Footprint C421
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(109.1000 mm, 120.6000 mm): Footprint R414
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(107.1000 mm, 120.6000 mm): Footprint C426
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(108.1000 mm, 120.0900 mm): Footprint R412
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(102.1500 mm, 104.4000 mm): Footprint C412
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(102.6200 mm, 118.7000 mm): Footprint C425
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(101.6200 mm, 102.5000 mm): Footprint C414
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(111.1000 mm, 120.6000 mm): Footprint C427
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(116.4500 mm, 119.2000 mm): Footprint C431
+[lib_footprint_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    Local override; warning
+    @(104.3000 mm, 120.8500 mm): Footprint U405
+[lib_footprint_issues]: The current configuration does not include the footprint library 'board'
+    Local override; warning
+    @(116.4500 mm, 115.7500 mm): Footprint TL403
+[lib_footprint_mismatch]: Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(116.4500 mm, 103.9150 mm): Footprint FB404
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(102.6200 mm, 102.5000 mm): Footprint C415
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(110.1000 mm, 120.0900 mm): Footprint R413
+[lib_footprint_mismatch]: Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(106.0500 mm, 103.9150 mm): Footprint FB403
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(101.0000 mm, 120.6000 mm): Footprint R411
+[lib_footprint_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    Local override; warning
+    @(104.3000 mm, 104.6500 mm): Footprint U403
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(101.6200 mm, 118.7000 mm): Footprint C424
+[lib_footprint_mismatch]: Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(106.0500 mm, 121.0850 mm): Footprint FB405
+[lib_footprint_mismatch]: Footprint 'L_0805_2012Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(116.3500 mm, 123.5125 mm): Footprint L406
+[lib_footprint_mismatch]: Footprint 'L_1210_3225Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(107.4500 mm, 122.4000 mm): Footprint L405
+[lib_footprint_mismatch]: Footprint 'L_0805_2012Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(116.3500 mm, 101.4875 mm): Footprint L404
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(110.3000 mm, 102.6000 mm): Footprint C434
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(112.7500 mm, 118.8500 mm): Footprint C429
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(110.3000 mm, 122.4000 mm): Footprint C435
+[lib_footprint_mismatch]: Footprint 'L_1210_3225Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(107.4500 mm, 102.6000 mm): Footprint L403
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(112.7500 mm, 106.1500 mm): Footprint C419
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(114.9000 mm, 124.5750 mm): Footprint C428
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(112.9500 mm, 107.8500 mm): Footprint C420
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(103.5500 mm, 119.8000 mm): Footprint C433
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(101.6200 mm, 118.5500 mm): Footprint C423
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(112.9500 mm, 117.1500 mm): Footprint C430
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(101.6200 mm, 102.3500 mm): Footprint C413
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(107.4500 mm, 101.0000 mm): Footprint R417
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(103.5500 mm, 103.6000 mm): Footprint C432
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(114.9000 mm, 100.4250 mm): Footprint C418
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(107.4500 mm, 124.0000 mm): Footprint R418
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(106.0000 mm, 117.4000 mm): PCB text 'PSTROBE K' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(106.0000 mm, 117.4000 mm): PCB text 'PSTROBE K' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(106.0000 mm, 107.6000 mm): PCB text 'PSTROBE A' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(106.0000 mm, 107.6000 mm): PCB text 'PSTROBE A' on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(107.7200 mm, 104.7564 mm): Segment of R408 on F.Silkscreen
+    @(107.5800 mm, 104.4000 mm): Pad 2 [Net-(C416-Pad2)] of C416 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(108.4800 mm, 104.7564 mm): Segment of R408 on F.Silkscreen
+    @(108.5900 mm, 104.4000 mm): Pad 1 [Net-(C416-Pad2)] of R410 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(107.7200 mm, 120.2436 mm): Segment of R412 on F.Silkscreen
+    @(107.5800 mm, 120.6000 mm): Pad 2 [Net-(C426-Pad2)] of C426 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(108.4800 mm, 120.2436 mm): Segment of R412 on F.Silkscreen
+    @(108.5900 mm, 120.6000 mm): Pad 1 [Net-(C426-Pad2)] of R414 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(109.7200 mm, 120.2436 mm): Segment of R413 on F.Silkscreen
+    @(109.6100 mm, 120.6000 mm): Pad 2 [Net-(C427-Pad1)] of R414 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(110.4800 mm, 120.2436 mm): Segment of R413 on F.Silkscreen
+    @(110.6200 mm, 120.6000 mm): Pad 1 [Net-(C427-Pad1)] of C427 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(111.9000 mm, 120.4200 mm): Polygon of U406 on F.Silkscreen
+    @(111.5800 mm, 120.6000 mm): Pad 2 [Net-(U406-IN)] of C427 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(116.4700 mm, 117.2900 mm): Segment of U406 on F.Silkscreen
+    @(116.4500 mm, 119.6800 mm): Pad 1 [Net-(U406-OUT)] of C431 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(116.4700 mm, 117.2900 mm): Segment of U406 on F.Silkscreen
+    @(116.4500 mm, 118.7200 mm): Pad 2 [/PSTRB_K] of C431 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(113.7900 mm, 117.1300 mm): Segment of D403 on F.Silkscreen
+    @(114.1100 mm, 120.5125 mm): Pad 2 [GND] of U406 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(113.7900 mm, 115.4300 mm): Segment of D403 on F.Silkscreen
+    @(114.1100 mm, 120.5125 mm): Pad 2 [GND] of U406 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(111.9000 mm, 104.2200 mm): Polygon of U404 on F.Silkscreen
+    @(111.5800 mm, 104.4000 mm): Pad 2 [Net-(U404-IN)] of C417 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(109.7200 mm, 104.7564 mm): Segment of R409 on F.Silkscreen
+    @(109.6100 mm, 104.4000 mm): Pad 2 [Net-(C417-Pad1)] of R410 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(110.4800 mm, 104.7564 mm): Segment of R409 on F.Silkscreen
+    @(110.6200 mm, 104.4000 mm): Pad 1 [Net-(C417-Pad1)] of C417 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(116.4700 mm, 101.0900 mm): Segment of U404 on F.Silkscreen
+    @(116.4500 mm, 103.4300 mm): Pad 2 [Net-(FB404-Pad2)] of FB404 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(106.8479 mm, 101.2400 mm): Segment of L403 on B.Silkscreen
+    @(106.9400 mm, 101.0000 mm): Pad 1 [Net-(FB403-Pad2)] of R417 on B.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(106.8479 mm, 101.2400 mm): Segment of L403 on B.Silkscreen
+    @(107.9600 mm, 101.0000 mm): Pad 2 [+3V3] of R417 on B.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(106.8479 mm, 123.7600 mm): Segment of L405 on B.Silkscreen
+    @(106.9400 mm, 124.0000 mm): Pad 1 [Net-(FB405-Pad2)] of R418 on B.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(106.8479 mm, 123.7600 mm): Segment of L405 on B.Silkscreen
+    @(107.9600 mm, 124.0000 mm): Pad 2 [+3V3] of R418 on B.Cu
+
+** Found 7 unconnected pads **
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(102.6200 mm, 119.1800 mm): Track [+3V3] on F.Cu, length 1.0000 mm
+    @(102.9500 mm, 103.9000 mm): Track [+3V3] on F.Cu, length 0.4667 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(103.3500 mm, 103.9000 mm): Track [+3V3] on F.Cu, length 0.4000 mm
+    @(107.9600 mm, 101.0000 mm): Track [+3V3] on B.Cu, length 0.5400 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(108.8500 mm, 123.6500 mm): Track [+3V3] on B.Cu, length 1.2500 mm
+    @(103.3500 mm, 120.1000 mm): Track [+3V3] on F.Cu, length 0.4000 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(100.1500 mm, 100.1500 mm): Zone [GND] on F.Cu, priority 0
+    @(100.1500 mm, 115.6500 mm): Zone [GND] on F.Cu, priority 0
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(111.6500 mm, 108.4700 mm): Via [VBUS] on F.Cu - B.Cu
+    @(111.6500 mm, 116.5300 mm): Via [VBUS] on F.Cu - B.Cu
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(111.9200 mm, 119.4700 mm): Via [VBUS] on F.Cu - B.Cu
+    @(115.3800 mm, 123.3250 mm): Via [VBUS] on F.Cu - B.Cu
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(115.3800 mm, 101.6750 mm): Via [VBUS] on F.Cu - B.Cu
+    @(111.9200 mm, 105.5300 mm): Via [VBUS] on F.Cu - B.Cu
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

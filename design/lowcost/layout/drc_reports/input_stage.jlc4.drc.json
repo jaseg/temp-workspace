@@ -1,7 +1,7 @@
 {
     "$schema": "https://schemas.kicad.org/drc.v1.json",
     "coordinate_units": "mm",
-    "date": "2026-11-21T17:25:38",
+    "date": "2026-11-21T17:26:29",
     "ignored_checks": [
         {
             "description": "Footprint has no courtyard defined",
@@ -1191,7 +1191,7 @@
             "type": "courtyards_overlap"
         },
         {
-            "description": "Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)",
+            "description": "Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0200 mm)",
             "items": [
                 {
                     "description": "Segment on Edge.Cuts",
@@ -1202,158 +1202,17 @@
                     "uuid": "a70c2821-ba0f-4661-94f9-3e47027466f3"
                 },
                 {
-                    "description": "Pad 1 [BUF_OUT_S] of IF1 on F.Cu",
+                    "description": "Track [BUF_OUT_S] on F.Cu, length 2.8925 mm",
                     "pos": {
-                        "x": 15.1,
+                        "x": 12.2075,
                         "y": 6.3
                     },
-                    "uuid": "72f08e56-ab90-4276-ae8b-9718edaa1653"
+                    "uuid": "28b68cbc-9abf-45d9-8948-772b0bc38ecc"
                 }
             ],
-            "layer": "F.Cu",
             "pos": {
-                "x": 15.3,
-                "y": 6.12
-            },
-            "severity": "error",
-            "type": "copper_edge_clearance"
-        },
-        {
-            "description": "Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)",
-            "items": [
-                {
-                    "description": "Segment on Edge.Cuts",
-                    "pos": {
-                        "x": 15.3,
-                        "y": 0.0
-                    },
-                    "uuid": "a70c2821-ba0f-4661-94f9-3e47027466f3"
-                },
-                {
-                    "description": "Pad 1 [BUF_OUT_T] of IF2 on F.Cu",
-                    "pos": {
-                        "x": 15.1,
-                        "y": 10.09
-                    },
-                    "uuid": "b68a3fc0-4dfb-48f8-b6d5-75def605ca70"
-                }
-            ],
-            "layer": "F.Cu",
-            "pos": {
-                "x": 15.3,
-                "y": 9.91
-            },
-            "severity": "error",
-            "type": "copper_edge_clearance"
-        },
-        {
-            "description": "Board edge clearance violation",
-            "items": [
-                {
-                    "description": "Segment on Edge.Cuts",
-                    "pos": {
-                        "x": 0.0,
-                        "y": 17.6
-                    },
-                    "uuid": "f665332e-9907-4e08-b7a8-6a6b0e697c8c"
-                },
-                {
-                    "description": "Pad 2 [GND] of J101 on B.Cu",
-                    "pos": {
-                        "x": 2.1,
-                        "y": 9.125
-                    },
-                    "uuid": "fce02d3a-8b78-4dac-85df-341e946c260d"
-                }
-            ],
-            "layer": "F.Cu",
-            "pos": {
-                "x": 0.0,
-                "y": 9.8
-            },
-            "severity": "error",
-            "type": "copper_edge_clearance"
-        },
-        {
-            "description": "Board edge clearance violation",
-            "items": [
-                {
-                    "description": "Segment on Edge.Cuts",
-                    "pos": {
-                        "x": 0.0,
-                        "y": 17.6
-                    },
-                    "uuid": "f665332e-9907-4e08-b7a8-6a6b0e697c8c"
-                },
-                {
-                    "description": "Pad 2 [GND] of J101 on F.Cu",
-                    "pos": {
-                        "x": 2.1,
-                        "y": 9.125
-                    },
-                    "uuid": "f6b1d998-62ce-4d1b-b103-57269181890b"
-                }
-            ],
-            "layer": "F.Cu",
-            "pos": {
-                "x": 0.0,
-                "y": 9.8
-            },
-            "severity": "error",
-            "type": "copper_edge_clearance"
-        },
-        {
-            "description": "Board edge clearance violation",
-            "items": [
-                {
-                    "description": "Segment on Edge.Cuts",
-                    "pos": {
-                        "x": 0.0,
-                        "y": 17.6
-                    },
-                    "uuid": "f665332e-9907-4e08-b7a8-6a6b0e697c8c"
-                },
-                {
-                    "description": "Pad 2 [GND] of J101 on B.Cu",
-                    "pos": {
-                        "x": 2.1,
-                        "y": 3.475
-                    },
-                    "uuid": "954e445b-8f83-4378-9ecc-19a86ddae1ad"
-                }
-            ],
-            "layer": "F.Cu",
-            "pos": {
-                "x": 0.0,
-                "y": 4.15
-            },
-            "severity": "error",
-            "type": "copper_edge_clearance"
-        },
-        {
-            "description": "Board edge clearance violation",
-            "items": [
-                {
-                    "description": "Segment on Edge.Cuts",
-                    "pos": {
-                        "x": 0.0,
-                        "y": 17.6
-                    },
-                    "uuid": "f665332e-9907-4e08-b7a8-6a6b0e697c8c"
-                },
-                {
-                    "description": "Pad 2 [GND] of J101 on F.Cu",
-                    "pos": {
-                        "x": 2.1,
-                        "y": 3.475
-                    },
-                    "uuid": "21adec09-d1b2-4e6a-8416-1b8b64f45962"
-                }
-            ],
-            "layer": "F.Cu",
-            "pos": {
-                "x": 0.0,
-                "y": 4.15
+                "x": 15.1,
+                "y": 6.3
             },
             "severity": "error",
             "type": "copper_edge_clearance"
@@ -1381,33 +1240,6 @@
             "pos": {
                 "x": 15.25,
                 "y": 10.09
-            },
-            "severity": "error",
-            "type": "copper_edge_clearance"
-        },
-        {
-            "description": "Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0200 mm)",
-            "items": [
-                {
-                    "description": "Segment on Edge.Cuts",
-                    "pos": {
-                        "x": 15.3,
-                        "y": 0.0
-                    },
-                    "uuid": "a70c2821-ba0f-4661-94f9-3e47027466f3"
-                },
-                {
-                    "description": "Track [BUF_OUT_S] on F.Cu, length 2.8925 mm",
-                    "pos": {
-                        "x": 12.2075,
-                        "y": 6.3
-                    },
-                    "uuid": "28b68cbc-9abf-45d9-8948-772b0bc38ecc"
-                }
-            ],
-            "pos": {
-                "x": 15.1,
-                "y": 6.3
             },
             "severity": "error",
             "type": "copper_edge_clearance"
@@ -1472,23 +1304,23 @@
                 {
                     "description": "Segment on Edge.Cuts",
                     "pos": {
-                        "x": 0.0,
-                        "y": 0.0
+                        "x": 15.3,
+                        "y": 17.6
                     },
-                    "uuid": "e6b14871-b0d1-4a67-9107-7b4b99310ec5"
+                    "uuid": "c5865da4-e25e-47ed-9f13-05b55949c658"
                 },
                 {
-                    "description": "Segment of J3 on F.Silkscreen",
+                    "description": "Segment of J2 on F.Silkscreen",
                     "pos": {
-                        "x": 5.48,
-                        "y": 0.69247
+                        "x": 5.655,
+                        "y": 17.81
                     },
-                    "uuid": "ba71d694-0aa0-44a2-b84f-e61ef4446c26"
+                    "uuid": "5ce02b83-d9ea-4d83-a72a-3ec422f7af63"
                 }
             ],
             "pos": {
-                "x": 5.48,
-                "y": 0.0
+                "x": 5.655,
+                "y": 17.6
             },
             "severity": "warning",
             "type": "silk_edge_clearance"
@@ -1526,23 +1358,23 @@
                 {
                     "description": "Segment on Edge.Cuts",
                     "pos": {
-                        "x": 15.3,
-                        "y": 17.6
+                        "x": 0.0,
+                        "y": 0.0
                     },
-                    "uuid": "c5865da4-e25e-47ed-9f13-05b55949c658"
+                    "uuid": "e6b14871-b0d1-4a67-9107-7b4b99310ec5"
                 },
                 {
-                    "description": "Segment of J2 on F.Silkscreen",
+                    "description": "Segment of J3 on F.Silkscreen",
                     "pos": {
-                        "x": 5.655,
-                        "y": 17.81
+                        "x": 5.48,
+                        "y": 0.69247
                     },
-                    "uuid": "5ce02b83-d9ea-4d83-a72a-3ec422f7af63"
+                    "uuid": "ba71d694-0aa0-44a2-b84f-e61ef4446c26"
                 }
             ],
             "pos": {
-                "x": 5.655,
-                "y": 17.6
+                "x": 5.48,
+                "y": 0.0
             },
             "severity": "warning",
             "type": "silk_edge_clearance"
