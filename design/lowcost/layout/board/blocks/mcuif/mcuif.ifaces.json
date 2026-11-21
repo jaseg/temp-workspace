@@ -163,36 +163,6 @@
    "note": "U704.25 PB11 <- U501.41"
   },
   {
-   "net": "/TRIG_SEL",
-   "x": 29.4,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.43 -> R302 (phase)"
-  },
-  {
-   "net": "/ADC_IN",
-   "x": 29.15,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.8 ADC in; RC R211 / C207 sit in the analog block"
-  },
-  {
-   "net": "/MCU_CLK",
-   "x": 45.95,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"
-  },
-  {
    "net": "/VTAP_TH",
    "x": 35.2,
    "y": 0.0,
@@ -204,7 +174,7 @@
   },
   {
    "net": "/ADC_REF_MID",
-   "x": 28.9,
+   "x": 29.4,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -214,7 +184,7 @@
   },
   {
    "net": "/VBIAS_K",
-   "x": 27.35,
+   "x": 29.15,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -234,7 +204,7 @@
   },
   {
    "net": "/VOFS",
-   "x": 28.65,
+   "x": 26.85,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -244,7 +214,7 @@
   },
   {
    "net": "/VNEG_REF",
-   "x": 26.85,
+   "x": 26.4,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -254,7 +224,7 @@
   },
   {
    "net": "/DAC_TRIG",
-   "x": 26.4,
+   "x": 22.6,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
