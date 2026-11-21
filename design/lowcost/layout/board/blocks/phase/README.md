@@ -1,51 +1,35 @@
-# Block "phase": trigger front chain (folded) and 16-tap phase delay line
-To run: `python3 gen_phase.py [--render]`. Outputs: `phase.kicad_pcb`, `phase.ifaces.json`, `phase.png` (F red / B blue) and `phase_detail.png` (front chain, local x 0-14). KiCad 7.0.11. kicad-cli 7 has no DRC or ERC, so the checks below are boardlib's scripted ones.
-**Size**: 99.5 x 22.5 mm at board (0, 22.5), as in FLOORPLAN, with the pstrobe cut-out (local x 9.5-26.5, y 3.5-22.5, except the corridor y 12-18) kept free. The block did not grow.
-181 parts: the whole trigger_phase sheet (179, incl. the new R383-R385 level network on B) plus J102 and R122, all with `Block.place`.
+# Block "phase": trigger front chain and 16-tap phase delay line
+Run `python3 gen_phase.py [--render]` → `phase.kicad_pcb`, `phase.ifaces.json`, `phase.png`, `phase_detail.png` (taps 0-2), `front_chain_detail.png` (local x 0-30).
+**Size**: 99.5 x 22.5 mm at board (0, 22.5). pstrobe rectangle kept free: local x 9.5-26.5, y 2.5-22.5 except the corridor y 12-18. 181 parts (trigger_phase sheet + J102, R122).
 
-**check_board results (refs = this block)**:
-- 0 missing / extra / footprint / value / pad-net / no-net; 0 clearance; 0 corners above 45 deg; 0 RF width deviations; 0 RF pour-gap violations.
-- Unrouted nets: only the plane-fed supplies +3V3 (10), +2V5 (1) and -2V5 (2). GND reaches In1 through vias.
-- Pad-axis exits: 74. They are the inherited tap-cell resistors (node and via legs) plus a few WSON / SOT-23 corner pins.
+## Checks (21 Nov 2026)
+- Nightly DRC `run_drc.sh --rules jlc4`: 244 items, all allowed: 14 unconnected_items (+3V3 / +2V5 / -2V5, plane-fed), 25 track_dangling (interface stubs), 24 via_dangling (supply plane vias), 1 invalid_outline, 180 lib_footprint_mismatch / issues. **0 courtyard, clearance, track-width, hole, silk, text, isolated-copper.**
+- check_board: 0 missing / extra / footprint / value / pad-net / no-net, 0 clearance, 0 corners, 0 off-axis pad exits, 0 RF width, 0 RF pour gap, 0 courtyard overlaps. Unrouted only +3V3 (10), +2V5 (1), -2V5 (3).
 
-## Geometry (copied unchanged from layout/phase_trigger)
-- Tap pitch is 4.514 mm. Tap 0 (D301) is at local x 29.757 and tap 15 at 97.467; the axis is at local y 15.0 (board 37.5).
-- PSTRB_A / PSTRB_K: 0.16 mm (73 R), 4.514 mm = 26.4 ps unloaded / 40 ps loaded per tap. Ends: R379 / R378, 49.9 R.
-- PH_LINE (`Net-(D301-common)`): 0.26 mm S meander, 9.929 mm = 59.3 ps unloaded / 70 ps loaded per tap. Same-net gaps are >= 0.5 mm. It ends in R377.
-- Summing node: identical B.Cu jumper per tap with the tap taken from its midpoint. Comparator routes A = B = 3.849 mm (asserted).
-- Bias tee: as corrected in sim/bias_tee. FB301 pad on the line → L302 1210 (with R382 beside it) → C313 at the cold pad → +3V3 via pair beyond C313.
+## Front chain (all RF on F.Cu, 0.36 mm, no vias in the signal path)
+- Column x 0-9.5: J102 (corner, y 4) → R301 / R122 shunts north of the line (staggered, 0.94 mm) → U301 TMUX136 (rot 270; BUF_OUT_T straight down into pin 1, EXT_CLK into pin 3) → COM1 1.7 mm straight → U302 TLV3801 → CMP_P / CMP_N straight down through R306, R311 / R312 taps, C308 / C312; R310 terminates CMP_N. U304 LVDS2 west of the taps.
+- Corridor on the axis: C308 → RFIN → U303 TRF37D73 → FB301 (pad on the line) → C311 → pi pad R307 / R308 / R309 (shunts north) → 50 R launch → 0.26 mm step 1.6 mm before tap 0.
+- Bias tee: FB301 pad 2 → via pair → L302 47 uH on B (along the axis, directly below) with R382 beside it (B) → C313 at the cold pad (B) → +3V3 via pair beyond C313.
+- On B: decoupling (C305, C307, C309, C310), VSW_GND network C302-C305/R304/R305/TP301 in the strip y 0-2.5 above pstrobe (C301, C306 on F there), SEL divider R302/R303, level network R383-R385/C304/TP302, TP303, TP304.
+- RF lengths (mm): EXT_CLK 6.40, BUF_OUT_T 4.63, COM1 1.68, CMP_P 6.87, CMP_N 2.96, RFIN 5.58, RFOUT 2.04, pad in 1.81, launch 10.09 + 2.60.
 
-| RF route (all 0.36 mm 50 R unless stated) | length mm | ps |
-|---|---|---|
-| BUF_OUT_T N edge → U301.1 / EXT_CLK J102 → U301.3 | 3.00 / 3.03 | 18.2 / 18.3 |
-| COM1 U301.8 → U302.5 | 5.36 | 32.4 |
-| CMP_P → C308 (R311 and R306 tees) / CMP_N → C312 (R306, R312) | 7.79 / 2.41 | 47.2 / 14.6 |
-| RFIN C308 → U303.2 / RFOUT U303.7 → FB301 → C311 / C311 → R308 | 1.74 / 1.60 / 1.53 | |
-| PH_LINE launch: R308 → step (0.36 mm), then step → D301.3 (0.26 mm) | 15.80 + 2.60 | 95.7 + 15.5 |
+## Delay line (geometry unchanged, identical in all 16 cells)
+- Pitch 4.514 mm, strobes 0.16 mm (73 R), PH_LINE 0.26 mm S meander (gaps >= 0.5 mm), summing jumper midpoint tap A = B = 3.849 mm.
+- **Line moved 0.29 mm west** (tap 0 at local 29.467, tap 15 at 97.177). The pstrobe interface stays at x 26.5; the first strobe half-section is 0.29 mm shorter for A and K alike (common delay, 1.7 ps). 0.29 mm is the limit: the tap-0 summing via must stay off the pstrobe rectangle.
+- Tap cells: node chamfers 0.1 mm so tracks enter the resistor pads on-axis (was 74 off-axis exits).
+- Far end: R377 horizontal below D316 (x 97.64-99.5), PH_LINE end 45° jog into pad 1; TP304 on B under R377 pad 1 (0.35 / 0.15 via in pad, stub behind the termination).
+- Comparator 100 n caps raised 0.5 mm (U305's cap was inside the pstrobe rectangle); all 8 identical.
 
-## Interfaces (local mm; board = local + (0, 22.5))
-| net | x, y | layer / side | note |
+## Interfaces (local; board = local + (0, 22.5)) - changed vs. the previous version
+| net | x, y | layer | note |
 |---|---|---|---|
-| /BUF_OUT_T | 4.925, 0 | F.Cu N, rf50 | Straight down into U301.1. FLOORPLAN had x 7. |
-| /PSTRB_A, /PSTRB_K | 26.5, 12.25 / 17.75 | F.Cu W, rf50 | **Deviation**: axis ±2.75, not ±4.4. pstrobe must make the 45° jog (1.65 mm in x) inside its own block. The 0.16 mm section starts on the boundary. |
-| /TAP0-15 | x 29.27-93.74, y 0 | B.Cu N, slow | Via at each comparator pin. |
-| /COARSE | 4.45, 0 | B.Cu N | |
-| /DAC_TRIG, /TRIG_SEL | 4.6 / 9.25, 22.5 | B.Cu S | DAC_TRIG via R383 (TRIG_LEVEL is now block-internal) |
-| /VTAP_N, /VTAP_P, /VTAP_TH | 44.15 / 48.66 / 62.22, 22.5 | B.Cu S | VTAP_TH feeds R380 / R381 (on B) between U308 and U309. |
-
-Supplies use via pairs to In2: +3V3 at U303, U304, the comparators and C313; +2V5 at U301 / U302; -2V5 at the U302 EP, R303 and R305. The integrator must provide In2 islands for these. The **VTAP_N / VTAP_P In2 strips are drawn by this block**: merge without `skip_planes`, or redraw them. The In1 GND zone, the In1 cut-outs and an F.Cu GND pour with the RF keep-outs are also in the file.
-
-## Deviations
-- **J102** is at board y 26.5 (local 4.0), not 37.5. The front chain is folded into x 0-9.5 because the corridor is only 6 mm high: TMUX at the top, TLV in the middle, TRF and bias tee on the axis.
-- **Local helper**: `Block.place(side="B")` segfaults in pcbnew 7.0.11, because it flips before `Board.Add`. `bplace()` places on F, then flips. boardlib.py was not edited.
-- **On B.Cu**: decoupling and slow parts (C302-C307, C309, C310, R304, R305, R380, R381, C354, C355, TP301-TP303, TP305).
-- **R303 / R302** (SEL divider) are on top, next to the TMUX.
+| /BUF_OUT_T | **8.79**, 0 | F.Cu N rf50 | was 4.925 |
+| /PSTRB_A, /PSTRB_K | 26.5, 12.25 / 17.75 | F.Cu W | unchanged (meets pstrobe) |
+| /TAP0-15, /VTAP_N, /VTAP_P, /VTAP_TH | x **-0.29** | B.Cu | moved with the line |
+| /COARSE 4.45, 0; /DAC_TRIG 4.6, 22.5; /TRIG_SEL 9.25, 22.5 | | B.Cu | unchanged |
 
 ## Open points
-- **NOT DONE: 24 courtyard overlaps remain** (DRC courtyards_overlap 24): front chain J102/R301/R122/U301/C301, R306/R311/R312/C308/C312/R310/U302, U303/FB301/L302, B-side C302/C303/R304/R305/TP301, J102/TP303/C310 (B); far end R377/TP304/D316 (no 0402 fits inside x 99.5). Fix = shift U301 cluster east 2.2 mm (shunts staggered at x 5.17/6.11), U302 to x 8.2, VSW network to the top strip on B, R377 needs ~0.3 mm block growth or TP304 on B.
-- Silk text 0.3-0.5 mm (DRC text_height/line_width 18 warnings): move refs to F.Fab.
-- The netlist has **both R122 and R301** (49.9 R from EXT_CLK to GND), giving 25 R at the SMA. Both are placed at the pin. Check the schematic.
-- TP304 (LINE_IN) sits after R377 at the far end: a 1.2 mm stub behind the termination.
-- U304 has one +3V3 via (the board edge is too close for a pair).
-- The pstrobe interface shift needs agreement with the pstrobe block.
-- 40 / 75 ps per tap is not re-simulated (inherited).
+- Reference designators and labels are on F.Fab / B.Fab; footprint silk touching pads or other silk is moved to Fab by `silk_fix()`.
+- U302 +2V5 has one via at the pins (C305 via-in-pad on B); the second 100 n (C306) sits at the +2V5 via pair in the north strip. U304 has one +3V3 via.
+- netlist has both R122 and R301 (25 R at the SMA): check the schematic. 40 / 70 ps per tap not re-simulated.
+- Integrator: In2 islands for +3V3 / +2V5 / -2V5; VTAP_N / VTAP_P In2 strips are drawn here.
