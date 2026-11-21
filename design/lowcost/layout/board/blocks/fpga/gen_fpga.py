@@ -12,7 +12,7 @@ import boardlib as bl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board"
-W, H = 24.0, 22.0                 # main rectangle
+W, H = 24.5, 22.0                 # main rectangle
 SX, SY = 29.6, 7.4                # strip for J501 (x W..SX, y 0..SY)
 W50, WS = bl.W50, 0.2
 blk = bl.Block("fpga")
@@ -33,32 +33,34 @@ def bplace(ref, x, y, rot=0, side="F"):
 CX, CY = 10.0, 12.6
 bplace("U501", CX, CY, 90)
 bplace("J501", 14.8, 3.3, 270)
-bplace("U502", 17.6, 8.6, 180)
-bplace("Y501", 22.0, 8.6, 0)
-bplace("R508", 13.6, 9.6, 180)          # CLK0 -> FPGA_CLK (pad 1 at U502)
-bplace("R509", 13.6, 8.8, 180)          # CLK1 -> MCU_CLK
-bplace("R510", 13.6, 7.6, 180)          # CLK2 -> CLK2_FPGA
-bplace("C508", 15.9, 6.9, 0, "B")       # U502 pin 7 VDD
-bplace("C509", 20.4, 10.7, 0)           # U502 pin 1 VDD
+bplace("U502", 17.3, 8.6, 180)
+bplace("Y501", 22.6, 8.6, 0)
+bplace("R508", 13.55, 9.6, 180)          # CLK0 -> FPGA_CLK (pad 1 at U502)
+bplace("R509", 13.55, 8.8, 180)          # CLK1 -> MCU_CLK
+bplace("R510", 13.55, 7.6, 180)          # CLK2 -> CLK2_FPGA
+bplace("C508", 15.7, 6.9, 0, "B")       # U502 pin 7 VDD
+bplace("C509", 21.0, 10.7, 0)           # U502 pin 1 VDD
 bplace("C510", 18.0, 11.2, 0, "B")      # 10u +3V3
 # QFN decoupling on B at the supply pins (pin -> via pair -> cap)
-bplace("C506", 6.3, 8.2, 90, "B")       # pin 36 +3V3
-bplace("C502", 5.7, 11.0, 90, "B")      # pin 37 +1V2
+bplace("C506", 7.0, 7.4, 0, "B")       # pin 36 +3V3
+bplace("C502", 6.3, 11.3, 0, "B")      # pin 37 +1V2
 bplace("C504", 7.0, 17.6, 90, "B")      # pin 1 +3V3
 bplace("C501", 13.1, 17.6, 90, "B")     # pin 12 +1V2
 bplace("C505", 13.9, 11.3, 90, "B")     # pin 25 +3V3
-bplace("C503", 15.4, 17.6, 90, "B")     # 10u +1V2
-bplace("C507", 15.4, 13.6, 90, "B")     # 10u +3V3
+bplace("C503", 2.6, 6.3, 0, "B")     # 10u +1V2
+bplace("C507", 1.6, 3.0, 90, "B")     # 10u +3V3
 # PH strobe series resistors (B, next to the pin vias), J501 UART resistors (B, under the plug body)
-bplace("R411", 0.55, 12.6, 90, "B")
-bplace("R407", 1.45, 12.6, 90, "B")
+for ref, net in (("R411", "Net-(C422-Pad1)"), ("R407", "Net-(C412-Pad1)")):
+    fp = bplace(ref, 0.55 if ref == "R411" else 1.45, 12.6, 90, "B")
+    if blk.pad(ref, "@" + net)[1] < 12.6:
+        fp.SetOrientationDegrees(fp.GetOrientationDegrees() + 180)
 bplace("R511", 23.05, 6.4, 90, "B")
 bplace("R512", 20.5, 6.4, 90, "B")
 # configuration resistors (B, bottom-left)
 for i, ref in enumerate(["R506", "R505", "R504", "R503", "R502", "R501"]):
     bplace(ref, 2.4 + 0.76 * i, 18.2 + (1.45 if i % 2 else 0.0), 90, "B")
 bplace("JP501", 3.6, 15.3, 0, "B")
-bplace("R507", 6.6, 20.6, 90, "B")
+bplace("R507", 8.1, 20.9, 0, "B")
 
 # fix 2-pad orientation: pad 1 on top for the vertical parts where the netlist side matters is left to the router
 
@@ -70,19 +72,19 @@ YP, YN = 9.365, 10.365                  # analog S_STROBE ifaces (board 9.865 / 
 X1, YT = 5.0, 7.4
 nN = [p35, (p35[0], YT), (X1, YT), (X1 - (YN - YT), YN), (0.0, YN)]
 qN = blk.track("/S_STROBE_N", W50, nN, name="S_N", z=50, ch=0.45)
-V1, V2 = (5.2, 10.4), (1.0, YP)
-qP1 = blk.track("/S_STROBE_P", W50, [p38, (5.6, p38[1]), V1], name="S_P", z=50)
+V1, V2 = (6.0, 10.35), (1.0, YP)
+qP1 = blk.track("/S_STROBE_P", W50, [p38, (6.45, p38[1]), V1], name="S_P", z=50)
 
 
 def lenP(top):
-    return [V1, (V1[0], top + 0.4), (V1[0] - 0.4, top), (V2[0] + 0.4, top), (V2[0], top + 0.4), V2]
+    return [V1, (5.4, 9.75), (5.4, top + 0.4), (5.0, top), (V2[0] + 0.4, top), (V2[0], top + 0.4), V2]
 
 
 LN = blk.route_len("S_N")
 lo, hi = 6.5, 9.5                       # solve the B meander top so P = N
 for _ in range(40):
     mid = (lo + hi) / 2
-    tot = bl.plen([p38, (5.6, p38[1]), V1]) + bl.plen(lenP(mid)) + (V2[0] - 0.0)
+    tot = bl.plen([p38, (6.45, p38[1]), V1]) + bl.plen(lenP(mid)) + (V2[0] - 0.0)
     lo, hi = (mid, hi) if tot > LN else (lo, mid)
 blk.track("/S_STROBE_P", W50, lenP(mid), "B.Cu", name="S_P", z=50)
 blk.track("/S_STROBE_P", W50, [V2, (0.0, YP)], name="S_P", z=50)
@@ -97,7 +99,7 @@ for ref, net in (("R411", "Net-(C422-Pad1)"), ("R407", "Net-(C412-Pad1)")):
     blk.iface(net, a[0], H, "B.Cu", "S", "pair", W50, f"{ref} 47 R at U501 ({'PH_STROBE_N' if ref == 'R411' else 'PH_STROBE_P'})")
 
 # ---------------- supply / ground vias (In2 / In1)
-SUP_V = {"36": (7.45, 8.75), "37": (6.3, 10.05), "1": (7.45, 16.45), "12": (12.55, 16.45), "25": (12.55, 8.75)}
+SUP_V = {"36": (7.45, 8.75), "37": (6.35, 9.6), "1": (7.45, 16.45), "12": (12.55, 16.45), "25": (12.55, 8.75)}
 for dx in (-1.2, 0.0, 1.2):                     # EP thermal vias
     for dy in (-1.2, 0.0, 1.2):
         blk.via(CX + dx, CY + dy, "GND")
@@ -217,7 +219,7 @@ def pad_cells(p):
 ROUTED, FAILED = [], []
 
 
-def route(net, src, dst, w=WS, via_cost=1.6, layer_pref=None, iface=None):
+def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
     """src: (ref, pad); dst: list of (ref, pad) / ('VIA', x, y) / ('EDGE', side, layer, x0, x1).  Draws tracks / vias."""
     net = NL.canon(net)
     code = netcode(net)
@@ -421,80 +423,98 @@ def to_edge(net, src, x0, x1, w=WS, note=""):
     return x
 
 
-# ---------------- routing (order matters: tight escapes first)
-print("routing ...")
-# QFN supply pins -> their vias (pad-wide 0.2 copper at the pin, 0.3 beyond is not possible at 0.4 pitch)
+# ---------------- routing jobs (a driver pass re-orders failed jobs first: prio.json)
+JOBS = []
+
+
+def job(name, fn):
+    JOBS.append((name, fn))
+
+
 for pin, (x, y) in list(SUP_V.items()):
-    v = place_via(NL.net_of("U501", pin), x, y)
-    SUP_V[pin] = v[1:]
-    route(NL.net_of("U501", pin), ("U501", pin), [v], 0.2)
-# QFN GND pins -> EP
+    def f(pin=pin, x=x, y=y):
+        v = place_via(NL.net_of("U501", pin), x, y)
+        SUP_V[pin] = v[1:]
+        route(NL.net_of("U501", pin), ("U501", pin), [v], 0.2)
+    job("sup" + pin, f)
 for pin in ("2", "26"):
-    route("GND", ("U501", pin), [("U501", "49")], 0.2)
-# PH strobe pins -> R411 / R407 (B) through one via each
-route("/PH_STROBE_N", ("U501", "39"), [("R411", "@PH_STROBE_N")])
-route("/PH_STROBE_P", ("U501", "40"), [("R407", "@PH_STROBE_P")])
-# decoupling caps: supply pad -> pin via, GND pad -> GND via
+    job("gnd" + pin, lambda pin=pin: route("GND", ("U501", pin), [("U501", "49")], 0.2))
+job("phn", lambda: route("/PH_STROBE_N", ("U501", "39"), [("R411", "@PH_STROBE_N")]))
+job("php", lambda: route("/PH_STROBE_P", ("U501", "40"), [("R407", "@PH_STROBE_P")]))
 DEC = {"C506": "36", "C502": "37", "C504": "1", "C501": "12", "C505": "25"}
 for c, pin in DEC.items():
-    net = NL.net_of("U501", pin)
-    route(net, (c, "@" + net), [("VIA", *SUP_V[pin])], 0.3)
-    tie(c, "@GND")
-# taps: fixed order along the S edge
+    def f(c=c, pin=pin):
+        net = NL.net_of("U501", pin)
+        route(net, (c, "@" + net), [("VIA", *SUP_V[pin])], 0.3)
+        tie(c, "@GND")
+    job("dec" + c, f)
 TAPX = {i: 8.3 + 0.62 * i for i in range(16)}
 TAPPIN = {NL.net_of("U501", p): p for p in [str(k) for k in list(range(9, 12)) + list(range(13, 25)) + [27]]}
-for i in list(range(3, 15)) + [0, 1, 2, 15]:
+for i in range(16):
     net = f"/TAP{i}"
-    to_edge(net, ("U501", TAPPIN[net]), TAPX[i] - 0.2, TAPX[i] + 0.2, note=f"U501.{TAPPIN[net]}")
-print("taps done")
-
-# ---------------- clock generator
-route("Net-(U502-CLK0)", ("U502", "10"), [("R508", "@Net-(U502-CLK0)")])
-route("Net-(U502-CLK1)", ("U502", "9"), [("R509", "@Net-(U502-CLK1)")])
-route("Net-(U502-CLK2)", ("U502", "6"), [("R510", "@Net-(U502-CLK2)")])
-route("Net-(U502-XA)", ("U502", "2"), [("Y501", "3")])
-route("Net-(U502-XB)", ("U502", "3"), [("Y501", "1")])
-route("/fpga_clock/FPGA_CLK", ("R508", "@FPGA_CLK"), [("U501", "33")])
-route("/fpga_clock/CLK2_FPGA", ("R510", "@CLK2_FPGA"), [("U501", "34")])
-route("+3V3", ("U502", "7"), [("C508", "@+3V3")], 0.3)
-route("+3V3", ("U502", "1"), [("C509", "@+3V3")], 0.3)
+    job("tap%d" % i, lambda net=net, i=i: to_edge(net, ("U501", TAPPIN[net]), TAPX[i] - 0.2, TAPX[i] + 0.2,
+                                                    note=f"U501.{TAPPIN[net]}"))
+job("clk0", lambda: route("Net-(U502-CLK0)", ("U502", "10"), [("R508", "@Net-(U502-CLK0)")]))
+job("clk1", lambda: route("Net-(U502-CLK1)", ("U502", "9"), [("R509", "@Net-(U502-CLK1)")]))
+job("clk2", lambda: route("Net-(U502-CLK2)", ("U502", "6"), [("R510", "@Net-(U502-CLK2)")]))
+job("xa", lambda: route("Net-(U502-XA)", ("U502", "2"), [("Y501", "3")]))
+job("xb", lambda: route("Net-(U502-XB)", ("U502", "3"), [("Y501", "1")]))
+job("fclk", lambda: route("/fpga_clock/FPGA_CLK", ("R508", "@FPGA_CLK"), [("U501", "33")]))
+job("fclk2", lambda: route("/fpga_clock/CLK2_FPGA", ("R510", "@CLK2_FPGA"), [("U501", "34")]))
+job("u502v7", lambda: route("+3V3", ("U502", "7"), [("C508", "@+3V3")], 0.3))
+job("u502v1", lambda: route("+3V3", ("U502", "1"), [("C509", "@+3V3")], 0.3))
 for ref, num in (("C508", "@+3V3"), ("C509", "@+3V3"), ("C508", "@GND"), ("C509", "@GND"), ("U502", "8"),
                  ("Y501", "2"), ("Y501", "4"), ("C510", "@+3V3"), ("C510", "@GND"), ("C503", "@+1V2"), ("C503", "@GND"),
                  ("C507", "@+3V3"), ("C507", "@GND")):
-    tie(ref, num)
-# ---------------- JTAG / DBG2 to J501
-route("/fpga_clock/JTAG_TCK", ("U501", "3"), [("J501", "7")])
-route("/fpga_clock/JTAG_TCK", ("R507", "@JTAG_TCK"), [("U501", "3"), ("J501", "7")])
-tie("R507", "@GND")
+    job("tie%s%s" % (ref, num), lambda ref=ref, num=num: tie(ref, num))
+job("tck", lambda: route("/fpga_clock/JTAG_TCK", ("U501", "3"), [("J501", "7")]))
+job("tckr", lambda: (route("/fpga_clock/JTAG_TCK", ("R507", "@JTAG_TCK"), [("U501", "3"), ("J501", "7")]), tie("R507", "@GND")))
 for pin, jp in (("4", "9"), ("5", "11"), ("7", "13"), ("6", "5")):
-    route(NL.net_of("U501", pin), ("U501", pin), [("J501", jp)])
-# ---------------- configuration pins
+    job("jtag" + pin, lambda pin=pin, jp=jp: route(NL.net_of("U501", pin), ("U501", pin), [("J501", jp)]))
 for pin, r in (("42", "R506"), ("43", "R505"), ("44", "R504"), ("45", "R503"), ("46", "R502"), ("48", "R501")):
-    net = NL.net_of("U501", pin)
-    route(net, ("U501", pin), [(r, "@" + net)])
-    other = [p.GetNumber() for p in blk.fps[r].Pads() if p.GetNetname() != net][0]
-    tie(r, other)
-route("/fpga_clock/JTAGSEL_N", ("JP501", "1"), [("U501", "44"), ("R504", "@JTAGSEL_N")])
-tie("JP501", "2")
-to_edge("/COARSE", ("U501", "47"), 2.0, 8.0, note="U501.47 (SN65LVDS2 in the phase block)")
-to_edge("/FPGA_DONE", ("R502", "@FPGA_DONE"), 2.0, 8.0, note="R502 4.7k pull-up; to the MCU")
-to_edge("/FPGA_RECONFIG", ("R501", "@FPGA_RECONFIG"), 2.0, 8.0, note="R501 4.7k pull-up; MCU open-drain")
-to_edge("/ADC_TRIG", ("U501", "41"), 2.0, 8.0, note="U501.41 -> STM32 PB11")
-# ---------------- SPI, I2C, MCU clock, J501 MCU lines
+    def f(pin=pin, r=r):
+        net = NL.net_of("U501", pin)
+        route(net, ("U501", pin), [(r, "@" + net)])
+        other = [p.GetNumber() for p in blk.fps[r].Pads() if p.GetNetname() != net][0]
+        tie(r, other)
+    job("cfg" + pin, f)
+job("jp", lambda: (route("/fpga_clock/JTAGSEL_N", ("JP501", "1"), [("U501", "44"), ("R504", "@JTAGSEL_N")]), tie("JP501", "2")))
+job("coarse", lambda: to_edge("/COARSE", ("U501", "47"), 1.8, 8.0, note="U501.47 (SN65LVDS2 in the phase block)"))
+job("done", lambda: to_edge("/FPGA_DONE", ("R502", "@FPGA_DONE"), 1.8, 8.0, note="R502 4.7k pull-up; to the MCU"))
+job("reconf", lambda: to_edge("/FPGA_RECONFIG", ("R501", "@FPGA_RECONFIG"), 1.8, 8.0, note="R501 4.7k pull-up; MCU open-drain"))
+job("adct", lambda: to_edge("/ADC_TRIG", ("U501", "41"), 1.8, 8.0, note="U501.41 -> STM32 PB11"))
 for pin in ("28", "29", "30", "31"):
-    to_edge(NL.net_of("U501", pin), ("U501", pin), 18.0, 23.8, note=f"U501.{pin}")
-to_edge("/MCU_CLK", ("R509", "@MCU_CLK"), 18.0, 23.8, note="MS5351M CLK1 via 33 R -> STM32 PF0")
-to_edge("/I2C_SCL", ("U502", "4"), 18.0, 23.8, note="MS5351M (pull-ups in mcuif)")
-to_edge("/I2C_SDA", ("U502", "5"), 18.0, 23.8, note="MS5351M")
-route("Net-(J501-Pin_2)", ("J501", "2"), [("R511", "@Net-(J501-Pin_2)")])
-route("Net-(J501-Pin_4)", ("J501", "4"), [("R512", "@Net-(J501-Pin_4)")])
-to_edge("/HOST_RX", ("R511", "@HOST_RX"), 18.0, 23.8, note="J501.2 via R511 100 R -> STM32 PA10")
-to_edge("/HOST_TX", ("R512", "@HOST_TX"), 18.0, 23.8, note="J501.4 via R512 100 R <- STM32 PA9")
+    job("spi" + pin, lambda pin=pin: to_edge(NL.net_of("U501", pin), ("U501", pin), 17.9, 24.3, note=f"U501.{pin}"))
+job("mclk", lambda: to_edge("/MCU_CLK", ("R509", "@MCU_CLK"), 17.9, 24.3, note="MS5351M CLK1 via 33 R -> STM32 PF0"))
+job("scl", lambda: to_edge("/I2C_SCL", ("U502", "4"), 17.9, 24.3, note="MS5351M (pull-ups in mcuif)"))
+job("sda", lambda: to_edge("/I2C_SDA", ("U502", "5"), 17.9, 24.3, note="MS5351M"))
+job("j2", lambda: route("Net-(J501-Pin_2)", ("J501", "2"), [("R511", "@Net-(J501-Pin_2)")]))
+job("j4", lambda: route("Net-(J501-Pin_4)", ("J501", "4"), [("R512", "@Net-(J501-Pin_4)")]))
+job("hrx", lambda: to_edge("/HOST_RX", ("R511", "@HOST_RX"), 17.9, 24.3, note="J501.2 via R511 100 R -> STM32 PA10"))
+job("htx", lambda: to_edge("/HOST_TX", ("R512", "@HOST_TX"), 17.9, 24.3, note="J501.4 via R512 100 R <- STM32 PA9"))
 for jp in ("8", "10", "12", "14"):
-    to_edge(NL.net_of("J501", jp), ("J501", jp), 18.0, 23.8, note=f"J501.{jp} -> STM32")
-x = route("VBUS", ("J501", "1"), [("EDGE", "E", "B.Cu", 0.5, 6.5)], 0.4)
-if x is not None:
-    blk.iface("VBUS", SX, x, "B.Cu", "E", "supply", 0.4, "J501.1 (5 V to the cable); from the power block")
+    job("j" + jp, lambda jp=jp: to_edge(NL.net_of("J501", jp), ("J501", jp), 17.9, 24.3, note=f"J501.{jp} -> STM32"))
+
+
+def vbus():
+    x = route("VBUS", ("J501", "1"), [("EDGE", "E", "B.Cu", 0.5, 6.5)], 0.4)
+    if x is not None:
+        blk.iface("VBUS", SX, x, "B.Cu", "E", "supply", 0.4, "J501.1 (5 V to the cable); from the power block")
+
+
+job("vbus", vbus)
+PRIO = json.load(open(os.path.join(HERE, "prio.json"))) if os.path.exists(os.path.join(HERE, "prio.json")) else []
+order = [j for p in PRIO for j in JOBS if j[0] == p] + [j for j in JOBS if j[0] not in PRIO]
+print("routing", len(order), "jobs ...")
+FAILJ = []
+for name, fn in order:
+    nf = len(FAILED)
+    fn()
+    if len(FAILED) > nf:
+        FAILJ.append(name)
+print("failed jobs:", FAILJ)
+print("failed nets:", sorted(set(f[0] for f in FAILED)))
+json.dump([n for n in PRIO] + [n for n in FAILJ if n not in PRIO], open(os.path.join(SCR, "fpga_prio_next.json"), "w"))
+blk.zone("GND", ["In1.Cu"], [(0, 0), (SX, 0), (SX, SY), (W, SY), (W, H), (0, H)], 0.2)
 blk.iface("+3V3", 0, 0, "In2.Cu", "-", "supply", None, "via pairs at the caps; J501.3 THT on the In2 +3V3 region")
 blk.iface("+1V2", 0, 0, "In2.Cu", "-", "supply", None, "vias at U501.12 / .37 and C501-C503: In2 +1V2 island under U501")
-print("failed:", FAILED)

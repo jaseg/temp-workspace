@@ -43,124 +43,34 @@
    "note": "R407 47 R at U501 (PH_STROBE_P)"
   },
   {
-   "net": "/TAP3",
-   "x": 10.35,
+   "net": "/SPI_CS",
+   "x": 17.9,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.2,
-   "note": "U501.13"
+   "note": "U501.31"
   },
   {
-   "net": "/TAP4",
-   "x": 11.0,
+   "net": "/DBG1",
+   "x": 18.25,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.2,
-   "note": "U501.14"
+   "note": "J501.12 -> STM32"
   },
   {
-   "net": "/TAP5",
-   "x": 11.6,
+   "net": "/UC_NRST",
+   "x": 18.7,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.2,
-   "note": "U501.15"
-  },
-  {
-   "net": "/TAP6",
-   "x": 12.2,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.16"
-  },
-  {
-   "net": "/TAP7",
-   "x": 12.85,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.17"
-  },
-  {
-   "net": "/TAP8",
-   "x": 13.45,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.18"
-  },
-  {
-   "net": "/TAP9",
-   "x": 14.1,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.19"
-  },
-  {
-   "net": "/TAP10",
-   "x": 14.7,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.20"
-  },
-  {
-   "net": "/TAP11",
-   "x": 15.3,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.21"
-  },
-  {
-   "net": "/TAP12",
-   "x": 15.95,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.22"
-  },
-  {
-   "net": "/TAP13",
-   "x": 16.55,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.23"
-  },
-  {
-   "net": "/TAP14",
-   "x": 17.2,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "U501.24"
+   "note": "J501.14 -> STM32"
   },
   {
    "net": "/TAP0",
@@ -193,14 +103,214 @@
    "note": "U501.11"
   },
   {
+   "net": "/TAP3",
+   "x": 10.35,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.13"
+  },
+  {
+   "net": "/TAP5",
+   "x": 11.6,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.15"
+  },
+  {
+   "net": "/TAP10",
+   "x": 14.3,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.20"
+  },
+  {
+   "net": "/TAP11",
+   "x": 14.9,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.21"
+  },
+  {
+   "net": "/TAP12",
+   "x": 15.55,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.22"
+  },
+  {
+   "net": "/TAP13",
+   "x": 16.15,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.23"
+  },
+  {
+   "net": "/TAP14",
+   "x": 16.8,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.24"
+  },
+  {
    "net": "/TAP15",
-   "x": 17.8,
+   "x": 17.45,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.2,
    "note": "U501.27"
+  },
+  {
+   "net": "/SPI_SCK",
+   "x": 19.2,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.28"
+  },
+  {
+   "net": "/SPI_MOSI",
+   "x": 20.25,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.29"
+  },
+  {
+   "net": "/UC_SWDIO",
+   "x": 20.6,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "J501.8 -> STM32"
+  },
+  {
+   "net": "/UC_SWCLK",
+   "x": 20.95,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "J501.10 -> STM32"
+  },
+  {
+   "net": "/TAP6",
+   "x": 12.2,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.16"
+  },
+  {
+   "net": "/FPGA_DONE",
+   "x": 5.2,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R502 4.7k pull-up; to the MCU"
+  },
+  {
+   "net": "/FPGA_RECONFIG",
+   "x": 5.75,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R501 4.7k pull-up; MCU open-drain"
+  },
+  {
+   "net": "/ADC_TRIG",
+   "x": 2.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.41 -> STM32 PB11"
+  },
+  {
+   "net": "/HOST_RX",
+   "x": 23.65,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "J501.2 via R511 100 R -> STM32 PA10"
+  },
+  {
+   "net": "/HOST_TX",
+   "x": 21.45,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "J501.4 via R512 100 R <- STM32 PA9"
+  },
+  {
+   "net": "VBUS",
+   "x": 29.6,
+   "y": 2.05,
+   "layer": "B.Cu",
+   "side": "E",
+   "class": "supply",
+   "width": 0.4,
+   "note": "J501.1 (5 V to the cable); from the power block"
+  },
+  {
+   "net": "+3V3",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "via pairs at the caps; J501.3 THT on the In2 +3V3 region"
+  },
+  {
+   "net": "+1V2",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "vias at U501.12 / .37 and C501-C503: In2 +1V2 island under U501"
   }
  ]
 }
