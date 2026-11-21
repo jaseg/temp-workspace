@@ -615,7 +615,9 @@ def tie_b(ref, num, w=0.3):
 for c, pin in DEC.items():
     def f(c=c, pin=pin):
         net = NL.net_of("U501", pin)
-        route(net, (c, "@" + net), [("VIA",) + SUPV[pin][1]], 0.4, layer_pref=BPREF, via_cost=30.0)
+        if route(net, (c, "@" + net), [("VIA",) + SUPV[pin][1]], 0.4, layer_pref=BPREF, via_cost=30.0) is None:
+            FAILED.pop()                  # fall back: any via of the supply (all land in the same In2 island)
+            route(net, (c, "@" + net), vias_of(net), 0.4, layer_pref=BPREF, via_cost=30.0)
         route("GND", (c, "@GND"), [nearest_th(c)], 0.4, layer_pref=BPREF, via_cost=30.0)
     job("dec" + c, f)
 job("c503", lambda: (route("+1V2", ("C503", "@+1V2"), [("VIA",) + SUPV["12"][1]], 0.4, layer_pref=BPREF, via_cost=30.0),
