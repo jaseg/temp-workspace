@@ -483,6 +483,10 @@ def main():
     sh.text("line 75 ps/tap", P(X0 + 11, YL[0] + 1), size=T)
     sh.text("strobe lines PSTRB_A / PSTRB_K: 40 ps/tap each", P(X0 + 12, YL[0] - 14.5), size=T)
 
+    # PWR_FLAG: VSW_GND (-0.9 V switch ground of U301) is driven by the R304 / R305 divider and C302-C305
+    sh.power("PWR_FLAG", (g(10), g(215)))
+    sh.wire((g(10), g(215)), (g(10), g(217)))
+    sh.label("VSW_GND", (g(10), g(217)))
     names = {n for n, _ in hier_pins("trigger_phase")}
     split_wires(sh)
     sh.save()

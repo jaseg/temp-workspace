@@ -196,6 +196,10 @@ def main():
     # MCU part refs continue as before: U704, C710..C719, R729, R730, FB701, JP701, D701
     sh._refn.update({"U": 3, "C": 9, "R": 28})
     mcu_section(sh)
+    # PWR_FLAG: VDDA is driven through FB701 from +3V3 (ERC power_pin_not_driven otherwise)
+    sh.power("PWR_FLAG", (g(20), g(215)))
+    sh.wire((g(20), g(215)), (g(20), g(217)))
+    sh.label("VDDA", (g(20), g(217)))
     sh.save()
 
 

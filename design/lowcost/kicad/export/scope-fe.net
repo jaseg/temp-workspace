@@ -1,7 +1,7 @@
 (export (version "E")
   (design
     (source "/home/user/temp-workspace/design/lowcost/kicad/scope-fe.kicad_sch")
-    (date "Sat Nov 21 21:01:11 2026")
+    (date "Sat Nov 21 21:41:12 2026")
     (tool "Eeschema 7.0.11+dfsg-1build4")
     (sheet (number "1") (name "/") (tstamps "/")
       (title_block
@@ -3561,7 +3561,7 @@
       (property (name "Sheetname") (value "trigger_phase"))
       (property (name "Sheetfile") (value "trigger_phase.kicad_sch"))
       (sheetpath (names "/trigger_phase/") (tstamps "/5de296a9-797d-5eeb-99d0-7e19448f4002/"))
-      (tstamps "65417c28-cdab-5e3c-98b5-a07a60df4e7e" "9a2b9880-fc12-53a7-8b74-6f335095d886" "09a8e501-c189-5ef6-b2db-d6b0c794006b"))
+      (tstamps "9a2b9880-fc12-53a7-8b74-6f335095d886" "65417c28-cdab-5e3c-98b5-a07a60df4e7e" "09a8e501-c189-5ef6-b2db-d6b0c794006b"))
     (comp (ref "U308")
       (value "COS3502")
       (footprint "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm")
@@ -3593,7 +3593,7 @@
       (property (name "Sheetname") (value "trigger_phase"))
       (property (name "Sheetfile") (value "trigger_phase.kicad_sch"))
       (sheetpath (names "/trigger_phase/") (tstamps "/5de296a9-797d-5eeb-99d0-7e19448f4002/"))
-      (tstamps "b7ee2ca1-f53f-5bf8-b683-4ff0c051d971" "fa8e983f-fef8-54b6-b460-cc82150ab698" "75c90dd9-4710-5da0-a87f-26bc1fc169bb"))
+      (tstamps "fa8e983f-fef8-54b6-b460-cc82150ab698" "b7ee2ca1-f53f-5bf8-b683-4ff0c051d971" "75c90dd9-4710-5da0-a87f-26bc1fc169bb"))
     (comp (ref "U310")
       (value "COS3502")
       (footprint "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm")

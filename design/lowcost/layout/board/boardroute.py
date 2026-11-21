@@ -194,6 +194,11 @@ class Router:
         for ln in Ls:
             o = self.own[ln][si:ei + 1, sj:ej + 1]
             occ = ((o != -1) & (o != code)) | self.notrack[ln][si:ei + 1, sj:ej + 1]
+            for (al, ax0, ay0, ax1, ay1) in (avoid or ()):
+                if al == ln:
+                    a0, a1 = max(0, int(ax0 / F) - si), max(0, int(math.ceil(ax1 / F)) - si + 1)
+                    b0, b1 = max(0, int(ay0 / F) - sj), max(0, int(math.ceil(ay1 / F)) - sj + 1)
+                    occ[a0:a1, b0:b1] = True
             dist[ln] = ndimage.distance_transform_edt(~occ) * F
             cst[ln] = self.cost[ln][si:ei + 1, sj:ej + 1]
         if len(Ls) > 1:

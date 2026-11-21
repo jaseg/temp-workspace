@@ -167,6 +167,16 @@ def main():
     sh.text("Load estimate (A): +3V3 0.45 (TRF37D73 6 x 55 mA, FPGA, MS5351M, COS3502 x 8, LVDS rx),\n"
             "+1V2 0.03, +5V 0.04, -5V 0.09 incl. -2V5 0.04, +2V5 0.05, VBUS direct 0.2 (GVA-84+ x 2).\n"
             "VBUS total ~0.85 A.", (g(15), g(200)))
+    # PWR_FLAGs: these nets are driven (USB connector / regulators with passive output pins in their
+    # symbols), ERC power_pin_not_driven otherwise
+    for k, (net, rail) in enumerate([('GND', True), ('VBUS', True), ('-5V', True), ('+5V4F', False)]):
+        x, y = g(20 + 14 * k), g(215)
+        sh.power("PWR_FLAG", (x, y))
+        if rail:
+            sh.power(net, (x, y), dy=(2.54 if net == "GND" or net.startswith("-") else -2.54))
+        else:
+            sh.wire((x, y), (x, y + 2.54))
+            sh.label(net, (x, y + 2.54))
     sh.save()
 
 

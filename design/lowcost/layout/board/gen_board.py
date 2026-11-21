@@ -91,7 +91,8 @@ def endpoint(net, i, strip=True):
     if not ts:
         return (x, y, ly, "*")
     t, (ox, oy) = ts[0]
-    if strip and via_at(net, ox, oy) is not None and len(tracks_at(net, ox, oy, ly)) == 1:
+    if strip and via_at(net, ox, oy) is not None and len(tracks_at(net, ox, oy, ly)) == 1 and \
+            math.hypot(x - ox, y - oy) < 2.5:
         B.Remove(t)
         return (ox, oy, "*", "*")
     return (x, y, ly, compass(x - ox, y - oy))
@@ -138,20 +139,45 @@ for net in ("/PH_STROBE_P", "/PH_STROBE_N"):
     pass
 for t, o in tracks_at("/PH_STROBE_N", 56.0, 13.1, "F.Cu") + tracks_at("/PH_STROBE_P", 56.0, 13.58, "F.Cu"):
     B.Remove(t)
+# the pstrobe inputs are boxed in on F.Cu by the phase block's C301 / C306 row (P) - both strobes drop to
+# B.Cu through one via each right at the pstrobe interface (same via count on P and N)
+vp = m.via(10.02, 25.1, "/PH_STROBE_P"); R.add_item(vp)
+m.track("/PH_STROBE_P", bl.W50, [(10.02, 25.0), (10.02, 25.1)], "F.Cu")
+vn = m.via(10.02, 49.9, "/PH_STROBE_N"); R.add_item(vn)
+m.track("/PH_STROBE_N", bl.W50, [(10.02, 50.0), (10.02, 49.9)], "F.Cu")
 php = (57.9, 13.58, "F.Cu", "SW")
 phn = (57.25, 13.1, "F.Cu", "SW")
-ps = {i["net"]: i for i in IF["/PH_STROBE_P"] + IF["/PH_STROBE_N"] if i["block"] == "pstrobe"}
-rt("/PH_STROBE_P", php, (ps["/PH_STROBE_P"]["bx"], ps["/PH_STROBE_P"]["by"], "F.Cu", "N"),
-   w=bl.W50, layers=("F.Cu",), clr=0.2, margin=14)
-rt("/PH_STROBE_N", phn, (ps["/PH_STROBE_N"]["bx"], ps["/PH_STROBE_N"]["by"], "F.Cu", "S"),
-   w=bl.W50, layers=("F.Cu", "B.Cu"), clr=0.2, via_cost=4.0, margin=14)
+for net, a, b in (("/PH_STROBE_N", phn, (10.02, 49.9, "*", "*")), ("/PH_STROBE_P", php, (10.02, 25.1, "*", "*"))):
+    r = rt(net, a, b, w=bl.W50, layers=("F.Cu", "B.Cu"), lcost={"F.Cu": 1.5}, clr=0.2, via_cost=6.0, margin=12)
+RF["/PH_STROBE_P"] = RF["/PH_STROBE_N"] = bl.W50
+
+# fpga SPI / I2C / MCU_CLK comb (0.25 mm pitch at the S edge): continue the comb straight down into the free
+# B.Cu strip of the phase block with staggered ends (east line ends first) so that every line can turn off
+COMB = ["/SPI_SCK", "/SPI_MOSI", "/SPI_MISO", "/SPI_CS", "/MCU_CLK", "/I2C_SDA", "/I2C_SCL"]
+COMB_END = {}
+for k, net in enumerate(COMB):
+    i = [i for i in IF[net] if i["block"] == "fpga"][0]
+    x, y = i["bx"], i["by"]
+    ye = round(23.0 + (len(COMB) - 1 - k) * 0.5, 3)
+    m.track(net, i["width"] or 0.12, [(x, y), (x, ye)], "B.Cu")
+    COMB_END[net] = (x, ye, "B.Cu", "S")
+for t in B.GetTracks():
+    if t.GetNetname() in COMB:
+        R.add_item(t)
 
 # ---------------------------------------------------------------- 2. slow nets (B.Cu, In2 where needed)
 SLOW = sorted(n for n, v in IF.items() if len({i["block"] for i in v}) >= 2 and n not in RF and
               all(i["class"] in ("slow", "supply") for i in v) and "STROBE" not in n and "USB" not in n)
-taps = [n for n in SLOW if "/TAP" in n]
+taps = [n for n in SLOW if "/TAP" in n] + ["/COARSE"]
 rest = [n for n in SLOW if n not in taps]
-for net in sorted(taps, key=lambda n: int(n[4:])) + rest:
+# channel plan: TAP0..15 + COARSE on In2 only, in the band y 20.5..27.0 (under the fpga pin row, the analog /
+# phase seam and the comparator row); everything that crosses the phase block runs on B.Cu in the free columns
+# between the tap cells and hops the VTH rail (B.Cu, y 28.9) on In2 in the band y 27.4..32.0
+TAP_AVOID = [("In2.Cu", 0, 0, W, 20.5), ("In2.Cu", 0, 27.0, W, H)]
+X_AVOID = [("In2.Cu", 0, 0, W, 27.4), ("In2.Cu", 0, 32.0, W, H)]
+first = [n for n in rest if "JTAG" in n or "DBG" in n] + [n for n in reversed(COMB) if n in rest]
+order = sorted(taps[:-1], key=lambda n: int(n[4:])) + ["/COARSE"] + first + [n for n in rest if n not in first]
+for net in order:
     v = IF[net]
     if len(v) != 2:
         print("skip", net, len(v))
@@ -159,9 +185,20 @@ for net in sorted(taps, key=lambda n: int(n[4:])) + rest:
     w = max(i["width"] or 0.15 for i in v)
     w = min(w, 0.4)
     a, b = [endpoint(net, i) for i in v]
-    rt(net, a, b, w=w, layers=("B.Cu", "In2.Cu"), lcost={"In2.Cu": 1.3}, via_cost=1.5, clr=0.15, margin=8)
+    if net in COMB_END:
+        w = 0.12
+        a, b = [COMB_END[net] if i["block"] == "fpga" else e for i, e in zip(v, (a, b))]
+    if net in taps:
+        kw = dict(w=w, layers=("In2.Cu",) if a[2] == "*" and b[2] == "*" else ("B.Cu", "In2.Cu"),
+                  lcost={"B.Cu": 3.0}, via_cost=1.5, clr=0.15, avoid=TAP_AVOID)
+    else:
+        kw = dict(w=w, layers=("B.Cu", "In2.Cu"), lcost={"In2.Cu": 1.5}, via_cost=1.0, clr=0.15, avoid=X_AVOID)
+    if rt(net, a, b, margin=6, maxn=200_000, **kw) is None:
+        LOG.pop()
+        rt(net, a, b, margin=25, maxn=600_000, **kw)
 
-bl.save_board(B, OUT)
+bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
+json.dump({"log": LOG, "fail": R.log, "rf": RF}, open(os.path.join(SCR, "routed.json"), "w"), indent=1)
 print("routes:")
 for r in LOG:
     print("  ", r)
