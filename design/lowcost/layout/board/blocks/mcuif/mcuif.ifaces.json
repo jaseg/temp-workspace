@@ -163,6 +163,16 @@
    "note": "R723 / R724 / C709 -> R380 / R381 (phase)"
   },
   {
+   "net": "/DAC_TRIG",
+   "x": 33.9,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.12 DAC -> R383 (phase)"
+  },
+  {
    "net": "/FPGA_DONE",
    "x": 51.6,
    "y": 0.0,
@@ -183,16 +193,6 @@
    "note": "U704.18 -> U501.48 (R501 pull-up)"
   },
   {
-   "net": "/SPI_CS",
-   "x": 52.1,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.22 -> U501.31"
-  },
-  {
    "net": "/ADC_TRIG",
    "x": 52.7,
    "y": 0.0,
@@ -211,36 +211,6 @@
    "class": "slow",
    "width": 0.15,
    "note": "U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"
-  },
-  {
-   "net": "/TRIG_SEL",
-   "x": 34.4,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.43 -> R302 (phase)"
-  },
-  {
-   "net": "/ADC_IN",
-   "x": 34.15,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.8 ADC in; RC R211 / C207 sit in the analog block"
-  },
-  {
-   "net": "/DAC_TRIG",
-   "x": 33.9,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.12 DAC -> R383 (phase)"
   },
   {
    "net": "/VOFS",

@@ -485,8 +485,8 @@ x1 = pd("C716", "1")[0]
 T("/mcu_if/VDDA", 0.3, [vd, (vd[0], 8.06), (x1, 8.06 - (x1 - vd[0])), pd("C716", "1"), pd("C715", "1"), pd("FB701", "2")], "B.Cu")
 x2 = pd("C716", "2")[0]
 q = pd("FB701", "1")                    # FB701 +3V3 side: straight up to its In2 via
-T("+3V3", 0.3, [q, (q[0], 4.45)], "B.Cu")
-VV("+3V3", (q[0], 4.45))
+T("+3V3", 0.3, [q, (50.8, q[1]), (51.0, q[1] + 0.2), (51.0, 5.6)], "B.Cu")
+VV("+3V3", (51.0, 5.6))
 T("GND", 0.3, [pd("C716", "2"), pd("C715", "2")], "B.Cu")
 T("GND", 0.3, [pd("C716", "2"), (x2, 7.75)], "B.Cu")
 VV("GND", (x2 + 0.0, 7.75 + 0.0))
@@ -613,8 +613,7 @@ for ref, net, xv in (("R726", "-2V5", 16.3), ("R725", "+2V5", 22.45)):
 # ============================================================ MCU bus J501 -> U704 (hand-drawn: F.Cu lanes above J501, B.Cu east of x 25.6)
 LANE = [("/HOST_RX", ("R511", "2"), 2.9), ("/HOST_TX", ("R512", "2"), 3.3), ("/UC_SWDIO", ("J501", "8"), 3.7),
         ("/UC_SWCLK", ("J501", "10"), 4.1), ("/DBG1", ("J501", "12"), 4.5), ("/UC_NRST", ("J501", "14"), 4.9)]
-XH = 40.4                                   # hand-over to the router (B.Cu lane ends)
-LANE_END = {}
+XH = {"/HOST_RX": 44.6, "/HOST_TX": 38.2, "/UC_SWDIO": 38.8, "/UC_SWCLK": 50.25, "/DBG1": 37.1, "/UC_NRST": 38.2}
 for k, (net, (ref, pn), y) in enumerate(LANE):
     q = pd(ref, pn)
     xv = 22.6 + 0.6 * (k % 2)
@@ -625,8 +624,39 @@ for k, (net, (ref, pn), y) in enumerate(LANE):
     else:
         T(net, WS, [q, (q[0], y), (xv, y)], "F.Cu")
     VV(net, (xv, y))
-    T(net, WS, [(xv, y), (XH, y)], "B.Cu")
-    LANE_END[net] = ("PT", XH, y, "B.Cu", (0, 1, 7))
+    if net == "/UC_SWCLK":                  # straight on under the west pins and the body, up into the pin-38 via
+        T(net, WS, [(xv, y), (XH[net], y), VIA_AT["38"]], "B.Cu")
+        continue
+    T(net, WS, [(xv, y), (XH[net], y)], "B.Cu")
+    if net != "/HOST_RX":
+        VV(net, (XH[net], y))               # F hops where the lanes have to swap order
+# HOST_RX: B east, via in the gap of the N via row (pin 48 has none), F under the body straight into pin 32
+T("/HOST_RX", WS, [(44.6, 2.9), (45.15, 3.45)], "B.Cu")
+VV("/HOST_RX", (45.15, 3.45))
+T("/HOST_RX", WS, [(45.15, 3.45), (45.15, 4.4), (45.6, 4.85), (50.9, 4.85), (51.3, 5.25), pd("U704", "32")])
+# DBG1: F up over TX / SWDIO / SWCLK, B along y 2.6 to the pin-46 via
+T("/DBG1", WS, [(37.1, 4.5), (37.1, 2.2)])
+VV("/DBG1", (37.1, 2.2))
+T("/DBG1", WS, [(37.1, 2.2), (37.5, 2.6), (45.95, 2.6), (46.25, 2.9), VIA_AT["46"]], "B.Cu")
+# SWDIO: F under SWCLK, B along y 4.5 under the body, up into the pin-37 via
+T("/UC_SWDIO", WS, [(38.8, 3.7), (39.6, 4.5), (40.0, 4.5)])
+VV("/UC_SWDIO", (40.0, 4.5))
+T("/UC_SWDIO", WS, [(40.0, 4.5), (50.75, 4.5), VIA_AT["37"]], "B.Cu")
+# HOST_TX: F over the lanes, B down to the south bus under the S pads, up the east side, F into pin 31
+T("/HOST_TX", WS, [(38.2, 3.3), (41.0, 3.3), (41.0, 5.0)])
+VV("/HOST_TX", (41.0, 5.0))
+T("/HOST_TX", WS, [(41.0, 5.0), (41.0, 9.9), (41.5, 10.4), (52.2, 10.4), (52.7, 9.9), (52.7, 7.25), (53.35, 6.6)], "B.Cu")
+VV("/HOST_TX", (53.35, 6.6))
+T("/HOST_TX", WS, [(53.35, 6.6), (53.35, 6.05), (53.05, 5.75), pd("U704", "31")])
+# NRST: F to C719 (the router connects C719 to U704.7)
+T("/UC_NRST", WS, [(38.2, 4.9), (40.07, 4.9), (40.92, 5.75), pd("C719", "@UC_NRST")])
+# VREF+ south feed: pin 20 straight down to a via, B.Cu below the bus to R731 (0.25 mm)
+p20 = pd("U704", "20")
+T("/mcu_if/VREFP", 0.25, [p20, (p20[0], 11.0)])
+VV("/mcu_if/VREFP", (p20[0], 11.0))
+T("/mcu_if/VREFP", 0.25, [(p20[0], 11.0), (38.9, 11.0), (38.4, 10.5), (38.4, 8.55)], "B.Cu")
+VV("/mcu_if/VREFP", (38.4, 8.55))
+T("/mcu_if/VREFP", 0.25, [(38.4, 8.55), pd("R731", "@VREFP")])
 
 # ============================================================ I2C pull-ups beside their B.Cu lanes
 for ref, pin in (("R728", "44"), ("R727", "39")):
@@ -680,13 +710,12 @@ def job(name, fn):
 V = lambda pin: ("PT", VIA_AT[pin][0], VIA_AT[pin][1], "B.Cu")
 # west analog / trigger group: ifaces east of the JTAG pins (board x 50..56), B.Cu
 AW = (31.8, 34.4)
-job("L_vofs", lambda: edge("/VOFS", V("13"), *AW, note="U704.13 DAC -> R119 (input block)"))
-job("L_vneg", lambda: edge("/VNEG_REF", ("R732", "@VNEG_REF"), *AW, note="U701 out -> R123 (input block)"))
-job("L_dactrig", lambda: edge("/DAC_TRIG", ("U704", "12"), *AW, note="U704.12 DAC -> R383 (phase)"))
-job("L_trigsel", lambda: edge("/TRIG_SEL", V("43"), *AW, note="U704.43 -> R302 (phase)"))
-job("L_adcin", lambda: edge("/ADC_IN", ("U704", "8"), *AW, note="U704.8 ADC in; RC R211 / C207 sit in the analog block"))
-job("L_vref", lambda: route("/mcu_if/VREFP", ("C717", "@VREFP"), [("R703", "@VREFP")], 0.2))
-job("L_vref3", lambda: route("/mcu_if/VREFP", ("R731", "@VREFP"), [("R703", "@VREFP"), ("C717", "@VREFP")], 0.2))
+job("L_vofs", lambda: edge("/VOFS", V("13"), 33.5, 33.5, note="U704.13 DAC -> R119 (input block)"))
+job("L_vneg", lambda: edge("/VNEG_REF", ("R732", "@VNEG_REF"), 33.05, 33.05, note="U701 out -> R123 (input block)"))
+job("L_dactrig", lambda: edge("/DAC_TRIG", ("U704", "12"), 33.9, 33.9, note="U704.12 DAC -> R383 (phase)"))
+job("L_trigsel", lambda: edge("/TRIG_SEL", V("43"), 34.4, 34.4, note="U704.43 -> R302 (phase)"))
+job("L_adcin", lambda: edge("/ADC_IN", ("U704", "8"), 34.15, 34.15, note="U704.8 ADC in; RC R211 / C207 sit in the analog block"))
+job("L_vref", lambda: route("/mcu_if/VREFP", ("R703", "@VREFP"), [("R731", "@VREFP")], 0.25))
 job("L_biask", lambda: route("/mcu_if/DAC_BIAS_K", V("17"), [("R735", "@DAC_BIAS_K"), ("R736", "@DAC_BIAS_K")]))
 job("L_biasa", lambda: route("/mcu_if/DAC_BIAS_A", V("14"), [("R733", "@DAC_BIAS_A")]))
 
@@ -720,18 +749,12 @@ job("boot0j", lambda: route("/mcu_if/BOOT0", ("R729", "@BOOT0"), [("JP701", "1")
 job("boot0v", lambda: tie("JP701", "2"))
 job("nrstc", lambda: route("/UC_NRST", ("U704", "7"), [("C719", "@UC_NRST")]))
 # U704 <-> J501 (inside the block)
-job("j_nrst", lambda: route("/UC_NRST", LANE_END["/UC_NRST"], [("C719", "@UC_NRST")]))
-job("j_swdio", lambda: route("/UC_SWDIO", LANE_END["/UC_SWDIO"], [("VIA",) + VIA_AT["37"]]))
-job("j_swclk", lambda: route("/UC_SWCLK", LANE_END["/UC_SWCLK"], [("VIA",) + VIA_AT["38"]]))
-job("j_dbg1", lambda: route("/DBG1", LANE_END["/DBG1"], [("VIA",) + VIA_AT["46"]]))
-job("j_rx", lambda: route("/HOST_RX", LANE_END["/HOST_RX"], [("U704", "32")]))
-job("j_tx", lambda: route("/HOST_TX", LANE_END["/HOST_TX"], [("U704", "31")]))
 # to the N edge: fpga
-job("mclk", lambda: edge("/MCU_CLK", ("U704", "5"), 37.0, 44.6, note="U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"))
-job("adctrig", lambda: edge("/ADC_TRIG", ("U704", "25"), 51.6, 66.0, note="U704.25 PB11 <- U501.41"))
-job("done", lambda: edge("/FPGA_DONE", V("16"), 51.6, 66.0, note="U704.16 <- U501.46 (R502 pull-up)"))
-job("reconf", lambda: edge("/FPGA_RECONFIG", V("18"), 51.6, 66.0, note="U704.18 -> U501.48 (R501 pull-up)"))
-job("spics", lambda: edge("/SPI_CS", V("22"), 51.6, 66.0, note="U704.22 -> U501.31"))
+job("mclk", lambda: edge("/MCU_CLK", ("U704", "5"), 44.6, 44.6, note="U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"))
+job("adctrig", lambda: edge("/ADC_TRIG", ("U704", "25"), 52.7, 52.7, note="U704.25 PB11 <- U501.41"))
+job("done", lambda: edge("/FPGA_DONE", V("16"), 51.6, 51.6, note="U704.16 <- U501.46 (R502 pull-up)"))
+job("reconf", lambda: edge("/FPGA_RECONFIG", V("18"), 51.85, 51.85, note="U704.18 -> U501.48 (R501 pull-up)"))
+job("spics", lambda: edge("/SPI_CS", V("22"), 52.1, 52.1, note="U704.22 -> U501.31"))
 
 PRIO = json.load(open(os.path.join(HERE, "prio.json"))) if os.path.exists(os.path.join(HERE, "prio.json")) and os.path.getsize(os.path.join(HERE, "prio.json")) else []
 order = [j for p in PRIO for j in JOBS if j[0] == p] + [j for j in JOBS if j[0] not in PRIO]

@@ -1,1 +1,1 @@
-["done","reconf","spics","adctrig","mclk","L_trigsel","L_adcin","L_dactrig","L_vofs","L_vneg","L_biask","L_biasa","dactapth","led","boot0","boot0j","boot0v","j_dbg1","j_swdio","j_swclk","j_tx","j_rx","j_nrst","L_vref","L_vref3","u701out","u701outc","u701fb","nrstc"]
+["L_trigsel","L_dactrig","L_biask","done","reconf","spics","adctrig","mclk","dactapth","led","ledk","boot0","boot0j","boot0v","L_adcin","L_vofs","L_vneg","L_biasa","L_vref","u701out","u701outc","u701fb","nrstc"]
