@@ -74,37 +74,23 @@ def T(net, w, pts, layer="F.Cu", ch=0.15):
 
 
 YP, YN = 10.37, 11.37                      # analog S_STROBE_P / N ifaces (board 10.87 / 11.87)
-# S_STROBE_N: F.Cu only: pin 35 up, west at y 4.2, down x 1.25 to its iface
+# S_STROBE_P drives the strobe amplifier: pin 38 west on F.Cu only (no vias), 45-degree jog up to y 7.7 (clear of
+# PH_STROBE_N at y 8.4), west, down x 0.6 to its iface.  S_STROBE_N is only terminated (R405 in analog): pin 35 up,
+# one via, B.Cu over the In2 ground strip around the P line, via at the iface, short F stub (no crossing of P).
 p35, p38 = up("35"), up("38")
-blk.track("/S_STROBE_N", 0.2, [p35, (p35[0], 6.2)], name="S_N")
-strobe("/S_STROBE_N", [(p35[0], 6.2), (p35[0], 4.55), (p35[0] - 0.35, 4.2), (1.6, 4.2), (1.25, 4.55), (1.25, YN - 0.37),
-                       (0.88, YN), (0.0, YN)], name="S_N")
-LN = blk.route_len("S_N")
-# S_STROBE_P: pin 38 west, via to B, B meander (x 1.3..3.0, y 4.9..7.7) under N, via at x 0.6, F down to its iface
 blk.track("/S_STROBE_P", 0.2, [p38, (4.85, p38[1])], name="S_P")
-PV1 = (3.0, 7.7)
-strobe("/S_STROBE_P", [(4.85, p38[1]), (3.3, p38[1]), PV1], name="S_P")
-TAILY = 5.2
-
-
-def p_b(top3, bot2, y_end):
-    return [PV1, (3.0, top3 + 0.2), (2.8, top3), (2.34, top3), (2.14, top3 + 0.2), (2.14, bot2 - 0.2), (1.94, bot2),
-            (1.48, bot2), (1.28, bot2 - 0.2), (1.28, y_end + 0.3), (0.98, y_end), (0.6, y_end)]
-
-
-tail = [(0.6, TAILY), (0.6, YP - 0.37), (0.23, YP), (0.0, YP)]
-LP0 = blk.route_len("S_P") + bl.plen(tail)
-lo, hi = 4.9, 7.4                         # solve the meander top for P = N
-for _ in range(60):
-    mid = (lo + hi) / 2
-    tot = LP0 + bl.plen(p_b(mid, 7.45, TAILY))
-    lo, hi = (mid, hi) if tot > LN else (lo, mid)
-strobe("/S_STROBE_P", p_b(mid, 7.45, TAILY), "B.Cu", name="S_P")
-strobe("/S_STROBE_P", tail, name="S_P")
-for v in (PV1, (0.6, TAILY)):
-    blk.via(*v, "/S_STROBE_P")
-blk.iface("/S_STROBE_P", 0.0, YP, "F.Cu", "W", "pair", W50, "U501.38; B.Cu meander under N (2 vias); R401 in analog")
-blk.iface("/S_STROBE_N", 0.0, YN, "F.Cu", "W", "pair", W50, "U501.35; R405 in analog")
+strobe("/S_STROBE_P", [(4.85, p38[1]), (3.3, p38[1]), (3.0, 7.7), (0.97, 7.7), (0.6, 8.07), (0.6, YP - 0.37),
+                       (0.23, YP), (0.0, YP)], name="S_P")
+blk.track("/S_STROBE_N", 0.2, [p35, (p35[0], 6.2)], name="S_N")
+NV1, NV2 = (6.7, 5.5), (0.6, YN)
+strobe("/S_STROBE_N", [(p35[0], 6.2), (p35[0], 5.6), NV1], name="S_N")
+strobe("/S_STROBE_N", [NV1, (5.5, 4.3), (1.0, 4.3), (0.6, 4.7), NV2], "B.Cu", name="S_N")
+strobe("/S_STROBE_N", [NV2, (0.0, YN)], name="S_N")
+for v in (NV1, NV2):
+    blk.via(*v, "/S_STROBE_N")
+LN, LP = blk.route_len("S_N"), blk.route_len("S_P")
+blk.iface("/S_STROBE_P", 0.0, YP, "F.Cu", "W", "pair", W50, "U501.38; F.Cu only, no vias; R401 in analog")
+blk.iface("/S_STROBE_N", 0.0, YN, "F.Cu", "W", "pair", W50, "U501.35; via-B.Cu-via, terminated only; R405 in analog")
 # PH strobes: 0.2 mm necks west to x 2.15 / 2.8, then 0.36 mm down x 1.95 / 2.6, out on the W edge below S_N
 p39, p40 = up("39"), up("40")
 YPHN = 12.6

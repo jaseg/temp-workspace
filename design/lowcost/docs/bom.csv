@@ -68,6 +68,7 @@ qty,refs,value,footprint,mpn,lcsc,unit,line,first_order,source,status,note
 2,R202 R203,24.9,R_0402_1005Metric,,,0.0012,0.002,0.120,LCSC class price,est,LCSC # to assign
 2,R308 R404,91,R_0402_1005Metric,,,0.0012,0.002,0.120,LCSC class price,est,LCSC # to assign
 2,R311 R312,470,R_0402_1005Metric,,,0.0012,0.002,0.120,LCSC class price,est,LCSC # to assign
+2,R385 R737,2.0k,R_0402_1005Metric,,,0.0012,0.002,0.120,LCSC class price,est,LCSC # to assign
 2,R410 R414,68,R_0402_1005Metric,,,0.0012,0.002,0.120,LCSC class price,est,LCSC # to assign
 2,R607 R608,120,R_0402_1005Metric,,C25079,0.0012,0.002,0.120,LCSC C25079 (class price),ok,
 2,R703 R723,30k,R_0402_1005Metric,,,0.0012,0.002,0.120,LCSC class price,est,LCSC # to assign
@@ -87,7 +88,6 @@ qty,refs,value,footprint,mpn,lcsc,unit,line,first_order,source,status,note
 1,R303,18k,R_0402_1005Metric,,,0.0012,0.001,0.120,LCSC class price,est,LCSC # to assign
 1,R305,2.7k,R_0402_1005Metric,,,0.0012,0.001,0.120,LCSC class price,est,LCSC # to assign
 1,R384,8.87k,R_0402_1005Metric,,,0.0012,0.001,0.120,LCSC class price,est,LCSC # to assign
-1,R385,2.0k,R_0402_1005Metric,,,0.0012,0.001,0.120,LCSC class price,est,LCSC # to assign
 1,R603,78.7k,R_0402_1005Metric,,,0.0012,0.001,0.120,LCSC class price,est,LCSC # to assign
 1,R605,1.54M,R_0402_1005Metric,,,0.0012,0.001,0.120,LCSC class price,est,LCSC # to assign
 1,R606,499k,R_0402_1005Metric,,,0.0012,0.001,0.120,LCSC class price,est,LCSC # to assign

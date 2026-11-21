@@ -193,6 +193,14 @@ def main():
         sh.power("+3V3", r["1"], dy=-2.54)
         sh.stub(r, "2", net)
     sh.text("I2C pull-ups 4.7k (MS5351M at 0x60)", (g(262), g(150)), size=T)
+    # TRIG_SEL reset pull-down (PA1 floats at reset). Without it the TMUX136 SEL network (10k series, 18k to
+    # -2V5) pulls the floating pin towards -2V5 (MCU clamp) and SEL to about -1.6 V below the switch ground.
+    # 2.0k: pin at -0.17 V (inside the -0.3 V limit), SEL at -1.00 V = 0.11 V below VSW_GND (-0.89 V);
+    # 1.65 mA from the GPIO when high. (5.1k would leave the pin at -0.39 V and SEL at -1.14 V.)
+    rts = R(sh, "2.0k", (g(292), g(160)), ref="R737", fields={"Note": "TRIG_SEL reset pull-down"})
+    sh.stub(rts, "1", "TRIG_SEL", kind="hlabel", shape="output")
+    sh.gnd(rts["2"])
+    sh.text("R737: TRIG_SEL pull-down (PA1 has none at reset)", (g(286), g(172)), size=T)
     # MCU part refs continue as before: U704, C710..C719, R729, R730, FB701, JP701, D701
     sh._refn.update({"U": 3, "C": 9, "R": 28})
     mcu_section(sh)

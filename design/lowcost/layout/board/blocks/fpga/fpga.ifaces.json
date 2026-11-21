@@ -10,7 +10,7 @@
    "side": "W",
    "class": "pair",
    "width": 0.36,
-   "note": "U501.38; B.Cu meander under N (2 vias); R401 in analog"
+   "note": "U501.38; F.Cu only, no vias; R401 in analog"
   },
   {
    "net": "/S_STROBE_N",
@@ -20,7 +20,7 @@
    "side": "W",
    "class": "pair",
    "width": 0.36,
-   "note": "U501.35; R405 in analog"
+   "note": "U501.35; via-B.Cu-via, terminated only; R405 in analog"
   },
   {
    "net": "/PH_STROBE_N",
