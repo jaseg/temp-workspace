@@ -548,8 +548,7 @@ class Block:
         z.SetMinThickness(mm(minw))
         z.SetPadConnection(pcbnew.ZONE_CONNECTION_THERMAL if thermal else pcbnew.ZONE_CONNECTION_FULL)
         z.SetAssignedPriority(prio)
-        z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_AREA)
-        z.SetMinIslandArea(int(mm(1.0)) * int(mm(1.0)))
+        z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)   # no isolated pour slivers
         self._outline(z, pts)
         self.b.Add(z)
         return z

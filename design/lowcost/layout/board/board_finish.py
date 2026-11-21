@@ -10,7 +10,7 @@ import boardlib as bl
 import boardroute as br
 
 W, H = 100.0, 57.0
-SUPPLY_TRACK = ("+5V", "-5V", "+2V5", "-2V5", "+1V2", "VBUS")
+SUPPLY_TRACK = ("+3V3", "+5V", "-5V", "+2V5", "-2V5", "+1V2", "VBUS")
 HOLES = ((3, 3), (97, 3), (3, 54), (97, 54))
 
 
@@ -71,7 +71,7 @@ def route_supplies(B, m, R, log):
             todo.remove(c)
             done.append(c)
             r = None
-            for wid, lay, mg in ((0.5, ("In2.Cu",), 5), (0.4, ("In2.Cu", "B.Cu"), 10), (0.3, ("In2.Cu", "B.Cu"), 25)):
+            for wid, lay, mg in ((0.6, ("In2.Cu",), 5), (0.5, ("In2.Cu",), 8), (0.4, ("In2.Cu", "B.Cu"), 10), (0.3, ("In2.Cu", "B.Cu"), 25)):
                 r = R.route(net, (p[0], p[1], "*", "*"), (q[0], q[1], "*", "*"), w=wid, layers=lay,
                             lcost={"B.Cu": 3.0}, via_cost=3.0, clr=0.2, margin=mg, maxn=300_000)
                 if r:
@@ -89,7 +89,9 @@ def planes(B, m):
     edge = 0.3
     full = [(edge, edge), (W - edge, edge), (W - edge, H - edge), (edge, H - edge)]
     zone(m, "GND", "In1.Cu", full, prio=0)
-    zone(m, "+3V3", "In2.Cu", full, prio=0)
+    # rule 10: In2 is ground by default; the supplies are local In2 feeds (0.5-0.6 mm tracks from the regulator
+    # to the via pairs) plus the blocks' own islands (fpga +1V2, phase VTAP strips)
+    zone(m, "GND", "In2.Cu", full, prio=0)
     # board-wide GND pours on F / B (the blocks' own GND pours stay; overlapping same-net pours are fine)
     zone(m, "GND", "F.Cu", full, prio=0, clr=0.2)
     zone(m, "GND", "B.Cu", full, prio=0, clr=0.2)
@@ -208,3 +210,42 @@ def write_pro(path, rf_nets):
         "sheets": [], "text_variables": {}}
     with open(path, "w") as f:
         json.dump(pro, f, indent=2)
+
+
+REF_NETS = ("/FPGA_CLK", "/MCU_CLK", "/fpga_clock/CLK0", "/fpga_clock/CLK2_FPGA", "/SPI_SCK", "/SPI_MOSI", "/SPI_MISO",
+            "/SPI_CS", "/ADC_TRIG", "/COARSE", "/fpga_clock/JTAG_TCK", "/S_STROBE_P", "/S_STROBE_N", "/PH_STROBE_P",
+            "/PH_STROBE_N", "/USB_DP", "/USB_DM") + tuple(f"/TAP{k}" for k in range(16))
+
+
+def in2_reference_check(B, step=0.25):
+    """rule 10: every B.Cu segment of a clock / fast net needs filled In2 GND directly above it (sampled every
+    step mm). Returns (n_samples, violations [(net, x, y, what)])."""
+    polys = {}
+    for z in B.Zones():
+        if z.GetIsRuleArea() or not z.IsOnLayer(pcbnew.In2_Cu):
+            continue
+        polys.setdefault(z.GetNetname(), []).append(z.GetFilledPolysList(pcbnew.In2_Cu))
+    in2_tracks = [t for t in B.GetTracks() if t.GetLayer() == pcbnew.In2_Cu and not isinstance(t, pcbnew.PCB_VIA)]
+    import re
+    rx = re.compile(r"(CLK|SPI_|ADC_TRIG|COARSE|JTAG_TCK|STROBE|USB_D|/TAP\d+$)")
+    n, bad = 0, []
+    for t in B.GetTracks():
+        if isinstance(t, pcbnew.PCB_VIA) or t.GetLayer() != pcbnew.B_Cu or not rx.search(t.GetNetname()) or "EXT_CLK" in t.GetNetname():
+            continue
+        a, b = t.GetStart(), t.GetEnd()
+        L = math.hypot(b.x - a.x, b.y - a.y)
+        k = max(1, int(pcbnew.ToMM(L) / step))
+        for i in range(k + 1):
+            p = pcbnew.VECTOR2I(int(a.x + (b.x - a.x) * i / k), int(a.y + (b.y - a.y) * i / k))
+            n += 1
+            ok = any(pl.Contains(p) for pl in polys.get("GND", []))
+            if not ok:
+                other = [nm for nm, pls in polys.items() if nm != "GND" and any(pl.Contains(p) for pl in pls)]
+                what = ("under In2 " + other[0]) if other else "In2 gap"
+                for tt in in2_tracks:
+                    if tt.HitTest(p, 0):
+                        what = "under In2 track " + tt.GetNetname()
+                        break
+                x, y = loc(p)
+                bad.append((t.GetNetname(), round(x, 2), round(y, 2), what))
+    return n, bad

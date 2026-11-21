@@ -169,7 +169,7 @@ place("C722", 9.25, 1.9, "v", "Net-(U701--)")
 place("C721", 8.42, 2.03, "v", "GND", "B")        # pin 2 / 3 decoupling on B, beside the two vias (no via-in-pad)
 # R737 TRIG_SEL reset pull-down (2.0k, PA1 floats at reset): on B under the TRIG_SEL column, TRIG_SEL pad on the
 # column-top via (B stub south, on-axis), GND pad into the B.Cu ground pour
-place("R737", 44.0, 3.3, "v", "/TRIG_SEL", "B")
+place("R737", 43.3, 3.35, "v", "/TRIG_SEL", "B")
 for r in REFS:
     assert r in blk.fps, r
 
@@ -342,7 +342,8 @@ for k, xc, yv, note in ((5, 46.35, YIF, "U704.5 PF0 HSE bypass <- MS5351M CLK1 (
     T(net, WS, [UP(k), (xc, wy(k)), (xc, yv)])
     stub(net, xc, yv, WS, note)
     if k == 9:
-        T(net, WS, [(xc, yv), P("R737", "@TRIG_SEL")], "B.Cu")
+        pr = P("R737", "@TRIG_SEL")
+        T(net, WS, [(xc, yv), (pr[0], yv + (xc - pr[0])), pr], "B.Cu")
 # straight DAC columns from the B lanes
 for key, net, note in (("VOFS", "/VOFS", "U704.13 DAC1_OUT2 -> R119 (input block)"),
                        ("DAC_TRIG", "/DAC_TRIG", "U704.12 DAC1_OUT1 -> R383 (phase)")):

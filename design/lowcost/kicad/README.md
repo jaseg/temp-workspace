@@ -43,7 +43,7 @@ Requires KiCad 7.0.x `kicad-cli` and `/usr/share/kicad/symbols`.
 | `strobe.kicad_sch` | `gen_strobe.py` | sampler strobe (2x TRF37D73, balun, fitted BAT15-03W clamp), phase strobes (TRF + GVA-84+ x2, 80 ps stubs), refs 4xx |
 | `fpga_clock.kicad_sch` | `gen_fpga_clock.py` | infrastructure, refs 5xx (J501 programming header, R511/R512 100 R) |
 | `power.kicad_sch` | `gen_power.py` | infrastructure, refs 6xx |
-| `mcu_if.kicad_sch` | `gen_mcu_if.py` | infrastructure, refs 7xx (STM32G474CBT6 U704 and its parts C710-C719, R729-R730, FB701, JP701, D701; J701 removed; control voltages: U701 TLV9001, R731-R736, C720-C722; R701/R702, R705-R722, C701, C703-C708, U702, U703 removed 21 Nov 2026) |
+| `mcu_if.kicad_sch` | `gen_mcu_if.py` | infrastructure, refs 7xx (STM32G474CBT6 U704 and its parts C710-C719, R729-R730, FB701, JP701, D701; J701 removed; control voltages: U701 TLV9001, R731-R736, C720-C722; R737 2.0k TRIG_SEL reset pull-down (22 Nov 2026: PA1 floats at reset; keeps the TMUX136 SEL at -1.0 V, the pin at -0.17 V); R701/R702, R705-R722, C701, C703-C708, U702, U703 removed 21 Nov 2026) |
 | `gen/gen_placeholders.py` | placeholder sheets (unused now: all four critical generators exist) | infrastructure |
 | `gen/gen_bom.py` | `../docs/bom.csv`, `../docs/bom.md` from `export/scope-fe.net`; price table inside | integration |
 | `export/` | `scope-fe.net`, `.pdf`, per-sheet `.svg`/`.png` (generated) | - |

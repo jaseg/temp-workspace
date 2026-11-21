@@ -43,6 +43,10 @@ for z in list(B.Zones()):
     elif z.GetNetname() == "+3V3" and z.IsOnLayer(pcbnew.In2_Cu):
         B.Remove(z)                                # fpga's In2 +3V3: replaced by the board partition
 
+for z in B.Zones():                                # isolated pour slivers (e.g. the mcuif's 8) are removed
+    if not z.GetIsRuleArea():
+        z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+
 # ---------------------------------------------------------------- interfaces -> route end points
 IF = {}
 for k in POS:
@@ -174,7 +178,7 @@ rest = [n for n in SLOW if n not in taps]
 # phase seam and the comparator row); everything that crosses the phase block runs on B.Cu in the free columns
 # between the tap cells and hops the VTH rail (B.Cu, y 28.9) on In2 in the band y 27.4..32.0
 TAP_AVOID = [("In2.Cu", 0, 0, W, 20.5), ("In2.Cu", 0, 27.0, W, H)]
-X_AVOID = [("In2.Cu", 0, 0, W, 23.4), ("In2.Cu", 0, 45.0, W, H), ("B.Cu", 0, 22.5, 9.5, 45.0)]
+X_AVOID = [("In2.Cu", 0, 0, W, 21.0), ("In2.Cu", 61.5, 21.0, 94.0, 23.8), ("In2.Cu", 0, 45.0, W, H), ("B.Cu", 0, 22.5, 9.5, 45.0)]
 first = [n for n in rest if "JTAG" in n or "DBG" in n] + [n for n in reversed(COMB) if n in rest]
 ANA = [n for n in rest if n in ("/VOFS", "/VNEG_REF", "/VBIAS_A", "/VBIAS_K", "/ADC_IN", "/ADC_REF_MID")]
 order = [f"/TAP{k}" for k in (0, 1, 2, 3, 4, 5, 7, 6, 8, 9, 15, 14, 13, 12, 11, 10)] + ["/COARSE"] + ANA + first + \
@@ -192,6 +196,23 @@ for k in range(6):
     Y = round(21.55 + 0.2 * k, 3)
     c = 0.2
     pts = [(fx, fy), (fx, Y - c), (fx - c, Y), (px + (py - Y), Y), (px, py)]
+    m.track(net, LANE_W, pts, "In2.Cu", ch=0.0)
+    for p, q in zip(pts, pts[1:]):
+        R.mark_seg("In2.Cu", p[0], p[1], q[0], q[1], LANE_W / 2, m.net(net).GetNetCode())
+    LOG.append((net, round(bl.plen(pts), 3), 0))
+    order.remove(net)
+# explicit In2 lanes for the east taps 10..15 (nested ribbon, TAP15 on top), below the power block's In2 vias
+for k in range(10, 16):
+    net = f"/TAP{k}"
+    ef = [i for i in IF[net] if i["block"] == "fpga"][0]
+    ep = [i for i in IF[net] if i["block"] == "phase"][0]
+    a = endpoint(net, ef)
+    b = endpoint(net, ep)
+    fx, fy = a[0], a[1]
+    px, py = b[0], b[1]
+    Y = round(22.55 + 0.2 * (15 - k), 3)
+    c = 0.2
+    pts = [(fx, fy), (fx, Y - c), (fx + c, Y), (px - (py - Y), Y), (px, py)]
     m.track(net, LANE_W, pts, "In2.Cu", ch=0.0)
     for p, q in zip(pts, pts[1:]):
         R.mark_seg("In2.Cu", p[0], p[1], q[0], q[1], LANE_W / 2, m.net(net).GetNetCode())
@@ -217,7 +238,12 @@ for net in order:
         kw = dict(w=w, layers=("B.Cu",), clr=0.15)
     if rt(net, a, b, margin=6, maxn=200_000, **kw) is None:
         LOG.pop()
-        rt(net, a, b, margin=25, maxn=600_000, **kw)
+        if rt(net, a, b, margin=25, maxn=600_000, **kw) is None:
+            LOG.pop()
+            kw2 = dict(kw, layers=("B.Cu", "In2.Cu"), avoid=[("In2.Cu", 61.5, 21.0, 94.0, 23.8)])
+            if net in taps or net == "/COARSE":
+                kw2["layers"] = ("B.Cu", "In2.Cu")
+            rt(net, a, b, margin=40, maxn=1_500_000, **kw2)
 
 bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
 json.dump({"log": LOG, "fail": R.log, "rf": RF}, open(os.path.join(SCR, "routed.json"), "w"), indent=1)
@@ -246,6 +272,12 @@ bl.save_board(B, OUT)
 bf.write_pro(OUT.replace(".kicad_pcb", ".kicad_pro"), sorted(RF))
 json.dump({"log": LOG, "fail": R.log, "rf": RF, "supply": SUP, "stitch": nst},
           open(os.path.join(HERE, "routes.json"), "w"), indent=1)
+nref, badref = bf.in2_reference_check(B)
+print(f"rule 10 In2 GND reference under B.Cu clock / fast nets: {nref} samples, {len(badref)} violations")
+from collections import Counter
+for k_, v_ in Counter((b_[0], b_[3]) for b_ in badref).most_common(30):
+    print("   ", k_, v_)
+json.dump(badref, open(os.path.join(SCR, "in2ref.json"), "w"))
 c = bl.check_board(OUT, rf_widths=RF, verbose=8)
 json.dump({k: v for k, v in c.items() if k != "details"}, open(os.path.join(SCR, "check.json"), "w"), indent=1)
 json.dump(c["details"], open(os.path.join(SCR, "check_details.json"), "w"), indent=1)

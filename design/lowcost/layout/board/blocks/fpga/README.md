@@ -12,7 +12,7 @@ Planes: In1 GND zone. In2 +3V3 over the block, with a +1V2 island under U501 and
 
 | iface (local; board = +56 / +0.5) | edge / layer | nets |
 |---|---|---|
-| W, y 10.37 / 11.37 | F.Cu 0.36 | S_STROBE_P / N (analog's points). P crosses under N on B (2 vias, B meander) |
+| W, y 10.37 / 11.37 | F.Cu 0.36 | S_STROBE_P / N (analog's points). P (drives the strobe amp) F.Cu only, no vias, 8.01 mm; N (only terminated) pin 35 -> via -> B.Cu (over In2 GND) -> via -> F stub, 15.42 mm. No crossing, no meander (22 Nov) |
 | W, y 12.60 / 13.08 | F.Cu 0.36 | PH_STROBE_N / P |
 | S, x 0.6-2.4 (0.6 pitch) | B.Cu 0.15 | ADC_TRIG, FPGA_DONE, COARSE, FPGA_RECONFIG (pull-ups R502 / R501 here) |
 | S, x 3.0-5.4 | B.Cu 0.15 | JTAG_TCK (R507 pull-down), TMS, TDI, DBG2, TDO (to J501 in mcuif) |
@@ -20,7 +20,7 @@ Planes: In1 GND zone. In2 +3V3 over the block, with a +1V2 island under U501 and
 | S, x 16.1-17.6 (0.25 pitch) | B.Cu 0.12-0.15 | SPI_SCK, MOSI, MISO, CS, MCU_CLK, I2C_SDA, I2C_SCL |
 | In2 | - | +3V3 (power W, board 74.45 / 5.5); +1V2 strip at E y 15.5 (power +1V2 at board 75.25 / 21.95) |
 
-Lengths: S_STROBE P = N = 15.993 mm; PH_STROBE P = N = 9.403 mm.
+Lengths: S_STROBE P 8.011 / N 15.424 mm (no longer matched: N is only a termination); PH_STROBE P = N = 9.403 mm.
 The strobes have a 0.2 mm neck inside the 0.4 mm pin row, so they are not in the RF width table.
 check_board (24 refs): every count 0 (missing, extra, footprint, value, pad-net, unrouted, clearance, corners, off-axis exits, courtyards).
 DRC (nightly 10.99, jlc4): total 61, error 1 (invalid_outline), warning 60. The warnings are 36 track_dangling (the 36 interface stubs) and 24 lib_footprint_mismatch.
