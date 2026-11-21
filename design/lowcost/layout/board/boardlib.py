@@ -36,7 +36,16 @@ FP_PATHS = {"scope-fe": os.path.join(LOWCOST, "kicad", "lib")}
 SVG2PNG = os.path.join(LOWCOST, "kicad", "gen", "svg2png.js")
 ORG = (100.0, 100.0)
 mm = pcbnew.FromMM
-CU_LAYERS = {"F.Cu": pcbnew.F_Cu, "In1.Cu": pcbnew.In1_Cu, "In2.Cu": pcbnew.In2_Cu, "B.Cu": pcbnew.B_Cu}
+CU_LAYERS = {"F.Cu": pcbnew.F_Cu, "In1.Cu": pcbnew.In1_Cu, "In2.Cu": pcbnew.In2_Cu, "In3.Cu": pcbnew.In3_Cu,
+             "In4.Cu": pcbnew.In4_Cu, "B.Cu": pcbnew.B_Cu}
+# Stack-up selector: "4L" = JLC04161H-7628 (the blocks as drawn so far), "6L" = JLC06161H-3313 (RULES rule 10).
+# Chosen by the environment variable BL_STACKUP (default 4L, so every existing block script regenerates unchanged);
+# gen_board.py sets BL_STACKUP=6L before importing boardlib.
+STACKUP_NAME = os.environ.get("BL_STACKUP", "4L").upper()
+assert STACKUP_NAME in ("4L", "6L"), STACKUP_NAME
+# 4-layer block -> 6-layer board layer map (merge(..., layer_map=LAYER_MAP_4TO6)): block In1 (ground) -> L2 In1,
+# block In2 (power zones / supply via landings) -> L4 In3; F.Cu / B.Cu stay; all vias are through vias.
+LAYER_MAP_4TO6 = {"In1.Cu": "In1.Cu", "In2.Cu": "In3.Cu"}
 
 
 def L(layer):
@@ -151,14 +160,21 @@ def canon(name):
 # ============================================================================= 2. stack-up / impedance
 # JLC04161H-7628 (jlcpcb.com/impedance): L1 35 um / 7628 prepreg 0.2104 mm er 4.4 / L2 15.2 um / core 1.065 mm
 # er 4.6 / L3 15.2 um / 7628 0.2104 mm / L4 35 um.  Mask er 3.8, 15 um over the trace, 30 um over laminate.
-H, T_CU, ER, ER_MASK, C_MASK_TR, C_MASK_SUB = 0.2104, 0.035, 4.4, 3.8, 0.015, 0.030
+# JLC06161H-3313 (rule 10): L1 35 um / 3313 prepreg 0.0994 mm er 4.1 / L2 15.2 um / core 0.55 mm er 4.6 / L3 /
+# 2116 prepreg 0.1088 mm er 4.16 / L4 / core 0.55 / L5 / 3313 0.0994 / L6 35 um.  The outer microstrips L1 over L2
+# and L6 over L5 have the same geometry (h 0.0994 mm, er 4.1).
+STACKUPS = {"4L": dict(H=0.2104, ER=4.4), "6L": dict(H=0.0994, ER=4.1)}
+H, T_CU, ER, ER_MASK, C_MASK_TR, C_MASK_SUB = STACKUPS[STACKUP_NAME]["H"], 0.035, STACKUPS[STACKUP_NAME]["ER"], \
+    3.8, 0.015, 0.030
 C0 = 0.299792458                                   # mm/ps
 
 
-def microstrip(w, h=H, t=T_CU, er=ER, mask=True):
+def microstrip(w, h=None, t=T_CU, er=None, mask=True):
     """Hammerstad-Jensen microstrip + Hammerstad thickness correction + first-order solder-mask overlay
     (eps_eff += (er_mask - 1)(1 - q)(1 - exp(-1.2 c / h))).  -> (Z0, eps_eff).  Copied verbatim from
     layout/phase_trigger/gen_phase_trigger.py (lands on JLC's 0.36 mm for 50 R)."""
+    h = H if h is None else h
+    er = ER if er is None else er
     u = w / h
 
     def z_air(x):
@@ -179,6 +195,16 @@ def microstrip(w, h=H, t=T_CU, er=ER, mask=True):
     return z_air(u1) / math.sqrt(ee), ee
 
 
+def microstrip_6l(w, mask=True):
+    """outer microstrip of the 6-layer stack-up (L1 over L2 or L6 over L5, 3313 prepreg 0.0994 mm) -> (Z0, ee)"""
+    return microstrip(w, h=STACKUPS["6L"]["H"], er=STACKUPS["6L"]["ER"], mask=mask)
+
+
+def width_for_6l(z):
+    """trace width (mm) for impedance z on L1 / L6 of JLC06161H-3313"""
+    return width_for(z, h=STACKUPS["6L"]["H"], er=STACKUPS["6L"]["ER"])
+
+
 def _K(k):
     a, b = 1.0, math.sqrt(1 - k * k)
     for _ in range(30):
@@ -186,8 +212,10 @@ def _K(k):
     return math.pi / (2 * a)
 
 
-def cpwg(w, g, h=H, er=ER):
+def cpwg(w, g, h=None, er=None):
     """conductor-backed coplanar waveguide (t = 0, no mask), Wadell -> (Z0, eps_eff)"""
+    h = H if h is None else h
+    er = ER if er is None else er
     k = w / (w + 2 * g)
     k3 = math.tanh(math.pi * w / (4 * h)) / math.tanh(math.pi * (w + 2 * g) / (4 * h))
     r1 = _K(k) / _K(math.sqrt(1 - k * k))
@@ -241,7 +269,7 @@ W_SIG, W_PWR, W_GND, W_NODE = 0.2, 0.5, 0.4, 0.15
 VIA_D, VIA_DRILL = 0.45, 0.2                        # JLC standard 0.45 / 0.2 mm
 VIA_PWR_D, VIA_PWR_DRILL = 0.6, 0.3
 
-STACKUP = """    (stackup
+STACKUP_4L = """    (stackup
       (layer "F.SilkS" (type "Top Silk Screen"))
       (layer "F.Paste" (type "Top Solder Paste"))
       (layer "F.Mask" (type "Top Solder Mask") (thickness 0.015) (epsilon_r 3.8))
@@ -259,13 +287,45 @@ STACKUP = """    (stackup
       (dielectric_constraints no)
     )
 """
+STACKUP_6L = """    (stackup
+      (layer "F.SilkS" (type "Top Silk Screen"))
+      (layer "F.Paste" (type "Top Solder Paste"))
+      (layer "F.Mask" (type "Top Solder Mask") (thickness 0.015) (epsilon_r 3.8))
+      (layer "F.Cu" (type "copper") (thickness 0.035))
+      (layer "dielectric 1" (type "prepreg") (thickness 0.0994) (material "3313") (epsilon_r 4.1) (loss_tangent 0.02))
+      (layer "In1.Cu" (type "copper") (thickness 0.0152))
+      (layer "dielectric 2" (type "core") (thickness 0.55) (material "FR4") (epsilon_r 4.6) (loss_tangent 0.02))
+      (layer "In2.Cu" (type "copper") (thickness 0.0152))
+      (layer "dielectric 3" (type "prepreg") (thickness 0.1088) (material "2116") (epsilon_r 4.16) (loss_tangent 0.02))
+      (layer "In3.Cu" (type "copper") (thickness 0.0152))
+      (layer "dielectric 4" (type "core") (thickness 0.55) (material "FR4") (epsilon_r 4.6) (loss_tangent 0.02))
+      (layer "In4.Cu" (type "copper") (thickness 0.0152))
+      (layer "dielectric 5" (type "prepreg") (thickness 0.0994) (material "3313") (epsilon_r 4.1) (loss_tangent 0.02))
+      (layer "B.Cu" (type "copper") (thickness 0.035))
+      (layer "B.Mask" (type "Bottom Solder Mask") (thickness 0.015) (epsilon_r 3.8))
+      (layer "B.Paste" (type "Bottom Solder Paste"))
+      (layer "B.SilkS" (type "Bottom Silk Screen"))
+      (copper_finish "ENIG")
+      (dielectric_constraints no)
+    )
+"""
+STACKUP = STACKUP_6L if STACKUP_NAME == "6L" else STACKUP_4L
 
 
-def setup_board(b, org=ORG):
-    """4 copper layers, JLC rules (0.1 mm clearance / track, 0.45 / 0.2 mm via), aux origin = org"""
-    b.SetCopperLayerCount(4)
-    for lay, name, typ in ((pcbnew.F_Cu, "F.Cu", pcbnew.LT_SIGNAL), (pcbnew.In1_Cu, "In1.Cu", pcbnew.LT_POWER),
-                           (pcbnew.In2_Cu, "In2.Cu", pcbnew.LT_POWER), (pcbnew.B_Cu, "B.Cu", pcbnew.LT_SIGNAL)):
+def setup_board(b, org=ORG, stackup=None):
+    """copper layers of the selected stack-up (4L: F/In1/In2/B; 6L: F, In1 GND, In2 slow, In3 power, In4 GND, B),
+    JLC rules (0.1 mm clearance / track, 0.45 / 0.2 mm via), aux origin = org"""
+    st = (stackup or STACKUP_NAME).upper()
+    if st == "6L":
+        b.SetCopperLayerCount(6)
+        lays = ((pcbnew.F_Cu, "F.Cu", pcbnew.LT_SIGNAL), (pcbnew.In1_Cu, "In1.Cu", pcbnew.LT_POWER),
+                (pcbnew.In2_Cu, "In2.Cu", pcbnew.LT_SIGNAL), (pcbnew.In3_Cu, "In3.Cu", pcbnew.LT_POWER),
+                (pcbnew.In4_Cu, "In4.Cu", pcbnew.LT_POWER), (pcbnew.B_Cu, "B.Cu", pcbnew.LT_SIGNAL))
+    else:
+        b.SetCopperLayerCount(4)
+        lays = ((pcbnew.F_Cu, "F.Cu", pcbnew.LT_SIGNAL), (pcbnew.In1_Cu, "In1.Cu", pcbnew.LT_POWER),
+                (pcbnew.In2_Cu, "In2.Cu", pcbnew.LT_POWER), (pcbnew.B_Cu, "B.Cu", pcbnew.LT_SIGNAL))
+    for lay, name, typ in lays:
         b.SetLayerName(lay, name)
         b.SetLayerType(lay, typ)
     ds = b.GetDesignSettings()
