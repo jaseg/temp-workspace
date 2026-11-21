@@ -33,7 +33,7 @@ MCU = "MCU_ST_STM32G4:STM32G474CBTx"
 MCU_FP = "Package_QFP:LQFP-48_7x7mm_P0.5mm"
 PINS = [
     (8, "PA0", "ADC_IN", "h", "ADC12_IN1 (fast channel), sampler output"),
-    (9, "PA1", None, "nc", "spare (ADC12_IN2)"),
+    (9, "PA1", "TRIG_SEL", "h", "GPIO out (TMUX136 select); moved from PB6 for the layout fan-out"),
     (10, "PA2", "DAC_TAPTH", "l", "OPAMP1_VOUT follower of DAC3_CH1 -> VTAP_TH divider"),
     (11, "PA3", None, "nc", "spare"),
     (12, "PA4", "DAC_TRIG", "h", "DAC1_OUT1 -> TRIG_LEVEL sum at the TLV3801 (trigger_phase)"),
@@ -50,25 +50,25 @@ PINS = [
     (39, "PA15", "I2C_SCL", "h", "I2C1_SCL (AF4) -> MS5351M"),
     (7, "PG10", "UC_NRST", "h", "NRST, 100 nF -> J501 pin 14"),
     (5, "PF0", "MCU_CLK", "h", "OSC_IN, HSE bypass from MS5351M CLK1"),
-    (6, "PF1", None, "nc", "OSC_OUT unused in bypass"),
-    (2, "PC13", "LED", "l", "status LED D701, active low"),
+    (6, "PF1", "DBG1", "h", "GPIO (OSC_OUT free in HSE bypass), debug -> J501 pin 12; moved from PB9"),
+    (2, "PC13", None, "nc", "spare"),
     (3, "PC14", None, "nc", "spare"),
     (4, "PC15", None, "nc", "spare"),
-    (16, "PB0", "FPGA_DONE", "h", "GPIO in (FPGA DONE)"),
+    (16, "PB0", None, "nc", "spare"),
     (17, "PB1", "DAC_BIAS_K", "l", "OPAMP3_VOUT follower of DAC3_CH2 -> 5.1k -> VBIAS_K"),
-    (18, "PB2", "FPGA_RECONFIG", "h", "GPIO open-drain (FPGA RECONFIG_N)"),
+    (18, "PB2", None, "nc", "spare"),
     (40, "PB3", "SPI_SCK", "h", "SPI1_SCK (AF5), master"),
     (41, "PB4", "SPI_MISO", "h", "SPI1_MISO (AF5); UCPD dead-battery pull-down until disabled"),
     (42, "PB5", "SPI_MOSI", "h", "SPI1_MOSI (AF5)"),
-    (43, "PB6", "TRIG_SEL", "h", "GPIO out (TMUX136 select); UCPD dead-battery pull-down = 0 at reset"),
+    (43, "PB6", "FPGA_DONE", "h", "GPIO in (FPGA DONE); UCPD dead-battery pull-down harmless on an input; moved from PB0"),
     (44, "PB7", "I2C_SDA", "h", "I2C1_SDA (AF4)"),
     (45, "PB8", "BOOT0", "l", "BOOT0: 10k pull-down, JP701 to +3V3 for the bootloader"),
-    (46, "PB9", "DBG1", "h", "GPIO, debug -> J501 pin 12"),
-    (22, "PB10", "SPI_CS", "h", "GPIO, SPI chip select (software NSS)"),
+    (46, "PB9", "SPI_CS", "h", "GPIO, SPI chip select (software NSS); moved from PB10"),
+    (22, "PB10", None, "nc", "spare"),
     (25, "PB11", "ADC_TRIG", "h", "EXTI11 = ADC12 regular external trigger (EXTSEL EXTI11)"),
     (26, "PB12", None, "nc", "reserved: OPAMP4_VOUT (DAC4_CH1 follower, ADC_REF_MID trim option)"),
-    (27, "PB13", None, "nc", "spare"),
-    (28, "PB14", None, "nc", "spare"),
+    (27, "PB13", "FPGA_RECONFIG", "h", "GPIO open-drain (FPGA RECONFIG_N); moved from PB2"),
+    (28, "PB14", "LED", "l", "status LED D701, active low; moved from PC13"),
     (29, "PB15", None, "nc", "spare"),
     (20, "VREF+", "VREFP", "l", "VREFBUF 2.9 V output, 1 uF + 100 nF"),
 ]
@@ -260,7 +260,7 @@ def mcu_section(sh):
     rl = R(sh, "1k", (k[0], k[1] + 2.54 + 3.81))
     sh.wire(k, rl["1"])
     sh.stub(rl, "2", "LED")
-    sh.text("NRST 100 nF; BOOT0 low (close JP701 for the\nUSB DFU / USART1 bootloader); LED on PC13, active low.",
+    sh.text("NRST 100 nF; BOOT0 low (close JP701 for the\nUSB DFU / USART1 bootloader); LED on PB14, active low.",
             (g(84), g(199)), size=1.0)
     sh.text("STM32G474CBT6 pin plan:\n" + "\n".join(
         f"{pin:2d} {port:5s} {net or 'NC':13s} {f}" for pin, port, net, _h, f in PINS) +

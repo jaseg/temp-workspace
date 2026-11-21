@@ -3,28 +3,8 @@
  "origin": "local (0, 0) = pcbnew (100.0, 100.0)",
  "ifaces": [
   {
-   "net": "/USB_DP",
-   "x": 57.0,
-   "y": 0.0,
-   "layer": "F.Cu",
-   "side": "N",
-   "class": "pair",
-   "width": 0.295,
-   "note": "90 R diff (w 0.295 s 0.205) from J601 / U608; 9.27 mm in block"
-  },
-  {
-   "net": "/USB_DM",
-   "x": 57.5,
-   "y": 0.0,
-   "layer": "F.Cu",
-   "side": "N",
-   "class": "pair",
-   "width": 0.295,
-   "note": "90 R diff; 9.27 mm in block"
-  },
-  {
    "net": "/I2C_SCL",
-   "x": 49.75,
+   "x": 53.75,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -34,7 +14,7 @@
   },
   {
    "net": "/SPI_SCK",
-   "x": 49.25,
+   "x": 53.25,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -44,7 +24,7 @@
   },
   {
    "net": "/SPI_MISO",
-   "x": 48.75,
+   "x": 52.75,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -54,7 +34,7 @@
   },
   {
    "net": "/SPI_MOSI",
-   "x": 48.25,
+   "x": 52.25,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -63,14 +43,134 @@
    "note": "U704.42; U501.29"
   },
   {
+   "net": "/FPGA_DONE",
+   "x": 51.75,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.43; U501.46 (R502 pull-up)"
+  },
+  {
    "net": "/I2C_SDA",
-   "x": 47.25,
+   "x": 51.25,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
    "class": "slow",
    "width": 0.15,
    "note": "U704.44; MS5351M; 4.7k R728 here"
+  },
+  {
+   "net": "/SPI_CS",
+   "x": 50.25,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.46; U501.31"
+  },
+  {
+   "net": "/MCU_CLK",
+   "x": 46.35,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.5 PF0 HSE bypass <- MS5351M CLK1 (R509 33 R in fpga)"
+  },
+  {
+   "net": "/ADC_IN",
+   "x": 44.5,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.8 PA0 ADC in; RC R211 / C207 in the analog block"
+  },
+  {
+   "net": "/TRIG_SEL",
+   "x": 44.0,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.9 PA1 -> R302 / TMUX136 select (phase)"
+  },
+  {
+   "net": "/VOFS",
+   "x": 32.5,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.13 DAC1_OUT2 -> R119 (input block)"
+  },
+  {
+   "net": "/DAC_TRIG",
+   "x": 31.6,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.12 DAC1_OUT1 -> R383 (phase)"
+  },
+  {
+   "net": "/VTAP_TH",
+   "x": 43.3,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.25,
+   "note": "R723 / R724 / C709 -> R380 / R381 (phase)"
+  },
+  {
+   "net": "/VBIAS_K",
+   "x": 39.5,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "R735 5.1k from U704.17 -> sampler"
+  },
+  {
+   "net": "/VBIAS_A",
+   "x": 36.0,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "R733 / R734 divider -> sampler"
+  },
+  {
+   "net": "/ADC_REF_MID",
+   "x": 28.29,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "R703 / R704 / C702 -> U202 (sampler)"
+  },
+  {
+   "net": "/VNEG_REF",
+   "x": 9.95,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U701 TLV9001 out (-1.97 V) -> R123 (input block)"
   },
   {
    "net": "/fpga_clock/DBG2",
@@ -80,7 +180,7 @@
    "side": "N",
    "class": "slow",
    "width": 0.15,
-   "note": "J501.5 DBG2 -> U501 (fpga S-W, crosses phase on B.Cu)"
+   "note": "J501.5 DBG2 -> U501 (fpga S-W)"
   },
   {
    "net": "/fpga_clock/JTAG_TCK",
@@ -90,7 +190,7 @@
    "side": "N",
    "class": "slow",
    "width": 0.15,
-   "note": "J501.7 JTAG TCK -> U501.3 (fpga S-W, crosses phase on B.Cu)"
+   "note": "J501.7 JTAG TCK -> U501.3 (fpga S-W)"
   },
   {
    "net": "/fpga_clock/JTAG_TMS",
@@ -100,7 +200,7 @@
    "side": "N",
    "class": "slow",
    "width": 0.15,
-   "note": "J501.9 JTAG TMS (fpga S-W, crosses phase on B.Cu)"
+   "note": "J501.9 JTAG TMS (fpga S-W)"
   },
   {
    "net": "/fpga_clock/JTAG_TDI",
@@ -110,7 +210,7 @@
    "side": "N",
    "class": "slow",
    "width": 0.15,
-   "note": "J501.11 JTAG TDI (fpga S-W, crosses phase on B.Cu)"
+   "note": "J501.11 JTAG TDI (fpga S-W)"
   },
   {
    "net": "/fpga_clock/JTAG_TDO",
@@ -120,121 +220,11 @@
    "side": "N",
    "class": "slow",
    "width": 0.15,
-   "note": "J501.13 JTAG TDO (fpga S-W, crosses phase on B.Cu)"
-  },
-  {
-   "net": "/VBIAS_A",
-   "x": 23.9,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "R733 / R734 divider -> sampler"
-  },
-  {
-   "net": "/VBIAS_K",
-   "x": 24.6,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "R735 / R736 divider -> sampler"
-  },
-  {
-   "net": "/ADC_REF_MID",
-   "x": 29.3,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "R703 / R704 / C702 -> U202"
-  },
-  {
-   "net": "/VTAP_TH",
-   "x": 35.219,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.25,
-   "note": "R723 / R724 / C709 -> R380 / R381 (phase)"
-  },
-  {
-   "net": "/DAC_TRIG",
-   "x": 33.9,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.12 DAC -> R383 (phase)"
-  },
-  {
-   "net": "/FPGA_DONE",
-   "x": 51.6,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.16 <- U501.46 (R502 pull-up)"
-  },
-  {
-   "net": "/FPGA_RECONFIG",
-   "x": 51.85,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.18 -> U501.48 (R501 pull-up)"
-  },
-  {
-   "net": "/ADC_TRIG",
-   "x": 52.7,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.25 PB11 <- U501.41"
-  },
-  {
-   "net": "/MCU_CLK",
-   "x": 44.6,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"
-  },
-  {
-   "net": "/VOFS",
-   "x": 33.5,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.13 DAC -> R119 (input block)"
-  },
-  {
-   "net": "/VNEG_REF",
-   "x": 33.05,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U701 out -> R123 (input block)"
+   "note": "J501.13 JTAG TDO (fpga S-W)"
   },
   {
    "net": "/VTAP_P",
-   "x": 21.663,
+   "x": 63.6,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -244,13 +234,53 @@
   },
   {
    "net": "/VTAP_N",
-   "x": 17.149,
+   "x": 65.45,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
    "class": "supply",
    "width": 0.4,
-   "note": "R726 0 R from +2V5 (In2 via pair at the part)"
+   "note": "R726 0 R from -2V5 (In2 via pair at the part)"
+  },
+  {
+   "net": "/FPGA_RECONFIG",
+   "x": 58.1,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.27 PB13 -> U501.48 RECONFIG_N (R501 pull-up)"
+  },
+  {
+   "net": "/ADC_TRIG",
+   "x": 58.8,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.25 PB11 EXTI11 <- U501.41"
+  },
+  {
+   "net": "/USB_DP",
+   "x": 61.0,
+   "y": 0.0,
+   "layer": "F.Cu",
+   "side": "N",
+   "class": "pair",
+   "width": 0.295,
+   "note": "90 R diff (w 0.295 s 0.205) from J601 / U608; 9.57 mm in block"
+  },
+  {
+   "net": "/USB_DM",
+   "x": 61.5,
+   "y": 0.0,
+   "layer": "F.Cu",
+   "side": "N",
+   "class": "pair",
+   "width": 0.295,
+   "note": "90 R diff; 9.57 mm in block"
   },
   {
    "net": "+3V3",
@@ -260,7 +290,7 @@
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "via pairs at the caps; In2 region by the integrator"
+   "note": "via pairs at the caps / THT pins of J501; In2 region by the integrator"
   },
   {
    "net": "+2V5",
@@ -270,7 +300,7 @@
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "via pairs at the caps; In2 region by the integrator"
+   "note": "via pairs at the caps / THT pins of J501; In2 region by the integrator"
   },
   {
    "net": "-2V5",
@@ -280,7 +310,7 @@
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "via pairs at the caps; In2 region by the integrator"
+   "note": "via pairs at the caps / THT pins of J501; In2 region by the integrator"
   },
   {
    "net": "VBUS",
@@ -290,7 +320,7 @@
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "via pairs at the caps; In2 region by the integrator"
+   "note": "via pairs at the caps / THT pins of J501; In2 region by the integrator"
   }
  ]
 }
