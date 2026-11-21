@@ -760,12 +760,30 @@ PRIO = json.load(open(os.path.join(HERE, "prio.json"))) if os.path.exists(os.pat
 order = [j for p in PRIO for j in JOBS if j[0] == p] + [j for j in JOBS if j[0] not in PRIO]
 print("routing", len(order), "jobs ...")
 FAILJ = []
+# FROZEN routes: every job that once routed is replayed verbatim from frozen_routes.json (deterministic output);
+# only jobs not in that file are routed.  `--refreeze` drops the file contents and routes everything again.
+FROZEN_PATH = os.path.join(HERE, "frozen_routes.json")
+FROZEN = {} if ("--refreeze" in sys.argv or not os.path.exists(FROZEN_PATH)) else json.load(open(FROZEN_PATH))
+_orig = (blk.track, blk.via, blk.iface)
 for name, fn in order:
+    if name in FROZEN:
+        for kind, args in FROZEN[name]:
+            {"track": _orig[0], "via": _orig[1], "iface": _orig[2]}[kind](*args)
+        continue
+    rec = []
+    blk.track = lambda net, w, pts, layer="F.Cu", name=None, z=None, ch=0.2, rec=rec: (
+        rec.append(("track", [net, w, [list(map(float, q)) for q in pts], layer])), _orig[0](net, w, pts, layer, name, z, ch))[1]
+    blk.via = lambda x, y, net, *a, rec=rec: (rec.append(("via", [float(x), float(y), net])), _orig[1](x, y, net, *a))[1]
+    blk.iface = lambda *a, rec=rec: (rec.append(("iface", list(a))), _orig[2](*a))[1]
     nf = len(FAILED)
     fn()
+    blk.track, blk.via, blk.iface = _orig
     if len(FAILED) > nf:
         FAILJ.append(name)
-print("failed jobs:", FAILJ)
+    else:
+        FROZEN[name] = rec
+json.dump(FROZEN, open(FROZEN_PATH, "w"), indent=0)
+print("failed jobs:", FAILJ, "| frozen jobs:", len(FROZEN))
 json.dump([n for n in PRIO] + [n for n in FAILJ if n not in PRIO], open(os.path.join(SCR, "mcuif_prio_next.json"), "w"))
 # ============================================================ pours, outline, ifaces
 blk.zone("GND", ["In1.Cu"], bl.rect_pts(0, 0, W, H - 0.5), 0.2)
