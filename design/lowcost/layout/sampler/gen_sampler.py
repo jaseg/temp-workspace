@@ -500,21 +500,34 @@ place("Package_SON", "WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm", "U402", "TRF37D73", 
        "8": "GND", "9": "GND"})
 XC404 = XTAP + 0.95 + 0.91
 two("C", "C404", "100n", XC404, YL, "h", "STRB_CLIP", "TRF2_OUT")
+# bias tee (sim/bias_tee/RESULT.md): one straight chain perpendicular to the line, courtyards touching:
+# FB402 BLM15HD102 with pad 1 centred ON the 50 R line (no stub) -> L402 47 uH 1210 (pad-wide link) with R416 1 k
+# beside it -> C411 100 nF across the cold pad (GND via at its GND pad) -> +3V3 plane via pair beyond C411; C412 10 uF.
 XFB = XC404 + 0.91 + 0.47
-two("FB", "FB402", "BLM15 1k@100M", XFB, YL - 0.30 - 0.485, "v", "TRF2_BIAS", "TRF2_OUT")
-two("L", "L402", "47u", XFB, YL - 0.30 - 0.485 - 0.93 - 2.28, "v", "+3V3", "TRF2_BIAS")
+YFB = YL - 0.485                                 # bead centre: pad 1 (TRF2_OUT) on the line axis
+two("FB", "FB402", "BLM15HD102", XFB, YFB, "v", "TRF2_BIAS", "TRF2_OUT")
+YL402 = YFB - 0.93 - 2.28 - 0.09                # 1210 courtyard touches the bead / U402 courtyards
+two("L", "L402", "47u LQH32CN", XFB, YL402, "v", "+3V3", "TRF2_BIAS")
+XR416 = XFB + 1.58 + 0.47                       # 1 k damping resistor beside the 1210 (courtyards touching)
+two("R", "R416", "1k", XR416, YL402, "v", "+3V3", "TRF2_BIAS")
 place("Diode_SMD", "D_SOD-323", "D203", "BAT15-03W", XTAP, YL - 0.40 - 1.05, 90, {"1": "STRB_CLIP", "2": "GND"})
 p7, p2 = pad("U402", "7"), pad("U402", "2")
 NECK = 0.25                                     # WSON pad height
 track("STRB_CLIP", W, [("T401", "1"), (XTAP, YL), ("C404", "1")], name="STRB_CLIP: balun.1 -> tap -> C404", z=50)
 track("TRF2_OUT", W, [("C404", "2"), (p7[0] - 0.25, YL)], name="TRF2_OUT: C404 -> U402.7", z=50)
 track("TRF2_OUT", NECK, [(p7[0] - 0.25, YL), p7], name="neck in U402.7 pad", z=50)
-track("TRF2_OUT", 0.3, [(XFB, YL), ("FB402", "@TRF2_OUT")])
 track("STRB_CLIP", 0.3, [(XTAP, YL), ("D203", "1")])
 x, y = pad("D203", "2")
 track("GND", W_GND, [(x, y), (x, y - 0.65)])
 via(x, y - 0.65, "GND")
-track("TRF2_BIAS", 0.6, [("FB402", "@TRF2_BIAS"), ("L402", "@TRF2_BIAS")])
+W_BT = 0.64                                     # bias-tee links as wide as the 0402 pads
+track("TRF2_BIAS", W_BT, [("FB402", "@TRF2_BIAS"), ("L402", "@TRF2_BIAS")], name="bias tee: FB402 -> L402")
+# R416 pads to the L402 pads: one 45-degree link each (R pad centre -> inside the 1210 pad)
+for net_, sgn in (("TRF2_BIAS", 1), ("+3V3", -1)):
+    rx, ry = pad("R416", "@" + net_)
+    lx, ly = pad("L402", "@" + net_)
+    d_ = rx - (lx + 1.325 - 0.18)
+    track(net_, 0.5, [(rx, ry), (rx - d_, ry + sgn * d_)], name=f"bias tee: R416 -> L402 ({net_})")
 # input side
 XC403 = XT + 1.6 + 0.91
 two("C", "C403", "100n", XC403, YL, "h", "TRF2_RFIN", "TRF2_IN")
@@ -542,19 +555,30 @@ for c in ("C405", "C406"):
     x, y = pad(c, "@GND")
     track("GND", W_GND, [(x, y), (x, y + 0.6)])
     via(x, y + 0.6, "GND")
-# L402 cold end: 1 nF + 10 uF, +3V3 copper polygon, via pair to In2
+# L402 cold end: C411 100 nF horizontal right across the cold pad (+3V3 pad over it, GND pad beside, GND via at
+# that pad); the +3V3 plane via pair sits beyond C411 (supply enters through the capacitor), C412 10 uF next to it.
 yt = pad("L402", "@+3V3")[1]
-two("C", "C411", "1n", XFB + 1.58 + 0.46, yt + 0.48, "v", "+3V3", "GND")
-two("C", "C412", "10u", XFB + 1.58 + 0.92 + 0.98, yt + 0.95, "v", "+3V3", "GND", size="0805")
-for c, d in (("C411", 0.6), ("C412", 0.6)):
-    x, y = pad(c, "@GND")
-    track("GND", W_GND, [(x, y), (x, y + d + (0.25 if c == "C412" else 0))])
-    via(x, y + d + (0.25 if c == "C412" else 0), "GND")
-VPWR_Y = yt - 0.8
-for dy in (-0.35, 0.35):
-    via(XFB - 1.75, yt + dy, "+3V3", why="supply")
-zone("+3V3", [pcbnew.F_Cu], rect_pts(XFB - 2.2, yt - 0.75, pad("C412", "@+3V3")[0] + 0.6, yt + 0.42),
-     clearance=0.2, prio=2)
+YC411 = YL402 - 2.28 - 0.46                     # courtyards touching
+two("C", "C411", "100n", XFB + 0.48, YC411, "h", "+3V3", "GND")
+cpx, cpy = pad("C411", "@+3V3")
+track("+3V3", 0.56, [(cpx, cpy), (cpx, yt)], name="bias tee: C411 -> L402 cold pad")
+gx, gy = pad("C411", "@GND")
+track("GND", W_GND, [(gx, gy), (gx + 0.62, gy)])
+via(gx + 0.62, gy, "GND")
+VIA_Y = cpy - 0.31 - 0.1 - 0.3 - 0.05
+for dx in (-0.36, 0.36):                         # plane via pair on the far side of C411
+    via(cpx + dx, VIA_Y, "+3V3", why="supply")
+track("+3V3", 0.6, [(cpx - 0.36, VIA_Y), (cpx + 0.36, VIA_Y)])
+track("+3V3", 0.56, [(cpx, VIA_Y), (cpx, cpy)])
+XC412 = XFB - 0.91 - 1.7                        # 10 uF 0805 left of C411, +3V3 pad towards it
+YC412 = VIA_Y                                   # on the via row: C412 -> plane vias -> C411 -> L402
+assert YC412 + 0.98 <= YL402 - 2.28 + 1e-6
+two("C", "C412", "10u", XC412, YC412, "h", "GND", "+3V3", size="0805")
+track("+3V3", 0.6, [("C412", "@+3V3"), (cpx - 0.36, VIA_Y)])
+gx, gy = pad("C412", "@GND")
+track("GND", W_GND, [(gx, gy), (gx - 0.75, gy)])
+via(gx - 0.75, gy, "GND")
+VPWR_Y = min(VIA_Y - 0.2, YC412 - 0.98 + 0.45)
 testpad("TP401", "+3V3", XX2 - 0.2, -4.6, bottom=True)
 via(XX2 - 0.2, -3.6, "+3V3", why="supply")
 track("+3V3", W_PWR, [(XX2 - 0.2, -3.6), (XX2 - 0.2, -4.6)], layer=pcbnew.B_Cu)
@@ -627,7 +651,7 @@ for nm, r in ROUTES.items():
                (x1 + ux * RF_KEEP - nx * e, y1 + uy * RF_KEEP - ny * e), (x1 + ux * e - nx * RF_KEEP, y1 + uy * e - ny * RF_KEEP),
                (x0 - ux * e - nx * RF_KEEP, y0 - uy * e - ny * RF_KEEP), (x0 - ux * RF_KEEP - nx * e, y0 - uy * RF_KEEP - ny * e)]
         zone(None, [pcbnew.F_Cu], pts, rule=True)
-for ref in ("R201", "C403", "C404", "T401", "R204", "D201", "D202", "C201", "C202"):   # RF pads: pour away too
+for ref in ("R201", "C403", "C404", "T401", "R204", "D201", "D202", "C201", "C202", "FB402"):   # RF pads: pour away too
     for p in FPS[ref].Pads():
         if p.GetNetname() == "GND":
             continue

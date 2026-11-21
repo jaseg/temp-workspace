@@ -4,7 +4,8 @@ SPEC decisions 4-6).
 Signal path, left to right (top of the sheet):
   BUF_OUT_T / EXT_CLK (49.9 R termination) -> U301 TMUX136 (local switch ground VSW_GND = -0.9 V,
   SEL level-shifted from TRIG_SEL) -> U302 TLV3801 (+/-2V5, IN- = TRIG_LEVEL), 100 R across CMP_P/CMP_N
-  -> CMP_P -> 1 uF -> U303 TRF37D73 (3V3, 120 nH + 47 uH choke) -> 1 uF -> 12 dB pi pad 82/91/82 R
+  -> CMP_P -> 1 uF -> U303 TRF37D73 (3V3, bias tee FB301 BLM15HD102 bead + L302 47 uH || R382 1 k, sim/bias_tee)
+  -> 1 uF -> 12 dB pi pad 82/91/82 R
   -> 16-tap delay line (two rows of 8 on the sheet, wired through) -> 49.9 R termination.
   CMP_N -> 1 uF -> 49.9 R dummy; CMP_P/CMP_N bridged by 2 x 470 R -> U304 SN65LVDS2 -> COARSE.
 Taps (ladder): BAT15-04W gate (pin 3 common on the line), 0.47 pF C0G hold caps to PSTRB_A (anode
@@ -238,19 +239,28 @@ def main():
     sh.wire(pv, (pv[0], pv[1] - g(2)))
     sh.power("+3V3", (pv[0], pv[1] - g(2)), dy=-2.54)
     dec_up((pv[0], pv[1] - g(2)), pv[0] - g(8))
-    # output choke: RFOUT -> 120 nH (high SRF) -> 47 uH -> +3V3
+    # output bias tee (sim/bias_tee/RESULT.md): RFOUT -> BLM15HD102 bead (pad on the line) -> 47 uH || 1 k -> +3V3,
+    # own 100 nF at the cold end. Was 120 nH + 47 uH 0806: 11 dB suck-out at 313 MHz, 0.3-0.45 V DC drop.
     po = u3["7"]
     xo = po[0] + g(3)
-    l1 = sh.add("Device:L", "L", "120n", (xo, po[1] - g(4)), fp="Inductor_SMD:L_0402_1005Metric",
-                fields={"Note": "high-SRF section at the pin (> 2 GHz SRF, e.g. Murata LQG15/LQW15)"})
-    l2 = sh.add("Device:L", "L", "47u", (xo, po[1] - g(11)), fp="Inductor_SMD:L_1008_2520Metric",
-                fields={"Note": "Isat >= 100 mA, e.g. Murata LQH2MCN470K02 (verify)"})
+    l1 = sh.add("Device:FerriteBead_Small", "FB301", "1k", (xo, po[1] - g(4)), rot=180, fp="Inductor_SMD:L_0402_1005Metric",
+                mpn="BLM15HD102SN1D", lcsc="C21516",
+                fields={"Price": "0.0197 USD (LCSC)",
+                        "Note": "1 k @100 MHz / 2 k @1 GHz, 250 mA, 1.25 R max; pad ON the 50 R line, body perpendicular"})
+    l2 = sh.add("Device:L", "L302", "47u", (xo, po[1] - g(11)), fp="Inductor_SMD:L_1210_3225Metric",
+                mpn="LQH32CN470K23L", lcsc="C701189",
+                fields={"Price": "0.1632 USD (LCSC 5+)",
+                        "Note": "47 uH 1210, 170 mA, DCR 1.3 R (1.69 max), SRF >= 15 MHz; abuts the bead"})
+    rd = R(sh, "1k", (xo + g(4), po[1] - g(11)), ref="R382",
+           fields={"Note": "damps the 47 uH (bias tee): 0402 beside the 1210, same two pads; sim/bias_tee/RESULT.md"})
     sh.wire(po, (xo, po[1]))
-    sh.wire((xo, po[1]), l1["2"])
-    sh.wire(l1["1"], l2["2"])
+    sh.wire((xo, po[1]), l1["1"])
+    sh.wire(l1["2"], l2["2"])
+    sh.wire(l2["2"], rd["2"])
+    sh.wire(l2["1"], rd["1"])
     pt = l2["1"]
     sh.power("+3V3", pt, dy=-2.54)
-    dec_up(pt, pt[0] + g(5))
+    dec_up(pt, pt[0] + g(8))
     # 1 uF -> 12 dB pi pad 82/91/82
     cout = C(sh, "1u", (xo + g(5), po[1]), rot=90, fields={"Note": "X7R 0402, DC block"})
     sh.wire((xo, po[1]), cout["1"])
@@ -437,9 +447,9 @@ def main():
     sh.text("TLV3801: +/-2V5, GND pin to GND, LVDS-type out.\n100 R R3xx across OUT+/OUT- at the pins\n"
             "(350 mV VOD, 25 R per leg at HF). Trace to\nTRF/LVDS2 short (< 5 mm, ~30 ps).",
             P(78, 10), size=T)
-    sh.text("LINE DRIVER: TRF37D73 22 dB, 50 R in/out.\nBias via 120 nH (at pin) + 47 uH, tau 1.9 us.\n"
+    sh.text("LINE DRIVER: TRF37D73 22 dB, 50 R in/out. Bias: bead on\nthe line + 47 uH || 1 k (tau 1.9 us), own 100 nF.\n"
             "12 dB pad 82/91/82: line +/-0.21 V (data),\n0.42 V steps; 10-90 % 225-250 ps at the taps.",
-            P(165, 10), size=T)
+            P(172, 10), size=T)
     sh.text("COARSE: 2 x 470 R bridge (high-Z tap,\nTRF input drop < 5 %). SN65LVDS2 at 3V3\n"
             "-> FPGA pin 47. Good to ~100-150 MHz edges.", P(148, 72), size=T)
     sh.text("DELAY LINE (SPEC decision 4, co-propagating): signal line 75 ps per tap (0.26 mm / 59 R trace, meander\n"
@@ -472,6 +482,13 @@ def check(outdir):
     print("CMP_N", on(("U302", "1")), sorted(n[on(("U302", "1"))]))
     print("RFIN", sorted(n[on(("U303", "2"))]))
     print("RFOUT", sorted(n[on(("U303", "7"))]))
+    # bias tee (sim/bias_tee/RESULT.md): RFOUT -> FB301 -> L302 || R382 -> +3V3, cold-end 100 nF on +3V3
+    assert ("FB301", "1") in n[on(("U303", "7"))], "FB301 not on RFOUT"
+    assert {("L302", "2"), ("R382", "2")} <= n[on(("FB301", "2"))], "L302 / R382 not on the bead cold end"
+    v33 = n[on(("U303", "1"))]
+    assert {("L302", "1"), ("R382", "1")} <= v33 and any(r.startswith("C") for r, _ in v33), "L302 cold end"
+    assert not any(r == "L301" for k in n for r, _ in n[k]), "L301 (120 nH) must be gone"
+    print("bias tee checks OK: RFOUT -> FB301 -> L302 || R382 -> +3V3")
     print("LVDS A", sorted(n[on(("U304", "3"))]), "B", sorted(n[on(("U304", "4"))]))
     print("COARSE", on(("U304", "5")))
     line = on(("D301", "3"))

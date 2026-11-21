@@ -119,7 +119,7 @@ def bias_tee(sh, x, Y, Yr, big, rail, cap_xs, tp_name):
         cc = C(sh, "100n", P(x + 8, Yr + 3), ref=new_ref("C"), fields=CCOLD_F)
         sh.gnd(cc["2"])
     # DC test point between bead and choke
-    tp = add_tp(sh, tp_name, P(x + 7, Y - 7))
+    tp = add_tp(sh, tp_name, P(x - 5, Y - 7))
     sh.wire(P(x, Y - 7), tp["1"])
     return b, l
 

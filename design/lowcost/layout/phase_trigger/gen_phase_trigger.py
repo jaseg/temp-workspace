@@ -215,7 +215,8 @@ def place(lib, name, ref, val, x, y, rot, nets, cond=None):
 def two(kind, ref, val, x, y, orient, na, nb):
     """2-terminal part. orient 'h': na left / nb right; 'v': na up / nb down."""
     lib, name = {"R": ("Resistor_SMD", "R_0402_1005Metric"), "C": ("Capacitor_SMD", "C_0402_1005Metric"),
-                 "L": ("Inductor_SMD", "L_0402_1005Metric"), "L1008": ("Inductor_SMD", "L_1008_2520Metric")}[kind]
+                 "L": ("Inductor_SMD", "L_0402_1005Metric"), "L1008": ("Inductor_SMD", "L_1008_2520Metric"),
+                 "L1210": ("Inductor_SMD", "L_1210_3225Metric")}[kind]
     if orient == "h":
         return place(lib, name, ref, val, x, y, 0, {"1": na, "2": nb})
     return place(lib, name, ref, val, x, y, 90, {"1": nb, "2": na})
@@ -597,37 +598,54 @@ for pn in ("3", "4", "5", "6", "8"):
     track("GND", 0.2, [(x, y), (XU3 + (0.3 if x > XU3 else -0.3), y)], ch=0)
 for dy in (-0.45, 0.25, 0.95):
     via(XU3, dy, "GND", "gnd", 0.2, 0.4)
-# VCC pin 1 -> C312 100 n + C311 1 n right above, +3V3 via pair at C312
-two("C", "C312", "100n", XU3 - 0.95, -1.6, "v", "GND", "+3V3")
-two("C", "C311", "1n C0G", XU3 - 0.01, -1.6, "v", "GND", "+3V3")
+# VCC pin 1 -> C312 100 n + C311 1 n right above, +3V3 via pair at C312 (both 0.25 mm further left than before
+# so that the 1210 47 uH of the bias tee fits right of them)
+X_C312, X_C311 = XU3 - 1.2, XU3 - 0.26
+two("C", "C312", "100n", X_C312, -1.6, "v", "GND", "+3V3")
+two("C", "C311", "1n C0G", X_C311, -1.6, "v", "GND", "+3V3")
 track("+3V3", 0.3, [("U303", "1"), ("C312", "@+3V3")], ch=0)
 track("+3V3", W_PWR, [("C312", "@+3V3"), ("C311", "@+3V3")], ch=0)
 for dy in (-0.5, 0.05):
-    via(XU3 - 0.95 - 0.66, -1.12 + dy, "+3V3", "supply")
-track("+3V3", 0.4, [("C312", "@+3V3"), (XU3 - 1.61, -1.62)], ch=0)
-track("+3V3", 0.4, [("C312", "@+3V3"), (XU3 - 1.61, -1.07)], ch=0)
+    via(X_C312 - 0.66, -1.12 + dy, "+3V3", "supply")
+track("+3V3", 0.4, [("C312", "@+3V3"), (X_C312 - 0.66, -1.62)], ch=0)
+track("+3V3", 0.4, [("C312", "@+3V3"), (X_C312 - 0.66, -1.07)], ch=0)
 for c_ in ("C311", "C312"):
     x, y = pad(c_, "@GND")
     gvia(x, y - 0.58)
     track("GND", W_GND, [(x, y), (x, y - 0.58)], ch=0)
-# output: L301 120 nH on the line, L302 47 uH above, 1 n + 100 n at the +3V3 end
-two("L", "L301", "120n", X_L301, -0.48, "v", "TRF_BIAS", "TRF_OUT")
-two("L1008", "L302", "47u", X_L301, -3.36, "v", "+3V3", "TRF_BIAS")
+# output bias tee (sim/bias_tee/RESULT.md), one straight chain perpendicular to the line, courtyards touching:
+# FB301 BLM15HD102 with pad 1 centred ON the line (no stub) -> L302 47 uH 1210 (pad-wide link) with R382 1 k beside
+# it -> C314 100 nF across the cold pad (GND via at its GND pad) -> +3V3 plane via pair beyond C314.
+# (was: L301 120 nH + 47 uH 0806 on a 1008 land, cold end 100 n + 1 n beside the inductor)
+two("L", "FB301", "BLM15HD102", X_L301, -0.485, "v", "TRF_BIAS", "TRF_OUT")
+YL302 = -0.485 - 0.93 - 2.28
+two("L1210", "L302", "47u LQH32CN", X_L301, YL302, "v", "+3V3", "TRF_BIAS")
+two("R", "R382", "1k", X_L301 + 1.58 + 0.47, YL302, "v", "+3V3", "TRF_BIAS")
 two("C", "C309", "1u", X_C309, 0.0, "h", "TRF_OUT", "PAD_IN")
-for r_, n_ in (("L301", "@TRF_OUT"), ("C309", "1"), ("C309", "2")):
+for r_, n_ in (("FB301", "@TRF_OUT"), ("C309", "1"), ("C309", "2")):
     rfpad(r_, n_)
-track("TRF_OUT", W50, [("U303", "7"), ("C309", "1")], name="TRF_OUT: U303.7 -> L301 -> C309", z=50)
-track("TRF_BIAS", W_PWR, [("L301", "@TRF_BIAS"), ("L302", "@TRF_BIAS")], ch=0)
+track("TRF_OUT", W50, [("U303", "7"), ("C309", "1")], name="TRF_OUT: U303.7 -> FB301 -> C309", z=50)
+W_BT = 0.64                                     # bias-tee links as wide as the 0402 pads
+track("TRF_BIAS", W_BT, [("FB301", "@TRF_BIAS"), ("L302", "@TRF_BIAS")], ch=0)
+for net_, sgn in (("TRF_BIAS", 1), ("+3V3", -1)):  # R382 pads -> L302 pads, one 45-degree link each
+    rx, ry = pad("R382", "@" + net_)
+    lx, ly = pad("L302", "@" + net_)
+    d_ = rx - (lx + 1.325 - 0.18)
+    track(net_, 0.5, [(rx, ry), (rx - d_, ry + sgn * d_)], ch=0)
 yl2 = pad("L302", "@+3V3")[1]
-X_C314, X_C313 = X_L301 + 1.1 + 0.4 + 0.31, X_L301 + 1.1 + 0.4 + 0.31 + 0.94
-two("C", "C314", "100n", X_C314, yl2 + 0.48, "v", "+3V3", "GND")
-two("C", "C313", "1n C0G", X_C313, yl2 + 0.48, "v", "+3V3", "GND")
-track("+3V3", W_PWR, [("L302", "@+3V3"), ("C314", "@+3V3"), ("C313", "@+3V3")], ch=0)
-for x in (X_C314, X_C313):
-    via(x, yl2 - 0.6, "+3V3", "supply")
-    track("+3V3", 0.4, [(x, yl2), (x, yl2 - 0.6)], ch=0)
-    gvia(x, yl2 + 1.53)
-    track("GND", W_GND, [(x, yl2 + 0.96), (x, yl2 + 1.53)], ch=0)
+YC314 = YL302 - 2.28 - 0.46
+X_C314 = X_L301 + 0.48
+two("C", "C314", "100n", X_C314, YC314, "h", "+3V3", "GND")
+cpx, cpy = pad("C314", "@+3V3")
+track("+3V3", 0.56, [(cpx, cpy), (cpx, yl2)], ch=0)
+gx_, gy_ = pad("C314", "@GND")
+gvia(gx_ + 0.6, gy_)
+track("GND", W_GND, [(gx_, gy_), (gx_ + 0.6, gy_)], ch=0)
+VIA_Y = cpy - 0.31 - 0.1 - 0.225 - 0.05
+for dx in (-0.3, 0.3):                           # plane via pair on the far side of C314
+    via(cpx + dx, VIA_Y, "+3V3", "supply")
+track("+3V3", 0.5, [(cpx - 0.3, VIA_Y), (cpx + 0.3, VIA_Y)], ch=0)
+track("+3V3", 0.56, [(cpx, VIA_Y), (cpx, cpy)], ch=0)
 # 12 dB pi pad
 two("R", "R311", "82", X_R311, 0.48, "v", "PAD_IN", "GND")
 two("R", "R312", "91", X_R312, 0.0, "h", "PAD_IN", "PH_LINE")
@@ -642,8 +660,8 @@ for r_ in ("R311", "R313"):
 X_STEP = -1.6
 track("PH_LINE", W50, [("R312", "2"), (X_STEP, 0.0)], name="PH_LINE launch: R312 -> R313 -> step", z=50)
 track("PH_LINE", W_LIN, [(X_STEP, 0.0), (XT[0] + X_P3, 0.0)], name="PH_LINE launch: step -> D01.3", z=round(Z_LIN))
-testpad("TP306", "+3V3", X_C314, yl2 - 1.65, lx=-1.2, ly=0)
-track("+3V3", W_PWR, [(X_C314, yl2 - 0.6), (X_C314, yl2 - 1.65)], ch=0)
+testpad("TP306", "+3V3", cpx - 1.5, VIA_Y, lx=-1.2, ly=0)
+track("+3V3", W_PWR, [(cpx - 0.3, VIA_Y), (cpx - 1.5, VIA_Y)], ch=0)
 testpad("TP307", "GND", XU3 - 1.0, -4.6, lx=0, ly=-0.85)
 gvia(XU3 - 1.0, -3.6)
 track("GND", W_PWR, [(XU3 - 1.0, -3.6), (XU3 - 1.0, -4.6)], ch=0)
@@ -938,7 +956,7 @@ print("  (sections 1..14 / cells 1..13 identical to the ones listed)")
 
 print("\npad discontinuities (excess C vs the line the pad replaces):")
 for lab, wl, wp, lp in (("0402 in-line on 50 R (C308, C309, R312)", W50, 0.62, 0.56),
-                        ("0402 shunt/T pad on 50 R (R301, R307, R309, R310, R311, R313, L301)", W50, 0.62, 0.56),
+                        ("0402 shunt/T pad on 50 R (R301, R307, R309, R310, R311, R313, FB301)", W50, 0.62, 0.56),
                         ("SOT-323 pin 3 on PH_LINE (in the tap load)", W_LIN, 0.45, 0.70),
                         ("0402 hold-cap pad on the strobe line (in the tap load)", W_STR, 0.56, 0.62),
                         ("WSON / UQFN pins (narrower than the line)", W50, 0.25, 0.5)):
