@@ -1,0 +1,98 @@
+ERC report (2026-11-21T17:24:53, Encoding UTF8)
+Report includes: Errors, Warnings, Exclusions
+
+***** Sheet /
+
+***** Sheet /input/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(12.70 mm, 66.04 mm): Symbol #PWR0101 Hidden pin 1 [GND, Power input, Line]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(134.62 mm, 93.98 mm): Symbol #PWR0103 Hidden pin 1 [-5V, Power input, Line]
+[lib_symbol_mismatch]: Symbol 'Conn_Coaxial' doesn't match copy in library 'Connector'
+    ; warning
+    @(12.70 mm, 58.42 mm): Symbol J101 [Conn_Coaxial]
+[footprint_link_issues]: Footprint 'SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount' not found in library 'Connector_Coaxial'
+    ; warning
+    @(12.70 mm, 58.42 mm): Symbol J101 [Conn_Coaxial]
+[lib_symbol_mismatch]: Symbol 'Conn_Coaxial' doesn't match copy in library 'Connector'
+    ; warning
+    @(12.70 mm, 223.52 mm): Symbol J102 [Conn_Coaxial]
+[footprint_link_issues]: Footprint 'SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount' not found in library 'Connector_Coaxial'
+    ; warning
+    @(12.70 mm, 223.52 mm): Symbol J102 [Conn_Coaxial]
+
+***** Sheet /sampler/
+
+***** Sheet /trigger_phase/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(66.04 mm, 71.12 mm): Symbol U301 Pin 5 [GND, Power input, Line]
+[footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    ; warning
+    @(111.76 mm, 48.26 mm): Symbol U302 [TLV3801]
+[footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    ; warning
+    @(177.80 mm, 48.26 mm): Symbol U303 [TRF37D73]
+
+***** Sheet /strobe/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(152.40 mm, 102.87 mm): Symbol #PWR0433 Hidden pin 1 [VBUS, Power input, Line]
+[footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    ; warning
+    @(63.50 mm, 50.80 mm): Symbol U401 [TRF37D73_S]
+[footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    ; warning
+    @(63.50 mm, 133.35 mm): Symbol U403 [TRF37D73_S]
+[footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    ; warning
+    @(63.50 mm, 209.55 mm): Symbol U405 [TRF37D73_S]
+[footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    ; warning
+    @(143.51 mm, 50.80 mm): Symbol U402 [TRF37D73_S]
+
+***** Sheet /fpga_clock/
+[lib_symbol_mismatch]: Symbol 'Crystal_GND24' doesn't match copy in library 'Device'
+    ; warning
+    @(50.80 mm, 63.50 mm): Symbol Y501 [Crystal_GND24]
+[lib_symbol_mismatch]: Symbol 'Si5351A-B-GT' doesn't match copy in library 'Oscillator'
+    ; warning
+    @(88.90 mm, 76.20 mm): Symbol U502 [Si5351A-B-GT]
+[lib_symbol_mismatch]: Symbol 'SolderJumper_2_Open' doesn't match copy in library 'Jumper'
+    ; warning
+    @(379.73 mm, 48.26 mm): Symbol JP501 [SolderJumper_2_Open]
+
+***** Sheet /power/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(180.34 mm, 111.76 mm): Symbol U604 Pin 1 [VIN, Power input, Line]
+[lib_symbol_mismatch]: Symbol 'USB_C_Receptacle_USB2.0_16P' doesn't match copy in library 'Connector'
+    ; warning
+    @(31.75 mm, 50.80 mm): Symbol J601 [USB_C_Receptacle_USB2.0_16P]
+[lib_symbol_mismatch]: Symbol 'LM27761' doesn't match copy in library 'Regulator_SwitchedCapacitor'
+    ; warning
+    @(292.10 mm, 114.30 mm): Symbol U605 [LM27761]
+[footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    ; warning
+    @(292.10 mm, 114.30 mm): Symbol U605 [LM27761]
+
+***** Sheet /mcu_if/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(64.77 mm, 50.80 mm): Symbol U704 Pin 21 [VDDA, Power input, Line]
+[lib_symbol_mismatch]: Symbol 'STM32G474CBTx' doesn't match copy in library 'MCU_ST_STM32G4'
+    ; warning
+    @(57.15 mm, 91.44 mm): Symbol U704 [STM32G474CBTx]
+[lib_symbol_mismatch]: Symbol 'SolderJumper_2_Open' doesn't match copy in library 'Jumper'
+    ; warning
+    @(134.62 mm, 232.41 mm): Symbol JP701 [SolderJumper_2_Open]
+
+ ** ERC messages: 24  Errors 6  Warnings 18
+
+ ** Ignored checks:
+    - Global label only appears once in the schematic
+    - Four connection points are joined together
+    - SPICE model issue
+    - Assigned footprint doesn't match footprint filters

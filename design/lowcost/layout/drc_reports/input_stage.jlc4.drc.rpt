@@ -1,0 +1,366 @@
+** Drc report for input_stage.kicad_pcb **
+** Created on 2026-11-21T17:25:33 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 92 DRC violations **
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.5000 mm, 15.8600 mm): Footprint R119
+    @(6.0000 mm, 13.1000 mm): Footprint U102
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.5000 mm, 15.8600 mm): Footprint R119
+    @(1.1500 mm, 16.7000 mm): Footprint J2
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(3.9200 mm, 11.9625 mm): Footprint C105
+    @(6.0000 mm, 13.1000 mm): Footprint U102
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(3.9200 mm, 11.9625 mm): Footprint C105
+    @(3.9200 mm, 11.0500 mm): Footprint R117
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(13.6100 mm, 8.7800 mm): Footprint R113
+    @(13.6100 mm, 7.1800 mm): Footprint R112
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(7.6200 mm, 7.6000 mm): Footprint R105
+    @(7.6200 mm, 9.2000 mm): Footprint R106
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(7.6200 mm, 7.6000 mm): Footprint R105
+    @(7.1100 mm, 6.3000 mm): Footprint R104
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(8.6400 mm, 11.1100 mm): Footprint C107
+    @(7.4600 mm, 10.6000 mm): Footprint R121
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(8.6400 mm, 11.1100 mm): Footprint C107
+    @(7.9000 mm, 12.9000 mm): Footprint C106
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(7.4600 mm, 10.6000 mm): Footprint R121
+    @(6.0000 mm, 13.1000 mm): Footprint U102
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(7.4600 mm, 10.6000 mm): Footprint R121
+    @(6.3000 mm, 9.7000 mm): Footprint TP103
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(1.1500 mm, 14.3000 mm): Footprint C116
+    @(2.9000 mm, 14.3000 mm): Footprint C115
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(7.9000 mm, 12.9000 mm): Footprint C106
+    @(6.0000 mm, 13.1000 mm): Footprint U102
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(12.0500 mm, 14.8500 mm): Footprint RV101
+    @(8.1700 mm, 15.3500 mm): Footprint R120
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.0000 mm, 13.1000 mm): Footprint U102
+    @(3.9200 mm, 11.0500 mm): Footprint R117
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.0000 mm, 13.1000 mm): Footprint U102
+    @(8.1700 mm, 15.3500 mm): Footprint R120
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.0000 mm, 13.1000 mm): Footprint U102
+    @(5.0500 mm, 10.3800 mm): Footprint R116
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(2.1000 mm, 6.3000 mm): Footprint J101
+    @(2.2450 mm, 1.0000 mm): Footprint J3
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(2.1000 mm, 6.3000 mm): Footprint J101
+    @(5.0500 mm, 10.3800 mm): Footprint R116
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(2.1000 mm, 6.3000 mm): Footprint J101
+    @(5.0500 mm, 8.7800 mm): Footprint R115
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(2.1000 mm, 6.3000 mm): Footprint J101
+    @(5.3500 mm, 6.3000 mm): Footprint C101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(2.1000 mm, 6.3000 mm): Footprint J101
+    @(5.0500 mm, 7.1800 mm): Footprint R114
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.3000 mm, 9.7000 mm): Footprint TP103
+    @(7.6200 mm, 9.2000 mm): Footprint R106
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.3000 mm, 9.7000 mm): Footprint TP103
+    @(5.0500 mm, 10.3800 mm): Footprint R116
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.3000 mm, 9.7000 mm): Footprint TP103
+    @(5.0500 mm, 8.7800 mm): Footprint R115
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(11.8950 mm, 9.4050 mm): Footprint C111
+    @(10.9950 mm, 9.4050 mm): Footprint R107
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(11.8950 mm, 9.4050 mm): Footprint C111
+    @(10.7450 mm, 6.5500 mm): Footprint U101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(3.9200 mm, 11.0500 mm): Footprint R117
+    @(5.0500 mm, 10.3800 mm): Footprint R116
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.2300 mm, 7.6000 mm): Footprint C102
+    @(7.1100 mm, 6.3000 mm): Footprint R104
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.2300 mm, 7.6000 mm): Footprint C102
+    @(5.3500 mm, 6.3000 mm): Footprint C101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(7.6450 mm, 2.3900 mm): Footprint R109
+    @(6.4450 mm, 1.7000 mm): Footprint TP101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(6.4450 mm, 1.7000 mm): Footprint TP101
+    @(2.2450 mm, 1.0000 mm): Footprint J3
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(7.1100 mm, 6.3000 mm): Footprint R104
+    @(5.3500 mm, 6.3000 mm): Footprint C101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(7.1100 mm, 6.3000 mm): Footprint R104
+    @(8.3450 mm, 4.9400 mm): Footprint C108
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(10.0950 mm, 9.4050 mm): Footprint C110
+    @(10.9950 mm, 9.4050 mm): Footprint R107
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(10.0950 mm, 9.4050 mm): Footprint C110
+    @(10.7450 mm, 6.5500 mm): Footprint U101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(5.0500 mm, 10.3800 mm): Footprint R116
+    @(5.0500 mm, 8.7800 mm): Footprint R115
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(5.0500 mm, 8.7800 mm): Footprint R115
+    @(5.0500 mm, 7.1800 mm): Footprint R114
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(5.3500 mm, 6.3000 mm): Footprint C101
+    @(5.0500 mm, 7.1800 mm): Footprint R114
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(10.9950 mm, 9.4050 mm): Footprint R107
+    @(10.7450 mm, 6.5500 mm): Footprint U101
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(8.3450 mm, 4.9400 mm): Footprint C108
+    @(10.7450 mm, 6.5500 mm): Footprint U101
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0200 mm)
+    Rule: board setup constraints edge; error
+    @(15.3000 mm, 0.0000 mm): Segment on Edge.Cuts
+    @(12.2075 mm, 6.3000 mm): Track [BUF_OUT_S] on F.Cu, length 2.8925 mm
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(15.3000 mm, 0.0000 mm): Segment on Edge.Cuts
+    @(14.1100 mm, 10.0900 mm): Track [BUF_OUT_T] on F.Cu, length 1.1400 mm
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(15.3000 mm, 0.0000 mm): Segment on Edge.Cuts
+    @(15.1000 mm, 6.3000 mm): Pad 1 [BUF_OUT_S] of IF1 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.2000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(15.3000 mm, 0.0000 mm): Segment on Edge.Cuts
+    @(15.1000 mm, 10.0900 mm): Pad 1 [BUF_OUT_T] of IF2 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation
+    Rule: edge-launch SMA to edge; error
+    @(0.0000 mm, 17.6000 mm): Segment on Edge.Cuts
+    @(2.1000 mm, 9.1250 mm): Pad 2 [GND] of J101 on F.Cu
+[copper_edge_clearance]: Board edge clearance violation
+    Rule: edge-launch SMA to edge; error
+    @(0.0000 mm, 17.6000 mm): Segment on Edge.Cuts
+    @(2.1000 mm, 9.1250 mm): Pad 2 [GND] of J101 on B.Cu
+[copper_edge_clearance]: Board edge clearance violation
+    Rule: edge-launch SMA to edge; error
+    @(0.0000 mm, 17.6000 mm): Segment on Edge.Cuts
+    @(2.1000 mm, 3.4750 mm): Pad 2 [GND] of J101 on B.Cu
+[copper_edge_clearance]: Board edge clearance violation
+    Rule: edge-launch SMA to edge; error
+    @(0.0000 mm, 17.6000 mm): Segment on Edge.Cuts
+    @(2.1000 mm, 3.4750 mm): Pad 2 [GND] of J101 on F.Cu
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(0.0000 mm, 0.0000 mm): Segment on Edge.Cuts
+    @(3.0050 mm, 0.4365 mm): Segment of J3 on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(0.0000 mm, 0.0000 mm): Segment on Edge.Cuts
+    @(5.4800 mm, 0.6925 mm): Segment of J3 on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(15.3000 mm, 17.6000 mm): Segment on Edge.Cuts
+    @(5.6550 mm, 17.8100 mm): Segment of J2 on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(15.3000 mm, 17.6000 mm): Segment on Edge.Cuts
+    @(1.9100 mm, 17.8100 mm): Segment of J2 on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(15.3000 mm, 17.6000 mm): Segment on Edge.Cuts
+    @(0.3900 mm, 17.8100 mm): Segment of J2 on F.Silkscreen
+[lib_footprint_issues]: The current configuration does not include the footprint library 'input_stage'
+    Local override; warning
+    @(15.1000 mm, 10.0900 mm): Footprint IF2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'input_stage'
+    Local override; warning
+    @(15.1000 mm, 6.3000 mm): Footprint IF1
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(1.1500 mm, 15.8500 mm): PCB text '-5V' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(1.1500 mm, 15.8500 mm): PCB text '-5V' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(4.7850 mm, 2.0000 mm): PCB text '+2V5' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(4.7850 mm, 2.0000 mm): PCB text '+2V5' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(15.2000 mm, 10.6900 mm): PCB text 'T>' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(15.2000 mm, 10.6900 mm): PCB text 'T>' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0525 mm)
+    Rule: board setup constraints silk line width; warning
+    @(15.2000 mm, 5.7000 mm): PCB text 'S>' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(15.2000 mm, 5.7000 mm): PCB text 'S>' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(4.9600 mm, 15.8500 mm): PCB text 'VOFS' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(4.9600 mm, 15.8500 mm): PCB text 'VOFS' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(2.4200 mm, 15.8500 mm): PCB text '+5V' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(2.4200 mm, 15.8500 mm): PCB text '+5V' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(3.5150 mm, 2.0000 mm): PCB text '-2V5' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(3.5150 mm, 2.0000 mm): PCB text '-2V5' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0600 mm)
+    Rule: board setup constraints silk line width; warning
+    @(0.2500 mm, 10.7500 mm): PCB text 'SIG_IN' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.4000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(0.2500 mm, 10.7500 mm): PCB text 'SIG_IN' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(3.6900 mm, 15.8500 mm): PCB text 'GND' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(3.6900 mm, 15.8500 mm): PCB text 'GND' on F.Silkscreen
+[line_width]: Line width out of range (board setup constraints silk line width min thickness 0.0800 mm; actual 0.0450 mm)
+    Rule: board setup constraints silk line width; warning
+    @(2.2450 mm, 2.0000 mm): PCB text 'GND' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.3000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(2.2450 mm, 2.0000 mm): PCB text 'GND' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(2.2450 mm, 2.1100 mm): Segment of J3 on F.Silkscreen
+    @(2.2450 mm, 2.0000 mm): PCB text 'GND' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(3.0050 mm, 2.1100 mm): Segment of J3 on F.Silkscreen
+    @(3.5150 mm, 2.0000 mm): PCB text '-2V5' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(3.5150 mm, 2.0000 mm): PCB text '-2V5' on F.Silkscreen
+    @(3.0050 mm, 2.1100 mm): Segment of J3 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(3.0050 mm, 2.1100 mm): Segment of J3 on F.Silkscreen
+    @(4.7850 mm, 2.0000 mm): PCB text '+2V5' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(7.5400 mm, 12.7922 mm): Segment of C106 on F.Silkscreen
+    @(7.5600 mm, 13.1000 mm): Segment of U102 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(7.5400 mm, 12.7922 mm): Segment of C106 on F.Silkscreen
+    @(7.5600 mm, 13.1000 mm): Segment of U102 on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(4.3600 mm, 6.3000 mm): Segment of J101 on F.Silkscreen
+    @(4.8700 mm, 6.3000 mm): Pad 1 [VIN] of C101 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(4.3600 mm, 6.3000 mm): Segment of J101 on F.Silkscreen
+    @(5.0500 mm, 6.6700 mm): Pad 1 [VIN] of R114 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(4.8600 mm, 6.0500 mm): Segment of J101 on F.Silkscreen
+    @(4.8700 mm, 6.3000 mm): Pad 1 [VIN] of C101 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(4.8600 mm, 6.5500 mm): Segment of J101 on F.Silkscreen
+    @(4.8700 mm, 6.3000 mm): Pad 1 [VIN] of C101 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(4.8600 mm, 6.5500 mm): Segment of J101 on F.Silkscreen
+    @(5.0500 mm, 6.6700 mm): Pad 1 [VIN] of R114 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(5.2422 mm, 6.6600 mm): Segment of C101 on F.Silkscreen
+    @(5.0500 mm, 6.6700 mm): Pad 1 [VIN] of R114 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(4.4400 mm, 13.1000 mm): Segment of U102 on F.Silkscreen
+    @(4.4000 mm, 11.9625 mm): Pad 2 [TAP] of C105 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(7.5600 mm, 13.1000 mm): Segment of U102 on F.Silkscreen
+    @(7.9000 mm, 12.4200 mm): Pad 1 [OPA_OUT] of C106 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(7.5600 mm, 13.1000 mm): Segment of U102 on F.Silkscreen
+    @(7.9000 mm, 13.3800 mm): Pad 2 [FB] of C106 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(15.2000 mm, 5.7000 mm): PCB text 'S>' on F.Silkscreen
+    @(14.5600 mm, 5.9300 mm): Pad 2 [BUF_OUT_S] of R118 on F.Cu
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - PTH inside courtyard
+    - NPTH inside courtyard
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

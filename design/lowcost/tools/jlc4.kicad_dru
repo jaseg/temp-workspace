@@ -1,0 +1,31 @@
+(version 1)
+# Custom DRC rules for JLCPCB 4-layer (used by run_drc.sh --rules jlc4 on the scratch copy).
+# The board-wide minimums and the Default net class live in the patched .kicad_pro
+# (kicad_inject_rules.py); these rules add the per-object limits that cannot be
+# expressed there.
+
+(rule "JLC4 track width"
+  (condition "A.Type == 'Track'")
+  (constraint track_width (min 0.09mm)))
+
+(rule "JLC4 copper clearance"
+  (layer outer)
+  (constraint clearance (min 0.09mm)))
+
+(rule "JLC4 via drill"
+  (condition "A.Type == 'Via'")
+  (constraint hole_size (min 0.15mm))
+  (constraint annular_width (min 0.075mm)))
+
+# Edge-launch SMA connectors: their pads are meant to sit on / straddle the board edge.
+(rule "edge-launch SMA to edge"
+  (condition "A.Type == 'Pad' && A.Parent.Library_link == '*EdgeMount*'")
+  (constraint edge_clearance)
+  (severity ignore))
+
+# Fragment boards only: IF_PAD pseudo-footprints mark the hand-over points where a
+# trace leaves the fragment, so they sit on the fragment outline by design.
+(rule "fragment interface pads"
+  (condition "A.Parent.Library_link == '*:IF_PAD*' || B.Parent.Library_link == '*:IF_PAD*'")
+  (constraint edge_clearance)
+  (severity ignore))

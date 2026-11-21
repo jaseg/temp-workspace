@@ -1,0 +1,438 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-21T17:25:00",
+    "ignored_checks": [
+        {
+            "description": "Global label only appears once in the schematic",
+            "key": "single_global_label"
+        },
+        {
+            "description": "Four connection points are joined together",
+            "key": "four_way_junction"
+        },
+        {
+            "description": "SPICE model issue",
+            "key": "simulation_model_issue"
+        },
+        {
+            "description": "Assigned footprint doesn't match footprint filters",
+            "key": "footprint_filter"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "10.99.0",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/5e23f493-b3c9-5738-8419-f17d1e307037",
+            "violations": []
+        },
+        {
+            "path": "/input/",
+            "uuid_path": "/5e23f493-b3c9-5738-8419-f17d1e307037/55297c72-aa8b-526d-a7a4-c3933d6a3405",
+            "violations": [
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol #PWR0101 Hidden pin 1 [GND, Power input, Line]",
+                            "pos": {
+                                "x": 12.7,
+                                "y": 66.04
+                            },
+                            "uuid": "9812a25c-48cf-5608-8e27-e175d15c49ad"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol #PWR0103 Hidden pin 1 [-5V, Power input, Line]",
+                            "pos": {
+                                "x": 134.62,
+                                "y": 93.98
+                            },
+                            "uuid": "9f2f468f-edb0-51dd-81ed-d3038f683016"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Symbol 'Conn_Coaxial' doesn't match copy in library 'Connector'",
+                    "items": [
+                        {
+                            "description": "Symbol J101 [Conn_Coaxial]",
+                            "pos": {
+                                "x": 12.7,
+                                "y": 58.42
+                            },
+                            "uuid": "007f76a5-06c7-5c4e-b9b2-d1adf2b1e0e0"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Footprint 'SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount' not found in library 'Connector_Coaxial'",
+                    "items": [
+                        {
+                            "description": "Symbol J101 [Conn_Coaxial]",
+                            "pos": {
+                                "x": 12.7,
+                                "y": 58.42
+                            },
+                            "uuid": "007f76a5-06c7-5c4e-b9b2-d1adf2b1e0e0"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_Coaxial' doesn't match copy in library 'Connector'",
+                    "items": [
+                        {
+                            "description": "Symbol J102 [Conn_Coaxial]",
+                            "pos": {
+                                "x": 12.7,
+                                "y": 223.52
+                            },
+                            "uuid": "5dcfff41-b82a-5e10-b62c-95c90953eff1"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Footprint 'SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount' not found in library 'Connector_Coaxial'",
+                    "items": [
+                        {
+                            "description": "Symbol J102 [Conn_Coaxial]",
+                            "pos": {
+                                "x": 12.7,
+                                "y": 223.52
+                            },
+                            "uuid": "5dcfff41-b82a-5e10-b62c-95c90953eff1"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                }
+            ]
+        },
+        {
+            "path": "/sampler/",
+            "uuid_path": "/5e23f493-b3c9-5738-8419-f17d1e307037/7254890a-3350-5a40-8279-79e31d820a86",
+            "violations": []
+        },
+        {
+            "path": "/trigger_phase/",
+            "uuid_path": "/5e23f493-b3c9-5738-8419-f17d1e307037/5de296a9-797d-5eeb-99d0-7e19448f4002",
+            "violations": [
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol U301 Pin 5 [GND, Power input, Line]",
+                            "pos": {
+                                "x": 66.04,
+                                "y": 71.12
+                            },
+                            "uuid": "b391900a-b509-55a1-9e0e-466c886f751f"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+                    "items": [
+                        {
+                            "description": "Symbol U302 [TLV3801]",
+                            "pos": {
+                                "x": 111.76,
+                                "y": 48.26
+                            },
+                            "uuid": "16f97c05-3854-5743-9236-4a157bda8a57"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+                    "items": [
+                        {
+                            "description": "Symbol U303 [TRF37D73]",
+                            "pos": {
+                                "x": 177.8,
+                                "y": 48.26
+                            },
+                            "uuid": "78879539-0de3-5104-9a2b-d017078e1c35"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                }
+            ]
+        },
+        {
+            "path": "/strobe/",
+            "uuid_path": "/5e23f493-b3c9-5738-8419-f17d1e307037/01cc9075-5c63-5460-96a7-633b14c9c292",
+            "violations": [
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol #PWR0433 Hidden pin 1 [VBUS, Power input, Line]",
+                            "pos": {
+                                "x": 152.4,
+                                "y": 102.87
+                            },
+                            "uuid": "b0ff1899-c412-5002-aab2-b04d2360e99d"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+                    "items": [
+                        {
+                            "description": "Symbol U401 [TRF37D73_S]",
+                            "pos": {
+                                "x": 63.5,
+                                "y": 50.8
+                            },
+                            "uuid": "54f32469-4c36-522a-b237-4f71aefb4d42"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+                    "items": [
+                        {
+                            "description": "Symbol U403 [TRF37D73_S]",
+                            "pos": {
+                                "x": 63.5,
+                                "y": 133.35
+                            },
+                            "uuid": "bfd37f3b-365b-5732-97a0-1e80b82cbd06"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+                    "items": [
+                        {
+                            "description": "Symbol U405 [TRF37D73_S]",
+                            "pos": {
+                                "x": 63.5,
+                                "y": 209.55
+                            },
+                            "uuid": "b4b00b96-12a8-51dd-b569-5b07c351fc39"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+                    "items": [
+                        {
+                            "description": "Symbol U402 [TRF37D73_S]",
+                            "pos": {
+                                "x": 143.51,
+                                "y": 50.8
+                            },
+                            "uuid": "2e7d8853-2f0f-54f9-9f33-080acb286d0a"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                }
+            ]
+        },
+        {
+            "path": "/fpga_clock/",
+            "uuid_path": "/5e23f493-b3c9-5738-8419-f17d1e307037/765ea63d-9451-55a2-a617-96db488f03d8",
+            "violations": [
+                {
+                    "description": "Symbol 'Crystal_GND24' doesn't match copy in library 'Device'",
+                    "items": [
+                        {
+                            "description": "Symbol Y501 [Crystal_GND24]",
+                            "pos": {
+                                "x": 50.8,
+                                "y": 63.5
+                            },
+                            "uuid": "4dadf8ef-a8d4-5d15-ad00-f8cab37a7bf4"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Si5351A-B-GT' doesn't match copy in library 'Oscillator'",
+                    "items": [
+                        {
+                            "description": "Symbol U502 [Si5351A-B-GT]",
+                            "pos": {
+                                "x": 88.9,
+                                "y": 76.2
+                            },
+                            "uuid": "80c800fd-7a6e-5cd7-a387-e3af9deccdfb"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'SolderJumper_2_Open' doesn't match copy in library 'Jumper'",
+                    "items": [
+                        {
+                            "description": "Symbol JP501 [SolderJumper_2_Open]",
+                            "pos": {
+                                "x": 379.73,
+                                "y": 48.26
+                            },
+                            "uuid": "d08311a8-e9fa-5a91-96ee-699e5b4500c5"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                }
+            ]
+        },
+        {
+            "path": "/power/",
+            "uuid_path": "/5e23f493-b3c9-5738-8419-f17d1e307037/1678cd83-bf01-5d9d-8825-3adf71d9020a",
+            "violations": [
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol U604 Pin 1 [VIN, Power input, Line]",
+                            "pos": {
+                                "x": 180.34,
+                                "y": 111.76
+                            },
+                            "uuid": "0e8bc9ed-0b45-543e-9bf6-4a0bcdba4d91"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Symbol 'USB_C_Receptacle_USB2.0_16P' doesn't match copy in library 'Connector'",
+                    "items": [
+                        {
+                            "description": "Symbol J601 [USB_C_Receptacle_USB2.0_16P]",
+                            "pos": {
+                                "x": 31.75,
+                                "y": 50.8
+                            },
+                            "uuid": "1d3b55d7-e23f-571a-aba7-4426f5ee9765"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'LM27761' doesn't match copy in library 'Regulator_SwitchedCapacitor'",
+                    "items": [
+                        {
+                            "description": "Symbol U605 [LM27761]",
+                            "pos": {
+                                "x": 292.1,
+                                "y": 114.3
+                            },
+                            "uuid": "d762438a-5c05-54be-af81-55511b086e00"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+                    "items": [
+                        {
+                            "description": "Symbol U605 [LM27761]",
+                            "pos": {
+                                "x": 292.1,
+                                "y": 114.3
+                            },
+                            "uuid": "d762438a-5c05-54be-af81-55511b086e00"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                }
+            ]
+        },
+        {
+            "path": "/mcu_if/",
+            "uuid_path": "/5e23f493-b3c9-5738-8419-f17d1e307037/81b759a6-45ca-5c80-9d34-b444cee6c404",
+            "violations": [
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol U704 Pin 21 [VDDA, Power input, Line]",
+                            "pos": {
+                                "x": 64.77,
+                                "y": 50.8
+                            },
+                            "uuid": "390e2693-8a66-55e2-99e9-67f4cd67ecf1"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Symbol 'STM32G474CBTx' doesn't match copy in library 'MCU_ST_STM32G4'",
+                    "items": [
+                        {
+                            "description": "Symbol U704 [STM32G474CBTx]",
+                            "pos": {
+                                "x": 57.15,
+                                "y": 91.44
+                            },
+                            "uuid": "d7732ee5-ef83-5f31-955d-7c83bbf2a66b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'SolderJumper_2_Open' doesn't match copy in library 'Jumper'",
+                    "items": [
+                        {
+                            "description": "Symbol JP701 [SolderJumper_2_Open]",
+                            "pos": {
+                                "x": 134.62,
+                                "y": 232.41
+                            },
+                            "uuid": "c76baaa0-fc33-5be1-aa42-3566e616f84a"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                }
+            ]
+        }
+    ],
+    "source": "scope-fe.kicad_sch"
+}
