@@ -59,27 +59,28 @@ CX, CY = 48.0, 6.0
 bplace("U704", CX, CY, 0)
 JX, JY = 15.0, 8.2                    # J501 centre: courtyard x 0.55..29.45, y 4.9..11.5
 bplace("J501", JX, JY, 90)            # pin 1 west, odd row (FPGA / supplies) south, even row (MCU) north
-bplace("R511", 6.745, 3.95, 90)       # under J501.2 (pad 1 = J side, south)
-bplace("R512", 9.285, 3.95, 90)       # under J501.4
+bplace("R511", 6.745, 4.75, 90, "B")  # B.Cu above J501.2 (pad 1 = J side, south)
+bplace("R512", 9.285, 4.75, 90, "B")  # B.Cu above J501.4
 # control-voltage networks (F), x 27..42
-bplace("R733", 28.0, 0.8, 0)     # DAC_BIAS_A -> VBIAS_A
-bplace("R734", 28.0, 1.8, 180)     # VBIAS_A -> -2V5
-bplace("R735", 28.0, 2.8, 0)     # DAC_BIAS_K -> VBIAS_K
-bplace("R736", 28.0, 3.8, 0)     # DAC_BIAS_K -> GND
-bplace("R703", 30.6, 0.8, 0)     # VREFP -> ADC_REF_MID
-bplace("R704", 30.6, 1.8, 0)     # ADC_REF_MID -> GND
-bplace("C702", 30.6, 2.8, 0)     # ADC_REF_MID -> GND
-bplace("R723", 35.2, 0.8, 0)     # DAC_TAPTH -> VTAP_TH
-bplace("R724", 35.2, 1.8, 0)     # VTAP_TH -> GND
-bplace("C709", 35.2, 2.8, 0)     # VTAP_TH -> GND
+# divider columns: inputs (from U704) on the east pads, outputs on one west column, joined by straight verticals
+bplace("R733", 28.0, 1.3, 180)   # DAC_BIAS_A (E) -> VBIAS_A (W)
+bplace("R734", 28.0, 2.3, 0)     # VBIAS_A (W) -> -2V5 (E)
+bplace("R735", 28.0, 3.3, 180)   # DAC_BIAS_K (E) -> VBIAS_K (W)
+bplace("R736", 28.0, 4.3, 180)   # DAC_BIAS_K (E) -> GND (W)
+bplace("R703", 30.6, 1.3, 180)   # VREFP (E) -> ADC_REF_MID (W)
+bplace("R704", 30.6, 2.3, 0)     # ADC_REF_MID (W) -> GND (E)
+bplace("C702", 30.57, 3.3, 0)    # ADC_REF_MID (W) -> GND (E)
+bplace("R723", 35.729, 1.3, 180) # DAC_TAPTH (E) -> VTAP_TH (W, x 35.219 = phase iface x)
+bplace("R724", 35.729, 2.3, 0)   # VTAP_TH (W) -> GND (E)
+bplace("C709", 35.699, 3.3, 0)   # VTAP_TH (W) -> GND (E)
 bplace("U701", 34.0, 7.6, 0)     # VNEG_REF op-amp
 bplace("C720", 37.0, 6.65, 0)    # +2V5 at pin 5
 bplace("R731", 37.0, 8.55, 180)  # VREFP -> IN-
 bplace("C721", 31.0, 7.6, 0)     # GND | -2V5 at pin 2
 bplace("R732", 33.0, 10.3, 0)    # IN- -> VNEG_REF
 bplace("C722", 35.0, 10.3, 0)    # IN- | VNEG_REF
-bplace("D701", 38.0, 0.9, 0)     # LED
-bplace("R730", 38.0, 2.3, 0)     # LED resistor
+bplace("D701", 38.5, 0.9, 0)     # LED
+bplace("R730", 38.5, 2.3, 0)     # LED resistor
 bplace("JP701", 40.2, 10.4, 0)    # BOOT0 solder jumper
 bplace("R729", 37.6, 10.4, 0)    # BOOT0 pull-down
 bplace("C719", 41.9, 5.75, 0)    # NRST at U704.7
@@ -95,8 +96,8 @@ bplace("C717", 48.27, 6.2, 0, "B")     # VREFP 1u
 bplace("C716", 50.09, 7.25, 180, "B")  # VDDA 10n (pad 1 west, x 49.61)
 bplace("C715", 50.09, 6.2, 180, "B")   # VDDA 1u
 bplace("FB701", 50.09, 5.15, 0, "B")   # +3V3 (east) -> VDDA (west)
-bplace("R728", 45.2, 5.4, 90, "B")     # SDA pull-up
-bplace("R727", 46.2, 5.4, 90, "B")     # SCL pull-up
+bplace("R728", 46.6, 1.6, 270, "B")    # SDA pull-up, beside the SDA lane
+bplace("R727", 50.4, 1.6, 270, "B")    # SCL pull-up, beside the SCL lane
 bplace("R726", 17.149, 1.5, 90, "B")   # -2V5 -> VTAP_N (pad 2 on top)
 bplace("R725", 21.663, 1.5, 90, "B")   # +2V5 -> VTAP_P
 for r in REFS:
@@ -108,7 +109,8 @@ NX, NY = int(round(W / G)) + 1, int(round(H / G)) + 1
 CLR = 0.1
 LAYERS = ("F.Cu", "B.Cu")
 gx, gy = np.meshgrid(np.arange(NX) * G, np.arange(NY) * G, indexing="ij")
-inside = (gx <= W) & (gy <= HR)
+YMIN = 0.6                                  # nothing runs along the N edge (phase tap row): stubs only
+inside = (gx <= W) & (gy <= HR) & (gy >= YMIN)
 DIRS = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
 KEEP = [[], []]          # extra per-layer keep-outs: (x0, y0, x1, y1)
 CUR = [0]
@@ -182,7 +184,7 @@ def free_maps(code, w, clr=CLR):
         ok = (d >= w / 2 + clr + 0.015) & inside
         out.append(ok)
     via_ok = (dists[0] >= bl.VIA_D / 2 + CLR + 0.005) & (dists[1] >= bl.VIA_D / 2 + CLR + 0.005) & inside
-    via_ok &= (gy >= bl.VIA_D / 2 + 0.05) & (gy <= HR - 0.1)
+    via_ok &= (gy >= YMIN + 0.3) & (gy <= HR - 0.1)
     for t in blk.b.GetTracks():                 # hole-to-hole >= 0.25 mm also to vias of the same net
         if isinstance(t, pcbnew.PCB_VIA):
             vx, vy = blk.loc(t.GetPosition())
@@ -244,7 +246,7 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, clr=CLR):
         if d[0] == "EDGE":
             _, side, ln, a0, a1 = d
             li = LAYERS.index(ln)
-            j = int(round((w / 2 + 0.05) / G + 0.5))
+            j = int(round(YMIN / G))
             for i in range(int(round(a0 / G)), int(round(a1 / G)) + 1):
                 tgt[li].add((i, j))
                 tax[(li, i, j)] = {6}
@@ -296,7 +298,7 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, clr=CLR):
             goal = st
             break
         n += 1
-        if n > 1500000:
+        if n > 4000000:
             break
         in_src = (i, j) in scells and li in slays
         for nd in (range(8) if d < 0 else (d, (d + 1) % 8, (d - 1) % 8)):
@@ -555,7 +557,117 @@ for pin in ("6", "16"):                 # north row GND: via pair above the pin
     T("GND", 0.4, [(p[0] - 0.55, 5.45), (p[0] + 0.55, 5.45)])
     VV("GND", (p[0] - 0.55, 5.45), (p[0] + 0.55, 5.45))
 for pin, r in (("2", "R511"), ("4", "R512")):
-    T(NL.net_of("J501", pin), 0.2, [pd("J501", pin), pd(r, "1")])
+    T(NL.net_of("J501", pin), 0.2, [pd("J501", pin), pd(r, "1")], "B.Cu")
+
+# ============================================================ NPTH keep-outs (J501 locating pegs) for the router
+for pp in blk.fps["J501"].Pads():
+    if pp.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH:
+        x_, y_ = blk.loc(pp.GetPosition())
+        r_ = pcbnew.ToMM(pp.GetDrillSize()[0]) / 2 + 0.3
+        for li in range(2):
+            KEEP[li].append((x_ - r_, y_ - r_, x_ + r_, y_ + r_))
+# silkscreen: J501 outline clipped around its NPTH pegs, U704 pin-1 wedge (sits on C713) dropped (F.Fab keeps it)
+for ref in ("J501", "U704"):
+    fp = blk.fps[ref]
+    for gi in list(fp.GraphicalItems()):
+        if gi.GetLayer() == pcbnew.F_SilkS and gi.GetClass() != "PCB_FP_TEXT" and gi.GetClass() != "PCB_TEXT":
+            if ref == "U704" and gi.GetShape() != pcbnew.SHAPE_T_POLY:
+                continue
+            fp.Remove(gi)
+sx0, sx1, sy0, sy1 = JX - 13.955, JX + 13.955, JY - 2.8, JY + 2.8
+for seg in (((sx0, sy0), (2.3, sy0)), ((6.2, sy0), (sx1, sy0)), ((sx0, sy1), (23.8, sy1)), ((27.7, sy1), (sx1, sy1)),
+            ((sx0, sy0), (sx0, sy1)), ((sx1, sy0), (sx1, sy1))):
+    blk.line(seg[0][0], seg[0][1], seg[1][0], seg[1][1], "F.SilkS", 0.12)
+
+
+# ============================================================ supply via pairs on axis (no bends)
+def tie2(ref, num, d=0.75, w=0.3):
+    """pad -> via A -> via B straight along the part axis (outward); falls back to tie()"""
+    p = padobj(ref, num)
+    net = p.GetNetname()
+    px, py = blk.loc(p.GetPosition())
+    ox, oy = blk.loc(p.GetParent().GetPosition())
+    ux, uy = (1.0 if px > ox else -1.0, 0.0) if abs(px - ox) >= abs(py - oy) else (0.0, 1.0 if py > oy else -1.0)
+    _, vok, _ = free_maps(netcode(net), w)
+    for d0 in (0.6, 0.7, 0.8, 0.9):
+        A = (round(px + ux * d0, 3), round(py + uy * d0, 3))
+        B = (round(A[0] + ux * d, 3), round(A[1] + uy * d, 3))
+        ia, ja, ib, jb = [int(round(v / G)) for v in (A[0], A[1], B[0], B[1])]
+        if all(0 <= q < n for q, n in ((ia, NX), (ib, NX), (ja, NY), (jb, NY))) and vok[ia, ja] and vok[ib, jb]:
+            lay = "B.Cu" if p.IsOnLayer(pcbnew.B_Cu) and not p.IsOnLayer(pcbnew.F_Cu) else "F.Cu"
+            blk.track(net, w, [(px, py), B], lay)
+            blk.via(A[0], A[1], net)
+            blk.via(B[0], B[1], net)
+            return True
+    print("  tie2 fallback", ref, num)
+    return tie(ref, num, pair=True)
+
+
+# R725 / R726 (0 R VTAP links, B.Cu): supply side to a via pair beside the part, clear of the JTAG verticals
+for ref, net, xv in (("R726", "-2V5", 16.3), ("R725", "+2V5", 22.45)):
+    q = pd(ref, "@" + net)
+    T(net, 0.4, [q, (xv, q[1])], "B.Cu")
+    VV(net, (xv, q[1]), (xv, q[1] - 0.75))
+    T(net, 0.4, [(xv, q[1] - 0.75), (xv, q[1] - 0.12)], "B.Cu")     # ends inside the first via (no joint)
+
+# ============================================================ MCU bus J501 -> U704 (hand-drawn: F.Cu lanes above J501, B.Cu east of x 25.6)
+LANE = [("/HOST_RX", ("R511", "2"), 2.9), ("/HOST_TX", ("R512", "2"), 3.3), ("/UC_SWDIO", ("J501", "8"), 3.7),
+        ("/UC_SWCLK", ("J501", "10"), 4.1), ("/DBG1", ("J501", "12"), 4.5), ("/UC_NRST", ("J501", "14"), 4.9)]
+XH = 40.4                                   # hand-over to the router (B.Cu lane ends)
+LANE_END = {}
+for k, (net, (ref, pn), y) in enumerate(LANE):
+    q = pd(ref, pn)
+    xv = 22.6 + 0.6 * (k % 2)
+    if ref.startswith("R"):                 # resistor on B: B up to a via on the lane, then F
+        VV(net, (q[0], y))
+        T(net, WS, [q, (q[0], y)], "B.Cu")
+        T(net, WS, [(q[0], y), (xv, y)], "F.Cu")
+    else:
+        T(net, WS, [q, (q[0], y), (xv, y)], "F.Cu")
+    VV(net, (xv, y))
+    T(net, WS, [(xv, y), (XH, y)], "B.Cu")
+    LANE_END[net] = ("PT", XH, y, "B.Cu", (0, 1, 7))
+
+# ============================================================ I2C pull-ups beside their B.Cu lanes
+for ref, pin in (("R728", "44"), ("R727", "39")):
+    xl = VIA_AT[pin][0]
+    a_, b_ = pd(ref, "@+3V3"), pd(ref, "@" + NL.net_of("U704", pin))
+    T(NL.net_of("U704", pin), WS, [b_, (xl, b_[1])], "B.Cu")
+    T("+3V3", 0.3, [a_, (a_[0], 0.6)], "B.Cu")
+    VV("+3V3", (a_[0], 0.6))
+
+# ============================================================ divider columns (hand-drawn) and their N-edge interfaces
+c = lambda r, n: pd(r, n)
+T("/VBIAS_A", WS, [c("R733", "2"), c("R734", "1")])
+T("/mcu_if/DAC_BIAS_K", WS, [c("R735", "1"), c("R736", "1")])
+T("/ADC_REF_MID", WS, [c("R703", "2"), c("R704", "1"), c("C702", "1")])
+T("/VTAP_TH", 0.25, [c("R723", "2"), c("R724", "1"), c("C709", "1")])
+q = c("R734", "2")
+T("-2V5", 0.3, [q, (29.3, q[1])])
+VV("-2V5", (29.3, q[1]))
+IFX = {}
+q = c("R733", "2")                                    # VBIAS_A: west on F, via, B stub
+T("/VBIAS_A", WS, [q, (23.9, q[1])])
+VV("/VBIAS_A", (23.9, q[1]))
+T("/VBIAS_A", WS, [(23.9, q[1]), (23.9, 0.0)], "B.Cu")
+IFX["/VBIAS_A"] = (23.9, "R733 / R734 divider -> sampler")
+q = c("R735", "2")                                    # VBIAS_K
+T("/VBIAS_K", WS, [q, (25.6, q[1]), (24.6, q[1] - 1.0)])
+VV("/VBIAS_K", (24.6, q[1] - 1.0))
+T("/VBIAS_K", WS, [(24.6, q[1] - 1.0), (24.6, 0.0)], "B.Cu")
+IFX["/VBIAS_K"] = (24.6, "R735 / R736 divider -> sampler")
+q = c("R703", "2")                                    # ADC_REF_MID
+T("/ADC_REF_MID", WS, [q, (29.3, q[1])])
+VV("/ADC_REF_MID", (29.3, q[1]))
+T("/ADC_REF_MID", WS, [(29.3, q[1]), (29.3, 0.0)], "B.Cu")
+IFX["/ADC_REF_MID"] = (29.3, "R703 / R704 / C702 -> U202")
+q = c("R723", "2")                                    # VTAP_TH
+T("/VTAP_TH", 0.25, [q, (q[0], 0.55)])
+VV("/VTAP_TH", (q[0], 0.55))
+T("/VTAP_TH", 0.25, [(q[0], 0.55), (q[0], 0.0)], "B.Cu")
+IFX["/VTAP_TH"] = (q[0], "R723 / R724 / C709 -> R380 / R381 (phase)")
+for n_, (x_, note_) in IFX.items():
+    blk.iface(n_, x_, 0.0, "B.Cu", "N", "slow", 0.25 if "TAP" in n_ else WS, note_)
 
 # ============================================================ jobs
 JOBS = []
@@ -567,7 +679,7 @@ def job(name, fn):
 
 V = lambda pin: ("PT", VIA_AT[pin][0], VIA_AT[pin][1], "B.Cu")
 # west analog / trigger group: ifaces east of the JTAG pins (board x 50..56), B.Cu
-AW = (22.6, 29.4)
+AW = (31.8, 34.4)
 job("L_vofs", lambda: edge("/VOFS", V("13"), *AW, note="U704.13 DAC -> R119 (input block)"))
 job("L_vneg", lambda: edge("/VNEG_REF", ("R732", "@VNEG_REF"), *AW, note="U701 out -> R123 (input block)"))
 job("L_dactrig", lambda: edge("/DAC_TRIG", ("U704", "12"), *AW, note="U704.12 DAC -> R383 (phase)"))
@@ -581,11 +693,12 @@ job("L_biasa", lambda: route("/mcu_if/DAC_BIAS_A", V("14"), [("R733", "@DAC_BIAS
 job("u701v5", lambda: route("+2V5", ("U701", "5"), [("C720", "@+2V5")], 0.3))
 job("u701v2", lambda: route("-2V5", ("U701", "2"), [("C721", "@-2V5")], 0.3))
 job("u701g", lambda: tie("U701", "3", 0.9, 0.3))
-for ref, num, pair in (("C714", "@GND", True), ("C714", "@+3V3", True), ("C720", "@GND", False), ("C720", "@+2V5", True),
-                       ("C721", "@GND", False), ("C721", "@-2V5", False), ("R725", "@+2V5", True), ("R726", "@-2V5", False),
-                       ("R704", "@GND", False), ("C702", "@GND", False), ("R736", "@GND", False), ("R724", "@GND", False),
-                       ("C709", "@GND", False), ("C719", "@GND", False), ("R729", "@GND", False), ("R734", "@-2V5", False),
-                       ("R727", "@+3V3", False), ("R728", "@+3V3", False)):
+for ref, num in (("C714", "@GND"), ("C714", "@+3V3"), ("C720", "@GND"), ("C720", "@+2V5"), ("C721", "@GND"), ("C721", "@-2V5")):
+    job("tie2" + ref + num, lambda ref=ref, num=num: tie2(ref, num))
+for ref, num, pair in ( 
+                       
+                        ("C719", "@GND", False), ("R729", "@GND", False), 
+                       ):
     job("tie" + ref + num, lambda ref=ref, num=num, pair=pair: tie(ref, num, pair=pair))
 for ref, net in (("R725", "/VTAP_P"), ("R726", "/VTAP_N")):
     def f(ref=ref, net=net):
@@ -598,12 +711,6 @@ job("u701fb", lambda: route("Net-(U701--)", ("R732", "@Net-(U701--)"), [("U701",
 job("u701fbc", lambda: route("Net-(U701--)", ("C722", "@Net-(U701--)"), [("R732", "@Net-(U701--)")]))
 job("u701out", lambda: route("/VNEG_REF", ("U701", "1"), [("R732", "@VNEG_REF")]))
 job("u701outc", lambda: route("/VNEG_REF", ("C722", "@VNEG_REF"), [("R732", "@VNEG_REF")]))
-job("refmid", lambda: route("/ADC_REF_MID", ("R704", "@ADC_REF_MID"), [("R703", "@ADC_REF_MID")]))
-job("refmidc", lambda: route("/ADC_REF_MID", ("C702", "@ADC_REF_MID"), [("R704", "@ADC_REF_MID")]))
-job("biasa", lambda: route("/VBIAS_A", ("R734", "@VBIAS_A"), [("R733", "@VBIAS_A")]))
-job("biask", lambda: route("/mcu_if/DAC_BIAS_K", ("R736", "@DAC_BIAS_K"), [("R735", "@DAC_BIAS_K")]))
-job("vth", lambda: route("/VTAP_TH", ("R724", "@VTAP_TH"), [("R723", "@VTAP_TH")]))
-job("vthc", lambda: route("/VTAP_TH", ("C709", "@VTAP_TH"), [("R724", "@VTAP_TH")]))
 job("dactapth", lambda: route("/mcu_if/DAC_TAPTH", ("U704", "10"), [("R723", "@DAC_TAPTH")]))
 job("led", lambda: route("/mcu_if/LED", ("U704", "2"), [("R730", "@LED")]))
 job("ledk", lambda: route("Net-(D701-K)", ("R730", "@Net-(D701-K)"), [("D701", "1")]))
@@ -612,25 +719,19 @@ job("boot0", lambda: route("/mcu_if/BOOT0", V("45"), [("JP701", "1")]))
 job("boot0j", lambda: route("/mcu_if/BOOT0", ("R729", "@BOOT0"), [("JP701", "1")]))
 job("boot0v", lambda: tie("JP701", "2"))
 job("nrstc", lambda: route("/UC_NRST", ("U704", "7"), [("C719", "@UC_NRST")]))
-job("scl", lambda: route("/I2C_SCL", V("39") + ((1, 2, 3),), [("R727", "@I2C_SCL")]))
-job("sda", lambda: route("/I2C_SDA", V("44") + ((1, 2, 3),), [("R728", "@I2C_SDA")]))
 # U704 <-> J501 (inside the block)
-job("j_nrst", lambda: route("/UC_NRST", ("J501", "14"), [("C719", "@UC_NRST")]))
-job("j_swdio", lambda: route("/UC_SWDIO", V("37"), [("J501", "8")]))
-job("j_swclk", lambda: route("/UC_SWCLK", V("38"), [("J501", "10")]))
-job("j_dbg1", lambda: route("/DBG1", V("46"), [("J501", "12")]))
-job("j_rx", lambda: route("/HOST_RX", ("U704", "32"), [("R511", "@HOST_RX")]))
-job("j_tx", lambda: route("/HOST_TX", ("U704", "31"), [("R512", "@HOST_TX")]))
+job("j_nrst", lambda: route("/UC_NRST", LANE_END["/UC_NRST"], [("C719", "@UC_NRST")]))
+job("j_swdio", lambda: route("/UC_SWDIO", LANE_END["/UC_SWDIO"], [("VIA",) + VIA_AT["37"]]))
+job("j_swclk", lambda: route("/UC_SWCLK", LANE_END["/UC_SWCLK"], [("VIA",) + VIA_AT["38"]]))
+job("j_dbg1", lambda: route("/DBG1", LANE_END["/DBG1"], [("VIA",) + VIA_AT["46"]]))
+job("j_rx", lambda: route("/HOST_RX", LANE_END["/HOST_RX"], [("U704", "32")]))
+job("j_tx", lambda: route("/HOST_TX", LANE_END["/HOST_TX"], [("U704", "31")]))
 # to the N edge: fpga
-job("mclk", lambda: edge("/MCU_CLK", ("U704", "5"), 39.0, 56.0, note="U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"))
+job("mclk", lambda: edge("/MCU_CLK", ("U704", "5"), 37.0, 44.6, note="U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"))
 job("adctrig", lambda: edge("/ADC_TRIG", ("U704", "25"), 51.6, 66.0, note="U704.25 PB11 <- U501.41"))
 job("done", lambda: edge("/FPGA_DONE", V("16"), 51.6, 66.0, note="U704.16 <- U501.46 (R502 pull-up)"))
 job("reconf", lambda: edge("/FPGA_RECONFIG", V("18"), 51.6, 66.0, note="U704.18 -> U501.48 (R501 pull-up)"))
 job("spics", lambda: edge("/SPI_CS", V("22"), 51.6, 66.0, note="U704.22 -> U501.31"))
-job("refmide", lambda: edge("/ADC_REF_MID", ("R703", "@ADC_REF_MID"), *AW, note="R703 / R704 / C702 -> U202"))
-job("vbiask", lambda: edge("/VBIAS_K", ("R735", "@VBIAS_K"), *AW, note="R735 divider -> sampler"))
-job("vbiasa", lambda: edge("/VBIAS_A", ("R733", "@VBIAS_A"), *AW, note="R733 / R734 divider -> sampler"))
-job("vthe", lambda: edge("/VTAP_TH", ("R723", "@VTAP_TH"), 35.219, 35.219, w=0.25, note="R723 / R724 / C709 -> R380 / R381"))
 
 PRIO = json.load(open(os.path.join(HERE, "prio.json"))) if os.path.exists(os.path.join(HERE, "prio.json")) and os.path.getsize(os.path.join(HERE, "prio.json")) else []
 order = [j for p in PRIO for j in JOBS if j[0] == p] + [j for j in JOBS if j[0] not in PRIO]
