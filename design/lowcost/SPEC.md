@@ -86,3 +86,7 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
 11. Programming header: Würth WR-WST 490107671612 with the yanartas sensing board J3 pinout (J501, footprint only).
 12. STM32G474 on board (user decision, 21 Nov 2026): STM32G474CBT6 LQFP-48 (U704) replaces the MCU header J701; USB FS
     on the USB-C receptacle, SWD/UART on J501. The 80 USD budget now includes the MCU. Pin plan: `kicad/README.md`.
+13. **Control voltages without difference amplifiers** (user instruction, 21 Nov 2026: "generate what can be generated in
+    software directly and only use op-amps where necessary"): DAC pins drive passive networks (TRIG_LEVEL = DAC + -2V5 sum
+    at the TLV3801, VBIAS_A = DAC/-2V5 divider, VBIAS_K = DAC via 5.1k, VOFS = DAC into the servo node); the only op-amp is
+    U701 TLV9001 making VNEG_REF = -0.68 x VREF+ for the VOFS mid-scale (offset drift). Details: `kicad/README.md`.

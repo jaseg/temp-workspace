@@ -171,8 +171,8 @@ def main():
             "strobe; 47 pF rails recover in 47 ns.\n"
             "Strobe kick: 174 mVpp at bridge input,\n"
             "113 mVpp at BUF802 pin, 19 mVpp trigger end.", P(40, 150), size=T)
-    sh.text("BIAS (mcu_if): VBIAS_A = -1.00 V (-0.4..-1.6 V),\n"
-            "VBIAS_K = +1.00 V (+0.4..+1.6 V): reverse-biases the\n"
+    sh.text("BIAS (mcu_if): VBIAS_A -0.50..-1.46 V (DAC/-2V5 divider,\n"
+            "2.9k), VBIAS_K +0.2..+2.7 V (DAC via 5.1k): reverse-biases the\n"
             "bridge between strobes. 1 k x 47 pF: tau 47 ns.\n"
             "10 nF at the cold end of each 1 k feed.", P(108, 36), size=T)
     sh.text("HOLD NODE: C205 2.2 pF C0G + U201 Cin (1 pF CM) + pad.\n"

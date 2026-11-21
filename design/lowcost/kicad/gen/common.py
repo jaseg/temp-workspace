@@ -18,7 +18,7 @@ MCU_DBG_FPGA = [(n, a) for n, a, _b in MCU_DBG]      # shapes as seen from fpga_
 MCU_DBG_MCU = [(n, b) for n, _a, b in MCU_DBG]       # shapes as seen from mcu_if
 SHEETS = {
     "input": ("Input: 5:1 divider, BUF802 + OPA197 servo", 100, 2,
-              [("VOFS", "input")],
+              [("VOFS", "input"), ("VNEG_REF", "input")],
               [("BUF_OUT_S", "output"), ("BUF_OUT_T", "output"), ("EXT_CLK", "output")]),
     "sampler": ("Sampler: diode bridge, hold, TPH2501 hold amp, level shift", 200, 3,
                 [("BUF_OUT_S", "input"), ("STRB_A", "input"), ("STRB_K", "input"), ("VBIAS_A", "input"),
@@ -26,7 +26,7 @@ SHEETS = {
                 [("ADC_IN", "output")]),
     "trigger_phase": ("Trigger + phase recovery: TLV3801, 16-tap line, COS3502", 300, 4,
                       [("BUF_OUT_T", "input"), ("EXT_CLK", "input"), ("TRIG_SEL", "input"),
-                       ("TRIG_LEVEL", "input"), ("PSTRB_A", "input"), ("PSTRB_K", "input"), ("VTAP_P", "input"),
+                       ("DAC_TRIG", "input"), ("PSTRB_A", "input"), ("PSTRB_K", "input"), ("VTAP_P", "input"),
                        ("VTAP_N", "input"), ("VTAP_TH", "input")],
                       [("COARSE", "output")] + [(t, "output") for t in TAPS]),
     "strobe": ("Strobe drivers: sampler (2x TRF37D73), phase (TRF + GVA-84+)",
@@ -45,12 +45,12 @@ SHEETS = {
                    + MCU_DBG_FPGA),
     "power": ("Power: USB-C 5 V in, +3V3, +1V2, +5V, -5V, +2V5, -2V5", 600, 7, [],
               [("USB_DP", "bidirectional"), ("USB_DM", "bidirectional")]),
-    "mcu_if": ("MCU: STM32G474CBT6, DAC scaling", 700, 8,
+    "mcu_if": ("MCU: STM32G474CBT6, control voltages", 700, 8,
                [("ADC_IN", "input"), ("ADC_TRIG", "input"), ("MCU_CLK", "input"), ("FPGA_DONE", "input"),
                 ("SPI_MISO", "input"), None, ("SPI_SCK", "output"), ("SPI_MOSI", "output"), ("SPI_CS", "output"),
                 ("FPGA_RECONFIG", "output"), ("I2C_SCL", "output"), ("I2C_SDA", "bidirectional"), None]
                + MCU_DBG_MCU + [None, ("USB_DP", "bidirectional"), ("USB_DM", "bidirectional")],
-               [("ADC_REF_MID", "output"), ("VOFS", "output"), ("TRIG_LEVEL", "output"), ("TRIG_SEL", "output"),
+               [("ADC_REF_MID", "output"), ("VOFS", "output"), ("VNEG_REF", "output"), ("DAC_TRIG", "output"), ("TRIG_SEL", "output"),
                 ("VBIAS_A", "output"), ("VBIAS_K", "output"), ("VTAP_P", "output"), ("VTAP_N", "output"),
                 ("VTAP_TH", "output")]),
 }

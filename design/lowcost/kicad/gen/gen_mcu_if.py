@@ -1,23 +1,31 @@
 """mcu_if.kicad_sch: STM32G474CBT6 microcontroller (on board since 21 Nov 2026; it replaced the 2x13 header
-J701 to an external STM32 board), DAC scaling stages (difference amplifiers on +/-2.5 V), ADC reference divider,
-tap threshold divider, I2C pull-ups. SWD, NRST, DBG1 and the UART (HOST_RX / HOST_TX, sensing-board naming: the
-MCU is the host, HOST_RX = MCU RX) go to the programming header J501 on fpga_clock; USB FS (PA11/PA12) to the
-USB-C receptacle on the power sheet. Pin plan: PINS below and kicad/README.md.
+J701 to an external STM32 board), control-voltage networks, ADC reference divider, tap threshold divider,
+I2C pull-ups. SWD, NRST, DBG1 and the UART (HOST_RX / HOST_TX, sensing-board naming: the MCU is the host,
+HOST_RX = MCU RX) go to the programming header J501 on fpga_clock; USB FS (PA11/PA12) to the USB-C receptacle
+on the power sheet. Pin plan: PINS below and kicad/README.md.
 
-DAC plan (docs/research/adc.md, "Analog control voltages"): PA4 DAC1_OUT1 -> TRIG_LEVEL, PA5 DAC1_OUT2 ->
-VOFS, PA6 DAC2_OUT1 -> VTAP_TH, PA2 (DAC3_CH1 via OPAMP1) -> VBIAS_A, PB1 (DAC3_CH2 via OPAMP3) -> VBIAS_K.
-Each bipolar output is a difference amplifier: Vout = G (Vdac - VMID) + Vr, VMID = VREF+/2 = 1.45 V
-(buffered), G = R2/R1, Vr set by the Thevenin divider on the + input (Ra to a rail, Rb to GND, Ra||Rb = R2).
-DAC range 0.25..2.65 V (buffer on) -> Vdac - VMID = +/-1.2 V."""
+Control voltages (21 Nov 2026 simplification: the three TP2272 difference-amplifier packages U701-U703 and the
+VMID buffer are gone; the DAC outputs drive passive networks, one op-amp section remains):
+  PA4 DAC1_OUT1 -> DAC_TRIG (raw 0.2..2.7 V) -> passive sum with -2V5 at the TLV3801 (trigger_phase).
+  PA5 DAC1_OUT2 -> VOFS (raw 0.2..2.7 V) -> Rofs into the OPA197 servo summing node (input sheet);
+        mid-scale cancelled by Rmid from VNEG_REF.
+  PA6 DAC2_OUT1 -> DAC_BIAS_A -> R733 7.5k / R734 4.7k divider to -2V5 -> VBIAS_A (-1.46..-0.50 V).
+  PB1 OPAMP3_VOUT (DAC3_CH2 follower) -> DAC_BIAS_K (100k R736 pull-down) -> R735 5.1k -> VBIAS_K
+        (+0.2..+2.7 V; 5.1k isolates the 10 nF on the sampler sheet, DAC/OPAMP CL <= 50 pF).
+  PA2 OPAMP1_VOUT (DAC3_CH1 follower) -> DAC_TAPTH -> 30k/1k divider -> VTAP_TH.
+  U701 TLV9001 on +/-2V5: VNEG_REF = -VREF+ x 10.0k/14.7k = -1.973 V (ratiometric to the DAC reference, so the
+        VOFS mid-scale cancellation does not drift with the -2V5 regulator); drives only Rmid (34.0k)."""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from schlib import g
 from common import new_sheet, hier_pins, R, C, decoupler
 
-OPAMP = "Amplifier_Operational:LMV358"   # standard dual pinout (1 OUTA, 2 -A, 3 +A, 4 V-, 5 +B, 6 -B, 7 OUTB, 8 V+)
-OPA_FP = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
-OPA_F = {"Price": "0.50 USD (LCSC C39487549)", "MPN": "TP2272-SO1R (3PEAK), any RRIO dual, 5 V total supply",
-         "LCSC": "C39487549"}
+# U701: TLV9001IDBVR (TI, SOT-23-5, 1.8-5.5 V, RRIO, Vos 0.4 mV typ / 1.6 mV max, 0.6 uV/K). KiCad has no DBV
+# symbol for it; OPA197xDBV has the identical DBV pinout: 1 OUT, 2 V-, 3 +IN, 4 -IN, 5 V+.
+OPAMP = "Amplifier_Operational:OPA197xDBV"
+OPA_FP = "Package_TO_SOT_SMD:SOT-23-5"
+OPA_F = {"Price": "0.080 USD (LCSC C398363, 5+)", "MPN": "TLV9001IDBVR (TI), on +/-2V5 (5.0 V total, spec 1.8-5.5 V)",
+         "Note": "VNEG_REF inverter; pinout = OPA197 DBV"}
 
 # STM32G474CBT6 (LQFP-48) pin plan. Pin numbers: DS12288 LQFP48 pinout = KiCad MCU_ST_STM32G4:STM32G474CBTx.
 # (pin, port, net, how): how h = hierarchical label, l = local label, nc = NC flag
@@ -26,11 +34,11 @@ MCU_FP = "Package_QFP:LQFP-48_7x7mm_P0.5mm"
 PINS = [
     (8, "PA0", "ADC_IN", "h", "ADC12_IN1 (fast channel), sampler output"),
     (9, "PA1", None, "nc", "spare (ADC12_IN2)"),
-    (10, "PA2", "DAC_BIAS_A", "l", "OPAMP1_VOUT follower of DAC3_CH1 -> VBIAS_A stage"),
+    (10, "PA2", "DAC_TAPTH", "l", "OPAMP1_VOUT follower of DAC3_CH1 -> VTAP_TH divider"),
     (11, "PA3", None, "nc", "spare"),
-    (12, "PA4", "DAC_TRIG", "l", "DAC1_OUT1 -> TRIG_LEVEL stage"),
-    (13, "PA5", "DAC_OFS", "l", "DAC1_OUT2 -> VOFS stage"),
-    (14, "PA6", "DAC_TAPTH", "l", "DAC2_OUT1 -> VTAP_TH divider"),
+    (12, "PA4", "DAC_TRIG", "h", "DAC1_OUT1 -> TRIG_LEVEL sum at the TLV3801 (trigger_phase)"),
+    (13, "PA5", "VOFS", "h", "DAC1_OUT2 -> Rofs into the OPA197 servo node (input)"),
+    (14, "PA6", "DAC_BIAS_A", "l", "DAC2_OUT1 -> VBIAS_A divider to -2V5"),
     (15, "PA7", None, "nc", "spare"),
     (30, "PA8", None, "nc", "reserved: OPAMP5_VOUT (DAC4_CH2 follower, spare analog output)"),
     (31, "PA9", "HOST_TX", "h", "USART1_TX (AF7) -> 100R R512 -> J501 pin 4"),
@@ -47,7 +55,7 @@ PINS = [
     (3, "PC14", None, "nc", "spare"),
     (4, "PC15", None, "nc", "spare"),
     (16, "PB0", "FPGA_DONE", "h", "GPIO in (FPGA DONE)"),
-    (17, "PB1", "DAC_BIAS_K", "l", "OPAMP3_VOUT follower of DAC3_CH2 -> VBIAS_K stage"),
+    (17, "PB1", "DAC_BIAS_K", "l", "OPAMP3_VOUT follower of DAC3_CH2 -> 5.1k -> VBIAS_K"),
     (18, "PB2", "FPGA_RECONFIG", "h", "GPIO open-drain (FPGA RECONFIG_N)"),
     (40, "PB3", "SPI_SCK", "h", "SPI1_SCK (AF5), master"),
     (41, "PB4", "SPI_MISO", "h", "SPI1_MISO (AF5); UCPD dead-battery pull-down until disabled"),
@@ -66,134 +74,127 @@ PINS = [
 ]
 
 
-def diffamp(sh, u, x, y, dac, out, r1, r2, ra=None, rb=None, rail=None, note=""):
-    """Unit u (already placed at (x, y), rot 0) as difference amplifier."""
-    plus, minus, o = u["3"] if u.unit == 1 else u["5"], u["2"] if u.unit == 1 else u["6"], \
-        u["1"] if u.unit == 1 else u["7"]
-    N = (x - g(8), plus[1])
-    sh.wire(plus, N)
-    rin = R(sh, r1, (x - g(18), plus[1]), rot=90)           # DAC -> + (R1)
-    sh.wire(rin["2"], N)
-    sh.stub(rin, "1", dac)
-    if ra:                                                     # Thevenin divider for Vr
-        ra_ = R(sh, ra, (N[0], N[1] - g(5)))
-        sh.wire(ra_["2"], N)
-        sh.power(rail, ra_["1"], dy=-2.54)
-        rb_ = R(sh, rb, (N[0] - g(6), N[1] - g(5)))
-        sh.wire(rb_["2"], (rb_["2"][0], N[1]))
-        sh.power("GND", rb_["1"], dy=-2.54, rot=180)
-    else:
-        rg = R(sh, r2, (N[0], N[1] - g(5)))
-        sh.wire(rg["2"], N)
-        sh.power("GND", rg["1"], dy=-2.54, rot=180)
-    M = (x - g(8), minus[1])
-    sh.wire(minus, M)
-    rm = R(sh, r1, (x - g(18), minus[1]), rot=90)          # VMID -> - (R1)
-    sh.wire(rm["2"], M)
-    sh.stub(rm, "1", "VMID")
-    rf = R(sh, r2, (x, minus[1] + g(6)), rot=90)            # feedback R2
-    sh.path([M, (M[0], rf["1"][1]), rf["1"]])
-    X = o[0] + g(2)
-    sh.path([rf["2"], (X, rf["2"][1]), (X, o[1])])
-    E = (o[0] + g(6), o[1])
-    sh.wire(o, E)
-    sh.hlabel(out, E, "output")
-    if note:
-        sh.text(note, (x - g(22), minus[1] + g(8)), size=1.0)
-
-
-def opamp_power(sh, ref, at):
-    p = sh.add(OPAMP, ref, "TP2272", at, unit=3, fp=OPA_FP)
-    sh.stub(p, "8", "+2V5", kind="power")
-    sh.power("-2V5", p["4"], dy=5.08, rot=180)
-    return p
-
-
 def main():
     sh = new_sheet("mcu_if", comments=["STM32G474CBT6 on board (USB FS, SWD + UART on J501, SPI/I2C to FPGA/clock).",
-                                       "DAC scaling: difference amplifiers, TP2272 on +/-2.5 V."])
-    # VMID buffer and ADC_REF_MID divider
-    rt = R(sh, "10k", (g(90), g(30)))
-    sh.stub(rt, "1", "VREFP")
-    rbt = R(sh, "10k", (g(90), g(40)))
-    sh.wire(rt["2"], rbt["1"])
-    sh.gnd(rbt["2"])
-    u1 = sh.add(OPAMP, "U", "TP2272", (g(110), g(32)), unit=1, fp=OPA_FP, fields=OPA_F)
-    sh.path([rt["2"], (rt["2"][0] + g(4), rt["2"][1]),
-                                                               (rt["2"][0] + g(4), u1["3"][1]), u1["3"]])
-    sh.path([u1["2"], (u1["2"][0], u1["2"][1] + g(3)), (u1["1"][0] + g(2), u1["2"][1] + g(3)),
-             (u1["1"][0] + g(2), u1["1"][1])])
-    sh.wire(u1["1"], (u1["1"][0] + g(6), u1["1"][1]))
-    sh.label("VMID", (u1["1"][0] + g(6), u1["1"][1]))
-    c = C(sh, "100n", (g(122), g(37)))
-    sh.wire(c["1"], (c["1"][0], u1["1"][1]))
-    sh.gnd(c["2"])
-    sh.text("VMID = VREF+/2 = 1.45 V, buffered", (g(95), g(22)), size=1.0)
-    r3 = R(sh, "30k", (g(150), g(30)))
+                                       "Control voltages: DAC outputs into passive networks; U701 TLV9001 makes VNEG_REF."])
+    T = 1.0
+    # ---------------------------------------------------------------- ADC_REF_MID divider (unchanged R703/R704/C702)
+    r3 = R(sh, "30k", (g(150), g(30)), ref="R703")
     sh.stub(r3, "1", "VREFP")
-    r4 = R(sh, "10k", (g(150), g(40)))
+    r4 = R(sh, "10k", (g(150), g(40)), ref="R704")
     sh.wire(r3["2"], r4["1"])
     sh.gnd(r4["2"])
-    c = C(sh, "10n", (g(156), g(40)))
+    c = C(sh, "10n", (g(156), g(40)), ref="C702")
     sh.path([r3["2"], (c["1"][0], r3["2"][1]), c["1"]])
     sh.gnd(c["2"])
     sh.path([(c["1"][0], r3["2"][1]), (c["1"][0] + g(6), r3["2"][1])])
     sh.hlabel("ADC_REF_MID", (c["1"][0] + g(6), r3["2"][1]), "output")
     sh.text("ADC_REF_MID = VREF+ x 10k/40k = 0.725 V\n(level-shift reference on the sampler sheet)",
-            (g(145), g(20)), size=1.0)
+            (g(145), g(20)), size=T)
 
-    # difference amplifiers
-    u1b = sh.add(OPAMP, u1.ref, "TP2272", (g(120), g(75)), unit=2, fp=OPA_FP, fields=OPA_F)
-    diffamp(sh, u1b, g(120), g(75), "DAC_TRIG", "TRIG_LEVEL", "40.2k", "10k",
-            note="TRIG_LEVEL = 0.25 (Vdac - VMID): +/-0.30 V, 0.18 mV/LSB")
-    u2 = sh.add(OPAMP, "U", "TP2272", (g(185), g(75)), unit=1, fp=OPA_FP, fields=OPA_F)
-    diffamp(sh, u2, g(185), g(75), "DAC_OFS", "VOFS", "24.9k", "10k",
-            note="VOFS = 0.40 (Vdac - VMID): +/-0.48 V (into the OPA197 servo summing node)")
-    u2b = sh.add(OPAMP, u2.ref, "TP2272", (g(120), g(120)), unit=2, fp=OPA_FP, fields=OPA_F)
-    # bridge bias (sampler sheet): anode rail VBIAS_A NEGATIVE, cathode rail VBIAS_K POSITIVE (reverse bias,
-    # sim/strobe/bridge.py, sim/sampler/RESULT.md); G = 0.5 -> 0.4..1.6 V magnitude (strobe RESULT: 0.5..1.2 V)
-    diffamp(sh, u2b, g(120), g(120), "DAC_BIAS_A", "VBIAS_A", "20k", "10k", ra="24.9k", rb="16.5k",
-            rail="-2V5", note="VBIAS_A = -1.00 V + 0.5 (Vdac - VMID): -1.60..-0.40 V (anode rail)")
-    u3 = sh.add(OPAMP, "U", "TP2272", (g(185), g(120)), unit=1, fp=OPA_FP, fields=OPA_F)
-    diffamp(sh, u3, g(185), g(120), "DAC_BIAS_K", "VBIAS_K", "20k", "10k", ra="24.9k", rb="16.5k",
-            rail="+2V5", note="VBIAS_K = +1.00 V + 0.5 (Vdac - VMID): +0.40..+1.60 V (cathode rail)")
-    # spare section: follower to GND
-    u3b = sh.add(OPAMP, u3.ref, "TP2272", (g(250), g(120)), unit=2, fp=OPA_FP, fields=OPA_F)
-    sh.path([u3b["5"], (u3b["5"][0] - g(3), u3b["5"][1])])
-    sh.power("GND", (u3b["5"][0] - g(3), u3b["5"][1]), dy=g(8))
-    sh.path([u3b["6"], (u3b["6"][0], u3b["6"][1] + g(3)), (u3b["7"][0] + g(2), u3b["6"][1] + g(3)),
-             (u3b["7"][0] + g(2), u3b["7"][1]), u3b["7"]])
-    sh.text("U703B spare (follower, input grounded)", (g(240), g(132)), size=1.0)
-    for i, ref in enumerate([u1.ref, u2.ref, u3.ref]):
-        opamp_power(sh, ref, (g(250 + 12 * i), g(40)))
-    decoupler(sh, "+2V5", (g(245), g(68)), ("100n", "100n", "100n"))
-    decoupler(sh, "-2V5", (g(275), g(68)), ("100n", "100n", "100n"), gnd="GND")
+    # ---------------------------------------------------------------- VNEG_REF: U701 TLV9001 inverter from VREF+
+    x, y = g(120), g(80)
+    u = sh.add(OPAMP, "U701", "TLV9001IDBVR", (x, y), fp=OPA_FP, lcsc="C398363", fields=OPA_F)
+    plus, minus, o = u["3"], u["4"], u["1"]
+    sh.path([plus, (plus[0] - g(3), plus[1])])
+    sh.power("GND", (plus[0] - g(3), plus[1]), dy=-g(3), rot=180)
+    M = (minus[0] - g(4), minus[1])
+    sh.wire(minus, M)
+    rin = R(sh, "14.7k", (M[0] - g(6), M[1]), rot=90, ref="R731", fields={"Note": "0.1 % 25 ppm/K"})
+    sh.wire(rin["2"], M)
+    sh.stub(rin, "1", "VREFP")
+    X = o[0] + g(3)
+    yf, yc = minus[1] + g(10), minus[1] + g(15)
+    rf = R(sh, "10.0k", (x, yf), rot=90, ref="R732", lcsc="C25744", fields={"Note": "0.1 % 25 ppm/K"})
+    cf = C(sh, "100n", (x, yc), rot=90, ref="C722")
+    sh.path([M, (M[0], yc), cf["1"]])
+    sh.wire((M[0], yf), rf["1"])
+    sh.path([cf["2"], (X, yc), (X, o[1])])
+    sh.wire(rf["2"], (X, yf))
+    sh.wire(o, (X, o[1]))
+    E = (X + g(6), o[1])
+    sh.wire((X, o[1]), E)
+    sh.hlabel("VNEG_REF", E, "output")
+    sh.stub(u, "5", "+2V5", kind="power")
+    sh.power("-2V5", u["2"], dy=g(4))
+    cp = C(sh, "100n", (x + g(14), y - g(12)), ref="C720")
+    sh.power("+2V5", cp["1"], dy=-2.54)
+    sh.gnd(cp["2"])
+    cn = C(sh, "100n", (x + g(20), y - g(12)), ref="C721")
+    sh.power("GND", cn["1"], dy=-2.54, rot=180)
+    sh.power("-2V5", cn["2"], dy=5.08)
+    sh.text("VNEG_REF = -VREF+ x R732/R731 = -1.973 V, ratiometric to the DACs\n"
+            "(mid-scale of VOFS cancels independent of VREF+ and of -2V5).\n"
+            "Load: Rmid 34.0k on the input sheet only. C722 100n: 160 Hz.\n"
+            "U701 TLV9001IDBVR on +/-2V5; C720/C721 at its pins 5/2.\n"
+            "Reset: VREFBUF off (VREF+ ~0 V) -> VNEG_REF = 0 V.", (g(95), g(102)), size=T)
 
-    # VTAP_TH divider, VTAP_P/N rails
-    r5 = R(sh, "30k", (g(90), g(160)))
+    # ---------------------------------------------------------------- VBIAS_A: divider DAC -> -2V5 (no op-amp)
+    xa, ya = g(185), g(70)
+    ra = R(sh, "7.5k", (xa, ya), ref="R733", fields={"Note": "1 %"})
+    sh.stub(ra, "1", "DAC_BIAS_A")
+    rb = R(sh, "4.7k", (xa, ya + g(10)), ref="R734", lcsc="C25900", fields={"Note": "1 %"})
+    sh.wire(ra["2"], rb["1"])
+    sh.power("-2V5", rb["2"], dy=5.08)
+    N = (xa + g(10), ra["2"][1])
+    sh.wire(ra["2"], N)
+    sh.hlabel("VBIAS_A", N, "output")
+    sh.text("VBIAS_A = 0.385 x Vdac - 0.615 x 2.5 V (Thevenin 2.89k,\n"
+            "with 10 nF on the sampler sheet: 5.5 kHz):\n"
+            "DAC 0.2..2.7 V -> -1.46..-0.50 V, 0.27 mV/LSB.\n"
+            "Reset (PA6 high-Z, clamped ~-0.4 V): about -1.7 V = reverse bias.\n"
+            "DAC load 12.2k to -2V5 (<= 0.43 mA).", (g(170), g(52)), size=T)
+
+    # ---------------------------------------------------------------- VBIAS_K: DAC3_CH2 follower, isolation, pull-down
+    xk, yk = g(185), g(118)
+    rk = R(sh, "5.1k", (xk + g(6), yk), rot=90, ref="R735", lcsc="C25905", fields={"Note": "isolates 10 nF (DAC CL <= 50 pF)"})
+    K = (xk, yk)
+    sh.wire(K, rk["1"])
+    sh.wire((xk - g(6), yk), K)
+    sh.label("DAC_BIAS_K", (xk - g(6), yk), rot=180)
+    rpd = R(sh, "100k", (xk, yk + g(5)), ref="R736", lcsc="C25741", fields={"Note": "reset state: VBIAS_K = 0 V"})
+    sh.wire(K, rpd["1"])
+    sh.gnd(rpd["2"])
+    E = (rk["2"][0] + g(4), yk)
+    sh.wire(rk["2"], E)
+    sh.hlabel("VBIAS_K", E, "output")
+    sh.text("VBIAS_K = Vdac (DAC3_CH2 -> OPAMP3 follower -> PB1): +0.2..+2.7 V,\n"
+            "0.71 mV/LSB. R735 5.1k: DAC never sees the 10 nF; rectified\n"
+            "strobe current 4.3 uA x 6.1k = 26 mV (calibrated). Step <= 1 V at a time.\n"
+            "Reset: R736 100k -> 0 V.", (g(170), g(135)), size=T)
+
+    # ---------------------------------------------------------------- VTAP_TH divider (unchanged), VTAP_P/N rails
+    r5 = R(sh, "30k", (g(90), g(160)), ref="R723")
     sh.stub(r5, "1", "DAC_TAPTH")
-    r6 = R(sh, "1k", (g(90), g(170)))
+    r6 = R(sh, "1k", (g(90), g(170)), ref="R724")
     sh.wire(r5["2"], r6["1"])
     sh.gnd(r6["2"])
-    c = C(sh, "100n", (g(96), g(170)))
+    c = C(sh, "100n", (g(96), g(170)), ref="C709")
     sh.path([r5["2"], (c["1"][0], r5["2"][1]), c["1"]])
     sh.gnd(c["2"])
     sh.path([(c["1"][0], r5["2"][1]), (c["1"][0] + g(6), r5["2"][1])])
     sh.hlabel("VTAP_TH", (c["1"][0] + g(6), r5["2"][1]), "output")
-    sh.text("VTAP_TH = Vdac/31: 8..85 mV, 0.02 mV/LSB (phase RESULT: 0..+80 mV)", (g(80), g(150)), size=1.0)
+    sh.text("VTAP_TH = Vdac/31: 3..90 mV, 0.02 mV/LSB (phase RESULT: 0..+80 mV)", (g(80), g(150)), size=T)
     for k, (rail, net) in enumerate((("+2V5", "VTAP_P"), ("-2V5", "VTAP_N"))):
-        r = R(sh, "0", (g(140 + 20 * k), g(165)), rot=90, size="0603")
+        r = R(sh, "0", (g(140 + 20 * k), g(165)), rot=90, size="0603", ref=f"R{725 + k}")
         sh.stub(r, "1", rail, kind="power")
         sh.stub(r, "2", net, kind="hlabel", shape="output", length=g(3))
     sh.text("VTAP_P/N = +2V5/-2V5 (phase RESULT: 12.5 mA per rail, fixed).\n"
-            "0R links: replace by a DAC-driven stage if a trim turns out to be needed.", (g(135), g(150)), size=1.0)
+            "0R links: replace by a DAC-driven stage if a trim turns out to be needed.", (g(135), g(150)), size=T)
+
+    # DAC_TRIG / VOFS leave as raw DAC voltages (hierarchical labels at PA4 / PA5)
+    sh.text("DAC_TRIG (PA4) and VOFS (PA5) are raw DAC outputs (0.2..2.7 V):\n"
+            "summing networks at the TLV3801 (trigger_phase) and at the\n"
+            "OPA197 servo node (input). DAC1/DAC2 buffered: RL >= 5k, CL <= 50 pF.", (g(225), g(92)), size=T)
 
     # I2C pull-ups
     for k, net in enumerate(("I2C_SCL", "I2C_SDA")):
-        r = R(sh, "4.7k", (g(268 + 12 * k), g(160)))
+        r = R(sh, "4.7k", (g(268 + 12 * k), g(160)), ref=f"R{727 + k}")
         sh.power("+3V3", r["1"], dy=-2.54)
         sh.stub(r, "2", net)
-    sh.text("I2C pull-ups 4.7k (MS5351M at 0x60)", (g(262), g(150)), size=1.0)
+    sh.text("I2C pull-ups 4.7k (MS5351M at 0x60)", (g(262), g(150)), size=T)
+    # MCU part refs continue as before: U704, C710..C719, R729, R730, FB701, JP701, D701
+    sh._refn.update({"U": 3, "C": 9, "R": 28})
     mcu_section(sh)
     sh.save()
 

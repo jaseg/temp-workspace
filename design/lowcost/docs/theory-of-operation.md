@@ -73,9 +73,12 @@ pF capacitor at the divider tap cancels the integrator feed-through. The 50k tri
 gain (trim range about -8 % to +7.6 %); a +/-0.3 pF spread of the BUF802 input capacitance alone moves the HF gain by
 +/-4 %. Trimmed, the crossover is flat to -0.25 % ... +0.67 % from 1 Hz to 100 MHz.
 
-The simulated network took VOFS from 0-3.3 V and gave +/-2.5 V of input offset. The schematic takes the bipolar VOFS
-(+/-0.48 V) from mcu_if, drops the centring resistor and recomputes Rofs (14.3k) and Rf2 (22.1k + RV101): OUT offset =
--0.70 x VOFS = +/-0.33 V, i.e. +/-1.7 V at the input. This recomputation is arithmetic, not simulated.
+VOFS is the raw STM32 DAC1_OUT2 (0.2-2.7 V) through Rofs 24.9k into the servo summing node; the mid-scale is
+cancelled by Rmid 34.0k from VNEG_REF (-1.973 V, -0.680 x VREF+, made by the one remaining op-amp U701 on mcu_if), and
+Rf2 = 22.1k + RV101 keeps the LF gain at 0.200. Simulated (`sim/input`, 21 Nov 2026): VOFS 0.2 / 1.45 / 2.7 V gives
++0.500 / -0.002 / -0.504 V at the BUF802 output, i.e. +/-2.5 V at the input; trim range -8.1 % ... +7.6 %; flatness
+unchanged. VNEG_REF is ratiometric to the DAC reference, so the mid-scale offset does not move with VREF+ or the -2V5
+regulator.
 
 CLH/CLL = +/-1.5 V limit the BUF802 output and so the bridge input. Protection is the BUF802's internal clamps; Ctop
 limits the current. Recovery from a +20 V overload takes about 50 us (servo wind-up).
@@ -87,7 +90,7 @@ in the trigger leg can take a ferrite or 100 ohm against strobe kick-out.
 ## 3. Sampler and hold chain
 
 The bridge is two BAT15-04W (four diodes). The strobe balun drives the anode rail STRB_A and the cathode rail STRB_K
-through 47 pF C0G and 24.9 ohm each; VBIAS_A (-1 V) and VBIAS_K (+1 V) reverse-bias the bridge through 1 k. A strobe
+through 47 pF C0G and 24.9 ohm each; VBIAS_A (about -1 V) and VBIAS_K (about +1 V) reverse-bias the bridge through 1 k. A strobe
 pulse forward-biases all four diodes for about 84 ps and the input charges the 2.2 pF hold capacitor. The hold node
 drives U201 (TPH2501, non-inverting, G = +3, 1.00 k / 499 ohm, +/-2.5 V). U202 (TPH2501 on 3.3 V) inverts and shifts:
 Vadc = 1.45 V - U201out, giving 0.41-2.49 V at PA0 for +/-0.5 V at the bridge. 33 ohm + 220 pF C0G at the pin absorb
@@ -133,7 +136,7 @@ JLC04161H-7628); the sampler layout fragment draws it at 13.207 mm.
 
 **Bias adjustment.** The sampler bridge only conducts if the strobe overcomes the reverse bias. At +/-1 V bias it
 stops at about -35 % strobe amplitude; a -40 % strobe still works at +/-0.6 V (gain 0.70, 93 %). VBIAS_A and VBIAS_K
-are therefore DAC-driven, each 0.4-1.6 V in magnitude, and set at calibration so that the efficiency is high and the
+are therefore DAC-driven (VBIAS_A -0.50 ... -1.46 V, VBIAS_K +0.2 ... +2.7 V), and set at calibration so that the efficiency is high and the
 input range (bias limits it to about +/-0.4 V at +/-0.6 V) is sufficient.
 
 ## 5. Trigger path and phase recovery
@@ -228,16 +231,22 @@ COS3502 and the readout allow. Snapshot reduction, coarse/fine combination and t
 fabric (1152 LUT; the fit is not checked).
 
 **MCU (STM32G474CBT6, LQFP-48, on board, U704).** ADC12_IN1 on PA0, 6.5-cycle sampling (108 ns) at 60 MHz with the synchronous ADC
-clock, VREFBUF 2.9 V, triggered by ADC_TRIG; DMA into SRAM. Five DAC outputs, scaled by TP2272 difference amplifiers
-on +/-2.5 V around VMID = VREF+/2:
+clock, VREFBUF 2.9 V, triggered by ADC_TRIG; DMA into SRAM. Five DAC outputs (since 21 Nov 2026 without difference
+amplifiers: the DACs drive passive networks, and one op-amp, U701 TLV9001, makes VNEG_REF = -0.680 x VREF+ for the
+offset network only). Vdac usable 0.2-2.7 V on the buffered pins:
 
-| DAC | Net | Range |
-|---|---|---|
-| PA4 DAC1_OUT1 | TRIG_LEVEL = 0.25 (Vdac - VMID) | +/-0.30 V |
-| PA5 DAC1_OUT2 | VOFS = 0.40 (Vdac - VMID) | +/-0.48 V |
-| PA6 DAC2_OUT1 | VTAP_TH = Vdac / 31 | 8-85 mV |
-| PA2 OPAMP1 (DAC3_CH1) | VBIAS_A = -1.0 V + 0.5 (Vdac - VMID) | -0.4 ... -1.6 V |
-| PB1 OPAMP3 (DAC3_CH2) | VBIAS_K = +1.0 V + 0.5 (Vdac - VMID) | +0.4 ... +1.6 V |
+| DAC | Network | Net | Range, resolution |
+|---|---|---|---|
+| PA4 DAC1_OUT1 | 5.1k from DAC, 8.87k from -2V5, 2.0k shunt, 10 nF at the TLV3801 pin | TRIG_LEVEL = 0.242 Vdac - 0.139 x 2.5 V | -0.30 ... +0.31 V, 0.17 mV/LSB |
+| PA5 DAC1_OUT2 | Rofs 24.9k into the servo node, Rmid 34.0k from VNEG_REF | VOFS (raw DAC) | +/-0.50 V at OUT = +/-2.5 V input, 1.4 mV/LSB at the input |
+| PA2 OPAMP1 (DAC3_CH1) | 30k / 1k divider, 100 nF | VTAP_TH = Vdac / 31 | 3-90 mV, 0.02 mV/LSB |
+| PA6 DAC2_OUT1 | 7.5k from DAC, 4.7k to -2V5 | VBIAS_A = 0.385 Vdac - 0.615 x 2.5 V | -1.46 ... -0.50 V, 0.27 mV/LSB |
+| PB1 OPAMP3 (DAC3_CH2) | 100k pull-down, 5.1k series (isolates the 10 nF) | VBIAS_K = Vdac | +0.2 ... +2.7 V, 0.71 mV/LSB |
+
+TRIG_LEVEL and VBIAS_A follow the -2V5 rail (0.139 and 0.615 V/V); the effects (LM337 tolerance, drift, noise) are
+listed in `kicad/README.md` and are calibrated or negligible. Reset state (DACs and OPAMPs off, pins high-Z, VREFBUF
+off): VBIAS_K 0 V (pull-down), VBIAS_A about -1.7 V (PA6 clamps at about -0.4 V), so the bridge is reverse-biased;
+VNEG_REF 0 V; TRIG_LEVEL -0.34 V. Firmware should enable VREFBUF, the DACs and the OPAMPs together.
 
 GPIOs drive TRIG_SEL (PB6), read FPGA_DONE (PB0) and pull FPGA_RECONFIG (PB2); SPI1 master on PB3/PB4/PB5 with CS on
 PB10, I2C1 on PA15/PB7, MCU_CLK into PF0 (HSE bypass), ADC_TRIG into PB11 (EXTI11, ADC12 external trigger), USB FS on
@@ -257,11 +266,12 @@ negotiation).
 | +5V4 | MT3608 boost to 5.32 V, pi filter -> +5V4F | 0.2 A |
 | +5V | LP2985-5.0 from +5V4F | BUF802, OPA197 |
 | -5V | LM27761 inverter from +5V4F | BUF802, OPA197, -2V5 |
-| +2V5 / -2V5 | LP5907-2.5 / LM337 | TLV3801, TMUX136, hold amp, TP2272, VTAP rails (12.5 mA each) |
+| +2V5 / -2V5 | LP5907-2.5 / LM337 | TLV3801, TMUX136, hold amp, TLV9001, VTAP rails (12.5 mA each), TRIG_LEVEL and VBIAS_A networks |
 | VBUS | direct | GVA-84+ x2 (own chokes) |
 
 The boost exists because the LM27761 cannot hold the BUF802's -4.5 V minimum from a 4.75 V USB input. The -2V5 rail
-feeds the offset network and VTAP_N, so it must be quiet below 10 kHz. The TMUX136 needs a VCC-to-GND ramp of 100-1000
+feeds VTAP_N and the passive TRIG_LEVEL and VBIAS_A networks (no longer the offset network): its initial tolerance is
+calibrated, its drift moves the trigger level by 0.14 V/V and the bridge pedestal by about 0.09 V/V. The TMUX136 needs a VCC-to-GND ramp of 100-1000
 us/V.
 
 ## 8. Calibration
@@ -269,7 +279,9 @@ us/V.
 1. **LF/HF match** (once, in production): 1 kHz square at the input, adjust RV101 for a flat top. Software cannot
    repair this in equivalent-time records.
 2. **Bridge bias**: sweep VBIAS_A/K magnitude against a DC step to find the bias with full efficiency and the required
-   input range; set the rail common mode to null the pedestal.
+   input range; set the rail common mode to null the pedestal. VBIAS_A codes include the actual -2V5 value and the
+   rectified strobe current (about 21 mV on VBIAS_A, 26 mV on VBIAS_K through the feed resistors); recalibrate when the
+   strobe rate or amplitude changes.
 3. **Gain, offset, efficiency coefficients**: DC reference steps through VOFS; fit gain, pedestal and the (1-e) memory
    term of section 3. Re-check against temperature and strobe amplitude.
 4. **DAC and op-amp self-calibration** in the G474 at every start (DAC3 -> OPAMP outputs need it).
@@ -280,7 +292,8 @@ us/V.
 7. **Coarse latency**: from signals that produce both fine and coarse stamps.
 8. **Sampler-to-phase-strobe offset**: measure the same edge with the sampler and the phase detector; one board
    constant.
-9. **Trigger level**: TLV3801 offset against TRIG_LEVEL code, per input (signal and EXT_CLK).
+9. **Trigger level**: TLV3801 offset against TRIG_LEVEL code, per input (signal and EXT_CLK). The code-to-level map
+   includes the -2V5 term (+/-14 mV for the LM337 tolerance) and the TLV3801 bias current x 1.24k (2.5 mV typ, 12 mV max).
 10. **50 ohm use**: the board cannot detect an external feed-through terminator. The voltage at SIG_IN is the same
    either way (the gain calibration holds), but the firmware should let the user state that a terminator is fitted
    (displayed source EMF x2, 50 ohm input limits).
@@ -289,7 +302,7 @@ us/V.
 
 | Area | Simulated with | Verified | Not verified |
 |---|---|---|---|
-| Input stage | ngspice; BUF802 behavioural (3.1 GHz two-pole, aux path simplified), gm-C op amps, ideal external 50 ohm terminator | network, flatness, noise, S11, clamp levels | real BUF802 bandwidth, slew, THD, Cin spread, overload recovery, real feed-through terminator; schematic offset network after VOFS change |
+| Input stage | ngspice; BUF802 behavioural (3.1 GHz two-pole, aux path simplified), gm-C op amps, ideal external 50 ohm terminator | network, flatness, noise, S11, clamp levels | real BUF802 bandwidth, slew, THD, Cin spread, overload recovery, real feed-through terminator |
 | Sampler | Infineon BAT15 model + SOT323 package; TPH2501 behavioural | gain, efficiency, settling, droop, kick-out, noise | real diode leakage and mismatch, TPH2501 vendor model, 1/f noise |
 | Strobes | behavioural gain blocks (tanh limiter, nominal and pessimistic filter split); FPGA pin as ramp | 50 % duty, amplitudes, edges, aperture | saturated edge speed of TRF37D73/GVA-84+, clipping asymmetry, 47 uH choke SRF; bridge rails 24.9 ohm / 47 pF combined with the final chain |
 | Phase array | full 16-tap deck with both strobe chains, signal chain, gates and readout | co-propagation, spacing, threshold, reverse pulse, 50 % duty | COS3502 Cin, delay and hysteresis at 10-30 mV (Cin 3 / 6 pF bracket only), 0.5 pF hold caps, feed-through on a real board |
@@ -315,7 +328,7 @@ Open risks, most severe first:
 5. **Tap comparator and feed-through.** COS3502 Cin, delay and hysteresis at small overdrive are unknown; Cin 6 pF
    costs 40 % of the signal. The feed-through model rests on the BAT15 package capacitance.
 6. **Unverified pin features**: OSER10 on IOT16/IOT17 and IDES on pin 47; MODE pins for autoboot; EXTI11 as ADC12
-   trigger and the DAC3 -> OPAMP1/3 mapping (RM0440 not read); TMUX136 Ron at 0.4-1.4 V above its GND; MS5351M
+   trigger (RM0440 not read; the DAC3 -> OPAMP1/3 mapping is now taken from the ST HAL OPAMP header and the LQFP-48 OPAMP outputs from ST's pin-data XML); TMUX136 Ron at 0.4-1.4 V above its GND; MS5351M
    register equivalence; LM337S (XBLW) pinout; balun pad map.
 7. **Firmware and FPGA logic** do not exist; dither, aiming and the tracking loop are arithmetic only, and the
    1152-LUT budget is tight.
@@ -360,8 +373,8 @@ Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and layout fragments:
    against 0.85 A.
 2. **Clock, MCU and FPGA**: flash the STM32 over SWD (or USB DFU / USART1 with JP701 closed), MS5351M over I2C, FPGA
    configuration (DONE), JTAG; check FPGA_CLK and MCU_CLK.
-3. **DAC stages**: all five DAC outputs over their range; confirm VBIAS_A negative and VBIAS_K positive before any
-   strobe runs.
+3. **DAC stages**: all five DAC outputs over their range, VNEG_REF (-1.97 V); confirm VBIAS_A negative and VBIAS_K
+   positive before any strobe runs.
 4. **Strobe chains**: S_STROBE and PH_STROBE patterns; measure step, edge and stub pulse of one chain each (risk 1);
    check the reverse pulse with the clamp.
 5. **Input stage**: 1 Mohm input and with an external 50 ohm feed-through terminator, servo, RV101 trim, offset range, overload behaviour.

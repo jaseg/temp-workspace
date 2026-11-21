@@ -32,7 +32,7 @@ PRICE = {
     "MS5351M": (0.91, "LCSC C1509083", "ok", 1, ""),
     "OPA197IDBVR": (0.75, "LCSC C221351", "ok", 1, ""),
     "TPH2501": (0.4311, "LCSC C126713 (5+)", "ok", 5, ""),
-    "TP2272": (0.5044, "LCSC C39487549 TP2272-SO1R (5+)", "ok", 5, "TP2272-SR C95871 out of stock"),
+    "TLV9001IDBVR": (0.0803, "LCSC C398363 (5+)", "ok", 5, "10.5k in stock (21 Nov 2026); replaces 3x TP2272"),
     "SN65LVDS2": (1.01, "LCSC C38204", "ok", 1, ""),
     "LM27761": (1.231, "LCSC C129351", "ok", 1, ""),
     "BAT15-03W": (0.5388, "LCSC C5310874", "no stock", 1, "0 in stock; C533623 (E6327) 0.28 at 5+"),

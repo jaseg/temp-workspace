@@ -3,7 +3,8 @@ SPEC decisions 4-6).
 
 Signal path, left to right (top of the sheet):
   BUF_OUT_T / EXT_CLK (49.9 R termination) -> U301 TMUX136 (local switch ground VSW_GND = -0.9 V,
-  SEL level-shifted from TRIG_SEL) -> U302 TLV3801 (+/-2V5, IN- = TRIG_LEVEL), 100 R across CMP_P/CMP_N
+  SEL level-shifted from TRIG_SEL) -> U302 TLV3801 (+/-2V5, IN- = TRIG_LEVEL = passive sum of DAC_TRIG and
+  -2V5: R383 5.1k / R384 8.87k / R385 2.0k, 10 nF), 100 R across CMP_P/CMP_N
   -> CMP_P -> 1 uF -> U303 TRF37D73 (3V3, bias tee FB301 BLM15HD102 bead + L302 47 uH || R382 1 k, sim/bias_tee)
   -> 1 uF -> 12 dB pi pad 82/91/82 R
   -> 16-tap delay line (two rows of 8 on the sheet, wired through) -> 49.9 R termination.
@@ -178,12 +179,29 @@ def main():
     u2 = sh.add(tlv, "U302", "TLV3801", (g(xt), yS + g(2)), fp=WSON, lcsc="C3658765", mpn="TLV3801DSGR",
                 fields={"Price": "5.13 USD (Mouser)"})
     sh.wire(u1["8"], u2["5"])
-    # TRIG_LEVEL -> IN-, 10 nF
+    # TRIG_LEVEL -> IN-, 10 nF: passive sum of DAC_TRIG (STM32 DAC1_OUT1, 0.2..2.7 V) and -2V5 into a 2.0k shunt
+    # (21 Nov 2026, replaces the TP2272 difference amplifier on mcu_if). Explicit refs R383-R385 (new parts).
     ym = u2["4"][1]
-    sh.hlabel("TRIG_LEVEL", (g(68), ym + g(6)), "input", side="left")
+    sh.label("TRIG_LEVEL", (g(68), ym + g(6)), rot=180)
     sh.path([(g(68), ym + g(6)), (g(74), ym + g(6)), (g(74), ym), u2["4"]])
     dec_down((g(74), ym + g(6)), g(77), "10n")
     sh.add(TP, "TP", "TRIG_LEVEL", (g(71), ym + g(6)), fp=TP_FP)
+    Y2 = ym + g(20)
+    sh.path([(g(74), ym + g(6)), (g(74), Y2), (g(90), Y2)])
+    rtb = R(sh, "8.87k", (g(78), Y2 + g(3)), ref="R384", fields={"Note": "1 %, from -2V5 (mid-scale cancel)"})
+    sh.power("-2V5", rtb["2"], dy=5.08)
+    rts = R(sh, "2.0k", (g(84), Y2 + g(3)), ref="R385", fields={"Note": "1 %, shunt"})
+    sh.gnd(rts["2"])
+    rta = R(sh, "5.1k", (g(90), Y2 + g(3)), ref="R383", lcsc="C25905", fields={"Note": "1 %, from DAC1_OUT1"})
+    sh.wire(rta["2"], (g(90), rta["2"][1] + g(2)))
+    sh.hlabel("DAC_TRIG", (g(90), rta["2"][1] + g(2)), "input", side="right")
+    sh.text("TRIG_LEVEL = 0.242 DAC_TRIG - 0.139 x 2.5 V\n"
+            "(R383/R384/R385, Rpar 1.24k, 10 nF: 13 kHz)\n"
+            "DAC 0.2..2.7 V -> -0.30..+0.31 V, 0.17 mV/LSB\n"
+            "-2V5 sensitivity 0.139 V/V. TLV3801 Ib 2 uA\n"
+            "typ / 10 uA max x 1.24k = 2.5 / 12 mV (cal.)\n"
+            "DAC load 6.7k. Reset (PA4 high-Z): -0.34 V.",
+            (g(10), ym + g(25)), size=T)
     # supplies
     a, b = u2["6"], u2["7"]
     sh.wire(a, (a[0], a[1] - g(2)))

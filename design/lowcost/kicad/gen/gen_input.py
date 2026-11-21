@@ -3,8 +3,10 @@ BUF802 in composite-loop (CL) mode with OPA197 differential-integrator servo, ou
 EXT_CLK SMA.
 
 Values: design/lowcost/sim/input/RESULT.md (final network) and SPEC decisions 1 and 7.
-Deviation: VOFS from mcu_if is +/-0.48 V centred on GND (not a 0..3.3 V DAC), so the -2V5 centring
-resistor Rmid is dropped and Rofs/Rf2 are re-computed to keep Gsum = 2/Rf1 (LF gain 0.200).
+VOFS (21 Nov 2026): the directly driven summing node of sim/input again. VOFS is the raw STM32 DAC1_OUT2
+(0.2..2.7 V) through Rofs 24.9k; the mid-scale is cancelled by Rmid 34.0k (R123) from VNEG_REF (-1.973 V =
+-0.680 x VREF+, U701 on mcu_if, ratiometric to the DAC) instead of from the -2V5 rail. Gsum = 1/Rf1 + 1/Rf2 +
+1/Rofs + 1/Rmid = 2/Rf1 with Rf2 nominal 32.9k = 22.1k + RV101 ~10.8k (LF gain 0.200, trim -8.3 %..+7.4 %).
 
 BUF802 pinout (TI SBOS998E, Table 4-1, RGT VQFN-16 3x3, EP 1.68 mm isolated from the die):
 1 VS+, 2 IN, 3 In_Bias, 4 In_Aux, 5 VS-, 6 Aux_Bias, 7 R_Bias, 8 VS-, 9 NC, 10 VSO-, 11 OUT,
@@ -239,10 +241,15 @@ def main():
     sh.wire((FBX, rf1["1"][1]), rf1["1"])
     sh.path([rf1["2"], (FBT[0], rf1["2"][1]), FBT])
     # Rofs from VOFS
-    rofs = R(sh, "14.3k", (g(58), Ys + g(24)), rot=90, fields={"Note": "0.1 %"})
+    rofs = R(sh, "24.9k", (g(58), Ys + g(24)), rot=90, fields={"Note": "0.1 % 25 ppm/K"})
     sh.wire(rofs["2"], (FBX, rofs["2"][1]))
     sh.wire(rofs["1"], (g(50), rofs["1"][1]))
     sh.hlabel("VOFS", (g(50), rofs["1"][1]), "input", side="left")
+    # Rmid from VNEG_REF (explicit ref: the auto-numbered refs after it stay as they were)
+    rmid = R(sh, "34.0k", (g(58), Ys + g(27)), rot=90, ref="R123", fields={"Note": "0.1 % 25 ppm/K"})
+    sh.wire(rmid["2"], (FBX, rmid["2"][1]))
+    sh.wire(rmid["1"], (g(50), rmid["1"][1]))
+    sh.hlabel("VNEG_REF", (g(50), rmid["1"][1]), "input", side="left")
     # Rf2 = 22.1k + 50k trimmer (rheostat) to GND
     rf2 = R(sh, "22.1k", (FBX, Ys + g(31)), fields={"Note": "0.1 %"})
     sh.wire((FBX, Ys + g(28)), rf2["1"])
@@ -271,14 +278,15 @@ def main():
             "Cp 18p: tap RC 90k x 26 pF = Rpar x Cint, cancels feed-through.\n"
             "Loop BW = Ga/(2 pi Rf1 Cint) = 8.8 kHz.",
             (g(4), Ys + g(31)), size=TS)
-    sh.text("FB node: Gsum = 1/Rf1 + 1/Rf2 + 1/Rofs = 2/Rf1\n"
+    sh.text("FB node: Gsum = 1/Rf1 + 1/Rf2 + 1/Rofs + 1/Rmid = 2/Rf1\n"
             "-> LF gain alpha x Rf1 x Gsum = 0.200 (= HF gain).\n"
-            "Rf2 nominal 33.3k = 22.1k + RV ~11k (range -8 %..+7.6 %).\n"
+            "Rf2 nominal 32.9k = 22.1k + RV ~10.8k (range -8.3 %..+7.4 %).\n"
             "Trim once: 1 kHz square wave, flat top LF = HF.\n"
-            "VOFS (+/-0.48 V, mcu_if): OUT offset = -0.70 x VOFS\n"
-            "= +/-0.33 V (+/-1.7 V at the input). Rmid of RESULT\n"
-            "dropped (VOFS is centred on GND). VOFS must be quiet\n"
-            "below 10 kHz (gain 0.7 to OUT).",
+            "VOFS = DAC1_OUT2 0.2..2.7 V via Rofs 24.9k, mid-scale\n"
+            "cancelled by Rmid 34.0k from VNEG_REF (-1.973 V, mcu_if):\n"
+            "OUT offset = 0.580 - 0.402 x VOFS = +0.50..-0.50 V\n"
+            "(+/-2.5 V at the input), 0.28 mV/LSB at OUT. VOFS and\n"
+            "VNEG_REF must be quiet below 10 kHz (gain 0.4 / 0.29 to OUT).",
             (g(74), Ys + g(28)), size=TS)
 
     # ------------------------------------------------------------------ decoupling
@@ -346,6 +354,8 @@ def check(fn):
     same(("R116", "2"), ("R117", "1"), ("C105", "1"), ("U102", "3"))        # TAP
     assert same(("U102", "4"), ("C106", "1"), ("R118", "1"), ("R119", "2"), ("R120", "1")).endswith("FB")
     assert same(("R119", "1"),).endswith("VOFS")
+    assert same(("R123", "1"),).endswith("VNEG_REF")
+    assert net_of(n, "R123", "2") == net_of(n, "U102", "4"), "Rmid not on FB"
     same(("U102", "1"), ("C106", "2"), ("R121", "1"), ("TP103", "1"))
     same(("R121", "2"), ("C107", "1"), ("U101", "4"))                       # In_Aux
     assert same(("U101", "5"), ("U101", "8"), ("U101", "10"), ("U101", "6"), ("R107", "2"), ("U102", "2")) == "-5V"
@@ -354,7 +364,7 @@ def check(fn):
     same(("U101", "14"), ("R110", "1"), ("R111", "1"), ("C104", "1"))
     assert same(("J102", "1"),).endswith("EXT_CLK")
     single = [k for k, v in n.items() if len(v) == 1 and not k.startswith("unconnected")
-              and not any(h in k for h in ("BUF_OUT_T", "VOFS", "+2V5", "-2V5"))]
+              and not any(h in k for h in ("BUF_OUT_T", "VOFS", "VNEG_REF", "+2V5", "-2V5"))]
     assert not single, single
     print("input.kicad_sch: netlist checks passed")
 

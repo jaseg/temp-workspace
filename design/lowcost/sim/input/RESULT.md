@@ -7,6 +7,31 @@ Script: `input_stage.py` (ngspice AC and transient, about 5 s). Plots: `input_ac
 - Op amps: gm-C single pole with GBW 10 MHz (OPA197) or 7 MHz (TP2272), 20 V/us, Ccm 6.4 pF and Cdiff 1.6 pF (OPA197 datasheet; the same values are assumed for the TP2272).
 - K1 (HFD3) contact inductance is assumed (4 nH per pole) because no RF data was found. (K1 removed, see above.)
 
+## VOFS network for the 2.9 V DAC (21 Nov 2026, supersedes the Rofs/Rmid/Rf2 values below)
+Control-voltage simplification (no difference amplifiers on mcu_if): VOFS is again the directly driven summing node of
+the original network, now fed by the raw STM32G474 DAC1_OUT2 (PA5, buffer on, 0.2..2.7 V usable of VREF+ = 2.9 V).
+The mid-scale is cancelled from VNEG_REF = -VREF+ x 10.0k/14.7k = -1.973 V (one TLV9001 inverter on mcu_if,
+ratiometric to the DAC) instead of from the -2V5 rail.
+
+| Part | Value | Why |
+|---|---|---|
+| Rofs (R119) | 24.9k 0.1 % (was 33.2k / 14.3k) | Rf1 x 2.5 V / 1.0 V: 2.5 V DAC span gives 1.0 V at OUT |
+| Rmid (R123) | 34.0k 0.1 % from VNEG_REF (was 49.9k from -2V5) | 1.973 V / 34.0k = 1.45 V / 24.9k: zero offset at DAC mid-scale |
+| Rf2 | 22.1k + 50k trimmer RV101 (unchanged parts), nominal 32.9k, sim trim 33.2k | Gsum = 1/Rf1 + 1/Rf2 + 1/Rofs + 1/Rmid = 2/Rf1 |
+
+`input_stage.py` re-run with these values (NOM updated; `vmid` is now a parameter):
+- Offset at the BUF802 OUT pin, input 0: VOFS 0.2 / 1.45 / 2.7 V -> +0.500 / -0.002 / -0.504 V, i.e. +/-2.5 V referred
+  to the input (5:1). Full DAC scale 0 / 2.9 V: +0.580 / -0.584 V. 0.28 mV/LSB at OUT (1.4 mV at the input).
+- LF gain 0.200 unchanged; trim range of 22.1k + 50k: -8.1 % ... +7.6 % (needed about +/-4.8 %: Cin +/-0.3 pF
+  gives +/-4.0 %), trimmed point at 11.1k of the 50k track.
+- Crossover flatness (trimmed, 1 Hz-100 MHz): max deviation 0.67 % (same as before, largest near 30 kHz); 1 V LF step
+  0.52 % peak deviation; Cin +/-0.3 pF untrimmed +/-4.0 %. -3 dB, rise time, S11, noise (0.568 mV rms): unchanged.
+- Sensitivities at OUT: 0.402 V/V to VOFS, 0.294 V/V to VNEG_REF (x5 at the input). Because VNEG_REF and the DAC
+  share VREF+, VREF+ drift moves the offset only away from mid-scale (VREF+ tempco x offset). With the mid-scale
+  taken from the -2V5 rail instead (Rmid to -2V5), the input-referred offset would move 1.16 V per V of -2V5:
+  LM337 0.6 % over 0-125 C (typ, about 48 ppm/K) gives about 4 mV over 30 K, plus the set-resistor tracking: that is
+  why this one voltage keeps an op-amp section.
+
 ## No switchable termination (21 Nov 2026, supersedes the relay figures below)
 User decision (SPEC decision 10): K1 HFD3, the 49.9 R / 2 x 100 R termination and TERM_50 are removed.
 Network now: SMA -- 3 mm 50 R line -- VIN (Ctop, 300k string); everything after VIN is unchanged. A user who needs
@@ -92,4 +117,4 @@ The servo is a **differential integrator**. Its loop bandwidth is Ga/(2 pi Rf1 C
 2. Overload recovery: clamp the servo output, for example with an output limiter or diodes at In_Aux, and/or lower the bias resistor to 2-5 MΩ as the TI datasheet suggests. Not simulated.
 3. (Superseded: relay removed.) HFD3 RF parameters (contact inductance, open capacitance) are assumed. Measure them or find data. S11 is -9 dB at 2 GHz.
 4. The BUF802 model has no real aux-path dynamics, no Cin tolerance data, no slew or THD, and no 1/f noise beyond the 18 kHz corner. Validate against the TI EVM or a TINA model if one can be obtained.
-5. The noise figure excludes the sampler and hold amplifier. The -2V5 rail drives the offset through Rmid (gain 0.2 at OUT), so it must be clean below 10 kHz.
+5. The noise figure excludes the sampler and hold amplifier. VNEG_REF drives the offset through Rmid (0.29 at OUT; since 21 Nov 2026 instead of the -2V5 rail), so it must be clean below 10 kHz (C722 100 nF across the inverter feedback: 160 Hz).

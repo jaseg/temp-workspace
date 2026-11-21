@@ -39,8 +39,11 @@ NOM = dict(
     G0=0.983,          # BUF802 unloaded main-path gain -> 0.971 into 101R
     Ga=0.26, fbuf=3.1e9, faux=800e6,
     gbw=10e6, sr=20e6,  # OPA197 (TP2272: 7e6, 20e6)
-    Rf1=10e3, Rf2=20.1e3, Rofs=33e3, Rmid=49.9e3, Cint=470e-12, Raux=1e3, Caux=100e-12,
-    vofs=1.65, vclh=1.5, vcll=-1.5,
+    # 21 Nov 2026: VOFS = raw STM32 DAC1_OUT2 (0.2..2.7 V, VREF+ 2.9 V) through Rofs 24.9k, mid-scale
+    # cancelled by Rmid 34.0k from VNEG_REF = -0.680 x VREF+ = -1.973 V (U701 TLV9001, mcu_if).
+    # (Original network: Rofs 33k from a 0..3.3 V DAC, Rmid 49.9k from -2V5.)
+    Rf1=10e3, Rf2=32.9e3, Rofs=24.9e3, Rmid=34.0e3, vmid=-1.973, Cint=470e-12, Raux=1e3, Caux=100e-12,
+    vofs=1.45, vclh=1.5, vcll=-1.5,
     pad=0.07e-12, esl=0.4e-9,
 )
 
@@ -118,7 +121,7 @@ def deck(p, analysis, src):
     # servo: OPA+ = tap, OPA- = fb (integrator), OPA out -> Raux -> In_Aux (Caux)
     L += ["Xop tap fb opo opamp", f"Rf1 outp fb {q['Rf1']}", f"Rf2 fb 0 {q['Rf2']:.6g}",
           f"Rofs vofs fb {q['Rofs']}", f"Rmid vmid fb {q['Rmid']}", f"Cint opo fb {q['Cint']:.4g}",
-          f"Vofs vofs 0 {q['vofs']}", "Vmid vmid 0 -2.5",
+          f"Vofs vofs 0 {q['vofs']}", f"Vmid vmid 0 {q['vmid']}",
           f"Raux opo aux {q['Raux']}", f"Cauxe aux 0 {q['Caux']:.4g}"]
     L += [analysis, ".end"]
     return "\n".join(L)
@@ -174,10 +177,12 @@ if __name__ == "__main__":
     a0 = ac({}, "ac_trim")
     hf = np.interp(10e6, a0["f"], np.abs(a0["outp"] / a0["vin"]))  # gain from the input node
     lf = np.abs(a0["outp"][0] / a0["vin"][0])
-    # LF gain = 0.1*Rf1*(1/Rf1+1/Rf2+2/33k); solve for Rf2
-    s = hf / 0.1 / 10e3 - 1 / 10e3 - 1 / 33e3 - 1 / 49.9e3
+    # LF gain = 0.1*Rf1*(1/Rf1+1/Rf2+1/Rofs+1/Rmid); solve for Rf2
+    s = hf / 0.1 / NOM["Rf1"] - 1 / NOM["Rf1"] - 1 / NOM["Rofs"] - 1 / NOM["Rmid"]
     rf2 = 1 / s
-    R["trim"] = dict(hf_gain_pin=hf, lf_gain_pin_untrimmed=lf, Rf2_trimmed=rf2)
+    g_lf = lambda rf2_: 0.1 * NOM["Rf1"] * (1 / NOM["Rf1"] + 1 / rf2_ + 1 / NOM["Rofs"] + 1 / NOM["Rmid"])
+    R["trim"] = dict(hf_gain_pin=hf, lf_gain_pin_untrimmed=lf, Rf2_trimmed=rf2,
+                     trim_range_pct_22k1_plus_50k=[100 * (g_lf(72.1e3) / hf - 1), 100 * (g_lf(22.1e3) / hf - 1)])
     print("trim", R["trim"])
     base = dict(Rf2=rf2)
 
@@ -251,9 +256,9 @@ if __name__ == "__main__":
                                             overshoot_pct=float(100 * (vb.max() / vb[-1] - 1)),
                                             overshoot_gate_pct=float(100 * (vg.max() / vg[-1] - 1)))
     ax[1].set_title("20 ps step: passive part (dashed) and output"); ax[1].set_xlabel("ns"); ax[1].set_xlim(0, 2)
-    # offset sweep check: VOFS 0 and 3.3 V, input 0
+    # offset sweep check: VOFS over the DAC range (buffer on 0.2..2.7 V; 0 and 2.9 V full scale), input 0
     offs = {}
-    for v in (0.0, 1.65, 3.3):
+    for v in (0.0, 0.2, 1.45, 2.7, 2.9):
         d = tran(dict(base, vofs=v), "tof", "Vs src 0 dc 0", 1e-6, 10e-9, 20e-9)
         offs[v] = float(d[-1, 2])
     R["offset_outp_vs_VOFS"] = offs

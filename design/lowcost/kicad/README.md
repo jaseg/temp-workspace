@@ -17,7 +17,7 @@ python3 gen_all.py --no-export
 `gen_power.py`, `gen_mcu_if.py`, `gen_root.py` (after `gen_footprints.py`, which writes the project footprint library
 `lib/scope-fe.pretty`), and collects every embedded `scope-fe:` symbol into
 `scope-fe.kicad_sym`. It then exports the netlist (`export/scope-fe.net`), asserts key inter-sheet connections
-(FPGA/MCU pins, VBIAS_A/K, STRB_A/K, BUF_OUT_S/T, EXT_CLK, TRIG_LEVEL, VOFS, ADC_IN, ADC_REF_MID),
+(FPGA/MCU pins, VBIAS_A/K, STRB_A/K, BUF_OUT_S/T, EXT_CLK, DAC_TRIG/TRIG_LEVEL, VOFS, VNEG_REF, ADC_IN, ADC_REF_MID),
 fails on any two-pin part with both pins on one net, lists single-node and NC-flagged nets, writes
 `export/scope-fe.pdf` plus one SVG/PNG per sheet (PNG via `gen/svg2png.js`, node + playwright/chromium), and
 finally runs `gen_bom.py` (`docs/bom.csv`, `docs/bom.md`). Each critical sheet also has its own check:
@@ -43,7 +43,7 @@ Requires KiCad 7.0.x `kicad-cli` and `/usr/share/kicad/symbols`.
 | `strobe.kicad_sch` | `gen_strobe.py` | sampler strobe (2x TRF37D73, balun, fitted BAT15-03W clamp), phase strobes (TRF + GVA-84+ x2, 80 ps stubs), refs 4xx |
 | `fpga_clock.kicad_sch` | `gen_fpga_clock.py` | infrastructure, refs 5xx (J501 programming header, R511/R512 100 R) |
 | `power.kicad_sch` | `gen_power.py` | infrastructure, refs 6xx |
-| `mcu_if.kicad_sch` | `gen_mcu_if.py` | infrastructure, refs 7xx (STM32G474CBT6 U704 and its parts C710-C719, R729-R730, FB701, JP701, D701; J701 removed) |
+| `mcu_if.kicad_sch` | `gen_mcu_if.py` | infrastructure, refs 7xx (STM32G474CBT6 U704 and its parts C710-C719, R729-R730, FB701, JP701, D701; J701 removed; control voltages: U701 TLV9001, R731-R736, C720-C722; R701/R702, R705-R722, C701, C703-C708, U702, U703 removed 21 Nov 2026) |
 | `gen/gen_placeholders.py` | placeholder sheets (unused now: all four critical generators exist) | infrastructure |
 | `gen/gen_bom.py` | `../docs/bom.csv`, `../docs/bom.md` from `export/scope-fe.net`; price table inside | integration |
 | `export/` | `scope-fe.net`, `.pdf`, per-sheet `.svg`/`.png` (generated) | - |
@@ -141,10 +141,12 @@ as in DS12288 (LQFP48: PG10 = NRST, PB8 = BOOT0, VREF+ separate pin 20).
 | Pin | Port | Net | Function |
 |---|---|---|---|
 | 8 | PA0 | ADC_IN | ADC12_IN1 (fast channel) |
-| 10 | PA2 | DAC_BIAS_A | OPAMP1_VOUT (DAC3_CH1 follower) -> VBIAS_A stage |
-| 12 / 13 / 14 | PA4 / PA5 / PA6 | DAC_TRIG / DAC_OFS / DAC_TAPTH | DAC1_OUT1 / DAC1_OUT2 / DAC2_OUT1 |
-| 17 | PB1 | DAC_BIAS_K | OPAMP3_VOUT (DAC3_CH2 follower) -> VBIAS_K stage |
-| 20 | VREF+ | VREFP | VREFBUF 2.9 V (1 uF + 100 nF); feeds VMID and ADC_REF_MID dividers (0.22 mA) |
+| 10 | PA2 | DAC_TAPTH | OPAMP1_VOUT (DAC3_CH1 follower) -> 30k/1k VTAP_TH divider |
+| 12 | PA4 | DAC_TRIG (sheet pin) | DAC1_OUT1, buffered -> TRIG_LEVEL network at the TLV3801 (trigger_phase) |
+| 13 | PA5 | VOFS (sheet pin) | DAC1_OUT2, buffered -> Rofs into the OPA197 servo node (input) |
+| 14 | PA6 | DAC_BIAS_A | DAC2_OUT1, buffered -> 7.5k / 4.7k divider to -2V5 -> VBIAS_A |
+| 17 | PB1 | DAC_BIAS_K | OPAMP3_VOUT (DAC3_CH2 follower) -> 5.1k -> VBIAS_K (100k pull-down) |
+| 20 | VREF+ | VREFP | VREFBUF 2.9 V (1 uF + 100 nF); feeds ADC_REF_MID divider and the VNEG_REF inverter (0.27 mA) |
 | 25 | PB11 | ADC_TRIG | EXTI11 = ADC12 regular external trigger (EXTI11 on port B; PA11 is USB) |
 | 5 | PF0 | MCU_CLK | OSC_IN, HSE bypass from MS5351M CLK1 (PF1 NC) |
 | 40 / 41 / 42 / 22 | PB3 / PB4 / PB5 / PB10 | SPI_SCK / MISO / MOSI / CS | SPI1 master AF5, CS as GPIO |
@@ -160,12 +162,49 @@ as in DS12288 (LQFP48: PG10 = NRST, PB8 = BOOT0, VREF+ separate pin 20).
 | 9, 11, 15, 3, 4, 6, 27-29 | PA1, PA3, PA7, PC14, PC15, PF1, PB13-15 | NC | spare |
 | 30 / 26 | PA8 / PB12 | NC | reserved: OPAMP5 / OPAMP4 follower outputs (spare analog, ADC_REF_MID trim) |
 
-DAC outputs are scaled by difference amplifiers (TP2272 dual on +/-2.5 V, 3 packages,
-VMID = VREF+/2 buffered): TRIG_LEVEL = 0.25 (Vdac - VMID) (+/-0.30 V), VOFS = 0.40 (Vdac - VMID)
-(+/-0.48 V), VBIAS_A = -1.0 V + 0.5 (Vdac - VMID) (anode rail, -0.4..-1.6 V), VBIAS_K = +1.0 V + 0.5 (Vdac -
-VMID) (cathode rail, +0.4..+1.6 V); offset from a Thevenin divider (24.9k/16.5k to -2V5 resp. +2V5) on the
-+ input, R1 20k / R2 10k. (Signs corrected at integration: the earlier +1 V on the anode rail forward-biased the
-bridge.) VTAP_TH = DAC/31 (8-85 mV). VTAP_P/N = +2V5/-2V5 through 0 R links.
+**Control voltages (21 Nov 2026, user instruction "generate what can be generated in software directly and only use
+op-amps where necessary").** The three TP2272 packages (VMID buffer, four difference amplifiers, one spare section)
+are gone. DAC pins (from the ST open pin-data XML for STM32G474C(B-C-E)Tx LQFP48 and the HAL OPAMP header): buffered
+external outputs exist only for DAC1_OUT1 PA4, DAC1_OUT2 PA5, DAC2_OUT1 PA6; DAC3/DAC4 reach pins only through an OPAMP
+follower (VINP = DAC3_CH1 for OPAMP1 and OPAMP6, DAC3_CH2 for OPAMP3, DAC4_CH1 for OPAMP4, DAC4_CH2 for OPAMP5), whose
+outputs on LQFP-48 are OPAMP1 PA2, OPAMP2 PA6, OPAMP3 PB1, OPAMP4 PB12, OPAMP5 PA8, OPAMP6 PB11 (PB11 is ADC_TRIG).
+Limits used (DS12288 values from `docs/research/adc.md` and the task brief; st.com refused the PDF download): buffered
+DAC RL >= 5k, CL <= 50 pF, output 0.2..VREF+ - 0.2 V; OPAMP follower <= 500 uA, CL <= 50 pF. Vdac below = 0.2..2.7 V.
+Only VOFS keeps an op-amp: U701 TLV9001IDBVR (LCSC C398363, 0.080 USD) on +/-2V5 makes VNEG_REF = -VREF+ x
+R732/R731 = -1.973 V (10.0k/14.7k, 0.1 % 25 ppm/K, 100 nF C722 across R732: 160 Hz), which drives only Rmid.
+
+| Voltage | Source pin | Network | Transfer | Range | Resolution | Reset state (DAC/OPAMP off, VREFBUF off) |
+|---|---|---|---|---|---|---|
+| TRIG_LEVEL | PA4 DAC1_OUT1 | trigger_phase: R383 5.1k from DAC_TRIG, R384 8.87k from -2V5, R385 2.0k shunt, C304 10 nF at U302.4 (Rpar 1.24k, 13 kHz) | 0.242 Vdac - 0.139 x 2.5 V | -0.30..+0.31 V | 0.17 mV/LSB | -0.34 V (PA4 high-Z) |
+| VOFS | PA5 DAC1_OUT2 | input: Rofs R119 24.9k into FB, Rmid R123 34.0k from VNEG_REF, Rf2 22.1k + RV101 | OUT offset = 0.580 - 0.402 Vdac (sim) | +/-0.50 V at OUT = +/-2.5 V input | 0.28 mV/LSB at OUT, 1.4 mV at the input | 0 (VNEG_REF 0 V, PA5 high-Z) |
+| VBIAS_A | PA6 DAC2_OUT1 | R733 7.5k from DAC, R734 4.7k to -2V5 (Thevenin 2.89k) + sampler 1k / 10 nF (5.5 kHz) | 0.385 Vdac - 0.615 x 2.5 V | -1.46..-0.50 V (-1.54..-0.42 V at 0..2.9 V) | 0.27 mV/LSB | about -1.7 V (PA6 clamped near -0.4 V by its substrate diode, 0.17 mA): reverse bias |
+| VBIAS_K | PB1 OPAMP3 (DAC3_CH2) | R736 100k pull-down at PB1, R735 5.1k series to VBIAS_K (+ sampler 1k / 10 nF) | Vdac | +0.2..+2.7 V | 0.71 mV/LSB | 0 V (pull-down) |
+| VTAP_TH | PA2 OPAMP1 (DAC3_CH1) | R723 30k / R724 1k, C709 100 nF (unchanged) | Vdac / 31 | 3..90 mV | 0.02 mV/LSB | 0 V |
+| VNEG_REF | VREF+ | U701 inverter (see above) | -0.680 VREF+ | -1.973 V fixed | - | 0 V |
+
+DAC loads: TRIG 5.1k + 8.87k||2.0k = 6.7k (>= 5k, max 0.47 mA); VOFS 24.9k to a virtual ground; VBIAS_A 12.2k to -2V5
+(max 0.43 mA at 2.7 V); VBIAS_K 100k DC, 5.1k transient (OPAMP3: change VBIAS_K in steps of <= 1 V, 0.2 mA);
+VTAP_TH 31k. Bridge at reset: anode rail about -1.7 V, cathode rail 0 V, never forward-biased; with the DACs at code 0
+-1.54 V / +0.0 V (OPAMP3 low limit). Firmware: enable VREFBUF, DAC1/2/3 and OPAMP1/3 (with their self-calibration)
+before the strobes; DAC_TRIG and VNEG_REF also before trusting the trigger.
+
+**-2V5 rail dependence** (LM337 + 120/120 R: reference 1.213-1.287 V at 25 C, i.e. +/-2.9 %, about +/-4 % = +/-0.1 V
+with 1 % resistors and Iadj 65 uA x 120 R; output change 0.6 % typ over 0-125 C, about 48 ppm/K, i.e. 3.6 mV over 30 K;
+noise 0.003 % = 75 uV rms 10 Hz-10 kHz; 2 MHz ripple from the LM27761 (its output ripple about 1 mV, assumed not
+reduced by the LM337 at 2 MHz) taken as <= 1 mV pp):
+
+| Voltage | Sensitivity | Initial tolerance (calibrated) | 30 K drift (regulator typ) | Noise / ripple after the node filter | What it means |
+|---|---|---|---|---|---|
+| TRIG_LEVEL | 0.139 V/V | +/-14 mV | 0.5 mV | 10 uV rms (13 kHz); 0.9 uVpp at 2 MHz | vs TLV3801 Vos +/-0.5 mV typ / 5 mV max, 2 mV hysteresis, Ib x 1.24k = 2.5 mV typ / 12 mV max, 19 mV minimum signal: negligible |
+| VBIAS_A | 0.615 V/V; pedestal 0.089 V/V (0.29 V per V of rail CM, CM = VA/2) | +/-62 mV on VBIAS_A, +/-9 mV pedestal | 2.2 mV on VBIAS_A, 0.32 mV pedestal at the hold node = 2.3 mV referred to the input (/0.69, x5) | 43 uV rms on VBIAS_A (5.5 kHz) -> 6 uV rms pedestal vs 35 uV kT/C (+0.5 uV RSS); 2 MHz ripple 0.25 uVpp | invisible in noise; drift below the 5 mV/30 K limit |
+| VBIAS_A, strobe charge | 1.75 pC x 3.125 MHz = 5.5 uA through 2.89k + 1k | 21 mV (op-amp version: 5.5 mV) toward 0 V; VBIAS_K 4.3 uA x 6.1k = 26 mV | follows strobe rate and amplitude | - | static; net rail CM -2.9 mV -> pedestal -0.8 mV; calibrated per strobe setting |
+| VOFS if passive (Rmid to -2V5, rejected) | 1.16 V/V at the input (Rf1/Rmid x 5) | +/-116 mV | 4.2 mV + set-resistor tracking (1 % thick film up to 200 ppm/K ratio: +17 mV) | 87 uV rms LF at the input | at or above the 5 mV/30 K limit: hence U701 |
+| VOFS with VNEG_REF (built) | 0 | - | U701 drift 0.6 uV/K: 0.04 mV; R731/R732 ratio 25 ppm/K worst: 4.4 mV, same-reel tracking typically < 1 mV; VREF+ drift only away from mid-scale | - | |
+
+Consequence for the regulator: fit the LM337 set pair (120 R / 120 R) as 0.1 % 25 ppm/K thin film (cents) so the
+resistor tracking does not dominate the TRIG_LEVEL and VBIAS_A drift; no extra -2V5 filtering is needed (the node
+capacitors give 5.5 kHz and 13 kHz corners and the residual noise is far below kT/C and the comparator offset).
+VTAP_TH = DAC/31. VTAP_P/N = +2V5/-2V5 through 0 R links.
 ADC_REF_MID = VREF+ x 1/4 = 0.725 V.
 
 USB: J601 is now a 16-pin USB 2.0 Type-C receptacle (HRO TYPE-C-31-M-12, LCSC C165948, price estimate) with both
@@ -174,7 +213,7 @@ D+/D- pairs tied, 5.1k CC pull-downs as before, and a USBLC6-2SC6 ESD array U608
 
 ## BOM
 
-`docs/bom.md` (generated): **64.3 USD for one board** (MCU included, PCB excluded) against the 80 USD budget, 6.0 USD of it
+`docs/bom.md` (generated): **62.85 USD for one board** (64.3 before the control-voltage simplification) (MCU included, PCB excluded) against the 80 USD budget, 6.0 USD of it
 estimates. Largest lines: TRF37D73 x5 7.50, GW1NZ-1 6.68, BAT15-04W x18 6.58, GVA-84+ x2 5.98, BUF802 5.89,
 TLV3801 5.13, STM32G474CBT6 4.11. J501 (WR-WST footprint) is a 0 USD footprint-only line, not counted as a part.
 First order with LCSC minimum quantities ~88 USD. LCSC numbers that pointed at other parts were corrected (power LDOs,
@@ -183,18 +222,23 @@ TVS, PTC) or removed (several resistor values) on 21 Nov 2026.
 ## Open points
 
 Integration (21 Nov 2026):
-- Root netlist: 261 nets, 0 failed checks, no single-node nets; 21 NC-flagged pins, all intended (BUF802 NC 9/13/16,
+- Root netlist (after the control-voltage simplification): 251 nets, 0 failed checks, no single-node nets; 21 NC-flagged pins, all intended (BUF802 NC 9/13/16,
   FPGA 8/32 unused, STM32 spares PA1/PA3/PA7/PA8/PB12-15/PC14/PC15/PF1, USB-C SBU1/2, NC pins of
   AP2112K/MT3608/LP5907). Not a KiCad ERC: run ERC in eeschema.
-- STM32 (21 Nov 2026): ADC12 external trigger EXTI11 from PB11 and the OPAMP/DAC3-4 mapping are from adc.md
-  (RM0440 not read, verify). PB4 (SPI1_MISO) and PB6 (TRIG_SEL) carry the UCPD dead-battery pull-downs until
+- STM32 (21 Nov 2026): ADC12 external trigger EXTI11 from PB11 is from adc.md (RM0440 not read, verify); the OPAMP/DAC3-4
+  mapping is from the ST HAL OPAMP header (stm32g4xx_hal_opamp.h). PB4 (SPI1_MISO) and PB6 (TRIG_SEL) carry the UCPD dead-battery pull-downs until
   firmware sets PWR_CR3.UCPD_DBDIS. USB-C 16P, USBLC6-2SC6 and the LED are price estimates; check the STM32G474CBT6
   price on the LCSC page (only search snapshots read).
 - Stock: BAT15-03W (C5310874) 0 at LCSC; TRF37D73 25 at LCSC (Mouser has stock); SMA
-  edge connectors not sourced (2 x ~2 USD estimate); TP2272 changed to TP2272-SO1R (TP2272-SR out of stock).
+  edge connectors not sourced (2 x ~2 USD estimate). TP2272 no longer used (U701 is a TLV9001IDBVR, LCSC C398363).
 - LCSC numbers missing (BOM `est`): 1.5p, 2.2p, 3.3p, 100p, 470p, 220p, 2.2u 0402, 4.7u 0603, 1% values (4.99M,
-  300k, 17.8k, 14.3k, 22.1k, 24.9, 499, 82, 91, 68, 47, 470, 49.9, 24.9k, 40.2k, 30k, 16.5k, 78.7k, 499k, 1.54M,
-  18k, 2.7k), 600R beads, 47 uH 1008, 120 nH 0402, 4.7 uH SRN4018, 50k trimmer.
+  300k, 17.8k, 22.1k, 24.9, 499, 82, 91, 68, 47, 470, 49.9, 24.9k, 34.0k, 14.7k, 7.5k, 8.87k, 2.0k, 30k, 78.7k, 499k,
+  1.54M, 18k, 2.7k), 600R beads, 47 uH 1008, 120 nH 0402, 4.7 uH SRN4018, 50k trimmer.
+- Control voltages (21 Nov 2026): DS12288 DAC/OPAMP load limits and the VREFBUF reset state (high-Z) taken from
+  adc.md / the brief, PDF not re-read; PA6 sees about -0.4 V / 0.17 mA substrate injection while the DAC is off
+  (reset, bootloader): within the absolute maximum as remembered, check IINJ in DS12288; the input_stage layout fragment
+  needs R119 24.9k and the new R123 (Rmid, VNEG_REF); trigger_phase fragment needs R383-R385. VBIAS_A / VBIAS_K ranges
+  (-1.46..-0.50 / +0.2..+2.7 V) cover the strobe RESULT window 0.5..1.2 V; the 40 / 75 ps re-simulation is still open.
 - Tap hold caps are 0.5 pF (nearest stocked C0G value, LCSC C1544) instead of 0.47 pF.
 - LM337S (XBLW) SOT-223 pinout to check against the TI pinout used in the symbol.
 - Sampler ADC must sample before the S_STROBE falling edge (+160 ns) - FPGA/MCU firmware timing.
@@ -205,7 +249,8 @@ Integration (21 Nov 2026):
 
 Earlier:
 1. Prices marked "~" and the passive/crystal/USB LCSC numbers were not re-checked in this session.
-2. TP2272 supply range and RRIO behaviour on +/-2.5 V not verified (any 5 V RRIO dual fits the footprint).
+2. (Closed 21 Nov 2026) TP2272 was specified 2.7-36 V (datasheet Rev D.1), so +/-2.5 V was legal; it is no longer used.
+   U701 TLV9001: 1.8-5.5 V, RRIO, Vos 0.4 mV typ / 1.6 mV max, 0.6 uV/K (TI SBOS833R), run at +/-2.5 V.
 3. MODE[1:0] = 00 for autoboot from internal flash is from memory of Gowin UG290; verify. Verify in Gowin
    EDA that OSER10 can be placed on IOT16/IOT17 and IDES on pin 47 (GW1NZ-1 IO logic placement rules).
 4. USB power ~0.85 A exceeds a default USB port (0.5/0.9 A): needs a 1.5 A-capable USB-C supply (no PD
