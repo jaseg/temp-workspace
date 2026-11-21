@@ -236,7 +236,7 @@ for k in range(NT // 2):
     place2(cref, xcap, p8[1] - 1.1, "v", "GND")
     cp = P(cref, "@+3V3")
     cg = P(cref, "@GND")
-    T("+3V3", 0.5, [p8, (p8[0], cp[1]), cp])
+    T("+3V3", 0.5, [(p8[0], cp[1]), cp], ch=0)       # starts inside the long pin-8 pad
     for dy in (-0.4, -1.05):
         V(xcap - 0.7, cp[1] + dy, "+3V3")
     T("+3V3", 0.45, [cp, (xcap - 0.4, cp[1]), (xcap - 0.7, cp[1] - 0.3), (xcap - 0.7, cp[1] - 1.05)], ch=0)
@@ -336,8 +336,8 @@ place2("C306", 11.6, 1.4, "v", "GND")       # second U302 100 n, at the +2V5 via
 T("+2V5", 0.3, [c1p, P("C306", "@+2V5")], ch=0)
 T("+2V5", 0.3, [(10.85, c1p[1]), (10.85, c1p[1] - 0.6)], ch=0)
 g = P("C306", "@GND")
-gv(g[0] + 0.6, g[1])
-T("GND", 0.3, [g, (g[0] + 0.6, g[1])], ch=0)
+gv(g[0] + 0.7, g[1] + 0.3)
+T("GND", 0.3, [g, (g[0] + 0.4, g[1]), (g[0] + 0.7, g[1] + 0.3)], ch=0)
 V(10.85, c1p[1], "+2V5")
 V(10.85, c1p[1] - 0.6, "+2V5")
 V(c1v[0], 0.45, VSW)

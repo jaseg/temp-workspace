@@ -63,7 +63,7 @@ bplace("R511", 6.745, 3.95, 90)       # under J501.2 (pad 1 = J side, south)
 bplace("R512", 9.285, 3.95, 90)       # under J501.4
 # control-voltage networks (F), x 27..42
 bplace("R733", 28.0, 0.8, 0)     # DAC_BIAS_A -> VBIAS_A
-bplace("R734", 28.0, 1.8, 0)     # VBIAS_A -> -2V5
+bplace("R734", 28.0, 1.8, 180)     # VBIAS_A -> -2V5
 bplace("R735", 28.0, 2.8, 0)     # DAC_BIAS_K -> VBIAS_K
 bplace("R736", 28.0, 3.8, 0)     # DAC_BIAS_K -> GND
 bplace("R703", 30.6, 0.8, 0)     # VREFP -> ADC_REF_MID
@@ -203,7 +203,10 @@ def pad_cells(p):
     cells = set()
     for i in range(int(math.ceil((x - w2) / G)), int(math.floor((x + w2) / G)) + 1):
         for j in range(int(math.ceil((y - h2) / G)), int(math.floor((y + h2) / G)) + 1):
-            if (i * G - x) ** 2 <= (w2 - 0.002) ** 2 + 1e-9 and (j * G - y) ** 2 <= (h2 - 0.002) ** 2 + 1e-9:
+            if p.GetShape() == pcbnew.PAD_SHAPE_CIRCLE:
+                if (i * G - x) ** 2 + (j * G - y) ** 2 <= (w2 - 0.002) ** 2:
+                    cells.add((i, j))
+            elif (i * G - x) ** 2 <= (w2 - 0.002) ** 2 + 1e-9 and (j * G - y) ** 2 <= (h2 - 0.002) ** 2 + 1e-9:
                 cells.add((i, j))
     lays = [li for li, ln in enumerate(LAYERS) if p.IsOnLayer(bl.L(ln))]
     par = p.GetParent()
@@ -214,6 +217,8 @@ def pad_cells(p):
         axes = {0, 4}
     else:
         axes = {2, 6}
+    if p.GetShape() == pcbnew.PAD_SHAPE_CIRCLE:
+        axes = {0, 2, 4, 6}
     if par.GetReference() == "U704":         # LQFP pins: outward / inward along the pin only
         axes = {0, 4} if w2 > h2 else {2, 6}
     return cells, lays, axes, (x, y)
@@ -335,8 +340,8 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, clr=CLR):
     runs.append(cur)
     for k, r in enumerate(runs):
         pts = [(round(s[0] * G, 3), round(s[1] * G, 3)) for s in r]
-        if k == 0:
-            pts[0] = sxy
+        if k == 0 and (abs(pts[0][0] - sxy[0]) < 1e-6 or abs(pts[0][1] - sxy[1]) < 1e-6):
+            pts.insert(0, sxy)
         if k == len(runs) - 1:
             gc = tcen[(goal[2], goal[0], goal[1])]
             if dst[0][0] == "EDGE":
@@ -618,10 +623,10 @@ job("j_rx", lambda: route("/HOST_RX", ("U704", "32"), [("R511", "@HOST_RX")]))
 job("j_tx", lambda: route("/HOST_TX", ("U704", "31"), [("R512", "@HOST_TX")]))
 # to the N edge: fpga
 job("mclk", lambda: edge("/MCU_CLK", ("U704", "5"), 39.0, 56.0, note="U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"))
-job("adctrig", lambda: edge("/ADC_TRIG", ("U704", "25"), 51.6, 56.2, note="U704.25 PB11 <- U501.41"))
-job("done", lambda: edge("/FPGA_DONE", V("16"), 51.6, 56.2, note="U704.16 <- U501.46 (R502 pull-up)"))
-job("reconf", lambda: edge("/FPGA_RECONFIG", V("18"), 51.6, 56.2, note="U704.18 -> U501.48 (R501 pull-up)"))
-job("spics", lambda: edge("/SPI_CS", V("22"), 51.6, 56.2, note="U704.22 -> U501.31"))
+job("adctrig", lambda: edge("/ADC_TRIG", ("U704", "25"), 51.6, 66.0, note="U704.25 PB11 <- U501.41"))
+job("done", lambda: edge("/FPGA_DONE", V("16"), 51.6, 66.0, note="U704.16 <- U501.46 (R502 pull-up)"))
+job("reconf", lambda: edge("/FPGA_RECONFIG", V("18"), 51.6, 66.0, note="U704.18 -> U501.48 (R501 pull-up)"))
+job("spics", lambda: edge("/SPI_CS", V("22"), 51.6, 66.0, note="U704.22 -> U501.31"))
 job("refmide", lambda: edge("/ADC_REF_MID", ("R703", "@ADC_REF_MID"), *AW, note="R703 / R704 / C702 -> U202"))
 job("vbiask", lambda: edge("/VBIAS_K", ("R735", "@VBIAS_K"), *AW, note="R735 divider -> sampler"))
 job("vbiasa", lambda: edge("/VBIAS_A", ("R733", "@VBIAS_A"), *AW, note="R733 / R734 divider -> sampler"))

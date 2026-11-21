@@ -1,33 +1,34 @@
-# fpga block (U501 GW1NZ-LV1 QN48, U502 MS5351M + Y501, J501 WR-WST, config/decoupling, R407/R411)
+# fpga block (U501 GW1NZ-LV1 QN48, U502 MS5351M + Y501, config pull-ups, decoupling)
 
-STATUS: INCOMPLETE. Not routed out and not DRC clean. Do not merge yet.
+STATUS: INCOMPLETE (re-placed and mostly routed, not DRC clean). Do not merge yet.
 
-Size: an L shape. The main part is 24.5 x 22.0 mm at board (56, 0.5); FLOORPLAN.md gives 18 x 22. A strip at x 24.5-29.6, y 0-7.4 holds the J501 body and the VBUS exit.
-So the block reaches board x 85.6 at the top edge and overlaps the power rectangle (x >= 74) by 6.5 / 11.6 mm.
-`python3 gen_fpga.py [--render]` writes fpga.kicad_pcb / fpga.ifaces.json / fpga.png / fpga_detail.png. It uses local helpers: a grid router (0.05 mm, F/B, 45-degree moves), `to_east`, and `courtyard_overlaps`.
-`prio.json` sets the order in which routing jobs run (empty = default order).
+Size: 18 x 22 mm at board (56, 0.5), the FLOORPLAN rectangle; nothing beyond x 74. J501, R511, R512 moved to mcuif
+(the UC_NRST 100 nF is C719 on mcu_if, never here); R407 / R411 are placed by pstrobe. Block refs (24) = fpga_clock
+sheet minus J501 / R511 / R512 (`REFS` in gen_fpga.py). `python3 gen_fpga.py [--render]` (about 50 s), prio.json = job order.
+U501 rot 90 at (8.6, 9.8). U502 / Y501 / R508-R510 on the top row, 33 R and caps U502 VDD on B. Pull-ups / JP501 on B (SW).
+Supplies: hand-drawn pad-wide neck + 0.4 mm + via pair at each U501 corner, 100 nF on B at the pair; In2 +3V3 zone
+over the block, +1V2 island under U501 with a tongue to the SE corner; In1 GND zone. Merge without skip_planes.
 
-Interfaces (see fpga.ifaces.json):
-| net | edge / layer | note |
+| iface (local) | edge / layer | nets |
 |---|---|---|
-| /S_STROBE_P, /S_STROBE_N | W, F.Cu, y 9.37 / 10.37 | 0.36 mm. P crosses under N on B.Cu with 2 vias and is length-matched by a B meander |
-| Net-(C412-Pad1), Net-(C422-Pad1) | S, B.Cu | after R407 / R411 (on B, at U501). 0.36 mm, straight |
-| /TAP0-15 | S, B.Cu, x 8.5-23.5 | the router permutes freely; order is not monotonic |
-| /COARSE, /ADC_TRIG, /FPGA_DONE, /FPGA_RECONFIG | S, B.Cu, x 1.8-8 | |
-| SPI x4, MCU_CLK, I2C, HOST_RX/TX, UC_SWDIO/SWCLK, DBG1, UC_NRST | E (x 24.5), B.Cu, y 11-21.5 | changed from S to E: the S edge could not take them |
-| VBUS | E of the strip, B.Cu | J501.1 |
-| +3V3, +1V2, GND | via pairs to In2 / vias to In1 | |
+| W, y 10.37 / 11.37 | F.Cu 0.36 | S_STROBE_P / N (matches analog). N dips to B under P (2 vias) |
+| W, y 12.6 / 13.4 | F.Cu 0.36 | PH_STROBE_N / P (series 47 R in pstrobe) |
+| S, x 1.15-4.6 | B.Cu 0.15 | FPGA_DONE, COARSE, FPGA_RECONFIG |
+| S, x 6.8-8.2 | B.Cu | JTAG_TMS, JTAG_TDI, DBG2, JTAG_TDO (TCK missing, see below) |
+| S, x 8.6-14.65 | B.Cu | TAP12, 14, 0, 1, 2, 11, 9, 7, 3, 4, 5, 6, 8, 10 (router order; TAP13 / TAP15 missing) |
+| S, x 15.1-17.6 | B.Cu | SPI_SCK, MOSI, MISO, CS, MCU_CLK, I2C_SDA, I2C_SCL |
+| In2 | - | +3V3 (power W, board 74.45 / 5.5), +1V2 at the SE corner (power 75.25 / 21.95) |
 
-Check state (last run):
-- check_board: 0 missing / extra / footprint / value / pad-net.
-- Unrouted: 5 nets (+1V2, +3V3, DBG2, JTAG_TCK, JTAG_TDI).
-- 11 routing jobs failed: SPI x4, MCU_CLK, COARSE, TAP8, U501.37 +1V2, U502.1 +3V3, JTAG_TDI, DBG2.
-- 1 clearance (U502.8 / R509.1), 0 corners, about 50 off-axis pad exits.
-- 9 courtyard overlaps: R508-R510 against U502 and U501, C509 against U502 and Y501, C504 against R502.
-- DRC (nightly, jlc4): 40 errors (18 unconnected, 12 clearance against U502's 0.2 mm pad clearance, 9 courtyards, 1 outline) and 75 warnings.
+Last run (check_board, 24 refs): 0 missing / extra / footprint / value / pad-net, 0 clearance, 0 off-axis exits,
+0 courtyard overlaps, 1 corner (U501.25 supply neck, 90 deg at local 10.8 / 6.1).
+Unrouted: +3V3 (U502.7), GND (U502.8, C503), FPGA_MODE1 (U501.42-R506), JTAG_TCK (U501.3, R507), CLK1 (U502.9-R509).
+Not routed and without iface: TAP13 (U501.23), TAP15 (U501.27), ADC_TRIG (U501.41).
+DRC (nightly, jlc4): 8 errors = 7 unconnected + 1 missing outline; 0 clearance / courtyard / hole / track width / silk.
 
-Open points:
-- U502, R508-R510 and C509 need a new placement with more room: move U502/Y501 into the empty bottom-right area (x 15-24, y 13-22).
-- The SPI pins (28-31, top side) then get a free path east.
-- A TAP permutation is not needed: the TAP pins (9-27) are on the bottom and right sides and fan straight to the S edge.
-- The strobe fan-out narrows next to the 0.4 mm pitch pins of U501.38 / .35.
+Open points (in order):
+- Strobe length: S_N 15.99 mm vs S_P 7.75 mm (the crossing forces N round the 36/37 supply corner); needs about
+  8.2 mm of meander on S_P or a shorter N path (move the pin 36 / 37 via pairs). PH: N 9.21 / P 9.49 mm (0.28 mm).
+- Strobes have a 0.2 mm neck inside the 0.4 mm pin row (not in the RF table for that reason).
+- U502.7 / .8 need hand fan-outs (0.2 mm clearance on 0.5 mm pitch defeats the grid router); route CLK1 on B.
+- Left pins 41 / 42 and 3 (TCK): hand fan-out or staggered vias; TAP13 / TAP15 after re-ordering the TAP jobs.
+- TAP order at the S edge is not monotonic; a permutation (schematic unchanged) can be chosen after routing.
