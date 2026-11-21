@@ -163,6 +163,10 @@ def free_maps(code, w, clr=CLR):
         out.append(ok)
     via_ok = (dists[0] >= bl.VIA_D / 2 + CLR + 0.005) & (dists[1] >= bl.VIA_D / 2 + CLR + 0.005) & inside
     via_ok &= (gy >= bl.VIA_D / 2 + 0.05) & (gy <= HR - 0.1)
+    for t in blk.b.GetTracks():                 # hole-to-hole >= 0.25 mm also to vias of the same net
+        if isinstance(t, pcbnew.PCB_VIA):
+            vx, vy = blk.loc(t.GetPosition())
+            via_ok &= (gx - vx) ** 2 + (gy - vy) ** 2 >= 0.5 ** 2
     return out, via_ok, own
 
 
@@ -471,7 +475,7 @@ job("vref", lambda: route("/mcu_if/VREFP", V("20"), [("C718", "@VREFP")], 0.25))
 job("vref2", lambda: route("/mcu_if/VREFP", ("C717", "@VREFP"), [("C718", "@VREFP")], 0.25))
 job("vdda", lambda: route("/mcu_if/VDDA", V("21"), [("C716", "@VDDA")], 0.25))
 job("vdda2", lambda: route("/mcu_if/VDDA", ("C715", "@VDDA"), [("C716", "@VDDA"), ("FB701", "@VDDA")], 0.25))
-job("vdda3", lambda: route("/mcu_if/VDDA", ("FB701", "@VDDA"), [("C715", "@VDDA")], 0.25))
+job("vdda3", lambda: route("/mcu_if/VDDA", ("C716", "@VDDA"), [("C715", "@VDDA")], 0.25))
 job("u701v5", lambda: route("+2V5", ("U701", "5"), [("C720", "@+2V5")], 0.3))
 job("u701v2", lambda: route("-2V5", ("U701", "2"), [("C721", "@-2V5")], 0.3))
 job("u701g", lambda: tie("U701", "3", 0.9, 0.3))
