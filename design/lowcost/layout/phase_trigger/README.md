@@ -1,7 +1,7 @@
 # Layout fragment: phase_trigger (trigger path, line driver, 16-tap phase delay line) - re-layout
 `python3 gen_phase_trigger.py` -> `phase_trigger.kicad_pcb` (KiCad 7, 105.1 x 25.4 mm, own Edge.Cuts) and prints all tables and checks below.
 `phase_trigger.png`: top = F.Cu without the pour (so widths show), silk, fab; below: F.Cu with pour, B.Cu (mirrored), In1, In2.
-`phase_trigger_detail.png`: two adjacent tap cells (taps 4/5) with the comparator inputs. Values: `sim/phase`, `sim/phase_array` RESULT.md, SPEC 4-6, 9.
+`phase_trigger_detail.png`: tap cells and one comparator, F.Cu red and B.Cu blue. Values: `sim/phase`, `sim/phase_array` RESULT.md, SPEC 4-6, 9.
 
 ## Stack-up (SPEC decision 9 rev., written into the board setup)
 JLC04161H-7628 1.6 mm, checked on jlcpcb.com/impedance: F.Cu 35 um / 7628 0.2104 mm er 4.4 / In1 = solid GND / core 1.065 mm /
@@ -25,6 +25,11 @@ Cell: BAT15-04W, PH_LINE enters between pins 1/2 under the body and ends in pin 
 S-meander (legs x = 1.00 / 1.99 / 2.76 mm, half-height 1.50 mm, same-net gaps >= 0.5 mm), 45-degree landing into the next diode. All on F.Cu
 over In1, **no vias in any RF path**. Hold caps CA/CK vertical, node pad 0.29 mm from pin 1/2 (0.15 mm node trace), outer pad on the
 strobe line. 1 k (to the comparator) and 2.2 k (to VTAP via In2) straddle each strobe line, perpendicular, either side of the cap.
+**Summing node (symmetric)**: the A-side and K-side 1 k resistors are mirror images; each outer pad has a via (0.605 mm F.Cu) and the two
+vias are joined by a straight B.Cu jumper (2 x 3.835 mm). The comparator input is tapped from the jumper MIDPOINT: a B.Cu branch runs
+0.8 mm west of the jumper to its own via (4.166 mm), then F.Cu to the comparator pin. Both resistors therefore see the same path and stray
+capacitance. Each COS3502 is centred between its two tap vias, so the routes to pins 1 and 3 are mirror images (3.849 mm each); the
+script asserts channel A = channel B. One extra via per tap.
 In1 cut-out under each hold node (VTAP strip in In2 below instead, symmetric A/K). K-side 1 k joins the A side on B.Cu (DC node).
 COS3502 row behind PSTRB_A: pin 1 in line with the tap's 1 k, IN- via to the B.Cu VTH rail (R404 1 k / C404 100 n from VTAP_TH).
 

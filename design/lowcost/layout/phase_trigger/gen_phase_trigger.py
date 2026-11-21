@@ -660,6 +660,7 @@ for s, nn, ref in ((-1, "PSTRB_A", "X2"), (+1, "PSTRB_K", "X3")):
 
 # ============================================================================= tap cells
 CUT = []
+DX_TAP = 0.8                                        # comparator tap run, west of the summing jumper (B.Cu)
 for n, x in enumerate(XT):
     na, nk, sm = f"TAP{n}_A", f"TAP{n}_K", f"TAP{n}_IN"
     place("Package_TO_SOT_SMD", "SOT-323_SC-70", f"D{n + 1:02d}", "BAT15-04W", x, 0.0, 0,
@@ -686,6 +687,11 @@ for n, x in enumerate(XT):
     track(sm, W_SIG, [(x + X_R1K, YL + 0.48), (x + X_R1K, Y_RV)], ch=0)
     track(sm, W_SIG, [(x + X_R1K, Y_RV), (x + X_R1K, -Y_RV)], layer=pcbnew.B_Cu, ch=0)
     track(sm, W_SIG, [(x + X_R1K, -(YL + 0.48)), (x + X_R1K, -Y_RV)], ch=0)
+    # comparator tap from the MIDPOINT of the B.Cu jumper (equal path from the A-side and the K-side 1 k):
+    # B.Cu branch at 45 degrees to a parallel run DX_TAP west of the jumper, up to its own via in the via row
+    track(sm, W_SIG, [(x + X_R1K, 0.0), (x + X_R1K - DX_TAP, -DX_TAP), (x + X_R1K - DX_TAP, -Y_RV)],
+          layer=pcbnew.B_Cu, ch=0)
+    via(x + X_R1K - DX_TAP, -Y_RV, sm, "signal")
     rfpad(f"D{n + 1:02d}", "3")
     rfpad(f"CA{n:02d}", "@PSTRB_A")
     rfpad(f"CK{n:02d}", "@PSTRB_K")
@@ -720,31 +726,46 @@ track("GND", W_GND, [(xg, yg), (xg + 0.6, yg)], ch=0)
 
 # VTAP rails = In2 strips; decoupling 2 x 100 n per rail at both ends; test pads at the far end
 for s, rail, tp in ((-1, "VTAP_N", "TP402"), (+1, "VTAP_P", "TP403")):
-    for xc_, ref in ((XT[0] - 3.0, f"C{'N' if s < 0 else 'P'}00"), (X15 + 2.6, f"C{'N' if s < 0 else 'P'}15")):
-        two("C", ref, "100n", xc_, (Y_RV + 0.75) * s, "h", *((rail, "GND") if xc_ < 0 else ("GND", rail)))
-        for nn_ in (rail, "GND"):
-            xr_, yr_ = pad(ref, "@" + nn_)
-            via(xr_, yr_ + 0.6 * s, nn_, "supply" if nn_ != "GND" else "gnd")
-            track(nn_, 0.4, [(xr_, yr_), (xr_, yr_ + 0.6 * s)], ch=0)
+    # far end: horizontal capacitor beyond the last tap
+    ref = f"C{'N' if s < 0 else 'P'}15"
+    two("C", ref, "100n", X15 + 2.6, (Y_RV + 0.75) * s, "h", "GND", rail)
+    for nn_ in (rail, "GND"):
+        xr_, yr_ = pad(ref, "@" + nn_)
+        via(xr_, yr_ + 0.6 * s, nn_, "supply" if nn_ != "GND" else "gnd")
+        track(nn_, 0.4, [(xr_, yr_), (xr_, yr_ + 0.6 * s)], ch=0)
+    # near end: vertical capacitor (mirror image on both rails), clear of the tap-0 comparator via and route
+    ref = f"C{'N' if s < 0 else 'P'}00"
+    two("C", ref, "100n", XT[0] - 3.5, (Y_RV + 1.0) * s, "v", *((rail, "GND") if s > 0 else ("GND", rail)))   # GND pad outward
+    for nn_, d in ((rail, -0.6), ("GND", +0.6)):
+        xr_, yr_ = pad(ref, "@" + nn_)
+        via(xr_, yr_ + d * s, nn_, "supply" if nn_ != "GND" else "gnd")
+        track(nn_, 0.4, [(xr_, yr_), (xr_, yr_ + d * s)], ch=0)
     testpad(tp, rail, X15 + 4.2, (Y_RV + 0.75) * s, lx=0, ly=0.85 * s)
     track(rail, W_PWR, [pad(f"C{'N' if s < 0 else 'P'}15", "@" + rail), (X15 + 4.2, (Y_RV + 0.75) * s)], ch=0)
 
 # ============================================================================= comparators COS3502 (SOIC-8)
 YC = -(YL + 7.0)
+SUM_LEN = []
 VTH_Y = YC + 1.175
 for k in range(NT // 2):
     n0, n1 = 2 * k, 2 * k + 1
-    xc = XT[n0] + X_R1K + 1.905
+    # pins 1 and 3 mirror-symmetric about the middle of the two tap vias: both channels get the same route length
+    xta, xtb = XT[n0] + X_R1K - DX_TAP, XT[n1] + X_R1K - DX_TAP
+    xc = (xta + xtb) / 2 + 0.635
     ref = f"U{11 + k}"
     place("Package_SO", "SOIC-8_3.9x4.9mm_P1.27mm", ref, "COS3502", xc, YC, None,
           {"1": f"TAP{n0}_IN", "2": "VTH", "3": f"TAP{n1}_IN", "4": "VTH", "5": "GND", "6": f"TAP{n1}",
            "7": f"TAP{n0}", "8": "+3V3"},
           cond=lambda pp: pp["1"][1] > 1.0 and pp["1"][0] < pp["4"][0])
-    track(f"TAP{n0}_IN", W_SIG, [(XT[n0] + X_R1K, -Y_RV), (ref, "1")], ch=0)
+    x1, y1 = pad(ref, "1")
     x3, y3 = pad(ref, "3")
-    xr1 = XT[n1] + X_R1K
     yj = y3 + 0.975 + 0.2
-    track(f"TAP{n1}_IN", W_SIG, [(xr1, -Y_RV), (xr1, yj + (xr1 - x3)), (x3, yj), (x3, y3)], ch=0)
+    assert abs((x1 - xta) - (xtb - x3)) < 1e-6 and x1 > xta
+    ra = [(xta, -Y_RV), (xta, yj + (x1 - xta)), (x1, yj), (x1, y1)]
+    rb = [(xtb, -Y_RV), (xtb, yj + (xtb - x3)), (x3, yj), (x3, y3)]
+    track(f"TAP{n0}_IN", W_SIG, ra, ch=0)
+    track(f"TAP{n1}_IN", W_SIG, rb, ch=0)
+    SUM_LEN.append((n0, plen(ra), n1, plen(rb)))
     for pin in ("2", "4"):
         px, py = pad(ref, pin)
         via(px, VTH_Y, "VTH", "signal")
@@ -884,6 +905,12 @@ for lab, w, z0, cl, tdu, L, tdt in (("PSTRB_A/K", W_STR, Z_STR, CL_STR, TDU_STR,
     print(f"  {lab:10s} w {w:.2f} mm, Z0 unloaded {z0:.1f} R, load {cl:.3f} pF, section {L:.3f} mm "
           f"(needed {tdu / ps_mm(w):.3f}), unloaded {L * ps_mm(w):.2f} ps, loaded {td:.2f} ps "
           f"(target {tdt:.1f}), loaded Z {zl:.1f} R")
+_jb = Y_RV + DX_TAP * math.sqrt(2) + (Y_RV - DX_TAP)
+print(f"summing node (per tap): 1 k pad -> via {Y_RV - YL - 0.48:.3f} mm F.Cu on both sides, via -> jumper midpoint "
+      f"{Y_RV:.3f} mm B.Cu on both sides (A = K), midpoint -> tap via {DX_TAP * math.sqrt(2) + (Y_RV - DX_TAP):.3f} mm B.Cu, "
+      f"tap via -> comparator pin F.Cu: " + ", ".join(sorted({f"{la:.3f} / {lb:.3f}" for _, la, _, lb in SUM_LEN}))
+      + " mm (channel A / B)")
+assert all(abs(la - lb) < 1e-6 for _, la, _, lb in SUM_LEN)
 print(f"  pitch {PITCH:.3f} mm, meander half-height Y {Y_M:.3f} mm, legs x = {X_P3:.2f} / {XU:.3f} / {XD:.3f} "
       f"(gaps {XU - X_P3 - W_LIN:.3f} / {XD - XU - W_LIN:.3f} mm), strobe |y| {YL:.2f} mm")
 print(f"{'interval':>8s} {'A mm':>7s} {'K mm':>7s} {'A ps':>6s} {'K ps':>6s} {'line mm':>8s} {'line ps':>8s} {'eff ps':>7s}")
