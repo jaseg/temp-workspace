@@ -688,6 +688,33 @@ def chamfer(pts, c):
     return out
 
 
+def courtyard_overlaps(b, min_area=0.005):
+    """COURTYARD RULE: same-side footprint courtyards (F.CrtYd / B.CrtYd, BuildCourtyardCaches + GetCourtyard)
+    intersected pairwise (BooleanIntersection); pairs with an intersection area > min_area mm2 are returned.
+    b: pcbnew.BOARD or path."""
+    if isinstance(b, str):
+        b = pcbnew.LoadBoard(b)
+    cs = []
+    for f in b.GetFootprints():
+        f.BuildCourtyardCaches()
+        for lay in (pcbnew.F_CrtYd, pcbnew.B_CrtYd):
+            ps = f.GetCourtyard(lay)
+            if ps.OutlineCount():
+                cs.append((f.GetReference(), lay, ps, ps.BBox()))
+    hits = []
+    for i in range(len(cs)):
+        for j in range(i + 1, len(cs)):
+            a_, c_ = cs[i], cs[j]
+            if a_[1] != c_[1] or not a_[3].Intersects(c_[3]):
+                continue
+            x_ = pcbnew.SHAPE_POLY_SET(a_[2])
+            x_.BooleanIntersection(c_[2], pcbnew.SHAPE_POLY_SET.PM_FAST)
+            ar = x_.Area() / 1e12
+            if ar > min_area:
+                hits.append(f"{a_[0]}/{c_[0]} {'F' if a_[1] == pcbnew.F_CrtYd else 'B'} {ar:.3f} mm2")
+    return hits
+
+
 # ============================================================================= 5. check_board
 def _fpid(fp):
     i = fp.GetFPID()
@@ -718,7 +745,7 @@ def check_board(pcb_path, refs=None, rf_widths=None, rf_gap=True, fill=True, cle
         have[r] = fp
     R = {k: [] for k in ("pad_missing", "missing", "extra", "duplicate", "footprint", "footprint_nolib", "value", "pad_net",
                          "pad_net_short", "pad_nonet", "pad_unknown", "unrouted", "clearance", "corner",
-                         "pad_axis", "rf_width", "rf_gap")}
+                         "pad_axis", "rf_width", "rf_gap", "courtyard")}
     R["duplicate"] = dup
     R["missing"] = sorted(want - set(have))
     R["extra"] = sorted(set(have) - want)
@@ -882,6 +909,7 @@ def check_board(pcb_path, refs=None, rf_widths=None, rf_gap=True, fill=True, cle
                         R["rf_gap"].append(f"{t.GetNetname()} / pour {z.GetNetname()} at "
                                            f"({pcbnew.ToMM(s.x):.2f}, {pcbnew.ToMM(s.y):.2f})")
                         break
+    R["courtyard"] = courtyard_overlaps(b)
     counts = {k: len(v) for k, v in R.items()}
     counts["unconnected_items"] = n_unconn
     counts["footprints"] = len(fps)
@@ -897,7 +925,8 @@ def check_board(pcb_path, refs=None, rf_widths=None, rf_gap=True, fill=True, cle
                   "pad_unknown": "pads with a net the netlist does not list",
                   "unrouted": "nets with unrouted connections (after fill)", "clearance": f"clearance < {clearance} mm",
                   "corner": "track corners > 45 deg", "pad_axis": "tracks leaving a pad off-axis",
-                  "rf_width": "RF width deviations", "rf_gap": "RF pour gap < 2 w"}
+                  "rf_width": "RF width deviations", "rf_gap": "RF pour gap < 2 w",
+                  "courtyard": "courtyard overlaps (same side, > 0.005 mm2)"}
         for k, lab in labels.items():
             v = R[k]
             print(f"  {lab:50s} {len(v):5d}" + ("" if not v or not verbose else "   e.g. " + "; ".join(v[:verbose])))
