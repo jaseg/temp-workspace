@@ -1,0 +1,108 @@
+{
+"strobe": {
+"v(pa0)": {
+"peak": 3.28807295,
+"t_peak": 2.045e-09,
+"fwhm_ps": 184.75507999999968
+},
+"v(pa8)": {
+"peak": 2.74599009,
+"t_peak": 2.33030129e-09,
+"fwhm_ps": 188.40386999999996
+},
+"v(pa15)": {
+"peak": 2.23052724,
+"t_peak": 2.55726142e-09,
+"fwhm_ps": 237.5729800000001
+},
+"v(pk0)": {
+"peak": -3.33097136,
+"t_peak": 2.04572e-09,
+"fwhm_ps": 182.64992000000004
+},
+"v(pk8)": {
+"peak": -2.61227325,
+"t_peak": 2.32955769e-09,
+"fwhm_ps": 204.4437899999999
+},
+"v(pk15)": {
+"peak": -2.15768859,
+"t_peak": 2.55295915e-09,
+"fwhm_ps": 233.5125900000001
+}
+},
+"strobe_arrival_ps": [
+0.0,
+41.7,
+78.1,
+115.8,
+153.8,
+190.2,
+223.0,
+253.9,
+285.3,
+316.2,
+348.2,
+380.6,
+412.7,
+446.5,
+478.1,
+512.3
+],
+"strobe_no_diodes": {
+"v(pa0)": {
+"peak": 3.48011372,
+"t_peak": 2.037e-09,
+"fwhm_ps": 170.61999999999998
+},
+"v(pa8)": {
+"peak": 2.54956774,
+"t_peak": 2.2339e-09,
+"fwhm_ps": 198.3200000000002
+},
+"v(pa15)": {
+"peak": 1.69588828,
+"t_peak": 2.41372e-09,
+"fwhm_ps": 290.61999999999995
+}
+},
+"strobe_no_diodes_arrival_15_ps": 376.7199999999999,
+"reference_gate": [
+{
+"vp": 2.0,
+"half_mV": 25.285851316666662,
+"mid_mV": -0.00018213333333357007,
+"loaded_node_peak": 2.00087338
+},
+{
+"vp": 1.5,
+"half_mV": 3.461763443333333,
+"mid_mV": -0.0026789566666669904,
+"loaded_node_peak": 1.49920777
+},
+{
+"vp": 2.0,
+"half_mV": 17.140908925,
+"mid_mV": -0.00012249166666741806,
+"loaded_node_peak": 2.00085274
+}
+]
+}
+edge at tap0 for x=0: 15.626251104910557
+co, Cin 3 pF {'spacing_ps': [37.3, 33.5, 32.4, 34.7, 34.3, 32.7, 33.0, 34.6, 36.0, 38.0, 40.2, 44.9, 52.7, 22.6, 47.6], 'spacing_mean': 36.97220059098349, 'spacing_sd': 6.949395078362913, 'spacing_min': 22.625218240051506, 'spacing_max': 52.67382957245297, 'half_min_mV': 17.841220018414415, 'half_max_mV': 38.04277702444861, 'w1090_ps': 338.1459376361002, 'rms_ps': 1.907577907214026e-11, 'rms_ps_off6p5': 2.157814072600537e-11}
+co, Cin 6 pF {'spacing_ps': [37.1, 33.3, 32.2, 34.4, 34.0, 32.5, 32.8, 34.2, 35.7, 37.6, 39.8, 44.3, 51.8, 21.8, 46.9], 'spacing_mean': 36.54707924811059, 'spacing_sd': 6.863860393610539, 'spacing_min': 21.789406321001877, 'spacing_max': 51.75927019692678, 'half_min_mV': 12.51964628244023, 'half_max_mV': 26.84933464397328, 'w1090_ps': 365.86977054807295, 'rms_ps': 2.2973750304346565e-11, 'rms_ps_off6p5': 2.7490776125301166e-11}
+co, launch x1.3 {'spacing_ps': [35.7, 32.7, 32.9, 32.7, 30.6, 30.1, 32.1, 34.5, 35.2, 35.2, 36.1, 36.0, 38.1, 34.1, 47.5], 'spacing_mean': 34.90737039013894, 'spacing_sd': 3.978429516573387, 'spacing_min': 30.0763269138368, 'spacing_max': 47.54437054243542, 'half_min_mV': 25.81920429125968, 'half_max_mV': 38.185091605123, 'w1090_ps': 336.27993862873916, 'rms_ps': 1.8258936835160543e-11, 'rms_ps_off6p5': 2.0907467468699577e-11}
+counter 30+30 ps (60 ps taps) {'spacing_ps': [83.2, 69.8, 60.6, 59.7, 63.8, 65.4, 66.6, 68.1, 69.4, 71.6, 75.8, 79.7, 80.7, 73.4, 59.4], 'spacing_mean': 69.82131111112132, 'spacing_sd': 7.36633921321473, 'spacing_min': 59.362319789996505, 'spacing_max': 83.20778125949425, 'half_min_mV': 4.66842844266489, 'half_max_mV': 27.91394675945645, 'w1090_ps': 102.59797573020971, 'rms_ps': 5.060677940500988e-11, 'rms_ps_off6p5': 6.378279828108215e-11}
+edge before all taps | 50 % duty {'o0_dmV_at_12ns': 0.04, 'o0_maxdev_mV': 0.43, 'rev_d1_0': 2.95, 'rev_d2_0': 2.44, 'o8_dmV_at_12ns': 0.11, 'o8_maxdev_mV': 0.32, 'rev_d1_8': 2.73, 'rev_d2_8': 2.22, 'o15_dmV_at_12ns': 0.16, 'o15_maxdev_mV': 0.33, 'rev_d1_15': 2.45, 'rev_d2_15': 1.93, 'pa0_peak': 3.33, 'pa0_min_late': -3.45}
+edge before all taps | 50 % duty, no reverse edge (reference) {'o0_dmV_at_12ns': 0.0, 'o0_maxdev_mV': 0.0, 'rev_d1_0': 1.8, 'rev_d2_0': 1.68, 'o8_dmV_at_12ns': 0.0, 'o8_maxdev_mV': 0.0, 'rev_d1_8': 1.42, 'rev_d2_8': 1.24, 'o15_dmV_at_12ns': 0.0, 'o15_maxdev_mV': 0.0, 'rev_d1_15': 1.15, 'rev_d2_15': 1.0, 'pa0_peak': 3.33, 'pa0_min_late': 0.01}
+edge before all taps | 50 % duty + BAT15 clamp at launch {'o0_dmV_at_12ns': 0.06, 'o0_maxdev_mV': 0.28, 'rev_d1_0': 1.99, 'rev_d2_0': 1.71, 'o8_dmV_at_12ns': 0.13, 'o8_maxdev_mV': 0.18, 'rev_d1_8': 1.89, 'rev_d2_8': 1.37, 'o15_dmV_at_12ns': 0.43, 'o15_maxdev_mV': 0.64, 'rev_d1_15': 1.74, 'rev_d2_15': 1.23, 'pa0_peak': 3.38, 'pa0_min_late': -1.72}
+edge before all taps | 70 % duty (reverse at +14 ns) {'o0_dmV_at_12ns': -0.0, 'o0_maxdev_mV': 0.44, 'rev_d1_0': 2.95, 'rev_d2_0': 2.43, 'o8_dmV_at_12ns': 0.0, 'o8_maxdev_mV': 0.33, 'rev_d1_8': 2.74, 'rev_d2_8': 2.21, 'o15_dmV_at_12ns': -0.0, 'o15_maxdev_mV': 0.34, 'rev_d1_15': 2.45, 'rev_d2_15': 1.93, 'pa0_peak': 3.33, 'pa0_min_late': -3.45}
+edge after all taps | 50 % duty {'o0_dmV_at_12ns': 0.04, 'o0_maxdev_mV': 0.46, 'rev_d1_0': 2.97, 'rev_d2_0': 2.42, 'o8_dmV_at_12ns': 0.12, 'o8_maxdev_mV': 0.34, 'rev_d1_8': 2.75, 'rev_d2_8': 2.2, 'o15_dmV_at_12ns': 0.17, 'o15_maxdev_mV': 0.34, 'rev_d1_15': 2.46, 'rev_d2_15': 1.92, 'pa0_peak': 3.29, 'pa0_min_late': -3.45}
+edge after all taps | 50 % duty, no reverse edge (reference) {'o0_dmV_at_12ns': 0.0, 'o0_maxdev_mV': 0.0, 'rev_d1_0': 1.97, 'rev_d2_0': 1.56, 'o8_dmV_at_12ns': 0.0, 'o8_maxdev_mV': 0.0, 'rev_d1_8': 1.29, 'rev_d2_8': 1.43, 'o15_dmV_at_12ns': 0.0, 'o15_maxdev_mV': 0.0, 'rev_d1_15': 1.13, 'rev_d2_15': 1.16, 'pa0_peak': 3.29, 'pa0_min_late': 0.01}
+edge after all taps | 50 % duty + BAT15 clamp at launch {'o0_dmV_at_12ns': 0.12, 'o0_maxdev_mV': 0.23, 'rev_d1_0': 2.01, 'rev_d2_0': 1.62, 'o8_dmV_at_12ns': 0.13, 'o8_maxdev_mV': 0.19, 'rev_d1_8': 1.9, 'rev_d2_8': 1.46, 'o15_dmV_at_12ns': -0.27, 'o15_maxdev_mV': 0.71, 'rev_d1_15': 1.75, 'rev_d2_15': 1.22, 'pa0_peak': 3.34, 'pa0_min_late': -1.72}
+edge after all taps | 70 % duty (reverse at +14 ns) {'o0_dmV_at_12ns': 0.0, 'o0_maxdev_mV': 0.45, 'rev_d1_0': 2.96, 'rev_d2_0': 2.42, 'o8_dmV_at_12ns': -0.0, 'o8_maxdev_mV': 0.34, 'rev_d1_8': 2.75, 'rev_d2_8': 2.2, 'o15_dmV_at_12ns': -0.0, 'o15_maxdev_mV': 0.34, 'rev_d1_15': 2.46, 'rev_d2_15': 1.92, 'pa0_peak': 3.29, 'pa0_min_late': -3.45}
+edge mid-array | 50 % duty {'o0_dmV_at_12ns': 0.04, 'o0_maxdev_mV': 0.43, 'rev_d1_0': 2.95, 'rev_d2_0': 2.43, 'o8_dmV_at_12ns': 0.11, 'o8_maxdev_mV': 0.34, 'rev_d1_8': 2.74, 'rev_d2_8': 2.21, 'o15_dmV_at_12ns': 0.17, 'o15_maxdev_mV': 0.34, 'rev_d1_15': 2.46, 'rev_d2_15': 1.92, 'pa0_peak': 3.32, 'pa0_min_late': -3.45}
+edge mid-array | 50 % duty, no reverse edge (reference) {'o0_dmV_at_12ns': 0.0, 'o0_maxdev_mV': 0.0, 'rev_d1_0': 1.83, 'rev_d2_0': 1.66, 'o8_dmV_at_12ns': 0.0, 'o8_maxdev_mV': 0.0, 'rev_d1_8': 1.56, 'rev_d2_8': 1.14, 'o15_dmV_at_12ns': 0.0, 'o15_maxdev_mV': 0.0, 'rev_d1_15': 1.21, 'rev_d2_15': 1.01, 'pa0_peak': 3.32, 'pa0_min_late': 0.01}
+edge mid-array | 50 % duty + BAT15 clamp at launch {'o0_dmV_at_12ns': 0.11, 'o0_maxdev_mV': 0.22, 'rev_d1_0': 1.99, 'rev_d2_0': 1.7, 'o8_dmV_at_12ns': 0.46, 'o8_maxdev_mV': 0.65, 'rev_d1_8': 1.9, 'rev_d2_8': 1.36, 'o15_dmV_at_12ns': -0.23, 'o15_maxdev_mV': 0.64, 'rev_d1_15': 1.75, 'rev_d2_15': 1.22, 'pa0_peak': 3.37, 'pa0_min_late': -1.72}
+edge mid-array | 70 % duty (reverse at +14 ns) {'o0_dmV_at_12ns': 0.0, 'o0_maxdev_mV': 0.44, 'rev_d1_0': 2.95, 'rev_d2_0': 2.43, 'o8_dmV_at_12ns': -0.0, 'o8_maxdev_mV': 0.34, 'rev_d1_8': 2.74, 'rev_d2_8': 2.21, 'o15_dmV_at_12ns': -0.0, 'o15_maxdev_mV': 0.34, 'rev_d1_15': 2.46, 'rev_d2_15': 1.92, 'pa0_peak': 3.32, 'pa0_min_late': -3.45}
+{'gates': {'0.5GHz': 31.69452042233165, '1GHz': 28.432518794472646, '2GHz': 24.469180363730825, '3GHz': 30.870477865737527, '4GHz': 14.108255009384653, '6GHz': 6.055880206306087}, 'no_gates': {'0.5GHz': 26.607908974505577, '1GHz': 21.02791967558997, '2GHz': 16.887560288543924, '3GHz': 16.85837055385696, '4GHz': 20.248324665773247, '6GHz': 21.08696807110267}} {'v(s0)': {'t1090_ps': 236.75840993242272, 't50_ps': 2053.7986552037, 'overshoot': 0.12302399640139239, 'step': 0.5158150715}, 'v(s8)': {'t1090_ps': 426.7509456470004, 't50_ps': 2561.1249330483993, 'overshoot': 0.10298028556708139, 'step': 0.4858593975}, 'v(s15)': {'t1090_ps': 166.1147211820931, 't50_ps': 3164.708920816631, 'overshoot': 0.034479935695688635, 'step': 0.2804904303}}

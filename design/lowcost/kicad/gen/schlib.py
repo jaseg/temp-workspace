@@ -615,8 +615,27 @@ class Sheet:
                     warn.append(f"unconnected pin {s.ref}.{pd.number} ({pd.name}) at {p}")
         return warn
 
+    def split_wires(self):
+        """KiCad 7 connects a pin, label or wire end only at a wire END: split every wire at each pin,
+        wire end and label point lying on its interior (idempotent; run by render())."""
+        pts = {p for w in self.wires for p in w}
+        for s in self.symbols:
+            for pd in s.pins:
+                if pd.hidden and pd.type == "power_in" and not s.power:
+                    continue
+                pts.add(s.pin(pd.number))
+        pts.update(self.label_pts)
+        out = []
+        for a, b in self.wires:
+            inner = sorted((p for p in pts if self._on_mid(p, a, b)),
+                           key=lambda p: abs(p[0] - a[0]) + abs(p[1] - a[1]))
+            chain = [a] + inner + [b]
+            out += list(zip(chain, chain[1:]))
+        self.wires = out
+
     # output
     def render(self) -> str:
+        self.split_wires()
         self.auto_junctions()
         libs = {}
         for s in self.symbols:

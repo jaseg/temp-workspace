@@ -85,7 +85,7 @@ def build(p: A, t_peak0: float) -> str:
     d.add(f.MODELS)
     # ---- signal source: LVDS starts balanced, goes low at 0.1 ns, edge up at the requested time
     if p.signal:
-        t_edge = t_peak0 + p.x - 0.33e-9          # LVDS 50 % -> line 50 % at tap 0 (~330 ps, see calib)
+        t_edge = t_peak0 + p.x - 0.126e-9         # LVDS 50 % -> line 50 % at tap 0 (126 ps, calibrated in run.py)
         pwl = f"0 0 0.1n 0 {0.1e-9 + c.T_EDGE:.6g} {-c.I_LVDS} {t_edge - c.T_EDGE / 2:.6g} {-c.I_LVDS} {t_edge + c.T_EDGE / 2:.6g} {c.I_LVDS}"
     else:
         pwl = f"0 0 0.1n 0 {0.1e-9 + c.T_EDGE:.6g} {-c.I_LVDS}"

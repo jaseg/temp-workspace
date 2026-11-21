@@ -137,7 +137,7 @@ def main():
     series_out(sh, ck, "10", "33", "FPGA_CLK")
     series_out(sh, ck, "9", "33", "MCU_CLK", kind="hlabel")
     series_out(sh, ck, "6", "33", "CLK2_FPGA")
-    y = sh.add("Device:Crystal_GND24", "Y", "25MHz", (g(40), g(52)),
+    y = sh.add("Device:Crystal_GND24", "Y", "25MHz", (g(40), g(50)),
                fp="Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm", lcsc="C9006",
                fields={"Note": "25 MHz, CL 8 pF (Si5351 internal load caps), ESR < 100R"})
     sh.wire(ck["2"], y["3"], via="vh")

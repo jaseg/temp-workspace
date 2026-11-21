@@ -3,13 +3,14 @@
 Signal paths, left to right (all 50 R, 50 % duty square waves from complementary LVCMOS33 FPGA pins):
   Sampler strobe (3.125 MHz):
     S_STROBE_P -> 47 R -> 100 nF -> TRF37D73 #1 -> 100 nF -> 12 dB pi pad (82/91/82 R) -> 100 nF
-    -> TRF37D73 #2 -> 100 nF -> clip node with shorted stub TL (80 ps one-way, 13.2 mm)
+    -> TRF37D73 #2 -> 100 nF -> clip node with shorted stub TL (80 ps one-way, 13.2 mm) and a fitted BAT15-03W clamp
     -> T401 common-mode-choke balun (Murata DLW21SN900HQ2L) -> STRB_A / STRB_K (floating rails;
     47 pF blocks, 1 k termination and bias feeds are on the sampler sheet).
     S_STROBE_N: unused complement, AC dummy load 47 R + 100 nF + 49.9 R (keeps pin currents equal).
   Phase strobe (50 MHz), one chain per polarity, identical layout:
     PH_STROBE_P/N -> 47 R -> 100 nF -> TRF37D73 -> 100 nF -> 10 dB pi pad (100/68/100 R) -> 100 nF
-    -> GVA-84+ (VBUS via 2.2 uH + bead) -> 100 nF -> launch node with shorted stub (45 ps, 7.4 mm)
+    -> GVA-84+ (VBUS via 2.2 uH + bead) -> 100 nF -> launch node with shorted stub
+    (80 ps, 13.2 mm, sim/phase_array/RESULT.md)
     and a DNP BAT15-03W clamp -> PSTRB_A / PSTRB_K (strobe lines along the taps, trigger_phase sheet).
 
 Deviation from RESULT.md: an extra 100 nF block in front of TRF #2 / GVA-84+ (both RF inputs carry
@@ -85,10 +86,10 @@ def bias_tee(sh, x, Y, Yr, big, rail, cap_xs, tp_name):
     """RF choke from the line node (x, Y) up to the rail at y = Yr: bead (RF side) + big inductor.
     Returns (bead, L)."""
     lib, fp, mpn, f = BEAD
-    b = sh.add(lib, "FB", "1k", P(x, Y - 4), fp=fp, mpn=mpn, fields=f)
+    b = sh.add(lib, "FB", "1k", P(x, Y - 4), rot=180, fp=fp, mpn=mpn, fields=f)  # pin 1 at the line
     lib, fp, mpn, f = big
     val = "47u" if big is L47 else "2.2u"
-    l = sh.add(lib, "L", val, P(x, Y - 11), fp=fp, mpn=mpn, fields=f)
+    l = sh.add(lib, "L", val, P(x, Y - 11), rot=180, fp=fp, mpn=mpn, fields=f)
     sh.wire(P(x, Y), b["1"])
     sh.wire(b["2"], l["1"])
     sh.wire(l["2"], P(x, Yr))
@@ -179,6 +180,17 @@ def main():
                  fp="Inductor_SMD:L_CommonModeChoke_Coilcraft_0805USB", lcsc="C97855", mpn="DLW21SN900HQ2L",
                  fields={"Price": "~0.29 USD", "Note": "CM choke as 1:1 TL balun; check pad map vs Murata drawing"})
     sh.wire(P(142, Y), bal["1"])
+    # BAT15 shunt clamp at the launch node, fitted (sim/phase_array/RESULT.md (3): bridge reverse 3.27 -> 1.90 V)
+    for rot in (90, 270):
+        dc = sh.add("Device:D_Schottky", "D", "BAT15-03W", P(164, Y + 4), rot=rot, fp="Diode_SMD:D_SOD-323",
+                    mpn="BAT1503WE6327HTSA1",
+                    fields={"Note": "FITTED: clamps the wrong-polarity pulse of the falling edge (K to node, A to GND)"})
+        if dc["1"][1] < dc["2"][1]:
+            break
+        sh.symbols.remove(dc)
+        sh._refn["D"] -= 1
+    sh.wire(P(164, Y), dc["1"])
+    sh.gnd(dc["2"])
     sh.gnd(bal["3"])
     sh.wire(bal["2"], P(196, Y))
     sh.hlabel("STRB_A", P(196, Y), shapes["STRB_A"], side="right")
@@ -208,7 +220,8 @@ def main():
     sh.text("CLIP STUB TL401: 80 ps one-way = 13.2 mm\n"
             "50 R microstrip (6.05 ps/mm). Tap right at\n"
             "C(TRF #2 out); far end via to GND (NT401).\n"
-            "Pulse ~160 ps wide; trim 60 ps = 9.9 mm.", P(128, Yn + 6), size=T)
+            "Pulse ~160 ps wide; trim 60 ps = 9.9 mm.\n"
+            "D clamp BAT15-03W FITTED (bridge reverse\n3.27 V -> 1.9 V, phase_array RESULT).", P(128, Yn + 6), size=T)
     sh.text("BALUN T401: Murata DLW21SN900HQ2L CMC\n"
             "(0805, 90 R CM @100 MHz, LCSC C97855)\n"
             "as 1:1 TL balun: line 1 = signal -> STRB_A,\n"
@@ -240,7 +253,7 @@ def main():
         c4 = C(sh, "100n", P(140, Y), rot=90)
         sh.wire(P(120, Y), c4["1"])
         sh.wire(c4["2"], P(148, Y))
-        stub(sh, 148, Y, f"TL40{n + 1}", 45, 7.4)
+        stub(sh, 148, Y, f"TL40{n + 1}", 80, 13.2)   # 80 ps: sim/phase_array/RESULT.md
         # DNP clamp at the launch point
         want_k_top = lab_out == "PSTRB_A"
         for rot in (90, 270):
@@ -269,10 +282,11 @@ def main():
             "Fig. 2): VBUS -> 2.2 uH -> bead -> pin 3,\n"
             "Vd ~ VBUS - 0.15 V. Pin 3 max 5.8 V.\n"
             "Step 7.2 V into 50 R (sim, nominal).", P(102, Y2 + 12), size=T)
-    sh.text("LAUNCH STUB: 45 ps one-way = 7.4 mm 50 R,\n"
-            "at the start of the tap line; far end via to\n"
-            "GND. Launch pulse 3.0-3.4 V, 166-180 ps FWHM.\n"
-            "D (DNP) BAT15-03W clamp at the launch point.", P(150, Y2 + 16), size=T)
+    sh.text("LAUNCH STUB: 80 ps one-way = 13.2 mm 50 R\n"
+            "(phase_array RESULT; was 45 ps), at the start of\n"
+            "the tap line; far end via to GND. Launch ~4 V peak,\n"
+            ">= 2.75 V at every tap. BAT15-03W clamp DNP\n"
+            "(reverse 2.95 V < BV 4 V: not needed).", P(150, Y2 + 16), size=T)
     sh.text("PSTRB_A: anode strobe line (positive pulse);\n"
             "73 R loaded line along the 16 gates, 35 ps/tap,\n"
             "ends in 50 R on trigger_phase.", P(200, Y2 + 3), size=T)
@@ -335,17 +349,17 @@ def check(outdir):
     A(n, "PH_STROBE_N", {("R411", "1")})
     A(n, "STRB_A", {("T401", "2")})
     A(n, "STRB_K", {("T401", "4")})
-    A(n, "PSTRB_A", {("C421", "2"), ("TL402", "1"), ("D401", "1")})
-    A(n, "PSTRB_K", {("C431", "2"), ("TL403", "1"), ("D402", "2")})
+    A(n, "PSTRB_A", {("C421", "2"), ("TL402", "1"), ("D402", "1")})
+    A(n, "PSTRB_K", {("C431", "2"), ("TL403", "1"), ("D403", "2")})
     # sampler chain
     on(("R401", "2"), ("C401", "1")); on(("C401", "2"), ("U401", "2"))
     on(("U401", "7"), ("FB401", "1"), ("C405", "1")); on(("FB401", "2"), ("L401", "1"), ("TP401", "1"))
     on(("C405", "2"), ("R402", "1"), ("R404", "1")); on(("R404", "2"), ("R403", "1"), ("C406", "1"))
     on(("C406", "2"), ("U402", "2")); on(("U402", "7"), ("FB402", "1"), ("C410", "1"))
-    on(("C410", "2"), ("TL401", "1"), ("T401", "1")); on(("TL401", "3"), ("NT401", "1"))
+    on(("C410", "2"), ("TL401", "1"), ("T401", "1"), ("D401", "1")); on(("TL401", "3"), ("NT401", "1"))
     on(("R405", "2"), ("C411", "1")); on(("C411", "2"), ("R406", "1"))
     A(n, "GND", {("T401", "3"), ("NT401", "2"), ("TL401", "2"), ("TL401", "4"), ("R406", "2"),
-                 ("D401", "2"), ("D402", "1"), ("U404", "2"), ("U406", "2")}
+                 ("D401", "2"), ("D402", "2"), ("D403", "1"), ("U404", "2"), ("U406", "2")}
       | {(u, p) for u in ("U401", "U402", "U403", "U405") for p in ("3", "4", "5", "6", "8", "9")})
     A(n, "+3V3", {(u, "1") for u in ("U401", "U402", "U403", "U405")} |
       {("L401", "2"), ("L402", "2"), ("L403", "2"), ("L405", "2")})

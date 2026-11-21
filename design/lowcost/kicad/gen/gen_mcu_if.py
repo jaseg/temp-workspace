@@ -135,11 +135,13 @@ def main():
     diffamp(sh, u2, g(185), g(75), "DAC_OFS", "VOFS", "24.9k", "10k",
             note="VOFS = 0.40 (Vdac - VMID): +/-0.48 V (into the OPA197 servo summing node)")
     u2b = sh.add(OPAMP, u2.ref, "TP2272", (g(120), g(120)), unit=2, fp=OPA_FP, fields=OPA_F)
-    diffamp(sh, u2b, g(120), g(120), "DAC_BIAS_A", "VBIAS_A", "60.4k", "10k", ra="24.9k", rb="16.5k",
-            rail="+2V5", note="VBIAS_A = +1.00 V + (Vdac - VMID)/6: +0.80..+1.20 V")
+    # bridge bias (sampler sheet): anode rail VBIAS_A NEGATIVE, cathode rail VBIAS_K POSITIVE (reverse bias,
+    # sim/strobe/bridge.py, sim/sampler/RESULT.md); G = 0.5 -> 0.4..1.6 V magnitude (strobe RESULT: 0.5..1.2 V)
+    diffamp(sh, u2b, g(120), g(120), "DAC_BIAS_A", "VBIAS_A", "20k", "10k", ra="24.9k", rb="16.5k",
+            rail="-2V5", note="VBIAS_A = -1.00 V + 0.5 (Vdac - VMID): -1.60..-0.40 V (anode rail)")
     u3 = sh.add(OPAMP, "U", "TP2272", (g(185), g(120)), unit=1, fp=OPA_FP, fields=OPA_F)
-    diffamp(sh, u3, g(185), g(120), "DAC_BIAS_K", "VBIAS_K", "60.4k", "10k", ra="24.9k", rb="16.5k",
-            rail="-2V5", note="VBIAS_K = -1.00 V + (Vdac - VMID)/6: -1.20..-0.80 V")
+    diffamp(sh, u3, g(185), g(120), "DAC_BIAS_K", "VBIAS_K", "20k", "10k", ra="24.9k", rb="16.5k",
+            rail="+2V5", note="VBIAS_K = +1.00 V + 0.5 (Vdac - VMID): +0.40..+1.60 V (cathode rail)")
     # spare section: follower to GND
     u3b = sh.add(OPAMP, u3.ref, "TP2272", (g(250), g(120)), unit=2, fp=OPA_FP, fields=OPA_F)
     sh.path([u3b["5"], (u3b["5"][0] - g(3), u3b["5"][1])])
