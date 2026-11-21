@@ -9,7 +9,7 @@ const fs = require('fs'), path = require('path');
     const svg = fs.readFileSync(f, 'utf8');
     const m = svg.match(/viewBox="([\d.\-]+) ([\d.\-]+) ([\d.]+) ([\d.]+)"/);
     const w = m ? parseFloat(m[3]) : 420, h = m ? parseFloat(m[4]) : 297;
-    const W = 3200, H = Math.round(W * h / w);
+    const W = parseInt(process.env.SVG2PNG_WIDTH || "3200", 10), H = Math.round(W * h / w);
     await page.setViewportSize({ width: W, height: H });
     await page.setContent(`<html><body style="margin:0;background:#fff"><img src="data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}" style="width:${W}px;height:${H}px"></body></html>`);
     await page.waitForTimeout(200);

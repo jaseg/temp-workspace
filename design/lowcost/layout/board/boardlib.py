@@ -342,19 +342,21 @@ def setup_board(b, org=ORG, stackup=None):
     nc.SetViaDrill(mm(VIA_DRILL))
 
 
-def write_stackup(path):
-    """pcbnew 7 Python cannot build the stack-up; insert it into the saved file"""
+def write_stackup(path, ncu=None):
+    """pcbnew 7 Python cannot build the stack-up; insert it into the saved file (6L text for 6 copper layers)"""
     with open(path) as f:
         s = f.read()
+    if ncu is None:
+        ncu = 6 if '"In4.Cu" signal' in s or '"In4.Cu" power' in s else 4
     if "(stackup" not in s:
-        s = s.replace("  (setup\n", "  (setup\n" + STACKUP, 1)
+        s = s.replace("  (setup\n", "  (setup\n" + (STACKUP_6L if ncu == 6 else STACKUP_4L), 1)
         with open(path, "w") as f:
             f.write(s)
 
 
 def save_board(b, path):
     pcbnew.SaveBoard(path, b)
-    write_stackup(path)
+    write_stackup(path, b.GetCopperLayerCount())
     for ext in (".kicad_pro", ".kicad_prl"):
         p = path[:-len(".kicad_pcb")] + ext
         if os.path.exists(p):
@@ -1076,12 +1078,14 @@ def _block_origin(bb):
 
 
 def merge(master, block_pcb_path, dx, dy, rot_deg=0.0, flip=False, skip_edge=True, skip_planes=False,
-          origin=None, ref_map=None):
+          origin=None, ref_map=None, layer_map=None):
     """Append a block board to master (pcbnew.BOARD).  The block's local origin (its aux origin, else the
     top-left of its Edge.Cuts) is flipped (left-right, optional), rotated by rot_deg (CCW) about itself and
     moved to master-local (dx, dy) (master aux origin + offset).  Nets are mapped by name (created in the
     master if absent).  skip_edge drops the block's Edge.Cuts; skip_planes drops its zones on In1 / In2.
-    ref_map: optional {old_ref: new_ref}.  Returns {"footprints", "tracks", "zones", "drawings", "nets"}."""
+    ref_map: optional {old_ref: new_ref}.  layer_map: optional {block layer name: master layer name} for tracks,
+    zones and drawings on inner layers (LAYER_MAP_4TO6 for a 4-layer block on the 6-layer board; block vias are
+    through vias and stay F.Cu-B.Cu).  Returns {"footprints", "tracks", "zones", "drawings", "nets"}."""
     bb = pcbnew.LoadBoard(block_pcb_path)
     o = origin if origin is not None else _block_origin(bb)
     mo = master.GetDesignSettings().GetAuxOrigin()
@@ -1109,6 +1113,24 @@ def merge(master, block_pcb_path, dx, dy, rot_deg=0.0, flip=False, skip_edge=Tru
             it.Rotate(o, ang)
         it.Move(shift)
     cnt = {"footprints": 0, "tracks": 0, "zones": 0, "drawings": 0}
+    lmap = {CU_LAYERS[a]: CU_LAYERS[b_]
+            for a, b_ in (layer_map or {}).items() if a != b_}
+
+    def relayer(it):
+        if not lmap:
+            return
+        if isinstance(it, pcbnew.PCB_VIA):
+            it.SetLayerPair(pcbnew.F_Cu, pcbnew.B_Cu)
+            return
+        if isinstance(it, pcbnew.ZONE):
+            ls = it.GetLayerSet()
+            new = pcbnew.LSET()
+            for lid in ls.Seq():
+                new.AddLayer(lmap.get(lid, lid))
+            it.SetLayerSet(new)
+            return
+        if it.GetLayer() in lmap:
+            it.SetLayer(lmap[it.GetLayer()])
     for fp in list(bb.GetFootprints()):
         nets = [(p, mnet(p.GetNet())) for p in fp.Pads()]
         bb.Remove(fp)
@@ -1126,6 +1148,7 @@ def merge(master, block_pcb_path, dx, dy, rot_deg=0.0, flip=False, skip_edge=Tru
         n = mnet(t.GetNet())
         bb.Remove(t)
         xform(t)
+        relayer(t)
         master.Add(t)
         if n is not None:
             t.SetNet(n)
@@ -1136,6 +1159,7 @@ def merge(master, block_pcb_path, dx, dy, rot_deg=0.0, flip=False, skip_edge=Tru
         n = None if z.GetIsRuleArea() else mnet(z.GetNet())
         bb.Remove(z)
         xform(z)
+        relayer(z)
         master.Add(z)
         if n is not None:
             z.SetNet(n)
@@ -1145,6 +1169,7 @@ def merge(master, block_pcb_path, dx, dy, rot_deg=0.0, flip=False, skip_edge=Tru
             continue
         bb.Remove(d)
         xform(d)
+        relayer(d)
         master.Add(d)
         cnt["drawings"] += 1
     cnt["nets"] = len(mnets)
@@ -1169,6 +1194,7 @@ def render(pcb_path, out_png, layers=("F.Cu", "F.SilkS", "F.Fab", "Edge.Cuts"), 
     """kicad-cli pcb export svg (board area) -> PNG (playwright, kicad/gen/svg2png.js, 3200 px wide).
     crop = (x0, y0, x1, y1) in pcbnew mm: crops the SVG viewBox before rasterising."""
     tmpdir = tmpdir or tempfile.mkdtemp(prefix="render_")
+    os.makedirs(tmpdir, exist_ok=True)
     base = os.path.splitext(os.path.basename(out_png))[0]
     svg = os.path.join(tmpdir, base + ".svg")
     cmd = ["kicad-cli", "pcb", "export", "svg", "--layers", ",".join(layers), "--exclude-drawing-sheet",
@@ -1201,7 +1227,11 @@ def selftest():
                                                                       f.split(":")[1] + ".kicad_mod"))]
     print(f"netlist: {len(nl.comps)} components, {len(nl.nets)} nets, {len(nl.pads)} pad nodes; "
           f"footprints not found: {miss or 'none'}")
-    print(f"50 R: w {W50:.2f} mm, Z0 {Z50:.1f} R, eps_eff {EE50:.2f}, {PS_MM50:.3f} ps/mm; 73 R: {W73:.2f} mm")
+    print(f"stack-up {STACKUP_NAME}: 50 R: w {W50:.2f} mm, Z0 {Z50:.1f} R, eps_eff {EE50:.2f}, {PS_MM50:.3f} ps/mm; "
+          f"73 R: {W73:.2f} mm")
+    w6 = width_for_6l(50.0)
+    print(f"6L (JLC06161H-3313) L1/L2 and L6/L5 microstrip: 50 R w {w6:.3f} mm (Z0 {microstrip_6l(r01(w6))[0]:.1f} R at "
+          f"{r01(w6):.2f}); 90 R diff guide: single 45 R w {width_for_6l(45.0):.3f} mm")
     for k in ("BUF_OUT_S", "VIN", "GND", "CMP_P"):
         print(f"  canon({k!r}) = {canon(k)!r}")
     print("  net_of('U101', '10') =", net_of("U101", "10"))

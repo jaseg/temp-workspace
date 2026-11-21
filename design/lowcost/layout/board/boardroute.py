@@ -18,7 +18,7 @@ import boardlib as bl
 
 F = 0.025                          # raster step
 G = 0.1                            # routing grid
-LAYERS = ("F.Cu", "In2.Cu", "B.Cu")
+LAYERS = ("F.Cu", "In2.Cu", "In3.Cu", "B.Cu")         # 6-layer board: In2 = L3 slow, In3 = L4 power
 DIRS = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]   # +y down: 2 = S, 6 = N
 _C = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]
 SIDE_DIRS = {c: {(k - 1) % 8, k, (k + 1) % 8} for k, c in enumerate(_C)}
@@ -148,10 +148,10 @@ class Router:
             for ln in LAYERS:
                 if not z.IsOnLayer(bl.L(ln)):
                     continue
-                if net == "GND" and ln != "In2.Cu":
+                if net == "GND":
                     continue                       # GND pours refill around new copper
-                if net == "+3V3" and ln == "In2.Cu":
-                    continue                       # In2 +3V3 is re-drawn by the integrator
+                if net == "+3V3" and ln == "In3.Cu":
+                    continue                       # the L4 +3V3 background plane is re-drawn by the integrator
                 self.mark_poly(self.own[ln], z.Outline(), z.GetNetCode())
         # board edge
         e = int(round(self.edge / F))

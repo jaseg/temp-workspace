@@ -10,7 +10,7 @@ import boardlib as bl
 import boardroute as br
 
 W, H = 100.0, 57.0
-SUPPLY_TRACK = ("+3V3", "+5V", "-5V", "+2V5", "-2V5", "+1V2", "VBUS")
+SUPPLY_TRACK = ("+5V", "-5V", "+2V5", "-2V5", "+1V2", "VBUS")   # +3V3 = the L4 background plane
 HOLES = ((3, 3), (97, 3), (3, 54), (97, 54))
 
 
@@ -44,14 +44,15 @@ def clusters(pts, d=2.5):
 
 def in_zone(B, net, p):
     for z in B.Zones():
-        if not z.GetIsRuleArea() and z.GetNetname() == net and z.IsOnLayer(pcbnew.In2_Cu):
+        if not z.GetIsRuleArea() and z.GetNetname() == net and z.IsOnLayer(pcbnew.In3_Cu):
             if z.Outline().Contains(pcbnew.VECTOR2I(pcbnew.FromMM(p[0] + bl.ORG[0]), pcbnew.FromMM(p[1] + bl.ORG[1]))):
                 return True
     return False
 
 
 def route_supplies(B, m, R, log):
-    """each non-3V3 supply: MST over its via clusters, In2 tracks 0.5 mm (B.Cu fallback)"""
+    """each non-3V3 supply: MST over its via clusters, wide L4 (In3) power strips (1.0 / 0.8 / 0.6 mm); the
+    strips become part of the rail's contiguous L4 copper (the +3V3 background plane fills around them)"""
     for net in SUPPLY_TRACK:
         cl = clusters(supply_points(B, net))
         if len(cl) < 2:
@@ -71,9 +72,10 @@ def route_supplies(B, m, R, log):
             todo.remove(c)
             done.append(c)
             r = None
-            for wid, lay, mg in ((0.6, ("In2.Cu",), 5), (0.5, ("In2.Cu",), 8), (0.4, ("In2.Cu", "B.Cu"), 10), (0.3, ("In2.Cu", "B.Cu"), 25)):
+            for wid, lay, mg, mx in ((1.0, ("In3.Cu",), 5, 400_000), (0.8, ("In3.Cu",), 10, 400_000),
+                                     (0.6, ("In3.Cu",), 25, 1_000_000), (0.5, ("In3.Cu",), 60, 3_000_000)):
                 r = R.route(net, (p[0], p[1], "*", "*"), (q[0], q[1], "*", "*"), w=wid, layers=lay,
-                            lcost={"B.Cu": 3.0}, via_cost=3.0, clr=0.2, margin=mg, maxn=300_000)
+                            via_cost=3.0, clr=0.25, margin=mg, maxn=mx)
                 if r:
                     break
             log.append((net, round(p[0], 2), round(p[1], 2), round(q[0], 2), round(q[1], 2), bool(r)))
@@ -86,13 +88,15 @@ def zone(m, net, layer, pts, prio=0, clr=0.2, minw=0.25, thermal=False):
 
 
 def planes(B, m):
+    """6-layer planes (RULES rule 10): L2 In1 and L5 In4 solid GND, L3 In2 GND pour around the slow lines,
+    L4 In3 +3V3 background plane (the other rails are wide strips / block zones at higher priority),
+    F.Cu / B.Cu GND pours"""
     edge = 0.3
     full = [(edge, edge), (W - edge, edge), (W - edge, H - edge), (edge, H - edge)]
     zone(m, "GND", "In1.Cu", full, prio=0)
-    # rule 10: In2 is ground by default; the supplies are local In2 feeds (0.5-0.6 mm tracks from the regulator
-    # to the via pairs) plus the blocks' own islands (fpga +1V2, phase VTAP strips)
-    zone(m, "GND", "In2.Cu", full, prio=0)
-    # board-wide GND pours on F / B (the blocks' own GND pours stay; overlapping same-net pours are fine)
+    zone(m, "GND", "In2.Cu", full, prio=0, clr=0.2)
+    zone(m, "+3V3", "In3.Cu", full, prio=0, clr=0.25)
+    zone(m, "GND", "In4.Cu", full, prio=0)
     zone(m, "GND", "F.Cu", full, prio=0, clr=0.2)
     zone(m, "GND", "B.Cu", full, prio=0, clr=0.2)
 
@@ -114,7 +118,7 @@ def stitch(B, m, R, rf_tracks):
             return False
         if d[i, j] < need or nov[i, j]:
             return False
-        if any(math.hypot(x - hx, y - hy) < 3.6 for hx, hy in HOLES):
+        if any(abs(x - hx) < 3.85 and abs(y - hy) < 3.85 for hx, hy in HOLES):     # square hole keep-outs
             return False
         if x < 0.8 or y < 0.8 or x > W - 0.8 or y > H - 0.8:
             return False
@@ -169,7 +173,7 @@ def silk(B, m):
         pass
     txt("PHASE", 22.0, 52.2, 0.8)
     txt("MCU / IF", 20.0, 53.9, 0.8)
-    txt("JLC04161H-7628", 16.0, 55.6, 0.8, "B.SilkS")
+    txt("JLC06161H-3313", 16.0, 55.6, 0.8, "B.SilkS")
 
 
 def write_pro(path, rf_nets):
