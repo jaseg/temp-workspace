@@ -442,18 +442,18 @@ def main():
             P(165, 10), size=T)
     sh.text("COARSE: 2 x 470 R bridge (high-Z tap,\nTRF input drop < 5 %). SN65LVDS2 at 3V3\n"
             "-> FPGA pin 47. Good to ~100-150 MHz edges.", P(148, 72), size=T)
-    sh.text("DELAY LINE (SPEC decision 4, co-propagating): signal line 70 ps per tap (0.25 mm / 60 R trace, meander\n"
-            "9.083 mm between taps, loaded to ~50 R by each gate ~0.37 pF); strobe lines PSTRB_A/K 35 ps per tap\n"
-            "(0.16 mm / 72.8 R trace, 3.737 mm pitch, loaded); effective tap spacing 70 - 35 = 35 ps, 16 taps = 560 ps window.\n"
+    sh.text("DELAY LINE (SPEC decision 4, co-propagating): signal line 75 ps per tap (0.26 mm / 59 R trace, meander\n"
+            "9.929 mm between taps, loaded to ~50 R by each gate ~0.37 pF); strobe lines PSTRB_A/K 40 ps per tap\n"
+            "(0.16 mm / 72.8 R trace, 4.514 mm pitch, loaded); effective tap spacing 75 - 40 = 35 ps, 16 taps = 560 ps window.\n"
             "Gate: BAT15-04W pin 3 on the line (stub < 0.3 mm), 0.47 pF C0G hold caps to PSTRB_A (anode)\n"
             "/ PSTRB_K (cathode). Strobe >= 2.75 V per side with the 80 ps launch stub (~4 V launch), FWHM 220-320 ps.\n"
-            "phase_array RESULT: line measured 75.7 ps/tap with the 70 ps design -> make the meander ~5 ps shorter.",
+            "phase_array RESULT: line measured 75.7 ps/tap with a 70 ps design -> layout draws 70 ps for 75 ps.",
             P(232, 26), size=T)
     sh.text("READOUT: 2.2 k to VTAP_N (A node) / VTAP_P (K node),\n2 x 1 k summing to COS3502 IN+, IN- = VTH (VTAP_TH).\n"
             "Hold nodes and the 1 k < 2 mm from the diode; comparator\nnext to its gate. Rising edges only, VTAP_TH ~ +17 mV.\n"
             "FPGA samples TAP[15:0] at strobe + 12 ns (10-22 ns); 50 % duty OK\n(reverse pulse < 0.5 mV; 70 % optional).", P(232, 54), size=T)
-    sh.text("line 70 ps/tap", P(X0 + 11, YL[0] + 1), size=T)
-    sh.text("strobe lines PSTRB_A / PSTRB_K: 35 ps/tap each", P(X0 + 12, YL[0] - 14.5), size=T)
+    sh.text("line 75 ps/tap", P(X0 + 11, YL[0] + 1), size=T)
+    sh.text("strobe lines PSTRB_A / PSTRB_K: 40 ps/tap each", P(X0 + 12, YL[0] - 14.5), size=T)
 
     names = {n for n, _ in hier_pins("trigger_phase")}
     split_wires(sh)

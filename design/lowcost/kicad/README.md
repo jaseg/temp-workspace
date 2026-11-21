@@ -137,7 +137,7 @@ Integration (21 Nov 2026):
   pinout to check against the TI pinout used in the symbol.
 - Sampler ADC must sample before the S_STROBE falling edge (+160 ns) - FPGA/MCU firmware timing.
 - Phase strobe stubs now 80 ps (13.2 mm) per sim/phase_array (strobe sheet; not part of the phase_trigger fragment,
-  which takes PSTRB_A/K from its X2/X3 interfaces); signal-line meander drawn 65 ps per tap (5 ps shorter).
+  which takes PSTRB_A/K from its X2/X3 interfaces); signal-line meander drawn 70 ps per tap for 75 ps, strobe lines 40 ps per tap (layout pitch 4.514 mm).
 - Remaining cosmetic text overlaps: power sheet value/power-symbol labels, COS3502 power units, MS5351M
   +3V3 pair.
 

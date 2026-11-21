@@ -288,8 +288,8 @@ def main():
             ">= 2.75 V at every tap. BAT15-03W clamp DNP\n"
             "(reverse 2.95 V < BV 4 V: not needed).", P(150, Y2 + 16), size=T)
     sh.text("PSTRB_A: anode strobe line (positive pulse);\n"
-            "0.16 mm / 72.8 R line along the 16 gates, 35 ps/tap\n"
-            "loaded, 3.737 mm pitch; "
+            "0.16 mm / 72.8 R line along the 16 gates, 40 ps/tap\n"
+            "loaded, 4.514 mm pitch; "
             "ends in 50 R on trigger_phase.", P(200, Y2 + 3), size=T)
 
     Y3 = 165

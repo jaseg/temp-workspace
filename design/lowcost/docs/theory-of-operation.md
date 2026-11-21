@@ -151,8 +151,10 @@ the strobe lines run along the taps at about 35 ps per tap (loaded) and the sign
 takes 70 ps per tap (meander). A signal edge and a strobe that start together separate by 35 ps per tap: the effective
 spacing is the difference. Simulated: strobe 34.2 ps/tap, signal 75.7 ps/tap (aim the meander about 5 ps shorter),
 effective 34.7 +/- 3.1 ps. Counter-propagation gave 69.8 ps and weak far taps. On JLC04161H-7628 the signal line
-PH_LINE is a 0.25 mm (60 ohm) F.Cu meander of 9.083 mm per tap, 65 ps loaded to 50 ohm; the strobe lines PSTRB_A/K
-are 0.16 mm (72.8 ohm) at a 3.737 mm tap pitch, 35 ps per tap loaded.
+PH_LINE is a 0.26 mm (59 ohm) F.Cu meander of 9.929 mm per tap, designed for 70 ps loaded to 50 ohm (about 75 ps
+expected); the strobe lines PSTRB_A/K are 0.16 mm (72.8 ohm) at a 4.514 mm tap pitch, 40 ps per tap loaded. The
+layout uses 40 / 75 ps instead of the simulated 35 / 70 ps so that the meander keeps 0.5 mm same-net gaps; the
+effective spacing stays 35 ps, but this combination is not re-simulated.
 
 **Readout.** Each hold node goes through 2.2 k to VTAP_N / VTAP_P (-/+2.5 V), and 2 x 1 k sum the two nodes into the
 IN+ of one COS3502 comparator half (8 dual parts, 3.3 V). IN- is VTAP_TH. The comparator input peaks 1-2 ns after the
@@ -290,7 +292,7 @@ Open risks, most severe first:
 2. **BUF802 model.** The 3.4 GHz bandwidth, the 13 % overshoot and the 113 mVpp kick-out all rest on an idealised
    model; the real part is expected at 2-2.4 GHz.
 3. **Layout open points.** The three fragments (JLC04161H-7628) are not merged and have only scripted checks; no DRC
-   has been run (kicad-cli 7 has none). The PH_LINE meander legs are 0.244 mm apart (self-coupling, check by TDR).
+   has been run (kicad-cli 7 has none). The delay line is laid out at 40 / 75 ps per tap, which is not re-simulated (the verification used 35 / 70 ps).
    Pad excess capacitances are noted, not compensated (up to 0.13 pF on the BUF802 output node); the loaded strobe
    lines are 45.5 ohm against 49.9 ohm terminations. Relay (HFD3) and balun (DLW21SN) footprints are unverified. Via
    stitching and fences are left to board integration.

@@ -5,8 +5,8 @@ BUF_OUT_T (50 R) / EXT_CLK (SMA, 49.9 R at the pin) -> TMUX136 (local -0.9 V swi
 (+/-2V5, IN- = TRIG_LEVEL) -> 100 R across CMP_P/CMP_N (2 x 50 R lines) -> CMP_P: 1 uF -> TRF37D73 (120 nH +
 47 uH bias) -> 1 uF -> 12 dB pi pad 82/91/82 -> PH_LINE;  CMP_N: 1 uF -> 49.9 R dummy;  2 x 470 R -> SN65LVDS2
 -> COARSE.  Delay line (SPEC decision 4, co-propagating), everything on F.Cu over the solid In1 ground, no
-vias in any RF path: PSTRB_A / PSTRB_K straight 73 R lines at 35 ps per tap (loaded), PH_LINE meanders
-between the gates (loaded 50 R, 65 ps per tap = 70 ps - 5 ps as sim/phase_array/RESULT.md recommends).
+vias in any RF path: PSTRB_A / PSTRB_K straight 73 R lines at 40 ps per tap (loaded), PH_LINE meanders
+between the gates (loaded 50 R, 70 ps per tap designed, about 75 ps expected; effective spacing 75 - 40 = 35 ps).
 Per tap: BAT15-04W straddling PH_LINE (line between pins 1/2 onto pin 3 = zero-length tap), 2 x 0.47 pF C0G
 bridging pin 1 / pin 2 to the strobe lines, 1 k and 2.2 k straddling each strobe line (perpendicular),
 COS3502 comparators in a row behind PSTRB_A.  No stitching grid (user applies stitching after assembling
@@ -120,11 +120,12 @@ W_NODE, W_SIG, W_PWR, W_GND = 0.15, 0.2, 0.5, 0.4
 #     + ~0.01 pF fringe per straddling 0402 resistor (2 per tap, pads 0.165 mm from the line edge, estimate)
 C_PAD_STR = (c_per_mm(0.56) - c_per_mm(W_STR)) * 0.62
 CL_STR = 0.40 + C_PAD_STR + 0.02
-TD_STR = 35.0
+TD_STR = 40.0                                      # 40 ps strobe / 75 ps line per tap: effective spacing still 35 ps;
+#                                                   the longer pitch gives the meander >= 0.5 mm same-net gaps
 TDU_STR = solve_tdu(Z_STR, CL_STR, TD_STR)
 PITCH = round(TDU_STR / ps_mm(W_STR), 3)
-# --- signal line: loaded 50 R at 65 ps / tap; load 0.37 pF gate + pin-3 pad excess (0.70 x 0.45 mm)
-TD_LIN = 65.0
+# --- signal line: loaded 50 R at 70 ps / tap; load 0.37 pF gate + pin-3 pad excess (0.70 x 0.45 mm)
+TD_LIN = 70.0                                      # aims 5 ps short: sim/phase_array measured +5 ps on the loaded line
 W_LIN = 0.25
 for _ in range(3):
     C_PAD_LIN = (c_per_mm(0.45) - c_per_mm(W_LIN)) * 0.70
@@ -394,7 +395,10 @@ def rfpad(ref, num):
 # x = 1.0 (down to +Y) -> XU (up to -Y) -> XD (down) -> 45 deg landing at x = PITCH - 1.55 -> next pin 3.
 X_P3, X_P12 = 1.0, -1.0
 XD = PITCH - 1.75
-XU = (X_P3 + XD) / 2
+PAD3_HALF_X = 0.35                                  # pin-3 pad half length along x
+XU = (XD + X_P3 + PAD3_HALF_X - W_LIN / 2) / 2      # equal gaps: pin-3 pad edge to leg XU, leg XU to leg XD
+GAP_PAD3 = XU - W_LIN / 2 - (X_P3 + PAD3_HALF_X)
+assert GAP_PAD3 >= 0.4 and XD - XU - W_LIN >= 0.4, (GAP_PAD3, XD - XU - W_LIN)
 E_LAND = 0.2
 CH_M = 0.2
 
@@ -790,7 +794,7 @@ text("TLV3801", XU2, 2.9, 0.3)
 text("TRF37D73", XU3, 1.9, 0.3)
 text("12 dB", X_R312, 1.6, 0.3)
 text("LVDS2", X_R309 - 1.137, YU4 - 2.0, 0.3)
-text(f"PH_LINE {W_LIN:.2f} mm, 65 ps/tap", 20.0, YL + 2.2, 0.4)
+text(f"PH_LINE {W_LIN:.2f} mm, {TD_LIN:.0f} ps/tap", 20.0, YL + 2.2, 0.4)
 text(f"PSTRB_A/K {W_STR:.2f} mm, pitch {PITCH:.3f} mm", 45.0, YL + 2.2, 0.4)
 for n, x in enumerate(XT):
     text(str(n), x + 1.85, YL + 1.0, 0.3)
