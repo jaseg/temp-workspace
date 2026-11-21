@@ -1,48 +1,55 @@
 # Layout fragment: sampler (bridge, hold amp, level shifter, sampler-strobe output)
-`python3 gen_sampler.py` -> `sampler.kicad_pcb` (KiCad 7, 31.5 x 22.8 mm, own Edge.Cuts) + delay table + checks.
-`sampler.png`: top = F.Cu/silk/fab, bottom = B.Cu. Values from `sim/sampler/RESULT.md` and `sim/strobe/RESULT.md`.
+`python3 gen_sampler.py` -> `sampler.kicad_pcb` (KiCad 7, 30.8 x 17.7 mm, own Edge.Cuts), plus the tables below and the checks.
+`sampler.png`: top = F.Cu with the top pour hidden (so track widths show), silk, fab. Bottom row = F.Cu with pour, B.Cu (mirrored), In1.
+`sampler_detail.png`: bridge, hold node, guard, STRB arms, balun. Values: `sim/sampler`, `sim/strobe`, `sim/phase_array` RESULT.md.
 
-## Stack-up (SPEC decision 9, written into the board setup)
-JLC04161H-3313, 1.6 mm: L1 35 um / 3313 prepreg 0.0994 mm (er 4.1) / L2 In1 = solid GND / core 1.265 mm /
-L3 In2 = +3V3 plane / 3313 0.0994 mm / L4 B.Cu (GND pour + slow feeds).
-50 R microstrip on L1 (Hammerstad-Jensen, Wheeler thickness correction, no mask): exact 0.172 mm,
-drawn **0.17 mm -> 50.4 R, eps_eff 3.10, 5.87 ps/mm**. Solder mask takes ~1-2 R off (still within tolerance).
-Hold node 0.15 mm, guard 0.12 mm, bias/control 0.2 mm, supplies 0.3 mm. Clearance >= 0.1 mm; top GND pour 0.3 mm (3h) clear.
+## Stack-up (SPEC decision 9 rev., written into the board setup)
+JLC04161H-7628, 1.6 mm (checked on jlcpcb.com/impedance): L1 35 um / 7628 0.2104 mm er 4.4 / L2 In1 = solid GND /
+core 1.065 mm er 4.6 / L3 In2 = +3V3 plane / 7628 0.2104 mm / L4 B.Cu (GND pour + slow feeds). Mask er 3.8, 15 um over the trace.
+`microstrip()` in the script: Hammerstad-Jensen with Hammerstad thickness correction, plus a first-order mask overlay
+(mask fills the air part of the fringing field, coefficient 1.2 c/h; it is an estimate that lands on JLC's 0.36 mm).
+| Line | width | Z0 | eps_eff | delay |
+|---|---|---|---|---|
+| 50 R, all RF nets | **0.36 mm** (exact 0.360) | 50.0 R (51.0 R without mask) | 3.30 | **6.06 ps/mm** |
+| neck inside the U402 pins 2/7 pads | 0.25 mm, 0.25 mm long (inside the pad) | 60 R | - | 1.5 ps |
+| hold node (not a line, kept thin) | 0.15 mm | 75 R | - | 1.6 + 1.2 mm |
+Top pour clearance from every RF trace = 2 w = 0.72 mm (3.4 h; keep-out rule areas per segment and per RF pad).
+Coplanar check (Wadell CPWG): side ground only pulls Z below the microstrip value for gaps < 0.33 mm, so the lines are microstrip.
 
-## Placement (local origin = bridge centre, mirror axis y = 0)
-- X1 (BUF_OUT_S, = BUF802 OUT pin) -> R201 10 R -> D201 pin 3. The trace runs **between D201 pins 1/2 under
-  the body**. Planar routing needs this: the two series pairs have the same handedness, so one
-  external lead has to enter the rail loop.
-- D201/D202 (BAT15-04W) side by side with the same orientation. Rails BRG_A (pins 1) and BRG_K (pins 2) are exact mirror images.
-  Each joins at x = -1.0, then goes to 24.9 R -> node (1 k bias to VBIAS_A/K, 10 nF) -> 47 pF C0G -> STRB_A/K.
-- T401 balun (0805 CMC) on the axis right of the hold amp, R204 1 k across its outputs. The STRB_A and
-  STRB_K arms run around the hold cluster as mirror images: **17.257 mm each (101.3 ps), mismatch 0**.
-- Hold node: D202.3 -> U201.3 (TPH2501, G = +3: R207 1.00 k, R208 499) 1.66 mm. C205 2.2 pF branch 1.2 mm.
-  The **ground cut-out** (In1, In2, B.Cu) is 2.95 x 1.9 mm under D202.3/trace/U201.3/C205.1, with no top pour near.
-  **Guard ring** = U201 -IN net (HOLD_FB, which sits at the hold voltage). It runs between U201 pins 2/3, under D202 and between the C205 pads.
-  -IN goes from R207 under the U201 body. U201 OUT drops to B.Cu (outside the cut-out) to the level shifter.
-- U202 (TPH2501 on +3V3) inverting 1 k / 1 k, +IN = ADC_REF_MID (10 nF), R211 33 R + C207 220 pF -> ADC_IN.
-- Strobe out: X2 (TRF2_IN, from the 12 dB pad) -> C403 100 nF -> U402 TRF37D73 (WSON-8 DSG) -> bias tee
-  FB402 bead + L402 47 uH (1210) to +3V3 -> C404 100 nF -> clip node -> T401 pin 1.
-  **Shorted stub** from the clip node: 13.625 mm = **80.0 ps**, ends in NT401 (net tie) + 3 GND vias.
-  U402 EP: 3 in-pad vias 0.2/0.4 mm (filled/tented), GND pins tied to the EP. VCC pin: 1 nF + 100 nF + via to In2.
-- 126 GND vias: stitching both sides of every RF line (about 1 mm pitch, 0.64 mm from the centreline) plus a grid.
-
-## Interface points (silk-labelled)
-| Point | Net | Connects to |
+## RF nets (script table, all 0.36 mm / 50 R, F.Cu over In1, no vias, no layer changes)
+| Net / segment | length | delay |
 |---|---|---|
-| X1 (left) | BUF_OUT_S | BUF802 OUT pin (input fragment); place the BUF802 so X1 is its pin, bridge 5 mm away |
-| X2 (right) | TRF2_IN | 12 dB pi pad output of the TRF37D73 #1 chain (strobe fragment / user board) |
-| TP201 / TP202 | VBIAS_A / VBIAS_K | TP2272 bias buffers (DAC) |
-| TP203 / TP204 | -2V5 / +2V5 | hold-amp rails (B.Cu feeds to 100 nF at the pins) |
-| TP205 / TP206 | ADC_IN / ADC_REF_MID | MCU PA0 / reference divider |
-| TP401, TP207/TP402 | +3V3 (also In2), GND | power |
+| BUF_OUT_S X1 -> R201, BRG_IN R201 -> D201.3 (under D201, between pins 1/2) | 0.80 + 3.12 mm | 4.8 + 18.9 ps |
+| BRG_A / BRG_K rails (4 pieces, mirror images) | 2.565 mm each | 15.5 ps |
+| STRB_A / STRB_K arms 47 pF -> balun (single-ended 50 R each; the bridge deck models no line, so 50 R) | 15.253 / 15.253 mm, mismatch 0 | 92.4 ps |
+| STRB_CLIP balun.1 -> tap -> C404; TRF2_OUT C404 -> U402.7; TRF2_RFIN U402.2 -> C403; TRF2_IN C403 -> X2 | 2.97; 1.77; 0.83; 0.88 mm | |
+| **Shorted stub**, 80 ps intended: 80 / 6.057 = 13.207 mm, drawn 13.207 mm (tap centre -> NT401) | 13.207 mm | **80.0 ps** |
+Pad discontinuities (excess C vs the 0.36 mm line, noted instead of In1 cut-outs): 0402 in-line pads (R201, C403, C404) +28 fF,
+R204 shunt pads on the arms +29 fF, balun pads +22 fF, SOT-323 pins +12 fF, D203 cathode +11 fF, X1/X2 +16 fF, WSON pins -11 fF.
+All < 0.03 pF (about 1.5 ps of a 50 R line each); no compensation cut-outs needed.
+
+## Placement (local origin = bridge centre, mirror axis y = 0, courtyards touching)
+- X1 -> R201 10 R -> D201.3; D201 / D202 BAT15-04W side by side; rails meet at the 24.9 R pads; 47 pF C0G horizontal so the arms leave along the pad axis.
+  1 k bias + 10 nF to VBIAS_A/K test pads. Arms: 45-degree chamfers, exact mirror images, R204 1 k on the arm pads at the balun.
+- Hold: D202.3 -> U201.3 1.61 mm, C205 2.2 pF branch 1.18 mm. Guard (HOLD_FB, 0.1 mm) from U201 pin 4 under the body, between pins 2/3,
+  around D202.3 / hold trace / C205.1 (between the C205 pads) to R208. Ground cut-out on In1/In2/B.Cu under the hold node, no top pour there.
+- Supplies: U201 +2V5 pin -> 100 nF along the pad axis (0.6 mm copper), -2V5 pin -> via -> 100 nF on B.Cu under it; U202 +3V3 -> 100 nF (0.6 mm) -> In2 via;
+  TRF37D73 VCC -> 1 nF + 100 nF in a row, via to In2; 47 uH cold end -> +3V3 copper polygon with 1 nF + 10 uF and a via pair to In2.
+  Ground pads: via right at the pad (not in it). U402 EP: 3 vias 0.2/0.45 in the EP (tented), GND pins tied to the EP.
+- Strobe out, one straight line on y = -0.435: X2 -> C403 -> U402 TRF37D73 -> FB402 bias tee (bead pad on the line) -> C404 -> clip node
+  -> T401 pin 1. **BAT15-03W clamp D203 added** (cathode on the clip node / stub tap, anode GND via), as `sim/phase_array/RESULT.md` asks.
+- U202 level shifter below the K arm: R211 / C207 and C206 along the pad axes; the 1 k feedback R210 below, its OUT side via B.Cu.
+
+## What changed (vs the JLC04161H-3313 version)
+Stack-up 3313 -> 7628; RF width 0.17 -> 0.36 mm; full re-layout: compact courtyard-to-courtyard placement, only 45-degree bends,
+wide/polygon supply connections, top pour with 2 w RF clearance, **no via stitching grid and no via fences** (to be added when the
+fragments are assembled), clamp D203 added, stub re-computed (13.625 -> 13.207 mm), arms 17.26 -> 15.25 mm, board 31.5 x 22.8 -> 30.8 x 17.7 mm.
+Vias left: 19 GND at pads/caps, 2 stub-short, 7 supply, 4 slow-signal (HOLD_OUT, SHIFT_OUT, -2V5 to B.Cu).
 
 ## Checks and limits
-Script checks: no courtyard overlaps, no track/via/pad pair closer than 0.1 mm (pcbnew shape collisions). Result: OK.
-Zones are filled by the script. **kicad-cli 7 has no DRC**: run DRC in pcbnew after integration.
-Not done: S_STROBE input chain (TRF #1, 12 dB pad, 47 R, dummy load). Integration also has to merge In2 (+3V3 here)
-with the board's power split, and connect the B.Cu feeds.
-Open points: R201 -> D201.3 is 3.29 mm centre to centre (2.7 mm pad edge to pad edge); the target was <= 3 mm.
-Check the balun pad map against the Murata DLW21SN drawing (custom pads: 1/3 input end, 2/4 output end, as in the schematic pins).
-The rail values follow the sampler RESULT (25 R / 47 pF), not the strobe RESULT (10 R / 1 nF).
+Script checks: courtyards (top and bottom) no overlap; copper clearance >= 0.1 mm; every bend <= 45 degrees; 0 unrouted after zone fill.
+**kicad-cli 7 has no DRC**: run DRC in pcbnew after integration (net tie NT401 shorts the stub to GND on purpose).
+Remaining deviations: R201 -> D201.3 is 3.12 mm (target <= 3 mm); BRG_IN passes 0.12 mm from the rail pads under D201; T-junctions at the
+rail / R25 pads and at the stub tap / clamp; R210 and the FB402 / D203 / C205 taps leave their pads sideways (short).
+Open: balun pad map vs the Murata DLW21SN drawing; rail values follow the sampler RESULT (25 R / 47 pF); mask model is an estimate
+(check with the JLC calculator at order time); integration must merge In2 (+3V3 here) with the board power split.
