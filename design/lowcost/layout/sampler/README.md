@@ -1,5 +1,5 @@
 # Layout fragment: sampler (bridge, hold amp, level shifter, sampler-strobe output)
-`python3 gen_sampler.py` -> `sampler.kicad_pcb` (KiCad 7, 30.8 x 17.7 mm, own Edge.Cuts), plus the tables below and the checks.
+`python3 gen_sampler.py` -> `sampler.kicad_pcb` (KiCad 7, 30.8 x 19.3 mm, own Edge.Cuts), plus the tables below and the checks.
 `sampler.png`: top = F.Cu with the top pour hidden (so track widths show), silk, fab. Bottom row = F.Cu with pour, B.Cu (mirrored), In1.
 `sampler_detail.png`: bridge, hold node, guard, STRB arms, balun. Values: `sim/sampler`, `sim/strobe`, `sim/phase_array` RESULT.md.
 
@@ -34,9 +34,14 @@ All < 0.03 pF (about 1.5 ps of a 50 R line each); no compensation cut-outs neede
 - Hold: D202.3 -> U201.3 1.61 mm, C205 2.2 pF branch 1.18 mm. Guard (HOLD_FB, 0.1 mm) from U201 pin 4 under the body, between pins 2/3,
   around D202.3 / hold trace / C205.1 (between the C205 pads) to R208. Ground cut-out on In1/In2/B.Cu under the hold node, no top pour there.
 - Supplies: U201 +2V5 pin -> 100 nF along the pad axis (0.6 mm copper), -2V5 pin -> via -> 100 nF on B.Cu under it; U202 +3V3 -> 100 nF (0.6 mm) -> In2 via;
-  TRF37D73 VCC -> 1 nF + 100 nF in a row, via to In2; 47 uH cold end -> +3V3 copper polygon with 1 nF + 10 uF and a via pair to In2.
+  TRF37D73 VCC -> 1 nF + 100 nF in a row, via to In2.
+- **Bias tee (revised, `sim/bias_tee/RESULT.md`, `bias_tee_detail.png` before/after)**: one straight chain perpendicular to the line,
+  courtyards touching: FB402 BLM15HD102 with pad 1 centred ON the 50 R line (no stub; +32 fF, no In1 cut-out needed) -> 0.64 mm link
+  -> L402 47 uH LQH32CN470K23L 1210 with R416 1 k 0402 beside it (two 45-degree links) -> C411 100 nF across the cold pad, GND via at
+  its GND pad -> +3V3 plane via pair beyond C411 (supply enters through the capacitor) -> C412 10 uF on the via row.
+  Was: bead 0.3 mm off the line on a 0.3 mm stub, plane vias at the inductor pad, 1 nF / 10 uF beside it on a polygon (-0.55 dB at 5.6 GHz).
   Ground pads: via right at the pad (not in it). U402 EP: 3 vias 0.2/0.45 in the EP (tented), GND pins tied to the EP.
-- Strobe out, one straight line on y = -0.435: X2 -> C403 -> U402 TRF37D73 -> FB402 bias tee (bead pad on the line) -> C404 -> clip node
+- Strobe out, one straight line on y = -0.435: X2 -> C403 -> U402 TRF37D73 -> FB402 bias tee (bead pad centred on the line) -> C404 -> clip node
   -> T401 pin 1. **BAT15-03W clamp D203 added** (cathode on the clip node / stub tap, anode GND via), as `sim/phase_array/RESULT.md` asks.
 - U202 level shifter below the K arm: R211 / C207 and C206 along the pad axes; the 1 k feedback R210 below, its OUT side via B.Cu.
 
@@ -50,6 +55,6 @@ Vias left: 19 GND at pads/caps, 2 stub-short, 7 supply, 4 slow-signal (HOLD_OUT,
 Script checks: courtyards (top and bottom) no overlap; copper clearance >= 0.1 mm; every bend <= 45 degrees; 0 unrouted after zone fill.
 **kicad-cli 7 has no DRC**: run DRC in pcbnew after integration (net tie NT401 shorts the stub to GND on purpose).
 Remaining deviations: R201 -> D201.3 is 3.12 mm (target <= 3 mm); BRG_IN passes 0.12 mm from the rail pads under D201; T-junctions at the
-rail / R25 pads and at the stub tap / clamp; R210 and the FB402 / D203 / C205 taps leave their pads sideways (short).
+rail / R25 pads and at the stub tap / clamp; R210 and the D203 / C205 taps leave their pads sideways (short).
 Open: balun pad map vs the Murata DLW21SN drawing; rail values follow the sampler RESULT (25 R / 47 pF); mask model is an estimate
 (check with the JLC calculator at order time); integration must merge In2 (+3V3 here) with the board power split.

@@ -35,9 +35,12 @@ COS3502 row behind PSTRB_A: pin 1 in line with the tap's 1 k, IN- via to the B.C
 
 ## Main chain (y = 0, in line, 0.3-0.35 mm pad gaps)
 X1 BUF_OUT_T / J301 SMA (49.9 R R301 at U301.3) -> U301 TMUX136 -> TRIG_COM 3.0 mm -> U302 TLV3801 -> CMP_P / CMP_N as 2 x 50 R
-(0.6 mm gap), R307 100 R bridging, R309/R310 470 R taps (LVDS_A under CMP_N on B.Cu) -> C308 -> U303 TRF37D73 -> L301 120 n
-(T on the line) / L302 47 u -> C309 -> pi pad R311/R312/R313 -> 0.36 -> 0.25 mm step at x = -1.6 -> D01. PSTRB feeds from X2/X3
+(0.6 mm gap), R307 100 R bridging, R309/R310 470 R taps (LVDS_A under CMP_N on B.Cu) -> C308 -> U303 TRF37D73 -> bias tee -> C309 -> pi pad R311/R312/R313 -> 0.36 -> 0.25 mm step at x = -1.6 -> D01. PSTRB feeds from X2/X3
 (50 R, 3.84 mm) step to 0.16 mm half a pitch before tap 0; far end 0.36 mm into 49.9 R (R401, R402, R403).
+**Bias tee (revised, `sim/bias_tee/RESULT.md`, `bias_tee_detail.png` before/after)**: FB301 BLM15HD102 with pad 1 centred ON the line
+-> 0.64 mm link -> L302 47 uH LQH32CN470K23L 1210 with R382 1 k beside it -> C314 100 nF across the cold pad (GND via at its pad) ->
++3V3 plane via pair beyond C314, TP306 on that row; C311/C312 moved 0.25 mm left to make room. Was 120 nH + 47 uH 0806 (on a 1008
+land) + 100 n / 1 n beside it: 11 dB suck-out at 313 MHz, PRBS DDJ 17 ps rms; C313 (1 nF at the cold end, useless there) removed.
 Necks: none (0.36 mm traces end on the WSON/UQFN pin centres with >= 0.19 mm to the neighbour pins).
 Pad discontinuities (excess C vs line): 0402 in-line / T pads +28 fF, WSON/UQFN pins -11 fF, SOT-323 pin 3 +28 fF and hold-cap
 pad +49 fF (both inside the tap load). SMA pin (1.27 mm): In1 cut-out below -> 70 R over 1.8 mm instead of +314 fF.
@@ -45,7 +48,7 @@ pad +49 fF (both inside the tap load). SMA pin (1.27 mm): In1 cut-out below -> 7
 ## Supplies and vias
 Each supply pin -> 0.25-0.6 mm copper -> decoupling cap at the pin -> via pair to the In2 plane; -2V5 (TLV EP vias, R304, R306)
 and VSW_GND (TMUX) as B.Cu polygons, VSW_GND pins also on a local F.Cu polygon; TRF EP 3 vias. Ground pads: one via beside
-the pad. 167 vias: 47 GND, 69 supply, 51 signal (TAPn_IN, VTH, LVDS_A); **no stitching grid, no fences** (stitch after assembly).
+the pad. 182 vias: 46 GND, 69 supply, 67 signal (TAPn_IN, VTH, LVDS_A); **no stitching grid, no fences** (stitch after assembly).
 
 **Changed vs previous**: JLC04161H-3313 -> 7628; all widths from the formula; PH_LINE moved from B.Cu (2 vias per tap) to an F.Cu meander; strobe 0.09 ->
 0.16 mm (73 R now possible), pitch 3.815 -> 4.514 mm (40 ps per tap); compact in-line chain; no 90-degree corners; power via planes/polygons;
