@@ -24,7 +24,7 @@
   },
   {
    "net": "/TAP0",
-   "x": 29.274,
+   "x": 28.984,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -34,7 +34,7 @@
   },
   {
    "net": "/TAP1",
-   "x": 30.544,
+   "x": 30.254,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -44,7 +44,7 @@
   },
   {
    "net": "/TAP2",
-   "x": 38.302,
+   "x": 38.012,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -54,7 +54,7 @@
   },
   {
    "net": "/TAP3",
-   "x": 39.572,
+   "x": 39.282,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -64,7 +64,7 @@
   },
   {
    "net": "/TAP4",
-   "x": 47.33,
+   "x": 47.04,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -74,7 +74,7 @@
   },
   {
    "net": "/TAP5",
-   "x": 48.6,
+   "x": 48.31,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -84,7 +84,7 @@
   },
   {
    "net": "/TAP6",
-   "x": 56.358,
+   "x": 56.068,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -94,7 +94,7 @@
   },
   {
    "net": "/TAP7",
-   "x": 57.628,
+   "x": 57.338,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -104,7 +104,7 @@
   },
   {
    "net": "/TAP8",
-   "x": 65.386,
+   "x": 65.096,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -114,7 +114,7 @@
   },
   {
    "net": "/TAP9",
-   "x": 66.656,
+   "x": 66.366,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -124,7 +124,7 @@
   },
   {
    "net": "/TAP10",
-   "x": 74.414,
+   "x": 74.124,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -134,7 +134,7 @@
   },
   {
    "net": "/TAP11",
-   "x": 75.684,
+   "x": 75.394,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -144,7 +144,7 @@
   },
   {
    "net": "/TAP12",
-   "x": 83.442,
+   "x": 83.152,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -154,7 +154,7 @@
   },
   {
    "net": "/TAP13",
-   "x": 84.712,
+   "x": 84.422,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -164,7 +164,7 @@
   },
   {
    "net": "/TAP14",
-   "x": 92.47,
+   "x": 92.18,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -174,7 +174,7 @@
   },
   {
    "net": "/TAP15",
-   "x": 93.74,
+   "x": 93.45,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -184,7 +184,7 @@
   },
   {
    "net": "/VTAP_TH",
-   "x": 62.219,
+   "x": 61.929,
    "y": 22.5,
    "layer": "B.Cu",
    "side": "S",
@@ -194,7 +194,7 @@
   },
   {
    "net": "/VTAP_N",
-   "x": 44.149,
+   "x": 43.859,
    "y": 22.5,
    "layer": "B.Cu",
    "side": "S",
@@ -204,7 +204,7 @@
   },
   {
    "net": "/VTAP_P",
-   "x": 48.663,
+   "x": 48.373,
    "y": 22.5,
    "layer": "B.Cu",
    "side": "S",
@@ -214,23 +214,13 @@
   },
   {
    "net": "/BUF_OUT_T",
-   "x": 4.925,
+   "x": 8.79,
    "y": 0.0,
    "layer": "F.Cu",
    "side": "N",
    "class": "rf50",
    "width": 0.36,
    "note": "from the input stage (BUF802 trigger output)"
-  },
-  {
-   "net": "/DAC_TRIG",
-   "x": 4.6,
-   "y": 22.5,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.2,
-   "note": "R383 5.1 k to TRIG_LEVEL (passive level network: R384 8.87 k to -2V5, R385 2 k to GND, C304)"
   },
   {
    "net": "/TRIG_SEL",
@@ -241,6 +231,16 @@
    "class": "slow",
    "width": 0.2,
    "note": "R302 10 k to U301 SEL"
+  },
+  {
+   "net": "/DAC_TRIG",
+   "x": 4.6,
+   "y": 22.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R383 5.1 k to TRIG_LEVEL (passive level network: R384 8.87 k to -2V5, R385 2 k to GND, C304)"
   },
   {
    "net": "/COARSE",

@@ -1,8 +1,9 @@
-"""FPGA block: GW1NZ-LV1 QN48 (U501), MS5351M (U502) + Y501, WR-WST programming footprint J501, config / decoupling.
+"""FPGA block: GW1NZ-LV1 QN48 (U501), MS5351M (U502) + Y501, configuration / decoupling.
 Run: cd blocks/fpga && python3 gen_fpga.py [--render]
-Block-local mm, origin = board (56, 0.5).  L-shaped block: main 24 x 22 mm, plus a strip x 24..29.6, y 0..7.4 for J501.
-Strobes are drawn by hand; the slow nets are routed by a small local grid router (route(), 0.05 mm grid, two layers,
-45-degree moves only, pad-axis exits) because boardlib has none.  Supplies end in via pairs (In2), grounds in vias (In1)."""
+Block-local mm, origin = board (56, 0.5), rectangle 18 x 22 mm (FLOORPLAN).  J501 / R511 / R512 live in mcuif.
+Strobes and supply fan-outs are drawn by hand; the slow nets are routed by a small local grid router (route(),
+0.05 mm grid, two layers, 45-degree moves only, pad-axis exits).  Supplies: via pairs into the In2 zones drawn here
+(+3V3 everywhere, +1V2 island under U501 with a tongue to the SE corner), grounds into the In1 zone."""
 import sys, os, math, json, heapq
 sys.path.insert(0, "../..")
 import numpy as np
@@ -12,16 +13,16 @@ import boardlib as bl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board"
-W, H = 24.5, 22.0                 # main rectangle
-SX, SY = 29.6, 7.4                # strip for J501 (x W..SX, y 0..SY)
+W, H = 18.0, 22.0
 W50, WS = bl.W50, 0.15
 blk = bl.Block("fpga")
 NL = blk.nl
-REFS = sorted(r for r, c in NL.comps.items() if c["sheet"] == "/fpga_clock/") + ["R407", "R411"]
+MOVED = ("J501", "R511", "R512")          # programming header + UART resistors: mcuif block
+REFS = sorted(r for r, c in NL.comps.items() if c["sheet"] == "/fpga_clock/" and r not in MOVED)
 
 
 def bplace(ref, x, y, rot=0, side="F"):
-    """local helper (as in phase): place on F, flip after Add (Block.place side B segfaults in 7.0.11)"""
+    """place on F, flip after Add (Block.place side B segfaults in 7.0.11)"""
     fp = blk.place(ref, x, y, rot, "F")
     if side == "B":
         fp.Flip(blk.P(x, y), True)
@@ -30,91 +31,135 @@ def bplace(ref, x, y, rot=0, side="F"):
 
 
 # ---------------- placement
-CX, CY = 10.0, 12.6
+CX, CY = 8.6, 9.8
 bplace("U501", CX, CY, 90)
-bplace("J501", 14.8, 3.3, 270)
-bplace("U502", 17.3, 8.6, 180)
-bplace("Y501", 22.6, 8.6, 0)
-bplace("R508", 13.55, 9.6, 180)          # CLK0 -> FPGA_CLK (pad 1 at U502)
-bplace("R509", 13.55, 8.8, 180)          # CLK1 -> MCU_CLK
-bplace("R510", 13.55, 7.6, 180)          # CLK2 -> CLK2_FPGA
-bplace("C508", 15.7, 6.9, 0, "B")       # U502 pin 7 VDD
-bplace("C509", 21.0, 10.7, 0)           # U502 pin 1 VDD
-bplace("C510", 18.0, 11.2, 0, "B")      # 10u +3V3
-# QFN decoupling on B at the supply pins (pin -> via pair -> cap)
-bplace("C506", 7.0, 7.4, 0, "B")       # pin 36 +3V3
-bplace("C502", 6.3, 11.3, 0, "B")      # pin 37 +1V2
-bplace("C504", 7.0, 17.6, 90, "B")      # pin 1 +3V3
-bplace("C501", 13.1, 17.6, 90, "B")     # pin 12 +1V2
-bplace("C505", 13.9, 11.3, 90, "B")     # pin 25 +3V3
-bplace("C503", 2.6, 6.3, 0, "B")     # 10u +1V2
-bplace("C507", 1.6, 3.0, 90, "B")     # 10u +3V3
-# PH strobe series resistors (B, next to the pin vias), J501 UART resistors (B, under the plug body)
-for ref, net in (("R411", "Net-(C422-Pad1)"), ("R407", "Net-(C412-Pad1)")):
-    fp = bplace(ref, 0.5 if ref == "R411" else 1.45, 12.6, 90, "B")
-    if blk.pad(ref, "@" + net)[1] < 12.6:
-        fp.SetOrientationDegrees(fp.GetOrientationDegrees() + 180)
-bplace("R511", 23.05, 6.4, 90, "B")
-bplace("R512", 20.5, 6.4, 90, "B")
-# configuration resistors (B, bottom-left)
+bplace("U502", 12.1, 2.3, 0)              # left: VDD XA XB SCL SDA, right: CLK0 CLK1 GND VDD CLK2 (top->bottom)
+bplace("Y501", 4.6, 2.0, 0)              # pin 3 XA top-right, pin 1 XB bottom-left
+bplace("R509", 15.75, 2.3, 90)            # CLK1 -> MCU_CLK (F, right of U502)
+bplace("R508", 8.4, 3.9, 90)              # CLK0 -> FPGA_CLK (pin 33)
+bplace("R510", 7.4, 3.9, 90)              # CLK2 -> CLK2_FPGA (pin 34)
+bplace("C509", 9.6, 1.3, 0, "B")          # U502.1 VDD (B, under the left pins)
+bplace("C508", 14.9, 3.6, 90, "B")        # U502.7 VDD (B, under the right pins)
+bplace("C510", 16.6, 6.0, 90, "B")        # 10u +3V3
+# FPGA decoupling on B at the corner via pairs
+bplace("C506", 4.1, 4.9, 180, "B")        # pin 36 +3V3
+bplace("C502", 2.7, 6.25, 180, "B")       # pin 37 +1V2
+bplace("C505", 13.0, 6.5, 0, "B")         # pin 25 +3V3
+bplace("C504", 5.4, 15.4, 90, "B")        # pin 1 +3V3
+bplace("C501", 12.3, 14.4, 90, "B")       # pin 12 +1V2
+bplace("C503", 10.2, 17.6, 0, "B")        # 10u +1V2
+bplace("C507", 2.4, 2.4, 90, "B")         # 10u +3V3
+# configuration pull resistors and the JTAGSEL jumper (B, south-west)
 for i, ref in enumerate(["R506", "R505", "R504", "R503", "R502", "R501"]):
-    bplace(ref, 2.45 + 0.95 * i, 18.2 + (1.45 if i % 2 else 0.0), 90, "B")
-bplace("JP501", 3.6, 15.3, 0, "B")
-bplace("R507", 8.7, 20.9, 0, "B")
+    bplace(ref, 1.0 + 1.05 * i, 17.4 + (1.2 if i % 2 else 0.0), 90, "B")
+bplace("JP501", 3.0, 20.9, 0, "B")
+bplace("R507", 7.6, 20.4, 90, "B")
 
-# fix 2-pad orientation: pad 1 on top for the vertical parts where the netlist side matters is left to the router
-
-
-# ---------------- hand-drawn strobes
-RF = {"/S_STROBE_P": W50, "/S_STROBE_N": W50, "Net-(C412-Pad1)": W50, "Net-(C422-Pad1)": W50}
-p35, p38 = blk.pad("U501", "35"), blk.pad("U501", "38")
-YP, YN = 9.365, 10.365                  # analog S_STROBE ifaces (board 9.865 / 10.865)
-X1, YT = 5.0, 7.4
-nN = [p35, (p35[0], YT), (X1, YT), (X1 - (YN - YT), YN), (0.0, YN)]
-qN = blk.track("/S_STROBE_N", W50, nN, name="S_N", z=50, ch=0.45)
-V1, V2 = (6.0, 10.35), (1.0, YP)
-qP1 = blk.track("/S_STROBE_P", W50, [p38, (6.45, p38[1]), V1], name="S_P", z=50)
+# ---------------- hand-drawn strobes (0.2 mm neck in the 0.4 mm pin row, then 0.36 mm)
+STROBE = {}
 
 
-def lenP(top):
-    return [V1, (5.4, 9.75), (5.4, top + 0.4), (5.0, top), (V2[0] + 0.4, top), (V2[0], top + 0.4), V2]
+def strobe(net, pts, layer="F.Cu", w=W50, name=None):
+    q = blk.track(net, w, pts, layer, name=name or net, z=50, ch=0.1)
+    return q
 
 
-LN = blk.route_len("S_N")
-lo, hi = 6.5, 9.5                       # solve the B meander top so P = N
-for _ in range(40):
-    mid = (lo + hi) / 2
-    tot = bl.plen([p38, (6.45, p38[1]), V1]) + bl.plen(lenP(mid)) + (V2[0] - 0.0)
-    lo, hi = (mid, hi) if tot > LN else (lo, mid)
-blk.track("/S_STROBE_P", W50, lenP(mid), "B.Cu", name="S_P", z=50)
-blk.track("/S_STROBE_P", W50, [V2, (0.0, YP)], name="S_P", z=50)
-for v in (V1, V2):
-    blk.via(*v, "/S_STROBE_P")
-blk.iface("/S_STROBE_P", 0.0, YP, "F.Cu", "W", "pair", W50, "U501.38; crosses under N on B.Cu (2 vias), 47 R R401 in analog")
-blk.iface("/S_STROBE_N", 0.0, YN, "F.Cu", "W", "pair", W50, "U501.35")
-# PH strobe: R411 / R407 on B, 0.36 mm lines straight down to the S edge (mirror-equal)
-for ref, net in (("R411", "Net-(C422-Pad1)"), ("R407", "Net-(C412-Pad1)")):
-    a = blk.pad(ref, "@" + net)
-    blk.track(net, W50, [a, (a[0], H)], "B.Cu", name=net, z=50)
-    blk.iface(net, a[0], H, "B.Cu", "S", "pair", W50, f"{ref} 47 R at U501 ({'PH_STROBE_N' if ref == 'R411' else 'PH_STROBE_P'})")
+def up(p):
+    return blk.pad("U501", p)
 
-# ---------------- supply / ground vias (In2 / In1)
-SUP_V = {"36": (7.45, 8.75), "37": (6.35, 9.6), "1": (7.45, 16.45), "12": (12.55, 16.45), "25": (12.55, 8.75)}
-for dx in (-1.2, 0.0, 1.2):                     # EP thermal vias
+
+YP, YN = 10.37, 11.37                      # analog S_STROBE_P / N ifaces (board 10.87 / 11.87)
+# S_STROBE_P: pin 38 straight west, x 0.5 down to its iface (outermost)
+p38 = up("38")
+blk.track("/S_STROBE_P", 0.2, [p38, (4.85, p38[1])], name="S_P")
+SPP = [(4.85, p38[1]), (0.87, p38[1]), (0.5, p38[1] + 0.37)]
+# S_STROBE_N: pin 35 up, west at y 4.2, down at x 1.25, crosses under S_P on B.Cu (2 vias), iface below P
+p35 = up("35")
+blk.track("/S_STROBE_N", 0.2, [p35, (p35[0], 6.2)], name="S_N")
+XN = 1.25
+NV1, NV2 = (XN, p38[1] - 0.7), (XN, p38[1] + 0.7)
+blk.track("/S_STROBE_N", W50, [(p35[0], 6.2), (p35[0], 4.55), (p35[0] - 0.35, 4.2), (XN + 0.35, 4.2), (XN, 4.55), NV1],
+          name="S_N", ch=0.1)
+blk.track("/S_STROBE_N", W50, [NV1, NV2], "B.Cu", name="S_N")
+for v in (NV1, NV2):
+    blk.via(*v, "/S_STROBE_N")
+LN0 = blk.route_len("S_N")
+nN = [NV2, (XN, YN - 0.37), (XN - 0.37, YN), (0.0, YN)]
+LN = LN0 + bl.plen(nN)
+# match P to N with the vertical run of P (P is shorter: add a small jog before the iface)
+LP0 = blk.route_len("S_P") + bl.plen(SPP)
+need = LN - LP0 - (YP - 0.37 - SPP[-1][1]) - math.hypot(0.37, 0.37) - 0.13
+# P: down x 0.5 to YP - 0.37, diag to (0.13, YP), west to 0 ... extra length as a 45-degree jog to x 0.85 and back
+ex = max(0.0, need)
+if ex > 0.02:
+    d = ex / (2 * (math.sqrt(2) - 1)) / 2              # leg of the jog (two 45-degree out/in pairs)
+    d = min(d, 0.2)
+    print('S jog need', ex)
+    ym = (SPP[-1][1] + YP - 0.37) / 2
+    jog = [(0.5, ym - 0.6), (0.5 + d, ym - 0.6 + d), (0.5 + d, ym + 0.6 - d), (0.5, ym + 0.6)]
+else:
+    jog = []
+strobe("/S_STROBE_P", SPP + jog + [(0.5, YP - 0.37), (0.13, YP), (0.0, YP)], name="S_P")
+strobe("/S_STROBE_N", nN, name="S_N")
+blk.iface("/S_STROBE_P", 0.0, YP, "F.Cu", "W", "pair", W50, "U501.38; 47 R R401 in analog")
+blk.iface("/S_STROBE_N", 0.0, YN, "F.Cu", "W", "pair", W50, "U501.35; dips to B.Cu under S_P (2 vias); R405 in analog")
+# PH strobes: pins 39 (N) / 40 (P) west, down x 1.95 / 2.6, out on the W edge below S_N
+p39, p40 = up("39"), up("40")
+YPHN, YPHP = 12.6, 13.4
+blk.track("/PH_STROBE_N", 0.2, [p39, (4.75, p39[1]), (4.55, p39[1] + 0.2)], name="PH_N")
+blk.track("/PH_STROBE_P", 0.2, [p40, (5.15, p40[1]), (4.75, p40[1] + 0.4)], name="PH_P")
+phn = [(4.55, p39[1] + 0.2), (2.15, p39[1] + 0.2), (1.95, p39[1] + 0.4), (1.95, YPHN - 0.7), (1.25, YPHN), (0.0, YPHN)]
+php = [(4.75, p40[1] + 0.4), (2.8, p40[1] + 0.4), (2.6, p40[1] + 0.6), (2.6, YPHP - 0.7), (1.9, YPHP), (0.0, YPHP)]
+dl = (blk.route_len("PH_N") + bl.plen(phn)) - (blk.route_len("PH_P") + bl.plen(php))
+# N is longer by dl: P gets the extra length as a longer vertical: move P's turn lower and its iface stays (jog)
+if dl > 0.01:
+    d = min(dl / (2 * (math.sqrt(2) - 1)) / 2, 0.25)
+    ym = (p40[1] + 0.6 + YPHP - 0.7) / 2
+    php = php[:3] + [(2.6, ym - 0.8), (2.6 + d, ym - 0.8 + d), (2.6 + d, ym + 0.8 - d), (2.6, ym + 0.8)] + php[3:]
+strobe("/PH_STROBE_N", phn, name="PH_N")
+strobe("/PH_STROBE_P", php, name="PH_P")
+blk.iface("/PH_STROBE_N", 0.0, YPHN, "F.Cu", "W", "pair", W50, "U501.39; 47 R R411 in pstrobe")
+blk.iface("/PH_STROBE_P", 0.0, YPHP, "F.Cu", "W", "pair", W50, "U501.40; 47 R R407 in pstrobe")
+
+# ---------------- supply fan-outs (hand-drawn): pin -> pad-wide neck -> 0.4 mm -> via pair
+SUPV = {}
+
+
+def supply(pin, neck, diag, n=2, step=(0.5, 0.5)):
+    """neck: list of points after the pad (0.2 mm), diag: first via; second via at diag + step"""
+    net = NL.net_of("U501", pin)
+    p = up(pin)
+    blk.track(net, 0.2, [p] + neck, name="sup" + pin)
+    blk.track(net, 0.4, [neck[-1], diag], name="sup" + pin)
+    v2 = (diag[0] + step[0], diag[1] + step[1])
+    blk.track(net, 0.4, [diag, v2])
+    blk.via(*diag, net)
+    blk.via(*v2, net)
+    SUPV[pin] = (diag, v2)
+
+
+supply("36", [(6.4, 6.1), (6.1, 5.8)], (5.7, 5.4), step=(-0.5, -0.5))
+supply("37", [(5.0, 7.6), (4.6, 7.2)], (4.15, 6.75), step=(-0.5, -0.5))
+supply("25", [(10.8, 6.1)], (10.8, 6.1), step=(0.65, 0.0))
+supply("1", [(6.4, 13.4)], (6.4, 13.95), step=(-0.5, 0.5))
+supply("12", [(10.8, 13.4), (11.1, 13.7)], (11.5, 14.1), step=(0.5, 0.5))
+for pin in ("2", "26"):                                      # GND pins straight into the exposed pad
+    p = up(pin)
+    e = (p[0], CY + 2.2) if p[1] > CY else (p[0], CY - 2.2)
+    blk.track("GND", 0.2, [p, e])
+for dx in (-1.2, 0.0, 1.2):                                  # EP thermal vias
     for dy in (-1.2, 0.0, 1.2):
         blk.via(CX + dx, CY + dy, "GND")
 
-
 # ---------------- grid router
 G = 0.05
-NX, NY = int(round(SX / G)) + 1, int(round(H / G)) + 1
+NX, NY = int(round(W / G)) + 1, int(round(H / G)) + 1
 CLR = 0.1
 LAYERS = ("F.Cu", "B.Cu")
-inside = np.zeros((NX, NY), bool)
 gx, gy = np.meshgrid(np.arange(NX) * G, np.arange(NY) * G, indexing="ij")
-inside |= (gx <= W) & (gy <= H)
-inside |= (gx <= SX) & (gy <= SY)
+inside = (gx <= W) & (gy <= H)
 DIRS = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
+EXTRA = {"U502": 0.1}                       # footprint pad clearance 0.2 mm (0.1 above the router default)
 
 
 def netcode(name):
@@ -122,7 +167,6 @@ def netcode(name):
 
 
 def raster():
-    """owner[layer] = net code per cell (-1 free, -2 hole / other)"""
     own = [np.full((NX, NY), -1, np.int32) for _ in LAYERS]
 
     def mark(li, x0, y0, x1, y1, code, shape=None):
@@ -136,10 +180,11 @@ def raster():
         o[m] = code
     b = blk.b
     for fp in b.GetFootprints():
+        ex = EXTRA.get(fp.GetReference(), 0.0)
         for p in fp.Pads():
             x, y = blk.loc(p.GetPosition())
             bb = p.GetBoundingBox()
-            w2, h2 = pcbnew.ToMM(bb.GetWidth()) / 2 + G / 2, pcbnew.ToMM(bb.GetHeight()) / 2 + G / 2
+            w2, h2 = pcbnew.ToMM(bb.GetWidth()) / 2 + G / 2 + ex, pcbnew.ToMM(bb.GetHeight()) / 2 + G / 2 + ex
             code = p.GetNetCode() if p.GetNetCode() > 0 else -2
             circ = p.GetShape() == pcbnew.PAD_SHAPE_CIRCLE
             shp = (lambda X, Y, x=x, y=y, r=w2: (X - x) ** 2 + (Y - y) ** 2 <= r * r) if circ else None
@@ -170,19 +215,23 @@ def raster():
 
 
 def free_maps(code, w):
-    """per layer: cell usable by a track of width w of net code; via map"""
     own = raster()
     out, dists = [], []
+    edge = ndimage.distance_transform_edt(np.pad(inside, 1)) [1:-1, 1:-1] * G
     for li in range(2):
         occ = (own[li] != -1) & (own[li] != code)
         d = ndimage.distance_transform_edt(~occ) * G
         dists.append(d)
-        ok = (d >= w / 2 + CLR + 0.015) & inside
-        # keep w/2 + 0.05 from the block outline (iface stubs end on it)
-        ok &= ndimage.distance_transform_edt(inside) * G >= w / 2 + 0.05 - 1e-9
+        ok = (d >= w / 2 + CLR + 0.015) & inside & (edge >= w / 2 + 0.05 - 1e-9)
         out.append(ok)
-    via_ok = (dists[0] >= bl.VIA_D / 2 + CLR + 0.005) & (dists[1] >= bl.VIA_D / 2 + CLR + 0.005) & inside
-    via_ok &= ndimage.distance_transform_edt(inside) * G >= bl.VIA_D / 2 + 0.1
+    via_ok = (dists[0] >= bl.VIA_D / 2 + CLR + 0.01) & (dists[1] >= bl.VIA_D / 2 + CLR + 0.01) & inside
+    via_ok &= edge >= bl.VIA_D / 2 + 0.15
+    via_ok &= ~((abs(gx - CX) < 3.35 + 0.5) & (abs(gy - CY) < 3.35 + 0.5))   # no vias in the U501 pin fan-out ring
+    via_ok &= ~((abs(gx - 12.1) < 2.9 + 0.35) & (abs(gy - 2.3) < 1.15 + 0.3))  # nor at the U502 pin ends
+    for t in blk.b.GetTracks():                    # via-to-via (also same net) >= 0.5 mm centre distance
+        if isinstance(t, pcbnew.PCB_VIA):
+            vx, vy = blk.loc(t.GetPosition())
+            via_ok &= (gx - vx) ** 2 + (gy - vy) ** 2 >= 0.5 ** 2
     return out, via_ok, own
 
 
@@ -193,7 +242,6 @@ def padobj(ref, num):
 
 
 def pad_cells(p):
-    """target cells inside a pad (per layer list) and its allowed axis directions"""
     x, y = blk.loc(p.GetPosition())
     bb = p.GetBoundingBox()
     w2, h2 = pcbnew.ToMM(bb.GetWidth()) / 2, pcbnew.ToMM(bb.GetHeight()) / 2
@@ -203,52 +251,35 @@ def pad_cells(p):
             if (i * G - x) ** 2 <= (w2 - 0.03) ** 2 + 1e-9 and (j * G - y) ** 2 <= (h2 - 0.03) ** 2 + 1e-9:
                 cells.add((i, j))
     lays = [li for li, ln in enumerate(LAYERS) if p.IsOnLayer(bl.L(ln))]
-    par = p.GetParent()
     if p.GetShape() == pcbnew.PAD_SHAPE_CIRCLE:
         axes = set(range(8))
-    elif len(par.Pads()) == 2 or abs(w2 - h2) < 0.05:
-        ox, oy = blk.loc(par.GetPosition())
-        axes = {0, 4} if abs(x - ox) >= abs(y - oy) else {2, 6}
-    elif w2 > h2:
-        axes = {0, 4}
     else:
-        axes = {2, 6}
-    return cells, lays, axes, (x, y)
+        axes = {0, 2, 4, 6}
+    return cells, lays, axes, (x, y), (w2, h2)
 
 
 ROUTED, FAILED = [], []
 
 
-def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
-    """src: (ref, pad); dst: list of (ref, pad) / ('VIA', x, y) / ('EDGE', side, layer, x0, x1).  Draws tracks / vias."""
+def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None):
+    """src: (ref, pad); dst: list of (ref, pad) / ('VIA', x, y) / ('EDGE', 'S', layer, x0, x1)"""
     net = NL.canon(net)
     code = netcode(net)
     ok, via_ok, _ = free_maps(code, w)
     sp = padobj(*src)
-    scells, slays, saxes, sxy = pad_cells(sp)
+    scells, slays, saxes, sxy, _ = pad_cells(sp)
     tgt = [set(), set()]
-    tax = {}
-    tcen = {}
+    tpad = [set(), set()]
+    tax, tcen = {}, {}
     for d in dst:
         if d[0] == "EDGE":
             _, side, ln, a0, a1 = d
             li = LAYERS.index(ln)
             for i in range(int(round(a0 / G)), int(round(a1 / G)) + 1):
-                if side == "S":
-                    c = (i, NY - 1 - int(round((w / 2 + 0.05) / G - 1e-6)))
-                    tgt[li].add(c)
-                    tax[(li,) + c] = {2}
-                    tcen[(li,) + c] = (i * G, H)
-                elif side == "EM":                 # E edge of the main rectangle (x = W): a0..a1 are y
-                    c = (int(round((W - w / 2 - 0.05) / G - 1e-6)), i)
-                    tgt[li].add(c)
-                    tax[(li,) + c] = {0}
-                    tcen[(li,) + c] = (W, i * G)
-                else:                              # E edge of the strip: a0..a1 are y
-                    c = (NX - 1 - int(round((w / 2 + 0.05) / G - 1e-6)), i)
-                    tgt[li].add(c)
-                    tax[(li,) + c] = {0}
-                    tcen[(li,) + c] = (SX, i * G)
+                c = (i, NY - 1 - int(round((w / 2 + 0.05) / G + 0.499)))
+                tgt[li].add(c)
+                tax[(li,) + c] = {2}
+                tcen[(li,) + c] = (i * G, H)
         elif d[0] == "VIA":
             c = (int(round(d[1] / G)), int(round(d[2] / G)))
             for li in range(2):
@@ -256,19 +287,25 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
                 tax[(li,) + c] = set(range(8))
                 tcen[(li,) + c] = (d[1], d[2])
         else:
-            pc, pl, pa, cen = pad_cells(padobj(*d))
+            pc, pl, pa, cen, _ = pad_cells(padobj(*d))
             for li in pl:
                 for c in pc:
                     tgt[li].add(c)
+                    tpad[li].add(c)
                     tax[(li,) + c] = pa
                     tcen[(li,) + c] = cen
     for li in range(2):
         for c in tgt[li]:
-            ok[li][c] = True
-        for c in scells:
-            if li in slays:
+            if c in tpad[li] or dst[0][0] == "VIA":
+                ok[li][c] = True
+        tgt[li] = {c for c in tgt[li] if ok[li][c]}
+        if li in slays:
+            for c in scells:
                 ok[li][c] = True
     allt = [c for li in range(2) for c in tgt[li]]
+    if not allt:
+        FAILED.append((net, src, None))
+        return None
     tx0, tx1 = min(c[0] for c in allt), max(c[0] for c in allt)
     ty0, ty1 = min(c[1] for c in allt), max(c[1] for c in allt)
 
@@ -285,8 +322,7 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
         best[st] = 0.0
         heapq.heappush(openl, (hfun(si, sj), 0.0, st))
     pref = [1.0, 1.0] if layer_pref is None else layer_pref
-    goal = None
-    n = 0
+    goal, n = None, 0
     while openl:
         f, g_, st = heapq.heappop(openl)
         if g_ > best.get(st, 1e18) + 1e-9:
@@ -296,20 +332,24 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
             goal = st
             break
         n += 1
-        if n > 900000:
+        if n > 700000:
             break
         in_src = (i, j) in scells and li in slays
+        near_src = False
+        if d >= 0 and not in_src and li in slays:
+            bi, bj = i - DIRS[d][0], j - DIRS[d][1]
+            near_src = (bi, bj) in scells
         for nd in (range(8) if d < 0 else (d, (d + 1) % 8, (d - 1) % 8)):
-            if d < 0 and in_src and nd not in saxes:
+            if d < 0 and nd not in saxes:
                 continue
-            if d < 0 and not in_src:
-                pass
+            if (in_src or near_src) and d >= 0 and nd != d:
+                continue
             di, dj = DIRS[nd]
             a, b_ = i + di, j + dj
             if not (0 <= a < NX and 0 <= b_ < NY) or not ok[li][a, b_]:
                 continue
-            if in_src and d >= 0 and nd != d:
-                continue                       # leave the source pad straight along its axis
+            if (a, b_) in tpad[li] and (nd not in tax[(li, a, b_)] or (d >= 0 and nd != d) or d < 0 and not in_src):
+                continue
             step = (1.414 if nd % 2 else 1.0) * pref[li] + (0.3 if (d >= 0 and nd != d) else 0.0)
             ns = (a, b_, li, nd)
             ng = g_ + step
@@ -317,7 +357,7 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
                 best[ns] = ng
                 prev[ns] = st
                 heapq.heappush(openl, (ng + hfun(a, b_), ng, ns))
-        if via_ok[i, j] and not in_src and d >= 0:
+        if via_ok[i, j] and not in_src and not near_src and d >= 0 and (i, j) not in tpad[li]:
             ns = (i, j, 1 - li, -1)
             ng = g_ + via_cost / G
             if ok[1 - li][i, j] and ng < best.get(ns, 1e18):
@@ -332,7 +372,6 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
     while path[-1] in prev:
         path.append(prev[path[-1]])
     path.reverse()
-    # split into layer runs
     runs, cur = [], [path[0]]
     for s in path[1:]:
         if s[2] != cur[-1][2]:
@@ -343,21 +382,24 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
     runs.append(cur)
     for k, r in enumerate(runs):
         pts = [(round(s[0] * G, 3), round(s[1] * G, 3)) for s in r]
-        if k == 0:
-            pts[0] = sxy
+        if k == 0 and len(pts) > 1:
+            # start exactly on the pad centre line along the exit axis
+            dx, dy = pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]
+            if abs(dy) < 1e-9:
+                pts = [(round(sxy[0], 4), pts[0][1])] + pts[1:]
+            elif abs(dx) < 1e-9:
+                pts = [(pts[0][0], round(sxy[1], 4))] + pts[1:]
         if k == len(runs) - 1:
-            gc = tcen[(goal[2], goal[0], goal[1])]
-            if not dst[0][0] == "EDGE":
-                last = pts[-1]
-                if abs(last[0] - gc[0]) < 1e-6 or abs(last[1] - gc[1]) < 1e-6 or abs(abs(last[0] - gc[0]) - abs(last[1] - gc[1])) < 1e-6:
-                    pts.append(gc)
-            elif dst[0][1] == "S":
+            if dst[0][0] == "EDGE":
                 pts.append((pts[-1][0], H))
-            elif dst[0][1] == "EM":
-                pts.append((W, pts[-1][1]))
             else:
-                pts.append((SX, pts[-1][1]))
-        # compress collinear
+                gc = tcen[(goal[2], goal[0], goal[1])]
+                last = pts[-1]
+                if (goal[0], goal[1]) in tpad[goal[2]]:
+                    pass                                   # ends inside the pad, entered along its axis
+                elif abs(last[0] - gc[0]) < 1e-6 or abs(last[1] - gc[1]) < 1e-6 or \
+                        abs(abs(last[0] - gc[0]) - abs(last[1] - gc[1])) < 1e-6:
+                    pts.append(gc)
         q = [pts[0]]
         for a_, b2, c2 in zip(pts, pts[1:], pts[2:]):
             v1 = (b2[0] - a_[0], b2[1] - a_[1])
@@ -365,24 +407,21 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
             if abs(v1[0] * v2[1] - v1[1] * v2[0]) > 1e-9 or v1[0] * v2[0] + v1[1] * v2[1] < 0:
                 q.append(b2)
         q.append(pts[-1])
-        if len(q) >= 2 and bl.plen(q) > 1e-6:
-            t = [q[0]]
-            for p_ in q[1:]:
-                if math.hypot(p_[0] - t[-1][0], p_[1] - t[-1][1]) > 1e-6:
-                    t.append(p_)
-            if len(t) >= 2:
-                for (a_, b2) in zip(t, t[1:]):          # draw segment by segment: no chamfering of grid joints
-                    blk.track(net, w, [a_, b2], LAYERS[r[0][2]])
+        t = [q[0]]
+        for p_ in q[1:]:
+            if math.hypot(p_[0] - t[-1][0], p_[1] - t[-1][1]) > 1e-6:
+                t.append(p_)
+        for (a_, b2) in zip(t, t[1:]):
+            blk.track(net, w, [a_, b2], LAYERS[r[0][2]])
         if k < len(runs) - 1:
             blk.via(round(r[-1][0] * G, 3), round(r[-1][1] * G, 3), net)
     ROUTED.append(net)
     if dst[0][0] == "EDGE":
-        return path[-1][0] * G if dst[0][1] == "S" else path[-1][1] * G
+        return path[-1][0] * G
     return True
 
 
 def place_via(net, x, y, keep=()):
-    """via of net at the free spot nearest to (x, y); keep = pads (ref, num) whose copper it must not touch"""
     _, vok, _ = free_maps(netcode(NL.canon(net)), 0.2)
     for ref, num in keep:
         p = padobj(ref, num)
@@ -400,44 +439,31 @@ def place_via(net, x, y, keep=()):
     return ("VIA", vx, vy)
 
 
-def gvia(x, y, keep=()):
-    return place_via("GND", x, y, keep)
-
-
-def svia(net, x, y, keep=()):
-    return place_via(net, x, y, keep)
-
-
-def tie(ref, num, net=None, d=0.7):
-    """pad -> own via (GND to In1, supply to In2) placed beyond the pad along the part axis"""
+def tie(ref, num, d=0.75, pair=False, w=None):
+    """pad -> own via (GND to In1, supply to In2) beyond the pad along the part axis; pair = second via"""
     p = padobj(ref, num)
-    net = net or p.GetNetname()
+    net = p.GetNetname()
     px, py = blk.loc(p.GetPosition())
     ox, oy = blk.loc(p.GetParent().GetPosition())
     dx, dy = px - ox, py - oy
     n_ = math.hypot(dx, dy) or 1.0
+    w = w or (0.4 if net in ("GND", "+3V3", "+1V2") else 0.2)
     v = place_via(net, px + dx / n_ * d, py + dy / n_ * d, keep=[(ref, num)])
-    return route(net, (ref, num), [v], 0.3 if net in ("GND", "+3V3", "+1V2") else 0.2)
-
-
-IFACE_NOTES = {}
-
-
-def to_east(net, src, y0=11.0, y1=21.5, w=WS, note=""):
-    y = route(net, src, [("EDGE", "EM", "B.Cu", y0, y1)], w)
-    if y is not None:
-        blk.iface(net, W, y, "B.Cu", "E", "slow", w, note)
-    return y
+    r = route(net, (ref, num), [v], w)
+    if pair and r:
+        v2 = place_via(net, v[1] + dx / n_ * 0.6, v[2] + dy / n_ * 0.6)
+        route(net, (ref, num), [v2], w)
+    return r
 
 
 def to_edge(net, src, x0, x1, w=WS, note=""):
     x = route(net, src, [("EDGE", "S", "B.Cu", x0, x1)], w)
     if x is not None:
-        blk.iface(net, x, H, "B.Cu", "S", "slow", w, note)
+        blk.iface(net, round(x, 3), H, "B.Cu", "S", "slow", w, note)
     return x
 
 
-# ---------------- routing jobs (a driver pass re-orders failed jobs first: prio.json)
+# ---------------- routing jobs
 JOBS = []
 
 
@@ -445,78 +471,68 @@ def job(name, fn):
     JOBS.append((name, fn))
 
 
-for pin, (x, y) in list(SUP_V.items()):
-    def f(pin=pin, x=x, y=y):
-        v = place_via(NL.net_of("U501", pin), x, y)
-        SUP_V[pin] = v[1:]
-        route(NL.net_of("U501", pin), ("U501", pin), [v], 0.2)
-    job("sup" + pin, f)
-for pin in ("2", "26"):
-    job("gnd" + pin, lambda pin=pin: route("GND", ("U501", pin), [("U501", "49")], 0.2))
-job("phn", lambda: route("/PH_STROBE_N", ("U501", "39"), [("R411", "@PH_STROBE_N")]))
-job("php", lambda: route("/PH_STROBE_P", ("U501", "40"), [("R407", "@PH_STROBE_P")]))
-DEC = {"C506": "36", "C502": "37", "C504": "1", "C501": "12", "C505": "25"}
+# decoupling: cap supply pad -> second via of the pin's pair (0.4 mm), cap GND pad -> via pair
+DEC = {"C506": "36", "C502": "37", "C505": "25", "C504": "1", "C501": "12"}
 for c, pin in DEC.items():
     def f(c=c, pin=pin):
         net = NL.net_of("U501", pin)
-        route(net, (c, "@" + net), [("VIA", *SUP_V[pin])], 0.3)
-        tie(c, "@GND")
+        route(net, (c, "@" + net), [("VIA",) + SUPV[pin][1], ("VIA",) + SUPV[pin][0]], 0.4)
+        tie(c, "@GND", pair=True)
     job("dec" + c, f)
-TAPX = {i: 8.3 + 0.62 * i for i in range(16)}
-TAPPIN = {NL.net_of("U501", p): p for p in [str(k) for k in list(range(9, 12)) + list(range(13, 25)) + [27]]}
-for i in range(16):
-    net = f"/TAP{i}"
-    job("tap%d" % i, lambda net=net, i=i: to_edge(net, ("U501", TAPPIN[net]), 8.5, 23.5,
-                                                    note=f"U501.{TAPPIN[net]}"))
-job("clk0", lambda: route("Net-(U502-CLK0)", ("U502", "10"), [("R508", "@Net-(U502-CLK0)")]))
-job("clk1", lambda: route("Net-(U502-CLK1)", ("U502", "9"), [("R509", "@Net-(U502-CLK1)")]))
-job("clk2", lambda: route("Net-(U502-CLK2)", ("U502", "6"), [("R510", "@Net-(U502-CLK2)")]))
+# U502 / Y501
 job("xa", lambda: route("Net-(U502-XA)", ("U502", "2"), [("Y501", "3")]))
 job("xb", lambda: route("Net-(U502-XB)", ("U502", "3"), [("Y501", "1")]))
+job("clk0", lambda: route("Net-(U502-CLK0)", ("U502", "10"), [("R508", "@Net-(U502-CLK0)")]))
+job("clk2", lambda: route("Net-(U502-CLK2)", ("U502", "6"), [("R510", "@Net-(U502-CLK2)")]))
+job("clk1", lambda: route("Net-(U502-CLK1)", ("U502", "9"), [("R509", "@Net-(U502-CLK1)")]))
 job("fclk", lambda: route("/fpga_clock/FPGA_CLK", ("R508", "@FPGA_CLK"), [("U501", "33")]))
 job("fclk2", lambda: route("/fpga_clock/CLK2_FPGA", ("R510", "@CLK2_FPGA"), [("U501", "34")]))
-job("u502v7", lambda: route("+3V3", ("U502", "7"), [("C508", "@+3V3")], 0.3))
-job("u502v1", lambda: route("+3V3", ("U502", "1"), [("C509", "@+3V3")], 0.3))
-for ref, num in (("C508", "@+3V3"), ("C509", "@+3V3"), ("C508", "@GND"), ("C509", "@GND"), ("U502", "8"),
-                 ("Y501", "2"), ("Y501", "4"), ("C510", "@+3V3"), ("C510", "@GND"), ("C503", "@+1V2"), ("C503", "@GND"),
-                 ("C507", "@+3V3"), ("C507", "@GND")):
-    job("tie%s%s" % (ref, num), lambda ref=ref, num=num: tie(ref, num))
-job("tck", lambda: route("/fpga_clock/JTAG_TCK", ("U501", "3"), [("J501", "7")]))
-job("tckr", lambda: (route("/fpga_clock/JTAG_TCK", ("R507", "@JTAG_TCK"), [("U501", "3"), ("J501", "7")]), tie("R507", "@GND")))
-for pin, jp in (("4", "9"), ("5", "11"), ("7", "13"), ("6", "5")):
-    job("jtag" + pin, lambda pin=pin, jp=jp: route(NL.net_of("U501", pin), ("U501", pin), [("J501", jp)]))
-for pin, r in (("42", "R506"), ("43", "R505"), ("44", "R504"), ("45", "R503"), ("46", "R502"), ("48", "R501")):
+job("u502v1", lambda: route("+3V3", ("U502", "1"), [("C509", "@+3V3")], 0.2))
+job("u502v7", lambda: route("+3V3", ("U502", "7"), [("C508", "@+3V3")], 0.2))
+job("u502g", lambda: tie("U502", "8", d=1.6, w=0.2))
+for ref, num, pr in (("C509", "@+3V3", True), ("C509", "@GND", True), ("C508", "@+3V3", True), ("C508", "@GND", True),
+                     ("Y501", "2", False), ("Y501", "4", False), ("C510", "@+3V3", True), ("C510", "@GND", True),
+                     ("C503", "@+1V2", True), ("C503", "@GND", True), ("C507", "@+3V3", True), ("C507", "@GND", True)):
+    job("tie%s%s" % (ref, num), lambda ref=ref, num=num, pr=pr: tie(ref, num, pair=pr))
+# south-west: config pins via the pull resistors, iface nets to the S edge (west end, x 0.4 .. 4.6)
+CFG = {"42": "R506", "43": "R505", "44": "R504", "45": "R503"}
+for pin, r in CFG.items():
     def f(pin=pin, r=r):
         net = NL.net_of("U501", pin)
         route(net, ("U501", pin), [(r, "@" + net)])
         other = [p.GetNumber() for p in blk.fps[r].Pads() if p.GetNetname() != net][0]
         tie(r, other)
     job("cfg" + pin, f)
-job("jp", lambda: (route("/fpga_clock/JTAGSEL_N", ("JP501", "1"), [("U501", "44"), ("R504", "@JTAGSEL_N")]), tie("JP501", "2")))
-job("coarse", lambda: to_edge("/COARSE", ("U501", "47"), 1.8, 8.0, note="U501.47 (SN65LVDS2 in the phase block)"))
-job("done", lambda: to_edge("/FPGA_DONE", ("R502", "@FPGA_DONE"), 1.8, 8.0, note="R502 4.7k pull-up; to the MCU"))
-job("reconf", lambda: to_edge("/FPGA_RECONFIG", ("R501", "@FPGA_RECONFIG"), 1.8, 8.0, note="R501 4.7k pull-up; MCU open-drain"))
-job("adct", lambda: to_edge("/ADC_TRIG", ("U501", "41"), 1.8, 8.0, note="U501.41 -> STM32 PB11"))
+job("jp", lambda: (route("/fpga_clock/JTAGSEL_N", ("JP501", "1"), [("R504", "@JTAGSEL_N")]), tie("JP501", "2")))
+SWX = (0.4, 4.6)
+job("adct", lambda: to_edge("/ADC_TRIG", ("U501", "41"), *SWX, note="U501.41 -> STM32 (mcuif)"))
+job("done", lambda: (to_edge("/FPGA_DONE", ("U501", "46"), *SWX, note="U501.46, R502 4.7k pull-up here; -> STM32"),
+                     route("/FPGA_DONE", ("R502", "@FPGA_DONE"), [("U501", "46")]), tie("R502", "@+3V3")))
+job("coarse", lambda: to_edge("/COARSE", ("U501", "47"), *SWX, note="U501.47 <- SN65LVDS2 (phase)"))
+job("reconf", lambda: (to_edge("/FPGA_RECONFIG", ("U501", "48"), *SWX, note="U501.48, R501 4.7k pull-up here; STM32 open-drain"),
+                       route("/FPGA_RECONFIG", ("R501", "@FPGA_RECONFIG"), [("U501", "48")]), tie("R501", "@+3V3")))
+# JTAG / DBG2 to the S edge next to them (x 4.6 .. 8.4), TCK with its 4.7k pull-down R507
+JX = (4.6, 8.6)
+for pin, nm in (("3", "TCK"), ("4", "TMS"), ("5", "TDI"), ("6", "DBG2"), ("7", "TDO")):
+    def f(pin=pin, nm=nm):
+        to_edge(NL.net_of("U501", pin), ("U501", pin), *JX, note=f"U501.{pin} -> J501 (mcuif)")
+        if nm == "TCK":
+            route("/fpga_clock/JTAG_TCK", ("R507", "@JTAG_TCK"), [("U501", "3")])
+            tie("R507", "@GND")
+    job("jtag" + pin, f)
+# TAPs: pins 9-11 (bottom), 13-24 (right side), 27 (top) -> S edge x 8.6 .. 14.6
+TAPPIN = {NL.net_of("U501", p): p for p in [str(k) for k in list(range(9, 12)) + list(range(13, 25)) + [27]]}
+for i in range(16):
+    net = f"/TAP{i}"
+    job("tap%d" % i, lambda net=net: to_edge(net, ("U501", TAPPIN[net]), 8.6, 14.9, note=f"U501.{TAPPIN[net]}"))
+# east group: SPI, MCU_CLK, I2C -> S edge x 14.6 .. 17.7
+EX = (14.6, 17.75)
 for pin in ("28", "29", "30", "31"):
-    job("spi" + pin, lambda pin=pin: to_east(NL.net_of("U501", pin), ("U501", pin), note=f"U501.{pin}"))
-job("mclk", lambda: to_east("/MCU_CLK", ("R509", "@MCU_CLK"), note="MS5351M CLK1 via 33 R -> STM32 PF0"))
-job("scl", lambda: to_east("/I2C_SCL", ("U502", "4"), note="MS5351M (pull-ups in mcuif)"))
-job("sda", lambda: to_east("/I2C_SDA", ("U502", "5"), note="MS5351M"))
-job("j2", lambda: route("Net-(J501-Pin_2)", ("J501", "2"), [("R511", "@Net-(J501-Pin_2)")]))
-job("j4", lambda: route("Net-(J501-Pin_4)", ("J501", "4"), [("R512", "@Net-(J501-Pin_4)")]))
-job("hrx", lambda: to_east("/HOST_RX", ("R511", "@HOST_RX"), note="J501.2 via R511 100 R -> STM32 PA10"))
-job("htx", lambda: to_east("/HOST_TX", ("R512", "@HOST_TX"), note="J501.4 via R512 100 R <- STM32 PA9"))
-for jp in ("8", "10", "12", "14"):
-    job("j" + jp, lambda jp=jp: to_east(NL.net_of("J501", jp), ("J501", jp), note=f"J501.{jp} -> STM32"))
+    job("spi" + pin, lambda pin=pin: to_edge(NL.net_of("U501", pin), ("U501", pin), *EX, note=f"U501.{pin} -> STM32"))
+job("mclk", lambda: to_edge("/MCU_CLK", ("R509", "@MCU_CLK"), *EX, note="MS5351M CLK1 via R509 33 R -> STM32 PF0"))
+job("scl", lambda: to_edge("/I2C_SCL", ("U502", "4"), *EX, note="MS5351M SCL (pull-ups in mcuif)"))
+job("sda", lambda: to_edge("/I2C_SDA", ("U502", "5"), *EX, note="MS5351M SDA"))
 
-
-def vbus():
-    x = route("VBUS", ("J501", "1"), [("EDGE", "E", "B.Cu", 0.5, 6.5)], 0.4)
-    if x is not None:
-        blk.iface("VBUS", SX, x, "B.Cu", "E", "supply", 0.4, "J501.1 (5 V to the cable); from the power block")
-
-
-job("vbus", vbus)
 PRIO = json.load(open(os.path.join(HERE, "prio.json"))) if os.path.exists(os.path.join(HERE, "prio.json")) else []
 order = [j for p in PRIO for j in JOBS if j[0] == p] + [j for j in JOBS if j[0] not in PRIO]
 print("routing", len(order), "jobs ...")
@@ -528,41 +544,31 @@ for name, fn in order:
         FAILJ.append(name)
 print("failed jobs:", FAILJ)
 print("failed nets:", sorted(set(f[0] for f in FAILED)))
-json.dump([n for n in PRIO] + [n for n in FAILJ if n not in PRIO], open(os.path.join(SCR, "fpga_prio_next.json"), "w"))
-blk.zone("GND", ["In1.Cu"], [(0, 0), (SX, 0), (SX, SY), (W, SY), (W, H), (0, H)], 0.2)
-blk.iface("+3V3", 0, 0, "In2.Cu", "-", "supply", None, "via pairs at the caps; J501.3 THT on the In2 +3V3 region")
-blk.iface("+1V2", 0, 0, "In2.Cu", "-", "supply", None, "vias at U501.12 / .37 and C501-C503: In2 +1V2 island under U501")
+json.dump([n for n in FAILJ] + [n for n in PRIO if n not in FAILJ], open(os.path.join(SCR, "fpga_prio_next.json"), "w"))
+
+# ---------------- planes: In1 GND, In2 +3V3 with a +1V2 island (U501 core) and tongue to the SE corner (power +1V2)
+blk.zone("GND", ["In1.Cu"], bl.rect_pts(0, 0, W, H), 0.2)
+blk.zone("+3V3", ["In2.Cu"], bl.rect_pts(0, 0, W, H), 0.2, prio=0)
+ISL = [(3.0, 5.6), (7.0, 5.6), (7.0, 7.2), (10.2, 7.2), (10.2, 12.4), (12.6, 12.4), (12.6, 15.6), (16.0, 15.6), (16.0, 20.6),
+       (W, 20.6), (W, H), (8.8, H), (8.8, 15.4), (5.0, 15.4), (5.0, 7.4), (3.0, 7.4)]
+blk.zone("+1V2", ["In2.Cu"], ISL, 0.2, prio=1)
+blk.iface("+3V3", 0, 0, "In2.Cu", "-", "supply", None, "In2 +3V3 zone over the block; feed from power W (board 74.45, 5.5)")
+blk.iface("+1V2", W, H - 0.7, "In2.Cu", "E", "supply", None, "In2 +1V2 island, tongue to the SE corner (power +1V2 at board 75.25, 21.95)")
 blk.edge_rect(0, 0, W, H, "Dwgs.User")
+for fp_ in blk.fps.values():
+    fp_.Reference().SetLayer(pcbnew.B_Fab if fp_.GetLayer() == pcbnew.B_Cu else pcbnew.F_Fab)
 blk.save(HERE)
 path = os.path.join(HERE, "fpga.kicad_pcb")
-res = bl.check_board(path, refs=REFS, rf_widths=RF)
-for k in ("clearance", "corner"):
-    for e in res["details"][k][:15]:
+print("strobe lengths: S_P %.3f S_N %.3f PH_P %.3f PH_N %.3f" % (blk.route_len("S_P"), blk.route_len("S_N"),
+                                                               blk.route_len("PH_P"), blk.route_len("PH_N")))
+RFT = {}
+res = bl.check_board(path, refs=REFS, rf_widths=RFT)
+for k in ("clearance", "corner", "pad_axis", "unrouted"):
+    for e in res["details"][k][:20]:
         print("   ", k, e)
-
-
-def courtyard_overlaps(pcb):
-    """local helper: pairwise courtyard intersection per side (area > 0.005 mm2)"""
-    b = pcbnew.LoadBoard(pcb)
-    fps = list(b.GetFootprints())
-    for f in fps:
-        f.BuildCourtyardCaches()
-    hits = []
-    for lay in (pcbnew.F_CrtYd, pcbnew.B_CrtYd):
-        polys = [(f.GetReference(), f.GetCourtyard(lay)) for f in fps]
-        polys = [(r, p) for r, p in polys if p.OutlineCount()]
-        for i in range(len(polys)):
-            for j in range(i + 1, len(polys)):
-                a = pcbnew.SHAPE_POLY_SET(polys[i][1])
-                a.BooleanIntersection(polys[j][1], pcbnew.SHAPE_POLY_SET.PM_FAST)
-                ar = a.Area() / 1e12
-                if ar > 0.005:
-                    hits.append((polys[i][0], polys[j][0], pcbnew.LayerName(lay), round(ar, 3)))
-    return hits
-
-
-CY_HITS = courtyard_overlaps(path)
+CY_HITS = bl.courtyard_overlaps(path)
 print("courtyard overlaps:", len(CY_HITS), CY_HITS)
 if "--render" in sys.argv:
     bl.render(path, os.path.join(HERE, "fpga.png"), layers=("F.Cu", "B.Cu", "F.SilkS", "F.Fab", "Dwgs.User"), tmpdir=SCR)
-    bl.render(path, os.path.join(HERE, "fpga_detail.png"), layers=("F.Cu", "B.Cu", "F.Fab"), crop=(104, 106, 116, 118), tmpdir=SCR)
+    bl.render(path, os.path.join(HERE, "fpga_detail.png"), layers=("F.Cu", "B.Cu", "F.Fab", "Dwgs.User"),
+              crop=(0, 0, 13, 14), tmpdir=SCR)
