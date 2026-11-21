@@ -9,9 +9,15 @@ Signal paths, left to right (all 50 R, 50 % duty square waves from complementary
     S_STROBE_N: unused complement, AC dummy load 47 R + 100 nF + 49.9 R (keeps pin currents equal).
   Phase strobe (50 MHz), one chain per polarity, identical layout:
     PH_STROBE_P/N -> 47 R -> 100 nF -> TRF37D73 -> 100 nF -> 10 dB pi pad (100/68/100 R) -> 100 nF
-    -> GVA-84+ (VBUS via 2.2 uH + bead) -> 100 nF -> launch node with shorted stub
+    -> GVA-84+ (VBUS via bead + 2.2 uH) -> 100 nF -> launch node with shorted stub
     (80 ps, 13.2 mm, sim/phase_array/RESULT.md)
     and a DNP BAT15-03W clamp -> PSTRB_A / PSTRB_K (strobe lines along the taps, trigger_phase sheet).
+
+Bias tees (sim/bias_tee/RESULT.md): every TRF37D73 output: BLM15HD102SN1D bead with its pad on the 50 R line
+-> 47 uH LQH32CN470K23L (1210) with 1 k 0402 across it (kills the bead-L / 47 uH self-C resonance near 70 MHz,
+-0.5 -> -0.28 dB) -> cold end 100 nF (own cap, GND via at its pad, supply via beyond it). GVA-84+: bead + 2.2 uH
+LQM21PN2R2MGHL (its 80 ps shorted launch stub shorts everything below ~300 MHz, so the 2.2 uH is enough; DCR
+budget 0.15-0.18 V at 108-130 mA), cold end = the VBUS 1 nF / 100 nF / 10 uF.
 
 Deviation from RESULT.md: an extra 100 nF block in front of TRF #2 / GVA-84+ (both RF inputs carry
 an internal DC bias and the pi pads' shunt resistors would otherwise load it).
@@ -41,11 +47,22 @@ GVA_F = {"Price": "2.99 USD (SPEC)", "Note": "SOT-89: 1 IN, 3 OUT+DC, 2/4(tab) G
 TP = "Connector:TestPoint"
 TP_FP = "TestPoint:TestPoint_Pad_D1.0mm"
 BEAD = ("Device:FerriteBead_Small", "Inductor_SMD:L_0402_1005Metric", "BLM15HD102SN1D",
-        {"LCSC": "C21516", "Note": "1 k @100 MHz, GHz-band bead, 250 mA, 1.25 R; next to the RF pin (high-SRF section)"})
+        {"LCSC": "C21516", "Price": "0.0197 USD (LCSC)",
+         "Note": "1 k @100 MHz / 2 k @1 GHz, 250 mA, 1.25 R max; pad ON the 50 R line, body perpendicular"})
 L47 = ("Device:L", "Inductor_SMD:L_1210_3225Metric", "LQH32CN470K23L",
-       {"LCSC": "C701189", "Note": "47 uH 1210 wire-wound, >= 100 mA (verify); cold end"})
+       {"LCSC": "C701189", "Price": "0.1632 USD (LCSC 5+)",
+        "Note": "47 uH 1210, 170 mA, DCR 1.3 R (1.69 max), SRF >= 15 MHz; 1 k across it; abuts the bead"})
 L22 = ("Device:L", "Inductor_SMD:L_0805_2012Metric", "LQM21PN2R2MGHL",
-       {"LCSC": "C341781", "Note": "2.2 uH 0805, >= 0.2 A, DCR <= 0.3 R (verify); cold end"})
+       {"LCSC": "C341781", "Price": "0.3667 USD (LCSC 5+)",
+        "Note": "2.2 uH 0805, Isat 450 mA, DCR 125 mR, SRF 40 MHz; abuts the bead"})
+RDAMP_F = {"Note": "damps the 47 uH (bias tee): 0402 beside the 1210, same two pads; sim/bias_tee/RESULT.md"}
+CCOLD_F = {"Note": "47 uH cold end: abuts the 1210 cold pad, GND via at its pad, +3V3 plane vias beyond it"}
+# explicit references for the parts added by the bias-tee revision (no renumbering of existing parts)
+_NEW = {"R": iter(range(415, 430)), "C": iter(range(432, 450))}
+
+
+def new_ref(prefix):
+    return f"{prefix}{next(_NEW[prefix])}"
 T = 1.0      # annotation text size
 
 
@@ -83,8 +100,9 @@ def rail_caps(sh, xs, Yr, vals):
 
 
 def bias_tee(sh, x, Y, Yr, big, rail, cap_xs, tp_name):
-    """RF choke from the line node (x, Y) up to the rail at y = Yr: bead (RF side) + big inductor.
-    Returns (bead, L)."""
+    """RF choke from the line node (x, Y) up to the rail at y = Yr: bead (RF side, pad on the line) + big
+    inductor; for the 47 uH (TRF37D73) also the 1 k damping resistor across it and an own 100 nF at its cold
+    end (rail extended to x + 8). Returns (bead, L)."""
     lib, fp, mpn, f = BEAD
     b = sh.add(lib, "FB", "1k", P(x, Y - 4), rot=180, fp=fp, mpn=mpn, fields=f)  # pin 1 at the line
     lib, fp, mpn, f = big
@@ -93,6 +111,13 @@ def bias_tee(sh, x, Y, Yr, big, rail, cap_xs, tp_name):
     sh.wire(P(x, Y), b["1"])
     sh.wire(b["2"], l["1"])
     sh.wire(l["2"], P(x, Yr))
+    if big is L47:
+        rd = R(sh, "1k", P(x + 4, Y - 11), rot=180, ref=new_ref("R"), fields=RDAMP_F)
+        sh.wire(l["1"], rd["1"])
+        sh.wire(l["2"], rd["2"])
+        sh.wire(P(x, Yr), P(x + 8, Yr))
+        cc = C(sh, "100n", P(x + 8, Yr + 3), ref=new_ref("C"), fields=CCOLD_F)
+        sh.gnd(cc["2"])
     # DC test point between bead and choke
     tp = add_tp(sh, tp_name, P(x + 7, Y - 7))
     sh.wire(P(x, Y - 7), tp["1"])
@@ -214,7 +239,7 @@ def main():
     sh.text("TRF37D73 x2: 22 dB, OP1dB 16.5 dBm, 3.3 V 55 mA each.\n"
             "Edge 300-600 ps (FPGA) -> ~250 ps -> 133-152 ps.\n"
             "PWDN and NC pins to GND, EP: >= 5 vias to L2.\n"
-            "Bias tee: bead at pin 7, then 47 uH (2.2 uH: -25 %).", P(46, Yn + 10), size=T)
+            "Bias tee: bead (pad on the line) -> 47 uH || 1 k\n-> own 100 nF at the cold end (bias_tee RESULT).", P(46, Yn + 10), size=T)
     sh.text("12 dB pi pad 82 / 91 / 82 R (0402):\n"
             "TRF #2 input ~+8.6 dBm square\n(abs. max +10 dBm).", P(78, Yn + 2), size=T)
     sh.text("CLIP STUB TL401: 80 ps one-way = 13.2 mm\n"
@@ -279,8 +304,9 @@ def main():
             P(78, Y2 + 12), size=T)
     sh.text("GVA-84+ (SOT-89): 1 IN, 3 OUT+DC, 2/4 GND.\n"
             "Vd 4.8-5.2 V, 108 mA; no Rbias at 5 V (datasheet\n"
-            "Fig. 2): VBUS -> 2.2 uH -> bead -> pin 3,\n"
-            "Vd ~ VBUS - 0.15 V. Pin 3 max 5.8 V.\n"
+            "Fig. 2): pin 3 -> bead -> 2.2 uH -> VBUS,\n"
+            "Vd ~ VBUS - 0.15 V (130 mA: 0.18 V). Pin 3 max 5.8 V.\n"
+            "2.2 uH is enough: the launch stub shorts < 300 MHz.\n"
             "Step 7.2 V into 50 R (sim, nominal).", P(102, Y2 + 12), size=T)
     sh.text("LAUNCH STUB: 80 ps one-way = 13.2 mm 50 R\n"
             "(phase_array RESULT; was 45 ps), at the start of\n"
@@ -305,7 +331,8 @@ def main():
             "- All RF nets 50 R microstrip on L1 (0.36 mm, outer prepreg 7628 0.21 mm, L2 solid GND):\n"
             "  6.057 ps/mm. Gain blocks 0402 DC blocks inline, no stubs, GND vias at every shunt part.\n"
             "- Decoupling per supply node: 1 nF 0402 nearest the pin, then 100 nF, 10 uF.\n"
-            "- Bias tees: bead on the RF pad, big inductor behind it (cold end on the rail).\n"
+            "- Bias tees (sim/bias_tee): bead pad ON the 50 R line (no stub), chain perpendicular, compact;\n"
+            "  TRF: 47 uH || 1 k + own 100 nF at the cold pad; supply enters through that cap.\n"
             "- Test points TRFx/GVAx: DC bias check only (expect ~3.2 V / ~4.8 V), not RF.\n"
             "- Supplies: +3V3 6 x TRF37D73 ... 4 here (220 mA); VBUS 2 x GVA-84+ (216 mA).\n"
             "- Open: large-signal edge of both blocks in saturation, CMC differential\n"
@@ -365,6 +392,17 @@ def check(outdir):
     A(n, "+3V3", {(u, "1") for u in ("U401", "U402", "U403", "U405")} |
       {("L401", "2"), ("L402", "2"), ("L403", "2"), ("L405", "2")})
     A(n, "VBUS", {("L404", "2"), ("L406", "2")})
+    # bias tees (sim/bias_tee/RESULT.md): RF pin -> bead -> 47 uH || 1 k (TRF) / 2.2 uH (GVA) -> rail, own 100 nF
+    for u, fb, l, rd, cc in (("U401", "FB401", "L401", "R415", "C432"), ("U402", "FB402", "L402", "R416", "C433"),
+                             ("U403", "FB403", "L403", "R417", "C434"), ("U405", "FB405", "L405", "R418", "C435")):
+        on((u, "7"), (fb, "1"))
+        on((fb, "2"), (l, "1"), (rd, "1"))
+        A(n, "+3V3", {(l, "2"), (rd, "2"), (cc, "1")})
+        A(n, "GND", {(cc, "2")})
+    for g_, fb, l in (("U404", "FB404", "L404"), ("U406", "FB406", "L406")):
+        on((g_, "3"), (fb, "1"))
+        on((fb, "2"), (l, "1"))
+        A(n, "VBUS", {(l, "2")})
     # phase chains
     for r, c, u, fb, cp, rs, rr, c3, g, fg, c4 in (("R407", "C412", "U403", "FB403", "C416", "R408", "R410", "C417",
                                                    "U404", "FB404", "C421"),
