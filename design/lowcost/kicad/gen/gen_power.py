@@ -64,9 +64,9 @@ def main():
     two(sh, "R", "5.1k", (g(50), g(52)), "CC1", "GND")
     two(sh, "R", "5.1k", (g(56), g(52)), "CC2", "GND")
     two(sh, ("Device:Polyfuse_Small", "F", "Fuse:Fuse_1206_3216Metric"), "1.5A hold PTC", (g(60), g(34)),
-        "VBUS_IN", "VBUS_F", rot=270, lcsc="C70069")
+        "VBUS_IN", "VBUS_F", rot=270, lcsc="C118413")
     two(sh, ("Device:D_TVS", "D", "Diode_SMD:D_SMA"), "SMAJ5.0A", (g(72), g(40)), "GND", "VBUS_F", rot=90,
-        lcsc="C19077", fields={"Note": "unidirectional SMAJ5.0A, cathode to VBUS_F"})
+        lcsc="C353442", fields={"Note": "unidirectional SMAJ5.0A, cathode to VBUS_F"})
     two(sh, FB, "220R@100MHz 2A", (g(80), g(34)), "VBUS_F", "VBUS", rot=270, lcsc="C85840")
     caps(sh, g(90), g(40), "VBUS", ["22u", "100n"])
     sh.text("USB-C sink, 5.1k CC pull-downs (default USB power).\n"
@@ -79,7 +79,7 @@ def main():
     caps(sh, g(15), g(102), "VBUS", ["10u"])
     caps(sh, g(42), g(102), "+3V3", ["22u", "22u", "100n"])
     u = sh.add("Regulator_Linear:AP2112K-1.2", "U", "AP2112K-1.2", (g(85), g(90)),
-               fp="Package_TO_SOT_SMD:SOT-23-5", lcsc="C460312", fields={"Price": "~0.10 USD"})
+               fp="Package_TO_SOT_SMD:SOT-23-5", lcsc="C460310", fields={"Price": "0.24 USD (LCSC)"})
     ns(sh, u, "1", "+3V3"); ns(sh, u, "3", "+3V3"); ns(sh, u, "5", "+1V2"); ns(sh, u, "2", "GND")
     ns(sh, u, "4", None)
     caps(sh, g(70), g(102), "+3V3", ["1u"])
@@ -93,20 +93,20 @@ def main():
     ns(sh, b, "5", "VBUS"); ns(sh, b, "4", "VBUS"); ns(sh, b, "2", "GND"); ns(sh, b, "6", None)
     ns(sh, b, "1", "SW_BOOST"); ns(sh, b, "3", "FB_BOOST")
     two(sh, ("Device:L", "L", "Inductor_SMD:L_Bourns-SRN4018"), "4.7uH 2A", (g(130), g(28)), "VBUS", "SW_BOOST",
-        rot=270, lcsc="C408335")
+        rot=270, lcsc="")
     two(sh, ("Device:D_Schottky", "D", "Diode_SMD:D_SOD-123"), "SS14 / B5819W", (g(172), g(28)), "+5V4",
         "SW_BOOST", lcsc="C8598")
     two(sh, "R", "78.7k", (g(180), g(45)), "+5V4", "FB_BOOST", size="0402")
     two(sh, "R", "10k", (g(186), g(45)), "FB_BOOST", "GND")
     caps(sh, g(194), g(45), "+5V4", ["22u", "22u"])
-    two(sh, FB, "600R@100MHz 1A", (g(215), g(36)), "+5V4", "+5V4F", rot=270, lcsc="C1017")
+    two(sh, FB, "600R@100MHz 1A", (g(215), g(36)), "+5V4", "+5V4F", rot=270, lcsc="")
     caps(sh, g(225), g(45), "+5V4F", ["22u", "100n"])
     sh.text("Boost 5.32 V (0.6 V x (1 + 78.7k/10k)), 1.2 MHz; ferrite + 22 uF pi filter -> +5V4F.\n"
             "Keep the SW loop (MT3608, L, D, 22 uF) tight and away from the analog sheets.", (g(125), g(58)))
 
     # --- +5V (LP2985-5.0)
     u = sh.add("Regulator_Linear:LP2985-5.0", "U", "LP2985-5.0", (g(150), g(90)), fp="Package_TO_SOT_SMD:SOT-23-5",
-               lcsc="C99075", fields={"Price": "~0.25 USD"})
+               lcsc="C74511", fields={"Price": "0.29 USD (LCSC)"})
     ns(sh, u, "1", "+5V4F"); ns(sh, u, "3", "+5V4F"); ns(sh, u, "5", "+5V"); ns(sh, u, "2", "GND")
     ns(sh, u, "4", "BP_5V")
     two(sh, "C", "10n", (g(170), g(104)), "BP_5V", "GND")
@@ -125,7 +125,7 @@ def main():
     two(sh, "R", "1.54M", (g(250), g(104)), "-5V_LDO", "VFB_N5")
     two(sh, "R", "499k", (g(256), g(104)), "VFB_N5", "GND")
     caps(sh, g(262), g(104), "-5V_LDO", ["2.2u"])
-    two(sh, FB, "600R@100MHz 1A", (g(275), g(84)), "-5V_LDO", "-5V", rot=270, lcsc="C1017")
+    two(sh, FB, "600R@100MHz 1A", (g(275), g(84)), "-5V_LDO", "-5V", rot=270, lcsc="")
     caps(sh, g(285), g(92), "-5V", ["10u", "100n"])
     sh.text("LM27761: VOUT = -1.22 V x (1 + 1.54M/499k) = -4.99 V. Pump output resistance 2 ohm, LDO dropout\n"
             "30 mV at 100 mA (datasheet): needs VIN >= 5.2 V at 90 mA -> fed from the 5.32 V boost.\n"
@@ -133,13 +133,13 @@ def main():
 
     # --- +2V5 (LP5907) and -2V5 (LM337)
     u = sh.add("Regulator_Linear:LP5907MFX-2.5", "U", "LP5907MFX-2.5", (g(150), g(150)),
-               fp="Package_TO_SOT_SMD:SOT-23-5", lcsc="C80670", fields={"Price": "~0.15 USD"})
+               fp="Package_TO_SOT_SMD:SOT-23-5", lcsc="C165132", fields={"Price": "0.34 USD (LCSC)"})
     ns(sh, u, "1", "+5V4F"); ns(sh, u, "3", "+5V4F"); ns(sh, u, "5", "+2V5"); ns(sh, u, "2", "GND")
     ns(sh, u, "4", None)
     caps(sh, g(132), g(164), "+5V4F", ["1u"])
     caps(sh, g(170), g(164), "+2V5", ["1u", "10u"])
     v = sh.add("Regulator_Linear:LM337_SOT223", "U", "LM337", (g(230), g(150)),
-               fp="Package_TO_SOT_SMD:SOT-223-3_TabPin2", lcsc="C130155", fields={"Price": "~0.30 USD"})
+               fp="Package_TO_SOT_SMD:SOT-223-3_TabPin2", lcsc="C19267471", fields={"Price": "0.44 USD (LCSC, XBLW LM337S; check pinout)"})
     ns(sh, v, "2", "-5V"); ns(sh, v, "3", "-2V5"); ns(sh, v, "1", "ADJ_N25")
     two(sh, "R", "120", (g(250), g(160)), "-2V5", "ADJ_N25", lcsc="C25079")
     two(sh, "R", "120", (g(256), g(160)), "ADJ_N25", "GND", lcsc="C25079")

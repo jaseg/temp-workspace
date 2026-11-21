@@ -13,7 +13,8 @@ from common import new_sheet, R, C, decoupler
 
 OPAMP = "Amplifier_Operational:LMV358"   # standard dual pinout (1 OUTA, 2 -A, 3 +A, 4 V-, 5 +B, 6 -B, 7 OUTB, 8 V+)
 OPA_FP = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
-OPA_F = {"Price": "0.50 USD (SPEC)", "MPN": "TP2272-SR (3PEAK), any RRIO dual, 5 V total supply"}
+OPA_F = {"Price": "0.50 USD (LCSC C39487549)", "MPN": "TP2272-SO1R (3PEAK), any RRIO dual, 5 V total supply",
+         "LCSC": "C39487549"}
 
 HEADER = {1: "GND", 2: "GND", 3: "ADC_IN", 4: "GND", 5: "VREFP", 6: "GND", 7: "DAC_TRIG", 8: "DAC_OFS",
           9: "DAC_TAPTH", 10: "DAC_BIAS_A", 11: "DAC_BIAS_K", 12: "GND", 13: "ADC_TRIG", 14: "MCU_CLK",
@@ -78,7 +79,7 @@ def main():
                                        "DAC scaling: difference amplifiers, TP2272 on +/-2.5 V."])
     # header
     j = sh.add("Connector_Generic:Conn_02x13_Odd_Even", "J", "MCU 2x13", (g(40), g(60)),
-               fp="Connector_PinHeader_2.54mm:PinHeader_2x13_P2.54mm_Vertical", lcsc="C2939733")
+               fp="Connector_PinHeader_2.54mm:PinHeader_2x13_P2.54mm_Vertical", lcsc="C53207345")
     for pin, net in HEADER.items():
         if net == "GND":
             sh.stub(j, str(pin), "GND_H", length=g(4))
@@ -151,8 +152,8 @@ def main():
     sh.text("U703B spare (follower, input grounded)", (g(240), g(132)), size=1.0)
     for i, ref in enumerate([u1.ref, u2.ref, u3.ref]):
         opamp_power(sh, ref, (g(250 + 12 * i), g(40)))
-    decoupler(sh, "+2V5", (g(245), g(60)), ("100n", "100n", "100n"))
-    decoupler(sh, "-2V5", (g(275), g(60)), ("100n", "100n", "100n"), gnd="GND")
+    decoupler(sh, "+2V5", (g(245), g(68)), ("100n", "100n", "100n"))
+    decoupler(sh, "-2V5", (g(275), g(68)), ("100n", "100n", "100n"), gnd="GND")
 
     # VTAP_TH divider, VTAP_P/N rails
     r5 = R(sh, "30k", (g(90), g(160)))
@@ -183,12 +184,12 @@ def main():
     sh.wire(rpd["1"], (rpd["1"][0], q["1"][1]))
     sh.gnd(rpd["2"])
     sh.gnd(q["2"])
-    d = sh.add("Device:D", "D", "1N4148W", (g(226), g(160)), rot=90, fp="Diode_SMD:D_SOD-123", lcsc="C81598")
+    d = sh.add("Device:D", "D", "1N4148W", (g(226), g(160)), rot=270, fp="Diode_SMD:D_SOD-123", lcsc="C81598")
     sh.wire(q["3"], d["2"], via="vh")
-    sh.power("VBUS", d["1"], dy=-5.08)
+    sh.power("VBUS", d["1"], dy=-2.54)
     sh.path([(q["3"][0], d["2"][1]), (q["3"][0] + g(10), d["2"][1])])
     sh.hlabel("TERM_50", (q["3"][0] + g(10), d["2"][1]), "output")
-    sh.text("Relay driver: TERM_50 is the low side of the HFD3/5 coil (coil top on VBUS, input sheet).\n"
+    sh.text("Relay driver: TERM_50 is the low side of the HFD3/3 coil (coil top on VBUS, input sheet).\n"
             "Flyback diode here; RELAY_CTL high = 50R termination on.", (g(195), g(185)), size=1.0)
 
     # I2C pull-ups

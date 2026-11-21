@@ -63,13 +63,14 @@ FP = {
     "C0805": "Capacitor_SMD:C_0805_2012Metric", "C1206": "Capacitor_SMD:C_1206_3216Metric",
     "FB0603": "Inductor_SMD:L_0603_1608Metric", "FB0805": "Inductor_SMD:L_0805_2012Metric",
 }
+# entries removed 2026-11-21 whose C number pointed at another value (24.9k, 25.5k, 30k, 40.2k, 60.4k,
+# 16.5k, 78.7k, 499k, 1.54M): fill in after an LCSC search
+# Removed 2026-11-21 (C number was another value on lcsc.com): 24.9k, 25.5k, 30k, 40.2k, 60.4k, 16.5k, 78.7k,
+# 499k, 1.54M, 2.2u (0603 part), 220p (0603 part), 4.7u (0402, no stock). Fill in after an LCSC search.
 LCSC_R = {"0": "C17168", "10": "C25077", "22": "C25092", "33": "C25105", "120": "C25079", "1k": "C11702",
           "2.2k": "C25879", "4.7k": "C25900", "5.1k": "C25905", "10k": "C25744", "20k": "C25765",
-          "24.9k": "C25771", "25.5k": "C25806", "30k": "C25768", "40.2k": "C25778", "60.4k": "C25793",
-          "16.5k": "C25812", "49.9k": "C25897", "78.7k": "C25891", "100k": "C25741", "499k": "C25795",
-          "1.54M": "C25805"}
-LCSC_C = {"100n": "C1525", "1u": "C52923", "10n": "C15195", "4.7u": "C23733", "10u": "C15850",
-          "22u": "C45783", "2.2u": "C23630", "18p": "C1549", "220p": "C1603"}
+          "49.9k": "C25897", "100k": "C25741"}
+LCSC_C = {"100n": "C1525", "1u": "C52923", "10n": "C15195", "10u": "C15850", "22u": "C45783", "18p": "C1549"}
 
 
 def R(sh: Sheet, value: str, at, rot: int = 0, size: str = "0402", ref: str = "R", **kw):
@@ -79,7 +80,8 @@ def R(sh: Sheet, value: str, at, rot: int = 0, size: str = "0402", ref: str = "R
 
 def C(sh: Sheet, value: str, at, rot: int = 0, size: str | None = None, ref: str = "C", **kw):
     if size is None:
-        size = "0402" if value in ("100n", "10n", "1u", "18p", "220p", "2.2u") else "0805"
+        # pF/nF values and 1u/2.2u are 0402 (SPEC decision 9); bulk (4.7u and up) 0805
+        size = "0402" if value.endswith(("p", "n")) or value in ("1u", "2.2u") else "0805"
     return sh.add("Device:C", ref, value, at, rot=rot, fp=FP["C" + size],
                   lcsc=kw.pop("lcsc", LCSC_C.get(value, "")), **kw)
 

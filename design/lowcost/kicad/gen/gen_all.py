@@ -101,4 +101,7 @@ if __name__ == "__main__":
     bad = check(n)
     if "--no-export" not in sys.argv:
         export()
+    if os.path.isdir(EXP):
+        import gen_bom
+        gen_bom.main()                     # docs/bom.csv, docs/bom.md
     sys.exit(1 if bad else 0)

@@ -86,10 +86,22 @@ def main():
             sh.stub(u, str(p), net, length=5.08, kind="hlabel" if how == "h" else "label",
                     shape="input" if net.startswith(("TAP", "SPI_S", "SPI_M", "COARSE", "FPGA_RECONFIG"))
                     and net != "SPI_MISO" else "output")
-    for p, _n, rail in TOP:
-        sh.stub(u, str(p), rail, kind="power")
-    for p, _n in BOT:
-        sh.stub(u, str(p), "GND", kind="gnd")
+    # supply pins: one short bus per rail with a single power symbol (adjacent symbols' texts overlapped)
+    for rail in ("+1V2", "+3V3"):
+        pts = [u[str(p)] for p, _n, r in TOP if r == rail]
+        yb = pts[0][1] - g(3)
+        for pt in pts:
+            sh.wire(pt, (pt[0], yb))
+        if len(pts) > 1:
+            sh.wire((pts[0][0], yb), (pts[-1][0], yb))
+        end = pts[0] if rail == "+1V2" else pts[-1]
+        sh.power(rail, (end[0], yb), dy=-2.54)
+    pts = [u[str(p)] for p, _n in BOT]
+    yb = pts[0][1] + g(3)
+    for pt in pts:
+        sh.wire(pt, (pt[0], yb))
+    sh.wire((pts[0][0], yb), (pts[-1][0], yb))
+    sh.gnd((pts[1][0], yb))
 
     # decoupling next to the FPGA (one 100 nF per supply pin, bulk 10 uF per rail)
     sh.text("FPGA decoupling: 100 nF at each of pins 12, 37 (VCC) and 36, 1, 25 (VCCX, VCCIO0/1)",
@@ -98,22 +110,22 @@ def main():
     decoupler(sh, "+3V3", (g(180), g(180)), ("100n", "100n", "100n", "10u"))
 
     # configuration straps (UG842 pin definitions; mode values per UG290, see README open points)
-    x0, y0 = g(270), g(30)
+    x0, y0 = g(235), g(30)
     sh.text("Configuration: internal flash (autoboot), MODE1=MODE0=0 via 4.7k pull-downs.\n"
             "RECONFIG_N, DONE, READY open-drain with 4.7k pull-ups; MCU sees FPGA_DONE and drives FPGA_RECONFIG.\n"
             "JTAGSEL_N pulled up (JTAG pins dedicated); close JP501 to force JTAG if they were reused as GPIO.",
-            (x0 - g(10), y0 - g(14)))
+            (x0 - g(30), y0 - g(14)))
     pull(sh, "FPGA_RECONFIG", (x0, y0))
-    pull(sh, "FPGA_DONE", (x0 + g(10), y0))
-    pull(sh, "FPGA_READY", (x0 + g(20), y0))
-    rj = pull(sh, "JTAGSEL_N", (x0 + g(30), y0))
-    jp = sh.add("Jumper:SolderJumper_2_Open", "JP", "JTAGSEL", (x0 + g(40), y0 + g(8)),
+    pull(sh, "FPGA_DONE", (x0 + g(16), y0))
+    pull(sh, "FPGA_READY", (x0 + g(32), y0))
+    rj = pull(sh, "JTAGSEL_N", (x0 + g(48), y0))
+    jp = sh.add("Jumper:SolderJumper_2_Open", "JP", "JTAGSEL", (x0 + g(64), y0 + g(8)),
                 fp="Jumper:SolderJumper-2_P1.3mm_Open_RoundedPad1.0x1.5mm")
     sh.stub(jp, "1", "JTAGSEL_N")
     sh.stub(jp, "2", "GND", kind="gnd")
     pull(sh, "FPGA_MODE0", (x0, y0 + g(22)), to="GND")
-    pull(sh, "FPGA_MODE1", (x0 + g(10), y0 + g(22)), to="GND")
-    pull(sh, "JTAG_TCK", (x0 + g(20), y0 + g(22)), to="GND")
+    pull(sh, "FPGA_MODE1", (x0 + g(16), y0 + g(22)), to="GND")
+    pull(sh, "JTAG_TCK", (x0 + g(32), y0 + g(22)), to="GND")
 
     # JTAG header (1x6, 2.54 mm): 3V3, TMS, TCK, TDO, TDI, GND
     j = sh.add("Connector_Generic:Conn_01x06", "J", "JTAG", (g(300), g(90)),
@@ -123,7 +135,7 @@ def main():
         sh.stub(j, pin, net, length=5.08)
     sh.stub(j, "6", "GND", kind="gnd")
     sh.text("JTAG 1x6: 1 3V3, 2 TMS, 3 TCK, 4 TDO, 5 TDI, 6 GND\n(wire to a Gowin USB cable / FT2232 adapter)",
-            (g(290), g(105)))
+            (g(268), g(105)))
 
     # MS5351M clock generator (pin-compatible with Si5351A-B-GT, MSOP-10) + 25 MHz crystal
     ck = sh.add("Oscillator:Si5351A-B-GT", "U", "MS5351M", (g(70), g(60)),
@@ -142,7 +154,7 @@ def main():
                fields={"Note": "25 MHz, CL 8 pF (Si5351 internal load caps), ESR < 100R"})
     sh.wire(ck["2"], y["3"], via="vh")
     sh.path([ck["3"], (y["1"][0] - 2.54, ck["3"][1]), (y["1"][0] - 2.54, y["1"][1]), y["1"]])
-    sh.stub(y, "2", "GND", kind="gnd")
+    sh.power("GND", y["2"], dy=-2.54, rot=180)
     sh.stub(y, "4", "GND", kind="gnd")
     decoupler(sh, "+3V3", (g(50), g(85)), ("100n", "100n", "10u"))
     sh.text("MS5351M: CLK0 -> FPGA_CLK (RPLL_T_in pin 33), CLK1 -> MCU_CLK (STM32 HSE bypass),\n"

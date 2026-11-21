@@ -41,11 +41,11 @@ GVA_F = {"Price": "2.99 USD (SPEC)", "Note": "SOT-89: 1 IN, 3 OUT+DC, 2/4(tab) G
 TP = "Connector:TestPoint"
 TP_FP = "TestPoint:TestPoint_Pad_D1.0mm"
 BEAD = ("Device:FerriteBead_Small", "Inductor_SMD:L_0402_1005Metric", "BLM15HD102SN1D",
-        {"Note": "1 k @100 MHz, GHz-band bead, 250 mA, 1.25 R; next to the RF pin (high-SRF section)"})
+        {"LCSC": "C21516", "Note": "1 k @100 MHz, GHz-band bead, 250 mA, 1.25 R; next to the RF pin (high-SRF section)"})
 L47 = ("Device:L", "Inductor_SMD:L_1210_3225Metric", "LQH32CN470K23L",
-       {"Note": "47 uH 1210 wire-wound, >= 100 mA (verify); cold end"})
-L22 = ("Device:L", "Inductor_SMD:L_0805_2012Metric", "LQM21PN2R2MGH",
-       {"Note": "2.2 uH 0805, >= 0.2 A, DCR <= 0.3 R (verify); cold end"})
+       {"LCSC": "C701189", "Note": "47 uH 1210 wire-wound, >= 100 mA (verify); cold end"})
+L22 = ("Device:L", "Inductor_SMD:L_0805_2012Metric", "LQM21PN2R2MGHL",
+       {"LCSC": "C341781", "Note": "2.2 uH 0805, >= 0.2 A, DCR <= 0.3 R (verify); cold end"})
 T = 1.0      # annotation text size
 
 
@@ -183,7 +183,7 @@ def main():
     # BAT15 shunt clamp at the launch node, fitted (sim/phase_array/RESULT.md (3): bridge reverse 3.27 -> 1.90 V)
     for rot in (90, 270):
         dc = sh.add("Device:D_Schottky", "D", "BAT15-03W", P(168, Y + 4), rot=rot, fp="Diode_SMD:D_SOD-323",
-                    mpn="BAT1503WE6327HTSA1",
+                    mpn="BAT1503WE6327HTSA1", lcsc="C5310874",
                     fields={"Note": "FITTED: clamps the wrong-polarity pulse of the falling edge (K to node, A to GND)"})
         if dc["1"][1] < dc["2"][1]:
             break
@@ -228,7 +228,7 @@ def main():
             "line 2 = GND -> STRB_K, rails float.\n"
             "Within 5 mm of the bridge; STRB_A/K a\n"
             "coupled 100 R pair, matched +/-0.2 mm.\n"
-            "Step at the bridge ~4.3-4.6 V (sim).", P(166, Y + 12), size=T)
+            "Step at the bridge ~4.3-4.6 V (sim).", P(173, Y + 12), size=T)
 
     # ================================================================== phase strobe (rows 2, 3)
     def phase(Y, lab_in, lab_out, n):
@@ -258,7 +258,7 @@ def main():
         want_k_top = lab_out == "PSTRB_A"
         for rot in (90, 270):
             d = sh.add("Device:D_Schottky", "D", "BAT15-03W", P(176, Y + 4), rot=rot, fp="Diode_SMD:D_SOD-323",
-                       mpn="BAT1503WE6327HTSA1", dnp=True,
+                       mpn="BAT1503WE6327HTSA1", lcsc="C5310874", dnp=True,
                        fields={"Note": "DNP: clamp for the wrong-polarity pulse of the second edge"})
             top, bot = ("1", "2") if want_k_top else ("2", "1")
             if d[top][1] < d[bot][1]:

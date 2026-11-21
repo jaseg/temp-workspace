@@ -129,7 +129,7 @@ def main():
     rs1 = R(sh, "10k", (g(20), ysel), rot=90)
     sh.wire((g(14), ysel), rs1["1"])
     sh.wire(rs1["2"], u1["9"])
-    rs2 = R(sh, "18k", (g(36), ysel + g(3)), lcsc="C25810")
+    rs2 = R(sh, "18k", (g(36), ysel + g(3)), lcsc="")
     sh.gnd(rs2["2"], dy=g(4), name="-2V5")
     sh.text("SEL: 3V3 GPIO -> -0.89 / +1.23 V\n= 0.0 / 2.1 V above VSW_GND", (g(9), ysel + g(5)), size=T)
     # A2, B2, EN to the local switch ground
@@ -156,7 +156,7 @@ def main():
     r15 = R(sh, "1.5k", (pg[0] - g(5), yn + g(3)), lcsc="C25867")
     sh.wire((pg[0] - g(5), yn), r15["1"])
     sh.gnd(r15["2"])
-    r27 = R(sh, "2.7k", (pg[0], yn + g(3)), lcsc="C13167")
+    r27 = R(sh, "2.7k", (pg[0], yn + g(3)), lcsc="")
     sh.gnd(r27["2"], dy=g(4), name="-2V5")
     c1 = C(sh, "100n", (pg[0] + g(5), yn + g(3)))
     sh.gnd(c1["2"])
@@ -335,8 +335,8 @@ def main():
             sh.wire(P(x0, yl), d["3"])
             pa, pk = d["1"], d["2"]                      # anode node (x0-6), cathode node (x0+6)
             # hold caps up to the strobe lines (cross the signal line)
-            ca = C(sh, "0.47p", P(x0 - 9, yl - 5), lcsc="C1514", fields={"Note": "C0G 0402, hold A"})
-            ck = C(sh, "0.47p", P(x0 + 9, yl - 5), lcsc="C1514", fields={"Note": "C0G 0402, hold K"})
+            ca = C(sh, "0.5p", P(x0 - 9, yl - 5), lcsc="C1544", fields={"Note": "C0G 0402, hold A"})
+            ck = C(sh, "0.5p", P(x0 + 9, yl - 5), lcsc="C1544", fields={"Note": "C0G 0402, hold K"})
             sh.path([pa, P(x0 - 9, yl + 5), ca["2"]])
             sh.wire(ca["1"], P(x0 - 9, yA))
             sh.path([pk, P(x0 + 9, yl + 5), ck["2"]])
@@ -417,7 +417,7 @@ def main():
         dec_down(P(xth + 12, yy), g(xth + 12))
         sh.label(f"VTH{k + 1}", P(xth + 16, yy))
     sh.add(TP, "TP", "VTAP_TH", P(xth + 2, 203), fp=TP_FP)
-    sh.text("VTH1: taps 0-7, VTH2: taps 8-15\nVTAP_TH 0..+80 mV (+15 mV data)", P(150, 220), size=T)
+    sh.text("VTH1: taps 0-7, VTH2: taps 8-15\nVTAP_TH 0..+80 mV (+17 mV, phase_array)", P(150, 220), size=T)
     # VTAP_P / VTAP_N rails: hierarchical labels + local labels, 1 uF + 100 nF each
     for k, (net, gnd_rot) in enumerate((("VTAP_P", 0), ("VTAP_N", 0))):
         yy = 186 + 14 * k
