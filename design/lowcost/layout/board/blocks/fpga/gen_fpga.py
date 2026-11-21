@@ -43,7 +43,7 @@ bplace("C508", 14.9, 3.6, 90, "B")        # U502.7 VDD (B, under the right pins)
 bplace("C510", 16.6, 6.0, 90, "B")        # 10u +3V3
 # FPGA decoupling on B at the corner via pairs
 bplace("C506", 4.1, 4.9, 180, "B")        # pin 36 +3V3
-bplace("C502", 2.7, 6.25, 180, "B")       # pin 37 +1V2
+bplace("C502", 2.6, 6.25, 0, "B")       # pin 37 +1V2
 bplace("C505", 13.0, 6.5, 0, "B")         # pin 25 +3V3
 bplace("C504", 5.4, 15.4, 90, "B")        # pin 1 +3V3
 bplace("C501", 12.3, 14.4, 90, "B")       # pin 12 +1V2

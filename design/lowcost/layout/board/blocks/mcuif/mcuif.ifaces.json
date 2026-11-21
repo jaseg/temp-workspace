@@ -123,38 +123,28 @@
    "note": "J501.13 JTAG TDO (fpga S-W, crosses phase on B.Cu)"
   },
   {
-   "net": "/FPGA_DONE",
-   "x": 51.6,
+   "net": "/TRIG_SEL",
+   "x": 29.4,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
    "class": "slow",
    "width": 0.15,
-   "note": "U704.16 <- U501.46 (R502 pull-up)"
+   "note": "U704.43 -> R302 (phase)"
   },
   {
-   "net": "/FPGA_RECONFIG",
-   "x": 51.85,
+   "net": "/ADC_IN",
+   "x": 29.15,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
    "class": "slow",
    "width": 0.15,
-   "note": "U704.18 -> U501.48 (R501 pull-up)"
-  },
-  {
-   "net": "/SPI_CS",
-   "x": 52.1,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.22 -> U501.31"
+   "note": "U704.8 ADC in; RC R211 / C207 sit in the analog block"
   },
   {
    "net": "/ADC_TRIG",
-   "x": 52.7,
+   "x": 51.6,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -164,7 +154,7 @@
   },
   {
    "net": "/MCU_CLK",
-   "x": 42.35,
+   "x": 45.95,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -173,18 +163,8 @@
    "note": "U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"
   },
   {
-   "net": "/VTAP_TH",
-   "x": 35.2,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.25,
-   "note": "R723 / R724 / C709 -> R380 / R381"
-  },
-  {
    "net": "/ADC_REF_MID",
-   "x": 29.4,
+   "x": 28.9,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -194,7 +174,7 @@
   },
   {
    "net": "/VBIAS_K",
-   "x": 28.15,
+   "x": 28.2,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -204,7 +184,7 @@
   },
   {
    "net": "/VBIAS_A",
-   "x": 28.8,
+   "x": 27.75,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -214,7 +194,7 @@
   },
   {
    "net": "/VOFS",
-   "x": 29.15,
+   "x": 28.65,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -224,7 +204,7 @@
   },
   {
    "net": "/VNEG_REF",
-   "x": 26.85,
+   "x": 26.8,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
@@ -234,7 +214,7 @@
   },
   {
    "net": "/DAC_TRIG",
-   "x": 26.4,
+   "x": 24.4,
    "y": 0.0,
    "layer": "B.Cu",
    "side": "N",
