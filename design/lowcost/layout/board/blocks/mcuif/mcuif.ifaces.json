@@ -103,56 +103,6 @@
    "note": "U704.46; J501.12"
   },
   {
-   "net": "/FPGA_RECONFIG",
-   "x": 51.6,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.18 -> U501.48 (R501 pull-up)"
-  },
-  {
-   "net": "/ADC_REF_MID",
-   "x": 6.6,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "R703 / R704 / C702 -> U202"
-  },
-  {
-   "net": "/ADC_IN",
-   "x": 4.9,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.8 ADC in; RC R211 / C207 sit in the analog block"
-  },
-  {
-   "net": "/VBIAS_K",
-   "x": 4.2,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "R735 divider -> sampler"
-  },
-  {
-   "net": "/VBIAS_A",
-   "x": 3.4,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "R733 / R734 divider -> sampler"
-  },
-  {
    "net": "/TRIG_SEL",
    "x": 2.6,
    "y": 0.0,
@@ -161,6 +111,16 @@
    "class": "slow",
    "width": 0.15,
    "note": "U704.43 -> R302 (phase)"
+  },
+  {
+   "net": "/FPGA_RECONFIG",
+   "x": 51.6,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.18 -> U501.48 (R501 pull-up)"
   },
   {
    "net": "/DAC_TRIG",
@@ -183,16 +143,6 @@
    "note": "U704.22 -> U501.31"
   },
   {
-   "net": "/FPGA_DONE",
-   "x": 52.1,
-   "y": 0.0,
-   "layer": "B.Cu",
-   "side": "N",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U704.16 <- U501.46 (R502 pull-up)"
-  },
-  {
    "net": "/VTAP_P",
    "x": 21.663,
    "y": 0.0,
@@ -213,6 +163,16 @@
    "note": "R726 0 R from +2V5 (In2 via pair at the part)"
   },
   {
+   "net": "/ADC_REF_MID",
+   "x": 6.6,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "R703 / R704 / C702 -> U202"
+  },
+  {
    "net": "/VTAP_TH",
    "x": 35.2,
    "y": 0.0,
@@ -223,6 +183,36 @@
    "note": "R723 / R724 / C709 -> R380 / R381"
   },
   {
+   "net": "/VNEG_REF",
+   "x": 1.6,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U701 out -> R123 (input block)"
+  },
+  {
+   "net": "/FPGA_DONE",
+   "x": 52.1,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.16 <- U501.46 (R502 pull-up)"
+  },
+  {
+   "net": "/ADC_IN",
+   "x": 4.9,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "U704.8 ADC in; RC R211 / C207 sit in the analog block"
+  },
+  {
    "net": "/MCU_CLK",
    "x": 42.7,
    "y": 0.0,
@@ -231,6 +221,26 @@
    "class": "slow",
    "width": 0.15,
    "note": "U704.5 PF0; from MS5351M CLK1 (R509 33 R in fpga)"
+  },
+  {
+   "net": "/VBIAS_K",
+   "x": 4.2,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "R735 divider -> sampler"
+  },
+  {
+   "net": "/VBIAS_A",
+   "x": 3.4,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.15,
+   "note": "R733 / R734 divider -> sampler"
   },
   {
    "net": "/VOFS",

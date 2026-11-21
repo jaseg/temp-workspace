@@ -94,6 +94,7 @@ inside = (gx <= W) & (gy <= HR)
 DIRS = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
 KEEP = [[], []]          # extra per-layer keep-outs: (x0, y0, x1, y1)
 CUR = [0]
+TURN = 0.3               # turn penalty (cells)
 STRIP = {}               # net -> (lane y, west end x): B.Cu lanes reserved for the west bus
 
 
@@ -166,7 +167,7 @@ def free_maps(code, w, clr=CLR):
     for t in blk.b.GetTracks():                 # hole-to-hole >= 0.25 mm also to vias of the same net
         if isinstance(t, pcbnew.PCB_VIA):
             vx, vy = blk.loc(t.GetPosition())
-            via_ok &= (gx - vx) ** 2 + (gy - vy) ** 2 >= 0.5 ** 2
+            via_ok &= (gx - vx) ** 2 + (gy - vy) ** 2 >= 0.46 ** 2
     return out, via_ok, own
 
 
@@ -283,7 +284,7 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, clr=CLR):
                 continue
             if in_src and d >= 0 and nd != d:
                 continue
-            step = (1.414 if nd % 2 else 1.0) * pref[li] + (0.3 if (d >= 0 and nd != d) else 0.0)
+            step = (1.414 if nd % 2 else 1.0) * pref[li] + (TURN if (d >= 0 and nd != d) else 0.0)
             ns = (a, b_, li, nd)
             ng = g_ + step
             if ng < best.get(ns, 1e18):
@@ -586,4 +587,4 @@ print("courtyard overlaps:", len(CY_HITS), CY_HITS)
 if "--render" in sys.argv:
     bl.render(path, os.path.join(HERE, "mcuif.png"), layers=("F.Cu", "B.Cu", "F.SilkS", "F.Fab", "Dwgs.User"), tmpdir=SCR)
     bl.render(path, os.path.join(HERE, "mcuif_detail.png"), layers=("F.Cu", "B.Cu", "F.Fab", "B.Fab"),
-              crop=(100 + 40, 99.5, 100 + 58, 110.5), tmpdir=SCR)
+              crop=(40.0, 0.0, 58.0, 10.8), tmpdir=SCR)   # crop in SVG (board-area) units
