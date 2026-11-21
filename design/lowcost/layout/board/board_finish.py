@@ -162,13 +162,14 @@ def silk(B, m):
         return t
     txt("scope-fe  rev A", 20.0, 55.6, 1.0)
     txt("SIG IN", 3.2, 7.3, 0.8)
-    txt("EXT CLK", 3.6, 46.6, 0.8)
-    txt("USB", 95.0, 20.6, 0.8)
+    # review: "EXT CLK" was at y 46.6, 20 mm below J102 (y 26.5); no free silk room next to J102 (TP103 / TP104,
+    # U304): its F.Fab value text EXT_CLK labels it (rule 9)
+    txt("USB", 95.0, 19.65, 0.8)
     for s, x, y in (("ANALOG", 40.0, 0.9), ("FPGA", 65.0, 23.2), ("POWER", 88.0, 23.2)):
         pass
     txt("PHASE", 22.0, 52.2, 0.8)
     txt("MCU / IF", 20.0, 53.9, 0.8)
-    txt("JLC04161H-7628", 79.0, 56.2, 0.8, "B.SilkS")
+    txt("JLC04161H-7628", 16.0, 55.6, 0.8, "B.SilkS")
 
 
 def write_pro(path, rf_nets):

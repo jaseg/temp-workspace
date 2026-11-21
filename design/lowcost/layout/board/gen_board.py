@@ -35,8 +35,16 @@ def loc(v):
 
 
 # ---------------------------------------------------------------- planes owned by the integrator
+PSTROBE_BOX = (9.5, 25.0, 26.5, 34.5)
 for z in list(B.Zones()):
     if z.GetIsRuleArea():
+        # review: the phase block's all-layer "north_cut" keep-out (its hole for pstrobe chain A) must not
+        # survive the merge - it removed In1 / In2 / F / B ground under chain A (chain K kept it: asymmetric)
+        bb = z.GetBoundingBox()
+        box = tuple(round(v, 2) for v in (pcbnew.ToMM(bb.GetX()) - bl.ORG[0], pcbnew.ToMM(bb.GetY()) - bl.ORG[1],
+                                         pcbnew.ToMM(bb.GetRight()) - bl.ORG[0], pcbnew.ToMM(bb.GetBottom()) - bl.ORG[1]))
+        if z.IsOnLayer(pcbnew.In1_Cu) and all(abs(a - b_) < 0.05 for a, b_ in zip(box, PSTROBE_BOX)):
+            B.Remove(z)
         continue
     if z.GetNetname() == "GND" and z.IsOnLayer(pcbnew.In1_Cu):
         B.Remove(z)                                # replaced by one board-wide In1 plane below

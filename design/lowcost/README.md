@@ -11,7 +11,9 @@ recovery, GW1NZ-1 FPGA, user-supplied STM32G474). Start with `docs/theory-of-ope
 | `sim/input/`, `sim/sampler/`, `sim/strobe/`, `sim/phase/`, `sim/phase_array/` | ngspice + Python simulations; `RESULT.md`, plots and JSON in each |
 | `kicad/` | generated KiCad 7 hierarchical schematic (7 sheets), `export/` netlist, PDF, SVG/PNG; see `kicad/README.md` |
 | `kicad/gen/` | schematic generators, netlist checks, BOM generator |
-| `layout/input_stage/`, `layout/sampler/`, `layout/phase_trigger/` | pcbnew-scripted layout fragments with render PNG and README |
+| `layout/board/` | the integrated board (`scope-fe.kicad_pcb` / `.kicad_pro`), generators `gen_board.py` + `board_fix.py`, blocks under `blocks/`, `RULES.md`, renders; NOT finished, status and review in its README |
+| `layout/input_stage/`, `layout/sampler/`, `layout/phase_trigger/` | superseded stand-alone fragments (geometry references only; refs and nets do not match the schematic) |
+| `tools/` | KiCad nightly DRC / ERC wrappers (`run_drc.sh --rules jlc4 --parity`, `run_erc.sh`) |
 | `docs/` | `theory-of-operation.md`, `bom.md` / `bom.csv` (generated) |
 
 ## Regenerate

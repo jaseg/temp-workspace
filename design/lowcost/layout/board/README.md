@@ -123,3 +123,65 @@ Trial merge (input at (0, 6.5), sampler abutting at IF1, phase_trigger at (0, 24
 - 57 unconnected items in 7 nets. These are the inter-fragment supplies, BUF_OUT_T, and VTAP_P / N with the In2 planes skipped.
 
 The fragments are therefore geometry references only. Every block is re-generated with `Block.place`.
+
+## Integrated board status (integrator run of 21 Nov, 22:35) - NOT FINISHED, NOT CHECK-CLEAN
+Flow: `python3 gen_board.py` (merge, inter-block routing with `boardroute.py`, `board_finish.py` planes / stitching /
+silk / .kicad_pro, ~11 min) then `python3 board_fix.py scope-fe.kicad_pcb <drc.json>` (removes stitching vias the
+nightly DRC flags). Outline 100.0 x 57.0 mm, 4 x M3 at 3 mm from the corners. Renders: scope-fe-{top,bottom,in1,in2,all}.png
+and scope-fe-detail-{analog,taprow,fpga}.png (3200 px; the detail crops are offset, re-crop before using them).
+KiCad 7: open scope-fe.kicad_pcb with scope-fe.kicad_pro; to link to the schematic, copy both next to
+kicad/scope-fe.kicad_sch (same basename) or open the schematic project and use Update PCB from Schematic (F8).
+check_board (whole board): 0 missing / footprint / value / pad-net mismatches, **0 courtyard overlaps** (cross-block
+included), 4 extra refs = H1-H4 (board-only holes), 19 nets unrouted, 22 clearance, 19 corners > 45 deg (supply feeds),
+7 off-axis exits, 2 RF width (0.2 mm fpga necks of PH_STROBE_P/N). Rule-10 check: 1412 samples, 709 violations.
+Nightly DRC jlc4 (after board_fix): error 60 = 39 unconnected_items, 11 clearance, 7 shorting_items, 2 copper_edge
+(C606 power block at y 0.5), 1 hole_clearance (DAC_TRIG at J501 NPTH); warnings 287 = 212 library artefacts,
+51 via_dangling, 14 track_dangling, 7 silk_over_copper, 3 silk_overlap. Schematic parity: not run (the nightly could
+not fetch the schematic netlist from the scratch copy). ERC (tools/run_erc.sh): 0 errors, 18 library-artefact warnings.
+Unrouted: PH_STROBE_N, USB_DP/DM (no F.Cu path across the tap row), SPI_CS, SPI_MOSI, I2C_SDA, JTAG_TCK/TMS,
+TRIG_SEL, VBIAS_K, VTAP_TH, +5V/-5V feeds to the input stage, +3V3, +2V5, -2V5, +1V2, VBUS, GND (9 islands).
+Root cause: every top-to-bottom net must cross the full-width tap row, whose In2 VTAP_P/VTAP_N strips leave no In2
+ground reference; the fix is one or two GND crossing corridors through the VTAP strips (strips split, each half fed)
+with all crossing nets forced through them, and the TAP ribbon moved off the phase GND / +3V3 vias at y 23.07 / 23.6.
+
+## Review (independent, 21 Nov 2026, ~45 min) - board still NOT finished
+Method: re-ran check_board, nightly DRC jlc4 **with schematic parity** (run_drc.sh now copies the schematic sheets
+into its scratch dir when `--parity` is given; that is why the integrator's parity run could not fetch the netlist),
+ERC, and rendered top-copper tiles (25 x 25 mm), B.Cu, In1, In2 and In2-over-B.Cu. Note: kicad-cli SVG
+coordinates are board-local + (10.045, 0.6) mm (the SMA bodies overhang the left edge) - the old detail crops used
+raw coordinates, hence the offset; those three crops are removed, `scope-fe-detail-pstrobe.png` is a correct tile.
+
+Found and fixed:
+1. **No ground at all under pstrobe chain A** (x 9.5-26.5, y 25-34.5): the phase block's all-layer `north_cut`
+   keep-out survived the merge and blanked In1, In2, F.Cu and B.Cu pours there, while chain K had ground (asymmetric
+   strobe chains, 16 GND islands / unconnected items). `gen_board.py` now drops that keep-out after the merge.
+   In1 is solid again under every F.Cu RF structure except the intentional tap-pad / SMA cut-outs.
+2. C606 (power, B.Cu) pads 0.19 mm from the top edge: moved to y 0.54 (courtyards just touch U601), GND track/via adjusted.
+3. Silk: "USB" over D601 pads and "JLC04161H-7628" over C715/C716/FB701 pads moved; "EXT CLK" label sat 20 mm below
+   J102 - removed (J102's F.Fab value labels it).
+4. Parity: `board_fix.py` copies the schematic's exclude-from-BOM flags to the footprints (24). The 3 DNP flags
+   (D402, D403, R122) cannot be stored in KiCad 7 footprints (no DNP attribute before KiCad 8): parity artefact.
+
+Results after the fixes (flow: gen_board.py, run_drc, board_fix.py, run_drc --parity):
+- check_board: 0 missing / footprint / value / pad-net, 0 courtyard overlaps, 4 extra (H1-H4), 18 unrouted
+  (was 19), 22 clearance, 19 corners > 45 deg, 7 off-axis exits, 2 RF width (0.2 mm fpga necks), 23 unconnected (was 39).
+- rule 10: 657 / 1412 violations (was 709).
+- Nightly DRC jlc4 + parity: `total 515: error 44, warning 471` - errors: 23 unconnected_items, 14 clearance,
+  6 shorting_items, 1 hole_clearance (was 60). Warnings: 199 lib_footprint_mismatch + 12 lib_footprint_issues
+  (library artefacts), 199 footprint_symbol_field_mismatch ('Note' field), 27 via_dangling, 14 track_dangling,
+  10 net_conflict (TL401-403 GND pins 2/4, J601 shell S1), 6 footprint_symbol_mismatch (DNP, KiCad 7), 2 silk_over_copper, 2 silk_overlap.
+- ERC: `total 18: warning 18` (9 footprint_link_issues, 9 lib_symbol_mismatch; 0 errors).
+
+Left open (ranked):
+1. TAP0-15 ribbon routed on **In2** at y 21-24 over the phase GND / +3V3 vias: all 6 shorts and 10 of 14 clearance
+   errors; it also cuts the In2 ground. Route TAP on B.Cu over an In2 GND strip (rule 10) instead.
+2. Tap row VTAP_P/N strips span the full width: no In2 ground crossing -> 18 unrouted nets and most rule-10 hits.
+   Needs GND corridors through the strips (each half fed separately).
+3. Supply feeds unrouted / 90-degree supply corners (+5V, -5V, +3V3, +2V5, -2V5, +1V2, VBUS); +1V2 In2 track at
+   (60.4, 7.1) shorts two GND vias.
+4. Router vias land on the TL402 / TL403 stub copper (VBUS via at (15.0, 40.3) shorts TL403; +2V5 via 0.015 mm
+   from TL402): the router does not see net-tie footprint copper. Also an asymmetry of the strobe chains.
+5. PH_STROBE pair unequal (P 54.3 mm F.Cu, N unrouted); 0.2 mm necks in fpga.
+6. Diagonal B.Cu slow traces cross under the analog block (input / sampler, x 15-30, y 8-25) - rule 10 asks them
+   to stay away from the hold / divider nodes; DAC_TRIG 0.17 mm from the J501 NPTH.
+7. TL401-403 parity: their GND pins 2/4 exist only on the board footprint (net_conflict warnings).

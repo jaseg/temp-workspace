@@ -45,6 +45,16 @@ for ext in kicad_pro kicad_dru; do
 done
 # project-local libraries referenced by a .kicad_pro next to the board
 [ -f "$SRC/fp-lib-table" ] && cp "$SRC/fp-lib-table" "$WORK/"
+# schematic parity needs the schematic (same basename) next to the copied board: if the
+# board directory has none, copy the project's schematic sheets + symbol libraries
+if [ -n "$PARITY" ] && [ ! -f "$SRC/$NAME.kicad_sch" ]; then
+  SCH="$(cd "$HERE/.." && pwd)/kicad"
+  cp "$SCH"/*.kicad_sch "$WORK/"
+  [ -f "$SCH/scope-fe.kicad_sch" ] && [ "$NAME" != scope-fe ] && mv "$WORK/scope-fe.kicad_sch" "$WORK/$NAME.kicad_sch"
+  for f in sym-lib-table scope-fe.kicad_sym; do [ -f "$SCH/$f" ] && cp "$SCH/$f" "$WORK/"; done
+  [ -f "$WORK/fp-lib-table" ] || { [ -f "$SCH/fp-lib-table" ] && cp "$SCH/fp-lib-table" "$WORK/"; }
+  [ -d "$SCH/lib" ] && cp -r "$SCH/lib" "$WORK/"
+fi
 if [ "$RULES" = jlc4 ]; then
   python3 -I "$HERE/kicad_inject_rules.py" "$WORK/$NAME.kicad_pro" jlc4
   [ -f "$WORK/$NAME.kicad_dru" ] || cp "$HERE/jlc4.kicad_dru" "$WORK/$NAME.kicad_dru"

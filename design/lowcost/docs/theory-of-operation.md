@@ -308,7 +308,7 @@ us/V.
 | Phase array | full 16-tap deck with both strobe chains, signal chain, gates and readout | co-propagation, spacing, threshold, reverse pulse, 50 % duty | COS3502 Cin, delay and hysteresis at 10-30 mV (Cin 3 / 6 pF bracket only), 0.5 pF hold caps, feed-through on a real board |
 | FPGA, firmware | none | - | tracking loop, dither, aiming, LUT fit, OSER10/IDES placement |
 | Schematic | generated netlist, 235 nets, own checks (no single-node nets, no shorted two-pin parts) | connectivity | KiCad ERC not run |
-| Layout | three fragments, scripted geometry checks | clearance, courtyards, line delays | DRC, merge, via stitching (below) |
+| Layout | integrated 4-layer board `layout/board/scope-fe.kicad_pcb` (100 x 57 mm, 454 parts); the fragments are superseded | netlist parity 0 mismatches, 0 courtyard overlaps, nightly DRC jlc4 + schematic parity, ERC 0 errors | 18 nets unrouted, 44 DRC errors, In2 reference rule (below) |
 
 Open risks, most severe first:
 
@@ -318,11 +318,13 @@ Open risks, most severe first:
 2. **BUF802 model and 50 ohm input.** The 3.3 GHz bandwidth, the 13 % overshoot and the 113 mVpp kick-out all rest on an idealised
    model; the real part is expected at about 2 GHz. Without on-board termination, 50 ohm S11 depends on the external
    feed-through terminator and the SMA-divider line (-3.4 dB at 2 GHz even with an ideal terminator).
-3. **Layout open points.** The three fragments (JLC04161H-7628) are not merged and have only scripted checks; no DRC
-   has been run (kicad-cli 7 has none). The delay line is laid out at 40 / 75 ps per tap, which is not re-simulated (the verification used 35 / 70 ps).
-   Pad excess capacitances are noted, not compensated (up to 0.13 pF on the BUF802 output node); the loaded strobe
-   lines are 45.5 ohm against 49.9 ohm terminations. The balun (DLW21SN) footprint is unverified. Via
-   stitching and fences are left to board integration.
+3. **Layout not finished.** The integrated board (`layout/board/`, JLC04161H-7628, 100 x 57 mm) holds all 454 parts
+   with the netlist's refs, values, footprints and pad nets, but 18 nets are unrouted (supply feeds, PH_STROBE_N,
+   USB, JTAG, SPI_CS/MOSI, I2C_SDA, TRIG_SEL, VBIAS_K, VTAP_TH), the nightly DRC (jlc4) reports 44 errors, and 657 of
+   1412 samples of B.Cu clock / TAP traces have no In2 ground above them: the full-width VTAP_P/N strips and the
+   TAP ribbon routed on In2 block every top-to-bottom crossing. The delay line is laid out at 40 / 75 ps per tap
+   (not re-simulated; verification used 35 / 70 ps); pad excess capacitances are not compensated; the DLW21SN balun
+   footprint is unverified. The fragments in `layout/input_stage|sampler|phase_trigger` are superseded.
 4. **Strobe kick-out into the trigger** (19 mVpp) is as large as the smallest trigger signal; the series ferrite/100
    ohm option is unproven.
 5. **Tap comparator and feed-through.** COS3502 Cin, delay and hysteresis at small overdrive are unknown; Cin 6 pF
@@ -357,15 +359,14 @@ Simulation plots:
 ![Strobe chain edges](../sim/strobe/chain_edges.png) ![Strobe along the tap lines](../sim/phase_array/strobe_spacing.png)
 ![Captured value per tap](../sim/phase_array/capture.png) ![Reverse pulse](../sim/phase_array/reverse.png)
 
-Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and layout fragments:
+Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and the integrated board (work in progress):
 
 ![Root sheet](../kicad/export/scope-fe.png) ![Input](../kicad/export/scope-fe-input.png)
 ![Sampler](../kicad/export/scope-fe-sampler.png) ![Strobe](../kicad/export/scope-fe-strobe.png)
 ![Trigger and phase](../kicad/export/scope-fe-trigger_phase.png) ![FPGA and clock](../kicad/export/scope-fe-fpga_clock.png)
 ![Power](../kicad/export/scope-fe-power.png) ![MCU](../kicad/export/scope-fe-mcu_if.png)
-![Input stage layout](../layout/input_stage/input_stage.png) ![Input stage layout detail](../layout/input_stage/input_stage_detail.png)
-![Sampler layout](../layout/sampler/sampler.png) ![Sampler layout detail](../layout/sampler/sampler_detail.png)
-![Phase trigger layout](../layout/phase_trigger/phase_trigger.png) ![Phase trigger layout detail](../layout/phase_trigger/phase_trigger_detail.png)
+![Board top copper](../layout/board/scope-fe-top.png) ![Board In1](../layout/board/scope-fe-in1.png)
+![Board In2 over B.Cu](../layout/board/scope-fe-in2-bcu.png) ![Board bottom](../layout/board/scope-fe-bottom.png)
 
 ## 10. Bring-up order
 
