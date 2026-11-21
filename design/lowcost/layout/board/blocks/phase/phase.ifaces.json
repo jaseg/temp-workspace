@@ -1,0 +1,256 @@
+{
+ "block": "phase",
+ "origin": "local (0, 0) = pcbnew (100.0, 100.0)",
+ "ifaces": [
+  {
+   "net": "/PSTRB_A",
+   "x": 26.5,
+   "y": 12.25,
+   "layer": "F.Cu",
+   "side": "W",
+   "class": "rf50",
+   "width": 0.36,
+   "note": "pstrobe output, 50 R up to the boundary, 0.16 mm (73 R) from here; equal A/K"
+  },
+  {
+   "net": "/PSTRB_K",
+   "x": 26.5,
+   "y": 17.75,
+   "layer": "F.Cu",
+   "side": "W",
+   "class": "rf50",
+   "width": 0.36,
+   "note": "pstrobe output, 50 R up to the boundary, 0.16 mm (73 R) from here; equal A/K"
+  },
+  {
+   "net": "/TAP0",
+   "x": 29.274,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP1",
+   "x": 30.544,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP2",
+   "x": 38.302,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP3",
+   "x": 39.572,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP4",
+   "x": 47.33,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP5",
+   "x": 48.6,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP6",
+   "x": 56.358,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP7",
+   "x": 57.628,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP8",
+   "x": 65.386,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP9",
+   "x": 66.656,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP10",
+   "x": 74.414,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP11",
+   "x": 75.684,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP12",
+   "x": 83.442,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP13",
+   "x": 84.712,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP14",
+   "x": 92.47,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/TAP15",
+   "x": 93.74,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "comparator output"
+  },
+  {
+   "net": "/VTAP_TH",
+   "x": 62.219,
+   "y": 22.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.25,
+   "note": "R380/R381 1 k to VTH1/VTH2"
+  },
+  {
+   "net": "/VTAP_N",
+   "x": 44.149,
+   "y": 22.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "supply",
+   "width": 0.3,
+   "note": "In2 strip under the taps (drawn by this block)"
+  },
+  {
+   "net": "/VTAP_P",
+   "x": 48.663,
+   "y": 22.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "supply",
+   "width": 0.3,
+   "note": "In2 strip under the taps (drawn by this block)"
+  },
+  {
+   "net": "/BUF_OUT_T",
+   "x": 4.925,
+   "y": 0.0,
+   "layer": "F.Cu",
+   "side": "N",
+   "class": "rf50",
+   "width": 0.36,
+   "note": "from the input stage (BUF802 trigger output)"
+  },
+  {
+   "net": "/TRIG_LEVEL",
+   "x": 8.75,
+   "y": 22.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U302 IN- (10 nF C304 at the pin)"
+  },
+  {
+   "net": "/TRIG_SEL",
+   "x": 9.25,
+   "y": 22.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R302 10 k to U301 SEL"
+  },
+  {
+   "net": "/COARSE",
+   "x": 4.45,
+   "y": 0.0,
+   "layer": "B.Cu",
+   "side": "N",
+   "class": "slow",
+   "width": 0.2,
+   "note": "SN65LVDS2 output to the FPGA"
+  }
+ ]
+}

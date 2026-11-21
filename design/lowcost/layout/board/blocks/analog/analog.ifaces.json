@@ -1,0 +1,136 @@
+{
+ "block": "analog",
+ "origin": "local (0, 0) = pcbnew (100.0, 100.0)",
+ "ifaces": [
+  {
+   "net": "/S_STROBE_P",
+   "x": 56.0,
+   "y": 9.865,
+   "layer": "F.Cu",
+   "side": "E",
+   "class": "pair",
+   "width": 0.36,
+   "note": "from U501 pin 38 (FPGA); 50 R, R401 47 R in this block"
+  },
+  {
+   "net": "/S_STROBE_N",
+   "x": 56.0,
+   "y": 10.865,
+   "layer": "F.Cu",
+   "side": "E",
+   "class": "pair",
+   "width": 0.36,
+   "note": "from U501 pin 35; dummy load R405/C411/R406 here"
+  },
+  {
+   "net": "/BUF_OUT_T",
+   "x": 15.75,
+   "y": 21.5,
+   "layer": "F.Cu",
+   "side": "S",
+   "class": "rf50",
+   "width": 0.36,
+   "note": "to U301.1 (phase block)"
+  },
+  {
+   "net": "/VOFS",
+   "x": 5.9,
+   "y": 21.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R119"
+  },
+  {
+   "net": "/VBIAS_A",
+   "x": 15.24,
+   "y": 21.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R205 / R206 via B.Cu column"
+  },
+  {
+   "net": "/VBIAS_K",
+   "x": 16.24,
+   "y": 21.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R205 / R206 via B.Cu column"
+  },
+  {
+   "net": "/ADC_IN",
+   "x": 18.9,
+   "y": 21.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "R211 / C207"
+  },
+  {
+   "net": "/ADC_REF_MID",
+   "x": 21.49,
+   "y": 21.5,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U202.3 / C206"
+  },
+  {
+   "net": "+5V",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "U101 / U102, In2 via pairs x 2-15"
+  },
+  {
+   "net": "-5V",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "U101 / U102, In2 via pairs x 1-14"
+  },
+  {
+   "net": "+2V5",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "R108 and U201 (In2 island under U201)"
+  },
+  {
+   "net": "-2V5",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "R110 and U201 (via pair at C209)"
+  },
+  {
+   "net": "+3V3",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "U202, TRF bias tees and VCC via pairs x 23-56"
+  }
+ ]
+}
