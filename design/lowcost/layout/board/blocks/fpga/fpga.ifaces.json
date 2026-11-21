@@ -1,0 +1,206 @@
+{
+ "block": "fpga",
+ "origin": "local (0, 0) = pcbnew (100.0, 100.0)",
+ "ifaces": [
+  {
+   "net": "/S_STROBE_P",
+   "x": 0.0,
+   "y": 9.365,
+   "layer": "F.Cu",
+   "side": "W",
+   "class": "pair",
+   "width": 0.36,
+   "note": "U501.38; crosses under N on B.Cu (2 vias), 47 R R401 in analog"
+  },
+  {
+   "net": "/S_STROBE_N",
+   "x": 0.0,
+   "y": 10.365,
+   "layer": "F.Cu",
+   "side": "W",
+   "class": "pair",
+   "width": 0.36,
+   "note": "U501.35"
+  },
+  {
+   "net": "Net-(C422-Pad1)",
+   "x": 0.55,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "pair",
+   "width": 0.36,
+   "note": "R411 47 R at U501 (PH_STROBE_N)"
+  },
+  {
+   "net": "Net-(C412-Pad1)",
+   "x": 1.45,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "pair",
+   "width": 0.36,
+   "note": "R407 47 R at U501 (PH_STROBE_P)"
+  },
+  {
+   "net": "/TAP3",
+   "x": 10.35,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.13"
+  },
+  {
+   "net": "/TAP4",
+   "x": 11.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.14"
+  },
+  {
+   "net": "/TAP5",
+   "x": 11.6,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.15"
+  },
+  {
+   "net": "/TAP6",
+   "x": 12.2,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.16"
+  },
+  {
+   "net": "/TAP7",
+   "x": 12.85,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.17"
+  },
+  {
+   "net": "/TAP8",
+   "x": 13.45,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.18"
+  },
+  {
+   "net": "/TAP9",
+   "x": 14.1,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.19"
+  },
+  {
+   "net": "/TAP10",
+   "x": 14.7,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.20"
+  },
+  {
+   "net": "/TAP11",
+   "x": 15.3,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.21"
+  },
+  {
+   "net": "/TAP12",
+   "x": 15.95,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.22"
+  },
+  {
+   "net": "/TAP13",
+   "x": 16.55,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.23"
+  },
+  {
+   "net": "/TAP14",
+   "x": 17.2,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.24"
+  },
+  {
+   "net": "/TAP0",
+   "x": 8.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.9"
+  },
+  {
+   "net": "/TAP1",
+   "x": 9.1,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.10"
+  },
+  {
+   "net": "/TAP2",
+   "x": 9.75,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.11"
+  },
+  {
+   "net": "/TAP15",
+   "x": 17.8,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.2,
+   "note": "U501.27"
+  }
+ ]
+}

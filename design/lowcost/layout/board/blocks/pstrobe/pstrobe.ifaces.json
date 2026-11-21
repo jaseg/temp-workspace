@@ -1,0 +1,66 @@
+{
+ "block": "pstrobe",
+ "origin": "local (0, 0) = pcbnew (100.0, 100.0)",
+ "ifaces": [
+  {
+   "net": "/PH_STROBE_P",
+   "x": 0.52,
+   "y": 0.0,
+   "layer": "F.Cu",
+   "side": "N",
+   "class": "pair",
+   "width": 0.36,
+   "note": "chain A input, R407 47 R here; FPGA U501"
+  },
+  {
+   "net": "/PH_STROBE_N",
+   "x": 0.52,
+   "y": 25.0,
+   "layer": "F.Cu",
+   "side": "S",
+   "class": "pair",
+   "width": 0.36,
+   "note": "chain K input (mirror), R411 47 R here; match P/N"
+  },
+  {
+   "net": "/PSTRB_A",
+   "x": 17.0,
+   "y": 9.75,
+   "layer": "F.Cu",
+   "side": "E",
+   "class": "rf50",
+   "width": 0.36,
+   "note": "to phase tap 0 (phase iface 26.5 / 34.75 board)"
+  },
+  {
+   "net": "/PSTRB_K",
+   "x": 17.0,
+   "y": 15.25,
+   "layer": "F.Cu",
+   "side": "E",
+   "class": "rf50",
+   "width": 0.36,
+   "note": "to phase tap 0 (phase iface 26.5 / 40.25 board)"
+  },
+  {
+   "net": "+3V3",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "TRF VCC and bias tees: via pairs, In2 island x 0-12"
+  },
+  {
+   "net": "VBUS",
+   "x": 0,
+   "y": 0,
+   "layer": "In2.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "GVA-84+ tees: via pairs at C418 / C428, In2 x 10-15"
+  }
+ ]
+}
