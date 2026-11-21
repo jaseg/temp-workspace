@@ -772,7 +772,7 @@ def render(png, layers, crop):
     bl.render(out, png, layers, crop=(x0 - _ox, y0 - _oy, x1 - _ox, y1 - _oy), tmpdir=SCR)
 
 
-if True:
+if os.environ.get("RENDER", "1") == "1":
     lay = ("F.Cu", "F.SilkS", "F.Fab", "Dwgs.User")
     render(os.path.join(HERE, "analog.png"), lay, (99.5, 99.5, 156.5, 122.0))
     render(os.path.join(HERE, "analog_detail.png"), lay, (127.0, 104.0, 150.0, 119.0))

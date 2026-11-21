@@ -223,7 +223,7 @@
    "note": "from the input stage (BUF802 trigger output)"
   },
   {
-   "net": "/TRIG_LEVEL",
+   "net": "/trigger_phase/TRIG_LEVEL",
    "x": 8.75,
    "y": 22.5,
    "layer": "B.Cu",
