@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """input_stage layout fragment (KiCad 7, pcbnew scripting), re-layout for JLC04161H-7628.
 
-SIG_IN SMA edge launch -> VIN 50R microstrip -> K101 HFD3 (both poles, 2 x 100R 0603) 50R termination
+SIG_IN SMA edge launch -> VIN 50R microstrip (taper + < 1 mm, unterminated 1 Mohm input, no relay)
 -> 5:1 compensated divider (Ctop 1.5p / Cbot 3.3p, Rg 10R) -> U101 BUF802 (RGT VQFN-16) with
 U102 OPA197 differential-integrator servo (3 x 300k / 100k alpha string, Cint 470p, Rf1 10k,
 Rf2 22.1k + RV 50k, Rofs 14.3k from VOFS) -> BUF_OUT_S edge pad (sampler 10R) and
-49.9R + 0R -> BUF_OUT_T 50R microstrip.  Values: sim/input/RESULT.md, as drawn in kicad/gen/gen_input.py.
+49.9R + 0R -> BUF_OUT_T 50R microstrip.  Values: sim/input/RESULT.md, as drawn in kicad/gen/gen_input.py,
+minus the switchable 50R termination (K101, R101-R103, TERM_50, VBUS removed on user decision).
 
 Every RF width comes from line_z() below (Hammerstad-Jensen + thickness + solder-mask correction,
 plus a conductor-backed-CPW check for the ground-pour gap).  All bends are 45 deg; check_corners()
@@ -103,12 +104,17 @@ W_HZ, W_SIG, W_PWR, W_GND = 0.15, 0.2, 0.4, 0.4
 C_PAD_PER_MM2 = EPS0 * ER_PP / H_PP              # parallel-plate pad capacitance over In1, pF/mm^2
 
 # ============================================================================= board coordinates (mm)
-Y0 = 5.8           # HF row (VIN, GA, BUF_IN, OUT)
-XC = 13.4          # K101 COM column (pins 4 / 9)
-XU = 20.3          # U101 centre
+Y0 = 6.3           # HF row (VIN, GA, BUF_IN, OUT)
+X_PAD_END = 3.7    # end of the SMA centre pad (1.27 mm wide)
+X_TAPER = X_PAD_END + 0.8                        # 1.27 -> W50 taper (F.Cu zone)
+X_CT = X_TAPER + 0.07 + 0.78                     # Ctop centre: pad 1 starts 0.07 mm after the taper
+XA = 5.05          # alpha-string column (R114 pad 1 bridges onto Ctop pad 1)
+x_ga = X_CT + 0.88                               # GA junction (Cbot column)
+x_rg = x_ga + 0.88                               # Rg centre
+x_bi = x_rg + 0.51                               # BUF_IN node (Rg pad 2, bias string column)
+XU = x_bi + 3.125  # U101 centre (room for the pin 3 / pin 4 fan-out)
 YU = Y0 + 0.25     # pins 2 and 11 on Y0
-W, H = 24.85, 19.2
-XA = 12.13         # alpha-string column (between NC and COM pins of K101)
+W, H = round(XU + 4.555, 2), 17.6
 
 board = pcbnew.BOARD()
 board.SetCopperLayerCount(4)
@@ -272,26 +278,14 @@ def edge_pad(ref, net, x, y, w, h):
 
 
 # ============================================================================= placement
-# --- RF chain on Y0, left to right
+# --- RF chain on Y0, left to right: SMA - taper - Ctop (R114 tap on its pad 1) - Rg - BUF802 pin 2
 place("Connector_Coaxial", "SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount", "J101", "SIG_IN", 2.1, Y0, 270,
       nets={"1": "VIN", "2": "GND"})
-X_PAD_END = 3.7                                  # end of the SMA centre pad (1.27 mm wide)
-X_TAPER = X_PAD_END + 0.8                        # 1.27 -> W50 taper
-place("Relay_THT", "Relay_DPDT_Kemet_EC2", "K101", "HFD3/3", XC - 7.62, Y0 - 2.54, 270, side="B",
-      nets={"1": "COIL_P", "12": "TERM_50", "4": "K_COM1", "9": "K_COM2", "5": "GND", "8": "GND"})
-# 0402 tap parts: pad1 overlaps the line edge by 0.08 mm (zero-length tap)
-TAP_DY = W50 / 2 - 0.08 + 0.27 + 0.51            # part centre offset from the line centre (0402)
-TAP_DY6 = W50 / 2 - 0.08 + 0.45 + 0.775          # 0603
-V("R101", "100", XC, Y0 - TAP_DY6, "K_COM1", "VIN", size="0603")     # pad2 (bottom) on VIN
-V("R102", "100", XC, Y0 + TAP_DY6, "VIN", "K_COM2", size="0603")
-V("R114", "300k 0.1%", XA, Y0 + TAP_DY, "VIN", "S1")                # first alpha resistor taps VIN
-x_ct = XC + 0.475 + 0.25 + 0.27 + 0.51
-Hz("C101", "1.5p C0G 100V", x_ct, Y0, "VIN", "GA", cap=True)          # Ctop
-x_ga = x_ct + 0.51 + 0.37                                           # GA junction
-x_rg = x_ga + 0.37 + 0.51
+TAP_DY = W50 / 2 - 0.08 + 0.27 + 0.51            # 0402 part centre offset from the line centre
+Hz("C101", "1.5p C0G 100V", X_CT, Y0, "VIN", "GA", cap=True)          # Ctop, first divider part
+V("R114", "300k 0.1%", XA, Y0 + TAP_DY, "VIN", "S1")                # first alpha resistor, pad 1 on Ctop pad 1
 Hz("R104", "10", x_rg, Y0, "GA", "BUF_IN")                           # Rg
-V("C102", "3.3p C0G", x_ga, Y0 + 1.3, "GA", "GND", cap=True)          # Cbot, GND pad onto K101 NO pin 8
-x_bi = x_rg + 0.51
+V("C102", "3.3p C0G", x_ga, Y0 + 1.3, "GA", "GND", cap=True)          # Cbot
 V("R105", "4.99M", x_bi, Y0 + 1.3, "BUF_IN", "IN_BIAS_MID")
 V("R106", "4.99M", x_bi, Y0 + 2.9, "IN_BIAS_MID", "IN_BIAS")
 U1N = {"1": "+5V", "2": "BUF_IN", "3": "IN_BIAS", "4": "IN_AUX", "5": "-5V", "6": "-5V", "7": "R_BIAS",
@@ -313,9 +307,6 @@ V("C117", "100n", x_sp, Y0 - 1.36, "GND", "+5V", cap=True)              # VSO+ p
 V("C110", "100n", XU - 0.65, y_bot_cap, "-5V", "GND", cap=True)          # VS- pins 5/6
 V("R107", "17.8k", XU + 0.25, y_bot_cap, "R_BIAS", "-5V")               # R_Bias pin 7
 V("C111", "100n", XU + 1.15, y_bot_cap, "-5V", "GND", cap=True)          # VS-/VSO- pins 8/10
-V("R121", "1k", 0, 0, "OPA_OUT", "IN_AUX")                               # moved below (placeholder)
-FPS["R121"].SetOrientationDegrees(0); FPS["R121"].SetPosition(P(x_bi - 0.18, Y0 + 4.3))   # Raux
-V("C107", "100p C0G", x_bi + 1.02, Y0 + 4.81, "IN_AUX", "GND", cap=True)  # Caux
 # --- clamp dividers above U101 (pad1 row = CLx node)
 Y_CL = Y0 - 3.4
 for ref, val, x, top in (("R109", "1.5k", XU - 3.1, "GND"), ("R108", "1k", XU - 2.15, "+2V5"),
@@ -323,51 +314,56 @@ for ref, val, x, top in (("R109", "1.5k", XU - 3.1, "GND"), ("R108", "1k", XU - 
                          ("R110", "1k", XU + 2.15, "-2V5"), ("R111", "1.5k", XU + 3.1, "GND")):
     V(ref, val, x, Y_CL - 0.51, top, "CLH" if x < XU else "CLL", cap=ref.startswith("C"))
 place("TestPoint", "TestPoint_Pad_D1.0mm", "TP101", "CLH", XU - 4.3, Y_CL - 1.2, nets={"1": "CLH"})
+place("Connector_PinHeader_1.27mm", "PinHeader_1x03_P1.27mm_Vertical", "J3", "CLAMP", XU - 8.5, 1.0, 90,
+      nets={"1": "GND", "2": "-2V5", "3": "+2V5"})
 # --- alpha string and servo (below the HF row)
 V("R115", "300k 0.1%", XA, Y0 + TAP_DY + 1.6, "S1", "S2")
 V("R116", "300k 0.1%", XA, Y0 + TAP_DY + 3.2, "S2", "TAP")
-XO, YO = XA + 0.95, 12.6                         # U102 (rot 270: IN+ top-left on the alpha column)
+XO, YO = XA + 0.95, Y0 + 6.8                     # U102 (rot 270: IN+ top-left on the alpha column)
 place("Package_TO_SOT_SMD", "SOT-23-5", "U102", "OPA197IDBVR", XO, YO, 270,
       nets={"1": "OPA_OUT", "2": "-5V", "3": "TAP", "4": "FB", "5": "+5V"})
-Hz("R117", "100k 0.1%", XA - 1.13, 10.55, "GND", "TAP")
-Hz("C105", "18p C0G", XA - 1.13, 11.5, "GND", "TAP", cap=True)
-V("C113", "100n", XO, 11.5, "-5V", "GND", side="B", cap=True)            # OPA V- (bottom, under pin 2)
-V("C112", "100n", XO + 0.95, 13.6, "GND", "+5V", side="B", cap=True)     # OPA V+ (bottom, under pin 5)
-X_TP3 = XO + 2.32
-place("TestPoint", "TestPoint_Pad_D1.0mm", "TP103", "SERVO", X_TP3, 10.1, nets={"1": "OPA_OUT"})
-V("C106", "470p C0G", X_TP3, 11.61, "OPA_OUT", "FB", cap=True)           # Cint
-Y_FB = 15.2
-V("R119", "14.3k 0.1%", 11.0, Y_FB + 0.88, "FB", "VOFS")                 # Rofs
-Hz("R120", "22.1k 0.1%", 9.75, Y_FB, "RF2_MID", "FB")                     # Rf2
-place("Potentiometer_SMD", "Potentiometer_Bourns_3314J_Vertical", "RV101", "50k", 6.4, 13.0, 180,
+Y_P3O = YO - 1.1375                              # U102 top pin row
+Hz("R117", "100k 0.1%", XA - 1.13, YO - 2.05, "GND", "TAP")
+Hz("C105", "18p C0G", XA - 1.13, Y_P3O, "GND", "TAP", cap=True)
+V("C113", "100n", XO, YO - 1.1, "-5V", "GND", side="B", cap=True)        # OPA V- (bottom, under pin 2)
+V("C112", "100n", XO + 0.95, YO + 1.0, "GND", "+5V", side="B", cap=True) # OPA V+ (bottom, under pin 5)
+x_p1o = XO + 0.95                                 # OPA OUT pin column
+Hz("R121", "1k", x_p1o + 0.51, Y0 + 4.3, "OPA_OUT", "IN_AUX")            # Raux, pad 1 right above OPA OUT
+V("C107", "100p C0G", x_bi + 1.02, Y0 + 4.81, "IN_AUX", "GND", cap=True)  # Caux
+place("TestPoint", "TestPoint_Pad_D1.0mm", "TP103", "SERVO", XA + 1.25, Y0 + 3.4, nets={"1": "OPA_OUT"})
+X_CI = XO + 1.9
+V("C106", "470p C0G", X_CI, YO - 0.2, "OPA_OUT", "FB", cap=True)         # Cint
+Y_FB = YO + 2.25                                  # FB line
+Hz("R120", "22.1k 0.1%", X_CI + 0.27, Y_FB, "FB", "RF2_MID")              # Rf2, pad 1 under the Cint drop
+V("R119", "14.3k 0.1%", XO + 0.5, Y_FB + 0.51, "FB", "VOFS")             # Rofs, pad 1 on the FB line
+place("Potentiometer_SMD", "Potentiometer_Bourns_3314J_Vertical", "RV101", "50k", W - 3.25, YO + 1.75, 90,
       nets={"1": "RF2_MID", "2": "GND", "3": "GND"})
-# --- relay coil, bulk caps, headers
-Hz("R103", "39", 6.2, 1.3, "VBUS", "COIL_P", size="0603")
-Hz("C115", "10u", 9.4, 1.3, "+5V", "GND", size="0805", cap=True)
-Hz("C116", "10u", 14.0, H - 0.9, "-5V", "GND", size="0805", cap=True)
+# --- header and bulk caps (bulk caps on the bottom side, straight into the header pins)
 YJ = H - 0.9
-J2N = ["VBUS", "TERM_50", "GND", "+5V", "-5V", "VOFS"]
-X_J2 = 11.0 - 1.27 * 5
-place("Connector_PinHeader_1.27mm", "PinHeader_1x06_P1.27mm_Vertical", "J2", "PWR", X_J2, YJ, 90,
+J2N = ["-5V", "+5V", "GND", "VOFS"]
+X_J2 = 1.15
+place("Connector_PinHeader_1.27mm", "PinHeader_1x04_P1.27mm_Vertical", "J2", "PWR", X_J2, YJ, 90,
       nets={str(i + 1): n for i, n in enumerate(J2N)})
-place("Connector_PinHeader_1.27mm", "PinHeader_1x03_P1.27mm_Vertical", "J3", "CLAMP", 11.8, 1.0, 90,
-      nets={"1": "GND", "2": "-2V5", "3": "+2V5"})
+V("C116", "10u", X_J2, YJ - 2.4, "GND", "-5V", size="0805", side="B", cap=True)
+V("C115", "10u", X_J2 + 1.75, YJ - 2.4, "GND", "+5V", size="0805", side="B", cap=True)
 
 # ============================================================================= routing
 F, B = pcbnew.F_Cu, pcbnew.B_Cu
 RF = {}                                          # net -> list of (tracks, intended Z0, note)
-# --- VIN: SMA pad -> taper (zone) -> 50R line -> termination taps -> Ctop pad 1
+# --- VIN: SMA pad -> taper (zone) -> 50R line -> Ctop pad 1 (R114 bridges onto it)
 zone([F], "VIN", [(X_PAD_END - 0.3, Y0 - 0.635), (X_PAD_END, Y0 - 0.635), (X_TAPER, Y0 - W50 / 2),
                   (X_TAPER, Y0 + W50 / 2), (X_PAD_END, Y0 + 0.635), (X_PAD_END - 0.3, Y0 + 0.635)],
      clearance=0.25, priority=5, minw=0.1)
-RF["VIN"] = [(track([(X_TAPER - 0.05, Y0), ("C101", 1)], W50, "VIN"), 50, "SMA taper end -> Ctop pad")]
-track([("R101", 2), (XC, Y0)], 0.5, "VIN"); track([("R102", 1), (XC, Y0)], 0.5, "VIN")
+RF["VIN"] = [(track([(X_TAPER - 0.05, Y0), ("C101", 1)], W50, "VIN"), 50, "SMA taper end -> Ctop pad 1")]
 track([("R114", 1), (XA, Y0)], 0.4, "VIN")
-track([("R101", 1), ("K101", 4)], 0.6, "K_COM1"); track([("R102", 2), ("K101", 9)], 0.6, "K_COM2")
+# SMA ground legs: one via per leg ties F/B legs, In1 and the In2 GND island under the launch
+for sy in (-1, 1):
+    gvia(3.9, Y0 + sy * 3.8)
 # --- divider: GA / BUF_IN (thin, low-C cut-out below)
 track([("C101", 2), ("R104", 1)], 0.3, "GA")
 track([(x_ga, Y0), ("C102", 1)], 0.3, "GA")
-track([("C102", 2), (x_ga, Y0 + 2.2), ("K101", 8)], 0.4, "GND")
+y_cbv = pad("C102", 2)[1] + 0.64
+gvia(x_ga, y_cbv); track([("C102", 2), (x_ga, y_cbv)], W_GND, "GND")
 p2, p3, p4 = pad("U101", 2), pad("U101", 3), pad("U101", 4)
 track([("R104", 2), p2], W_HZ, "BUF_IN")
 track([("R104", 2), ("R105", 1)], 0.3, "BUF_IN")
@@ -438,20 +434,22 @@ j32, j33 = pad("J3", 2), pad("J3", 3)
 xr8, xr10 = pad("R108", 1)[0], pad("R110", 1)[0]
 track([j33, (j33[0] + 0.25, 1.25), (xr8 - 0.7, 1.25), (xr8, YCV)], 0.3, "+2V5", B)
 track([j32, (j32[0] + 0.9, 1.9), (xr10 - 0.9, 1.9), (xr10, 1.0), (xr10, YCV)], 0.3, "-2V5", B)
-# --- output: OUT pin -> 50R -> edge pad IF1; 49.9R + 0R -> BUF_OUT_T 50R to the bottom edge
+# --- output: OUT pin -> 50R -> edge pad IF1; 49.9R + 0R -> BUF_OUT_T 50R to the right edge (IF2)
 p11 = pad("U101", 11)
 RF["BUF_OUT_S"] = [(track([p11, ("IF1", 1)], W50, "BUF_OUT_S"), 50, "OUT pin -> edge pad IF1")]
 track([("R112", 1), (x_sp, Y0)], 0.4, "BUF_OUT_S"); track([("R118", 2), (x_sp + 0.95, Y0)], 0.4, "BUF_OUT_S")
 track([("R112", 2), ("R113", 1)], 0.4, "RT_MID")
 xt, yt0 = pad("R113", 2)
-RF["BUF_OUT_T"] = [(track([("R113", 2), (xt, H - 0.25)], W50, "BUF_OUT_T"), 50, "0R pad -> bottom edge IF2")]
-edge_pad("IF2", "BUF_OUT_T", xt, H - 0.2, W50, 0.4)
-# Rf1: FB via above R118, B.Cu down the right edge to the servo FB node
+Y_T = yt0 + 0.8                                   # BUF_OUT_T row at the right edge
+RF["BUF_OUT_T"] = [(track([("R113", 2), (xt, Y_T - 0.5), (xt + 0.5, Y_T), (W - 0.05, Y_T)], W50, "BUF_OUT_T"),
+                    50, "0R pad -> right edge IF2")]
+edge_pad("IF2", "BUF_OUT_T", W - 0.2, Y_T, 0.4, W50)
+# Rf1: FB via above R118, B.Cu down the right edge and left under the pot to the Cint/FB drop
 r118 = pad("R118", 1)
 svia(r118[0], Y0 - 2.1, "FB"); track([("R118", 1), (r118[0], Y0 - 2.1)], W_SIG, "FB")
-XFBV = 14.6
-track([(r118[0], Y0 - 2.1), (r118[0], 15.2), (r118[0] - 0.7, 15.9), (XFBV + 0.7, 15.9), (XFBV, Y_FB)], W_SIG, "FB", B)
-svia(XFBV, Y_FB, "FB")
+Y_FBB = YO + 1.1                                  # B.Cu FB row and FB via on the Cint drop
+track([(r118[0], Y0 - 2.1), (r118[0], Y_FBB - 0.7), (r118[0] - 0.7, Y_FBB), (X_CI, Y_FBB)], W_SIG, "FB", B)
+svia(X_CI, Y_FBB, "FB")
 # --- alpha string -> TAP -> U102 IN+
 track([("R114", 2), ("R115", 1)], 0.3, "S1"); track([("R115", 2), ("R116", 1)], 0.3, "S2")
 p3o = pad("U102", 3)
@@ -462,47 +460,34 @@ for ref in ("R117", "C105"):
     x, y = pad(ref, 1); gvia(x - 0.7, y); track([(ref, 1), (x - 0.7, y)], W_GND, "GND")
 # --- U102 supplies: vias at the pins, 100n on the bottom side, shared GND via in the SOT centre
 p2o, p5o, p1o, p4o = pad("U102", 2), pad("U102", 5), pad("U102", 1), pad("U102", 4)
-via(p2o[0], 10.4, "-5V"); track([p2o, (p2o[0], 10.4)], 0.6, "-5V")
-track([(p2o[0], 10.4), ("C113", 1)], 0.5, "-5V", B)
+via(p2o[0], YO - 2.2, "-5V"); track([p2o, (p2o[0], YO - 2.2)], 0.6, "-5V")
+track([(p2o[0], YO - 2.2), ("C113", 1)], 0.5, "-5V", B)
 gvia(XO, YO); track([("C113", 2), (XO, YO)], 0.5, "GND", B)
 c112 = pad("C112", 1)
 track([("C112", 1), (c112[0], c112[1] - 0.05), (c112[0] - (c112[1] - 0.05 - YO), YO), (XO, YO)], 0.5, "GND", B)
-via(p5o[0], 14.65, "+5V"); track([p5o, (p5o[0], 14.65)], 0.6, "+5V"); track([(p5o[0], 14.65), ("C112", 2)], 0.5, "+5V", B)
-# --- OPA_OUT -> TP103 -> Raux; Cint to FB
+via(XO, p5o[1], "+5V"); track([p5o, (XO, p5o[1])], 0.6, "+5V")       # +5V via between pins 4 and 5
+c1122 = pad("C112", 2)
+track([(XO, p5o[1]), (XO + c1122[1] - p5o[1], c1122[1]), c1122], 0.5, "+5V", B)
+# --- OPA_OUT: pin 1 straight up into Raux pad 1, TP103 beside it, right to Cint
 r121 = pad("R121", 1)
-track([p1o, (p1o[0], r121[1] + 0.5), (p1o[0] + 0.5, r121[1]), r121], W_SIG, "OPA_OUT")
-track([("TP103", 1), ("C106", 1)], W_SIG, "OPA_OUT")
-# --- FB node: pin 4 -> FB line (y = Y_FB) -> Cint; Rofs / Rf2 / Rf1 via on the line
-c106 = pad("C106", 2)
-track([p4o, (p4o[0], Y_FB)], 0.25, "FB")
-track([("R120", 2), (c106[0] - 0.4, Y_FB), (c106[0], Y_FB - 0.4), c106], W_SIG, "FB")
-track([("R119", 1), (pad("R119", 1)[0], Y_FB)], W_SIG, "FB")
-track([("R120", 1), ("RV101", 1)], 0.3, "RF2_MID")
-for n_ in (2, 3):
-    x, y = pad("RV101", n_)
-    if n_ == 2:
-        gvia(x + 1.5, y); track([("RV101", 2), (x + 1.5, y)], W_GND, "GND")
-    else:
-        gvia(x, y + 1.4); track([("RV101", 3), (x, y + 1.4)], W_GND, "GND")
-# --- VOFS straight down into J2 pin 6, supplies into the header
-track([("R119", 2), ("J2", 6)], W_SIG, "VOFS")
-c116 = pad("C116", 1)                               # J2 -5V/+5V pins are THT into the In2 planes
-via(c116[0], c116[1] - 1.1, "-5V"); track([("C116", 1), (c116[0], c116[1] - 1.1)], 0.6, "-5V")
-gvia(pad("C116", 2)[0] + 0.9, YJ); track([("C116", 2), (pad("C116", 2)[0] + 0.9, YJ)], 0.6, "GND")
-c115 = pad("C115", 1)
-via(c115[0], c115[1] + 1.0, "+5V"); track([("C115", 1), (c115[0], c115[1] + 1.0)], 0.6, "+5V")
-c1152 = pad("C115", 2); j31 = pad("J3", 1)
-track([("C115", 2), (j31[0] - 0.8, c1152[1]), (j31[0] - 0.5, j31[1]), j31], 0.6, "GND")
-# --- relay coil: VBUS (J2-1) -> B.Cu -> via -> R103 39R -> pin 1; pin 12 -> TERM_50 (J2-2) on B.Cu
-j21, j22 = pad("J2", 1), pad("J2", 2)
-r103 = pad("R103", 1)
-xvb = r103[0] - 0.85
-via(xvb, r103[1], "VBUS"); track([("R103", 1), (xvb, r103[1])], 0.5, "VBUS")
-track([j21, (xvb, j21[1] - (j21[0] - xvb)), (xvb, r103[1])], 0.4, "VBUS", B)
-k1, k12 = pad("K101", 1), pad("K101", 12)
-r1032 = pad("R103", 2)
-track([("R103", 2), (r1032[0], k1[1] - (r1032[0] - k1[0])), k1], 0.5, "COIL_P")
-track([j22, (j22[0], k12[1] + (j22[0] - k12[0])), k12], 0.4, "TERM_50", B)
+track([p1o, r121], W_SIG, "OPA_OUT")
+tp3 = pad("TP103", 1)
+track([tp3, (r121[0], tp3[1] + r121[0] - tp3[0]), r121], W_SIG, "OPA_OUT")
+c106 = pad("C106", 1)
+track([p1o, (c106[0] - (c106[1] - p1o[1]), p1o[1]), c106], W_SIG, "OPA_OUT")
+# --- FB node: pin 4 -> FB line (y = Y_FB) -> Rf2 pad 1 <- Cint drop (FB via) ; Rofs pad 1 on the line
+track([p4o, (p4o[0], Y_FB - 0.4), (p4o[0] + 0.4, Y_FB), ("R120", 1)], W_SIG, "FB")
+track([("C106", 2), (X_CI, Y_FBB)], 0.25, "FB"); track([(X_CI, Y_FBB), (X_CI, Y_FB)], 0.25, "FB")
+rv1 = pad("RV101", 1); r1202 = pad("R120", 2)
+track([r1202, (r1202[0] + rv1[1] - r1202[1], rv1[1]), rv1], 0.3, "RF2_MID")
+x, y = pad("RV101", 3); gvia(x + 1.5, y); track([("RV101", 3), (x + 1.5, y)], W_GND, "GND")
+x, y = pad("RV101", 2); gvia(x, y + 1.5); track([("RV101", 2), (x, y + 1.5)], W_GND, "GND")
+# --- VOFS into J2 pin 4; bulk caps on B.Cu straight into the J2 supply pins
+r1192, j24 = pad("R119", 2), pad("J2", 4)
+track([r1192, (r1192[0] - (j24[1] - r1192[1]), j24[1]), j24], W_SIG, "VOFS")
+track([("C116", 2), ("J2", 1)], 0.6, "-5V", B)
+c1152, j22 = pad("C115", 2), pad("J2", 2)
+track([c1152, (c1152[0], j22[1] - (c1152[0] - j22[0]) - 0.3), (j22[0], j22[1] - 0.3), j22], 0.6, "+5V", B)
 
 # ============================================================================= zones
 outline = rect(0, 0, W, H)
@@ -512,42 +497,39 @@ for a, b in zip(outline, outline[1:] + outline[:1]):
 I1, I2 = pcbnew.In1_Cu, pcbnew.In2_Cu
 # RF keep-outs on F.Cu (ground pour stays >= G_RF from every RF trace edge)
 g = W50 / 2 + G_RF
-keepout(X_TAPER - 0.05, Y0 - g, pad("C101", 1)[0], Y0 + g)
+keepout(X_TAPER - 0.05, Y0 - g, pad("C101", 2)[0], Y0 + g)
 keepout(XU + 1.0, Y0 - g, W, Y0 + g)
-keepout(xt - g, yt0, xt + g, H)
+keepout(xt - g, yt0, W, Y_T + g)
 # SMA launch: In1 cut out under the 1.27 mm centre pad; In2 is a GND island there (reference L3);
 # F.Cu pour 0.25 mm beside the pad -> CPWG over L3 (see table)
 keepout(0, Y0 - 0.9, X_PAD_END, Y0 + 0.9, (I1,))
-# 0603 termination pads at the VIN line: In1 + In2 cut out under the line-side pad (reference -> L4)
-for ref, n_ in (("R101", 2), ("R102", 1)):
-    x, y = pad(ref, n_)
-    keepout(x - 0.5, y - 0.47, x + 0.5, y + 0.47, (I1, I2))
 # low-capacitance cut-out: Ctop pad 2, GA, Cbot pad 1, Rg, BUF_IN, R105 pad 1, U101 pin 2 region
 CUT_HZ = (pad("C101", 2)[0] - 0.3, Y0 - 0.45, XU - 1.1, Y0 + 1.1)
 keepout(*CUT_HZ, (F, I1, I2, B))
 zone([I1], "GND", outline, clearance=0.2)
 zone([F], "GND", outline, clearance=0.25, priority=0)
 zone([B], "GND", outline, clearance=0.25, priority=0)
-# In2: +5V / -5V split (pads of U101/U102 decoupling vias decide the shape), GND island under the SMA
-zone([I2], "GND", rect(0, Y0 - 3.6, 4.7, Y0 + 3.6), clearance=0.25, priority=2)
-MINUS5 = [(12.5, Y0 + 0.3), (W, Y0 + 0.3), (W, H), (9.2, H), (9.2, 17.3), (11.7, 17.3), (11.7, 16.4),
-          (15.6, 16.4), (15.6, 11.0), (12.5, 11.0)]
+# In2: GND island under the SMA; -5V band below the HF row (U101 bottom, U102 V-) with a tongue down the
+# left edge to J2 pin 1; +5V everywhere else (top band, right-edge corridor, bottom band)
+zone([I2], "GND", rect(0, Y0 - 4.0, 4.7, Y0 + 4.0), clearance=0.25, priority=2)
+X_M5 = X_P11 + 0.85
+MINUS5 = [(0, Y0 + 0.3), (X_M5, Y0 + 0.3), (X_M5, YO + 0.5), (1.75, YO + 0.5), (1.75, H), (0, H)]
 zone([I2], "-5V", MINUS5, clearance=0.25, priority=1)
 zone([I2], "+5V", outline, clearance=0.25, priority=0)
 
 # ============================================================================= silkscreen / fab
-text("SIG_IN", 0.4, 1.0, 0.6, just=-1)
+text("SIG_IN", 0.25, Y0 + 4.45, 0.4, just=-1)
 text("S>", W - 0.1, Y0 - 0.6, 0.35, just=1)
-text("T", xt + 0.55, H - 0.6, 0.35, just=-1)
+text("T>", W - 0.1, Y_T + 0.6, 0.35, just=1)
 for i, n in enumerate(J2N):
     text(n, X_J2 + 1.27 * i, YJ - 0.85, 0.3)
 for i, n in enumerate(("GND", "-2V5", "+2V5")):
-    text(n, 11.8 + 1.27 * i, 2.0, 0.3)
-text("K101 HFD3 on B side", 8.3, Y0 - 1.5, 0.35)
-text("JLC04161H-7628: L1 | 7628 0.2104 er4.4 | L2 GND | core 1.065 | L3 +5V/-5V | 7628 0.2104 | L4 GND",
-     0.3, H + 0.8, 0.45, pcbnew.F_Fab, just=-1)
-text("50R microstrip w=%.2f mm (mask): Z0 %.1f R, eps_eff %.2f, %.2f ps/mm; pour gap %.2f mm" %
-     (W50, Z50, EE50, PS_MM, G_RF), 0.3, H + 1.5, 0.45, pcbnew.F_Fab, just=-1)
+    text(n, XU - 8.5 + 1.27 * i, 2.0, 0.3)
+for i, s_ in enumerate(("JLC04161H-7628, 1.6 mm: L1 | 7628 0.2104 er 4.4 |",
+                        "L2 GND | core 1.065 | L3 +5V/-5V | 7628 | L4 GND",
+                        "50R microstrip w=%.2f mm (mask): Z0 %.1f R," % (W50, Z50),
+                        "eps_eff %.2f, %.2f ps/mm, pour gap %.2f mm" % (EE50, PS_MM, G_RF))):
+    text(s_, 0.1, H + 0.6 + 0.55 * i, 0.35, pcbnew.F_Fab, just=-1)
 
 # ============================================================================= tables
 print("Stack-up JLC04161H-7628: L1-L2 7628 prepreg %.4f mm er %.1f, Cu %.3f mm, mask er %.1f %.0f/%.0f um"
@@ -575,31 +557,47 @@ for net, segs in RF.items():
                                                           ToMM(t.GetLength()) * PS_MM))
 print("necks < 1 mm: U101 OUT pad 0.25 mm wide, 0.41 mm from pad centre to pad end (line 0.36 mm starts on it)")
 print("\nexcess pad capacitance (parallel plate over In1, %.3f pF/mm^2, pad area minus line area):" % C_PAD_PER_MM2)
+
+
+def pad_rect(ref, n):
+    x, y = pad(ref, n)
+    for p in FPS[ref].Pads():
+        if p.GetNumber() == str(n):
+            bb = p.GetBoundingBox()
+            return ToMM(bb.GetLeft()), ToMM(bb.GetTop()), ToMM(bb.GetRight()), ToMM(bb.GetBottom())
+
+
+def overlap(a, b):
+    return max(0, min(a[2], b[2]) - max(a[0], b[0])) * max(0, min(a[3], b[3]) - max(a[1], b[1]))
+
+
+r114, c1011 = pad_rect("R114", 1), pad_rect("C101", 1)
+a114 = (r114[2] - r114[0]) * (r114[3] - r114[1]) - overlap(r114, c1011)
 pads_x = [("SMA centre pad (In1 cut, CPWG over L3)", 0.0),
-          ("R101/R102 0603 tap pads (In1+In2 cut, ref L4)", 2 * EPS0 * ER_PP * 0.9 * 0.95 / (H_L3 + 0.21)),
-          ("R114 0402 tap pad on VIN", C_PAD_PER_MM2 * 0.54 * 0.64),
-          ("C101 0402 pad 1 in line", C_PAD_PER_MM2 * (0.54 * 0.64 - 0.54 * W50)),
+          ("C101 0402 pad 1 (line end)", C_PAD_PER_MM2 * (0.54 * 0.64 - 0.27 * W50)),
+          ("R114 0402 pad bridged onto C101 pad 1", C_PAD_PER_MM2 * a114),
           ("R112 + R118 0402 tap pads on BUF_OUT_S", 2 * C_PAD_PER_MM2 * 0.54 * 0.64),
           ("R113 0402 pad 2 at BUF_OUT_T start", C_PAD_PER_MM2 * (0.54 * 0.64 - 0.54 * W50))]
 for n_, c_ in pads_x:
     print("  %-48s %.3f pF" % (n_, c_))
 print("\nlength-defined elements:\n%-44s %9s %9s %9s %9s" % ("element", "int. mm", "int. ps", "act. mm", "act. ps"))
-vin_term = XC - X_PAD_END
-rows = [("VIN: SMA pad end -> termination taps", 6.0, vin_term),
-        ("VIN: termination -> Ctop pad 1 (stub)", 0.0, pad("C101", 1)[0] - XC),
-        ("BUF_OUT_S: OUT pin -> edge (10R <= 3 mm)", 1.5, tlen(RF["BUF_OUT_S"][0][0])),
+L_STUB = c1011[0] - X_PAD_END                    # SMA pad end -> first divider part (Ctop pad 1 edge)
+rows = [("VIN: SMA pad end -> Ctop pad 1 edge (stub)", 5.0, L_STUB),
+        ("VIN: SMA pad end -> Ctop pad 1 centre", 5.0, pad("C101", 1)[0] - X_PAD_END),
+        ("BUF_IN: Rg pad 2 -> U101 pin 2 (0.15 mm)", float("nan"), p2[0] - pad("R104", 2)[0]),
+        ("BUF_OUT_S: OUT pin -> edge (10R <= 3 mm)", 3.0, tlen(RF["BUF_OUT_S"][0][0])),
         ("BUF_OUT_S: OUT pin -> R112 tap", 0.0, x_sp - p11[0]),
-        ("BUF_OUT_T: 0R -> bottom edge (< 30 mm)", float("nan"), tlen(RF["BUF_OUT_T"][0][0]))]
+        ("BUF_OUT_T: 0R -> right edge (< 30 mm)", float("nan"), tlen(RF["BUF_OUT_T"][0][0]))]
 for name, imm, amm in rows:
     print("%-44s %9.2f %9.1f %9.2f %9.1f" % (name, imm, imm * PS_MM, amm, amm * PS_MM))
-stub = math.dist(pad("R101", 2), (XC, Y0)) + math.dist(pad("R101", 2), pad("R101", 1)) + math.dist(pad("R101", 1), pad("K101", 4))
-print("termination stub VIN -> 100R -> K101 COM pin centre: %.2f mm per pole" % stub)
+print("1 Mohm input stub: %.2f mm = %.1f ps one way (%.1f ps round trip) from SMA pad end to Ctop; outline %.2f x %.2f mm"
+      % (L_STUB, L_STUB * PS_MM, 2 * L_STUB * PS_MM, W, H))
 
 # ============================================================================= checks
 probs = 0
-# intended overlaps: 0603 taps straddling the 0.36 mm VIN line; pad-to-pad bridges into SOT/test pads
-OK_PAIRS = [{"R101", "R102"}, {"U102", "R117"}, {"U102", "C105"}, {"TP103", "C106"}, {"TP103", "R121"},
-            {"TP101", "J3"}, {"C115", "J3"}]          # header courtyard only; bodies >= 0.3 mm apart
+# intended overlaps: R114 pad bridged onto Ctop pad 1; pad-to-pad bridges into SOT/test pads
+OK_PAIRS = [{"C101", "R114"}, {"U102", "R117"}, {"U102", "C105"}, {"TP103", "R121"},
+            {"TP101", "J3"}]          # pad-to-pad bridges; header courtyard only; bodies >= 0.13 mm apart
 print("courtyard overlaps accepted by design:", ", ".join("/".join(sorted(p)) for p in OK_PAIRS))
 fl = list(FPS.values())
 for f in fl:
