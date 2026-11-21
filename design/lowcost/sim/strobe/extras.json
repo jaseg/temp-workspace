@@ -1,0 +1,9 @@
+{
+ "S_STROBE 3.125 MHz, 50 % duty, choke 2.2 uH": 3.4725605609153174,
+ "S_STROBE 3.125 MHz, 50 % duty, choke 47 uH": 4.3047816025714285,
+ "S_STROBE 3.125 MHz, 1/64 duty, choke 47 uH": 2.3961753816082543,
+ "PH_STROBE 50 MHz, 50 % duty, choke 2.2 uH": 4.416071883896826,
+ "PH_STROBE 50 MHz, 1/20 duty, choke 2.2 uH": 3.0148118003595235,
+ "phase_pulse_peak": 2.15216757,
+ "phase_pulse_fwhm_ps": 187.99999999999997
+}

@@ -1,0 +1,32 @@
+[
+ {
+  "case": "Cin 3 pF, nominal",
+  "rms_ps": 19.878761987133174,
+  "usable": 1.0
+ },
+ {
+  "case": "Cin 6 pF, nominal",
+  "rms_ps": 28.092006370722213,
+  "usable": 0.996875
+ },
+ {
+  "case": "Cin 3 pF, offsets 6.5 mV rms (all at max)",
+  "rms_ps": 24.36668246639062,
+  "usable": 0.984375
+ },
+ {
+  "case": "Cin 6 pF, offsets 6.5 mV rms",
+  "rms_ps": 39.314104922332355,
+  "usable": 0.93125
+ },
+ {
+  "case": "Cin 3 pF, edge 300 ps",
+  "rms_ps": 21.098541530351543,
+  "usable": 1.0
+ },
+ {
+  "case": "Cin 3 pF, amplitude -30 % vs calibration",
+  "rms_ps": 25.003231358913855,
+  "usable": 1.0
+ }
+]
