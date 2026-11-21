@@ -14,7 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board"
 W, H = 24.5, 22.0                 # main rectangle
 SX, SY = 29.6, 7.4                # strip for J501 (x W..SX, y 0..SY)
-W50, WS = bl.W50, 0.2
+W50, WS = bl.W50, 0.15
 blk = bl.Block("fpga")
 NL = blk.nl
 REFS = sorted(r for r, c in NL.comps.items() if c["sheet"] == "/fpga_clock/") + ["R407", "R411"]
@@ -51,16 +51,16 @@ bplace("C503", 2.6, 6.3, 0, "B")     # 10u +1V2
 bplace("C507", 1.6, 3.0, 90, "B")     # 10u +3V3
 # PH strobe series resistors (B, next to the pin vias), J501 UART resistors (B, under the plug body)
 for ref, net in (("R411", "Net-(C422-Pad1)"), ("R407", "Net-(C412-Pad1)")):
-    fp = bplace(ref, 0.55 if ref == "R411" else 1.45, 12.6, 90, "B")
+    fp = bplace(ref, 0.5 if ref == "R411" else 1.45, 12.6, 90, "B")
     if blk.pad(ref, "@" + net)[1] < 12.6:
         fp.SetOrientationDegrees(fp.GetOrientationDegrees() + 180)
 bplace("R511", 23.05, 6.4, 90, "B")
 bplace("R512", 20.5, 6.4, 90, "B")
 # configuration resistors (B, bottom-left)
 for i, ref in enumerate(["R506", "R505", "R504", "R503", "R502", "R501"]):
-    bplace(ref, 2.4 + 0.76 * i, 18.2 + (1.45 if i % 2 else 0.0), 90, "B")
+    bplace(ref, 2.45 + 0.95 * i, 18.2 + (1.45 if i % 2 else 0.0), 90, "B")
 bplace("JP501", 3.6, 15.3, 0, "B")
-bplace("R507", 8.1, 20.9, 0, "B")
+bplace("R507", 8.7, 20.9, 0, "B")
 
 # fix 2-pad orientation: pad 1 on top for the vertical parts where the netlist side matters is left to the router
 
@@ -177,7 +177,7 @@ def free_maps(code, w):
         occ = (own[li] != -1) & (own[li] != code)
         d = ndimage.distance_transform_edt(~occ) * G
         dists.append(d)
-        ok = (d >= w / 2 + CLR + 0.005) & inside
+        ok = (d >= w / 2 + CLR + 0.015) & inside
         # keep w/2 + 0.05 from the block outline (iface stubs end on it)
         ok &= ndimage.distance_transform_edt(inside) * G >= w / 2 + 0.05 - 1e-9
         out.append(ok)
@@ -239,6 +239,11 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
                     tgt[li].add(c)
                     tax[(li,) + c] = {2}
                     tcen[(li,) + c] = (i * G, H)
+                elif side == "EM":                 # E edge of the main rectangle (x = W): a0..a1 are y
+                    c = (int(round((W - w / 2 - 0.05) / G - 1e-6)), i)
+                    tgt[li].add(c)
+                    tax[(li,) + c] = {0}
+                    tcen[(li,) + c] = (W, i * G)
                 else:                              # E edge of the strip: a0..a1 are y
                     c = (NX - 1 - int(round((w / 2 + 0.05) / G - 1e-6)), i)
                     tgt[li].add(c)
@@ -348,6 +353,8 @@ def route(net, src, dst, w=WS, via_cost=1.0, layer_pref=None, iface=None):
                     pts.append(gc)
             elif dst[0][1] == "S":
                 pts.append((pts[-1][0], H))
+            elif dst[0][1] == "EM":
+                pts.append((W, pts[-1][1]))
             else:
                 pts.append((SX, pts[-1][1]))
         # compress collinear
@@ -416,6 +423,13 @@ def tie(ref, num, net=None, d=0.7):
 IFACE_NOTES = {}
 
 
+def to_east(net, src, y0=11.0, y1=21.5, w=WS, note=""):
+    y = route(net, src, [("EDGE", "EM", "B.Cu", y0, y1)], w)
+    if y is not None:
+        blk.iface(net, W, y, "B.Cu", "E", "slow", w, note)
+    return y
+
+
 def to_edge(net, src, x0, x1, w=WS, note=""):
     x = route(net, src, [("EDGE", "S", "B.Cu", x0, x1)], w)
     if x is not None:
@@ -452,7 +466,7 @@ TAPX = {i: 8.3 + 0.62 * i for i in range(16)}
 TAPPIN = {NL.net_of("U501", p): p for p in [str(k) for k in list(range(9, 12)) + list(range(13, 25)) + [27]]}
 for i in range(16):
     net = f"/TAP{i}"
-    job("tap%d" % i, lambda net=net, i=i: to_edge(net, ("U501", TAPPIN[net]), TAPX[i] - 0.2, TAPX[i] + 0.2,
+    job("tap%d" % i, lambda net=net, i=i: to_edge(net, ("U501", TAPPIN[net]), 8.5, 23.5,
                                                     note=f"U501.{TAPPIN[net]}"))
 job("clk0", lambda: route("Net-(U502-CLK0)", ("U502", "10"), [("R508", "@Net-(U502-CLK0)")]))
 job("clk1", lambda: route("Net-(U502-CLK1)", ("U502", "9"), [("R509", "@Net-(U502-CLK1)")]))
@@ -484,16 +498,16 @@ job("done", lambda: to_edge("/FPGA_DONE", ("R502", "@FPGA_DONE"), 1.8, 8.0, note
 job("reconf", lambda: to_edge("/FPGA_RECONFIG", ("R501", "@FPGA_RECONFIG"), 1.8, 8.0, note="R501 4.7k pull-up; MCU open-drain"))
 job("adct", lambda: to_edge("/ADC_TRIG", ("U501", "41"), 1.8, 8.0, note="U501.41 -> STM32 PB11"))
 for pin in ("28", "29", "30", "31"):
-    job("spi" + pin, lambda pin=pin: to_edge(NL.net_of("U501", pin), ("U501", pin), 17.9, 24.3, note=f"U501.{pin}"))
-job("mclk", lambda: to_edge("/MCU_CLK", ("R509", "@MCU_CLK"), 17.9, 24.3, note="MS5351M CLK1 via 33 R -> STM32 PF0"))
-job("scl", lambda: to_edge("/I2C_SCL", ("U502", "4"), 17.9, 24.3, note="MS5351M (pull-ups in mcuif)"))
-job("sda", lambda: to_edge("/I2C_SDA", ("U502", "5"), 17.9, 24.3, note="MS5351M"))
+    job("spi" + pin, lambda pin=pin: to_east(NL.net_of("U501", pin), ("U501", pin), note=f"U501.{pin}"))
+job("mclk", lambda: to_east("/MCU_CLK", ("R509", "@MCU_CLK"), note="MS5351M CLK1 via 33 R -> STM32 PF0"))
+job("scl", lambda: to_east("/I2C_SCL", ("U502", "4"), note="MS5351M (pull-ups in mcuif)"))
+job("sda", lambda: to_east("/I2C_SDA", ("U502", "5"), note="MS5351M"))
 job("j2", lambda: route("Net-(J501-Pin_2)", ("J501", "2"), [("R511", "@Net-(J501-Pin_2)")]))
 job("j4", lambda: route("Net-(J501-Pin_4)", ("J501", "4"), [("R512", "@Net-(J501-Pin_4)")]))
-job("hrx", lambda: to_edge("/HOST_RX", ("R511", "@HOST_RX"), 17.9, 24.3, note="J501.2 via R511 100 R -> STM32 PA10"))
-job("htx", lambda: to_edge("/HOST_TX", ("R512", "@HOST_TX"), 17.9, 24.3, note="J501.4 via R512 100 R <- STM32 PA9"))
+job("hrx", lambda: to_east("/HOST_RX", ("R511", "@HOST_RX"), note="J501.2 via R511 100 R -> STM32 PA10"))
+job("htx", lambda: to_east("/HOST_TX", ("R512", "@HOST_TX"), note="J501.4 via R512 100 R <- STM32 PA9"))
 for jp in ("8", "10", "12", "14"):
-    job("j" + jp, lambda jp=jp: to_edge(NL.net_of("J501", jp), ("J501", jp), 17.9, 24.3, note=f"J501.{jp} -> STM32"))
+    job("j" + jp, lambda jp=jp: to_east(NL.net_of("J501", jp), ("J501", jp), note=f"J501.{jp} -> STM32"))
 
 
 def vbus():
@@ -518,3 +532,37 @@ json.dump([n for n in PRIO] + [n for n in FAILJ if n not in PRIO], open(os.path.
 blk.zone("GND", ["In1.Cu"], [(0, 0), (SX, 0), (SX, SY), (W, SY), (W, H), (0, H)], 0.2)
 blk.iface("+3V3", 0, 0, "In2.Cu", "-", "supply", None, "via pairs at the caps; J501.3 THT on the In2 +3V3 region")
 blk.iface("+1V2", 0, 0, "In2.Cu", "-", "supply", None, "vias at U501.12 / .37 and C501-C503: In2 +1V2 island under U501")
+blk.edge_rect(0, 0, W, H, "Dwgs.User")
+blk.save(HERE)
+path = os.path.join(HERE, "fpga.kicad_pcb")
+res = bl.check_board(path, refs=REFS, rf_widths=RF)
+for k in ("clearance", "corner"):
+    for e in res["details"][k][:15]:
+        print("   ", k, e)
+
+
+def courtyard_overlaps(pcb):
+    """local helper: pairwise courtyard intersection per side (area > 0.005 mm2)"""
+    b = pcbnew.LoadBoard(pcb)
+    fps = list(b.GetFootprints())
+    for f in fps:
+        f.BuildCourtyardCaches()
+    hits = []
+    for lay in (pcbnew.F_CrtYd, pcbnew.B_CrtYd):
+        polys = [(f.GetReference(), f.GetCourtyard(lay)) for f in fps]
+        polys = [(r, p) for r, p in polys if p.OutlineCount()]
+        for i in range(len(polys)):
+            for j in range(i + 1, len(polys)):
+                a = pcbnew.SHAPE_POLY_SET(polys[i][1])
+                a.BooleanIntersection(polys[j][1], pcbnew.SHAPE_POLY_SET.PM_FAST)
+                ar = a.Area() / 1e12
+                if ar > 0.005:
+                    hits.append((polys[i][0], polys[j][0], pcbnew.LayerName(lay), round(ar, 3)))
+    return hits
+
+
+CY_HITS = courtyard_overlaps(path)
+print("courtyard overlaps:", len(CY_HITS), CY_HITS)
+if "--render" in sys.argv:
+    bl.render(path, os.path.join(HERE, "fpga.png"), layers=("F.Cu", "B.Cu", "F.SilkS", "F.Fab", "Dwgs.User"), tmpdir=SCR)
+    bl.render(path, os.path.join(HERE, "fpga_detail.png"), layers=("F.Cu", "B.Cu", "F.Fab"), crop=(104, 106, 116, 118), tmpdir=SCR)

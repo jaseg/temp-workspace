@@ -1,0 +1,5 @@
+{
+ "block": "power",
+ "origin": "local (0, 0) = pcbnew (100.0, 100.0)",
+ "ifaces": []
+}
