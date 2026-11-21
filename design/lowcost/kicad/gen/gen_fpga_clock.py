@@ -1,6 +1,6 @@
 """fpga_clock.kicad_sch: GW1NZ-LV1QN48C6/I5 FPGA, MS5351M clock generator with 25 MHz crystal, JTAG,
 configuration straps, decoupling, programming header J501 (Würth WR-WST 490107671612, yanartas sensing
-board J3 pinout: FPGA JTAG + DBG2 and the MCU SWD/UART/NRST/DBG1 nets, which continue to mcu_if J701).
+board J3 pinout: FPGA JTAG + DBG2 and the MCU SWD/UART/NRST/DBG1 nets, which continue to the STM32G474 on mcu_if).
 
 Pinout source: Gowin UG842-1.6.8E "GW1NZ-1 Pinout" (pin list, QN48 column) and UG843-1.8.7E figure 3-6
 (QN48 top view): Bank0 = pins 3-8, 35, 38-48; Bank1 = pins 9-11, 13-24, 27-34; VCC 12, 37; VCCIO0 1;
@@ -131,7 +131,7 @@ def main():
     # programming header J501: Würth WR-WST 490107671612 (2x08 Redfit IDC direct-to-board, footprint only),
     # same part and pinout as the yanartas sensing board J3 (odd pins left, even pins right):
     #  1 VBUS (5 V)  2 HOST_RX (100 R)  3 +3V3  4 HOST_TX (100 R)  5 DBG2 (FPGA pin 6)  6 GND
-    #  7 TCK  8 UC_SWDIO  9 TMS  10 UC_SWCLK  11 TDI  12 DBG1  13 TDO  14 UC_NRST (100 nF)  15 GND  16 GND
+    #  7 TCK  8 UC_SWDIO  9 TMS  10 UC_SWCLK  11 TDI  12 DBG1  13 TDO  14 UC_NRST  15 GND  16 GND
     j = sh.add("Connector_Generic:Conn_02x08_Odd_Even", "J501", "WR-WST 490107671612", (g(280), g(130)),
                fp="scope-fe:Würth_WR-WST_debug_490107671612_2x08_P2.54mm_Vertical", lcsc="NA",
                mpn="Würth 490107671612",
@@ -157,12 +157,10 @@ def main():
         sh.hlabel(net, (xl, p[1]), dict(MCU_DBG_FPGA)[net])
     for pin, net in (("8", "UC_SWDIO"), ("10", "UC_SWCLK"), ("12", "DBG1"), ("14", "UC_NRST")):
         sh.stub(j, pin, net, length=g(20), kind="hlabel", shape=dict(MCU_DBG_FPGA)[net])
-    cn = C(sh, "100n", (j["14"][0] + g(16), j["14"][1] + 3.81), ref="C511")
-    sh.gnd(cn["2"])
     sh.text("J501 programming header: Würth WR-WST 490107671612 (Redfit IDC, footprint only),\n"
             "pinout of the yanartas sensing board J3. FPGA JTAG (TCK/TMS/TDI/TDO, DBG2 = FPGA pin 6)\n"
-            "and the STM32 SWD / UART / NRST / DBG1, which go on to the MCU header J701 pins 27-32.\n"
-            "HOST_RX/HOST_TX named as seen from the host (debug adapter): HOST_RX = MCU UART TX.\n"
+            "and the STM32G474 SWD / UART / NRST / DBG1 (mcu_if; NRST 100 nF at the MCU).\n"
+            "HOST_RX/HOST_TX named as on the sensing board (MCU = host): HOST_RX = MCU RX (PA10).\n"
             "1 VBUS 2 HOST_RX 3 +3V3 4 HOST_TX 5 DBG2 6 GND 7 TCK 8 SWDIO\n"
             "9 TMS 10 SWCLK 11 TDI 12 DBG1 13 TDO 14 NRST 15 GND 16 GND", (g(255), g(150)), size=1.0)
 

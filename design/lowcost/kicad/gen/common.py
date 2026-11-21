@@ -7,12 +7,13 @@ from schlib import Sheet, g  # noqa: F401
 
 # sheet name -> (title, ref_base, page, left pins [(net, shape)], right pins)
 TAPS = [f"TAP{i}" for i in range(16)]
-# MCU debug / console nets of the programming header J501 (fpga_clock; yanartas sensing board J3 pinout) to the
-# MCU header J701 pins 27-32 (mcu_if). HOST_RX / HOST_TX are named as seen from the host (debug adapter):
-# HOST_RX = MCU UART TX, HOST_TX = MCU UART RX.
+# MCU debug / console nets between the programming header J501 (fpga_clock; yanartas sensing board J3 pinout)
+# and the STM32G474 (mcu_if). HOST_RX / HOST_TX follow the sensing board, where the MCU is the host:
+# HOST_RX = MCU UART RX (J501 pin 2 via 100R), HOST_TX = MCU UART TX (J501 pin 4 via 100R).
+# (net, shape on fpga_clock, shape on mcu_if)
 MCU_DBG = [("UC_SWDIO", "bidirectional", "bidirectional"), ("UC_SWCLK", "output", "input"),
            ("UC_NRST", "bidirectional", "bidirectional"), ("DBG1", "bidirectional", "bidirectional"),
-           ("HOST_RX", "input", "output"), ("HOST_TX", "output", "input")]
+           ("HOST_RX", "output", "input"), ("HOST_TX", "input", "output")]
 MCU_DBG_FPGA = [(n, a) for n, a, _b in MCU_DBG]      # shapes as seen from fpga_clock
 MCU_DBG_MCU = [(n, b) for n, _a, b in MCU_DBG]       # shapes as seen from mcu_if
 SHEETS = {
@@ -42,12 +43,13 @@ SHEETS = {
                    [("PH_STROBE_P", "output"), ("PH_STROBE_N", "output"), ("S_STROBE_P", "output"),
                     ("S_STROBE_N", "output"), None, ("ADC_TRIG", "output"), ("MCU_CLK", "output"), None]
                    + MCU_DBG_FPGA),
-    "power": ("Power: USB-C 5 V in, +3V3, +1V2, +5V, -5V, +2V5, -2V5", 600, 7, [], []),
-    "mcu_if": ("MCU interface: STM32G474 header, DAC scaling", 700, 8,
+    "power": ("Power: USB-C 5 V in, +3V3, +1V2, +5V, -5V, +2V5, -2V5", 600, 7, [],
+              [("USB_DP", "bidirectional"), ("USB_DM", "bidirectional")]),
+    "mcu_if": ("MCU: STM32G474CBT6, DAC scaling", 700, 8,
                [("ADC_IN", "input"), ("ADC_TRIG", "input"), ("MCU_CLK", "input"), ("FPGA_DONE", "input"),
                 ("SPI_MISO", "input"), None, ("SPI_SCK", "output"), ("SPI_MOSI", "output"), ("SPI_CS", "output"),
                 ("FPGA_RECONFIG", "output"), ("I2C_SCL", "output"), ("I2C_SDA", "bidirectional"), None]
-               + MCU_DBG_MCU,
+               + MCU_DBG_MCU + [None, ("USB_DP", "bidirectional"), ("USB_DM", "bidirectional")],
                [("ADC_REF_MID", "output"), ("VOFS", "output"), ("TRIG_LEVEL", "output"), ("TRIG_SEL", "output"),
                 ("VBIAS_A", "output"), ("VBIAS_K", "output"), ("VTAP_P", "output"), ("VTAP_N", "output"),
                 ("VTAP_TH", "output")]),

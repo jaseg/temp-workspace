@@ -30,6 +30,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LOWCOST = os.path.normpath(os.path.join(HERE, "..", ".."))
 NETLIST = os.path.join(LOWCOST, "kicad", "export", "scope-fe.net")
 FPLIB = "/usr/share/kicad/footprints"
+# footprint search path: library nickname -> directory holding <nickname>.pretty. "scope-fe" is the project
+# library written by kicad/gen/gen_footprints.py (kicad/lib/scope-fe.pretty, also in kicad/fp-lib-table).
+FP_PATHS = {"scope-fe": os.path.join(LOWCOST, "kicad", "lib")}
 SVG2PNG = os.path.join(LOWCOST, "kicad", "gen", "svg2png.js")
 ORG = (100.0, 100.0)
 mm = pcbnew.FromMM
@@ -386,9 +389,10 @@ def load_footprint(board, fpid):
         fp = FP_CUSTOM[fpid](board)
     else:
         lib, name = fpid.split(":", 1)
-        fp = pcbnew.FootprintLoad(os.path.join(FPLIB, lib + ".pretty"), name)
+        base = FP_PATHS.get(lib, FPLIB)
+        fp = pcbnew.FootprintLoad(os.path.join(base, lib + ".pretty"), name)
         if fp is None:
-            raise KeyError(f"footprint {fpid} not found in {FPLIB}")
+            raise KeyError(f"footprint {fpid} not found in {base}")
     lib, name = fpid.split(":", 1)
     fp.SetFPID(pcbnew.LIB_ID(lib, name))
     return fp
@@ -1104,7 +1108,8 @@ def render(pcb_path, out_png, layers=("F.Cu", "F.SilkS", "F.Fab", "Edge.Cuts"), 
 def selftest():
     nl = netlist()
     miss = [f for f in sorted({c["footprint"] for c in nl.comps.values() if c["footprint"]})
-            if f not in FP_CUSTOM and not os.path.exists(os.path.join(FPLIB, f.split(":")[0] + ".pretty",
+            if f not in FP_CUSTOM and not os.path.exists(os.path.join(FP_PATHS.get(f.split(":")[0], FPLIB),
+                                                                      f.split(":")[0] + ".pretty",
                                                                       f.split(":")[1] + ".kicad_mod"))]
     print(f"netlist: {len(nl.comps)} components, {len(nl.nets)} nets, {len(nl.pads)} pad nodes; "
           f"footprints not found: {miss or 'none'}")

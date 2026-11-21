@@ -5,8 +5,8 @@ LCSC come from the symbol fields, prices from the PRICE table below (USD, qty 1 
 
 Price sources (21 Nov 2026): lcsc.com product pages read in this session ("LCSC"), docs/research/prices.md
 (LCSC / DigiKey / Mouser via Octopart), docs/research/opamps.md, kicad/README.md. "est" = estimate (typical
-LCSC price for the class or an out-of-stock listing), not a quote. Not counted: MCU (user's STM32G474 board),
-PCB, assembly. PCB-only items (test pads, net ties, solder jumper, TLINE stubs) and the footprint-only programming
+LCSC price for the class or an out-of-stock listing), not a quote. Not counted: PCB, assembly. The STM32G474CBT6
+is on the board since 21 Nov 2026 and counted. PCB-only items (test pads, net ties, solder jumper, TLINE stubs) and the footprint-only programming
 header J501 (Würth WR-WST 490107671612, no part fitted) are listed at 0 and not counted as fitted parts.
 Usage: python3 gen_bom.py  (after gen_all.py)"""
 import csv, os, re, sys
@@ -43,7 +43,6 @@ PRICE = {
     "LM337": (0.4359, "LCSC C19267471 (XBLW LM337S)", "ok", 1, "check SOT-223 pinout vs TI"),
     "MT3608": (0.0639, "LCSC C84817", "ok", 1, ""),
     "DLW21SN900HQ2L": (0.1479, "LCSC C97855 (5+)", "ok", 5, ""),
-    "USB-C 5V": (0.0653, "LCSC C2927039 (10+)", "ok", 10, ""),
     "25MHz": (0.0946, "LCSC C9006 (5+)", "ok", 5, ""),
     "SS14 / B5819W": (0.0254, "LCSC C8598", "ok", 20, ""),
     "SMAJ5.0A": (0.0338, "LCSC C353442", "ok", 20, ""),
@@ -53,7 +52,11 @@ PRICE = {
     "4.7uH 2A": (0.10, ES, "est", 5, "SRN4018-class, LCSC # to assign"),
     # programming header J501: plated holes only, the WR-WST cable connector plugs into the board (no part)
     "WR-WST 490107671612": (0.0, FOOT, "n/a", 0, "footprint only (Würth Redfit IDC, yanartas J3 pinout), no part"),
-    "MCU 2x16": (0.18, ES, "est", 5, "2x16 2.54 mm male header, LCSC # to assign"),
+    "STM32G474CBT6": (4.11, "LCSC C730123 (search snapshot)", "ok", 1,
+                      "2.64-4.11 at 1 pc in LCSC listings, ~3-5k in stock; CET6 C730125 11.27, 704 in stock"),
+    "USBLC6-2SC6": (0.10, ES, "est", 5, "LCSC C7519 from memory, price not re-checked"),
+    "green": (0.02, ES, "est", 20, "0603 green LED, LCSC # to assign"),
+    "USB-C 16P": (0.20, ES, "est", 5, "HRO TYPE-C-31-M-12, LCSC C165948 from memory, price not re-checked"),
     "SIG_IN": (1.99, "LCSC C5356059 CON-SMA-EDGE-S", "est", 1, "0 in stock; Samtec/TE branded 4.47 (prices.md)"),
     "EXT_CLK": (1.99, "LCSC C5356059 CON-SMA-EDGE-S", "est", 1, "as SIG_IN"),
     "50k": (1.50, ES, "est", 1, "Bourns 3314J trimmer, distributor price not checked"),
@@ -184,10 +187,10 @@ def write_md(rows, total, first, est, nparts):
         f"| **Parts total, 1 board** | **{total:.2f}** |",
         f"| of which estimates (`est`) | {est:.2f} |",
         f"| R/C passives (included) | {sums.get('R/C passives', 0):.2f} |",
-        "| Budget (SPEC, MCU and PCB excluded) | 80.00 |",
+        "| Budget (SPEC, MCU included, PCB excluded) | 80.00 |",
         f"| **Margin** | **{80 - total:.2f}** ({(80 - total) / 80 * 100:.0f} %) |",
         f"| First order incl. minimum order quantities (passives 20-100 pcs, ICs 5 pcs) | {first:.2f} |", "",
-        "Not included: STM32G474 board (user's), PCB (4-layer JLC04161H-7628, impedance control), assembly, "
+        "Not included: PCB (4-layer JLC04161H-7628, impedance control), assembly, "
         "shipping, USB-C supply.", "",
         "## Ten most expensive lines", "",
         "| Line USD | Qty | Part | Source | Status |", "|---|---|---|---|---|"]

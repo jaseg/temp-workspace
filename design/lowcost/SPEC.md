@@ -83,3 +83,6 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
    pour clearance large enough (>= 2 x trace width, or the coplanar effect included in the calculation).
    Layer 2 solid ground, 0402 passives (0201 where a simulation asks for it), SMA edge-launch connectors.
 10. No switchable termination (user decision): external feed-through terminator.
+11. Programming header: Würth WR-WST 490107671612 with the yanartas sensing board J3 pinout (J501, footprint only).
+12. STM32G474 on board (user decision, 21 Nov 2026): STM32G474CBT6 LQFP-48 (U704) replaces the MCU header J701; USB FS
+    on the USB-C receptacle, SWD/UART on J501. The 80 USD budget now includes the MCU. Pin plan: `kicad/README.md`.

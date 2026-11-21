@@ -1,7 +1,8 @@
 # Low-cost sampling front end: theory of operation
 
 Equivalent-time sampling front end for 2 GHz / 3 Gbps signals, built around a 4-diode sampling bridge, a 16-tap
-delay-line phase detector and a small FPGA. The user's STM32G474 board supplies the ADC, the DACs and the calibration.
+delay-line phase detector and a small FPGA. An on-board STM32G474CBT6 supplies the ADC, the DACs and the calibration
+(it replaced the earlier header to a user STM32 board on 21 Nov 2026).
 Every number in this document is a simulation result or a design value; no board has been built. Sources: `../SPEC.md`
 (Decisions section), `../sim/*/RESULT.md`, `../kicad/README.md`, `bom.md`, `../layout/*/README.md`,
 `../../../docs/research/`.
@@ -30,7 +31,7 @@ EXT_CLK SMA ─┴────────────────────�
                                                                        │ 2.2 k / 2x 1 k readout
                                                 VTAP_TH (DAC) ─► 8x COS3502 ─► TAP[15:0]
    MS5351M ─ FPGA_CLK ─► GW1NZ-1 FPGA: PH_STROBE 50 MHz, S_STROBE 3.125 MHz, latch TAP, ADC_TRIG, SPI
-           └ MCU_CLK ──► STM32G474 (user board): ADC, 5 DACs, I2C, firmware, calibration
+           └ MCU_CLK ──► STM32G474CBT6 (on board): ADC, 5 DACs, I2C, USB FS, firmware, calibration
 ```
 
 The sampler takes one sample per S_STROBE (3.125 MHz). The phase path measures, on every 50 MHz phase strobe, where a
@@ -52,8 +53,8 @@ Key figures (simulated, behavioural amplifier models; see section 9):
 | Sample rate | 3.125 MS/s (S_STROBE = PH_STROBE / 16) |
 | Phase detector | 16 taps, 34.7 +/- 3.1 ps spacing (31-44 ps), window 58-579 ps; 19 ps rms per snapshot (22 ps with 6.5 mV comparator offsets) |
 | Trigger | down to 200 mVpp at the tip (+/-20 mV at the comparator); TRIG_LEVEL +/-0.30 V at the comparator |
-| Power | USB-C 5 V, about 0.85 A |
-| Parts cost | 60.02 USD per board (MCU and PCB excluded), 5.84 USD of it estimates |
+| Power | USB-C 5 V, about 0.9 A |
+| Parts cost | 64.31 USD per board (MCU included, PCB excluded), 6.04 USD of it estimates |
 
 ## 2. Input stage
 
@@ -214,14 +215,19 @@ The MS5351M (Si5351A-compatible, 25 MHz crystal, I2C from the MCU) supplies FPGA
 | Dither | - | pseudo-random coarse offset in 1 ns bits per strobe plus a slow IODELAY sweep; both known, the sweep calibrated by code density |
 | TAP[15:0] | 9-11, 13-24, 27 | latched at phase strobe + 12 ns |
 | COARSE | 47 (GCLKT_0) | IDES at 1 Gbps, 1 ns bins |
-| ADC_TRIG | 41 -> EXTI11 | strobe + 40 ns (sampling window 40-148 ns, must end before the falling edge at +160 ns) |
+| ADC_TRIG | 41 -> PB11 (EXTI11) | strobe + 40 ns (sampling window 40-148 ns, must end before the falling edge at +160 ns) |
 | SPI slave | 28-31 | per-strobe records with sequence numbers to the MCU |
+
+**Programming header J501** (Würth WR-WST 490107671612, Redfit IDC direct-to-board footprint, no part fitted) has
+the yanartas sensing board J3 pinout: 1 VBUS, 3 +3V3, 6/15/16 GND, FPGA JTAG on 7/9/11/13 (TCK/TMS/TDI/TDO), DBG2 on 5
+(FPGA pin 6), and for the STM32 SWDIO 8, SWCLK 10, NRST 14, DBG1 12 (PB9) and the USART1 console on 2 (HOST_RX = MCU RX,
+PA10) and 4 (HOST_TX = MCU TX, PA9), each through 100 R. One cable debugs both chips.
 
 The ratio 16 sets the sample rate below the G474 ADC limit (4 MS/s) while keeping the phase strobe at the 50 MHz the
 COS3502 and the readout allow. Snapshot reduction, coarse/fine combination and the tracking loop run in the FPGA
 fabric (1152 LUT; the fit is not checked).
 
-**MCU (STM32G474, user's board).** ADC12_IN1 on PA0, 6.5-cycle sampling (108 ns) at 60 MHz with the synchronous ADC
+**MCU (STM32G474CBT6, LQFP-48, on board, U704).** ADC12_IN1 on PA0, 6.5-cycle sampling (108 ns) at 60 MHz with the synchronous ADC
 clock, VREFBUF 2.9 V, triggered by ADC_TRIG; DMA into SRAM. Five DAC outputs, scaled by TP2272 difference amplifiers
 on +/-2.5 V around VMID = VREF+/2:
 
@@ -233,7 +239,9 @@ on +/-2.5 V around VMID = VREF+/2:
 | PA2 OPAMP1 (DAC3_CH1) | VBIAS_A = -1.0 V + 0.5 (Vdac - VMID) | -0.4 ... -1.6 V |
 | PB1 OPAMP3 (DAC3_CH2) | VBIAS_K = +1.0 V + 0.5 (Vdac - VMID) | +0.4 ... +1.6 V |
 
-GPIOs drive TRIG_SEL, read FPGA_DONE and pull FPGA_RECONFIG; header pin 17 is a spare (NC). The MCU pairs ADC results
+GPIOs drive TRIG_SEL (PB6), read FPGA_DONE (PB0) and pull FPGA_RECONFIG (PB2); SPI1 master on PB3/PB4/PB5 with CS on
+PB10, I2C1 on PA15/PB7, MCU_CLK into PF0 (HSE bypass), ADC_TRIG into PB11 (EXTI11, ADC12 external trigger), USB FS on
+PA11/PA12 to the USB-C receptacle (USBLC6-2SC6 ESD). The MCU pairs ADC results
 with FPGA records by count, applies the efficiency correction and all calibration tables, and builds the
 equivalent-time record. ADC_REF_MID (0.725 V) is VREF+ / 4 by divider.
 
@@ -341,7 +349,7 @@ Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and layout fragments:
 ![Root sheet](../kicad/export/scope-fe.png) ![Input](../kicad/export/scope-fe-input.png)
 ![Sampler](../kicad/export/scope-fe-sampler.png) ![Strobe](../kicad/export/scope-fe-strobe.png)
 ![Trigger and phase](../kicad/export/scope-fe-trigger_phase.png) ![FPGA and clock](../kicad/export/scope-fe-fpga_clock.png)
-![Power](../kicad/export/scope-fe-power.png) ![MCU interface](../kicad/export/scope-fe-mcu_if.png)
+![Power](../kicad/export/scope-fe-power.png) ![MCU](../kicad/export/scope-fe-mcu_if.png)
 ![Input stage layout](../layout/input_stage/input_stage.png) ![Input stage layout detail](../layout/input_stage/input_stage_detail.png)
 ![Sampler layout](../layout/sampler/sampler.png) ![Sampler layout detail](../layout/sampler/sampler_detail.png)
 ![Phase trigger layout](../layout/phase_trigger/phase_trigger.png) ![Phase trigger layout detail](../layout/phase_trigger/phase_trigger_detail.png)
@@ -350,8 +358,9 @@ Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and layout fragments:
 
 1. **Power, no RF parts powered**: check every rail, ripple, the -2V5 noise and the TMUX136 ramp; total current
    against 0.85 A.
-2. **Clock and FPGA**: MS5351M over I2C, FPGA configuration (DONE), JTAG; check FPGA_CLK and MCU_CLK.
-3. **MCU interface**: all five DAC outputs over their range; confirm VBIAS_A negative and VBIAS_K positive before any
+2. **Clock, MCU and FPGA**: flash the STM32 over SWD (or USB DFU / USART1 with JP701 closed), MS5351M over I2C, FPGA
+   configuration (DONE), JTAG; check FPGA_CLK and MCU_CLK.
+3. **DAC stages**: all five DAC outputs over their range; confirm VBIAS_A negative and VBIAS_K positive before any
    strobe runs.
 4. **Strobe chains**: S_STROBE and PH_STROBE patterns; measure step, edge and stub pulse of one chain each (risk 1);
    check the reverse pulse with the clamp.

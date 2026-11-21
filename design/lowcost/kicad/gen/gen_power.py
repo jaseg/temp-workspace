@@ -53,13 +53,18 @@ def main():
                                       "Prices: see README (LCSC single-piece, partly unverified)."])
     FB = ("Device:FerriteBead_Small", "FB", FP["FB0805"])
     # --- USB-C input
-    j = sh.add("Connector:USB_C_Receptacle_PowerOnly_6P", "J", "USB-C 5V",
-               (g(25), g(40)), fp="Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal",
-               lcsc="C2927039", fields={"Note": "any 6P power-only USB-C; source must allow ~1 A (see README)"})
-    ns(sh, j, "A9", "VBUS_IN")
+    j = sh.add("Connector:USB_C_Receptacle_USB2.0_16P", "J", "USB-C 16P",
+               (g(25), g(40)), fp="Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
+               lcsc="C165948", mpn="HRO TYPE-C-31-M-12",
+               fields={"Note": "USB 2.0 receptacle (data for the STM32G474 USB FS); source must allow ~1 A"})
+    ns(sh, j, "A4", "VBUS_IN")
+    for pin, net in (("A6", "USB_DP"), ("B6", "USB_DP"), ("A7", "USB_DM"), ("B7", "USB_DM")):
+        ns(sh, j, pin, net, length=g(6))                 # both plug orientations tied by the labels
+    sh.nc(j["A8"])
+    sh.nc(j["B8"])
     ns(sh, j, "A5", "CC1")
     ns(sh, j, "B5", "CC2")
-    ns(sh, j, "A12", "GND")
+    ns(sh, j, "A1", "GND")
     ns(sh, j, "S1", "GND")
     two(sh, "R", "5.1k", (g(50), g(52)), "CC1", "GND")
     two(sh, "R", "5.1k", (g(56), g(52)), "CC2", "GND")
@@ -70,7 +75,17 @@ def main():
     two(sh, FB, "220R@100MHz 2A", (g(80), g(34)), "VBUS_F", "VBUS", rot=270, lcsc="C85840")
     caps(sh, g(90), g(40), "VBUS", ["22u", "100n"])
     sh.text("USB-C sink, 5.1k CC pull-downs (default USB power).\n"
-            "Total VBUS load ~0.85 A: use a 5 V / >=1.5 A USB-C supply.", (g(20), g(62)))
+            "Total VBUS load ~0.9 A: use a 5 V / >=1.5 A USB-C supply.\n"
+            "D+/D- (both orientations) -> USBLC6-2SC6 ESD -> USB_DP/DM to the STM32G474 (mcu_if).", (g(15), g(68)))
+    esd = sh.add("Power_Protection:USBLC6-2SC6", "U608", "USBLC6-2SC6", (g(106), g(56)),
+                 fp="Package_TO_SOT_SMD:SOT-23-6", lcsc="C7519",
+                 fields={"Note": "optional USB ESD array (pins 1/6 and 3/4 flow-through); may be left unfitted"})
+    ns(sh, esd, "1", "USB_DP")
+    ns(sh, esd, "3", "USB_DM")
+    sh.stub(esd, "6", "USB_DP", length=g(3), kind="hlabel", shape="bidirectional")
+    sh.stub(esd, "4", "USB_DM", length=g(3), kind="hlabel", shape="bidirectional")
+    ns(sh, esd, "5", "VBUS")
+    ns(sh, esd, "2", "GND")
 
     # --- +3V3 and +1V2
     u = sh.add("Regulator_Linear:AMS1117-3.3", "U", "AMS1117-3.3", (g(30), g(90)),
