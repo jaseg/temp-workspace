@@ -610,7 +610,7 @@ JOIN_MAX = 25.0
 STAIRCASE = (0.0, 20.5, 56.0, 23.5)      # board mm: L6 COARSE / TAP staircase band, no joins there
 BRANCH_W = 0.8
 BRANCH_MAX = 6.0
-BRANCH_CLR = 0.27         # branch track to foreign via / copper
+BRANCH_CLR = 0.4          # branch track to foreign via / copper
 FPGA_RECT = (56.0, 0.5, 74.0, 22.5)
 PRIO_L3 = 3
 ROUTE_CORRIDORS = False   # corridors as hand-drawn ZONES (they flow around foreign vias)
@@ -1264,7 +1264,7 @@ class Maze:
         RES = MAZE_RES
         try:
             G = self.G
-            m = MAZE_CLR + MAZE_RES / 2
+            m = MAZE_CLR + MAZE_RES / 2 + 0.15     # + chamfer / diagonal-segment allowance
             c3, c6, cv = self.static.copy(), self.static.copy(), self.static.copy()
             rv = VIA_D / 2
             for key, kind, geom, r, n in self.items:
@@ -1349,7 +1349,7 @@ class Maze:
         finally:
             RES = old
 
-    def route(self, net, src, dst, w, cores, force=False, src_cells=(), dst_cells=()):
+    def route(self, net, src, dst, w, cores, force=False, src_cells=(), dst_cells=(), via_cells=()):
         """src / dst: lists of (x, y, layers) with layers a subset of {0: L3, 1: L6}. Returns list of runs
         [(layer, [(x, y), ...])] and via points, or None."""
         global RES
@@ -1389,6 +1389,11 @@ class Maze:
                     prev[c] = -1
                     heapq.heappush(h, (0.0, c))
             tg = set(c for c in dst_cells if fl[0][c])
+            for c in via_cells:                     # end on either layer where a via down to L4 fits
+                if fvl[c]:
+                    for L in (0, 1):
+                        if fl[L][c]:
+                            tg.add(L * N + c)
             for (x, y, lays) in dst:
                 for c in cells(x, y):
                     for L in lays:
@@ -1512,7 +1517,7 @@ def smooth45(line):
             out.append(p)
     if len(out) < 3:
         return out
-    return bl.chamfer(out, 0.3)
+    return bl.chamfer(out, 0.2)
 
 
 def selfcheck(board):
@@ -1567,6 +1572,85 @@ def selfcheck(board):
                     if min(ang, 90 - ang) > 1.0:
                         axis.append((n, round(e[0] - 100, 2), round(e[1] - 100, 2)))
     return dict(clearance=clr, corners=corner, pad_axis=axis)
+
+
+EDGE_STRIP = (0.3, 2.3)    # board y of the L4 edge strip (top edge); +3V3 plane stays one piece below it
+
+
+def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
+    """Last resort for a rail the L3 / L6 maze cannot join: a strip of that rail on In3.Cu (L4) along the top
+    board edge (zone, priority above the +3V3 plane), reached from both sides by maze routes ending in a via."""
+    ox, oy = _org(board)
+    names = [nets[r] for r in ISLANDS if r in nets]
+    left = []
+    for net, items, why in still:
+        comps = net_components(board, [net]).get(net, [])
+        real = [c for c in comps if any(d[0] != "zone" for d in c)]
+        if len(real) < 2:
+            continue
+        main, comp = real[0], real[1]
+        xs = [d[2] for d in comp if d[0] != "zone"]
+        xa = sum(xs) / len(xs)
+        cand = [(d[2], d[3]) for d in main if d[0] == "via"]
+        for d in main:
+            if d[0] == "zone":
+                bbx = d[6].BBox()
+                cand.append((bbx.GetX() / MM, bbx.GetY() / MM))
+                cand.append((bbx.GetRight() / MM, bbx.GetY() / MM))
+        xb = min(cand, key=lambda p: abs(p[0] - xa) + 3 * (p[1] - oy))[0]
+        x0, x1 = min(xa, xb) - 1.5, max(xa, xb) + 1.5
+        y0, y1 = oy + EDGE_STRIP[0], oy + EDGE_STRIP[1]
+        shp = polyset([(x0 + 0.5, y0), (x1 - 0.5, y0), (x1, y0 + 0.5), (x1, y1 - 0.5), (x1 - 0.5, y1),
+                       (x0 + 0.5, y1), (x0, y1 - 0.5), (x0, y0 + 0.5)])
+        new_zone(board, net, shp, PRIO_ISLAND, f"L4_edge_{net}", LAYER)
+        occ.append(dict(net=net, kind="L4_edge_strip", layer="In3.Cu", pts=[(round(x0 - ox, 2), round(y0 - oy, 2)),
+                                                                            (round(x1 - ox, 2), round(y1 - oy, 2))]))
+        M = Maze(board)
+        cores = M.masks(net)
+        old = globals()["RES"]
+        globals()["RES"] = MAZE_RES
+        sm = M.G.empty()
+        sm |= (M.G.X > x0 + 0.8) & (M.G.X < x1 - 0.8) & (M.G.Y > y0 + 0.6) & (M.G.Y < y1 - 0.6)
+        globals()["RES"] = old
+        vc = np.flatnonzero(sm.ravel()).tolist()
+        ok = True
+        for c_ in (comp, main):
+            src = [(d[2], d[3], (0, 1)) for d in c_ if d[0] == "via"]
+            res = None
+            for w in MAZE_WIDTHS:
+                res = M.route(net, src, [], w, cores, False, M.comp_cells(c_), (), vc)
+                if res:
+                    break
+            if not res:
+                ok = False
+                break
+            runs, vias = res
+            st = stats[net]
+            for L, line in runs:
+                if len(line) >= 2:
+                    line = smooth45(line)
+                    layer = L3 if L == 0 else pcbnew.B_Cu
+                    _add_track(board, net, line, w, layer)
+                    M.add_track(net, line, w, layer)
+                    _ADDED.append((net, layer, line, w))
+                    st["length"] += sum(math.hypot(q[0] - p[0], q[1] - p[1]) for p, q in zip(line[:-1], line[1:]))
+                    (occ if L == 0 else l6occ).append(dict(net=net, kind="maze", layer="In2.Cu" if L == 0 else "B.Cu",
+                                                           width=w, pts=[(round(x - ox, 3), round(y - oy, 3))
+                                                                         for x, y in line]))
+            end = runs[-1][1][-1]
+            for (x, y) in vias + [end]:
+                _add_via(board, net, x, y)
+                M.add_via(net, x, y)
+                _MAZE_VIAS.setdefault(net, set()).add((round(x, 3), round(y, 3)))
+                l6occ.append(dict(net=net, kind="maze_via", layer="all", dia=VIA_D, pts=[(round(x - ox, 3), round(y - oy, 3))]))
+            st["vias"] += len(vias) + 1
+            st["wmin"] = w if st["wmin"] is None else min(st["wmin"], w)
+        report.setdefault("edge_strips", []).append((net, round(x0 - ox, 1), round(x1 - ox, 1), ok))
+        if not ok:
+            left.append((net, items, "edge strip: no route to the strip"))
+    board.BuildConnectivity()
+    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+    return left
 
 
 def maze_connect(board, nets, report, l6occ, occ, rounds=8):
@@ -1649,6 +1733,8 @@ def maze_connect(board, nets, report, l6occ, occ, rounds=8):
         pcbnew.ZONE_FILLER(board).Fill(board.Zones())
         if not progress:
             break
+    if still:
+        still = edge_strip_fallback(board, nets, report, l6occ, occ, stats, still)
     report["maze"] = stats
     report["stranded"] = still
 
@@ -2011,6 +2097,7 @@ def main(argv):
     print("+3V3 vias added (power-block F.Cu polygon without via):", rep.get("3v3_vias"))
     print("still stranded:", rep.get("stranded"))
     print("maze rounds (components per net):", rep.get("maze_rounds"))
+    print("L4 edge strips:", rep.get("edge_strips"))
     comps = net_components(board, [BACKGROUND] + [rail_nets(board)[r] for r in ISLANDS if r in rail_nets(board)])
     for n, cl in comps.items():
         if len(cl) > 1:
