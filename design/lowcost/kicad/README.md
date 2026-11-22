@@ -83,7 +83,7 @@ recommended land pattern EP 4.3 x 4.3 mm -> footprint `QFN-48-1EP_6x6mm_P0.4mm_E
   TAP0..4 9,10,11,13,14 -> 28,29,30,31,32; TAP5 15 -> 41; TAP6 16 -> 47; TAP7 17 -> 6; TAP8..10 18,19,20 -> 9,10,11;
   TAP11..15 21,22,23,24,27 -> 13,14,15,16,17; COARSE 47 -> 27 (GCLKT_3); ADC_TRIG 41 -> 18; DBG2 6 -> 8;
   SPI SCK/MISO/MOSI/CS 28/30/29/31 -> 20/21/22/24 (plain user I/O after internal-flash boot).
-  22 Nov, second step (board integration): TAP8..15 reversed on 9,10,11,13,14,15,16,17 (now TAP15..TAP8), PH_STROBE_P / _N
+  22 Nov, second step (board integration): TAP8..15 re-permuted on 9,10,11,13,14,15,16,17 = TAP9, TAP8, TAP15, TAP14, TAP13, TAP12, TAP11, TAP10, PH_STROBE_P / _N
   swapped 40/39 -> 39/40.
   Unchanged: strobes 38/35, FPGA_CLK 33, CLK2 34, DONE 46, RECONFIG 48, READY 45, JTAGSEL 44, MODE 43/42,
   JTAG 3/4/5/7. All moved nets stay on 3.3 V user I/O (both banks at 3.3 V).

@@ -81,9 +81,10 @@ for ref, x, y in (("R502", 1.2, 0.75), ("R503", 1.2, 1.75), ("R504", 1.2, 2.75),
 
 # ---------------- edge slots (S edge, L6), TOPOLOGY.md section 1, west to east, 0.5 mm pitch
 ORDER = (["/COARSE"] + [f"/TAP{i}" for i in range(8)] +
-         [C(n) for n in ("DBG2", "JTAG_TCK", "JTAG_TMS", "JTAG_TDI", "JTAG_TDO", "MCU_CLK", "SPI_CS", "I2C_SDA",
+         [C(n) for n in ("DBG2", "JTAG_TCK", "JTAG_TMS", "JTAG_TDI", "JTAG_TDO")] + ["/TAP9", "/TAP8"] +
+         [C(n) for n in ("MCU_CLK", "SPI_CS", "I2C_SDA",
                          "FPGA_DONE", "SPI_MOSI", "SPI_MISO", "SPI_SCK", "I2C_SCL", "FPGA_RECONFIG", "ADC_TRIG")] +
-         [f"/TAP{i}" for i in range(15, 7, -1)])          # east group reversed (TAP8 eastmost), 22 Nov
+         [f"/TAP{i}" for i in range(15, 9, -1)])     # 22 Nov: board drop order (TOPOLOGY.md section 7)          # east group reversed (TAP8 eastmost), 22 Nov
 SLOT = {n: round(2.0 + 0.5 * k, 3) for k, n in enumerate(ORDER)}
 YE = 21.2                                            # via row of the L1-routed nets near the edge (staggered)
 
@@ -203,9 +204,16 @@ for pin, xl in L3X.items():
 
 # ---------------- DONE / RECONFIG: L1 west, down the west side (DONE outer x 2.0, RECONFIG x 2.4), east to their slots
 p46, p48 = up(46), up(48)
-YD, YR = 18.5, 18.1
-T("/FPGA_DONE", WS, [p46, (2.0, p46[1]), (2.0, YD), (SLOT["/FPGA_DONE"], YD)], ch=0.3)
-T("/FPGA_RECONFIG", WS, [p48, (2.4, p48[1]), (2.4, YR), (SLOT["/FPGA_RECONFIG"], YR)], ch=0.3)
+# 22 Nov: DONE / RECONFIG run east on L3 (static config lines) so the TAP9 / TAP8 L1 escapes can cross them:
+# DONE from its configuration-column via (pin 46, already on L3 for the pull-up), RECONFIG from a via on its L1 run
+# just west of pin 48 (east of the L6 west bundle); both south on L3 and east under the escapes to their slots
+YD, YR = 18.7, 18.3
+p48 = up(48)
+T("/FPGA_RECONFIG", WS, [p48, (2.4, p48[1]), (2.4, 14.3)], ch=0.3)
+V(4.85, p48[1], "/FPGA_RECONFIG")
+xd, yd = COLV[46]
+T("/FPGA_DONE", WS, [(xd, yd), (xd, YD), (SLOT["/FPGA_DONE"], YD)], "In2.Cu", ch=0.3)
+T("/FPGA_RECONFIG", WS, [(4.85, p48[1]), (4.85, YR), (SLOT["/FPGA_RECONFIG"], YR)], "In2.Cu", ch=0.3)
 for net, y in (("/FPGA_DONE", YD), ("/FPGA_RECONFIG", YR)):
     V(SLOT[net], y, net)
     T(net, WS, [(SLOT[net], y), (SLOT[net], H)], "B.Cu")
@@ -231,14 +239,14 @@ for pin, net, yr in ((6, "/TAP7", 17.2), (8, C("DBG2"), 17.6)):
     edge(net, f"U501.{pin}")
 
 # ---------------- TAP8..10 (bottom pins 9..11) and TAP11..15 (east pins 13..17): L1, via at YE, L6 stub
-for pin, net, yr in ((9, "/TAP15", 16.9), (10, "/TAP14", 16.6), (11, "/TAP13", 16.3)):
+for pin, net, yr in ((9, "/TAP9", 18.0), (10, "/TAP8", 18.4), (11, "/TAP15", 16.3)):
     p = up(pin)
     s = SLOT[net]
     T(net, WS, [p, (p[0], yr), (s, yr), (s, ye(net))], ch=0.3)
     V(s, ye(net), net)
     T(net, WS, [(s, ye(net)), (s, H)], "B.Cu")
     edge(net, f"U501.{pin}")
-for pin, net in ((13, "/TAP12"), (14, "/TAP11"), (15, "/TAP10"), (16, "/TAP9"), (17, "/TAP8")):
+for pin, net in ((13, "/TAP14"), (14, "/TAP13"), (15, "/TAP12"), (16, "/TAP11"), (17, "/TAP10")):
     p = up(pin)
     s = SLOT[net]
     T(net, WS, [p, (s, p[1]), (s, ye(net))], ch=0.3)
