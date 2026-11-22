@@ -77,15 +77,19 @@ recommended land pattern EP 4.3 x 4.3 mm -> footprint `QFN-48-1EP_6x6mm_P0.4mm_E
 - **No true LVDS on GW1NZ-1** (LVDS column NONE for every pin; DS841: "GW1NZ-1 only supports ELVDS
   output", which needs VCCIO 2.5 V and resistor networks). Strobes are therefore complementary LVCMOS33
   on True/Comp pairs: PH_STROBE_P/N = 40/39 (IOT16A/B), S_STROBE_P/N = 38/35 (IOT17A/B). No LVDS input
-  either: COARSE comes from the SN65LVDS2 on trigger_phase, into pin 47 (IOT10A/GCLKT_0).
-- FPGA_CLK (MS5351M CLK0) -> 33 (IOR5A/GCLKT_2/RPLL_T_in). CLK2 -> 34 (spare clock).
-- TAP0..15 -> 9, 10, 11, 13-24, 27 (Bank1; may be permuted for routing). SPI slave SCK/MOSI/MISO/CS ->
-  28/29/30/31 (dual-purpose MSPI/SSPI config pins, free after internal-flash boot). ADC_TRIG -> 41.
+  either: COARSE comes from the SN65LVDS2 on trigger_phase, into pin 27 (IOR7A/GCLKT_3; was 47 GCLKT_0).
+- FPGA_CLK (MS5351M CLK0) -> 33 (IOR5A/GCLKT_2/RPLL_T_in). CLK2 -> 24 (spare clock; was 34).
+- Pin permutation for the 6-layer fan-out (22 Nov 2026, layout/board/TOPOLOGY.md section 1; old -> new):
+  TAP0..5 9,10,11,13,14,15 -> 28,29,30,31,32,34; TAP6/7 16,17 -> 41,47; TAP8..11 18,19,20,21 -> 8,9,10,11;
+  TAP12..15 22,23,24,27 -> 13,14,15,16; COARSE 47 -> 27; ADC_TRIG 41 -> 17; SPI SCK/MISO/MOSI/CS 28/30/29/31 ->
+  19/20/21/23 (plain user I/O after internal-flash boot; the MSPI/SSPI pins 28-31 now carry TAPs); CLK2 34 -> 24.
+  Unchanged: strobes 40/39/38/35, FPGA_CLK 33, DONE 46, RECONFIG 48, READY 45, JTAGSEL 44, MODE 43/42, JTAG 3/4/5/7,
+  DBG2 6. All moved nets stay on 3.3 V user I/O (both banks at 3.3 V).
 - Config: RECONFIG_N 48, DONE 46, READY 45 (4.7k pull-ups; MCU reads FPGA_DONE, drives FPGA_RECONFIG
   open-drain), JTAGSEL_N 44 (4.7k pull-up + solder jumper to GND), MODE0 43 / MODE1 42 (4.7k to GND;
   MODE2 is internally grounded on QN48), JTAG TCK 3 (4.7k pull-down), TMS 4, TDI 5, TDO 7 on the programming
   header J501. DBG2 (debug I/O to J501 pin 5) on pin 6 (IOT9A/SCLK, Bank0, next to the JTAG pins; SCLK is only used
-  for SSPI configuration, not for the internal-flash autoboot). Unused: 8, 32 (NC flags).
+  for SSPI configuration, not for the internal-flash autoboot). Unused: 18, 22 (NC flags).
 
 ## Programming header J501 (yanartas sensing board J3: same part and pinout)
 
