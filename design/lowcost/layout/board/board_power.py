@@ -597,7 +597,7 @@ TRUNKS = {
     ],
     "VBUS": [  # band y 26.8 (south member) to the pstrobe choke column
         ([(88.0, 17.4), (88.0, 26.0), (87.2, 26.8), (23.6, 26.8), (22.78, 27.6), (22.78, 28.9),
-          (20.8, 30.9), (20.8, 44.5), (22.78, 46.48), (22.78, 48.3)], 1.5),
+          (20.8, 30.9), (20.8, 46.0), (22.78, 47.98), (22.78, 48.65)], 1.5),
     ],
 }
 # L6 (B.Cu) tracks: J501 pin 1 programmer supply (0.5 mm, TOPOLOGY.md section 8)
@@ -672,7 +672,8 @@ def remove_old(board, nets):
     import json
     import os
     segs, vpos = set(), set()
-    for fn in ("board_power_L6.json", "board_power_L3.json"):
+    for fn in ("board_power_L6.json", "board_power_L3.json", "board_power_L6_trunks.json",
+               "board_power_L3_trunks.json"):
         jp = os.path.join(os.path.dirname(os.path.abspath(__file__)), fn)
         if not os.path.exists(jp):
             continue
@@ -923,6 +924,9 @@ def _branches(board, nets, pts, corr_abs, report):
                 if o != rail:
                     for p, q in zip(line[:-1], line[1:]):
                         seg_mask(G, obst, p, q, BRANCH_W / 2 + 0.3 + hw)
+            bw = BRANCH_W_NET.get(rail, BRANCH_W)
+            if bw > BRANCH_W:
+                obst = dilate(obst, (bw - BRANCH_W) / 2)
             free = ~obst
             src = set(np.flatnonzero((cmask[rail] & free).ravel()).tolist())
             out[rail] = []
@@ -1574,6 +1578,10 @@ def selfcheck(board):
     return dict(clearance=clr, corners=corner, pad_axis=axis)
 
 
+TRUNK_RAILS = ["VBUS", "+5V", "-5V"]   # apply_trunks(): drawn before the slow bias lines
+EDGE_STRIP_NETS = ("VBUS", "+5V", "-5V")
+MAZE_WIDTHS_NET = {"VBUS": (1.5, 1.2, 1.0, 0.8)}   # VBUS ~220 mA: 0.8 only as a reported last resort
+BRANCH_W_NET = {"VBUS": 1.0}
 EDGE_STRIP_ONE = True     # one rail at most on the L4 top-edge strip
 EDGE_STRIP = (0.3, 2.3)    # board y of the L4 edge strip (top edge); +3V3 plane stays one piece below it
 
@@ -1586,7 +1594,7 @@ def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
     left = []
     done_nets = set()
     for net, items, why in still:
-        if net in done_nets or (done_nets and EDGE_STRIP_ONE):
+        if net in done_nets or (done_nets and EDGE_STRIP_ONE) or net not in EDGE_STRIP_NETS:
             left.append((net, items, why))
             continue
         done_nets.add(net)
@@ -1623,7 +1631,7 @@ def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
         for c_ in (comp, main):
             src = [(d[2], d[3], (0, 1)) for d in c_ if d[0] == "via"]
             res = None
-            for w in MAZE_WIDTHS:
+            for w in MAZE_WIDTHS_NET.get(net, MAZE_WIDTHS):
                 res = M.route(net, src, [], w, cores, False, M.comp_cells(c_), (), vc)
                 if res:
                     break
@@ -1661,12 +1669,14 @@ def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
     return left
 
 
-def maze_connect(board, nets, report, l6occ, occ, rounds=8):
+def maze_connect(board, nets, report, l6occ, occ, rounds=8, rails=None, strips=True):
     """Connect every stranded component of every rail to its main component with the L3 / L6 maze router."""
-    _MAZE_VIAS.clear()
     ox, oy = _org(board)
-    names = [nets[r] for r in ISLANDS if r in nets] + [n for n in STRIPS if board.FindNet(n) is not None]
-    stats = {n: dict(length=0.0, wmin=None, vias=0, routes=0) for n in names}
+    names = [nets[r] for r in (rails or ISLANDS) if r in nets] + \
+        ([n for n in STRIPS if board.FindNet(n) is not None] if strips else [])
+    stats = report.setdefault("maze", {})
+    for n in names:
+        stats.setdefault(n, dict(length=0.0, wmin=None, vias=0, routes=0))
     still = []
     for rnd in range(rounds):
         comps = net_components(board, names)
@@ -1702,7 +1712,7 @@ def maze_connect(board, nets, report, l6occ, occ, rounds=8):
                 dc = M.comp_cells(cl[0])
                 res = None
                 for force in (False, True):
-                    for w in MAZE_WIDTHS:
+                    for w in MAZE_WIDTHS_NET.get(net, MAZE_WIDTHS):
                         res = M.route(net, src, dst, w, cores, force, sc, dc)
                         if res:
                             break
@@ -1784,24 +1794,45 @@ def join_stranded(board, nets, report, l6occ):
     report["stranded"] = still
 
 
-def apply(board, json_path=None, png_path=None):
-    """L4 = one +3V3 plane; L3 = table-driven corridors + routed branches; VTAP tracks; L6 J501 feed.
-    Call on a freshly merged board, then fill all zones, then verify()."""
+def apply_trunks(board):
+    """Stage 1 (before the slow bias lines): VBUS, +5V, -5V trunks; writes board_power_reserved.json."""
+    return apply(board, stage="trunks")
+
+
+def apply_rest(board):
+    """Stage 2 (last, after all signal routing): +2V5, -2V5, +1V2, VTAP_P / VTAP_N, +3V3 plane fixes, leftovers."""
+    return apply(board, stage="rest")
+
+
+def apply(board, json_path=None, png_path=None, stage="all"):
+    """L4 = one +3V3 plane; L3 = table-driven corridors (zones) + routed branches; VTAP tracks; maze router
+    (L3 / L6) for whatever is left; L4 top-edge strip as the last resort for one trunk rail.
+    stage: "all" (both), "trunks" (VBUS / +5V / -5V only) or "rest". Fill the zones afterwards, then verify()."""
     import json
     import os
-    report = {}
+    report = _LAST if stage == "rest" and _LAST else {}
     nets = rail_nets(board)
     ox, oy = _org(board)
-    remove_old(board, nets)
+    here = os.path.dirname(os.path.abspath(__file__))
+    sel = TRUNK_RAILS if stage == "trunks" else [r for r in ISLANDS if r not in TRUNK_RAILS] if stage == "rest" \
+        else list(ISLANDS)
+    if stage != "rest":
+        remove_old(board, nets)
+        _ADDED.clear()
+        _MAZE_VIAS.clear()
+        report.pop("maze", None)
     replicate_keepouts(board, landing_points(board, nets), report)
     box = board_box(board)
-    bg = polyset([(box[0] + 0.3, box[1] + 0.3), (box[2] - 0.3, box[1] + 0.3), (box[2] - 0.3, box[3] - 0.3),
-                  (box[0] + 0.3, box[3] - 0.3)])
-    new_zone(board, nets[BACKGROUND], bg, PRIO_BG, "L4_+3V3")
+    if not any(str(z.GetZoneName()) == "L4_+3V3" for z in board.Zones()):
+        bg = polyset([(box[0] + 0.3, box[1] + 0.3), (box[2] - 0.3, box[1] + 0.3), (box[2] - 0.3, box[3] - 0.3),
+                      (box[0] + 0.3, box[3] - 0.3)])
+        new_zone(board, nets[BACKGROUND], bg, PRIO_BG, "L4_+3V3")
     occ = []
     # VTAP strips: keep existing L3 tracks of those nets if present, else draw them
     have = {t.GetNetname() for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetLayer() == L3}
-    if not all(n in have for n in STRIPS):
+    if stage == "trunks":
+        report["strip_problems"] = "(stage trunks)"
+    elif not all(n in have for n in STRIPS):
         strips, prob = strip_tracks(board, nets)
         report["strip_problems"] = prob
         for net, lines in strips.items():
@@ -1814,7 +1845,7 @@ def apply(board, json_path=None, png_path=None):
     else:
         report["strip_problems"] = "VTAP L3 tracks already on the board: kept"
     corr = {r: [([(x + ox, y + oy) for x, y in line], w) for line, w in lst]
-            for r, lst in TRUNKS.items() if r in nets}
+            for r, lst in TRUNKS.items() if r in nets and r in sel}
     if ROUTE_CORRIDORS:
         corr = route_corridors(board, nets, corr, report)
     pts = landing_points(board, nets)
@@ -1827,13 +1858,13 @@ def apply(board, json_path=None, png_path=None):
             occ.append(dict(net=nets[rail], kind="zone", layer="In2.Cu",
                             pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in poly_points(sub, 0)]))
     br = _branches(board, nets, pts, corr, report)
-    _ADDED.clear()
     for rail, lines in br.items():
         for line in lines:
             line = smooth45(line)
-            _add_track(board, nets[rail], line, BRANCH_W, L3)
-            _ADDED.append((nets[rail], L3, line, BRANCH_W))
-            occ.append(dict(net=nets[rail], kind="track", layer="In2.Cu", width=BRANCH_W,
+            bw = BRANCH_W_NET.get(rail, BRANCH_W)
+            _add_track(board, nets[rail], line, bw, L3)
+            _ADDED.append((nets[rail], L3, line, bw))
+            occ.append(dict(net=nets[rail], kind="track", layer="In2.Cu", width=bw,
                             pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in line]))
     l6occ = []
     for rail, lst in L6_TRACKS.items():
@@ -1852,16 +1883,35 @@ def apply(board, json_path=None, png_path=None):
                 _add_via(board, nets[rail], u + ox, v + oy)
             l6occ.append(dict(net=nets[rail], kind="via_array", layer="all", dia=VIA_D, pts=arr))
     report["hop_clearance"] = _check_hops(board)
-    fix_3v3_island(board, nets, report, l6occ)
+    if stage != "trunks":
+        fix_3v3_island(board, nets, report, l6occ)
     board.BuildConnectivity()
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
-    maze_connect(board, nets, report, l6occ, occ)
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L6.json"), "w") as f:
+    maze_connect(board, nets, report, l6occ, occ, rails=(sel if stage == "trunks" else None),
+                 strips=(stage != "trunks"))
+    if stage == "trunks":
+        res_items = []
+        for it in occ + l6occ:
+            res_items.append(it)
+        for z in board.Zones():
+            nm = str(z.GetZoneName())
+            if nm.startswith("L4_edge_") or (nm.startswith("L3_") and z.GetNetname() in [nets[r] for r in sel]):
+                o = z.Outline()
+                for i in range(o.OutlineCount()):
+                    res_items.append(dict(net=z.GetNetname(), kind="zone",
+                                          layer=board.GetLayerName(z.GetLayer()),
+                                          pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in poly_points(o, i)]))
+        with open(os.path.join(here, "board_power_reserved.json"), "w") as f:
+            json.dump(dict(note="copper reserved by board_power.apply_trunks (VBUS, +5V, -5V), board mm, per layer; "
+                           "the slow-line planner must keep >= 0.3 mm from it", items=res_items), f, indent=1)
+        report["reserved_json"] = os.path.join(here, "board_power_reserved.json")
+    l6name = "board_power_L6.json" if stage != "trunks" else "board_power_L6_trunks.json"
+    with open(os.path.join(here, l6name), "w") as f:
         json.dump(dict(note="B.Cu (L6) copper added by board_power.py, board mm", items=l6occ), f, indent=1)
     report["branches"] = {r: len(v) for r, v in br.items()}
     report["corr"] = corr
     report["l3"] = occ
-    jp = json_path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L3.json")
+    jp = json_path or os.path.join(here, "board_power_L3.json" if stage != "trunks" else "board_power_L3_trunks.json")
     with open(jp, "w") as f:
         json.dump(dict(note="L3 (In2.Cu) copper added by board_power.py, board mm (origin board top-left). "
                        "Keep slow lines >= 0.3 mm away (1.5 mm channel beside corridors).", items=occ), f, indent=1)
@@ -2036,6 +2086,12 @@ def verify(board):
             d["maze_len"] = round(ms.get("length", 0.0), 1)
             d["maze_w"] = ms.get("wmin")
             d["maze_vias"] = ms.get("vias", 0)
+            ws = [w for _, w in TRUNKS.get(rail, [])]
+            if _LAST.get("branches", {}).get(rail):
+                ws.append(BRANCH_W_NET.get(rail, BRANCH_W))
+            if ms.get("wmin"):
+                ws.append(ms["wmin"])
+            d["trunk_min_w"] = min(ws) if ws else None
             d["landing"] = len(pts.get(rail, []))
         res[rail] = d
     res["_pcbnew_total"] = unc["_pcbnew_total"]
@@ -2055,7 +2111,7 @@ def table(res):
         else:
             lines.append(f"{r:9s} {d['landing']:7d}  {d['corridors']:9d}  {str(d['width']):5s}  {d['branches']:8d}  "
                          f"{str(d['unconnected']):13s}  {d.get('maze_len', 0):7}  {str(d.get('maze_w')):10s}  "
-                         f"{d.get('maze_vias', 0)}")
+                         f"{d.get('maze_vias', 0):9}  min-w {d.get('trunk_min_w')}")
     lines.append(f"missing links over the rail nets: {res['_rails_total']};  pcbnew GetUnconnectedCount() board-wide: "
                  f"{res['_pcbnew_total']}")
     sc = res.get("_selfcheck", {})
@@ -2092,7 +2148,29 @@ def main(argv):
         for t in [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetLayer() == L3
                   and "VTH" in t.GetNetname()]:
             board.Delete(t)
-    rep = apply(board)
+    if "--drop-slow" in argv:            # test only: remove the board_slow.py lines (0.15 mm L3 / L6 tracks)
+        slow = {"/VBIAS_A", "/VBIAS_K", "/VOFS", "/VNEG_REF", "/DAC_TRIG", "/VTAP_TH", "/ADC_REF_MID", "/TRIG_SEL",
+                "/ADC_IN"}
+        ends = set()
+        for t in [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetLayer() in (L3, pcbnew.B_Cu)
+                  and t.GetNetname() in slow and round(t.GetWidth() / MM, 2) == 0.15]:
+            for q in (t.GetStart(), t.GetEnd()):
+                ends.add((q.x, q.y))
+            board.Delete(t)
+        pads = [(p_.GetPosition().x, p_.GetPosition().y) for f in board.GetFootprints() for p_ in f.Pads()]
+        for v in [t for t in board.GetTracks() if t.GetClass() == "PCB_VIA" and t.GetNetname() in slow]:
+            q = v.GetPosition()
+            if (q.x, q.y) in ends and not any(abs(q.x - a) < 1000 and abs(q.y - b) < 1000 for a, b in pads):
+                still_used = any(t.GetClass() == "PCB_TRACK" and t.GetNetname() == v.GetNetname() and
+                                 ((t.GetStart().x, t.GetStart().y) == (q.x, q.y) or (t.GetEnd().x, t.GetEnd().y) == (q.x, q.y))
+                                 for t in board.GetTracks())
+                if not still_used:
+                    board.Delete(v)
+    stage = "all"
+    for a in argv:
+        if a.startswith("--stage="):
+            stage = a.split("=", 1)[1]
+    rep = apply(board, stage=stage)
     board.BuildConnectivity()
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     res = verify(board)
