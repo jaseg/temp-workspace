@@ -299,7 +299,7 @@
  "stitch": {
   "beside signal vias": 14,
   "RF fences": 14,
-  "grid": 363,
+  "grid": 357,
   "signal vias without a ground via": 6
  },
  "rule10": {

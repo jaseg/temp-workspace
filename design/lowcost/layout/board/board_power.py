@@ -612,6 +612,7 @@ BRANCH_MAX = 6.0
 BRANCH_CLR = 0.2          # branch track to foreign via / copper
 FPGA_RECT = (56.0, 0.5, 74.0, 22.5)
 PRIO_L3 = 3
+ROUTE_CORRIDORS = False   # corridors as hand-drawn ZONES (they flow around foreign vias)
 DEBUG_DIR = None
 
 
@@ -1174,6 +1175,327 @@ def gap_arrays(board, nets, report, l6occ):
     report["gap_hops"] = hops
 
 
+MAZE_RES = 0.2
+MAZE_WIDTHS = (0.8, 0.6, 0.5)
+MAZE_CLR = 0.2            # to foreign copper (+ half a grid cell of rasterisation margin)
+MAZE_BPAD = 0.3           # extra margin around bottom-side pads
+MAZE_VIA_COST = 15.0      # grid steps per layer change
+
+
+class Maze:
+    """Two-layer (In2.Cu = L3, B.Cu = L6) maze router on a MAZE_RES grid. Obstacles are read from the board at
+    construction (tracks, vias, pads, filled zones of other nets except the GND pours, rule areas / node windows,
+    board edge). Vias may be placed where a 0.45 mm via clears all foreign copper on every layer by MAZE_CLR."""
+
+    def __init__(self, board):
+        global RES
+        self.board = board
+        old = RES
+        RES = MAZE_RES
+        try:
+            self.G = G = Grid(board_box(board))
+            bb = board_box(board)
+            m = MAZE_CLR + MAZE_RES / 2
+            edge = (G.X < bb[0] + 0.5) | (G.X > bb[2] - 0.5) | (G.Y < bb[1] + 0.5) | (G.Y > bb[3] - 0.5)
+            self.items = []          # (layerkey, kind, geom, radius, net): layerkey 3, 6 or 'all'
+            for t in board.GetTracks():
+                n = t.GetNetname()
+                if t.GetClass() == "PCB_VIA":
+                    q = t.GetPosition()
+                    self.items.append(("all", "disk", (q.x / MM, q.y / MM), t.GetWidth() / MM / 2, n))
+                else:
+                    lay = t.GetLayer()
+                    key = 3 if lay == L3 else 6 if lay == pcbnew.B_Cu else 1 if lay == pcbnew.F_Cu else None
+                    if key is None:
+                        continue
+                    a_, b_ = t.GetStart(), t.GetEnd()
+                    self.items.append((key, "seg", ((a_.x / MM, a_.y / MM), (b_.x / MM, b_.y / MM)),
+                                       t.GetWidth() / MM / 2, n))
+            for f in board.GetFootprints():
+                for pd in f.Pads():
+                    bbp = pd.GetBoundingBox()
+                    rect = (bbp.GetX() / MM, bbp.GetY() / MM, bbp.GetRight() / MM, bbp.GetBottom() / MM)
+                    th = pd.GetAttribute() in (pcbnew.PAD_ATTRIB_PTH, pcbnew.PAD_ATTRIB_NPTH)
+                    key = "all" if th else (6 if pd.IsOnLayer(pcbnew.B_Cu) else 1 if pd.IsOnLayer(pcbnew.F_Cu) else None)
+                    if key is None:
+                        continue
+                    self.items.append((key, "rect", rect, MAZE_BPAD if key == 6 else 0.0, pd.GetNetname()))
+            self.zones3 = []
+            self.zones6 = []
+            for z in board.Zones():
+                if z.GetIsRuleArea() or z.GetNetname() in ("GND", ""):
+                    continue
+                for lay, lst in ((L3, self.zones3), (pcbnew.B_Cu, self.zones6)):
+                    if z.GetLayerSet().Contains(lay):
+                        fl = z.GetFilledPolysList(lay)
+                        for i in range(fl.OutlineCount()):
+                            lst.append((poly_points(fl, i), z.GetNetname()))
+            ko = G.empty()
+            for z in board.Zones():
+                if z.GetIsRuleArea() and any(z.GetLayerSet().Contains(l_) for l_ in (pcbnew.In1_Cu, L3, LAYER,
+                                                                                       pcbnew.B_Cu)):
+                    o = z.Outline()
+                    for i in range(o.OutlineCount()):
+                        pp = poly_points(o, i)
+                        if len(pp) >= 3:
+                            G.poly(ko, pp, grow=m)
+            self.static = edge | ko
+        finally:
+            RES = old
+
+    def masks(self, net):
+        """core obstacle masks (copper + clearance) for L3, L6 and for via centres, for this net."""
+        global RES
+        old = RES
+        RES = MAZE_RES
+        try:
+            G = self.G
+            m = MAZE_CLR + MAZE_RES / 2
+            c3, c6, cv = self.static.copy(), self.static.copy(), self.static.copy()
+            rv = VIA_D / 2
+            for key, kind, geom, r, n in self.items:
+                if n == net and n != "":
+                    continue
+                tgt = []
+                if key in ("all", 3):
+                    tgt.append((c3, r + m))
+                if key in ("all", 6):
+                    tgt.append((c6, r + m))
+                tgt.append((cv, r + m + rv))          # a via touches every layer
+                for mk, rr in tgt:
+                    if kind == "disk":
+                        G.disk(mk, geom[0], geom[1], rr)
+                    elif kind == "seg":
+                        seg_mask(G, mk, geom[0], geom[1], rr)
+                    else:
+                        x0, y0, x1, y1 = geom
+                        i0, j0 = G.ij(x0 - rr, y0 - rr)
+                        i1, j1 = G.ij(x1 + rr, y1 + rr)
+                        mk[max(i0, 0):max(i1 + 1, 0), max(j0, 0):max(j1 + 1, 0)] = True
+            for pp, n in self.zones3:
+                if n != net:
+                    G.poly(c3, pp, grow=m)
+                    G.poly(cv, pp, grow=m + rv)
+            for pp, n in self.zones6:
+                if n != net:
+                    G.poly(c6, pp, grow=m)
+                    G.poly(cv, pp, grow=m + rv)
+            return c3, c6, cv
+        finally:
+            RES = old
+
+    def route(self, net, src, dst, w, cores):
+        """src / dst: lists of (x, y, layers) with layers a subset of {0: L3, 1: L6}. Returns list of runs
+        [(layer, [(x, y), ...])] and via points, or None."""
+        global RES
+        old = RES
+        RES = MAZE_RES
+        try:
+            G = self.G
+            c3, c6, cv = cores
+            f3 = ~dilate(c3, w / 2)
+            f6 = ~dilate(c6, w / 2)
+            fv = ~cv
+            N = G.nx * G.ny
+            fl = [f3.ravel().tolist(), f6.ravel().tolist()]
+            fvl = fv.ravel().tolist()
+            nx, ny = G.nx, G.ny
+
+            def cells(x, y, rad=0.15):
+                mm_ = G.empty()
+                G.disk(mm_, x, y, rad)
+                return np.flatnonzero(mm_.ravel()).tolist()
+            dist, prev, h = {}, {}, []
+            for (x, y, lays) in src:
+                for c in cells(x, y):
+                    for L in lays:
+                        fl[L][c] = True
+                        u = L * N + c
+                        if u not in dist:
+                            dist[u] = 0.0
+                            prev[u] = -1
+                            heapq.heappush(h, (0.0, u))
+            tg = set()
+            for (x, y, lays) in dst:
+                for c in cells(x, y):
+                    for L in lays:
+                        fl[L][c] = True
+                        tg.add(L * N + c)
+            found = None
+            while h:
+                d, u = heapq.heappop(h)
+                if d > dist.get(u, 1e18):
+                    continue
+                if u in tg:
+                    found = u
+                    break
+                L, c = divmod(u, N)
+                i, j = divmod(c, nx)
+                if fvl[c]:
+                    v = (1 - L) * N + c
+                    if fl[1 - L][c]:
+                        nd = d + MAZE_VIA_COST
+                        if nd < dist.get(v, 1e18):
+                            dist[v] = nd
+                            prev[v] = u
+                            heapq.heappush(h, (nd, v))
+                fL = fl[L]
+                for di, dj, cc in DIRS:
+                    ii, jj = i + di, j + dj
+                    if 0 <= ii < ny and 0 <= jj < nx:
+                        cw = ii * nx + jj
+                        if fL[cw]:
+                            v = L * N + cw
+                            nd = d + cc * (1.0 if L == 0 else 1.15)
+                            if nd < dist.get(v, 1e18):
+                                dist[v] = nd
+                                prev[v] = u
+                                heapq.heappush(h, (nd, v))
+            if found is None:
+                return None
+            path = []
+            u = found
+            while u != -1:
+                path.append(u)
+                u = prev[u]
+            path = path[::-1]
+            runs, cur, lay, vias = [], [], None, []
+            for u in path:
+                L, c = divmod(u, N)
+                if lay is not None and L != lay:
+                    runs.append((lay, cur))
+                    vias.append(G.xy(*divmod(c, nx)))
+                    cur = []
+                lay = L
+                cur.append(divmod(c, nx))
+            runs.append((lay, cur))
+            out = []
+            for L, cl in runs:
+                fm = f3 if L == 0 else f6
+                poly = simplify(fm, cl) if len(cl) > 1 else cl
+                out.append((L, [G.xy(i, j) for i, j in poly]))
+            return out, vias
+        finally:
+            RES = old
+
+
+def _snap_ends(runs, src, dst):
+    """put the first / last point of the route exactly on the source / target via or pad centre (short 45-degree
+    lead-in stays inside the grid cell + pad)."""
+    if not runs:
+        return runs
+    L0, l0 = runs[0]
+    p = l0[0]
+    s0 = min(src, key=lambda q: math.hypot(q[0] - p[0], q[1] - p[1]))
+    l0[0] = (s0[0], s0[1])
+    L1, l1 = runs[-1]
+    p = l1[-1]
+    d0 = min(dst, key=lambda q: math.hypot(q[0] - p[0], q[1] - p[1]))
+    l1[-1] = (d0[0], d0[1])
+    return runs
+
+
+def fix_3v3_island(board, nets, report, l6occ):
+    """+3V3 F.Cu polygons that hold +3V3 pads but no via to L4 (power block: C607 / U602 input): add 2 vias."""
+    ox, oy = _org(board)
+    net = nets[BACKGROUND]
+    vias = [(t.GetPosition().x / MM, t.GetPosition().y / MM) for t in board.GetTracks()
+            if t.GetClass() == "PCB_VIA" and t.GetNetname() == net]
+    added = []
+    for z in board.Zones():
+        if z.GetIsRuleArea() or z.GetNetname() != net or not (z.GetLayerSet().Contains(pcbnew.F_Cu) or
+                                                              z.GetLayerSet().Contains(pcbnew.B_Cu)):
+            continue
+        o = z.Outline()
+        if any(o.Contains(pcbnew.VECTOR2I(fmm(x), fmm(y))) for x, y in vias):
+            continue
+        bb = o.BBox()
+        x0, y0, x1, y1 = bb.GetX() / MM, bb.GetY() / MM, bb.GetRight() / MM, bb.GetBottom() / MM
+        got = []
+        y = y0 + 0.3
+        while y < y1 - 0.3 and len(got) < 2:
+            x = x0 + 0.3
+            while x < x1 - 0.3 and len(got) < 2:
+                if o.Contains(pcbnew.VECTOR2I(fmm(x), fmm(y))) and _via_site_ok(board, x, y, net, got) and \
+                        all(math.hypot(x - u, y - v) >= 1.0 for u, v in got):
+                    got.append((x, y))
+                x += 0.05
+            y += 0.05
+        for (x, y) in got:
+            _add_via(board, net, x, y)
+            added.append((round(x - ox, 2), round(y - oy, 2)))
+    report["3v3_vias"] = added
+
+
+def maze_connect(board, nets, report, l6occ, occ, rounds=4):
+    """Connect every stranded component of every rail to its main component with the L3 / L6 maze router."""
+    ox, oy = _org(board)
+    names = [nets[r] for r in ISLANDS if r in nets] + [n for n in STRIPS if board.FindNet(n) is not None]
+    stats = {n: dict(length=0.0, wmin=None, vias=0, routes=0) for n in names}
+    still = []
+    for rnd in range(rounds):
+        comps = net_components(board, names)
+        todo = [(n, cl) for n, cl in comps.items() if len(cl) > 1]
+        if not todo:
+            break
+        M = Maze(board)
+        progress = False
+        still = []
+        for net, cl in todo:
+            def ends(comp):
+                e = []
+                for d in comp:
+                    if d[0] == "via" or d[4]:
+                        e.append((d[2], d[3], (0, 1)))
+                    elif d[5]:
+                        e.append((d[2], d[3], (1,)))
+                return e
+            cores = M.masks(net)
+            main = ends(cl[0])
+            for comp in cl[1:]:
+                src = ends(comp)
+                if not src or not main:
+                    still.append((net, [(d[1] or d[0], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp][:4],
+                                  "no via / pad on L3 or L6"))
+                    continue
+                dst = sorted(main, key=lambda p: min(math.hypot(p[0] - q[0], p[1] - q[1]) for q in src))[:40]
+                res = None
+                for w in MAZE_WIDTHS:
+                    res = M.route(net, src, dst, w, cores)
+                    if res:
+                        break
+                if not res:
+                    still.append((net, [(d[1] or d[0], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp][:4],
+                                  "no route"))
+                    continue
+                runs, vias = res
+                runs = _snap_ends(runs, src, dst)
+                st = stats[net]
+                for L, line in runs:
+                    layer = L3 if L == 0 else pcbnew.B_Cu
+                    if len(line) < 2:
+                        continue
+                    _add_track(board, net, line, w, layer)
+                    st["length"] += sum(math.hypot(q[0] - p[0], q[1] - p[1]) for p, q in zip(line[:-1], line[1:]))
+                    rec = dict(net=net, kind="maze", layer="In2.Cu" if L == 0 else "B.Cu", width=w,
+                               pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in line])
+                    (occ if L == 0 else l6occ).append(rec)
+                for (x, y) in vias:
+                    _add_via(board, net, x, y)
+                    l6occ.append(dict(net=net, kind="maze_via", layer="all", dia=VIA_D,
+                                      pts=[(round(x - ox, 3), round(y - oy, 3))]))
+                st["vias"] += len(vias)
+                st["routes"] += 1
+                st["wmin"] = w if st["wmin"] is None else min(st["wmin"], w)
+                main += src
+                progress = True
+        pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+        if not progress:
+            break
+    report["maze"] = stats
+    report["stranded"] = still
+
+
 def join_stranded(board, nets, report, l6occ):
     """After a fill: every rail component that is not the main one gets one local L6 join to the main one."""
     ox, oy = _org(board)
@@ -1242,7 +1564,8 @@ def apply(board, json_path=None, png_path=None):
         report["strip_problems"] = "VTAP L3 tracks already on the board: kept"
     corr = {r: [([(x + ox, y + oy) for x, y in line], w) for line, w in lst]
             for r, lst in TRUNKS.items() if r in nets}
-    corr = route_corridors(board, nets, corr, report)
+    if ROUTE_CORRIDORS:
+        corr = route_corridors(board, nets, corr, report)
     pts = landing_points(board, nets)
     for rail, lines in corr.items():
         shp = corridor_shape(lines)
@@ -1275,9 +1598,9 @@ def apply(board, json_path=None, png_path=None):
                 _add_via(board, nets[rail], u + ox, v + oy)
             l6occ.append(dict(net=nets[rail], kind="via_array", layer="all", dia=VIA_D, pts=arr))
     report["hop_clearance"] = _check_hops(board)
-    gap_arrays(board, nets, report, l6occ)
+    fix_3v3_island(board, nets, report, l6occ)
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
-    join_stranded(board, nets, report, l6occ)
+    maze_connect(board, nets, report, l6occ, occ)
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L6.json"), "w") as f:
         json.dump(dict(note="B.Cu (L6) copper added by board_power.py, board mm", items=l6occ), f, indent=1)
     report["branches"] = {r: len(v) for r, v in br.items()}
@@ -1441,6 +1764,10 @@ def verify(board):
             d["corridors"] = len(TRUNKS.get(rail, []))
             d["width"] = min((w for _, w in TRUNKS.get(rail, [])), default=STRIP_W if rail in STRIPS else None)
             d["branches"] = _LAST.get("branches", {}).get(rail, 0)
+            ms = _LAST.get("maze", {}).get(net, {})
+            d["maze_len"] = round(ms.get("length", 0.0), 1)
+            d["maze_w"] = ms.get("wmin")
+            d["maze_vias"] = ms.get("vias", 0)
             d["landing"] = len(pts.get(rail, []))
         res[rail] = d
     res["_pcbnew_total"] = unc["_pcbnew_total"]
@@ -1449,7 +1776,7 @@ def verify(board):
 
 
 def table(res):
-    lines = ["rail      landing  corridors  width  branches  missing-links  notes"]
+    lines = ["rail      landing  corridors  width  branches  missing-links  maze-mm  maze-min-w  maze-vias  notes"]
     for r, d in res.items():
         if r.startswith("_"):
             continue
@@ -1458,7 +1785,8 @@ def table(res):
                          f"L4 polygons {d['l4_polys']}, landing outside fill {d['missing'] or 0}")
         else:
             lines.append(f"{r:9s} {d['landing']:7d}  {d['corridors']:9d}  {str(d['width']):5s}  {d['branches']:8d}  "
-                         f"{d['unconnected']}")
+                         f"{str(d['unconnected']):13s}  {d.get('maze_len', 0):7}  {str(d.get('maze_w')):10s}  "
+                         f"{d.get('maze_vias', 0)}")
     lines.append(f"missing links over the rail nets: {res['_rails_total']};  pcbnew GetUnconnectedCount() board-wide: "
                  f"{res['_pcbnew_total']}")
     return "\n".join(lines)
@@ -1498,7 +1826,7 @@ def main(argv):
     print("landing vias not branched:", rep.get("unreached"))
     print("hop clearance problems:", rep.get("hop_clearance"))
     print("corridor gaps:", rep.get("corridor_gaps"))
-    print("L6 joins:", rep.get("l6_joins"))
+    print("+3V3 vias added (power-block F.Cu polygon without via):", rep.get("3v3_vias"))
     print("still stranded:", rep.get("stranded"))
     comps = net_components(board, [BACKGROUND] + [rail_nets(board)[r] for r in ISLANDS if r in rail_nets(board)])
     for n, cl in comps.items():

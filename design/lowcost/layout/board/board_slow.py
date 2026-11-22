@@ -1,4 +1,5 @@
-"""Slow bias / control lines (TOPOLOGY.md section 8), drawn after board_power.apply():
+"""Slow bias / control lines (TOPOLOGY.md section 8), drawn after board_power.apply()  - WORK IN PROGRESS, NOT CALLED
+by gen_board.py (22 Nov): the current L3 corridor layout leaves no channel for the plan below; see README.md.
 
     import board_slow
     res = board_slow.draw(B, m)        # m = boardlib.Block wrapping B
