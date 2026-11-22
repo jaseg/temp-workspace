@@ -1,10 +1,20 @@
-"""FPGA block: GW1NZ-LV1 QN48 (U501), MS5351M (U502) + Y501, configuration / decoupling.
-Run: cd blocks/fpga && python3 gen_fpga.py [--render]
-Block-local mm, origin = board (56, 0.5), rectangle 18 x 22 mm (FLOORPLAN).  J501 / R511 / R512 live in mcuif.
-Strobes and supply fan-outs are drawn by hand; the slow nets are routed by a small local grid router (route(),
-0.05 mm grid, two layers, 45-degree moves only, pad-axis exits).  Supplies: via pairs into the In2 zones drawn here
-(+3V3 everywhere, +1V2 island under U501 with a tongue to the SE corner), grounds into the In1 zone."""
+"""FPGA block, six layers (JLC06161H-3313, RULES rule 10): GW1NZ-LV1 QN48 (U501), MS5351M (U502) + Y501,
+configuration / decoupling.   Run: cd blocks/fpga && python3 gen_fpga.py [--render]
+Block-local mm, origin = board (56, 0.5), 18 x 22 mm.  L1 F.Cu parts + strobes, L2 In1 GND, L3 In2 GND pour (nothing
+fast), L4 In3 +3V3 with a +1V2 island, L5 In4 GND, L6 B.Cu fan-out over L5.
+Every escape to the block edges is drawn here with explicit coordinates (TOPOLOGY.md section 1): planar per layer.
+  - west bundle (L6): COARSE + TAP0..4 from the top pins (via stair north of the pads, runs west, down the west margin),
+    TAP5 / TAP6 from the west pins 41 / 47; fans to the S edge slots 2.0 .. 5.5.
+  - TAP7 (pin 6) and DBG2 (pin 8): L1 south, west over the JTAG L6 lanes, via, L6 to the edge.
+  - JTAG (pins 3 4 5 7): via at the pins, L6 straight south.
+  - MCU_CLK, SPI_CS, I2C_SDA, SPI_MOSI, SPI_MISO, SPI_SCK, I2C_SCL, ADC_TRIG: L6 lanes under the package (entering
+    from the east: vias at the east pins, the I2C / MCU_CLK lines from U502 down the NE corner), out under the bottom
+    pads, fanned to their slots.
+  - FPGA_DONE / FPGA_RECONFIG (west pins 46 / 48): L1 down the west side, east over the bundle, via at their slots.
+  - TAP8..15 (pins 9-11, 13-17): L1 south / east, via near the edge, L6 stub.
+Only the local support connections (crystal, caps, pull resistors, ties) use the small grid router."""
 import sys, os, math, json, heapq
+os.environ["BL_STACKUP"] = "6L"
 sys.path.insert(0, "../..")
 import numpy as np
 from scipy import ndimage
@@ -14,15 +24,16 @@ import boardlib as bl
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board"
 W, H = 18.0, 22.0
-W50, WS = bl.W50, 0.15
+W50 = bl.W50                         # 0.16 mm = 50 R on L1 / L6 (6L)
+WS = 0.12                            # digital fan-out
 blk = bl.Block("fpga")
 NL = blk.nl
-MOVED = ("J501", "R511", "R512")          # programming header + UART resistors: mcuif block
+MOVED = ("J501", "R511", "R512")
 REFS = sorted(r for r, c in NL.comps.items() if c["sheet"] == "/fpga_clock/" and r not in MOVED)
+C = NL.canon
 
 
 def bplace(ref, x, y, rot=0, side="F"):
-    """place on F, flip after Add (Block.place side B segfaults in 7.0.11)"""
     fp = blk.place(ref, x, y, rot, "F")
     if side == "B":
         fp.Flip(blk.P(x, y), True)
@@ -30,225 +41,298 @@ def bplace(ref, x, y, rot=0, side="F"):
     return fp
 
 
-# ---------------- placement
-CX, CY = 8.6, 9.8
-bplace("U501", CX, CY, 90)
-bplace("U502", 12.1, 2.3, 0)              # left: VDD XA XB SCL SDA, right: CLK0 CLK1 GND VDD CLK2 (top->bottom)
-bplace("Y501", 4.6, 2.0, 0)               # pin 3 XA top-right, pin 1 XB bottom-left
-bplace("R509", 16.4, 2.31, 270)           # CLK1 (pad 1, top, in line with U502.9) -> MCU_CLK (pad 2)
-bplace("R508", 8.4, 2.9, 90)              # CLK0 -> FPGA_CLK (pin 33)
-bplace("R510", 7.4, 2.9, 90)              # CLK2 -> CLK2_FPGA (pin 34)
-bplace("C509", 9.6, 1.3, 0, "B")          # U502.1 VDD (B, under the left pins)
-bplace("C508", 13.6, 2.9, 0, "B")         # U502.7 VDD (B, under the right pins)
-bplace("C510", 16.6, 18.6, 90)            # 10u +3V3 (F, SE corner, vias at x 15.55)
-bplace("C507", 2.3, 1.2, 0, "B")          # 10u +3V3 (B, NW corner)
-bplace("C503", 11.9, 12.4, 90, "B")       # 10u +1V2 (B, at the pin-12 via pair)
-# 100 nF on B under the U501 pad ring, GND to the exposed-pad vias
-bplace("C506", 6.3, 6.4, 0, "B")          # pin 36 +3V3
-bplace("C502", 5.3, 7.9, 90, "B")         # pin 37 +1V2
-bplace("C505", 11.1, 7.0, 0, "B")         # pin 25 +3V3
-bplace("C504", 5.6, 13.0, 0, "B")         # pin 1 +3V3
-bplace("C501", 10.4, 12.3, 90, "B")       # pin 12 +1V2
-# configuration pull resistors on B under the strobes, next to the cfg-pin vias (x 3.7)
-for i, ref in enumerate(["R506", "R505", "R504"]):      # pins 42..44
-    bplace(ref, 2.55, 9.3 + 1.0 * i, 0, "B")
-bplace("R503", 4.2, 13.2, 90, "B")        # pin 45 READY pull-up, next to C504 (+3V3)
-bplace("R502", 0.75, 15.6, 90, "B")       # DONE pull-up
-bplace("R501", 1.75, 15.0, 90, "B")       # RECONFIG pull-up
-bplace("JP501", 8.25, 12.6, 0, "B")
-bplace("R507", 4.4, 16.4, 90, "B")        # TCK pull-down
-
-STROBE = {}
-
-
-def strobe(net, pts, layer="F.Cu", w=W50, name=None):
-    return blk.track(net, w, pts, layer, name=name or net, z=50, ch=0.1)
-
-
 def up(p):
-    return blk.pad("U501", p)
+    return blk.pad("U501", str(p))
 
 
-def T(net, w, pts, layer="F.Cu", ch=0.15):
-    return blk.track(net, w, pts, layer, ch=ch)
+def T(net, w, pts, layer="F.Cu", ch=0.15, name=None):
+    return blk.track(net, w, pts, layer, ch=ch, name=name)
 
 
-YP, YN = 10.37, 11.37                      # analog S_STROBE_P / N ifaces (board 10.87 / 11.87)
-# S_STROBE_P drives the strobe amplifier: pin 38 west on F.Cu only (no vias), 45-degree jog up to y 7.7 (clear of
-# PH_STROBE_N at y 8.4), west, down x 0.6 to its iface.  S_STROBE_N is only terminated (R405 in analog): pin 35 up,
-# one via, B.Cu over the In2 ground strip around the P line, via at the iface, short F stub (no crossing of P).
-p35, p38 = up("35"), up("38")
-blk.track("/S_STROBE_P", 0.2, [p38, (4.85, p38[1])], name="S_P")
-strobe("/S_STROBE_P", [(4.85, p38[1]), (3.3, p38[1]), (3.0, 7.7), (0.97, 7.7), (0.6, 8.07), (0.6, YP - 0.37),
-                       (0.23, YP), (0.0, YP)], name="S_P")
-blk.track("/S_STROBE_N", 0.2, [p35, (p35[0], 6.2)], name="S_N")
-NV1, NV2 = (6.7, 5.5), (0.6, YN)
-strobe("/S_STROBE_N", [(p35[0], 6.2), (p35[0], 5.6), NV1], name="S_N")
-strobe("/S_STROBE_N", [NV1, (5.5, 4.3), (1.0, 4.3), (0.6, 4.7), NV2], "B.Cu", name="S_N")
-strobe("/S_STROBE_N", [NV2, (0.0, YN)], name="S_N")
-for v in (NV1, NV2):
-    blk.via(*v, "/S_STROBE_N")
-LN, LP = blk.route_len("S_N"), blk.route_len("S_P")
-blk.iface("/S_STROBE_P", 0.0, YP, "F.Cu", "W", "pair", W50, "U501.38; F.Cu only, no vias; R401 in analog")
-blk.iface("/S_STROBE_N", 0.0, YN, "F.Cu", "W", "pair", W50, "U501.35; via-B.Cu-via, terminated only; R405 in analog")
-# PH strobes: 0.2 mm necks west to x 2.15 / 2.8, then 0.36 mm down x 1.95 / 2.6, out on the W edge below S_N
-p39, p40 = up("39"), up("40")
-YPHN = 12.6
-YPHP = YPHN + 0.48
-blk.track("/PH_STROBE_N", 0.2, [p39, (2.35, p39[1])], name="PH_N")
-blk.track("/PH_STROBE_P", 0.2, [p40, (3.0, p40[1])], name="PH_P")
-phn = [(2.35, p39[1]), (2.15, p39[1]), (1.95, p39[1] + 0.2), (1.95, YPHN - 0.7), (1.25, YPHN), (0.0, YPHN)]
+def V(x, y, net):
+    blk.via(x, y, net)
 
 
-def php_pts(jd):
-    base = [(3.0, p40[1]), (2.8, p40[1]), (2.6, p40[1] + 0.2)]
-    if jd > 0:
-        base += [(2.6, 10.4), (2.6 + jd, 10.4 + jd), (2.6 + jd, 11.4 - jd), (2.6, 11.4)]
-    return base + [(2.6, YPHP - 0.7), (1.9, YPHP), (0.0, YPHP)]
+# ---------------- placement
+CX, CY = 8.6, 11.165                 # pin 38 (S_STROBE_P) at y 9.365 = the analog iface: S_STROBE_P is one straight line
+U502X, U502Y = 11.1, 2.2
+bplace("U501", CX, CY, 90)
+bplace("U502", U502X, U502Y, 180)    # left: 6 CLK2, 7 VDD, 8 GND, 9 CLK1, 10 CLK0 (top->bottom); right: 5 SDA, 4 SCL, 3 XB, 2 XA, 1 VDD
+bplace("Y501", 16.3, 5.55, 90)
+bplace("R510", 6.9, 2.7, 270)         # CLK2 -> CLK2_FPGA (pin 34)
+bplace("R508", 7.7, 5.0, 270)         # CLK0 -> FPGA_CLK (pin 33)
+bplace("R509", 9.1, 2.7, 180, "B")    # CLK1 -> MCU_CLK, on B under U502
+bplace("C508", 11.2, 1.45, 180, "B")  # U502.7 VDD (B under the U502 body)
+bplace("C509", 12.6, 4.7, 0)         # U502.1 VDD
+bplace("C507", 16.0, 10.75, 0)       # 10u +3V3
+bplace("C510", 16.0, 8.75, 0)        # 10u +3V3
+bplace("C506", 4.05, 7.65, 180)      # pin 36 +3V3 (VCCX)
+bplace("C502", 4.05, 8.65, 180)      # pin 37 +1V2
+bplace("C505", 12.3, 6.9, 0)         # pin 25 +3V3
+bplace("C504", 6.4, 15.7, 270)       # pin 1 +3V3
+bplace("C501", 11.9, 15.25, 0)       # pin 12 +1V2
+bplace("C503", 14.6, 14.6, 90, "B")  # 10u +1V2 (B, SE)
+bplace("R501", 3.3, 14.3, 180)       # RECONFIG pull-up (F, SW pocket)
+bplace("R507", 5.6, 15.6, 0, "B")    # TCK pull-down (B, SW of the package)
+# configuration pull resistors + JP501 on F in the free NW corner; the pins reach them on L3 (slow static lines)
+bplace("JP501", 4.6, 1.3, 0)
+for ref, x, y in (("R502", 1.2, 0.75), ("R503", 1.2, 1.75), ("R504", 1.2, 2.75), ("R505", 3.3, 3.05), ("R506", 5.4, 3.05)):
+    bplace(ref, x, y, 0)
+
+# ---------------- edge slots (S edge, L6), TOPOLOGY.md section 1, west to east, 0.5 mm pitch
+ORDER = (["/COARSE"] + [f"/TAP{i}" for i in range(8)] +
+         [C(n) for n in ("DBG2", "JTAG_TCK", "JTAG_TMS", "JTAG_TDI", "JTAG_TDO", "MCU_CLK", "SPI_CS", "I2C_SDA",
+                         "FPGA_DONE", "SPI_MOSI", "SPI_MISO", "SPI_SCK", "I2C_SCL", "FPGA_RECONFIG", "ADC_TRIG")] +
+         [f"/TAP{i}" for i in range(8, 16)])
+SLOT = {n: round(2.0 + 0.5 * k, 3) for k, n in enumerate(ORDER)}
+YE = 21.2                                            # via row of the L1-routed nets near the edge (staggered)
 
 
-def phn_pts(jd):
-    base = [(2.35, p39[1]), (2.15, p39[1]), (1.95, p39[1] + 0.2)]
-    if jd > 0:
-        base += [(1.95, 9.6), (1.95 + jd, 9.6 + jd), (1.95 + jd, 10.6 - jd), (1.95, 10.6)]
-    return base + [(1.95, YPHN - 0.7), (1.25, YPHN), (0.0, YPHN)]
-
-
-def solve(fun, L0, target):
-    lo, hi = 0.0, 0.18
-    for _ in range(50):
-        mid = (lo + hi) / 2
-        lo, hi = (mid, hi) if L0 + bl.plen(fun(mid)) < target else (lo, mid)
-    return mid
-
-
-LHN0, LHP0 = blk.route_len("PH_N"), blk.route_len("PH_P")
-LN_, LP_ = LHN0 + bl.plen(phn_pts(0)), LHP0 + bl.plen(php_pts(0))
-jn = solve(phn_pts, LHN0, LP_) if LN_ < LP_ else 0.0
-jp = solve(php_pts, LHP0, LN_) if LP_ < LN_ else 0.0
-strobe("/PH_STROBE_N", phn_pts(jn), name="PH_N")
-strobe("/PH_STROBE_P", php_pts(jp), name="PH_P")
-blk.iface("/PH_STROBE_N", 0.0, YPHN, "F.Cu", "W", "pair", W50, "U501.39; 47 R R411 in pstrobe")
-blk.iface("/PH_STROBE_P", 0.0, YPHP, "F.Cu", "W", "pair", W50, "U501.40; 47 R R407 in pstrobe")
-
-# ---------------- supply fan-outs (hand-drawn): pin -> pad-wide neck -> 0.4 mm -> via pair
-SUPV = {}
-
-
-def supply(pin, neck, diag, step=(0.5, 0.5)):
-    net = NL.net_of("U501", pin)
-    p = up(pin)
-    blk.track(net, 0.2, [p] + neck, name="sup" + pin, ch=0.1)
-    blk.track(net, 0.4, [neck[-1], diag], ch=0.1)
-    v2 = (diag[0] + step[0], diag[1] + step[1])
-    blk.track(net, 0.4, [diag, v2])
-    blk.via(*diag, net)
-    blk.via(*v2, net)
-    SUPV[pin] = (diag, v2)
-
-
-supply("36", [(6.4, 6.1), (6.1, 5.8)], (5.7, 5.4), step=(-0.5, -0.5))
-supply("37", [(5.0, 7.6), (4.6, 7.2)], (4.15, 6.75), step=(-0.5, -0.5))
-supply("25", [(10.8, 6.3), (11.0, 6.1)], (11.6, 6.1), step=(0.65, 0.0))
-supply("1", [(6.4, 13.4)], (6.4, 13.95), step=(-0.5, 0.5))
-supply("12", [(10.8, 13.4)], (11.2, 13.8), step=(0.0, 0.65))
-for pin in ("2", "26"):                                      # GND pins straight into the exposed pad
-    p = up(pin)
-    e = (p[0], CY + 2.2) if p[1] > CY else (p[0], CY - 2.2)
-    blk.track("GND", 0.2, [p, e])
-THV = []
-for dx in (-1.2, 0.0, 1.2):                                  # EP thermal vias
-    for dy in (-1.2, 0.0, 1.2):
-        blk.via(CX + dx, CY + dy, "GND")
-        THV.append((CX + dx, CY + dy))
-
-# ---------------- hand-routed slow buses (F.Cu fan-out, one via row at y 20.6, B.Cu stubs to the S edge)
-VY = 20.6
-SLOT = {}
-for i, n_ in enumerate(["TCK", "TMS", "TDI", "DBG2", "TDO"]):
-    SLOT[NL.canon("JTAG_" + n_ if n_ != "DBG2" else "DBG2")] = 3.0 + 0.6 * i
-for i in range(16):
-    SLOT[f"/TAP{i}"] = 6.0 + 0.6 * i
-for n_, x_ in (("ADC_TRIG", 0.6), ("FPGA_DONE", 1.2), ("COARSE", 1.8), ("FPGA_RECONFIG", 2.4)):
-    SLOT[NL.canon(n_)] = x_
+def ye(net):
+    return 20.75 if ORDER.index(net) % 2 == 0 else 21.4
 NOTE = {}
 
 
-def drop(net, x, w=WS, note=""):
-    """via at (x, VY) and B.Cu stub to the S edge; registers the interface"""
-    blk.via(x, VY, net)
-    T(net, w, [(x, VY), (x, H)], "B.Cu")
-    blk.iface(net, x, H, "B.Cu", "S", "slow", w, note)
+def edge(net, note, w=WS):
+    blk.iface(net, SLOT[net], H, "B.Cu", "S", "slow", w, note)
 
 
-Y1 = 14.6
-for pin in ("3", "4", "5", "6", "7", "9", "10", "11"):          # bottom pins: down, 45 deg west, down
-    net = NL.net_of("U501", pin)
-    xp, yp = up(pin)
-    xs = SLOT[net]
-    T(net, WS, [(xp, yp), (xp, Y1), (xs, Y1 + xp - xs), (xs, VY)])
-    drop(net, xs, note=f"U501.{pin}")
-for k, pin in enumerate(range(13, 25)):                        # right side: east, down, 45 deg west, down
+RF = {}
+# ---------------- strobes (L1, 0.16 mm)
+p38 = up(38)
+T("/S_STROBE_P", W50, [p38, (0.0, p38[1])], name="S_P")
+RF["/S_STROBE_P"] = W50
+blk.iface("/S_STROBE_P", 0.0, p38[1], "F.Cu", "W", "pair", W50, "U501.38; one straight F.Cu line, no vias; R401 in analog")
+# S_STROBE_N (termination only): pin 35 north, west over the L6 bundle at y 6.9, via at the W edge, L6 down under S_P,
+# via, 0.4 mm F stub to the analog iface
+p35 = up(35)
+YSN = 10.365
+T("/S_STROBE_N", W50, [p35, (p35[0], 6.9), (0.4, 6.9), (0.4, 7.3)], ch=0.3, name="S_N")
+T("/S_STROBE_N", W50, [(0.4, 7.3), (0.4, YSN)], "B.Cu", name="S_N")
+T("/S_STROBE_N", W50, [(0.4, YSN), (0.0, YSN)], name="S_N")
+V(0.4, 7.3, "/S_STROBE_N")
+V(0.4, YSN, "/S_STROBE_N")
+RF["/S_STROBE_N"] = W50
+blk.iface("/S_STROBE_N", 0.0, YSN, "F.Cu", "W", "pair", W50, "U501.35; F - via - B - via - F, terminated only; R405 in analog")
+# PH_STROBE pair: west, down the west margin (N outer x 0.9, P inner x 1.26), out west at the S end of the W edge
+p39, p40 = up(39), up(40)
+YPN = 21.35
+
+
+def ph_pts(p, xd, yo):
+    return [p, (xd + 0.4, p[1]), (xd, p[1] + 0.4), (xd, yo - 0.4), (xd - 0.4, yo), (0.0, yo)]
+
+
+def ph_pts(p, xd, yo, yh=None):
+    yh = p[1] if yh is None else yh
+    head = [p, (5.15, p[1]), (5.15 - (p[1] - yh), yh)] if yh != p[1] else [p]
+    return head + [(xd + 0.4, yh), (xd, yh + 0.4), (xd, yo - 0.4), (xd - 0.4, yo), (0.0, yo)]
+
+
+PHN = ph_pts(p39, 0.9, YPN)
+LN = bl.plen(PHN)
+lo, hi = YPN + 0.2, YPN + 0.5                      # PH_P exit y solved for equal length
+for _ in range(60):
+    mid = (lo + hi) / 2
+    lo, hi = (mid, hi) if bl.plen(ph_pts(p40, 1.26, mid, 10.12)) < LN else (lo, mid)
+YPP = round(mid, 4)
+T("/PH_STROBE_N", W50, PHN, ch=0.0001, name="PH_N")
+T("/PH_STROBE_P", W50, ph_pts(p40, 1.26, YPP, 10.12), ch=0.0001, name="PH_P")
+RF["/PH_STROBE_N"] = RF["/PH_STROBE_P"] = W50
+blk.iface("/PH_STROBE_N", 0.0, YPN, "F.Cu", "W", "pair", W50, "U501.39; pair with P, equal length; 47 R R411 in pstrobe")
+blk.iface("/PH_STROBE_P", 0.0, YPP, "F.Cu", "W", "pair", W50, "U501.40; pair with N, equal length; 47 R R407 in pstrobe")
+
+# ---------------- west bundle: COARSE + TAP0..4 from the top pins (L1 stub north, via stair, L6 west and south)
+TOPP = [(27, "/COARSE"), (28, "/TAP0"), (29, "/TAP1"), (30, "/TAP2"), (31, "/TAP3"), (32, "/TAP4")]
+DX = {"/COARSE": 0.9, "/TAP0": 1.25, "/TAP1": 1.6, "/TAP2": 1.95, "/TAP3": 2.3, "/TAP4": 2.65, "/TAP5": 3.2, "/TAP6": 3.75}
+YF = 18.9                                           # bundle fan to the edge slots starts here
+
+
+def fan(net, x, y_from, layer="B.Cu"):
+    """vertical at x down to YF, 45 degrees to the slot, down to the edge (L6)"""
+    s = SLOT[net]
+    pts = [(x, y_from), (x, YF), (s, YF + abs(s - x)), (s, H)]
+    return pts
+
+
+for k, (pin, net) in enumerate(TOPP):
+    p = up(pin)
+    yv = round(5.25 + 0.4 * k, 3)                   # COARSE northmost (outermost)
+    T(net, WS, [p, (p[0], yv)])
+    V(p[0], yv, net)
+    x = DX[net]
+    T(net, WS, [(p[0], yv), (x + 0.0, yv)] + fan(net, x, yv)[1:], "B.Cu", ch=0.3)
+    edge(net, f"U501.{pin}; west bundle on L6")
+# TAP5 (pin 41) / TAP6 (pin 47): via west of the pin, L6 down inside the bundle
+p41, p47 = up(41), up(47)
+T("/TAP5", WS, [p41, (3.75, p41[1])])                # over the configuration column to a via west of it
+V(3.75, p41[1], "/TAP5")
+T("/TAP5", WS, [(3.75, p41[1]), (DX["/TAP5"], p41[1])] + fan("/TAP5", DX["/TAP5"], p41[1])[1:], "B.Cu", ch=0.3)
+edge("/TAP5", "U501.41; west bundle on L6")
+T("/TAP6", WS, [p47, (3.75, p47[1])])
+V(3.75, p47[1], "/TAP6")
+T("/TAP6", WS, fan("/TAP6", 3.75, p47[1]), "B.Cu", ch=0.3)
+edge("/TAP6", "U501.47; west bundle on L6")
+
+# ---------------- west column: configuration pins to vias (pull resistors on B under the package)
+COLV = {}
+for pin, xv in ((42, 4.3), (43, 4.85), (44, 4.3), (45, 4.85), (46, 4.3)):
     net = NL.net_of("U501", str(pin))
-    xp, yp = up(str(pin))
-    xv = 12.2 + 0.4 * k
-    xs = SLOT[net]
-    T(net, WS, [(xp, yp), (xv, yp), (xv, Y1), (xs, Y1 + xv - xs), (xs, VY)])
-    drop(net, xs, note=f"U501.{pin}")
-xp, yp = up("27")                                              # TAP15 round the top-right corner
-T("/TAP15", WS, [(xp, yp), (xp, 5.65), (17.0, 5.65), (17.0, Y1), (15.0, Y1 + 2.0), (15.0, VY)])
-drop("/TAP15", 15.0, note="U501.27")
-# west group: 41 / 46 / 47 / 48 continue to the S edge; 42..45 end in vias at x 3.7 (pull resistors on B)
-WX = {"41": 3.05, "46": 4.6, "47": 4.85, "48": 5.1}
-K = 0.3
-for pin, xv in WX.items():
-    net = NL.net_of("U501", pin)
-    xp, yp = up(pin)
-    xs = SLOT[net]
-    t1 = 14.07 + K * xv
-    T(net, 0.12, [(xp, yp), (xv, yp), (xv, t1), (xs, t1 + xv - xs), (xs, VY)], ch=0.12)
-    drop(net, xs, note=f"U501.{pin}")
-CFGV = {"42": [(3.7, 9.6)], "43": [(4.0, 10.0), (3.7, 10.3)], "44": [(4.3, 10.4), (3.7, 11.0)], "45": [(4.6, 10.8), (3.7, 11.7)]}
-for pin, pts in CFGV.items():
-    net = NL.net_of("U501", pin)
-    T(net, 0.12, [up(pin)] + pts, ch=0.1)
-    blk.via(*pts[-1], net)
-    CFGV[pin] = pts[-1]
-# SPI: pins 28..31 up to staggered vias, B.Cu east and down the east edge (x 16.1 .. 16.85)
-SPIV = {"28": (9.6, 5.55), "29": (9.2, 4.85), "30": (8.8, 5.55), "31": (8.4, 4.85)}
-for pin, v in SPIV.items():
-    net = NL.net_of("U501", pin)
-    T(net, 0.12, [up(pin), v])
-    blk.via(*v, net)
-SPIB = {"28": [(9.6, 5.55), (16.1, 5.55)], "29": [(9.2, 4.85), (16.35, 4.85)],
-        "30": [(8.8, 5.55), (8.8, 4.45), (16.6, 4.45)], "31": [(8.4, 4.85), (8.4, 4.1), (16.85, 4.1)]}
-for pin, pts in SPIB.items():
-    net = NL.net_of("U501", pin)
-    xv = pts[-1][0]
-    T(net, 0.12, pts + [(xv, H)], "B.Cu", ch=0.12)
-    blk.iface(net, xv, H, "B.Cu", "S", "slow", 0.12, f"U501.{pin} -> STM32")
-# MCU_CLK: R509 pad 2 down, via, B.Cu down x 17.1
-mc = blk.pad("R509", "@MCU_CLK")
-T("/MCU_CLK", WS, [mc, (mc[0], 3.45)])
-blk.via(mc[0], 3.45, "/MCU_CLK")
-T("/MCU_CLK", WS, [(mc[0], 3.45), (16.75, 3.45), (17.1, 3.8), (17.1, H)], "B.Cu")
-blk.iface("/MCU_CLK", 17.1, H, "B.Cu", "S", "slow", WS, "MS5351M CLK1 via R509 33 R -> STM32 PF0")
-# CLK1: U502.9 straight east into R509 pad 1
-T("Net-(U502-CLK1)", WS, [blk.pad("U502", "9"), blk.pad("R509", "@Net-(U502-CLK1)")])
-# U502 pins 7 (+3V3) / 8 (GND): pad-wide east, via pairs at x 15.45
-T("GND", 0.3, [blk.pad("U502", "8"), (15.45, 2.3)])
-blk.via(15.45, 2.3, "GND")
-T("+3V3", 0.3, [blk.pad("U502", "7"), (15.45, 2.8), (15.45, 3.45)], ch=0.1)
-blk.via(15.45, 3.45, "+3V3")
-# C510 (F) vias at x 15.55
-c1, c2 = blk.pad("C510", "@+3V3"), blk.pad("C510", "@GND")
-for pad_, net in ((c1, "+3V3"), (c2, "GND")):
-    ys = (round(pad_[1] - 0.35, 3), round(pad_[1] + 0.3, 3))
-    for yv in ys:
-        blk.via(15.55, yv, net)
-    T(net, 0.4, [(15.55, ys[0]), (15.55, ys[1])])
-    T(net, 0.4, [pad_, (15.55, pad_[1])] if abs(pad_[1] - ys[0]) > 0.5 and abs(pad_[1] - ys[1]) > 0.5 else [pad_, (15.55, pad_[1])])
+    p = up(pin)
+    T(net, WS, [p, (xv, p[1])])
+    V(xv, p[1], net)
+    COLV[pin] = (xv, p[1])
+# L3 (In2) slow lines: column vias west, north at x 2.95 .. 1.15 to staggered vias below the NW resistors
+L3X = {42: 2.95, 43: 2.5, 44: 2.05, 45: 1.6, 46: 1.15}
+L3V = {}
+for pin, xl in L3X.items():
+    net = NL.net_of("U501", str(pin))
+    xv, yv = COLV[pin]
+    yt = 4.4 if pin % 2 == 0 else 3.8
+    T(net, WS, [(xv, yv), (xl, yv), (xl, yt)], "In2.Cu", ch=0.3)
+    V(xl, yt, net)
+    L3V[pin] = (xl, yt)
 
+# ---------------- DONE / RECONFIG: L1 west, down the west side (DONE outer x 2.0, RECONFIG x 2.4), east to their slots
+p46, p48 = up(46), up(48)
+YD, YR = 18.5, 18.1
+T("/FPGA_DONE", WS, [p46, (2.0, p46[1]), (2.0, YD), (SLOT["/FPGA_DONE"], YD)], ch=0.3)
+T("/FPGA_RECONFIG", WS, [p48, (2.4, p48[1]), (2.4, YR), (SLOT["/FPGA_RECONFIG"], YR)], ch=0.3)
+for net, y in (("/FPGA_DONE", YD), ("/FPGA_RECONFIG", YR)):
+    V(SLOT[net], y, net)
+    T(net, WS, [(SLOT[net], y), (SLOT[net], H)], "B.Cu")
+edge("/FPGA_DONE", "U501.46 (DONE); F.Cu west / south / east, via; pull-up R502")
+edge("/FPGA_RECONFIG", "U501.48 (RECONFIG_N); F.Cu west / south / east, via; pull-up R501")
+
+# ---------------- JTAG (pins 3 4 5 7): vias at the pins, L6 straight south
+JV = {3: (7.2, 15.0), 4: (7.6, 15.6), 5: (8.0, 15.0), 7: (8.8, 15.0)}
+for pin, v in JV.items():
+    net = NL.net_of("U501", str(pin))
+    T(net, WS, [up(pin), v])
+    V(*v, net)
+    s = SLOT[net]
+    T(net, WS, [v, (v[0], 15.75), (s, 15.75 + abs(s - v[0])), (s, H)], "B.Cu", ch=0.1)
+    edge(net, f"U501.{pin}; to J501 in mcuif")
+# TAP7 (pin 6) and DBG2 (pin 8): L1 south, west over the JTAG lanes, via, L6 to the edge
+for pin, net, yr in ((6, "/TAP7", 17.2), (8, C("DBG2"), 17.6)):
+    p = up(pin)
+    s = SLOT[net]
+    T(net, WS, [p, (p[0], yr), (s, yr)], ch=0.3)
+    V(s, yr, net)
+    T(net, WS, [(s, yr), (s, H)], "B.Cu")
+    edge(net, f"U501.{pin}")
+
+# ---------------- TAP8..10 (bottom pins 9..11) and TAP11..15 (east pins 13..17): L1, via at YE, L6 stub
+for pin, net, yr in ((9, "/TAP8", 16.9), (10, "/TAP9", 16.6), (11, "/TAP10", 16.3)):
+    p = up(pin)
+    s = SLOT[net]
+    T(net, WS, [p, (p[0], yr), (s, yr), (s, ye(net))], ch=0.3)
+    V(s, ye(net), net)
+    T(net, WS, [(s, ye(net)), (s, H)], "B.Cu")
+    edge(net, f"U501.{pin}")
+for pin, net in ((13, "/TAP11"), (14, "/TAP12"), (15, "/TAP13"), (16, "/TAP14"), (17, "/TAP15")):
+    p = up(pin)
+    s = SLOT[net]
+    T(net, WS, [p, (s, p[1]), (s, ye(net))], ch=0.3)
+    V(s, ye(net), net)
+    T(net, WS, [(s, ye(net)), (s, H)], "B.Cu")
+    edge(net, f"U501.{pin}")
+
+# ---------------- M group: L6 lanes under the package, entering from the east
+EV = {24: ("/SPI_CS", 12.2), 22: ("/SPI_MOSI", 12.2), 21: ("/SPI_MISO", 12.75), 20: ("/SPI_SCK", 12.2),
+      18: ("/ADC_TRIG", 12.2)}
+LANE = {"/MCU_CLK": 9.3, "/SPI_CS": 9.62, "/I2C_SDA": 9.94, "/SPI_MOSI": 10.26, "/SPI_MISO": 10.58, "/SPI_SCK": 10.9,
+        "/I2C_SCL": 11.22, "/ADC_TRIG": 11.54}
+LANE = {C(k): v for k, v in LANE.items()}
+YL = 16.0                                            # lanes fan to their slots below this
+
+
+def lane_tail(net):
+    x, s = LANE[net], SLOT[net]
+    return [(x, YL), (s, YL + abs(s - x)), (s, H)]
+
+
+for pin, (net, xv) in EV.items():
+    net = C(net)
+    p = up(pin)
+    T(net, WS, [p, (xv, p[1])])
+    V(xv, p[1], net)
+    T(net, WS, [(xv, p[1]), (LANE[net], p[1])] + lane_tail(net), "B.Cu", ch=0.25)
+    edge(net, f"U501.{pin}; L6 lane under the package")
+# I2C from U502 (right pins 5 SDA / 4 SCL): F east to vias, L6 down the NE corner (SDA x 13.6, SCL x 14.0), west in
+sda, scl = blk.pad("U502", "5"), blk.pad("U502", "4")
+VSDA, VSCL = (14.4, sda[1]), (14.95, scl[1])
+T("/I2C_SDA", WS, [sda, VSDA])
+T("/I2C_SCL", WS, [scl, VSCL])
+V(*VSDA, "/I2C_SDA")
+V(*VSCL, "/I2C_SCL")
+T("/I2C_SDA", WS, [VSDA, (13.6, VSDA[1] + 0.8), (13.6, up(23)[1]), (LANE[C("I2C_SDA")], up(23)[1])] + lane_tail(C("I2C_SDA")),
+  "B.Cu", ch=0.25)
+T("/I2C_SCL", WS, [VSCL, (14.0, VSCL[1] + 0.95), (14.0, up(19)[1]), (LANE[C("I2C_SCL")], up(19)[1])] + lane_tail(C("I2C_SCL")),
+  "B.Cu", ch=0.25)
+edge(C("I2C_SDA"), "MS5351M SDA; L6 down the NE corner, lane under U501")
+edge(C("I2C_SCL"), "MS5351M SCL; L6 down the NE corner, lane under U501")
+
+# MCU_CLK: U502.9 CLK1 -> F west -> via -> R509 (B) -> L6 east under U502 -> down x 13.2 -> lane (westmost)
+ck1 = blk.pad("U502", "9")
+VCK1 = (7.85, ck1[1])
+T("Net-(U502-CLK1)", WS, [ck1, VCK1])
+V(*VCK1, "Net-(U502-CLK1)")
+r9a, r9b = blk.pad("R509", "@Net-(U502-CLK1)"), blk.pad("R509", "@MCU_CLK")
+T("Net-(U502-CLK1)", WS, [VCK1, r9a], "B.Cu")
+YMC = up(25)[1] + 0.335                              # 8.55: entry row under the top-right pads
+T("/MCU_CLK", WS, [r9b, (12.75, r9b[1]), (13.2, r9b[1] + 0.45), (13.2, YMC - 0.45), (12.75, YMC),
+                   (LANE[C("MCU_CLK")], YMC)] + lane_tail(C("MCU_CLK")), "B.Cu", ch=0.25)
+edge(C("MCU_CLK"), "MS5351M CLK1 via R509 33 R; L6 under U502 / U501 -> STM32 PF0")
+# FPGA_CLK: CLK0 (U502.10) -> R508 -> pin 33; CLK2 (U502.6) -> R510 -> pin 34 (both F.Cu, short, over L2)
+ck0, ck2 = blk.pad("U502", "10"), blk.pad("U502", "6")
+r8a, r8b = blk.pad("R508", "@Net-(U502-CLK0)"), blk.pad("R508", "@FPGA_CLK")
+T("Net-(U502-CLK0)", WS, [ck0, (r8a[0], ck0[1]), r8a], ch=0.3)
+p33 = up(33)
+T("/fpga_clock/FPGA_CLK", WS, [r8b, (r8b[0], 6.3), (p33[0], 6.3 + abs(r8b[0] - p33[0])), p33], ch=0.0001)
+r10a, r10b = blk.pad("R510", "@Net-(U502-CLK2)"), blk.pad("R510", "@CLK2_FPGA")
+T("Net-(U502-CLK2)", WS, [ck2, (r10a[0], ck2[1]), r10a], ch=0.4)
+T("/fpga_clock/CLK2_FPGA", WS, [r10b, (r10b[0], 6.0), (up(34)[0], 6.3), up(34)], ch=0.0001)
+
+u7, u8 = blk.pad("U502", "7"), blk.pad("U502", "8")
+T("+3V3", 0.25, [u7, (10.1, u7[1])])
+T("GND", 0.25, [u8, (10.6, u8[1])])
+V(10.1, u7[1], "+3V3")
+V(10.6, u8[1], "GND")
+c8v, c8g = blk.pad("C508", "@+3V3"), blk.pad("C508", "@GND")
+T("+3V3", 0.25, [(10.1, u7[1]), (10.1 + (u7[1] - c8v[1]), c8v[1]), c8v], "B.Cu", ch=0.0001)
+T("GND", 0.25, [(10.6, u8[1]), (c8g[0] - 0.2, u8[1]), (c8g[0], u8[1] - 0.2), c8g], "B.Cu", ch=0.0001)
+# ---------------- supply necks (pad-wide 0.2 mm, then 0.4 mm) and the decoupling capacitors at the pins
+p36, p37, p25, p1, p12 = up(36), up(37), up(25), up(1), up(12)
+c506 = blk.pad("C506", "@+3V3")
+T("+3V3", 0.2, [p36, (p36[0], 7.75), (p36[0] - 0.1, c506[1]), c506], ch=0.0001)
+V(5.55, c506[1], "+3V3")
+c502 = blk.pad("C502", "@+1V2")
+T("+1V2", 0.2, [p37, (5.15, p37[1]), (5.15 - (p37[1] - c502[1]), c502[1]), c502], ch=0.0001)
+V(5.05, 8.3, "+1V2")
+T("+1V2", 0.25, [(5.05, 8.3), (5.05, 8.865)])
+V(3.55, 8.15, "GND")                                   # shared GND via between the C506 / C502 GND pads
+T("GND", 0.3, [blk.pad("C506", "@GND"), (blk.pad("C506", "@GND")[0], 8.15)])
+T("GND", 0.3, [blk.pad("C502", "@GND"), (blk.pad("C502", "@GND")[0], 8.15)])
+T("+3V3", 0.2, [p25, (p25[0], 7.45)])
+V(p25[0], 7.45, "+3V3")
+c504 = blk.pad("C504", "@+3V3")
+T("+3V3", 0.2, [p1, c504])
+c501 = blk.pad("C501", "@+1V2")
+T("+1V2", 0.2, [p12, (p12[0], c501[1] - 0.3), (p12[0] + 0.3, c501[1]), c501], ch=0.0001)
+for pin in ("2", "26"):                              # GND pins straight into the exposed pad
+    p = up(pin)
+    T("GND", 0.2, [p, (p[0], CY + 1.85 if p[1] > CY else CY - 1.85)])
+THV = [(7.15, 9.7), (7.15, 11.2), (7.15, 12.7), (8.3, 9.6), (8.3, 11.7)]
+for v in THV:
+    V(*v, "GND")
+# RECONFIG pull-up R501 (F) on the RECONFIG descent, +3V3 via; JP501 (F) GND via, JTAGSEL via
+r1n, r1v = blk.pad("R501", "@FPGA_RECONFIG"), blk.pad("R501", "@+3V3")
+T("/FPGA_RECONFIG", WS, [(2.4, r1n[1]), r1n])
+T("+3V3", 0.3, [r1v, (4.35, r1v[1])])
+V(4.35, r1v[1], "+3V3")
+
+# ---------------- grid router (local support connections only)
 # ---------------- grid router
 G = 0.05
 NX, NY = int(round(W / G)) + 1, int(round(H / G)) + 1
@@ -325,7 +409,7 @@ def free_maps(code, w):
     via_ok = (dists[0] >= bl.VIA_D / 2 + CLR + 0.01) & (dists[1] >= bl.VIA_D / 2 + CLR + 0.01) & inside
     via_ok &= edge >= bl.VIA_D / 2 + 0.15
     via_ok &= ~((abs(gx - CX) < 3.35 + 0.5) & (abs(gy - CY) < 3.35 + 0.5))   # no vias in the U501 pin fan-out ring
-    via_ok &= ~((abs(gx - 12.1) < 2.9 + 0.35) & (abs(gy - 2.3) < 1.15 + 0.3))  # nor at the U502 pin ends
+    via_ok &= ~((abs(gx - U502X) < 2.9 + 0.35) & (abs(gy - U502Y) < 1.15 + 0.3))  # nor at the U502 pin ends
     for t in blk.b.GetTracks():                    # via-to-via (also same net) >= 0.5 mm centre distance
         if isinstance(t, pcbnew.PCB_VIA):
             vx, vy = blk.loc(t.GetPosition())
@@ -568,7 +652,8 @@ def to_edge(net, src, x0, x1, w=WS, note=""):
     return x
 
 
-# ---------------- routing jobs
+
+# ---------------- local support connections (router: F.Cu / B.Cu, vias land in the L2/L5 GND or L4 supply planes)
 JOBS = []
 
 
@@ -576,19 +661,8 @@ def job(name, fn):
     JOBS.append((name, fn))
 
 
-# decoupling: cap supply pad -> the pin's via pair (0.4 mm), cap GND pad -> exposed-pad via (0.4 mm)
-DEC = {"C506": "36", "C502": "37", "C505": "25", "C504": "1", "C501": "12"}
-
-
-USED = set()
 BPREF = [25.0, 1.0]
-
-
-def nearest_th(ref):
-    x, y = blk.pad(ref, "@GND")
-    v = min([v for v in THV if v not in USED], key=lambda v: (v[0] - x) ** 2 + (v[1] - y) ** 2)
-    USED.add(v)
-    return ("VIA",) + v
+FPREF = [1.0, 25.0]
 
 
 def vias_of(net):
@@ -597,99 +671,65 @@ def vias_of(net):
             if isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net]
 
 
-def tie_b(ref, num, w=0.3):
-    """B.Cu link from a pad to the nearest existing via of its net (supply / GND)"""
-    p = padobj(ref, num)
-    net = p.GetNetname()
-    x, y = blk.loc(p.GetPosition())
-    vs = sorted(vias_of(net), key=lambda v: (v[1] - x) ** 2 + (v[2] - y) ** 2)[:6]
-    if net == "GND":
-        vs = [v for v in vs if (v[1], v[2]) not in USED] or vs
-    r = route(net, (ref, num), vs, w, layer_pref=BPREF, via_cost=30.0)
-    if r is None:
-        FAILED.pop()
-        r = tie(ref, num, w=w)
-    return r
+def near_vias(net, xy, n=6):
+    return sorted(vias_of(net), key=lambda v: (v[1] - xy[0]) ** 2 + (v[2] - xy[1]) ** 2)[:n]
 
 
-for c, pin in DEC.items():
-    def f(c=c, pin=pin):
-        net = NL.net_of("U501", pin)
-        if route(net, (c, "@" + net), [("VIA",) + SUPV[pin][1]], 0.4, layer_pref=BPREF, via_cost=30.0) is None:
-            FAILED.pop()                  # fall back: any via of the supply (all land in the same In2 island)
-            route(net, (c, "@" + net), vias_of(net), 0.4, layer_pref=BPREF, via_cost=30.0)
-        route("GND", (c, "@GND"), [nearest_th(c)], 0.4, layer_pref=BPREF, via_cost=30.0)
-    job("dec" + c, f)
-job("c503", lambda: (route("+1V2", ("C503", "@+1V2"), [("VIA",) + SUPV["12"][1]], 0.4, layer_pref=BPREF, via_cost=30.0),
-                     route("GND", ("C503", "@GND"), [nearest_th("C503")], 0.4, layer_pref=BPREF, via_cost=30.0)))
-job("c508", lambda: (route("+3V3", ("C508", "@+3V3"), [("VIA", 15.45, 3.45)], 0.4, layer_pref=BPREF, via_cost=30.0),
-                     route("GND", ("C508", "@GND"), [("VIA", 15.45, 2.3)], 0.4, layer_pref=BPREF, via_cost=30.0)))
-# U502 / Y501
-job("xa", lambda: route("Net-(U502-XA)", ("U502", "2"), [("Y501", "3")]))
-job("xb", lambda: route("Net-(U502-XB)", ("U502", "3"), [("Y501", "1")]))
-job("clk0", lambda: route("Net-(U502-CLK0)", ("U502", "10"), [("R508", "@Net-(U502-CLK0)")]))
-job("clk2", lambda: route("Net-(U502-CLK2)", ("U502", "6"), [("R510", "@Net-(U502-CLK2)")]))
-job("fclk", lambda: route("/fpga_clock/FPGA_CLK", ("R508", "@FPGA_CLK"), [("U501", "33")]))
-job("fclk2", lambda: route("/fpga_clock/CLK2_FPGA", ("R510", "@CLK2_FPGA"), [("U501", "34")]))
-job("u502v1", lambda: route("+3V3", ("U502", "1"), [("C509", "@+3V3")], 0.2))
-for ref, num, pr in (("C509", "@+3V3", True), ("C509", "@GND", True), ("Y501", "2", False), ("Y501", "4", False),
-                     ("C507", "@+3V3", True), ("C507", "@GND", True)):
+def rb(net, src, dst, w=WS, pref=BPREF, vc=30.0):
+    return route(net, src, dst, w, layer_pref=pref, via_cost=vc)
+
+
+for num in ("2", "4"):                               # crystal GND pads: own via outward along x
+    def fy(num=num):
+        x, y = blk.pad("Y501", num)
+        v = (x, y - 1.15) if num == "2" else (x - 0.95, y)
+        T("GND", 0.3, [(x, y), v])
+        V(*v, "GND")
+    job("y501g" + num, fy)
+# crystal, U502 supply
+job("xa", lambda: route("Net-(U502-XA)", ("U502", "2"), [("Y501", "@Net-(U502-XA)")], layer_pref=FPREF, via_cost=30))
+job("xb", lambda: route("Net-(U502-XB)", ("U502", "3"), [("Y501", "@Net-(U502-XB)")], layer_pref=FPREF, via_cost=30))
+job("u502v1", lambda: route("+3V3", ("U502", "1"), [("C509", "@+3V3")], 0.25, layer_pref=FPREF, via_cost=30))
+for ref, num, pr in (("C509", "@+3V3", True), ("C509", "@GND", True),
+                     ("C507", "@+3V3", True), ("C507", "@GND", True),
+                     ("C510", "@+3V3", True), ("C510", "@GND", True), ("C504", "@+3V3", True), ("C504", "@GND", True),
+                     ("C501", "@+1V2", True), ("C501", "@GND", True), ("C503", "@+1V2", True), ("C503", "@GND", True)):
     job("tie%s%s" % (ref, num), lambda ref=ref, num=num, pr=pr: tie(ref, num, pair=pr))
-# config: cfg-pin via -> pull resistor (B), resistor -> supply / GND via
-CFG = {"42": "R506", "43": "R505", "44": "R504", "45": "R503"}
-for pin, r in CFG.items():
-    def f(pin=pin, r=r):
-        net = NL.net_of("U501", pin)
-        route(net, (r, "@" + net), [("VIA",) + CFGV[pin]], layer_pref=BPREF, via_cost=30.0)
-        other = [p.GetNumber() for p in blk.fps[r].Pads() if p.GetNetname() != net][0]
-        if r == "R503":
-            if route("+3V3", (r, other), [("C504", "@+3V3")], 0.3, layer_pref=BPREF, via_cost=30.0) is None:
-                FAILED.pop()
-                route("+3V3", (r, other), vias_of("+3V3") + [("C504", "@+3V3")], 0.25, layer_pref=[3.0, 1.0], via_cost=5.0)
-        elif r == "R504":
-            route("+3V3", (r, other), [("R503", "@+3V3"), ("C504", "@+3V3")], 0.3, layer_pref=BPREF, via_cost=30.0)
-        else:
-            tie_b(r, other)
-    job("cfg" + pin, f)
-job("jp", lambda: (route("/fpga_clock/JTAGSEL_N", ("JP501", "1"), [("R504", "@JTAGSEL_N")], layer_pref=BPREF, via_cost=30.0),
-                   route("GND", ("JP501", "2"), [nearest_th("JP501")], 0.3, layer_pref=BPREF, via_cost=30.0)))
-job("done", lambda: (route("/FPGA_DONE", ("R502", "@FPGA_DONE"), [("VIA", SLOT["/FPGA_DONE"], VY)], layer_pref=[2.0, 1.0], via_cost=3.0), tie_b("R502", "@+3V3")))
-job("reconf", lambda: (route("/FPGA_RECONFIG", ("R501", "@FPGA_RECONFIG"), [("VIA", SLOT["/FPGA_RECONFIG"], VY)], layer_pref=[2.0, 1.0], via_cost=3.0),
-                       tie_b("R501", "@+3V3")))
-job("tck", lambda: (route("/fpga_clock/JTAG_TCK", ("R507", "@JTAG_TCK"), [("VIA", SLOT["/fpga_clock/JTAG_TCK"], VY)], layer_pref=[2.0, 1.0], via_cost=3.0),
-                    tie_b("R507", "@GND")))
+job("c505g", lambda: route("GND", ("C505", "@GND"), [("VIA", 14.5, blk.pad("Y501", "4")[1])], 0.3, layer_pref=FPREF, via_cost=30))
+job("c505v", lambda: route("+3V3", ("C505", "@+3V3"), [("VIA", up(25)[0], 7.45)], 0.3, layer_pref=FPREF, via_cost=30))
+# configuration resistors (F, NW): net pad -> its L3 via, other pad -> own GND / +3V3 via; JP501 to R504
+CFGR = {42: "R506", 43: "R505", 44: "R504", 45: "R503", 46: "R502"}
+for pin, r_ in CFGR.items():
+    def f(pin=pin, r_=r_):
+        net = NL.net_of("U501", str(pin))
+        route(net, (r_, "@" + net), [("VIA",) + L3V[pin]], WS, layer_pref=FPREF, via_cost=30)
+        other = [p.GetNumber() for p in blk.fps[r_].Pads() if p.GetNetname() != net][0]
+        tie(r_, other)
+    job("cfg%d" % pin, f)
+job("jsel", lambda: route("/fpga_clock/JTAGSEL_N", ("JP501", "@JTAGSEL_N"), [("R504", "@JTAGSEL_N")], WS, layer_pref=FPREF, via_cost=30))
+job("jpg", lambda: tie("JP501", "@GND"))
+job("tck", lambda: (rb(C("JTAG_TCK"), ("R507", "@JTAG_TCK"), [("VIA",) + JV[3]]), tie("R507", "@GND")))
 
-
-def i2c(net, pin):
-    x = route(net, ("U502", pin), [("EDGE", "S", "B.Cu", 17.3, 17.75)], WS)
-    if x is not None:
-        blk.iface(net, round(x, 3), H, "B.Cu", "S", "slow", WS, "MS5351M (pull-ups in mcuif)")
-
-
-job("sda", lambda: i2c("/I2C_SDA", "5"))
-job("scl", lambda: i2c("/I2C_SCL", "4"))
-
-PRIO = json.load(open(os.path.join(HERE, "prio.json"))) if os.path.exists(os.path.join(HERE, "prio.json")) else []
-order = [j for p in PRIO for j in JOBS if j[0] == p] + [j for j in JOBS if j[0] not in PRIO]
-print("routing", len(order), "jobs ...")
+print("routing", len(JOBS), "jobs ...")
 FAILJ = []
-for name, fn in order:
+for name, fn in JOBS:
     nf = len(FAILED)
     fn()
     if len(FAILED) > nf:
         FAILJ.append(name)
 print("failed jobs:", FAILJ)
-print("failed nets:", sorted(set(f[0] for f in FAILED)))
-json.dump([n for n in FAILJ] + [n for n in PRIO if n not in FAILJ], open(os.path.join(SCR, "fpga_prio_next.json"), "w"))
 
-# ---------------- planes: In1 GND, In2 +3V3 with a +1V2 island (U501 core) and tongue to the SE corner (power +1V2)
+# ---------------- planes
 blk.zone("GND", ["In1.Cu"], bl.rect_pts(0, 0, W, H), 0.2)
-blk.zone("+3V3", ["In2.Cu"], bl.rect_pts(0, 0, W, H), 0.2, prio=0)
-ISL = [(3.2, 5.75), (4.7, 5.75), (4.7, 7.0), (10.6, 7.0), (10.6, 11.0), (12.9, 11.0), (12.9, 15.0), (W, 15.0), (W, 16.0),
-       (10.6, 16.0), (10.6, 13.45), (4.7, 13.45), (4.7, 7.4), (3.2, 7.4)]
-blk.zone("+1V2", ["In2.Cu"], ISL, 0.2, prio=1)
-blk.iface("+3V3", 0, 0, "In2.Cu", "-", "supply", None, "In2 +3V3 zone over the block; feed from power W (board 74.45, 5.5)")
-blk.iface("+1V2", W, 15.5, "In2.Cu", "E", "supply", None, "In2 +1V2 island, tongue east at y 15..16 (power +1V2 at board 75.25, 21.95)")
+blk.zone("GND", ["In2.Cu"], bl.rect_pts(0, 0, W, H), 0.2)
+blk.zone("GND", ["In4.Cu"], bl.rect_pts(0, 0, W, H), 0.2)
+blk.zone("+3V3", ["In3.Cu"], bl.rect_pts(0, 0, W, H), 0.2, prio=0)
+ISL = [(3.4, 8.1), (5.9, 8.1), (5.9, 9.0), (11.9, 9.0), (11.9, 13.8), (W, 13.8), (W, 16.1), (10.6, 16.1), (10.6, 14.4),
+       (5.3, 14.4), (5.3, 9.6), (3.4, 9.6)]
+blk.zone("+1V2", ["In3.Cu"], ISL, 0.2, prio=1)
+blk.iface("+3V3", W, 5.0, "In3.Cu", "E", "supply", None, "L4 +3V3 zone over the block; feed from power W (board 74.45, 5.5)")
+blk.iface("+1V2", W, 15.35, "In3.Cu", "E", "supply", None, "L4 +1V2 island (pins 12 / 37, C501-C503), strip east at y 13.8-16.1")
+blk.iface("GND", 0, 0, "In1.Cu", "-", "supply", None, "L2 / L3 / L5 GND zones over the block")
 blk.edge_rect(0, 0, W, H, "Dwgs.User")
 for fp_ in blk.fps.values():
     fp_.Reference().SetLayer(pcbnew.B_Fab if fp_.GetLayer() == pcbnew.B_Cu else pcbnew.F_Fab)
@@ -697,10 +737,10 @@ blk.save(HERE)
 path = os.path.join(HERE, "fpga.kicad_pcb")
 print("strobe lengths: S_P %.3f S_N %.3f PH_P %.3f PH_N %.3f" % (blk.route_len("S_P"), blk.route_len("S_N"),
                                                                blk.route_len("PH_P"), blk.route_len("PH_N")))
-RFT = {}
-res = bl.check_board(path, refs=REFS, rf_widths=RFT)
-for k in ("clearance", "corner", "pad_axis", "unrouted"):
-    for e in res["details"][k][:20]:
+print("slots:", {k.split("/")[-1]: v for k, v in SLOT.items()})
+res = bl.check_board(path, refs=REFS, rf_widths=RF)
+for k in ("clearance", "corner", "pad_axis", "unrouted", "rf_width", "rf_gap"):
+    for e in res["details"].get(k, [])[:25]:
         print("   ", k, e)
 CY_HITS = bl.courtyard_overlaps(path)
 print("courtyard overlaps:", len(CY_HITS), CY_HITS)

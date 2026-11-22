@@ -5,382 +5,392 @@
   {
    "net": "/S_STROBE_P",
    "x": 0.0,
-   "y": 10.37,
+   "y": 9.365,
    "layer": "F.Cu",
    "side": "W",
    "class": "pair",
-   "width": 0.36,
-   "note": "U501.38; F.Cu only, no vias; R401 in analog"
+   "width": 0.16,
+   "note": "U501.38; one straight F.Cu line, no vias; R401 in analog"
   },
   {
    "net": "/S_STROBE_N",
    "x": 0.0,
-   "y": 11.37,
+   "y": 10.365,
    "layer": "F.Cu",
    "side": "W",
    "class": "pair",
-   "width": 0.36,
-   "note": "U501.35; via-B.Cu-via, terminated only; R405 in analog"
+   "width": 0.16,
+   "note": "U501.35; F - via - B - via - F, terminated only; R405 in analog"
   },
   {
    "net": "/PH_STROBE_N",
    "x": 0.0,
-   "y": 12.6,
+   "y": 21.35,
    "layer": "F.Cu",
    "side": "W",
    "class": "pair",
-   "width": 0.36,
-   "note": "U501.39; 47 R R411 in pstrobe"
+   "width": 0.16,
+   "note": "U501.39; pair with P, equal length; 47 R R411 in pstrobe"
   },
   {
    "net": "/PH_STROBE_P",
    "x": 0.0,
-   "y": 13.08,
+   "y": 21.6864,
    "layer": "F.Cu",
    "side": "W",
    "class": "pair",
-   "width": 0.36,
-   "note": "U501.40; 47 R R407 in pstrobe"
+   "width": 0.16,
+   "note": "U501.40; pair with N, equal length; 47 R R407 in pstrobe"
   },
   {
-   "net": "/fpga_clock/JTAG_TCK",
+   "net": "/COARSE",
+   "x": 2.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.27; west bundle on L6"
+  },
+  {
+   "net": "/TAP0",
+   "x": 2.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.28; west bundle on L6"
+  },
+  {
+   "net": "/TAP1",
    "x": 3.0,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.3"
+   "width": 0.12,
+   "note": "U501.29; west bundle on L6"
+  },
+  {
+   "net": "/TAP2",
+   "x": 3.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.30; west bundle on L6"
+  },
+  {
+   "net": "/TAP3",
+   "x": 4.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.31; west bundle on L6"
+  },
+  {
+   "net": "/TAP4",
+   "x": 4.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.32; west bundle on L6"
+  },
+  {
+   "net": "/TAP5",
+   "x": 5.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.41; west bundle on L6"
+  },
+  {
+   "net": "/TAP6",
+   "x": 5.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.47; west bundle on L6"
+  },
+  {
+   "net": "/FPGA_DONE",
+   "x": 10.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.46 (DONE); F.Cu west / south / east, via; pull-up R502"
+  },
+  {
+   "net": "/FPGA_RECONFIG",
+   "x": 13.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.48 (RECONFIG_N); F.Cu west / south / east, via; pull-up R501"
+  },
+  {
+   "net": "/fpga_clock/JTAG_TCK",
+   "x": 7.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.3; to J501 in mcuif"
   },
   {
    "net": "/fpga_clock/JTAG_TMS",
-   "x": 3.6,
+   "x": 7.5,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.4"
+   "width": 0.12,
+   "note": "U501.4; to J501 in mcuif"
   },
   {
    "net": "/fpga_clock/JTAG_TDI",
-   "x": 4.2,
+   "x": 8.0,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.5"
-  },
-  {
-   "net": "/fpga_clock/DBG2",
-   "x": 4.8,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.6"
+   "width": 0.12,
+   "note": "U501.5; to J501 in mcuif"
   },
   {
    "net": "/fpga_clock/JTAG_TDO",
-   "x": 5.4,
+   "x": 8.5,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.7"
+   "width": 0.12,
+   "note": "U501.7; to J501 in mcuif"
   },
   {
-   "net": "/TAP0",
+   "net": "/TAP7",
    "x": 6.0,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.9"
+   "width": 0.12,
+   "note": "U501.6"
   },
   {
-   "net": "/TAP1",
-   "x": 6.6,
+   "net": "/fpga_clock/DBG2",
+   "x": 6.5,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.10"
-  },
-  {
-   "net": "/TAP2",
-   "x": 7.2,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.11"
-  },
-  {
-   "net": "/TAP3",
-   "x": 7.8,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.13"
-  },
-  {
-   "net": "/TAP4",
-   "x": 8.4,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.14"
-  },
-  {
-   "net": "/TAP5",
-   "x": 9.0,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.15"
-  },
-  {
-   "net": "/TAP6",
-   "x": 9.6,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.16"
-  },
-  {
-   "net": "/TAP7",
-   "x": 10.2,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.17"
+   "width": 0.12,
+   "note": "U501.8"
   },
   {
    "net": "/TAP8",
-   "x": 10.8,
+   "x": 14.0,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.18"
+   "width": 0.12,
+   "note": "U501.9"
   },
   {
    "net": "/TAP9",
-   "x": 11.4,
+   "x": 14.5,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.19"
+   "width": 0.12,
+   "note": "U501.10"
   },
   {
    "net": "/TAP10",
-   "x": 12.0,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.20"
-  },
-  {
-   "net": "/TAP11",
-   "x": 12.6,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.21"
-  },
-  {
-   "net": "/TAP12",
-   "x": 13.2,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.22"
-  },
-  {
-   "net": "/TAP13",
-   "x": 13.8,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.23"
-  },
-  {
-   "net": "/TAP14",
-   "x": 14.4,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.24"
-  },
-  {
-   "net": "/TAP15",
    "x": 15.0,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "U501.27"
+   "width": 0.12,
+   "note": "U501.11"
   },
   {
-   "net": "/ADC_TRIG",
-   "x": 0.6,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.41"
-  },
-  {
-   "net": "/FPGA_DONE",
-   "x": 1.2,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.46"
-  },
-  {
-   "net": "/COARSE",
-   "x": 1.8,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.47"
-  },
-  {
-   "net": "/FPGA_RECONFIG",
-   "x": 2.4,
-   "y": 22.0,
-   "layer": "B.Cu",
-   "side": "S",
-   "class": "slow",
-   "width": 0.15,
-   "note": "U501.48"
-  },
-  {
-   "net": "/SPI_SCK",
-   "x": 16.1,
+   "net": "/TAP11",
+   "x": 15.5,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.12,
-   "note": "U501.28 -> STM32"
+   "note": "U501.13"
   },
   {
-   "net": "/SPI_MOSI",
-   "x": 16.35,
+   "net": "/TAP12",
+   "x": 16.0,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.12,
-   "note": "U501.29 -> STM32"
+   "note": "U501.14"
   },
   {
-   "net": "/SPI_MISO",
-   "x": 16.6,
+   "net": "/TAP13",
+   "x": 16.5,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.12,
-   "note": "U501.30 -> STM32"
+   "note": "U501.15"
+  },
+  {
+   "net": "/TAP14",
+   "x": 17.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.16"
+  },
+  {
+   "net": "/TAP15",
+   "x": 17.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.17"
   },
   {
    "net": "/SPI_CS",
-   "x": 16.85,
+   "x": 9.5,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.12,
-   "note": "U501.31 -> STM32"
+   "note": "U501.24; L6 lane under the package"
   },
   {
-   "net": "/MCU_CLK",
-   "x": 17.1,
+   "net": "/SPI_MOSI",
+   "x": 11.0,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "MS5351M CLK1 via R509 33 R -> STM32 PF0"
+   "width": 0.12,
+   "note": "U501.22; L6 lane under the package"
+  },
+  {
+   "net": "/SPI_MISO",
+   "x": 11.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.21; L6 lane under the package"
+  },
+  {
+   "net": "/SPI_SCK",
+   "x": 12.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.20; L6 lane under the package"
+  },
+  {
+   "net": "/ADC_TRIG",
+   "x": 13.5,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "U501.18; L6 lane under the package"
   },
   {
    "net": "/I2C_SDA",
-   "x": 17.35,
+   "x": 10.0,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "MS5351M (pull-ups in mcuif)"
+   "width": 0.12,
+   "note": "MS5351M SDA; L6 down the NE corner, lane under U501"
   },
   {
    "net": "/I2C_SCL",
-   "x": 17.6,
+   "x": 12.5,
    "y": 22.0,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
-   "width": 0.15,
-   "note": "MS5351M (pull-ups in mcuif)"
+   "width": 0.12,
+   "note": "MS5351M SCL; L6 down the NE corner, lane under U501"
+  },
+  {
+   "net": "/MCU_CLK",
+   "x": 9.0,
+   "y": 22.0,
+   "layer": "B.Cu",
+   "side": "S",
+   "class": "slow",
+   "width": 0.12,
+   "note": "MS5351M CLK1 via R509 33 R; L6 under U502 / U501 -> STM32 PF0"
   },
   {
    "net": "+3V3",
-   "x": 0,
-   "y": 0,
-   "layer": "In2.Cu",
-   "side": "-",
+   "x": 18.0,
+   "y": 5.0,
+   "layer": "In3.Cu",
+   "side": "E",
    "class": "supply",
    "width": null,
-   "note": "In2 +3V3 zone over the block; feed from power W (board 74.45, 5.5)"
+   "note": "L4 +3V3 zone over the block; feed from power W (board 74.45, 5.5)"
   },
   {
    "net": "+1V2",
    "x": 18.0,
-   "y": 15.5,
-   "layer": "In2.Cu",
+   "y": 15.35,
+   "layer": "In3.Cu",
    "side": "E",
    "class": "supply",
    "width": null,
-   "note": "In2 +1V2 island, tongue east at y 15..16 (power +1V2 at board 75.25, 21.95)"
+   "note": "L4 +1V2 island (pins 12 / 37, C501-C503), strip east at y 13.8-16.1"
+  },
+  {
+   "net": "GND",
+   "x": 0,
+   "y": 0,
+   "layer": "In1.Cu",
+   "side": "-",
+   "class": "supply",
+   "width": null,
+   "note": "L2 / L3 / L5 GND zones over the block"
   }
  ]
 }
