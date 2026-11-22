@@ -230,6 +230,8 @@ def dilate(m, r):
         for dj in range(-n, n + 1):
             if (di * di + dj * dj) * RES * RES > r * r + 1e-9 or (di == 0 and dj == 0):
                 continue
+            if abs(di) >= ny or abs(dj) >= nx:
+                continue
             src = m[max(0, -di):ny - max(0, di), max(0, -dj):nx - max(0, dj)]
             out[max(0, di):ny - max(0, -di), max(0, dj):nx - max(0, -dj)] |= src
     return out
@@ -564,12 +566,14 @@ def _pt_seg(x, y, p, q):
 # automatically from these corridors (max BRANCH_MAX mm); farther vias are reported, not chased.
 TRUNKS = {
     "-5V": [   # outermost: top edge, then down the west side past the SMA keep-outs to the input stage
-        ([(90.25, 8.9), (87.4, 6.05), (87.4, 2.0), (86.6, 1.2), (8.4, 1.2), (7.6, 2.0), (7.6, 7.4),
+        ([(90.25, 8.9), (87.4, 6.05), (87.4, 3.3), (86.6, 2.5), (62.0, 2.5), (54.5, 2.5), (8.4, 2.5), (7.6, 3.3),
+          (7.6, 7.4),
           (4.75, 10.25), (4.75, 13.4), (5.45, 14.1), (10.5, 14.1)], 1.5),
         ([(76.45, 14.5), (83.0, 14.5), (87.4, 10.1), (87.4, 6.05)], 1.5),
     ],
     "+5V": [   # second: y 3 along the top, down at x 15 to the BUF802 / servo supply vias
-        ([(74.45, 12.6), (73.3, 11.45), (73.3, 3.8), (72.5, 3.0), (16.8, 3.0), (15.0, 4.8), (15.0, 8.2), (13.9, 9.3)], 1.5),
+        ([(74.45, 12.6), (73.3, 11.45), (73.3, 5.8), (72.5, 5.0), (62.0, 5.0), (54.5, 5.0), (16.8, 5.0), (15.0, 6.8),
+          (15.0, 8.2), (13.9, 9.3)], 1.5),
         ([(74.95, 19.2), (73.3, 17.55), (73.3, 11.45)], 1.5),
     ],
     "+1V2": [  # power block LDO -> FPGA, all on L3 (no +1V2 copper on L4)
@@ -581,8 +585,8 @@ TRUNKS = {
         ([(74.45, 16.2), (75.8, 17.55), (78.4, 17.55), (79.85, 19.0), (81.5, 19.0), (82.7, 20.2), (82.7, 22.4),
           (81.9, 23.2), (6.8, 23.2), (6.0, 24.0), (6.0, 28.5)], 1.5),
         ([(28.5, 23.2), (28.5, 9.4), (27.8, 8.7), (27.15, 8.7)], 1.0),     # hold amplifier
-        # branch (ii): after the L6 hop (x 82.7 -> 90.0 at y 21.2) down inside the east edge, west along y 50.8
-        ([(90.0, 20.2), (90.0, 22.0), (91.0, 23.0), (97.8, 23.0), (98.6, 23.8), (98.6, 48.0), (95.8, 50.8),
+        # branch (ii): north of the -2V5 / VBUS landing vias, east, down inside the east edge, west along y 50.8
+        ([(81.5, 19.0), (82.6, 16.3), (90.5, 16.3), (95.0, 20.8), (98.4, 20.8), (98.4, 48.0), (95.6, 50.8),
           (31.0, 50.8), (29.88, 49.68)], 1.5),
     ],
     "-2V5": [  # band y 25.0, down x 13 / x 5.2 west of the pstrobe column, along the bottom, east on y 47
@@ -591,7 +595,7 @@ TRUNKS = {
           (91.65, 47.0), (92.45, 47.8), (92.45, 49.5)], 1.5),
     ],
     "VBUS": [  # band y 26.8 (south member) to the pstrobe choke column
-        ([(89.1, 13.5), (88.0, 14.6), (88.0, 26.0), (87.2, 26.8), (23.6, 26.8), (22.78, 27.6), (22.78, 28.9),
+        ([(88.0, 17.4), (88.0, 26.0), (87.2, 26.8), (23.6, 26.8), (22.78, 27.6), (22.78, 28.9),
           (20.8, 30.9), (20.8, 44.5), (22.78, 46.48), (22.78, 48.3)], 1.5),
     ],
 }
@@ -599,7 +603,7 @@ TRUNKS = {
 L6_TRACKS = {"VBUS": [([(22.78, 48.65), (28.6, 54.47), (32.47, 54.47)], 0.5)]}
 # L6 hops: (rail, L6 polyline board mm, width); a 3-via array (0.8 mm pitch) sits on each end, oriented along
 # the L3 corridor it lands on (dir = unit vector of that corridor)
-HOPS = [("+2V5", [(82.7, 21.2), (90.0, 21.2)], 1.5, [(0.0, 1.0), (0.0, 1.0)])]
+HOPS = []                 # none needed (the +2V5 east branch passes north of the -2V5 / VBUS landing vias)
 JOIN_W = 0.6              # local L6 joins of stranded landing vias
 JOIN_MAX = 25.0
 STAIRCASE = (0.0, 20.5, 56.0, 23.5)      # board mm: L6 COARSE / TAP staircase band, no joins there
@@ -608,6 +612,7 @@ BRANCH_MAX = 6.0
 BRANCH_CLR = 0.2          # branch track to foreign via / copper
 FPGA_RECT = (56.0, 0.5, 74.0, 22.5)
 PRIO_L3 = 3
+DEBUG_DIR = None
 
 
 def _org(board):
@@ -622,6 +627,13 @@ def _old_arrays(board, names):
         if t.GetClass() == "PCB_VIA" and t.GetNetname() in names:
             p = t.GetPosition()
             by.setdefault(t.GetNetname(), []).append((p.x / MM, p.y / MM, t))
+    ends = set()
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_TRACK":
+            for q in (t.GetStart(), t.GetEnd()):
+                ends.add((round(q.x / MM, 2), round(q.y / MM, 2)))
+    # only arrays with no track attached (board_power's arrays are joined by zones only)
+    by = {n: [v for v in vs if (round(v[0], 2), round(v[1], 2)) not in ends] for n, vs in by.items()}
     kill = set()
     for n, vs in by.items():
         for a in vs:
@@ -651,12 +663,26 @@ def remove_old(board, nets):
     kill_items.clear()
     for v in _old_arrays(board, names):
         board.Delete(v)
-    old_t = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() in names and
-             ((t.GetLayer() == L3 and round(t.GetWidth() / MM, 2) in (0.8, 1.0, 1.5)) or
-              (t.GetLayer() == pcbnew.B_Cu and round(t.GetWidth() / MM, 2) in (JOIN_W, 1.5)) or
-              (t.GetLayer() == pcbnew.B_Cu and t.GetNetname() == "VBUS" and round(t.GetWidth() / MM, 2) == 0.5))]
-    for t in old_t:
+    # earlier board_power output: L3 branch tracks (0.8 mm, rail nets) and L6 joins listed in board_power_L6.json
+    for t in [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() in names and
+              t.GetLayer() == L3 and round(t.GetWidth() / MM, 2) == BRANCH_W]:
         board.Delete(t)
+    import json
+    import os
+    jp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L6.json")
+    if os.path.exists(jp):
+        segs = set()
+        for it in json.load(open(jp)).get("items", []):
+            if it.get("kind") in ("join", "hop", "track"):
+                P = it["pts"]
+                for a_, b_ in zip(P[:-1], P[1:]):
+                    segs.add((round(a_[0] + ox, 2), round(a_[1] + oy, 2), round(b_[0] + ox, 2), round(b_[1] + oy, 2)))
+        for t in [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetLayer() == pcbnew.B_Cu
+                  and t.GetNetname() in names]:
+            a_, b_ = t.GetStart(), t.GetEnd()
+            k = (round(a_.x / MM, 2), round(a_.y / MM, 2), round(b_.x / MM, 2), round(b_.y / MM, 2))
+            if k in segs or (k[2], k[3], k[0], k[1]) in segs:
+                board.Delete(t)
     kill = []
     for z in board.Zones():
         nm = str(z.GetZoneName())
@@ -707,6 +733,124 @@ def _add_track(board, net, pts, w, layer):
         t.SetLayer(layer)
         t.SetNetCode(code)
         board.Add(t)
+
+
+def route_corridors(board, nets, corr, report):
+    """Follow each hand-specified corridor (waypoints) with the grid router so that the strip stays clear of
+    foreign vias, L3 keep-outs, holes and the other corridors (it bends around via clusters instead of being cut
+    by them). Each leg between two waypoints keeps within 4 mm of its straight line (soft cost); width 1.5 mm,
+    1.0 mm neck where 1.5 does not pass. Returns {rail: [(polyline, w), ...]}."""
+    global RES
+    old = RES
+    RES = 0.2
+    try:
+        G = Grid(board_box(board))
+        bb = board_box(board)
+        base = (G.X < bb[0] + 0.5) | (G.X > bb[2] - 0.5) | (G.Y < bb[1] + 0.5) | (G.Y > bb[3] - 0.5)
+        for z in board.Zones():
+            if is_pour_keepout(z) and z.GetLayerSet().Contains(L3):
+                o = z.Outline()
+                for i in range(o.OutlineCount()):
+                    pp = poly_points(o, i)
+                    if len(pp) >= 3:
+                        G.poly(base, pp, grow=CLEAR)
+        for (x, y, r) in other_holes(board, {}):
+            G.disk(base, x, y, r + CLEAR)
+        vias = [(t.GetPosition().x / MM, t.GetPosition().y / MM, t.GetWidth() / MM / 2, t.GetNetname())
+                for t in board.GetTracks() if t.GetClass() == "PCB_VIA"]
+        l3t = [((t.GetStart().x / MM, t.GetStart().y / MM), (t.GetEnd().x / MM, t.GetEnd().y / MM),
+                t.GetWidth() / MM / 2, t.GetNetname()) for t in board.GetTracks()
+               if t.GetClass() == "PCB_TRACK" and t.GetLayer() == L3]
+        placed = G.empty()
+        out = {}
+        for rail, lines in corr.items():
+            net = nets[rail]
+            ob = base | dilate(placed, 0.3)
+            for (x, y, r, n) in vias:
+                if n != net:
+                    G.disk(ob, x, y, r + CLEAR + 0.05)
+            for (p, q, r, n) in l3t:
+                if n != net and "VTH" not in n:
+                    seg_mask(G, ob, p, q, r + 0.3)
+            frees = {w: ~dilate(ob, w / 2) for w in (1.5, 1.0)}
+            res = []
+            mine = G.empty()
+            for line, w0 in lines:
+                pts_out = []
+                wmin = w0
+                for A, B in zip(line[:-1], line[1:]):
+                    seg = None
+                    for w in ((w0, 1.0) if w0 > 1.0 else (w0,)):
+                        free = frees.get(w)
+                        if free is None:
+                            free = frees[w] = ~dilate(ob, w / 2)
+                        win = G.empty()
+                        seg_mask(G, win, A, B, 5.0)
+                        f2 = free & win
+                        cost = np.zeros(f2.shape)
+                        d = G.empty()
+                        for k, rr in enumerate((0.6, 1.2, 2.0, 3.0)):
+                            m = G.empty()
+                            seg_mask(G, m, A, B, rr)
+                            cost += (~m) * 0.6
+                        def snap(P):
+                            i, j = G.ij(*P)
+                            best = None
+                            for di in range(-10, 11):
+                                for dj in range(-10, 11):
+                                    ii, jj = i + di, j + dj
+                                    if 0 <= ii < G.ny and 0 <= jj < G.nx and f2[ii, jj]:
+                                        dd = di * di + dj * dj
+                                        if best is None or dd < best[0]:
+                                            best = (dd, ii * G.nx + jj)
+                            return best[1] if best else None
+                        sa, sb = snap(A), snap(B)
+                        if DEBUG_DIR and w == 1.0:
+                            import matplotlib
+                            matplotlib.use("Agg")
+                            import matplotlib.pyplot as plt
+                            plt.figure(figsize=(16, 9))
+                            plt.imshow(f2 * 1 + ob * 2, extent=(bb[0] - 100, bb[0] - 100 + G.nx * RES,
+                                                                 bb[1] - 100 + G.ny * RES, bb[1] - 100))
+                            plt.plot([A[0] - 100, B[0] - 100], [A[1] - 100, B[1] - 100], "r-")
+                            plt.savefig(f"{DEBUG_DIR}/leg_{rail}_{A[0]:.0f}_{A[1]:.0f}.png", dpi=80)
+                            plt.close()
+                        if sa is None or sb is None:
+                            continue
+                        k, path = dijkstra(f2, {sa}, {sb: 0}, cost)
+                        if k is None:
+                            continue
+                        seg = ([G.xy(i, j) for i, j in simplify(f2, [divmod(c, G.nx) for c in path])], w)
+                        break
+                    if seg is None:
+                        report.setdefault("corridor_gaps", []).append((rail, (round(A[0] - bb[0], 2), round(A[1] - bb[1], 2)),
+                                                                       (round(B[0] - bb[0], 2), round(B[1] - bb[1], 2))))
+                        report.setdefault("gap_ends", []).append((rail, pts_out[-2:] if len(pts_out) > 1 else [A], B,
+                                                                  line))
+                        if len(pts_out) > 1:
+                            res.append((pts_out, wmin))
+                        pts_out, wmin = [], w0
+                        continue
+                    pl, w = seg
+                    if w < wmin:
+                        # emit what we have at the wider width, start a neck piece
+                        if len(pts_out) > 1:
+                            res.append((pts_out, wmin))
+                        res.append((pl, w))
+                        pts_out = [pl[-1]]
+                        continue
+                    pts_out = pts_out + (pl[1:] if pts_out and pts_out[-1] == pl[0] else
+                                         ([pl[0]] if not pts_out else [pl[0]]) + pl[1:])
+                if len(pts_out) > 1:
+                    res.append((pts_out, wmin))
+            for line, w in res:
+                for p_, q_ in zip(line[:-1], line[1:]):
+                    seg_mask(G, mine, p_, q_, w / 2)
+            placed |= mine
+            out[rail] = res
+    finally:
+        RES = old
+    return out
 
 
 def corridor_shape(lines):
@@ -887,7 +1031,7 @@ def net_components(board, names):
     return out
 
 
-def _l6_join(board, net, src_pts, dst_pts, report):
+def _l6_join(board, net, src_pts, dst_pts, report, width=None):
     """Route one JOIN_W track on B.Cu from any src point to any dst point (0.1 mm grid, local window)."""
     global RES
     ox, oy = _org(board)
@@ -899,7 +1043,7 @@ def _l6_join(board, net, src_pts, dst_pts, report):
     RES = 0.1
     try:
         G = Grid(win)
-        hw = JOIN_W / 2
+        hw = (width or JOIN_W) / 2
         c = CLEAR + hw
         obst = (G.X < box[0] + 0.5 + hw) | (G.X > box[2] - 0.5 - hw) | (G.Y < box[1] + 0.5 + hw) | \
             (G.Y > box[3] - 0.5 - hw)
@@ -963,6 +1107,73 @@ def _l6_join(board, net, src_pts, dst_pts, report):
         RES = old
 
 
+def _via_site_ok(board, x, y, net, extra=()):
+    r0 = VIA_D / 2 + 0.2
+    for t in board.GetTracks():
+        if t.GetNetname() == net:
+            continue
+        if t.GetClass() == "PCB_VIA":
+            q = t.GetPosition()
+            if math.hypot(q.x / MM - x, q.y / MM - y) < r0 + t.GetWidth() / MM / 2:
+                return False
+        else:
+            a_, b_ = t.GetStart(), t.GetEnd()
+            if _pt_seg(x, y, (a_.x / MM, a_.y / MM), (b_.x / MM, b_.y / MM)) < r0 + t.GetWidth() / MM / 2:
+                return False
+    for f in board.GetFootprints():
+        for pd in f.Pads():
+            if pd.GetNetname() == net:
+                continue
+            bb = pd.GetBoundingBox()
+            if bb.GetX() / MM - r0 < x < bb.GetRight() / MM + r0 and bb.GetY() / MM - r0 < y < bb.GetBottom() / MM + r0:
+                return False
+    for z in board.Zones():
+        if z.GetIsRuleArea() and (z.GetDoNotAllowVias() or z.GetDoNotAllowCopperPour()):
+            if z.Outline().Collide(pcbnew.VECTOR2I(fmm(x), fmm(y)), fmm(r0)):
+                return False
+    for (u, v) in extra:
+        if math.hypot(u - x, v - y) < VIA_PITCH - 0.01:
+            return False
+    return True
+
+
+def gap_arrays(board, nets, report, l6occ):
+    """At each corridor gap (leg that L3 could not route) drop a 3-via array on both sides, inside the corridor
+    copper, for an L6 hop (made by join_stranded)."""
+    ox, oy = _org(board)
+    hops = []
+    for rail, tail, B, line in report.get("gap_ends", []):
+        net = nets[rail]
+        ends = []
+        if len(tail) == 2:
+            P, Q = tail[1], tail[0]                 # walk back from the piece end
+            ends.append((P, Q))
+        nb = line[line.index(B) + 1] if B in line and line.index(B) + 1 < len(line) else None
+        if nb is not None:
+            ends.append((B, nb))
+        placed = []
+        for P, Q in ends:
+            L = math.hypot(Q[0] - P[0], Q[1] - P[1])
+            if L < 1e-6:
+                continue
+            d = ((Q[0] - P[0]) / L, (Q[1] - P[1]) / L)
+            done = False
+            for k0 in [0.9 + 0.2 * i for i in range(int(max(0, L - 2.6) / 0.2) + 1)]:
+                arr = [(P[0] + (k0 + k * VIA_PITCH) * d[0], P[1] + (k0 + k * VIA_PITCH) * d[1]) for k in (-1, 0, 1)]
+                if all(_via_site_ok(board, u, v, net) for u, v in arr):
+                    for u, v in arr:
+                        _add_via(board, net, u, v)
+                    l6occ.append(dict(net=net, kind="via_array", layer="all", dia=VIA_D,
+                                      pts=[(round(u - ox, 3), round(v - oy, 3)) for u, v in arr]))
+                    placed.append(arr)
+                    done = True
+                    break
+            if not done:
+                report.setdefault("gap_array_failed", []).append((rail, round(P[0] - ox, 2), round(P[1] - oy, 2)))
+        hops.append((rail, placed))
+    report["gap_hops"] = hops
+
+
 def join_stranded(board, nets, report, l6occ):
     """After a fill: every rail component that is not the main one gets one local L6 join to the main one."""
     ox, oy = _org(board)
@@ -979,16 +1190,23 @@ def join_stranded(board, nets, report, l6occ):
                 still.append((net, [(d[1], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp], "no via / PTH"))
                 continue
             dst = sorted(main, key=lambda p: min(math.hypot(p[0] - q[0], p[1] - q[1]) for q in src))[:12]
-            line = _l6_join(board, net, src, dst, report)
+            hopset = {(round(u, 2), round(v, 2)) for r_, pl in report.get("gap_hops", []) for arr in pl
+                      for (u, v) in arr}
+            is_hop = any((round(x, 2), round(y, 2)) in hopset for x, y in src)
+            line, wj = None, JOIN_W
+            for wj in ((1.5, 1.0) if is_hop else (JOIN_W,)):
+                line = _l6_join(board, net, src, dst, report, wj)
+                if line is not None:
+                    break
             if line is None:
                 still.append((net, [(d[1] or d[0], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp],
                               "no L6 path"))
                 continue
-            _add_track(board, net, line, JOIN_W, pcbnew.B_Cu)
+            _add_track(board, net, line, wj, pcbnew.B_Cu)
             main += src
             rel = [(round(x - ox, 3), round(y - oy, 3)) for x, y in line]
-            joins.append((net, rel))
-            l6occ.append(dict(net=net, kind="join", layer="B.Cu", width=JOIN_W, pts=rel))
+            joins.append((net, wj, rel))
+            l6occ.append(dict(net=net, kind="hop" if is_hop else "join", layer="B.Cu", width=wj, pts=rel))
     report["l6_joins"] = joins
     report["stranded"] = still
 
@@ -1024,6 +1242,7 @@ def apply(board, json_path=None, png_path=None):
         report["strip_problems"] = "VTAP L3 tracks already on the board: kept"
     corr = {r: [([(x + ox, y + oy) for x, y in line], w) for line, w in lst]
             for r, lst in TRUNKS.items() if r in nets}
+    corr = route_corridors(board, nets, corr, report)
     pts = landing_points(board, nets)
     for rail, lines in corr.items():
         shp = corridor_shape(lines)
@@ -1056,6 +1275,7 @@ def apply(board, json_path=None, png_path=None):
                 _add_via(board, nets[rail], u + ox, v + oy)
             l6occ.append(dict(net=nets[rail], kind="via_array", layer="all", dia=VIA_D, pts=arr))
     report["hop_clearance"] = _check_hops(board)
+    gap_arrays(board, nets, report, l6occ)
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     join_stranded(board, nets, report, l6occ)
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L6.json"), "w") as f:
@@ -1277,6 +1497,7 @@ def main(argv):
     print("L6 J501 feed clearance problems:", rep.get("l6_clearance"))
     print("landing vias not branched:", rep.get("unreached"))
     print("hop clearance problems:", rep.get("hop_clearance"))
+    print("corridor gaps:", rep.get("corridor_gaps"))
     print("L6 joins:", rep.get("l6_joins"))
     print("still stranded:", rep.get("stranded"))
     comps = net_components(board, [BACKGROUND] + [rail_nets(board)[r] for r in ISLANDS if r in rail_nets(board)])
