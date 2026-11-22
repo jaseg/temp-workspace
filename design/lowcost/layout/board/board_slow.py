@@ -175,7 +175,7 @@ def leg(B, m, net, layer, a, b, clr=0.2, w=W_SLOW, margin=3.0, extra=(), d0=-1):
 # of the later VTAP tracks, south of the VTH rail on L1) or, for VTAP_TH, ends on the R380 / R381 link on L6.
 # Strip levels nest so that no two lines cross (south -> north in source order).
 EAST = [  # net, strip y, lane x, via (None = ends on L6 at the given point)
-    ("/ADC_REF_MID", 44.6, 52.7, (52.7, 26.9)),
+    ("/ADC_REF_MID", 44.6, 52.7, (52.7, 28.0)),
     ("/DAC_TRIG", 44.2, 53.3, (53.3, 31.0)),
     ("/VOFS", 43.8, 57.3, (57.3, 32.0)),
     ("/VBIAS_A", 43.4, 57.85, (57.85, 28.93)),
@@ -191,11 +191,11 @@ L3_ORDER = ["/ADC_REF_MID", "/ADC_IN", "/VBIAS_A", "/VBIAS_K", "/VNEG_REF", "/VO
 # explicit L3 band under the highway / comparators (north -> south), x from the via west to WEST_X; ADC_IN keeps 1 mm
 # from its neighbours; lanes pass the band's vias (VTH 58.61 / 65.1, R380 / R381 GND 59.04 / 63.16, C358 GND 33.92 /
 # 31.41, the slow vias themselves) with >= 0.45 mm centre distance
-BAND = {"/ADC_REF_MID": 26.9, "/ADC_IN": 28.0, "/VBIAS_A": 29.1, "/VBIAS_K": 29.55, "/VNEG_REF": 30.1,
-        "/VOFS": 30.55, "/DAC_TRIG": 31.95, "/TRIG_SEL": 32.45}
+BAND = {"/ADC_REF_MID": 28.0, "/ADC_IN": 29.1, "/VBIAS_A": 30.2, "/VBIAS_K": 30.65, "/VNEG_REF": 31.9,
+        "/VOFS": 32.35, "/DAC_TRIG": 32.65, "/TRIG_SEL": 33.0}   # south of the VBUS trunk (L3, y 24.7-27.45)
 WEST_X = 27.6
 WEST_ORDER = ["/ADC_REF_MID", "/ADC_IN", "/VBIAS_K", "/VNEG_REF", "/VOFS", "/VBIAS_A", "/DAC_TRIG", "/TRIG_SEL"]
-VNEG_VIA = (35.09, 30.1)
+VNEG_VIA = (35.09, 31.9)
 
 
 def plen(q):

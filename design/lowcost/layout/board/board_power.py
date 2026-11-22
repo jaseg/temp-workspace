@@ -737,6 +737,26 @@ def new_zone(board, net, shape, prio, name, layer=LAYER):
 
 def _add_track(board, net, pts, w, layer):
     code = board.FindNet(net).GetNetCode()
+    # an end that lands exactly on another track end of the net would form a (possibly sharp) joint:
+    # pull it back by 0.02 mm along its own segment (it still lies inside the same via / pad copper)
+    pts = list(pts)
+    taken = set()
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_TRACK" and t.GetNetCode() == code and t.GetLayer() == layer:
+            for q in (t.GetStart(), t.GetEnd()):
+                taken.add((q.x, q.y))
+    for idx, nb in ((0, 1), (len(pts) - 1, len(pts) - 2)):
+        if len(pts) < 2:
+            break
+        e, o = pts[idx], pts[nb]
+        L = math.hypot(o[0] - e[0], o[1] - e[1])
+
+        def near(q):
+            return any(abs(q[0] * MM - a) < 15000 and abs(q[1] * MM - b) < 15000 for a, b in taken)
+        k = 1
+        while near(pts[idx]) and L > 0.03 * (k + 1) and k < 8:
+            pts[idx] = (e[0] + (o[0] - e[0]) * 0.03 * k / L, e[1] + (o[1] - e[1]) * 0.03 * k / L)
+            k += 1
     for p, q in zip(pts[:-1], pts[1:]):
         t = pcbnew.PCB_TRACK(board)
         t.SetStart(pcbnew.VECTOR2I(fmm(p[0]), fmm(p[1])))
@@ -957,6 +977,17 @@ def _branches(board, nets, pts, corr_abs, report):
 
 
 def _add_via(board, net, x, y):
+    """add a through via unless one of the same net already sits within 0.3 mm (reuse); refuse a position whose
+    hole would come closer than 0.25 mm hole-to-hole to another net's via."""
+    for t in board.GetTracks():
+        if t.GetClass() != "PCB_VIA":
+            continue
+        q = t.GetPosition()
+        d = math.hypot(q.x / MM - x, q.y / MM - y)
+        if t.GetNetname() == net and d < 0.3:
+            return None
+        if t.GetNetname() != net and d < VIA_DRILL / 2 + t.GetDrillValue() / MM / 2 + 0.25:
+            raise AssertionError(f"via {net} at ({x - 100:.2f}, {y - 100:.2f}) too close to {t.GetNetname()} via")
     v = pcbnew.PCB_VIA(board)
     v.SetPosition(pcbnew.VECTOR2I(fmm(x), fmm(y)))
     v.SetWidth(fmm(VIA_D))
@@ -1524,6 +1555,45 @@ def smooth45(line):
     return bl.chamfer(out, 0.12)
 
 
+def pad_axis_ends(board, net, line, layer):
+    """If an end of the polyline lies inside a pad of the net (on that layer) and the end segment is diagonal,
+    move the end a little along the pad axis that turns by 45 degrees, so the track leaves the pad on-axis."""
+    pads = [pd for f in board.GetFootprints() for pd in f.Pads()
+            if pd.GetNetname() == net and pd.IsOnLayer(layer)]
+    line = list(line)
+    for idx, prv in ((len(line) - 1, len(line) - 2), (0, 1)):
+        if len(line) < 2:
+            break
+        E, P = line[idx], line[prv]
+        hit = [pd for pd in pads if pd.HitTest(pcbnew.VECTOR2I(fmm(E[0]), fmm(E[1])))]
+        if not hit:
+            continue
+        pd = hit[0]
+        ang = (math.degrees(math.atan2(E[1] - P[1], E[0] - P[0])) - pd.GetOrientationDegrees()) % 90
+        if min(ang, 90 - ang) <= 1.0:
+            continue
+        dx, dy = E[0] - P[0], E[1] - P[1]
+        L = math.hypot(dx, dy)
+        o = math.radians(pd.GetOrientationDegrees())
+        axes = [(math.cos(o), math.sin(o)), (-math.sin(o), math.cos(o))]
+        axes += [(-a, -b) for a, b in axes]
+        axes.sort(key=lambda a: -(a[0] * dx + a[1] * dy) / L)       # closest to the incoming direction first
+        done = False
+        for a in (0.3, 0.2, 0.12):
+            for ux, uy in axes[:2]:
+                E2 = (E[0] + ux * a, E[1] + uy * a)
+                if any(p_.HitTest(pcbnew.VECTOR2I(fmm(E2[0]), fmm(E2[1]))) for p_ in hit):
+                    if idx == 0:
+                        line.insert(0, E2)
+                    else:
+                        line.append(E2)
+                    done = True
+                    break
+            if done:
+                break
+    return line
+
+
 def selfcheck(board):
     """DRC-like check of the copper added by apply(): clearance (< 0.2 mm, crossings included) of every added
     track against foreign tracks / vias / pads on its layer, joints sharper than 45 degrees, ends inside pads
@@ -1575,6 +1645,26 @@ def selfcheck(board):
                     ang = (math.degrees(math.atan2(o[1] - e[1], o[0] - e[0])) - pd.GetOrientationDegrees()) % 90
                     if min(ang, 90 - ang) > 1.0:
                         axis.append((n, round(e[0] - 100, 2), round(e[1] - 100, 2)))
+    # boardlib's rule on every L3 / L6 track of the rail nets (joints between pieces included)
+    sys.path.insert(0, __file__.rsplit("/", 1)[0])
+    rails = {n for n, *_ in _ADDED}
+    ends = {}
+    for t in tracks:
+        if t.GetClass() != "PCB_TRACK" or t.GetNetname() not in rails or t.GetLayer() not in (L3, pcbnew.B_Cu):
+            continue
+        a_, b_ = t.GetStart(), t.GetEnd()
+        if a_ == b_:
+            continue
+        for p_, o_ in ((a_, b_), (b_, a_)):
+            ends.setdefault((t.GetNetname(), t.GetLayer(), p_.x, p_.y), []).append((o_.x, o_.y))
+    for (n, l, x, y), others in ends.items():
+        if len(others) != 2:
+            continue
+        if any(pd.GetNetname() == n and pd.IsOnLayer(l) and pd.HitTest(pcbnew.VECTOR2I(x, y)) for pd in pads):
+            continue
+        if bl.turn_deg(others[0], (x, y), others[1]) > 45.5:
+            corner.append((n, round(x / MM - 100, 2), round(y / MM - 100, 2)))
+    corner = sorted(set(corner))
     return dict(clearance=clr, corners=corner, pad_axis=axis)
 
 
@@ -1642,8 +1732,8 @@ def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
             st = stats[net]
             for L, line in runs:
                 if len(line) >= 2:
-                    line = smooth45(line)
                     layer = L3 if L == 0 else pcbnew.B_Cu
+                    line = pad_axis_ends(board, net, smooth45(line), layer)
                     _add_track(board, net, line, w, layer)
                     M.add_track(net, line, w, layer)
                     _ADDED.append((net, layer, line, w))
@@ -1728,7 +1818,7 @@ def maze_connect(board, nets, report, l6occ, occ, rounds=8, rails=None, strips=T
                     layer = L3 if L == 0 else pcbnew.B_Cu
                     if len(line) < 2:
                         continue
-                    line = smooth45(line)
+                    line = pad_axis_ends(board, net, smooth45(line), layer)
                     _add_track(board, net, line, w, layer)
                     M.add_track(net, line, w, layer)
                     _ADDED.append((net, layer, line, w))
@@ -1860,7 +1950,7 @@ def apply(board, json_path=None, png_path=None, stage="all"):
     br = _branches(board, nets, pts, corr, report)
     for rail, lines in br.items():
         for line in lines:
-            line = smooth45(line)
+            line = pad_axis_ends(board, nets[rail], smooth45(line), L3)
             bw = BRANCH_W_NET.get(rail, BRANCH_W)
             _add_track(board, nets[rail], line, bw, L3)
             _ADDED.append((nets[rail], L3, line, bw))
@@ -2097,6 +2187,11 @@ def verify(board):
     res["_pcbnew_total"] = unc["_pcbnew_total"]
     res["_rails_total"] = sum((unc.get(r) or 0) for r in allnets)
     res["_selfcheck"] = selfcheck(board)
+    thin = [(line, w) for n, l, line, w in _ADDED if n == "VBUS" and w < 1.0]
+    res["_vbus_thin"] = (round(sum(math.hypot(q[0] - p[0], q[1] - p[1]) for line, w in thin
+                                   for p, q in zip(line[:-1], line[1:])), 1),
+                         [(round(line[0][0] - 100, 1), round(line[0][1] - 100, 1), round(line[-1][0] - 100, 1),
+                           round(line[-1][1] - 100, 1), w) for line, w in thin])
     return res
 
 
@@ -2114,6 +2209,8 @@ def table(res):
                          f"{d.get('maze_vias', 0):9}  min-w {d.get('trunk_min_w')}")
     lines.append(f"missing links over the rail nets: {res['_rails_total']};  pcbnew GetUnconnectedCount() board-wide: "
                  f"{res['_pcbnew_total']}")
+    if res.get("_vbus_thin"):
+        lines.append(f"VBUS below 1.0 mm: {res['_vbus_thin'][0]} mm  {res['_vbus_thin'][1][:6]}")
     sc = res.get("_selfcheck", {})
     lines.append(f"self-check of added copper: clearance/crossing {len(sc.get('clearance', []))}, corners > 45 deg "
                  f"{len(sc.get('corners', []))}, off-axis pad exits {len(sc.get('pad_axis', []))}")

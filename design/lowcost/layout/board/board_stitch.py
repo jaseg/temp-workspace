@@ -112,7 +112,7 @@ def stitch(B, m, rf_tracks, sig_vias):
 
     for sx, sy in sig_vias:
         done = False
-        for rad in (0.7, 0.8, 0.9, 1.0):
+        for rad in (0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5):
             for a in range(0, 360, 15):
                 x, y = sx + rad * math.cos(math.radians(a)), sy + rad * math.sin(math.radians(a))
                 if ok(x, y):
@@ -122,6 +122,8 @@ def stitch(B, m, rf_tracks, sig_vias):
             if done:
                 break
         cnt["beside signal vias" if done else "signal vias without a ground via"] += 1
+        if not done:
+            cnt.setdefault("lacking", []).append((round(sx, 2), round(sy, 2)))
     for (x0, y0), (x1, y1), w in rf_tracks:
         L = math.hypot(x1 - x0, y1 - y0)
         if L < 0.4:

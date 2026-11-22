@@ -346,13 +346,6 @@ for net, (x, yc) in (("/DAC_TRIG", (4.6, 41.0)), ("/TRIG_SEL", (9.25, 44.6))):
             else:
                 t.SetStart(m.P(x, lo)); t.SetEnd(m.P(x, yc))
     m.via(x, yc, net)
-import board_slow
-SLOW = board_slow.draw(B, m, mc_if, phase_if["/VTAP_TH"])
-print("slow lines:", SLOW)
-for net, (ok, L_, nv) in SLOW.items():
-    LOG.append((net, "B.Cu+In2.Cu", "slow line (board_slow.py): L6 tap-row lane, L3 north", L_))
-    if not ok:
-        NOT_PLACED.append((net, "board_slow: no L3 path (see log)"))
 
 bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
 print("NOT PLACED:")
@@ -376,6 +369,20 @@ for z in list(B.Zones()):                          # L4 belongs to board_power.p
 for z in B.Zones():
     if not z.GetIsRuleArea():
         z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+# power trunks (VBUS, +5V, -5V: reserved first, they carry the current), then the slow lines around them
+import board_power
+board_power.apply_trunks(B)
+pcbnew.ZONE_FILLER(B).Fill(B.Zones())
+import board_slow
+SLOW = board_slow.draw(B, m, mc_if, phase_if["/VTAP_TH"])
+print("slow lines:", SLOW)
+for net, (ok, L_, nv) in SLOW.items():
+    LOG.append((net, "B.Cu+In2.Cu", "slow line (board_slow.py): L6 tap-row lane, L3 north", L_))
+    if not ok:
+        NOT_PLACED.append((net, "board_slow: no L3 path (see log)"))
+if "--slowonly" in sys.argv:
+    bl.save_board(B, os.path.join(SCR, "slow.kicad_pcb"))
+    sys.exit(0)
 import board_stitch
 SIGV = [(86.4, 27.2), (86.9, 26.7), (86.4, 29.4), (86.9, 29.9), (86.4, 31.06), (87.39, 31.45), (88.0, 44.35), (89.6, 43.9), (73.5, 22.75), (73.0, 23.25)] + \
     [loc(v.GetPosition()) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
@@ -389,11 +396,10 @@ bf.silk(B, m)
 # routes.json first (board_power.py reads it), then the power module as the LAST copper step
 json.dump({"log": LOG, "not_placed": NOT_PLACED, "rf": RF, "stitch": NST}, open(os.path.join(HERE, "routes.json"), "w"),
           indent=1)
-import board_power
 try:
-    board_power.apply(B)
+    board_power.apply_rest(B)
 except Exception as e_:                            # the module belongs to the power agent: report, do not fix
-    print("board_power.apply FAILED:", repr(e_))
+    print("board_power.apply_rest FAILED:", repr(e_))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 bl.save_board(B, OUT)
 bf.write_pro(OUT.replace(".kicad_pcb", ".kicad_pro"), sorted(RF))
