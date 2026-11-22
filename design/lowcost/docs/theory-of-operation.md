@@ -112,7 +112,7 @@ the ADC (0.48 mV rms at the pin) dominates the 0.35 mV total.
 
 ## 4. Strobe generation
 
-The GW1NZ-1 has no true LVDS output, so each strobe is a complementary LVCMOS33 pin pair driven by a 1 Gbps
+The GW1NZ-1 has no true LVDS output, so each strobe is a complementary LVCMOS33 pin pair driven by a
 serializer (960 Mbit/s, section 6). The gain blocks are AC coupled and saturating.
 
 **Why 50 % duty.** A low-duty pulse lets the AC-coupled chain idle in its linear range, so the output step is only one
@@ -157,11 +157,13 @@ at that instant.
 the strobe lines run along the taps at about 35 ps per tap (loaded) and the signal line, launched from the same end,
 takes 70 ps per tap (meander). A signal edge and a strobe that start together separate by 35 ps per tap: the effective
 spacing is the difference. Simulated: strobe 34.2 ps/tap, signal 75.7 ps/tap (aim the meander about 5 ps shorter),
-effective 34.7 +/- 3.1 ps. Counter-propagation gave 69.8 ps and weak far taps. On JLC04161H-7628 the signal line
+effective 34.7 +/- 3.1 ps. Counter-propagation gave 69.8 ps and weak far taps. On the old 4-layer JLC04161H-7628 design the signal line
 PH_LINE is a 0.26 mm (59 ohm) F.Cu meander of 9.929 mm per tap, designed for 70 ps loaded to 50 ohm (about 75 ps
 expected); the strobe lines PSTRB_A/K are 0.16 mm (72.8 ohm) at a 4.514 mm tap pitch, 40 ps per tap loaded. The
 layout uses 40 / 75 ps instead of the simulated 35 / 70 ps so that the meander keeps 0.5 mm same-net gaps; the
-effective spacing stays 35 ps, but this combination is not re-simulated.
+effective spacing stays 35 ps, but this combination is not re-simulated. On the six-layer board the lines are drawn at
+39.4 ps (strobe) and 69.4 ps (signal) per tap, an effective 30 ps, with the strobe lines loaded to about 41 ohm against
+49.9 ohm terminations (open risk 3).
 
 **Readout.** Each hold node goes through 2.2 k to VTAP_N / VTAP_P (-/+2.5 V), and 2 x 1 k sum the two nodes into the
 IN+ of one COS3502 comparator half (8 dual parts, 3.3 V). IN- is VTAP_TH. The comparator input peaks 1-2 ns after the
@@ -187,7 +189,7 @@ identifies which edge this was (cycle count); the check is
 |t_fine - t_coarse - latency| < one bin. A type-2 tracking loop (phase and frequency, so it follows
 spread-spectrum clocks) fits the signal phase to the stamps. Each S_STROBE sits a fixed number of serializer bits plus
 a calibrated board constant from a phase strobe, so the fitted phase at that instant is the equivalent time of the ADC
-sample. The FPGA reduces each snapshot to (strobe index, k, valid) so that only one phase value per sample (3.125 M/s)
+sample. The FPGA reduces each snapshot to (strobe index, k, valid) so that only one phase value per sample (3.0 M/s)
 has to reach the MCU.
 
 **Minimum signal levels.** The delay line always sees a saturated comparator output, so its amplitude does not depend
@@ -218,7 +220,7 @@ ADC and firmware timers count the same clock:
 | FPGA serialiser | 960 Mbit/s, 1.04 ns per bit | 24 MHz x 40 (rPLL, OSER10 at 96 MHz fabric) |
 | Phase strobe PH_STROBE | 48 MHz, 20.83 ns | 20 bits (10 high, 10 low) |
 | Sampling strobe S_STROBE | 3.0 MHz, 333.3 ns | 320 bits = 16 phase strobes; falling edge (reverse pulse) at +166.7 ns |
-| MCU system clock | 120 MHz | 24 MHz PLL x 5 |
+| MCU system clock | 120 MHz | PLL from the 24 MHz HSE (x 5) |
 | ADC clock | 60 MHz, synchronous mode (HCLK / 2) | one strobe period = 20 ADC clocks; 12-bit conversion with 6.5-cycle sampling = 19 clocks (316.7 ns) |
 | Two-ADC variant | ADC 48 MHz, S_STROBE 2.4 MHz (416.7 ns) | 20 ADC clocks = 400 bits; for the case that two ADCs together have a lower clock limit (about 52 MHz, unverified) |
 
@@ -298,12 +300,45 @@ negotiation).
 | +2V5 / -2V5 | LP5907-2.5 / LM337 | TLV3801, TMUX136, hold amp, TLV9001, VTAP rails (12.5 mA each), TRIG_LEVEL and VBIAS_A networks |
 | VBUS | direct | GVA-84+ x2 (own chokes) |
 
+All regulators are on the board (power block, top right; the MT3608 boost about 23 mm east of the analog block with the
+FPGA between). Distribution on the six layers: +3V3 is one solid plane on L4 that every +3V3 pin reaches by its
+decoupling via; the minor rails (+5V, -5V, +2V5, -2V5, +1V2, VBUS to the GVA-84+ chokes, VTAP_P / VTAP_N) are routed
+tracks on L3 (and short L6 sections), 0.5-1.5 mm wide, down to 0.3 mm on parts of +/-2V5 (50 / 40 mA; IPC-2221 allows
+0.27 A for 0.3 mm on the 0.5 oz inner layer). Widths per rail: `layout/board/README.md`.
+
 The boost exists because the LM27761 cannot hold the BUF802's -4.5 V minimum from a 4.75 V USB input. The -2V5 rail
 feeds VTAP_N and the passive TRIG_LEVEL and VBIAS_A networks (no longer the offset network): its initial tolerance is
 calibrated, its drift moves the trigger level by 0.14 V/V and the bridge pedestal by about 0.09 V/V. The TMUX136 needs a VCC-to-GND ramp of 100-1000
 us/V.
 
-## 8. Calibration
+## 8. Board layout
+
+One six-layer board, 100 x 57 mm, JLCPCB JLC06161H-3313 (1.6 mm), four M3 holes, generated by
+`layout/board/gen_board.py` from six blocks (analog, phase, pstrobe, fpga, power, mcuif). Layer use:
+
+| Layer | Use |
+|---|---|
+| L1 F.Cu | all components on top, RF and analog routing; 50 ohm microstrip 0.16 mm over the 0.0994 mm prepreg to L2 |
+| L2 In1 | solid GND; cut only under the hold node, the divider node and the SMA pads (deliberate windows) |
+| L3 In2 | slow bias / control lines (VBIAS_A/K, VOFS, VNEG_REF, DAC_TRIG, TRIG_SEL, VTAP_TH, ADC_REF_MID, ADC_IN) and the minor-rail tracks; remaining area GND pour |
+| L4 In3 | one solid +3V3 plane |
+| L5 In4 | solid GND, reference for L6 |
+| L6 B.Cu | inter-block digital buses (TAP0..15, COARSE, FPGA_CLK / MCU_CLK, SPI, I2C, JTAG, ADC_TRIG, USB section) over L5; bottom-side decoupling, bulk and slow parts |
+
+Routing plan (`layout/board/TOPOLOGY.md`): every inter-block route is drawn with explicit coordinates (no auto-router).
+The RF paths (input, sampler strobe, BUF_OUT_T, the PH_STROBE pair) stay on L1 over L2; the TAP outputs, COARSE and the
+MCU / JTAG group leave the FPGA's south edge on L6 as two staircases (TAP0..7 west to the comparator vias, TAP8..15 and
+the MCU group down a drop column and east along a highway under the tap row, then south in the gaps between tap cells
+to the MCU block); the nine slow lines leave the MCU block on L6, change to L3 north of the tap row and run in a bundle
+under the comparators and up a reserved channel to the analog block's south edge, with ADC_IN 1 mm from its neighbours;
+the minor rails are maze-routed around them on L3 / L6. KiCad DRC (jlc4 rules, schematic parity): 0 errors, 0 unconnected.
+
+Renders: [L1](../layout/board/scope-fe-L1.png), [L2](../layout/board/scope-fe-L2.png), [L3](../layout/board/scope-fe-L3.png),
+[L4](../layout/board/scope-fe-L4.png), [L5](../layout/board/scope-fe-L5.png), [L6](../layout/board/scope-fe-L6.png),
+[L1 + L6](../layout/board/scope-fe-all.png), details: [analog](../layout/board/scope-fe-detail-analog.png),
+[FPGA south edge](../layout/board/scope-fe-detail-fpga-south.png), [MCU and J501](../layout/board/scope-fe-detail-mcu.png).
+
+## 9. Calibration
 
 1. **LF/HF match** (once, in production): 1 kHz square at the input, adjust RV101 for a flat top. Software cannot
    repair this in equivalent-time records.
@@ -317,7 +352,7 @@ us/V.
 5. **Tap threshold**: sweep VTAP_TH with the actual signal class and take the midpoint of the code-density plateau
    (about +17 mV).
 6. **Tap positions**: code density with an uncorrelated signal gives d_k for each tap, including skew, comparator
-   offsets and the irregular end taps 12-15. Repeat for the IODELAY dither steps.
+   offsets and the irregular end taps 12-15. Repeat for the output-delay sweep steps.
 7. **Coarse latency**: from signals that produce both fine and coarse stamps.
 8. **Sampler-to-phase-strobe offset**: measure the same edge with the sampler and the phase detector; one board
    constant.
@@ -327,7 +362,7 @@ us/V.
    either way (the gain calibration holds), but the firmware should let the user state that a terminator is fitted
    (displayed source EMF x2, 50 ohm input limits).
 
-## 9. Verification status
+## 10. Verification status
 
 | Area | Simulated with | Verified | Not verified |
 |---|---|---|---|
@@ -336,8 +371,8 @@ us/V.
 | Strobes | behavioural gain blocks (tanh limiter, nominal and pessimistic filter split); FPGA pin as ramp | 50 % duty, amplitudes, edges, aperture | saturated edge speed of TRF37D73/GVA-84+, clipping asymmetry, 47 uH choke SRF; bridge rails 24.9 ohm / 47 pF combined with the final chain |
 | Phase array | full 16-tap deck with both strobe chains, signal chain, gates and readout | co-propagation, spacing, threshold, reverse pulse, 50 % duty | COS3502 Cin, delay and hysteresis at 10-30 mV (Cin 3 / 6 pF bracket only), 0.5 pF hold caps, feed-through on a real board |
 | FPGA, firmware | none | - | tracking loop, dither, aiming, LUT fit, OSER10/IDES placement |
-| Schematic | generated netlist, 235 nets, own checks (no single-node nets, no shorted two-pin parts) | connectivity | KiCad ERC not run |
-| Layout | integrated 4-layer board `layout/board/scope-fe.kicad_pcb` (100 x 57 mm, 454 parts); the fragments are superseded | netlist parity 0 mismatches, 0 courtyard overlaps, nightly DRC jlc4 + schematic parity, ERC 0 errors | 18 nets unrouted, 44 DRC errors, In2 reference rule (below) |
+| Schematic | generated netlist, 251 nets, own checks (no single-node nets, no shorted two-pin parts) | connectivity | - |
+| Layout | integrated six-layer board `layout/board/scope-fe.kicad_pcb` (100 x 57 mm, 457 parts); the fragments are superseded | fully routed; netlist parity 0 mismatches, 0 courtyard overlaps, 0 clearance; nightly DRC jlc4 + schematic parity 0 errors; ERC 0 errors; L2 / L5 under every L1 / L6 fast trace except via antipads and the node windows | RF widths and delay-line sections not re-simulated for the six-layer stack-up (below) |
 
 Open risks, most severe first:
 
@@ -347,23 +382,24 @@ Open risks, most severe first:
 2. **BUF802 model and 50 ohm input.** The 3.3 GHz bandwidth, the 13 % overshoot and the 113 mVpp kick-out all rest on an idealised
    model; the real part is expected at about 2 GHz. Without on-board termination, 50 ohm S11 depends on the external
    feed-through terminator and the SMA-divider line (-3.4 dB at 2 GHz even with an ideal terminator).
-3. **Layout not finished.** The integrated board (`layout/board/`, JLC04161H-7628, 100 x 57 mm) holds all 454 parts
-   with the netlist's refs, values, footprints and pad nets, but 18 nets are unrouted (supply feeds, PH_STROBE_N,
-   USB, JTAG, SPI_CS/MOSI, I2C_SDA, TRIG_SEL, VBIAS_K, VTAP_TH), the nightly DRC (jlc4) reports 44 errors, and 657 of
-   1412 samples of B.Cu clock / TAP traces have no In2 ground above them: the full-width VTAP_P/N strips and the
-   TAP ribbon routed on In2 block every top-to-bottom crossing. The delay line is laid out at 40 / 75 ps per tap
-   (not re-simulated; verification used 35 / 70 ps); pad excess capacitances are not compensated; the DLW21SN balun
-   footprint is unverified. The fragments in `layout/input_stage|sampler|phase_trigger` are superseded.
+3. **Phase array on the built board, not re-simulated.** The strobe lines load to about 41 ohm against 49.9 ohm
+   terminations (43 ohm would match); the effective tap spacing is 30 ps with 39.4 / 69.4 ps per tap as laid out
+   (simulated: 35 ps with 35 / 70 ps). The pstrobe A / K legs are equal length but not mirror images; pad excess
+   capacitances are not compensated; the DLW21SN balun footprint is unverified.
 4. **Strobe kick-out into the trigger** (19 mVpp) is as large as the smallest trigger signal; the series ferrite/100
    ohm option is unproven.
 5. **Tap comparator and feed-through.** COS3502 Cin, delay and hysteresis at small overdrive are unknown; Cin 6 pF
    costs 40 % of the signal. The feed-through model rests on the BAT15 package capacitance.
-6. **Unverified pin features**: OSER10 on IOT16/IOT17 and IDES on pin 47; MODE pins for autoboot; EXTI11 as ADC12
-   trigger (RM0440 not read; the DAC3 -> OPAMP1/3 mapping is now taken from the ST HAL OPAMP header and the LQFP-48 OPAMP outputs from ST's pin-data XML); TMUX136 Ron at 0.4-1.4 V above its GND; MS5351M
+6. **Unverified pin and clock features**: OSER10 on IOT16/IOT17 and IDES on pin 27, serialiser / input-capture placement on
+   the permuted pins, the output delay block on a serialiser pin; MS5351M output-to-output phase repeatability after a PLL
+   reset; the PB11 timer output; the ADC clock limit with two ADCs; MODE pins for autoboot (RM0440 not read; the DAC3 -> OPAMP1/3 mapping is now taken from the ST HAL OPAMP header and the LQFP-48 OPAMP outputs from ST's pin-data XML); TMUX136 Ron at 0.4-1.4 V above its GND; MS5351M
    register equivalence; LM337S (XBLW) pinout; balun pad map.
-7. **Firmware and FPGA logic** do not exist; dither, aiming and the tracking loop are arithmetic only, and the
-   1152-LUT budget is tight.
-8. **Power**: 0.85 A needs a 1.5 A USB-C supply; LM337 stability with ceramics; AMS1117 dissipation.
+7. **No firmware or FPGA logic exists**; frame alignment, the fine sweep, aiming and the tracking loop are arithmetic
+   only, and the 1152-LUT budget is tight.
+8. **Power**: 0.85 A needs a 1.5 A USB-C supply; the GVA-84+ run directly from VBUS and are below their 4.8 V minimum
+   when USB delivers 4.75 V (strobe amplitude, risk 1); minor rails are tracks, not planes (+/-2V5 down to 0.3 mm,
+   adequate for the current; one -2V5 L3 run passes 0.18 mm from the hold-node window); LM337 stability with ceramics;
+   AMS1117 dissipation.
 9. **Sourcing**: BAT15-03W out of stock at LCSC; TRF37D73 25 pcs at LCSC (Mouser has stock); SMA connectors
    and about 30 passives have no part number.
 
@@ -388,16 +424,16 @@ Simulation plots:
 ![Strobe chain edges](../sim/strobe/chain_edges.png) ![Strobe along the tap lines](../sim/phase_array/strobe_spacing.png)
 ![Captured value per tap](../sim/phase_array/capture.png) ![Reverse pulse](../sim/phase_array/reverse.png)
 
-Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and the integrated board (work in progress):
+Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and the integrated board:
 
 ![Root sheet](../kicad/export/scope-fe.png) ![Input](../kicad/export/scope-fe-input.png)
 ![Sampler](../kicad/export/scope-fe-sampler.png) ![Strobe](../kicad/export/scope-fe-strobe.png)
 ![Trigger and phase](../kicad/export/scope-fe-trigger_phase.png) ![FPGA and clock](../kicad/export/scope-fe-fpga_clock.png)
 ![Power](../kicad/export/scope-fe-power.png) ![MCU](../kicad/export/scope-fe-mcu_if.png)
-![Board top copper](../layout/board/scope-fe-top.png) ![Board In1](../layout/board/scope-fe-in1.png)
-![Board In2 over B.Cu](../layout/board/scope-fe-in2-bcu.png) ![Board bottom](../layout/board/scope-fe-bottom.png)
+![Board L1](../layout/board/scope-fe-L1.png) ![Board L3](../layout/board/scope-fe-L3.png)
+![Board L6](../layout/board/scope-fe-L6.png) ![Board analog detail](../layout/board/scope-fe-detail-analog.png)
 
-## 10. Bring-up order
+## 11. Bring-up order
 
 1. **Power, no RF parts powered**: check every rail, ripple, the -2V5 noise and the TMUX136 ramp; total current
    against 0.85 A.
@@ -408,7 +444,7 @@ Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and the integrated bo
 4. **Strobe chains**: S_STROBE and PH_STROBE patterns; measure step, edge and stub pulse of one chain each (risk 1);
    check the reverse pulse with the clamp.
 5. **Input stage**: 1 Mohm input and with an external 50 ohm feed-through terminator, servo, RV101 trim, offset range, overload behaviour.
-6. **Sampler**: hold chain and ADC timing (ADC_TRIG at +40 ns), bias sweep, pedestal, efficiency.
+6. **Sampler**: hold chain and ADC timing (sampling 40-148 ns after the strobe, frame alignment on ADC_TRIG), bias sweep, pedestal, efficiency.
 7. **Trigger path**: TMUX136 both inputs, TLV3801 level, line driver output, COARSE.
 8. **Delay line**: VTAP_TH sweep, code density, tap positions, latch timing (+12 ns).
 9. **System**: tracking loop, dither, equivalent-time records; compare with a known edge and a 3 Gbps pattern.

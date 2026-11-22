@@ -171,14 +171,14 @@ def silk(B, m):
     txt("SIG IN", 3.2, 7.3, 0.8)
     # review: "EXT CLK" was at y 46.6, 20 mm below J102 (y 26.5); no free silk room next to J102 (TP103 / TP104,
     # U304): its F.Fab value text EXT_CLK labels it (rule 9)
-    # review: was (95.0, 19.65), over the D601 pads (silk_over_copper) and inside its outline: vertical, west of J601
-    txt("USB", 89.9, 13.5, 0.8, rot=90)
+    # review: was (95.0, 19.65), over the D601 pads (silk_over_copper) and inside its outline: now north of J601
+    txt("USB", 95.3, 7.7, 0.8)
     # block / connector labels (review): ANALOG comes from the analog block
     txt("FPGA", 64.5, 21.3, 0.8)
     txt("POWER", 83.5, 21.8, 0.8)
     txt("PHASE", 40.0, 44.6, 0.8)
-    txt("MCU / IF", 64.0, 51.2, 0.8)
-    txt("PROG J501", 61.5, 54.6, 0.8)
+    txt("MCU / IF", 75.0, 44.6, 0.8)
+    txt("PROG J501", 59.6, 54.6, 0.8)
     # U603 / L601 library silk overlap (silk_overlap): drop L601's silk segments that touch U603's silk
     u603, l601 = B.FindFootprintByReference("U603"), B.FindFootprintByReference("L601")
     if u603 and l601:
@@ -334,4 +334,11 @@ def cleanup(B, m):
     # VBUS: pstrobe landing vias (22.78, 26.345 / 27.045) fed only by the B stub from C418.1 (the L6 hop feeds C418.1)
     if kill_via("VBUS", (22.78, 26.345)) | kill_via("VBUS", (22.78, 27.045)):
         kill_seg("VBUS", "B.Cu", (22.78, 25.725), (22.78, 27.045))
+    # R737.1 (TRIG_SEL pull-down, B side, vertical 0402): the slow line entered the pad diagonally; enter along its axis
+    # (branch off the north stub at y 46.6, 45-degree bends only; the via at (71.0, 47.1) stays on the stub)
+    if kill_seg("/TRIG_SEL", "B.Cu", (71.0, 47.1), (70.3, 47.8)):
+        kill_seg("/TRIG_SEL", "B.Cu", (70.3, 47.8), (70.3, 47.84))
+        if kill_seg("/TRIG_SEL", "B.Cu", (71.0, 45.0), (71.0, 47.1)):
+            m.track("/TRIG_SEL", 0.15, [(71.0, 45.0), (71.0, 46.6), (70.3, 47.3), (70.3, 47.84)], "B.Cu", ch=0.0001)
+            m.track("/TRIG_SEL", 0.15, [(71.0, 46.6), (71.0, 47.1)], "B.Cu", ch=0.0001)
     return done
