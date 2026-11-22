@@ -62,25 +62,22 @@ beside every inter-block signal via (stitching module; the highway-end USB pair 
    excluded from the L3 fast-net check).
 
 ## Check results (last run, verbatim)
-- check_board: `missing 0, extra 4 (H1-H4), footprint 0, value 0, pad-net 0, nets with unrouted connections (after fill) 15,
-  clearance < 0.1 mm 1, track corners > 45 deg 29, tracks leaving a pad off-axis 2 (C111.1, R737.1), RF width 0,
-  RF pour gap 0, courtyard overlaps 0, unconnected items 17`. Unrouted: the nine slow lines plus +2V5 (1), +3V3 (1), +5V (1),
-  -2V5 (3) and others of the power module. The clearance (VBUS / VREFP on B.Cu at (22.73, 48.60)), the 29 corners (VTAP_P /
-  VTAP_N 90-degree joints, +2V5 / +5V joints) and C111.1 are in copper added by `board_power.py` (second agent); the signal
-  routing of this file has 0 clearance, 0 corners, 0 crossings.
-- rule 10: `fast-net segments on L3: 0` (FPGA_DONE excluded: static config line); `L1/L6 samples 8155, without filled GND on
-  L2/L5: 449` = 417 via antipads + 25 PTH antipads + 7 deliberate L2 windows (tap pads / hold nodes); **0 real plane holes**.
-  L4: `+3V3` one polygon. L5 solid except antipads.
-- Stitching (`board_stitch.py`): 14 GND vias beside inter-block signal vias (6 signal vias without room within 1.1 mm),
-  14 RF fence vias, 357 grid vias.
-- DRC jlc4 + parity: `total 503: error 17, warning 486` = 16 unconnected_items (unrouted nets above) + 1 tracks_crossing
-  (board_power.py's VBUS L6 feeder over the mcuif VREFP B track at (22.73, 48.60)); warnings 199 'Note' field, 199
-  lib_footprint_mismatch + 12 lib_footprint_issues (library version), 30 DNP (KiCad 7), 18 track_dangling + 14 via_dangling
-  (slow-line stubs and analog-side L3 vias waiting for their lines), 10 net_conflict (TL401-403, J601 shell), 2
-  silk_over_copper, 2 silk_overlap.
-- ERC (re-run after the schematic change): `total 18: warning 18` (9 footprint_link_issues, 9 lib_symbol_mismatch), 0 errors.
-- Renders (all looked at): L1-L6, all, three details: staircase, JTAG band, drop column / highway / peel-offs, USB L1-L6
-  hops and the PH pair as intended; L2 / L5 solid apart from the deliberate windows; L3 / L4 from board_power.py.
+Order in gen_board.py: blocks -> signal routes -> slow lines (board_slow) -> planes -> stitching -> silk -> routes.json ->
+`board_power.apply` (the old single-step module; `apply_trunks` / `apply_rest` did not exist yet) -> fill -> checks.
+- check_board: `missing 0, extra 4 (H1-H4), footprint 0, value 0, pad-net 0, nets with unrouted connections (after fill) 9,
+  clearance < 0.1 mm 0, track corners > 45 deg 22, tracks leaving a pad off-axis 2 (C111.1, R737.1), RF 0, courtyard 0,
+  unconnected items 12`. Unrouted signals: DAC_TRIG, VBIAS_A, VNEG_REF, VOFS (slow lines, see above). Unrouted supplies
+  (power module): +5V (1), -2V5 (1), -5V (1), GND (1). The 22 corners (+2V5 / -2V5 / +5V / VTAP_N joints) and C111.1 are in
+  board_power.py copper; the signal routing has 0 clearance, 0 corners, 0 crossings.
+- rule 10: `fast-net segments on L3: 0`; `L1/L6 samples 8170, without filled GND on L2/L5: 449` = 417 via antipads + 25 PTH
+  antipads + 7 deliberate L2 windows; **0 real plane holes**; L4 `+3V3` one polygon.
+- Stitching: 29 GND vias beside inter-block signal vias (0.7-1.0 mm), 11 signal vias without room within 1 mm (listed by
+  `board_stitch.stitch`), 13 RF fence vias, 346 grid vias.
+- DRC jlc4 + parity: `total 482: error 11, warning 471` = 11 unconnected_items (the unrouted nets above); 0 clearance,
+  0 crossing, 0 shorting. Warnings: 199 'Note' field, 199 + 12 library version, 30 DNP (KiCad 7), 10 net_conflict
+  (TL401-403, J601 shell), 8 track_dangling + 7 via_dangling (unfinished slow lines), 2 silk_over_copper, 2 silk_overlap,
+  1 hole_to_hole + 1 holes_co_located (+2V5 vias of board_power.py at (32.95 / 32.55, 23.75) and (32.15, 48.15)).
+- ERC (re-run): `total 18: warning 18` (9 footprint_link_issues, 9 lib_symbol_mismatch), 0 errors.
 
 ## History (short)
 21 Nov: a 4-layer attempt and a first six-layer pass were auto-routed and failed on same-layer crossings at the fpga south
