@@ -4,7 +4,7 @@ Equivalent-time sampling front end for 2 GHz / 3 Gbps signals, built around a 4-
 delay-line phase detector and a small FPGA. An on-board STM32G474CBT6 supplies the ADC, the DACs and the calibration
 (it replaced the earlier header to a user STM32 board on 21 Nov 2026).
 Every number in this document is a simulation result or a design value; no board has been built. Sources: `../SPEC.md`
-(Decisions section), `../sim/*/RESULT.md`, `../kicad/README.md`, `bom.md`, `../layout/*/README.md`,
+(Decisions section), `../sim/*/RESULT.md`, `../kicad/README.md`, `bom.md`, `../layout/board/README.md`,
 `../../../docs/research/`.
 
 ## 1. Overview
@@ -30,17 +30,17 @@ EXT_CLK SMA ─┴────────────────────�
   PH_STROBE_P/N ─ 2x (TRF37D73 ─ 10 dB ─ GVA-84+ ─ 80 ps stub) ─► PSTRB_A/K, 16 x 35 ps ─► 50 R
                                                                        │ 2.2 k / 2x 1 k readout
                                                 VTAP_TH (DAC) ─► 8x COS3502 ─► TAP[15:0]
-   MS5351M ─ FPGA_CLK ─► GW1NZ-1 FPGA: PH_STROBE 50 MHz, S_STROBE 3.125 MHz, latch TAP, ADC_TRIG, SPI
-           └ MCU_CLK ──► STM32G474CBT6 (on board): ADC, 5 DACs, I2C, USB FS, firmware, calibration
+   MS5351M ─ FPGA_CLK 24 MHz ─► GW1NZ-1 FPGA: PH_STROBE 48 MHz, S_STROBE 3.0 MHz, latch TAP, SPI
+           └ MCU_CLK 24 MHz ──► STM32G474CBT6 (on board): ADC, 5 DACs, I2C, USB FS, ADC_TRIG frame mark
 ```
 
-The sampler takes one sample per S_STROBE (3.125 MHz). The phase path measures, on every 50 MHz phase strobe, where a
+The sampler takes one sample per S_STROBE (3.0 MHz). The phase path measures, on every 48 MHz phase strobe, where a
 rising edge of the trigger signal lies inside a 560 ps window. Because both strobes come from the same FPGA
 serializer, every edge found in a snapshot is a time stamp on the strobe grid. Software fits the signal phase and
 frequency to those stamps and assigns each sample its equivalent time. No trigger divider or programmable delay is
 needed.
 
-Key figures (simulated, behavioural amplifier models; see section 9):
+Key figures (simulated, behavioural amplifier models; see section 10):
 
 | Item | Value |
 |---|---|
@@ -50,11 +50,11 @@ Key figures (simulated, behavioural amplifier models; see section 9):
 | Step at the splitter (20 ps input) | external terminator 130 ps 10-90 %, 13 % overshoot; unterminated 191 ps, 0.5 % |
 | Sampler aperture | 84 ps (2x TRF37D73 strobe, 80 ps stub); 109 ps 10-90 % behind a 2 GHz first-order input |
 | Noise, referred to the input tip | input stage 0.57 mV rms; sampler + ADC 0.35 mV rms at the bridge = about 1.75 mV at the tip, per deconvolved point |
-| Sample rate | 3.125 MS/s (S_STROBE = PH_STROBE / 16) |
+| Sample rate | 3.0 MS/s (S_STROBE = PH_STROBE / 16); 2.4 MS/s in the two-ADC variant (section 6) |
 | Phase detector | 16 taps, 34.7 +/- 3.1 ps spacing (31-44 ps), window 58-579 ps; 19 ps rms per snapshot (22 ps with 6.5 mV comparator offsets) |
 | Trigger | down to 200 mVpp at the tip (+/-20 mV at the comparator); TRIG_LEVEL +/-0.30 V at the comparator |
 | Power | USB-C 5 V, about 0.9 A |
-| Parts cost | 64.31 USD per board (MCU included, PCB excluded), 6.04 USD of it estimates |
+| Parts cost | 62.85 USD per board (MCU included, PCB excluded), 6.0 USD of it estimates |
 
 ## 2. Input stage
 
@@ -105,7 +105,7 @@ Kick-out on a quiet input: 174 mVpp at the bridge, 113 mVpp at the BUF802 pin, 1
 **Efficiency correction.** With efficiency e < 1 the hold node remembers the previous sample: v_k = (1-e) v_(k-1) + e
 (g x_k + ped). For the sampler RESULT values (e = 0.69, g = 0.69): x_k = (v_k - 0.31 v_(k-1)) / 0.48 (after pedestal
 removal). v_(k-1) is the previous strobe in time order, not in equivalent-time order, so the MCU keeps the raw ADC
-stream for this step. The coefficients are calibrated per board (section 8) because they move with strobe amplitude,
+stream for this step. The coefficients are calibrated per board (section 9) because they move with strobe amplitude,
 bias and temperature; with the final strobe chain the efficiency is close to 1 and the correction small. A rail
 bootstrap was rejected: it raises gain but not the weight of the new sample. Deconvolution doubles the noise (x2.08);
 the ADC (0.48 mV rms at the pin) dominates the 0.35 mV total.
@@ -113,7 +113,7 @@ the ADC (0.48 mV rms at the pin) dominates the 0.35 mV total.
 ## 4. Strobe generation
 
 The GW1NZ-1 has no true LVDS output, so each strobe is a complementary LVCMOS33 pin pair driven by a 1 Gbps
-serializer. The gain blocks are AC coupled and saturating.
+serializer (960 Mbit/s, section 6). The gain blocks are AC coupled and saturating.
 
 **Why 50 % duty.** A low-duty pulse lets the AC-coupled chain idle in its linear range, so the output step is only one
 saturation level (about 2.4 V for TRF37D73). A 50 % square wave saturates both levels and the step is 2 Vsat: 4.59 V
@@ -125,14 +125,15 @@ a reverse pulse half a period later.
 common-mode-choke balun (DLW21SN) -> STRB_A/STRB_K. S_STROBE_N is terminated in 50 ohm. Edge 133-152 ps (FPGA edge
 300-600 ps), aperture 84 ps. A fitted BAT15-03W shunt clamp at the stub node cuts the reverse pulse on the bridge from
 3.27 V to 1.90 V (BAT15 BV 4 V). The reverse pulse still shifts the held value by -13 mV (-17 mV with the clamp), so
-**the ADC must sample before the S_STROBE falling edge, 160 ns after the strobe**.
+**the ADC must finish sampling before the S_STROBE falling edge, 166.7 ns after the strobe at 3.0 MHz** (160 ns in the
+original 3.125 MHz simulation).
 
 **Phase strobes.** PH_STROBE_P and PH_STROBE_N each drive TRF37D73 -> 10 dB pad (100/68/100) -> GVA-84+ (VBUS, 2.2 uH
 choke) -> 80 ps shorted stub -> PSTRB_A resp. PSTRB_K. With the 80 ps stub the pulse is +4.14 V / 221 ps at tap 0 and
 +2.87 / -2.75 V / 286-319 ps at tap 15; every gate gets at least 2.75 V against the 2.0 V it needs. The reverse pulse
 reaches at most 2.95 V on a tap diode (74 % of BV) and moves the comparator inputs by less than 0.5 mV, so the PSTRB
-clamps are not fitted (footprints kept). The stub length is 13.2 mm at 6.057 ps/mm (50 ohm microstrip, 0.36 mm on
-JLC04161H-7628); the sampler layout fragment draws it at 13.207 mm.
+clamps are not fitted (footprints kept). The stub is 80 ps of 50 ohm microstrip (13.2 mm at 6.057 ps/mm on the old
+4-layer stack-up; 0.16 mm wide on the six-layer board).
 
 **Bias adjustment.** The sampler bridge only conducts if the strobe overcomes the reverse bias. At +/-1 V bias it
 stops at about -35 % strobe amplitude; a -40 % strobe still works at +/-0.6 V (gain 0.70, 93 %). VBIAS_A and VBIAS_K
@@ -175,9 +176,9 @@ zeros. This also handles the AC coupling: on a slow clock the line idles at 0 V,
 per signal class by a threshold sweep.
 
 **Latch and coarse stamp.** COS3502 outputs are valid from strobe + 9 ns (worst case) to strobe + 24 ns. The FPGA
-latches TAP[15:0] at **strobe + 12 ns** (window 10-22 ns), before the next phase strobe. The SN65LVDS2, bridged onto
-CMP_P/CMP_N by 2 x 470 ohm, gives COARSE to FPGA pin 47 (GW1NZ-1 has no differential input). The FPGA deserializes it
-at 1 Gbps: 1 ns bins, usable for edges up to about 100-150 MHz (1.4 ns RC).
+latches TAP[15:0] at **strobe + 12 ns** (window 10-20.8 ns), before the next phase strobe (20.83 ns period). The SN65LVDS2, bridged onto
+CMP_P/CMP_N by 2 x 470 ohm, gives COARSE to FPGA pin 27 (GCLKT_3; GW1NZ-1 has no differential input). The FPGA deserializes it
+at 960 Mbit/s: 1.04 ns bins, usable for edges up to about 100-150 MHz (1.4 ns RC).
 
 **From snapshots to sample times.** A snapshot with a rising edge is a thermometer code: taps the edge has passed read
 1. The transition position k gives the edge time t = t_PH(n) - d_k, where t_PH(n) is the known phase strobe time
@@ -194,44 +195,72 @@ on the input. The trigger needs about 200 mVpp at the tip (+/-20 mV at the TLV38
 about 100 ps, at the strobe instant) is comparable to that and is not yet mitigated. The phase strobes must deliver at
 least 2.0 V at every gate (1.5 V gives 3.5 mV, a failure).
 
-**Minimum trigger rates.** With a 560 ps window, 50 MHz strobes and rising edges only, a free-running clock of
-frequency f gives about 0.028 f stamps/s: 10 k/s from about 360 kHz, and gaps over 100 us become rare (< 1e-3) from
+**Minimum trigger rates.** With a 560 ps window, 48 MHz strobes and rising edges only, a free-running clock of
+frequency f gives about 0.027 f stamps/s (0.028 f at the original 50 MHz, from which the following figures come): 10 k/s from about 360 kHz, and gaps over 100 us become rare (< 1e-3) from
 about 2.5 MHz. These are the both-polarity figures of `timing-architecture.md` doubled (arithmetic, not simulated). 3
 Gbps data gives roughly half of the 34 M/s listed there. Below that, the FPGA aims phase strobes at the predicted edge
-(coarse plus fine history, 1 ns bits plus IODELAY steps); for crystal sources this works down to the kHz range at one
+(coarse plus fine history, 1.04 ns bits plus output-delay steps); for crystal sources this works down to the kHz range at one
 stamp per period. Non-periodic single events get a random hit with probability about 2.8 %. Strobe phase must be
-dithered so that commensurate signals (for example 10 MHz against 50 MHz) do not land on a fixed set of phases.
+swept so that commensurate signals (a simple ratio of the strobe rate, for example 12 MHz against 48 MHz) do not land on
+a fixed set of phases (section 6).
 
 **External clock mode.** TRIG_SEL switches the TMUX136 to EXT_CLK; the comparator, delay line and coarse path are
 unchanged. EXT_CLK must stay within +/-0.5 V into 50 ohm (the TMUX136 range); TRIG_LEVEL is set to the clock midpoint.
 
 ## 6. Time base and FPGA functions
 
-The MS5351M (Si5351A-compatible, 25 MHz crystal, I2C from the MCU) supplies FPGA_CLK (pin 33, rPLL input) and MCU_CLK
-(STM32 HSE bypass on PF0), so ADC and strobes share one reference. The FPGA PLL makes the 1 Gbps serializer clock
-(OSER10, 100 MHz fabric).
+**Synchronous frequency plan** (SPEC decision 17). One MS5351M PLL (Si5351A-compatible, 25 MHz crystal, I2C from the
+MCU) with integer dividers gives 24 MHz on FPGA_CLK (pin 33, rPLL input) and MCU_CLK (STM32 HSE bypass, PF0), so strobes,
+ADC and firmware timers count the same clock:
 
-| Function | Pins | Behaviour |
+| Quantity | Value | Relation |
 |---|---|---|
-| PH_STROBE_P/N | 40/39 (IOT16A/B) | 50 MHz, 50 % (10 bits high, 10 low); 70 % high is an option that moves the reverse pulse to +14 ns |
-| S_STROBE_P/N | 38/35 (IOT17A/B) | 3.125 MHz = PH_STROBE / 16, 160 ns / 160 ns, fixed bit offset from a phase strobe (10 ns proposed in research) |
-| Dither | - | pseudo-random coarse offset in 1 ns bits per strobe plus a slow IODELAY sweep; both known, the sweep calibrated by code density |
-| TAP[15:0] | 9-11, 13-24, 27 | latched at phase strobe + 12 ns |
-| COARSE | 47 (GCLKT_0) | IDES at 1 Gbps, 1 ns bins |
-| ADC_TRIG | 41 -> PB11 (EXTI11) | strobe + 40 ns (sampling window 40-148 ns, must end before the falling edge at +160 ns) |
-| SPI slave | 28-31 | per-strobe records with sequence numbers to the MCU |
+| FPGA serialiser | 960 Mbit/s, 1.04 ns per bit | 24 MHz x 40 (rPLL, OSER10 at 96 MHz fabric) |
+| Phase strobe PH_STROBE | 48 MHz, 20.83 ns | 20 bits (10 high, 10 low) |
+| Sampling strobe S_STROBE | 3.0 MHz, 333.3 ns | 320 bits = 16 phase strobes; falling edge (reverse pulse) at +166.7 ns |
+| MCU system clock | 120 MHz | 24 MHz PLL x 5 |
+| ADC clock | 60 MHz, synchronous mode (HCLK / 2) | one strobe period = 20 ADC clocks; 12-bit conversion with 6.5-cycle sampling = 19 clocks (316.7 ns) |
+| Two-ADC variant | ADC 48 MHz, S_STROBE 2.4 MHz (416.7 ns) | 20 ADC clocks = 400 bits; for the case that two ADCs together have a lower clock limit (about 52 MHz, unverified) |
+
+**Frame alignment.** An MCU timer triggers the ADC internally (fixed, deterministic latency) and drives its output on the
+ADC_TRIG wire (MCU PB11 -> FPGA pin 18), which marks the frame start. The FPGA aligns its strobe counter to that edge
+once, with serialiser bit slips (1.04 ns) plus the GW1NZ output delay block (about 30 ps per step, 128 steps). The same
+delay block trims the phase-strobe to sampling-strobe delay and provides the slow fine sweep that keeps a signal at a
+simple ratio of the strobe rate from always or never hitting the tap window. The ADC samples from strobe + 40 ns for
+6.5 cycles: 40-148 ns at 60 MHz, which ends 18.6 ns before the reverse pulse at 166.7 ns (variant: 40-175 ns against
+208.3 ns). Because the reverse pulse shifts the held value, this window must stay fixed relative to the strobe, which is
+why the whole plan is phase-locked rather than free-running.
+
+Not verified: MS5351M output-to-output phase repeatability after a PLL reset; the PB11 timer output function (EXTI11 is
+the ADC12 trigger input; which timer channel PB11 carries is not checked); whether the output delay block can be used on
+a serialiser (OSER10) pin; serialiser and input-capture placement on the permuted FPGA pins.
+
+| Function | FPGA pins (as built) | Behaviour |
+|---|---|---|
+| PH_STROBE_P/N | 39/40 (IOT16B/A) | 48 MHz, 50 % (which output is P is a firmware matter) |
+| S_STROBE_P/N | 38/35 (IOT17A/B) | 3.0 MHz, fixed bit offset from a phase strobe, trimmed by the output delay |
+| TAP0..7 | 28, 29, 30, 31, 32, 41, 47, 6 | latched at phase strobe + 12 ns |
+| TAP15..8 | 9, 10, 11, 13, 14, 15, 16, 17 | (reversed for the board fan-out) |
+| COARSE | 27 (GCLKT_3) | IDES at 960 Mbit/s, 1.04 ns bins |
+| ADC_TRIG | 18 <- MCU PB11 | frame start from the MCU timer |
+| SPI slave SCK / MISO / MOSI / CS | 20 / 21 / 22 / 24 | per-strobe records with sequence numbers to the MCU; plain user I/O: SPI no longer uses the configuration SPI, the FPGA is configured by JTAG or from its internal flash only |
+| DBG2, JTAG TCK / TMS / TDI / TDO | 8, 3 / 4 / 5 / 7 | to J501 |
+| FPGA_DONE / RECONFIG | 46 / 48 | MCU PB6 / PB13 |
+
+The pin numbers above replace the original plan (TAP on 9-11 / 13-24 / 27, COARSE 47, ADC_TRIG 41, SPI 28-31): they were
+permuted so that the six-layer fan-out has no crossings (`kicad/README.md`, FPGA section).
 
 **Programming header J501** (Würth WR-WST 490107671612, Redfit IDC direct-to-board footprint, no part fitted) has
 the yanartas sensing board J3 pinout: 1 VBUS, 3 +3V3, 6/15/16 GND, FPGA JTAG on 7/9/11/13 (TCK/TMS/TDI/TDO), DBG2 on 5
-(FPGA pin 6), and for the STM32 SWDIO 8, SWCLK 10, NRST 14, DBG1 12 (PB9) and the USART1 console on 2 (HOST_RX = MCU RX,
+(FPGA pin 8), and for the STM32 SWDIO 8, SWCLK 10, NRST 14, DBG1 12 (PF1) and the USART1 console on 2 (HOST_RX = MCU RX,
 PA10) and 4 (HOST_TX = MCU TX, PA9), each through 100 R. One cable debugs both chips.
 
-The ratio 16 sets the sample rate below the G474 ADC limit (4 MS/s) while keeping the phase strobe at the 50 MHz the
+The ratio 16 sets the sample rate below the G474 ADC limit (4 MS/s) while keeping the phase strobe at the 48 MHz the
 COS3502 and the readout allow. Snapshot reduction, coarse/fine combination and the tracking loop run in the FPGA
 fabric (1152 LUT; the fit is not checked).
 
-**MCU (STM32G474CBT6, LQFP-48, on board, U704).** ADC12_IN1 on PA0, 6.5-cycle sampling (108 ns) at 60 MHz with the synchronous ADC
-clock, VREFBUF 2.9 V, triggered by ADC_TRIG; DMA into SRAM. Five DAC outputs (since 21 Nov 2026 without difference
+**MCU (STM32G474CBT6, LQFP-48, on board, U704; pin table in `kicad/README.md`).** ADC12_IN1 on PA0, 6.5-cycle sampling
+(108 ns) at 60 MHz with the synchronous ADC clock, VREFBUF 2.9 V, triggered internally by the frame timer; DMA into SRAM. Five DAC outputs (since 21 Nov 2026 without difference
 amplifiers: the DACs drive passive networks, and one op-amp, U701 TLV9001, makes VNEG_REF = -0.680 x VREF+ for the
 offset network only). Vdac usable 0.2-2.7 V on the buffered pins:
 
@@ -248,8 +277,8 @@ listed in `kicad/README.md` and are calibrated or negligible. Reset state (DACs 
 off): VBIAS_K 0 V (pull-down), VBIAS_A about -1.7 V (PA6 clamps at about -0.4 V), so the bridge is reverse-biased;
 VNEG_REF 0 V; TRIG_LEVEL -0.34 V. Firmware should enable VREFBUF, the DACs and the OPAMPs together.
 
-GPIOs drive TRIG_SEL (PB6), read FPGA_DONE (PB0) and pull FPGA_RECONFIG (PB2); SPI1 master on PB3/PB4/PB5 with CS on
-PB10, I2C1 on PA15/PB7, MCU_CLK into PF0 (HSE bypass), ADC_TRIG into PB11 (EXTI11, ADC12 external trigger), USB FS on
+GPIOs drive TRIG_SEL (PA1, 2.0k reset pull-down R737), read FPGA_DONE (PB6) and pull FPGA_RECONFIG (PB13); SPI1 master on
+PB3/PB4/PB5 with CS on PB9, I2C1 on PA15/PB7, MCU_CLK into PF0 (HSE bypass), ADC_TRIG out on PB11 (frame mark), USB FS on
 PA11/PA12 to the USB-C receptacle (USBLC6-2SC6 ESD). The MCU pairs ADC results
 with FPGA records by count, applies the efficiency correction and all calibration tables, and builds the
 equivalent-time record. ADC_REF_MID (0.725 V) is VREF+ / 4 by divider.
