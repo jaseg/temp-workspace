@@ -264,8 +264,11 @@ for k in range(NT // 2):
     vth = nn(ref, "2")
     for pin in ("2", "4"):
         px, py = P(ref, pin)
-        V(px, VTH_Y, vth)
-        T(vth, W_SIG, [(px, py), (px, VTH_Y)], ch=0)
+        # 22 Nov (TOPOLOGY.md section 8): VTH on L1 at the body centre line YC, pins 2 / 4 by short inward stubs;
+        # vias only where the B-side divider (R380 / R381) joins: U308 pin 4 and U309 pin 2
+        T(vth, W_SIG, [(px, py), (px, YC)], ch=0)
+        if (k, pin) in ((3, "4"), (4, "2")):
+            V(px, VTH_Y, vth)
         VTH_X[vth].append(px)
     # +3V3 pin 8: pad-wide copper to the 100 n left of the pin, via pair to In2; GND pin 5 via
     p8, p5 = P(ref, "8"), P(ref, "5")
@@ -319,11 +322,11 @@ XVTH = xg
 x_r380, x_r381 = xg - 1.55, xg + 1.55
 place2("R380", x_r380, VTH_Y, "h", "/trigger_phase/VTH1", side="B")
 place2("R381", x_r381, VTH_Y, "h", "/VTAP_TH", side="B")
-# 22 Nov: the rails run on L3 (In2) between their pin vias (static threshold); only the last piece into R380 / R381 is B
+# 22 Nov: the rails run on L1 under the comparator bodies (centre line YC); the divider joins through one via per rail
 v1, v2 = sorted(VTH_X["/trigger_phase/VTH1"]), sorted(VTH_X["/trigger_phase/VTH2"])
-T("/trigger_phase/VTH1", 0.3, [(v1[0], VTH_Y), (v1[-1], VTH_Y)], layer="In2.Cu", ch=0)
+T("/trigger_phase/VTH1", 0.3, [(v1[0] - 0.3, YC), (v1[-1] + 0.3, YC)], layer="F.Cu", ch=0)
 T("/trigger_phase/VTH1", 0.3, [(v1[-1], VTH_Y), P("R380", "@/trigger_phase/VTH1")], layer="B.Cu", ch=0)
-T("/trigger_phase/VTH2", 0.3, [(v2[0], VTH_Y), (v2[-1], VTH_Y)], layer="In2.Cu", ch=0)
+T("/trigger_phase/VTH2", 0.3, [(v2[0] - 0.3, YC), (v2[-1] + 0.3, YC)], layer="F.Cu", ch=0)
 T("/trigger_phase/VTH2", 0.3, [P("R381", "@/trigger_phase/VTH2"), (v2[0], VTH_Y)], layer="B.Cu", ch=0)
 T("/VTAP_TH", 0.25, [P("R380", "@/VTAP_TH"), P("R381", "@/VTAP_TH")], layer="B.Cu", ch=0)
 for cref, rref, net in (("C354", "R380", "/trigger_phase/VTH1"), ("C355", "R381", "/trigger_phase/VTH2")):

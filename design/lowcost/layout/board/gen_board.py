@@ -229,10 +229,19 @@ for k, net in enumerate(WEST):
 # (86.80-88.60) and the tap-14 jumpers (89.92)), south, vias east of the C357 GND via (88.09, 43.59), F into mcuif.
 W_USB = 0.18
 pDP, pDM = (82.6, 22.5), (83.0, 22.5)
-T("/USB_DP", W_USB, [pDP, (82.6, 22.95), (82.9, 23.25), (86.0, 23.25), (86.4, 23.65), (86.4, 31.06)], "F.Cu",
+# the VTH2 rail (L1, comparator centre line y 27.755) and the highway TAP14 / TAP15 (L6, y 30.35 / 30.6) both cross the
+# pair's path: L1 down to above VTH2, L6 under it, L1 again under the highway lanes, L6 from y 31.1 on
+T("/USB_DP", W_USB, [pDP, (82.6, 22.95), (82.9, 23.25), (86.0, 23.25), (86.4, 23.65), (86.4, 27.2)], "F.Cu",
   "L1 north of U311, gap U311|U312", ch=0.0001)
-T("/USB_DM", W_USB, [pDM, (83.0, 22.55), (83.3, 22.85), (86.4, 22.85), (86.8, 23.25), (86.8, 30.86), (87.39, 31.45)],
+T("/USB_DM", W_USB, [pDM, (83.0, 22.55), (83.3, 22.85), (86.4, 22.85), (86.9, 23.35), (86.9, 26.7)],
   "F.Cu", "L1 north of U311, gap U311|U312", ch=0.0001)
+m.via(86.4, 27.2, "/USB_DP"); m.via(86.9, 26.7, "/USB_DM")
+T("/USB_DP", W_USB, [(86.4, 27.2), (86.4, 29.4)], "B.Cu", "L6 under the VTH2 rail")
+T("/USB_DM", W_USB, [(86.9, 26.7), (86.9, 29.9)], "B.Cu", "L6 under the VTH2 rail")
+m.via(86.4, 29.4, "/USB_DP"); m.via(86.9, 29.9, "/USB_DM")
+T("/USB_DP", W_USB, [(86.4, 29.4), (86.4, 31.06)], "F.Cu", "L1 over the highway TAP14 / TAP15")
+T("/USB_DM", W_USB, [(86.9, 29.9), (86.9, 30.96), (87.39, 31.45)], "F.Cu", "L1 over the highway TAP14 / TAP15",
+  ch=0.0001)
 m.via(86.4, 31.06, "/USB_DP"); m.via(87.39, 31.45, "/USB_DM")
 T("/USB_DP", W_USB, [(86.4, 31.06), (89.0, 33.66), (89.0, 43.35), (88.0, 44.35)], "B.Cu", "L6 tap-row lane 13",
   ch=0.0001)
@@ -345,7 +354,7 @@ for z in B.Zones():
 import board_power
 board_power.apply(B)
 import board_stitch
-SIGV = [(86.4, 31.06), (87.39, 31.45), (88.0, 44.35), (89.6, 43.9), (73.5, 22.75), (73.0, 23.25)] + \
+SIGV = [(86.4, 27.2), (86.9, 26.7), (86.4, 29.4), (86.9, 29.9), (86.4, 31.06), (87.39, 31.45), (88.0, 44.35), (89.6, 43.9), (73.5, 22.75), (73.0, 23.25)] + \
     [loc(v.GetPosition()) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
      v.GetNetname() in ("/VBIAS_A", "/VBIAS_K", "/ADC_IN", "/ADC_REF_MID")]
 RFT = [(loc(t.GetStart()), loc(t.GetEnd()), pcbnew.ToMM(t.GetWidth())) for t in B.GetTracks()
