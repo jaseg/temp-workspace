@@ -9,7 +9,7 @@
    "layer": "F.Cu",
    "side": "E",
    "class": "pair",
-   "width": 0.36,
+   "width": 0.16,
    "note": "from U501 pin 38 (FPGA); 50 R, R401 47 R in this block"
   },
   {
@@ -19,7 +19,7 @@
    "layer": "F.Cu",
    "side": "E",
    "class": "pair",
-   "width": 0.36,
+   "width": 0.16,
    "note": "from U501 pin 35; dummy load R405/C411/R406 here"
   },
   {
@@ -29,7 +29,7 @@
    "layer": "F.Cu",
    "side": "S",
    "class": "rf50",
-   "width": 0.36,
+   "width": 0.16,
    "note": "to U301.1 (phase block)"
   },
   {
@@ -96,37 +96,37 @@
    "net": "+5V",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "U101 / U102, In2 via pairs x 2-15"
+   "note": "U101 / U102, L4 via pairs x 2-15"
   },
   {
    "net": "-5V",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "U101 / U102, In2 via pairs x 1-14"
+   "note": "U101 / U102, L4 via pairs x 1-14"
   },
   {
    "net": "+2V5",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "R108 and U201 (In2 island under U201)"
+   "note": "R108 and U201 (L4 island under U201)"
   },
   {
    "net": "-2V5",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
@@ -136,7 +136,7 @@
    "net": "+3V3",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,

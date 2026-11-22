@@ -10,11 +10,12 @@ Run: cd blocks/analog && python3 gen_analog.py
 """
 import sys, os, math
 sys.path.insert(0, "../..")
+os.environ["BL_STACKUP"] = "6L"            # phase two: native 6-layer block (JLC06161H-3313, RULES rule 10)
 import boardlib as bl
 import pcbnew
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board/analog"
+SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board6/analog"
 os.makedirs(SCR, exist_ok=True)
 BW, BH = 56.0, 21.5                       # FLOORPLAN block rectangle (board x 0, y 1)
 blk = bl.Block("analog")
@@ -431,9 +432,20 @@ for tp, dx, dy in (("TP104", 0, 0.2),):
     x, y = FL.pad(tp, "1")
     gl(x + dx, y + dy)
 # keep-outs / cut-outs of the input stage
-FL.keepout(rect(0, YL0 - 0.9, X_PAD_END, YL0 + 0.9), ("In1.Cu",))
-CUT_HZ = (FL.pad("C101", "2")[0] - 0.3, YL0 - 0.45, XU - 1.1, YL0 + 1.1)
-FL.keepout(rect(*CUT_HZ), ("F.Cu", "In1.Cu", "In2.Cu", "B.Cu"))
+# 6L: L2 is only 0.0994 mm under L1, so the SMA centre pad, the divider node (C101.2 / R104 / C102) and the
+# BUF802 input see L5 ground (1.354 mm) instead: L2 (In1), L3 (In2) and L4 (In3) cleared under them.
+NODE_CUT = ("In1.Cu", "In2.Cu", "In3.Cu")
+NODE_WIN = {}
+SMA_CUT = (0, YL0 - 0.9, X_PAD_END, YL0 + 0.9)
+FL.keepout(rect(*SMA_CUT), NODE_CUT)
+NODE_WIN["SMA centre pad"] = SMA_CUT
+# L-shaped window: the full height over C101.2 / R104 / C102 / R105.1, only the BUF_IN strip at U101.2 so that
+# the IN_BIAS channel via (x 8.52, at pin 3) stays outside it
+X_HZ0, X_HZ1, X_HZ2 = FL.pad("C101", "2")[0] - 0.3, 8.25, XU - 1.1
+FL.keepout([(X_HZ0, YL0 - 0.45), (X_HZ2, YL0 - 0.45), (X_HZ2, YL0 + 0.25), (X_HZ1, YL0 + 0.25), (X_HZ1, YL0 + 1.1),
+            (X_HZ0, YL0 + 1.1)], ("F.Cu",) + NODE_CUT + ("B.Cu",))
+NODE_WIN["divider node"] = (X_HZ0, YL0 - 0.45, X_HZ1, YL0 + 1.1)
+NODE_WIN["BUF802 input"] = (X_HZ1, YL0 - 0.45, X_HZ2, YL0 + 0.25)
 g = W / 2 + 0.75
 FL.keepout(rect(X_TAPER - 0.05, YL0 - g, FL.pad("C101", "2")[0], YL0 + g))
 for sg in (-1, 1):
@@ -781,7 +793,8 @@ FS.track("GND", W_GND, [(gn[0] - 0.7, gn[1] + 0.3), (gn[0] - 0.3, gn[1]), (gn[0]
 
 # ============================================================================= sampler keep-outs
 HOLD_CUT = rect(2.25, -0.42, 5.15, 1.5)
-FS.keepout(HOLD_CUT, ("In1.Cu", "In2.Cu", "B.Cu"))
+FS.keepout(HOLD_CUT, NODE_CUT + ("B.Cu",))
+NODE_WIN["hold node"] = (2.25 + XBR, -0.42 + YBR, 5.15 + XBR, 1.5 + YBR)
 FS.keepout(rect(1.5, -1.0, 5.9, 2.05), ("F.Cu",))
 
 # ============================================================================= pours, hole keep-out, RF keep-outs
@@ -796,6 +809,80 @@ blk.zone("GND", ["B.Cu"], OUTLINE, clearance=0.25, prio=0)
 for q, w in RFPOLY:
     blk.rf_keepout(q, w, gap=2 * w + 0.03)
 
+# ============================================================================= 6L pad compensation / node C
+# Microstrip capacitance per mm from boardlib.microstrip (mask corrected).  References: L2 at H2 (3313, er 4.1);
+# L3 at H3 when only L2 is cut (L2 copper + 0.55 core, er ~4.5); L5 at H5 when L2 / L3 / L4 are cut.
+H2 = bl.STACKUPS["6L"]["H"]
+H3 = H2 + 0.0152 + 0.55
+H5 = H3 + 0.0152 + 0.1088 + 0.0152 + 0.55
+ER_DEEP = 4.5
+C_EXCESS_MAX = 0.030                               # pF: cut L2 under an in-line RF pad above this
+
+
+def c_mm(w, h=H2, er=None):
+    """pF per mm of a w-wide strip over a plane h below (boardlib microstrip)"""
+    z, ee = bl.microstrip(w, h=h, er=er or (bl.STACKUPS["6L"]["ER"] if h <= H2 + 1e-6 else ER_DEEP))
+    return math.sqrt(ee) / (bl.C0 * z)
+
+
+RF_NETS = [A(n) for n in ("VIN", "BUF_OUT_S", "BUF_OUT_T", "BRG_IN", "BRG_A", "BRG_K", "STRB_A", "STRB_K", "CLIP",
+                          "TRF2_OUT", "TRF2_RFIN", "TRF2_IN", "PADN", "TRF1_OUT", "TRF1_RFIN", "TRF1_IN",
+                          "S_STROBE_P", "S_STROBE_N", "STUB_END")]
+
+
+def _in_win(x, y):
+    return any(x0 <= x <= x1 and y0 <= y <= y1 for x0, y0, x1, y1 in NODE_WIN.values())
+
+
+def _pad_axis(pd, net):
+    """axis (0 = x, 1 = y) of the RF track that enters the pad (block-local)"""
+    c = blk.loc(pd.GetPosition())
+    for t in blk.b.GetTracks():
+        if t.GetNetname() != net or isinstance(t, pcbnew.PCB_VIA) or not pd.IsOnLayer(t.GetLayer()):
+            continue
+        for e, o in ((t.GetStart(), t.GetEnd()), (t.GetEnd(), t.GetStart())):
+            if pd.HitTest(e) or t.HitTest(pd.GetPosition()):     # ends on the pad, or runs over it (bead pads)
+                a, b_ = blk.loc(e), blk.loc(o)
+                return 0 if abs(b_[0] - a[0]) >= abs(b_[1] - a[1]) else 1
+    if f_.GetReference().startswith("TL"):
+        return None                                              # the stub's own end pads are the line
+    bb = pd.GetBoundingBox()                                     # no track (stub end NT401): long axis
+    return 1 if bb.GetHeight() > bb.GetWidth() else 0
+
+
+def track_only_keepout(pts, layers):
+    """rule area: no tracks / vias, copper pour allowed (keeps the L3 GND pour under an L2 pad cut solid)"""
+    z = blk.keepout(pts, layers, tracks=True, vias=False)
+    z.SetDoNotAllowCopperPour(False)
+    return z
+
+
+PADCOMP = []
+for f_ in blk.fps.values():
+    for pd in f_.Pads():
+        net_ = pd.GetNetname()
+        if net_ not in RF_NETS or not pd.IsOnLayer(pcbnew.F_Cu):
+            continue
+        ax = _pad_axis(pd, net_)
+        if ax is None:
+            continue
+        bb = pd.GetBoundingBox()
+        dims = (pcbnew.ToMM(bb.GetWidth()), pcbnew.ToMM(bb.GetHeight()))
+        along, across = dims[ax], dims[1 - ax]
+        cx, cy = blk.loc(pd.GetPosition())
+        c_line = c_mm(W) * along
+        ex2 = c_mm(across) * along - c_line
+        win = _in_win(cx, cy)
+        cut = (not win) and ex2 > C_EXCESS_MAX
+        ex3 = c_mm(across, H3) * along - c_line
+        if cut:
+            r_ = rect(cx - dims[0] / 2, cy - dims[1] / 2, cx + dims[0] / 2, cy + dims[1] / 2)
+            blk.keepout(r_, ("In1.Cu",))
+            track_only_keepout(r_, ("In2.Cu",))
+        PADCOMP.append((f"{f_.GetReference()}.{pd.GetNumber()}", across, along, ex2 * 1e3,
+                        "node window" if win else ("L2 cut" if cut else "-"),
+                        (c_mm(across, H5) * along - c_line if win else ex3 if cut else ex2) * 1e3))
+
 # ============================================================================= interfaces, outline drawing
 YLl = YL + YBR
 blk.iface("S_STROBE_P", BW, YLl, "F.Cu", "E", "pair", W, "from U501 pin 38 (FPGA); 50 R, R401 47 R in this block")
@@ -807,10 +894,10 @@ for vb, s_ in (("VBIAS_A", -1), ("VBIAS_K", 1)):
     blk.iface(vb, VB_X[s_] + XBR, BH, "B.Cu", "S", "slow", W_SIG, "R205 / R206 via B.Cu column")
 blk.iface("ADC_IN", xa + XBR, BH, "B.Cu", "S", "slow", W_SIG, "R211 / C207")
 blk.iface("ADC_REF_MID", UX - 1.75 + XBR, BH, "B.Cu", "S", "slow", W_SIG, "U202.3 / C206")
-for net, note in (("+5V", "U101 / U102, In2 via pairs x 2-15"), ("-5V", "U101 / U102, In2 via pairs x 1-14"),
-                  ("+2V5", "R108 and U201 (In2 island under U201)"), ("-2V5", "R110 and U201 (via pair at C209)"),
+for net, note in (("+5V", "U101 / U102, L4 via pairs x 2-15"), ("-5V", "U101 / U102, L4 via pairs x 1-14"),
+                  ("+2V5", "R108 and U201 (L4 island under U201)"), ("-2V5", "R110 and U201 (via pair at C209)"),
                   ("+3V3", "U202, TRF bias tees and VCC via pairs x 23-56")):
-    blk.iface(net, 0, 0, "In2.Cu", "-", "supply", None, note)
+    blk.iface(net, 0, 0, "In3.Cu", "-", "supply", None, note)
 blk.edge_rect(0, 0, BW, BH, layer="Dwgs.User")
 blk.text("ANALOG", 33.0, 20.6, 0.8)
 for d_ in blk.b.GetDrawings():                   # board texts: 0.8 mm / 0.15 mm (JLC legibility)
@@ -862,6 +949,71 @@ o11 = blk.pad("U101", "11")
 r1 = blk.pad("R201", "@" + A("BUF_OUT_S"))
 print(f"BUF802 OUT pin centre -> R201 pad 1 centre {r1[0] - o11[0]:.3f} mm; SMA pad end -> Ctop pad 1 edge "
       f"{FI.pad('C101', '1')[0] - 0.27 - X_PAD_END:.3f} mm")
+
+# 6L tables: impedance, pad compensation, node capacitance, via placement
+print("impedance (JLC06161H-3313, L1 over L2 h 0.0994 mm er 4.1, mask corrected; L6 over L5 identical)")
+for z_ in (50, 73, 100):
+    w_ = bl.width_for_6l(z_)
+    print(f"  {z_:3d} R: w {w_:.3f} mm (drawn {bl.r01(w_):.2f}: {bl.microstrip_6l(bl.r01(w_))[0]:.1f} R)")
+for w_ in (W, W_HOLD, W_SIG, 0.3, 0.4):
+    z_, ee_ = bl.microstrip_6l(w_)
+    print(f"  w {w_:.2f} mm: Z0 {z_:5.1f} R, eps_eff {ee_:.3f}, {math.sqrt(ee_) / bl.C0:.3f} ps/mm, "
+          f"{c_mm(w_) * 1e3:.0f} fF/mm")
+print(f"pad compensation (excess C of a pad vs. the {W} mm line over the same length; cut L2 if > "
+      f"{C_EXCESS_MAX * 1e3:.0f} fF, L3 GND pour kept under the cut)")
+print(f"  {'pad':10s} {'across':>6s} {'along':>6s} {'over L2 fF':>10s}  action       {'after fF':>8s}")
+for row in sorted(PADCOMP):
+    print(f"  {row[0]:10s} {row[1]:6.2f} {row[2]:6.2f} {row[3]:10.1f}  {row[4]:12s} {row[5]:8.1f}")
+
+
+def node_c(net):
+    """layout capacitance of a net's F.Cu copper (pF): (as cut, all over L2)"""
+    cc, c2 = 0.0, 0.0
+    for f_ in blk.fps.values():
+        for pd in f_.Pads():
+            if pd.GetNetname() == net and pd.IsOnLayer(pcbnew.F_Cu):
+                bb = pd.GetBoundingBox()
+                a_, b_ = sorted((pcbnew.ToMM(bb.GetWidth()), pcbnew.ToMM(bb.GetHeight())))
+                h_ = H5 if _in_win(*blk.loc(pd.GetPosition())) else H2
+                cc += c_mm(a_, h_) * b_
+                c2 += c_mm(a_) * b_
+    for t in blk.b.GetTracks():
+        if t.GetNetname() == net and t.GetLayer() == pcbnew.F_Cu and not isinstance(t, pcbnew.PCB_VIA):
+            a_, b_ = blk.loc(t.GetStart()), blk.loc(t.GetEnd())
+            l_ = math.hypot(b_[0] - a_[0], b_[1] - a_[1])
+            w_ = pcbnew.ToMM(t.GetWidth())
+            h_ = H5 if _in_win((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2) else H2
+            cc += c_mm(w_, h_) * l_
+            c2 += c_mm(w_) * l_
+    return cc, c2
+
+
+print(f"node capacitance (layout copper only; windows: L2 / L3 / L4 cleared, reference L5 at {H5:.3f} mm)")
+for lab, net_ in (("hold node (D202.3 / U201.3 / C205)", A("HOLD")), ("divider node GA (C101.2 / R104 / C102)", A("GA")),
+                  ("BUF802 input (R104.2 / U101.2 / R105)", A("BUF_IN")), ("SMA centre pad + taper (VIN)", A("VIN"))):
+    cc, c2 = node_c(net_)
+    print(f"  {lab:42s} {cc * 1e3:6.0f} fF   (over solid L2: {c2 * 1e3:6.0f} fF)")
+
+
+def _dseg(p, a, b):
+    ux, uy = b[0] - a[0], b[1] - a[1]
+    n2 = ux * ux + uy * uy or 1e-12
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy) / n2))
+    return math.hypot(p[0] - a[0] - t * ux, p[1] - a[1] - t * uy)
+
+
+bad_v = []
+for v in blk.b.GetTracks():
+    if not isinstance(v, pcbnew.PCB_VIA):
+        continue
+    pv, rv = blk.loc(v.GetPosition()), pcbnew.ToMM(v.GetWidth()) / 2
+    if _in_win(*pv):
+        bad_v.append((v.GetNetname(), pv, "node window"))
+    for q, w in RFPOLY:
+        if min(_dseg(pv, a, b) for a, b in zip(q, q[1:])) < w / 2 + rv + 0.1:
+            bad_v.append((v.GetNetname(), pv, "RF copper"))
+            break
+print(f"vias in node windows / within 0.1 mm of RF or stub copper: {len(bad_v)}", bad_v[:10])
 
 # ============================================================================= checks
 import floorplan as fpl

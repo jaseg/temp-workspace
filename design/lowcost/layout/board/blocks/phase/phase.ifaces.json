@@ -9,8 +9,8 @@
    "layer": "F.Cu",
    "side": "W",
    "class": "rf50",
-   "width": 0.36,
-   "note": "pstrobe output, 50 R up to the boundary, 0.16 mm (73 R) from here; equal A/K"
+   "width": 0.16,
+   "note": "pstrobe output, 50 R (0.16 mm) up to the boundary, 0.1 mm (62 R) from here; equal A/K"
   },
   {
    "net": "/PSTRB_K",
@@ -19,8 +19,8 @@
    "layer": "F.Cu",
    "side": "W",
    "class": "rf50",
-   "width": 0.36,
-   "note": "pstrobe output, 50 R up to the boundary, 0.16 mm (73 R) from here; equal A/K"
+   "width": 0.16,
+   "note": "pstrobe output, 50 R (0.16 mm) up to the boundary, 0.1 mm (62 R) from here; equal A/K"
   },
   {
    "net": "/TAP0",
@@ -219,7 +219,7 @@
    "layer": "F.Cu",
    "side": "N",
    "class": "rf50",
-   "width": 0.36,
+   "width": 0.16,
    "note": "from the input stage (BUF802 trigger output)"
   },
   {

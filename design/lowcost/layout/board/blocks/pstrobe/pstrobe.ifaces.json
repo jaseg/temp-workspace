@@ -9,7 +9,7 @@
    "layer": "F.Cu",
    "side": "N",
    "class": "pair",
-   "width": 0.36,
+   "width": 0.16,
    "note": "chain A input, R407 47 R here; FPGA U501"
   },
   {
@@ -19,7 +19,7 @@
    "layer": "F.Cu",
    "side": "S",
    "class": "pair",
-   "width": 0.36,
+   "width": 0.16,
    "note": "chain K input (mirror), R411 47 R here; match P/N"
   },
   {
@@ -29,7 +29,7 @@
    "layer": "F.Cu",
    "side": "E",
    "class": "rf50",
-   "width": 0.36,
+   "width": 0.16,
    "note": "to phase tap 0 (phase iface 26.5 / 34.75 board)"
   },
   {
@@ -39,28 +39,28 @@
    "layer": "F.Cu",
    "side": "E",
    "class": "rf50",
-   "width": 0.36,
+   "width": 0.16,
    "note": "to phase tap 0 (phase iface 26.5 / 40.25 board)"
   },
   {
    "net": "+3V3",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "TRF VCC and bias tees: via pairs, In2 island x 0-12"
+   "note": "TRF VCC and bias tees: via pairs, L4 (In3) x 0-12"
   },
   {
    "net": "VBUS",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "GVA-84+ tees: via pairs at C418 / C428, In2 x 10-15"
+   "note": "GVA-84+ tees: via pairs at C418 / C428, L4 (In3) x 10-15"
   }
  ]
 }

@@ -21,27 +21,62 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(HERE)
 blk = bl.Block("phase")
 NL = blk.nl
-W50 = bl.W50
 BW, BH = 99.5, 22.5
 
-# ============================================================================= delay-line constants (fragment)
-W_STR = bl.r01(bl.width_for(73.0))                     # 0.16
-Z_STR = bl.microstrip(W_STR)[0]
-C_PAD_STR = (bl.c_per_mm(0.56) - bl.c_per_mm(W_STR)) * 0.62
-CL_STR = 0.40 + C_PAD_STR + 0.02
-TD_STR = 40.0
-TDU_STR = bl.solve_tdu(Z_STR, CL_STR, TD_STR)
-PITCH = round(TDU_STR / bl.ps_mm(W_STR), 3)            # 4.514
-TD_LIN = 70.0
-W_LIN = 0.25
-for _ in range(3):
-    C_PAD_LIN = (bl.c_per_mm(0.45) - bl.c_per_mm(W_LIN)) * 0.70
-    CL_LIN = 0.37 + C_PAD_LIN
+# ============================================================================= six-layer RF geometry (phase two)
+# RULES rule 10: L1 over L2 = 3313 prepreg 0.0994 mm, er 4.1 (boardlib STACKUPS["6L"], solder-mask corrected).
+# The block file itself stays a 4-copper-layer board (F / In1 GND / In2 supply / B) that the integrator merges
+# with LAYER_MAP_4TO6 (In1 -> L2, In2 -> L4); only the impedance / delay maths use the 6-layer stack-up.
+H6, ER6 = bl.STACKUPS["6L"]["H"], bl.STACKUPS["6L"]["ER"]
+
+
+def z6(w):
+    return bl.microstrip(w, h=H6, er=ER6)[0]
+
+
+def ps6(w):                                             # ps / mm
+    return math.sqrt(bl.microstrip(w, h=H6, er=ER6)[1]) / bl.C0
+
+
+def c6(w):                                              # pF / mm
+    z, ee = bl.microstrip(w, h=H6, er=ER6)
+    return math.sqrt(ee) / (bl.C0 * z)
+
+
+W_MIN_FAB = 0.09                                        # JLC 6-layer minimum track
+W_MIN_RF = 0.10                                         # used minimum for controlled-impedance lines (margin)
+W50 = bl.r01(bl.width_for_6l(50.0))                     # 0.16 mm (50.2 R)
+Z50 = z6(W50)
+
+# --- strobe lines PSTRB_A / K: straight sections of one pitch; the pitch is KEPT (4.514 mm, comparators and the
+#     summing-node routing unchanged).  Loaded Z = Z0 * tdu / td with tdu fixed by the pitch, so the narrowest
+#     manufacturable trace gives the highest loaded impedance; the pad loading (0.5 p cap pad 0.56 x 0.62 on solid
+#     L2) is not cut: with it the loaded delay lands on 40 ps within 2 %.
+PITCH = 4.514
+PAD_STR_W, PAD_STR_L = 0.56, 0.62
+C_GATE_STR, C_MISC_STR = 0.40, 0.02
+TD_STR_TGT = 40.0
+W_STR = W_MIN_RF
+Z_STR = z6(W_STR)
+C_PAD_STR = (c6(PAD_STR_W) - c6(W_STR)) * PAD_STR_L
+CL_STR = C_GATE_STR + C_PAD_STR + C_MISC_STR
+TDU_STR = PITCH * ps6(W_STR)
+TD_STR, ZL_STR = bl.loaded(TDU_STR, Z_STR, CL_STR)
+# --- signal line PH_LINE: loaded 50 R; the per-tap delay keeps the designed line - strobe difference
+#     (70 - 40 = 30 ps model) so the effective tap spacing is unchanged with the actual strobe delay
+TD_LIN = TD_STR + (70.0 - 40.0)
+PAD_LIN_W, PAD_LIN_L = 0.45, 0.70                       # BAT15 pad 3 (SOT-323), line along the 0.70 mm length
+C_GATE_LIN = 0.37
+W_LIN = 0.10
+for _ in range(4):
+    C_PAD_LIN = (c6(PAD_LIN_W) - c6(W_LIN)) * PAD_LIN_L
+    CL_LIN = C_GATE_LIN + C_PAD_LIN
     z_t = math.sqrt(50.0 * TD_LIN / (TD_LIN / 50.0 - CL_LIN))
-    W_LIN = bl.r01(bl.width_for(z_t))                  # 0.26
-Z_LIN = bl.microstrip(W_LIN)[0]
+    W_LIN = max(W_MIN_RF, bl.r01(bl.width_for_6l(z_t)))
+Z_LIN = z6(W_LIN)
 TDU_LIN = bl.solve_tdu(Z_LIN, CL_LIN, TD_LIN)
-L_LIN = TDU_LIN / bl.ps_mm(W_LIN)
+TD_LIN_A, ZL_LIN = bl.loaded(TDU_LIN, Z_LIN, CL_LIN)
+L_LIN = TDU_LIN / ps6(W_LIN)
 NT = 16
 X_P3, X_P12 = 1.0, -1.0
 XD = PITCH - 1.75
@@ -60,9 +95,12 @@ for _ in range(60):
     m = (lo + hi) / 2
     lo, hi = (m, hi) if bl.plen(bl.chamfer(cell_path(m), CH_M)) < L_LIN else (lo, m)
 Y_M = (lo + hi) / 2
-YL = math.ceil((Y_M + W_LIN / 2 + 0.3 + 0.79) / 0.05) * 0.05      # 2.75
+YL_MIN = math.ceil((Y_M + W_LIN / 2 + 0.3 + 0.79) / 0.05) * 0.05
+YL = 2.75                                   # kept (4-layer value): rows, pstrobe interface, comparators
+assert YL_MIN <= YL, YL_MIN
 YNODE = YL - 0.96
 X_R1K, X_R22K = -1.94, -0.06
+Y_CUT0 = 0.40                               # node cut-out now covers the BAT15 pads 1 / 2 completely (was 0.55)
 Y_RV = YL + 1.085
 DX_TAP = 0.8
 W_NODE, W_SIG, W_PWR, W_GND = 0.15, 0.2, 0.5, 0.4
@@ -160,7 +198,7 @@ for n, x in enumerate(XT):
             T(node, W_NODE, [(x + X_P12, AX + YNODE * s), (x + xr, AX + YNODE * s), (x + xr, yi)], ch=0.1)
         V(x + X_R22K, AX + Y_RV * s, rail)
         T(rail, 0.3, [P(rna if s < 0 else rnk, "@" + rail), (x + X_R22K, AX + Y_RV * s)], ch=0)
-        CUT.append(bl.rect_pts(x - 1.35, AX + 0.55 * s, x + 0.45, AX + (YL - 0.4) * s))
+        CUT.append(bl.rect_pts(x - 1.35, AX + Y_CUT0 * s, x + 0.45, AX + (YL - 0.4) * s))
     # summing node: both 1 k outer pads -> vias -> straight B.Cu jumper; comparator tap from the jumper midpoint
     V(x + X_R1K, AX + Y_RV, sm)
     V(x + X_R1K, AX - Y_RV, sm)
@@ -176,12 +214,12 @@ for n, x in enumerate(XT):
           z=round(Z_LIN), ch=CH_M, rf=True)
     for s, net in ((-1, "PSTRB_A"), (+1, "PSTRB_K")):
         T(net, W_STR, [(max(x + X_P12 - PITCH / 2, X_IF_STR), AX + YL * s), (x + X_P12 + PITCH / 2, AX + YL * s)],
-          name=f"{net} section {n}", z=73, rf=True)
+          name=f"{net} section {n}", z=round(Z_STR), rf=True)
 
 # --- strobe interfaces (pstrobe east edge, the 0.16 mm sections start on the boundary)
 for s, net in ((-1, "PSTRB_A"), (+1, "PSTRB_K")):
     blk.iface(net, X_IF_STR, AX + YL * s, "F.Cu", "W", "rf50", W50,
-              "pstrobe output, 50 R up to the boundary, 0.16 mm (73 R) from here; equal A/K")
+              f"pstrobe output, 50 R ({W50} mm) up to the boundary, {W_STR} mm ({Z_STR:.0f} R) from here; equal A/K")
 
 # --- far end: terminations (vertical, pad centred on the line, GND pad outward)
 XE = X15 + X_P12 + PITCH / 2
@@ -510,7 +548,7 @@ for ref in ("R307", "R309"):
     T("GND", W_GND, [g, (g[0], g[1] - 0.65)], ch=0)
 X_STEP = X0 - 1.6
 T("Net-(D301-common)", W50, [P("R308", "@Net-(D301-common)"), (X_STEP, AX)], name="PH_LINE launch 50 R", z=50, rf=True)
-T("Net-(D301-common)", W_LIN, [(X_STEP, AX), (X0 + X_P3, AX)], name="PH_LINE launch 0.26", z=round(Z_LIN), rf=True)
+T("Net-(D301-common)", W_LIN, [(X_STEP, AX), (X0 + X_P3, AX)], name=f"PH_LINE launch {W_LIN}", z=round(Z_LIN), rf=True)
 
 # --- U304 SN65LVDS2 (COARSE) west of the network, R311 / R312 470 R taps
 XU4, YU4 = 2.0, 10.0
@@ -562,9 +600,11 @@ blk_ol = [(IN, IN), (BW - IN, IN), (BW - IN, BH - IN), (26.5 + IN, BH - IN), (26
           (9.5 - IN, 18.0 - IN), (9.5 - IN, BH - IN), (IN, BH - IN)]
 blk.zone("GND", ["In1.Cu"], blk_ol, clearance=0.2)
 blk.keepout(north_cut, ("F.Cu", "In1.Cu", "In2.Cu", "B.Cu"))
+# node / SMA cut-outs: L2 (block In1) AND L4 (block In2 -> In3) cleared; the integrator clears L3 under every L2
+# cut-out, so the hold nodes reference L5 (1.37 mm) as they referenced In2 (1.29 mm) on the 4-layer board
 for c in CUT:
-    blk.keepout(c, ("In1.Cu",))
-blk.keepout(bl.rect_pts(0.0, YJ - 0.95, jx + 1.9, YJ + 0.95), ("In1.Cu",))
+    blk.keepout(c, ("In1.Cu", "In2.Cu"))
+blk.keepout(bl.rect_pts(0.0, YJ - 0.95, jx + 1.9, YJ + 0.95), ("In1.Cu", "In2.Cu"))
 XV0, XV1 = XT[0] - 3.2, X15 + 1.5
 blk.zone("VTAP_N", ["In2.Cu"], bl.rect_pts(XV0, AX - (Y_RV + 1.4), XV1, AX - 0.15), clearance=0.3, prio=1)
 blk.zone("VTAP_P", ["In2.Cu"], bl.rect_pts(XV0, AX + 0.15, XV1, AX + Y_RV + 1.4), clearance=0.3, prio=1)
@@ -621,12 +661,22 @@ path = blk.save(HERE)
 
 # ============================================================================= tables
 print(f"PITCH {PITCH} mm, W_STR {W_STR}, W_LIN {W_LIN}, L_LIN {L_LIN:.3f} mm/tap, Y_M {Y_M:.3f}, YL {YL}")
+print("6-layer microstrip L1/L2 (h %.4f, er %.1f, mask):" % (H6, ER6))
+for w_ in (0.09, 0.10, 0.11, 0.12, 0.14, W50, 0.20, 0.26, 0.36, 0.45, 0.56):
+    print(f"  w {w_:.2f}  Z0 {z6(w_):6.2f} R  {ps6(w_):.3f} ps/mm  {c6(w_):.4f} pF/mm")
+print("line     width  Z0 unl.  load (gate + pad)        section            loaded delay  loaded Z")
+print(f"PSTRB    {W_STR:.2f}  {Z_STR:6.2f}  {CL_STR:.3f} pF ({C_GATE_STR + C_MISC_STR:.2f} + {C_PAD_STR:.3f})  {PITCH:.3f} mm {TDU_STR:5.2f} ps  {TD_STR:5.2f} ps  {ZL_STR:5.2f} R")
+print(f"PH_LINE  {W_LIN:.2f}  {Z_LIN:6.2f}  {CL_LIN:.3f} pF ({C_GATE_LIN:.2f} + {C_PAD_LIN:.3f})  {L_LIN:.3f} mm {TDU_LIN:5.2f} ps  {TD_LIN_A:5.2f} ps  {ZL_LIN:5.2f} R")
+print(f"effective tap spacing (line - strobe) {TD_LIN_A - TD_STR:.2f} ps (4-layer design 70.00 - 40.00 = 30.00 model)")
+print(f"meander same-net gaps: X_P3..XU {XU - X_P3 - W_LIN:.3f}, XU..XD {XD - XU - W_LIN:.3f}, pad3..XU {XU - W_LIN / 2 - X_P3 - PAD3_HALF_X:.3f} mm; YL_MIN {YL_MIN:.2f} (YL {YL})")
+cell_pts = bl.chamfer(cell_path(Y_M), CH_M)
+print(f"drawn cell length {bl.plen(cell_pts):.3f} mm (target {L_LIN:.3f})")
 print(f"tap 0 x {X0:.3f}, tap 15 x {X15:.3f} (local), axis y {AX}")
 for nm in blk.routes:
     r = blk.routes[nm]
     L = blk.route_len(nm)
     if r["z"]:
-        print(f"  {nm:45s} w {r['width']:.2f} L {L:7.3f} mm  {L * bl.ps_mm(r['width']):7.1f} ps")
+        print(f"  {nm:45s} w {r['width']:.2f} L {L:7.3f} mm  {L * ps6(r['width']):7.1f} ps")
 print("summing taps A = B:", SUM_LEN[0][1], SUM_LEN[0][3])
 REFS = [r for r, c in NL.comps.items() if c["sheet"] == "/trigger_phase/"] + ["J102", "R122"]
 RFC = {"/EXT_CLK": W50, "/BUF_OUT_T": W50, "Net-(U301-COM1)": W50, "/trigger_phase/CMP_P": W50,
@@ -661,7 +711,7 @@ for it in list(b2.GetTracks()) + [p for f in b2.GetFootprints() for p in f.Pads(
     if not inside or cut:
         out.append((it.GetNetname(), round(x0_, 2), round(y0_, 2), round(x1_, 2), round(y1_, 2)))
 print("items outside the block area:", len(out), out[:8])
-print("mixed-width RF nets (PH_LINE 0.36/0.26, PSTRB 0.16): deviations", bad)
+print(f"mixed-width RF nets (PH_LINE {W50}/{W_LIN}, PSTRB {W_STR}): deviations", bad)
 json.dump({k: v for k, v in res.items() if k != "details"}, open("/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board/phase_check.json", "w"), indent=1)
 if "--render" in sys.argv:
     S = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board"

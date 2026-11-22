@@ -260,6 +260,11 @@ def slow(net):
     return r
 
 
+# slow lines: the L3 via at every B.Cu interface stub end is placed before any routing (so no route passes it)
+for net in SLOW_L3:
+    if net in EP:
+        EP[net] = [l3_end(net, e) for e in EP[net]]
+
 # ---- planned TAP ribbon, west group (TAP0..9): L6 lanes between the fpga S via row (y 21.1, north) and the
 # phase comparator via row (y 23.92, south), staircase in pin order (lane k at y0 + 0.2 k, 0.1 mm lines /
 # 0.1 mm gaps): no lane crosses another.  Block adjustment: the phase GND via at (62.53, 23.07) (U-comparator

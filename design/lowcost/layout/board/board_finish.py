@@ -71,6 +71,9 @@ def route_supplies(B, m, R, log):
             _, c, p, q = best
             todo.remove(c)
             done.append(c)
+            if in_zone(B, net, p) and in_zone(B, net, q):
+                log.append((net, round(p[0], 2), round(p[1], 2), round(q[0], 2), round(q[1], 2), "zone"))
+                continue                                   # already joined by the rail's own L4 zone
             r = None
             for wid, lay, mg, mx in ((1.0, ("In3.Cu",), 5, 400_000), (0.8, ("In3.Cu",), 10, 400_000),
                                      (0.6, ("In3.Cu",), 25, 1_000_000), (0.5, ("In3.Cu",), 60, 3_000_000)):

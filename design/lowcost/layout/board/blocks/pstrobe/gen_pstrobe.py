@@ -12,17 +12,19 @@ Run: cd blocks/pstrobe && python3 gen_pstrobe.py
 """
 import sys, os, math
 sys.path.insert(0, "../..")
+os.environ["BL_STACKUP"] = "6L"            # phase two: native 6-layer block (JLC06161H-3313, RULES rule 10)
 import boardlib as bl
 import pcbnew
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board/pstrobe"
+SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board6/pstrobe"
 os.makedirs(SCR, exist_ok=True)
 BW, BH, AX = 17.0, 25.0, 12.5            # FLOORPLAN 17 x 23 at (9.5, 26.0), grown 1 mm N and S: board (9.5, 25.0)
 CORR = (9.5, 15.5)                         # phase corridor (board y 34.5-40.5), not ours
 blk = bl.Block("pstrobe")
 nl = blk.nl
-W = bl.W50
+W = bl.W50                                 # 6L: 0.16 mm (50.2 R, L1 over L2 0.0994 mm 3313)
+assert bl.STACKUP_NAME == "6L" and abs(W - 0.16) < 1e-9, W
 W_PWR, W_GND = 0.5, 0.4
 N = bl.net_of
 RFPOLY = []
@@ -134,19 +136,25 @@ def chain(s):
     rf(n_gin, [(C_I, "@" + n_gin), (X2, yl), (G, "1")], f"{G} IN", ch=0.3)
     rf(n_gout, [(G, "3"), (XO, yl)], f"{G} OUT")
     rf(n_gout, [(XO, yl), (C_OUT, "@" + n_gout)], f"{G} OUT b")      # joint inside the bead pad
-    rf(OUT, [(C_OUT, "@" + OUT), (XO, ys), (BW - 0.5, ys), (BW, my(YS + 0.5))], f"{OUT[1:]} output", ch=0.3)
+    # launch node = a T at (XO, ys): drop from C421 north, stub west, output east (6L: a 0.3 chamfer at the node
+    # would leave the 0.16 mm stub start 0.21 mm off the line copper, i.e. disconnected)
+    rf(OUT, [(C_OUT, "@" + OUT), (XO, ys)], f"{OUT[1:]} drop")
+    rf(OUT, [(XO, ys), (BW - 0.5, ys), (BW, my(YS + 0.5))], f"{OUT[1:]} output", ch=0.3)
     dx_, dy_ = blk.pad(D, "@" + OUT)
     RFPOLY.append((blk.track(OUT, W, [(dx_, dy_), (dx_, ys)]), W))
     q_st, l_st = blk.tline(TL, [(XO, ys), (XO - L_STUB, ys)], W)
     RFPOLY.append((q_st, W))
     RF[OUT] = W
-    # stub short: NT pad 1 on the stub end, pad 2 -> two GND vias towards the line
+    # stub short: NT pad 1 on the stub end, pad 2 -> two GND vias towards the line.  6L: the 80 ps stub is
+    # 0.30 mm longer (5.925 ps/mm), so the net tie stands across the stub (pad 2 towards the line, x 0.6-1.6 is
+    # free between the input leg and U403) instead of in-line (that put pad 2 / the vias off the block edge)
     xe = XO - L_STUB
-    two(NT, xe - 0.5, ys, "E", n_stub)
+    two(NT, xe, my(YS - 0.5), NS("S"), n_stub)
+    assert max(abs(a - b) for a, b in zip(blk.pad(NT, "@" + n_stub), (xe, ys))) < 1e-6
     gx, gy = blk.pad(NT, "2")
-    blk.track("GND", W_GND, [(gx, gy), (gx, my(YS - 1.32))])
-    gv(gx, my(YS - 0.64))
-    gv(gx, my(YS - 1.32))
+    blk.track("GND", W_GND, [(gx, gy), (gx, my(YS - 2.32))])
+    gv(gx, my(YS - 1.64))
+    gv(gx, my(YS - 2.32))
     # clamp GND -> via beyond its pad
     x, y = blk.pad(D, "@GND")
     blk.track("GND", W_GND, [(x, y), (x, y - s * 0.62)])
@@ -250,7 +258,7 @@ def chain(s):
     blk.track("GND", 0.4, [g2, (g10[0], g2[1]), g10], layer="B.Cu", ch=0.12)
     blk.track("GND", W_GND, [g10, (g10[0] + 0.60, g10[1])], layer="B.Cu")
     gv(g10[0] + 0.60, g10[1])
-    return {"stub": l_st, "out": blk.route_len(f"{OUT[1:]} output"), "in": blk.route_len(f"{PIN[1:]} input")}
+    return {"stub": l_st, "out": blk.route_len(f"{OUT[1:]} drop") + blk.route_len(f"{OUT[1:]} output"), "in": blk.route_len(f"{PIN[1:]} input")}
 
 
 RES = {"A": chain(+1), "K": chain(-1)}
@@ -265,13 +273,67 @@ for r in REG.values():
 for q, w in RFPOLY:
     blk.rf_keepout(q, w, gap=2 * w + 0.03)
 
+# ============================================================================= 6L pad compensation
+# (same method as blocks/analog) pF/mm from boardlib.microstrip (mask corrected): L2 at H2 (3313, er 4.1); where
+# L2 is cut under a pad the reference is L3 (GND pour, 0.565 mm deeper, core er ~4.5).  Every in-line RF pad
+# whose excess C over L2 (pad vs. the 0.16 mm line over the pad length) exceeds 30 fF gets an L2 cut of the pad
+# size; L3 keeps its GND pour under it with a no-track / no-via rule area (no bias line under an RF pad).
+H2 = bl.STACKUPS["6L"]["H"]
+H3 = H2 + 0.0152 + 0.55
+ER_DEEP = 4.5
+C_EXCESS_MAX = 0.030
+
+
+def c_mm(w, h=H2):
+    """pF per mm of a w-wide strip over a plane h below"""
+    z, ee = bl.microstrip(w, h=h, er=bl.STACKUPS["6L"]["ER"] if h <= H2 + 1e-6 else ER_DEEP)
+    return math.sqrt(ee) / (bl.C0 * z)
+
+
+def _pad_axis(pd, net):
+    """axis (0 = x, 1 = y) of the RF track that enters the pad; None for the TLine footprints' own pads"""
+    if pd.GetParent().GetReference().startswith("TL"):
+        return None
+    for t in blk.b.GetTracks():
+        if t.GetNetname() != net or isinstance(t, pcbnew.PCB_VIA) or t.GetLayer() != pcbnew.F_Cu:
+            continue
+        for e, o in ((t.GetStart(), t.GetEnd()), (t.GetEnd(), t.GetStart())):
+            if pd.HitTest(e) or t.HitTest(pd.GetPosition()):
+                a, b_ = blk.loc(e), blk.loc(o)
+                return 0 if abs(b_[0] - a[0]) >= abs(b_[1] - a[1]) else 1
+    return 0                                     # NT402 / NT403 pad 1: the stub enters along x
+
+
+PADCOMP = []
+for f_ in blk.fps.values():
+    for pd in f_.Pads():
+        net_ = pd.GetNetname()
+        if net_ not in RF or not pd.IsOnLayer(pcbnew.F_Cu):
+            continue
+        ax = _pad_axis(pd, net_)
+        if ax is None:
+            continue
+        bb = pd.GetBoundingBox()
+        dims = (pcbnew.ToMM(bb.GetWidth()), pcbnew.ToMM(bb.GetHeight()))
+        along, across = dims[ax], dims[1 - ax]
+        cx, cy = blk.loc(pd.GetPosition())
+        c_line = c_mm(W) * along
+        ex2 = c_mm(across) * along - c_line
+        cut = ex2 > C_EXCESS_MAX
+        if cut:
+            r_ = bl.rect_pts(cx - dims[0] / 2, cy - dims[1] / 2, cx + dims[0] / 2, cy + dims[1] / 2)
+            blk.keepout(r_, ("In1.Cu",))
+            blk.keepout(r_, ("In2.Cu",), tracks=True, vias=True).SetDoNotAllowCopperPour(False)
+        PADCOMP.append((f"{f_.GetReference()}.{pd.GetNumber()}", across, along, ex2 * 1e3,
+                        "L2 cut" if cut else "-", ((c_mm(across, H3) * along - c_line) if cut else ex2) * 1e3))
+
 # ============================================================================= interfaces, outline
 blk.iface("PH_STROBE_P", X_IN, 0.0, "F.Cu", "N", "pair", W, "chain A input, R407 47 R here; FPGA U501")
 blk.iface("PH_STROBE_N", X_IN, BH, "F.Cu", "S", "pair", W, "chain K input (mirror), R411 47 R here; match P/N")
 blk.iface("PSTRB_A", BW, 9.75, "F.Cu", "E", "rf50", W, "to phase tap 0 (phase iface 26.5 / 34.75 board)")
 blk.iface("PSTRB_K", BW, 15.25, "F.Cu", "E", "rf50", W, "to phase tap 0 (phase iface 26.5 / 40.25 board)")
-blk.iface("+3V3", 0, 0, "In2.Cu", "-", "supply", None, "TRF VCC and bias tees: via pairs, In2 island x 0-12")
-blk.iface("VBUS", 0, 0, "In2.Cu", "-", "supply", None, "GVA-84+ tees: via pairs at C418 / C428, In2 x 10-15")
+blk.iface("+3V3", 0, 0, "In3.Cu", "-", "supply", None, "TRF VCC and bias tees: via pairs, L4 (In3) x 0-12")
+blk.iface("VBUS", 0, 0, "In3.Cu", "-", "supply", None, "GVA-84+ tees: via pairs at C418 / C428, L4 (In3) x 10-15")
 blk.edge_rect(0, 0, BW, BH, layer="Dwgs.User")
 blk.line(0, CORR[0], BW, CORR[0], layer="Dwgs.User")
 blk.line(0, CORR[1], BW, CORR[1], layer="Dwgs.User")
@@ -299,6 +361,22 @@ for nm in blk.routes:
 for k, r in RES.items():
     print(f"chain {k}: stub {r['stub']:.3f} mm = {r['stub'] * bl.PS_MM50:.1f} ps; output (C421/C431 pad -> edge) "
           f"{r['out']:.3f} mm; input (edge -> 47 R) {r['in']:.3f} mm")
+print("impedance (JLC06161H-3313, L1 over L2 h 0.0994 mm er 4.1, mask corrected; L6 over L5 identical)")
+for z_ in (50,):
+    w_ = bl.width_for_6l(z_)
+    print(f"  {z_:3d} R: w {w_:.3f} mm (drawn {bl.r01(w_):.2f}: {bl.microstrip_6l(bl.r01(w_))[0]:.1f} R)")
+for w_ in (0.10, W, 0.25, 0.36, 0.5):
+    z_, ee_ = bl.microstrip_6l(w_)
+    print(f"  w {w_:.2f} mm: Z0 {z_:5.1f} R, eps_eff {ee_:.3f}, {math.sqrt(ee_) / bl.C0:.3f} ps/mm, "
+          f"{c_mm(w_) * 1e3:.0f} fF/mm")
+print(f"pad compensation (excess C vs. the {W} mm line over the pad length; L2 cut if > {C_EXCESS_MAX * 1e3:.0f} fF)")
+print(f"  {'pad':10s} {'across':>6s} {'along':>6s} {'over L2 fF':>10s}  action  {'after fF':>8s}")
+for row in sorted(PADCOMP):
+    print(f"  {row[0]:10s} {row[1]:6.2f} {row[2]:6.2f} {row[3]:10.1f}  {row[4]:6s}  {row[5]:8.1f}")
+print("intended vs actual (6L ps/mm %.3f)" % bl.PS_MM50)
+for k, r in RES.items():
+    print(f"  chain {k}: stub target 80.0 ps = {80.0 / bl.PS_MM50:.3f} mm, drawn {r['stub']:.3f} mm = "
+          f"{r['stub'] * bl.PS_MM50:.2f} ps; output target A = K, drawn {r['out']:.3f} mm = {r['out'] * bl.PS_MM50:.2f} ps")
 dA = abs(RES["A"]["out"] - RES["K"]["out"])
 print(f"A/K output mismatch {dA * 1e3:.1f} um")
 assert dA < 0.05
@@ -355,5 +433,7 @@ if "--norender" not in sys.argv:
     lay = ("F.Cu", "B.Cu", "F.SilkS", "F.Fab", "Dwgs.User")
     render(os.path.join(HERE, "pstrobe.png"), lay, (-0.5, -0.5, 17.5, 25.5))
     render(os.path.join(HERE, "pstrobe_detail.png"), lay, (-0.3, -0.3, 9.3, 9.8))
+    render(os.path.join(HERE, "pstrobe_detail_L1L2.png"), ("F.Cu", "In1.Cu", "F.Fab", "Dwgs.User"),
+           (-0.3, 3.0, 17.3, 10.0))
     render(os.path.join(SCR, "pstrobe_f.png"), ("F.Cu", "F.Fab", "Dwgs.User"), (-0.5, -0.5, 17.5, 25.5))
     render(os.path.join(SCR, "pstrobe_b.png"), ("B.Cu", "B.Fab", "Dwgs.User"), (-0.5, -0.5, 17.5, 25.5))
