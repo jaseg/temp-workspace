@@ -6,7 +6,7 @@ medium finding was then given to a second reviewer whose task was to refute it f
 below is the one left after that check. Findings first rated low were not re-checked. Nothing in the design was
 changed by the validation.
 
-Result in one paragraph: no finding says the board cannot work and none is rated high. Seven medium findings remain;
+Result in one paragraph: no finding says the board cannot work and none is rated high. Eight medium findings remain (two of them about the same LM27761 capacitors);
 one is a timing-plan error (the 960 Mbit/s serialiser needs a 480 MHz clock, above the 400 MHz PLL limit of the
 GW1NZ-1), the others are layout or power items worth fixing before fabrication. Pinouts and footprints of all 66
 non-passive parts match their datasheets.
