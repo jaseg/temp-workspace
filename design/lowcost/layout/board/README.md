@@ -1,5 +1,62 @@
 # layout/board: scope-fe integrated board (six layers) - signal routing complete except the nine L3 slow lines
 
+**Status (22 Nov 2026, fourth pass, TOPOLOGY.md section 9 implemented):** one run of `python3 gen_board.py` (~75 s;
+`--fast` reuses the cached pre-power board, `--powonly` stops after the power check) gives 0 unconnected items.
+
+### Check results (last run, verbatim)
+- board_power.verify: `missing links over the rail nets: 0;  pcbnew GetUnconnectedCount() board-wide: 0`; `VBUS below 1.0 mm: 0 mm`;
+  `self-check of added copper: clearance/crossing 0, corners > 45 deg 0, off-axis pad exits 0`.
+- check_board: missing 0, extra 4 (H1-H4), footprint 0, value 0, pad-net 0, unrouted 0, clearance 0, corners > 45 deg 0,
+  off-axis pad exits 1 (R737.1, known), RF 0, courtyard 0, unconnected items 0.
+- rule 10: `fast-net segments on L3: 0; L1/L6 samples 8170, without filled GND on L2/L5: 449` = 417 via antipads, 25 PTH
+  antipads, 7 deliberate windows, 0 real plane holes; L4 `+3V3` one polygon.
+- DRC jlc4 + parity: `total 462: warning 462`, 0 errors, 0 unconnected. Warnings: 199 footprint_symbol_field_mismatch ('Note'),
+  199 lib_footprint_mismatch, 30 footprint_symbol_mismatch (DNP), 12 lib_footprint_issues, 10 net_conflict, 4 track_dangling,
+  4 via_dangling, 2 silk_over_copper, 2 silk_overlap.
+- ERC (re-run, schematic untouched): `total 18: warning 18` (9 footprint_link_issues, 9 lib_symbol_mismatch), 0 errors.
+
+### Slow lines (board_slow.py, section 9)
+| net | route | mm |
+|---|---|---|
+| ADC_IN | L6 lane 66.85 -> via (66.85, 28.3) -> L3 band y 28.0 (north edge, >= 1 mm to the bundle) -> channel C x 30.85 -> y 19.35 north of R210's via -> (19.06, 20.0) | 77.25 |
+| ADC_REF_MID | lane 52.7 -> via (52.7, 29.15) -> band 29.15 -> C x 29.65 -> A y 21.4 -> (21.65, 20.8) | 56.55 |
+| VBIAS_K | lane 61.8 -> via (61.8, 29.75) -> band 29.75 -> C x 28.5 -> A y 21.7 -> (16.4, 20.3) | 73.04 |
+| VBIAS_A | lane 57.85, L6 jog past U308.3's input trace -> via (59.5, 30.5) -> band 30.05 -> C x 28.2 -> A y 22.0 -> x 15.4 north to (15.4, 16.3) | 77.08 |
+| VNEG_REF | lane 35.09 -> via (35.09, 30.5) -> band 30.5 -> C x 27.9 -> A y 22.3 / 22.45 -> (1.94, 19.2) | 58.88 |
+| VOFS | lane 57.3 -> via (57.3, 32.0) -> band 30.95 -> C x 27.6 -> A y 22.6 / 22.75 -> (1.0, 19.2) | 82.61 |
+| DAC_TRIG | lane 53.3 -> via (53.3, 32.0) -> band 32.0 -> C x 27.3 -> pstrobe N edge y 24.97 -> x 14.57 -> y 23.05 -> B (grid) -> (4.6, 41.0) | 89.98 |
+| TRIG_SEL | lane 66.3 -> via (66.3, 32.0) -> band 32.45 -> C x 27.0 -> y 25.27 -> x 14.12 -> y 23.35 -> B (grid) -> (9.25, 44.6) | 104.5 |
+| VTAP_TH | pure L6, lane 62.35 to the R380 / R381 link | 23.67 |
+
+### Power (board_power.py)
+Keep-free on L3 for all power copper: A (0..31, 21.5..24.6), B (0..12.5, 24.6..48), C (26..31, 24.6..33.5) plus access paths
+A_N (14.8..31, 18.6..21.5), A_W (0.3..2.6, 18.95..21.5), A_V (14.8..16, 15.7..18.6), D (12.5..26, 24.6..25.7) and the explicit
+slow-line copper (`SLOW_RESERVED` from `board_slow.reserve()`); corridor zones subtract them, branches / maze / via sites avoid them.
+| rail | path | maze mm | narrowest |
+|---|---|---|---|
+| +1V2 | L3 corridors power block -> FPGA | 10.4 | 0.8 |
+| VBUS | L3 band y 26.8 x 88 -> 32.4, 3-via array, L6 1.5 mm hop across channel C to L404.2 / C418.1, choke column + J501 by maze (L6) | 70.1 | 1.2 |
+| +5V / -5V | L3 corridors along the top edge, maze in the analog block | 98.5 / 101.9 | 0.5 / 0.6 |
+| +2V5 | L3 band y 23.2 (x >= 32), east loop y 50.8 to U701, rest maze (L3 / L6) | 357.7 | 0.3 |
+| -2V5 | L3 band y 25.0 (x >= 32), mcuif run y 47, rest maze | 275.1 | 0.3 |
+
+### Shortfalls / open points
+- Minor rails are routed tracks, not planes; +/-2V5 maze pieces go down to 0.3 mm (the last-resort width added for them),
+  +5V 0.5, -5V 0.6, VBUS 1.2 at its narrowest (no VBUS below 1.0 mm).
+- **Deviation:** apply_rest treats area B and strip A west of x 12.5 / south of y 23.6 as passable on L3 (keeping clear of the
+  routed DAC_TRIG / TRIG_SEL), because L6 there is walled by the front end's own tracks; the trunk stage keeps A, B, C closed.
+- GND vias beside signal vias: 36 placed (second pass at 0.12 mm clearance, 0.05 mm search grid); 4 still without one within
+  1.5 mm: (86.4, 27.2) USB_DP hop, (4.6, 41.0) DAC_TRIG, (71.0, 47.1) TRIG_SEL mcuif, (1.0, 19.2) VOFS (no free spot: block
+  copper / pads / power corridors on some layer everywhere in the ring). Stitching now also keeps out of the L3 power corridors.
+- Hand fixes in gen_board.py: dead +2V5 block via (11.1, 23.85) removed; R737.2 GND tied by a B track to R729.2 (its pour neck
+  no longer fills); explicit +2V5 L3 stub into the corridor at U701's via (29.88, 49.3); the +2V5 join into C305.2 re-entered
+  horizontally.
+- Renders (L1-L6, all, three details) and board_power_plan.png regenerated from this board and looked at; L3 shows the
+  slow bundle under the comparators, up channel C and along strip A; L6 shows the VBUS hop and long maze joins of the minor rails.
+- Unchanged open design points: strobe lines load to about 41 R against 49.9 R terminations; effective tap spacing 30 ps;
+  pstrobe input legs equal-length but not mirror images; TAP8 / TAP9 with a short L1 hop; USB pair with four layer changes.
+
+### Previous status (third pass, superseded)
 **Status (22 Nov 2026, third integration pass):** 100.0 x 57.0 mm, 4 x M3 3 mm in from the corners, JLC06161H-3313
 (L1 signal / L2 GND / L3 slow + minor-rail corridors / L4 +3V3 / L5 GND / L6 signal). Every block is a native six-layer
 file (merged with `layer_map=None`). **Every fast / RF / inter-block digital net is routed** by explicit coordinates in

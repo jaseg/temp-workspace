@@ -438,6 +438,38 @@ SIGV = [(86.4, 27.2), (86.9, 26.7), (86.4, 29.4), (86.9, 29.9), (86.4, 31.06), (
 RFT = [(loc(t.GetStart()), loc(t.GetEnd()), pcbnew.ToMM(t.GetWidth())) for t in B.GetTracks()
        if t.GetClass() == "PCB_TRACK" and t.GetNetname() in ("/BUF_OUT_T", "/PH_STROBE_P", "/PH_STROBE_N")]
 NST = board_stitch.stitch(B, m, RFT, SIGV)
+# second chance for the signal vias without a ground via: the same raster at the board's own clearance (0.12 mm
+# instead of the stitching margin 0.2), every spot within 1.5 mm (0.05 mm steps)
+if NST.get("lacking"):
+    _clr0 = board_stitch.CLR
+    board_stitch.CLR = 0.12
+    _occ = board_stitch.build_mask(B)
+    board_stitch.CLR = _clr0
+    _still = []
+    for sx, sy in NST["lacking"]:
+        _best = None
+        for _i in range(-30, 31):
+            for _j in range(-30, 31):
+                x_, y_ = sx + 0.05 * _i, sy + 0.05 * _j
+                d_ = math.hypot(x_ - sx, y_ - sy)
+                if not (0.55 <= d_ <= 1.5):
+                    continue
+                gi, gj = int(round(x_ / board_stitch.G)), int(round(y_ / board_stitch.G))
+                if 0 <= gi < _occ.shape[0] and 0 <= gj < _occ.shape[1] and not _occ[gi, gj]:
+                    if _best is None or d_ < _best[0]:
+                        _best = (d_, round(x_, 3), round(y_, 3))
+        if _best:
+            m.via(_best[1], _best[2], "GND")
+            _occ = board_stitch.build_mask(B) if False else _occ
+            _k = int(1.0 / board_stitch.G)
+            gi, gj = int(round(_best[1] / board_stitch.G)), int(round(_best[2] / board_stitch.G))
+            _occ[max(0, gi - _k):gi + _k + 1, max(0, gj - _k):gj + _k + 1] = True
+            NST["beside signal vias"] += 1
+            NST["signal vias without a ground via"] -= 1
+            NST.setdefault("second_chance", []).append(((sx, sy), _best[1:], round(_best[0], 2)))
+        else:
+            _still.append((sx, sy))
+    NST["lacking"] = _still
 print("GND stitching:", NST)
 bf.silk(B, m)
 # routes.json first (board_power.py reads it), then the power module as the LAST copper step
@@ -445,10 +477,19 @@ json.dump({"log": LOG, "not_placed": NOT_PLACED, "rf": RF, "stitch": NST}, open(
           indent=1)
 _rr = board_power.apply_rest(B)
 print("power rest: stranded", _rr.get("stranded"), "| unreached", _rr.get("unreached"))
+# the +2V5 maze join to C305.2 (B side, via-in-pad 7.54, 29.3) ends with a diagonal inside the pad: re-enter the pad
+# horizontally from the east (45-degree bends only)
+_d = [t for t in segs("+2V5", "B.Cu") if {loc(t.GetStart()), loc(t.GetEnd())} == {(8.8, 28.0), (7.6, 29.2)}]
+_h = [t for t in segs("+2V5", "B.Cu") if {loc(t.GetStart()), loc(t.GetEnd())} == {(7.6, 29.2), (7.3, 29.2)}]
+if _d and _h:
+    _w = pcbnew.ToMM(_d[0].GetWidth())
+    for t in _d + _h:
+        B.Remove(t)
+    m.track("+2V5", _w, [(8.8, 28.0), (8.3, 28.5), (8.3, 28.95), (7.95, 29.3), (7.54, 29.3)], "B.Cu", ch=0.0001)
 # U701.5 / C720.1 +2V5 via (29.88, 49.3) sits at the end of the +2V5 east-loop corridor: explicit L3 stub into it
 # (the fill alone leaves the via in a clearance notch after a reload)
 # (the corridor neck between the via and the J-connector THT pads 29.9-32.5 / 50.6 is below the zone's min width)
-m.track("+2V5", 0.5, [(29.88, 49.3), (30.35, 49.3), (31.2, 50.15), (32.8, 50.15)], "In2.Cu", ch=0.0001)
+m.track("+2V5", 0.5, [(29.88, 49.68), (30.35, 50.15), (32.8, 50.15)], "In2.Cu", ch=0.0001)
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 B.BuildConnectivity()
 PWR = board_power.verify(B)
