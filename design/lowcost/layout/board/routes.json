@@ -286,31 +286,31 @@
    "/ADC_REF_MID",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   0.0
+   56.55
   ],
   [
    "/DAC_TRIG",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   0.0
+   89.98
   ],
   [
    "/VOFS",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   0.0
+   82.61
   ],
   [
    "/VBIAS_A",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   0.0
+   77.08
   ],
   [
    "/VBIAS_K",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   0.0
+   73.04
   ],
   [
    "/VTAP_TH",
@@ -322,55 +322,22 @@
    "/TRIG_SEL",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   0.0
+   104.5
   ],
   [
    "/ADC_IN",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   0.0
+   77.25
   ],
   [
    "/VNEG_REF",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   0.0
+   58.88
   ]
  ],
- "not_placed": [
-  [
-   "/ADC_REF_MID",
-   "board_slow: no L3 path (see log)"
-  ],
-  [
-   "/DAC_TRIG",
-   "board_slow: no L3 path (see log)"
-  ],
-  [
-   "/VOFS",
-   "board_slow: no L3 path (see log)"
-  ],
-  [
-   "/VBIAS_A",
-   "board_slow: no L3 path (see log)"
-  ],
-  [
-   "/VBIAS_K",
-   "board_slow: no L3 path (see log)"
-  ],
-  [
-   "/TRIG_SEL",
-   "board_slow: no L3 path (see log)"
-  ],
-  [
-   "/ADC_IN",
-   "board_slow: no L3 path (see log)"
-  ],
-  [
-   "/VNEG_REF",
-   "board_slow: no L3 path (see log)"
-  ]
- ],
+ "not_placed": [],
  "rf": {
   "/S_STROBE_P": 0.16,
   "/S_STROBE_N": 0.16,
@@ -384,11 +351,19 @@
   "deliberate cut-out (listed L2 / L5 window)": 7
  },
  "stitch": {
-  "beside signal vias": 27,
+  "beside signal vias": 32,
   "RF fences": 12,
-  "grid": 323,
-  "signal vias without a ground via": 5,
+  "grid": 278,
+  "signal vias without a ground via": 8,
   "lacking": [
+   [
+    86.4,
+    27.2
+   ],
+   [
+    86.9,
+    26.7
+   ],
    [
     73.0,
     23.25
@@ -398,12 +373,16 @@
     41.0
    ],
    [
+    15.4,
+    16.3
+   ],
+   [
     71.0,
     47.1
    ],
    [
-    16.4,
-    14.47
+    15.4,
+    8.13
    ],
    [
     1.0,
@@ -420,10 +399,10 @@
     "+3V3",
     1,
     [
-     0.25,
-     0.25,
-     99.75,
-     56.75
+     0.3,
+     0.3,
+     99.7,
+     56.7
     ]
    ]
   ]
@@ -4030,10 +4009,10 @@
     "+3V3",
     1,
     [
-     0.25,
-     0.25,
-     99.75,
-     56.75
+     0.3,
+     0.3,
+     99.7,
+     56.7
     ]
    ]
   ]

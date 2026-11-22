@@ -63,10 +63,94 @@ def fmm(v):
     return int(round(float(v) * MM))
 
 
+# ------------------------------------------------------------------ TOPOLOGY.md section 9: L3 keep-free areas
+# No power copper of any stage (corridor zones, branches, maze tracks, new vias) inside these rectangles on L3
+# (board mm, origin board top-left).  A, B, C are the lead's allocation; A_N / A_W (strip A continued north to the
+# analog vias of the slow lines at y 19.2-20.8) and D (pstrobe north edge, the DAC_TRIG / TRIG_SEL passage from C to
+# B) are the slow lines' access paths added by the implementation.  L6 passes are allowed everywhere.
+KEEP_FREE = {"A": (0.0, 21.5, 31.0, 24.6), "B": (0.0, 24.6, 12.5, 48.0), "C": (26.0, 24.6, 31.0, 33.5),
+             "A_N": (14.8, 18.6, 31.0, 21.5), "A_W": (0.3, 18.95, 2.6, 21.5), "A_V": (14.8, 15.7, 16.0, 18.6),
+             "D": (12.5, 24.6, 26.0, 25.7)}
+# explicit slow-line copper (board_slow.reserve(): [(layer 'In2.Cu' | 'B.Cu' | 'all', pts board mm, half-width incl.
+# clearance)]), set by gen_board.py before apply_trunks(): power copper keeps out of it on that layer
+SLOW_RESERVED = []
+# apply_rest(): the trigger front end's supply landings in area B (-2V5 U302 / R384, +2V5 U302 / U301 / C301-C306 and
+# the lone +2V5 via 11.1, 23.85) cannot be reached on L6: B.Cu there is walled by the front end's own tracks (COARSE
+# x 4.45, VSW_GND y 23 / x 8, U301-SEL x 9.2, the U30x runs y 33.4-34.9).  The rest stage therefore treats area B and
+# the part of strip A west of x 12.5 and south of y 23.6 as passable on L3, keeping clear of the slow lines already
+# routed there (DAC_TRIG, TRIG_SEL); A elsewhere, C, D and the access paths stay closed.
+KEEP_FREE_REST = {k: v for k, v in KEEP_FREE.items() if k not in ("A", "B")}
+KEEP_FREE_REST.update({"A1": (0.0, 21.5, 31.0, 23.6), "A2": (12.5, 23.6, 31.0, 24.6)})
+_KF = [KEEP_FREE]
+
+
+def _kf_abs(board):
+    ox, oy = board_box(board)[:2]
+    return [(x0 + ox, y0 + oy, x1 + ox, y1 + oy) for x0, y0, x1, y1 in _KF[0].values()]
+
+
+def _reserved_abs(board, layers):
+    ox, oy = board_box(board)[:2]
+    return [([(x + ox, y + oy) for x, y in pts], hw) for lay, pts, hw in SLOW_RESERVED if lay in layers]
+
+
+def keep_mask(G, board, grow, layer="In2.Cu"):
+    """grid mask of the keep-free rectangles (L3 only) and the reserved slow-line copper on `layer`, grown"""
+    m = G.empty()
+    if layer == "In2.Cu":
+        for x0, y0, x1, y1 in _kf_abs(board):
+            m |= (G.X >= x0 - grow) & (G.X <= x1 + grow) & (G.Y >= y0 - grow) & (G.Y <= y1 + grow)
+    for pts, hw in _reserved_abs(board, (layer, "all")):
+        if len(pts) == 1:
+            G.disk(m, pts[0][0], pts[0][1], hw + grow)
+        for a, b in zip(pts[:-1], pts[1:]):
+            seg_mask(G, m, a, b, hw + grow)
+    return m
+
+
+def keep_free_ok(board, x, y, r, layer="In2.Cu"):
+    """True if a disk (x, y, r) (absolute mm) stays out of the keep-free areas / reserved copper on layer"""
+    if layer == "In2.Cu":
+        for x0, y0, x1, y1 in _kf_abs(board):
+            if x0 - r < x < x1 + r and y0 - r < y < y1 + r:
+                return False
+    for pts, hw in _reserved_abs(board, (layer, "all")):
+        if len(pts) == 1 and math.hypot(x - pts[0][0], y - pts[0][1]) < hw + r:
+            return False
+        for a, b in zip(pts[:-1], pts[1:]):
+            if _pt_seg(x, y, a, b) < hw + r:
+                return False
+    return True
+
+
+def keep_polyset(board, grow=0.0):
+    """SHAPE_POLY_SET of the L3 keep-free rectangles + reserved L3 slow copper (absolute mm), grown"""
+    parts = []
+    for x0, y0, x1, y1 in _kf_abs(board):
+        parts.append(polyset([(x0 - grow, y0 - grow), (x1 + grow, y0 - grow), (x1 + grow, y1 + grow),
+                              (x0 - grow, y1 + grow)]))
+    for pts, hw in _reserved_abs(board, ("In2.Cu", "all")):
+        if len(pts) == 1:
+            parts.append(octagon(pts[0][0], pts[0][1], hw + grow))
+        for a, b in zip(pts[:-1], pts[1:]):
+            parts.append(seg_rect(a, b, 2 * (hw + grow)))
+            parts.append(octagon(b[0], b[1], hw + grow))
+    return union(parts)
+
+
 # --------------------------------------------------------------------------------------------- board data
 def board_box(board):
-    bb = board.GetBoardEdgesBoundingBox()
-    return bb.GetX() / MM, bb.GetY() / MM, bb.GetRight() / MM, bb.GetBottom() / MM
+    """outline box from the Edge.Cuts end points (independent of the line width, same for a loaded board)"""
+    xs, ys = [], []
+    for d in board.GetDrawings():
+        if d.GetLayer() == pcbnew.Edge_Cuts and d.GetClass() == "PCB_SHAPE":
+            for q in (d.GetStart(), d.GetEnd()):
+                xs.append(q.x / MM)
+                ys.append(q.y / MM)
+    if not xs:
+        bb = board.GetBoardEdgesBoundingBox()
+        return bb.GetX() / MM, bb.GetY() / MM, bb.GetRight() / MM, bb.GetBottom() / MM
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def rail_nets(board):
@@ -582,29 +666,29 @@ TRUNKS = {
         ([(75.25, 21.95), (74.5, 21.2), (71.5, 21.2), (69.25, 18.95), (69.25, 16.4)], 1.5),
         ([(69.25, 16.4), (68.45, 15.6), (68.45, 14.5), (62.75, 8.8), (61.05, 8.8)], 1.0),
     ],
-    "+2V5": [  # band y 23.2 (north member), then down x 6 to the trigger front chain
+    "+2V5": [  # band y 23.2 (north member) for x >= 32 (section 9: strip A / channel C stay free); the hold
+        # amplifier, level shifter and trigger front chain are joined by the maze router (L6 across A / B)
         ([(74.45, 16.2), (75.8, 17.55), (78.4, 17.55), (79.85, 19.0), (81.5, 19.0), (82.7, 20.2), (82.7, 22.4),
-          (81.9, 23.2), (6.8, 23.2), (6.0, 24.0), (6.0, 28.5)], 1.5),
-        ([(28.5, 23.2), (28.5, 9.4), (27.8, 8.7), (27.15, 8.7)], 1.0),     # hold amplifier
+          (81.9, 23.2), (32.4, 23.2)], 1.5),
         # branch (ii): north of the -2V5 / VBUS landing vias, east, down inside the east edge, west along y 50.8
         ([(81.5, 19.0), (82.6, 16.3), (90.5, 16.3), (95.0, 20.8), (98.4, 20.8), (98.4, 48.0), (95.6, 50.8),
           (31.0, 50.8), (29.88, 49.68)], 1.5),
     ],
-    "-2V5": [  # band y 25.0, down x 13 / x 5.2 west of the pstrobe column, along the bottom, east on y 47
-        ([(83.75, 18.5), (84.6, 19.35), (84.6, 24.2), (83.8, 25.0), (13.8, 25.0), (13.0, 25.8), (13.0, 29.4),
-          (10.4, 32.0), (6.0, 32.0), (5.2, 32.8), (5.2, 50.6), (6.0, 51.4), (24.0, 51.4), (28.4, 47.0),
-          (91.65, 47.0), (92.45, 47.8), (92.45, 49.5)], 1.5),
+    "-2V5": [  # band y 25.0 for x >= 32 (section 9); the mcuif-side run along y 47; the rest by the maze router
+        ([(83.75, 18.5), (84.6, 19.35), (84.6, 24.2), (83.8, 25.0), (32.4, 25.0)], 1.5),
+        ([(31.0, 47.0), (91.65, 47.0), (92.45, 47.8), (92.45, 49.5)], 1.5),
     ],
-    "VBUS": [  # band y 26.8 (south member) to the pstrobe choke column
-        ([(88.0, 17.4), (88.0, 26.0), (87.2, 26.8), (23.6, 26.8), (22.78, 27.6), (22.78, 28.9),
-          (20.8, 30.9), (20.8, 46.0), (22.78, 47.98), (22.78, 48.65)], 1.5),
+    "VBUS": [  # band y 26.8 (south member) for x >= 31 only; crosses channel C on L6 (HOPS) to L404 / C418
+        ([(88.0, 17.4), (88.0, 26.0), (87.2, 26.8), (32.4, 26.8)], 1.5),
     ],
 }
 # L6 (B.Cu) tracks: J501 pin 1 programmer supply (0.5 mm, TOPOLOGY.md section 8)
 L6_TRACKS = {}            # J501 pin 1 (VBUS) is joined by the maze router like any other stranded load
 # L6 hops: (rail, L6 polyline board mm, width); a 3-via array (0.8 mm pitch) sits on each end, oriented along
 # the L3 corridor it lands on (dir = unit vector of that corridor)
-HOPS = []                 # none needed (the +2V5 east branch passes north of the -2V5 / VBUS landing vias)
+# section 9: VBUS crosses channel C on L6 (1.5 mm strip) from its band end (3-via array 32.4-34.0, 26.8) to the pstrobe
+# landing L404.2 / C418.1 (24.1, 25.725, B side pads joined to the vias 22.78, 26.35 / 27.05); dir None = no array
+HOPS = [("VBUS", [(24.1, 25.725), (32.125, 25.725), (33.2, 26.8)], 1.5, (None, (1.0, 0.0)))]
 JOIN_W = 0.6              # local L6 joins of stranded landing vias
 JOIN_MAX = 25.0
 STAIRCASE = (0.0, 20.5, 56.0, 23.5)      # board mm: L6 COARSE / TAP staircase band, no joins there
@@ -920,6 +1004,7 @@ def _branches(board, nets, pts, corr_abs, report):
                if t.GetClass() == "PCB_TRACK" and t.GetLayer() == L3]
         for (x, y, r) in other_holes(board, {}):
             G.disk(base, x, y, r + CLEAR + hw)
+        base |= keep_mask(G, board, CLEAR + hw)
         cmask = {}
         for rail, lines in corr_abs.items():
             m = G.empty()
@@ -1123,6 +1208,7 @@ def _l6_join(board, net, src_pts, dst_pts, report, width=None):
                         G.poly(obst, pp, grow=hw + 0.1)
         for (x, y, r) in other_holes(board, {}):
             G.disk(obst, x, y, r + c)
+        obst |= keep_mask(G, board, c, "B.Cu")
         free = ~obst
         src = set()
         for (x, y) in src_pts:
@@ -1181,6 +1267,8 @@ def _via_site_ok(board, x, y, net, extra=()):
     for (u, v) in extra:
         if math.hypot(u - x, v - y) < VIA_PITCH - 0.01:
             return False
+    if not (keep_free_ok(board, x, y, r0) and keep_free_ok(board, x, y, r0, "B.Cu")):
+        return False
     return True
 
 
@@ -1289,6 +1377,9 @@ class Maze:
                         if len(pp) >= 3:
                             G.poly(ko, pp, grow=m)
             self.static = edge | ko
+            self.kf3 = keep_mask(G, board, m)                    # section 9 keep-free (L3) + reserved slow copper
+            self.kf6 = keep_mask(G, board, m, "B.Cu")
+            self.kfv = keep_mask(G, board, m + VIA_D / 2) | keep_mask(G, board, m + VIA_D / 2, "B.Cu")
         finally:
             RES = old
 
@@ -1300,7 +1391,7 @@ class Maze:
         try:
             G = self.G
             m = MAZE_CLR + MAZE_RES / 2 + 0.06     # + 45-degree chamfer allowance (chamfer 0.12)
-            c3, c6, cv = self.static.copy(), self.static.copy(), self.static.copy()
+            c3, c6, cv = self.static | self.kf3, self.static | self.kf6, self.static | self.kfv
             rv = VIA_D / 2
             for key, kind, geom, r, n in self.items:
                 if n == net and n != "":
@@ -1735,7 +1826,10 @@ ESCAPES = {"-2V5": [([(83.75, 18.5), (84.6, 19.35), (84.6, 24.2), (83.8, 25.0), 
            "+2V5": [([(74.45, 16.2), (75.8, 17.55), (78.4, 17.55), (79.85, 19.0), (81.5, 19.0), (82.7, 20.2),
                       (82.7, 22.4), (81.9, 23.2), (74.0, 23.2)], 1.5)]}
 EDGE_STRIP_NETS = ("VBUS", "+5V", "-5V")
-MAZE_WIDTHS_NET = {"VBUS": (1.5, 1.2, 1.0, 0.8)}   # VBUS ~220 mA: 0.8 only as a reported last resort
+MAZE_WIDTHS_NET = {"VBUS": (1.5, 1.2, 1.0, 0.8),   # VBUS ~220 mA: 0.8 only as a reported last resort
+                   # +/-2V5 (op-amp / comparator / level-shifter supplies, tens of mA): 0.4 / 0.3 mm only as a
+                   # reported last resort where the section 9 keep-free areas and the L6 buses leave no wider path
+                   "+2V5": (0.8, 0.6, 0.5, 0.4, 0.3), "-2V5": (0.8, 0.6, 0.5, 0.4, 0.3)}
 BRANCH_W_NET = {"VBUS": 1.0}
 EDGE_STRIP_ONE = True     # one rail at most on the L4 top-edge strip
 EDGE_STRIP = (0.3, 2.3)    # board y of the L4 edge strip (top edge); +3V3 plane stays one piece below it
@@ -1966,6 +2060,7 @@ def apply(board, json_path=None, png_path=None, stage="all"):
     import json
     import os
     report = _LAST if stage == "rest" and _LAST else {}
+    _KF[0] = KEEP_FREE_REST if stage == "rest" else KEEP_FREE
     nets = rail_nets(board)
     ox, oy = _org(board)
     here = os.path.dirname(os.path.abspath(__file__))
@@ -2008,14 +2103,28 @@ def apply(board, json_path=None, png_path=None, stage="all"):
     if ROUTE_CORRIDORS:
         corr = route_corridors(board, nets, corr, report)
     pts = landing_points(board, nets)
+    kps = keep_polyset(board, CLEAR)
     for rail, lines in corr.items():
         shp = corridor_shape(lines)
+        shp.BooleanSubtract(kps, pcbnew.SHAPE_POLY_SET.PM_FAST)
         for i in range(shp.OutlineCount()):
             sub = pcbnew.SHAPE_POLY_SET()
             sub.AddOutline(shp.Outline(i))
             new_zone(board, nets[rail], sub, PRIO_L3, f"L3_{rail}_{stage}_{i}", L3)
             occ.append(dict(net=nets[rail], kind="zone", layer="In2.Cu",
                             pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in poly_points(sub, 0)]))
+    # a landing via within 1 mm of a corridor end gets an explicit L3 stub to that end (the zone fill alone left the
+    # +2V5 via 29.88, 49.3 in a clearance notch of its own corridor after a reload)
+    for rail, lines in corr.items():
+        for line, w in lines:
+            for e in (line[0], line[-1]):
+                for (x, y, r) in pts.get(rail, []):
+                    d = math.hypot(x - e[0], y - e[1])
+                    if 0.05 < d < 1.0 and keep_free_ok(board, e[0], e[1], 0.3) and stage == "rest" and not any(
+                            t.GetClass() == "PCB_VIA" and t.GetNetname() != nets[rail] and _pt_seg(
+                                t.GetPosition().x / MM, t.GetPosition().y / MM, (x, y), e) < min(1.0, w) / 2 + 0.4
+                            for t in board.GetTracks()):
+                        _add_track(board, nets[rail], [(x, y), e], min(1.0, w), L3)
     br = _branches(board, nets, pts, {r: v for r, v in corr.items() if r in sel}, report)
     for rail, lines in br.items():
         for line in lines:
@@ -2032,11 +2141,13 @@ def apply(board, json_path=None, png_path=None, stage="all"):
             l6occ.append(dict(net=nets[rail], kind="track", layer="B.Cu", width=w, pts=line))
     report["l6_clearance"] = _check_l6(board)
     for rail, line, w, dirs in HOPS:
-        if rail not in nets:
+        if rail not in nets or rail not in sel:
             continue
         _add_track(board, nets[rail], [(x + ox, y + oy) for x, y in line], w, pcbnew.B_Cu)
         l6occ.append(dict(net=nets[rail], kind="hop", layer="B.Cu", width=w, pts=line))
         for (x, y), d in zip((line[0], line[-1]), dirs):
+            if d is None:
+                continue
             arr = [(x + k * VIA_PITCH * d[0], y + k * VIA_PITCH * d[1]) for k in (-1, 0, 1)]
             for (u, v) in arr:
                 _add_via(board, nets[rail], u + ox, v + oy)
@@ -2080,9 +2191,10 @@ def apply(board, json_path=None, png_path=None, stage="all"):
     report["json"] = jp
     draw_plan(board, png_path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_plan.png"),
               corr, br, pts)
+    rep = dict(report)
     _LAST.clear()
-    _LAST.update(report)
-    return report
+    _LAST.update(rep)
+    return rep
 
 
 def _check_hops(board):

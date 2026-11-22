@@ -393,9 +393,28 @@ else:
     RF, LOG, NOT_PLACED = _c["RF"], [tuple(x) for x in _c["LOG"]], _c["NOT_PLACED"]
     import board_finish as bf
 
+    def near(a, b, tol=0.02):
+        return abs(a[0] - b[0]) < tol and abs(a[1] - b[1]) < tol
+
+    def segs(net, layer=None):
+        return [t for t in B.GetTracks() if not isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net and
+                (layer is None or t.GetLayerName() == layer)]
+
+    def vias(net):
+        return [t for t in B.GetTracks() if isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net]
+
 # power trunks (VBUS, +5V, -5V: reserved first, they carry the current), then the slow lines around them
 import board_power
-board_power.apply_trunks(B)
+import board_slow
+board_power.SLOW_RESERVED[:] = board_slow.reserve(mc_if, phase_if["/VTAP_TH"])   # TOPOLOGY.md section 9
+# dead block via: the +2V5 via (11.1, 23.85) of the old L4 +2V5 island touches no track, pad or zone any more
+for v in vias("+2V5"):
+    if near(loc(v.GetPosition()), (11.1, 23.85)) and not any(
+            near(loc(t.GetStart()), (11.1, 23.85)) or near(loc(t.GetEnd()), (11.1, 23.85)) for t in segs("+2V5")):
+        B.Remove(v)
+_rt = board_power.apply_trunks(B)
+print("power trunks: stranded", _rt.get("stranded"), "| maze", {k: (round(v["length"], 1), v["wmin"])
+      for k, v in _rt.get("maze", {}).items() if v["routes"]}, "| hop problems", _rt.get("hop_clearance"))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 import board_slow
 SLOW = board_slow.draw(B, m, mc_if, phase_if["/VTAP_TH"])
@@ -408,6 +427,10 @@ if "--slowonly" in sys.argv:
     bl.save_board(B, os.path.join(SCR, "slow.kicad_pcb"))
     sys.exit(0)
 import board_stitch
+# R737.2 (TRIG_SEL pull-down, B side) sits in a B.Cu pour pocket (BOOT0, JP701, R729) whose neck no longer fills:
+# explicit B track to the neighbouring GND pad R729.2
+m.track("GND", 0.25, [(70.3, 48.86), (69.85, 48.86), (69.75, 48.76), (69.75, 47.49), (69.65, 47.39), (69.1, 47.39)],
+        "B.Cu", ch=0.0001)
 SIGV = [(86.4, 27.2), (86.9, 26.7), (86.4, 29.4), (86.9, 29.9), (86.4, 31.06), (87.39, 31.45), (88.0, 44.35), (89.6, 43.9), (73.5, 22.75), (73.0, 23.25)] + \
     [loc(v.GetPosition()) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
      v.GetNetname() in ("/VBIAS_A", "/VBIAS_K", "/ADC_IN", "/ADC_REF_MID", "/VOFS", "/VNEG_REF", "/DAC_TRIG",
@@ -420,11 +443,20 @@ bf.silk(B, m)
 # routes.json first (board_power.py reads it), then the power module as the LAST copper step
 json.dump({"log": LOG, "not_placed": NOT_PLACED, "rf": RF, "stitch": NST}, open(os.path.join(HERE, "routes.json"), "w"),
           indent=1)
-try:
-    board_power.apply_rest(B)
-except Exception as e_:                            # the module belongs to the power agent: report, do not fix
-    print("board_power.apply_rest FAILED:", repr(e_))
+_rr = board_power.apply_rest(B)
+print("power rest: stranded", _rr.get("stranded"), "| unreached", _rr.get("unreached"))
+# U701.5 / C720.1 +2V5 via (29.88, 49.3) sits at the end of the +2V5 east-loop corridor: explicit L3 stub into it
+# (the fill alone leaves the via in a clearance notch after a reload)
+# (the corridor neck between the via and the J-connector THT pads 29.9-32.5 / 50.6 is below the zone's min width)
+m.track("+2V5", 0.5, [(29.88, 49.3), (30.35, 49.3), (31.2, 50.15), (32.8, 50.15)], "In2.Cu", ch=0.0001)
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
+B.BuildConnectivity()
+PWR = board_power.verify(B)
+print(board_power.table(PWR))
+print("maze (rest):", {k: (round(v["length"], 1), v["wmin"], v["vias"]) for k, v in _rr.get("maze", {}).items()})
+if "--powonly" in sys.argv:
+    bl.save_board(B, os.path.join(SCR, "powonly.kicad_pcb"))
+    sys.exit(0)
 bl.save_board(B, OUT)
 bf.write_pro(OUT.replace(".kicad_pcb", ".kicad_pro"), sorted(RF))
 

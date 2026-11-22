@@ -88,6 +88,28 @@ def build_mask(B):
             inside = MPath(pts).contains_points(np.c_[X.ravel(), Y.ravel()]).reshape(X.shape)
             rule[i0:i1 + 1, j0:j1 + 1] |= inside
     occ |= ndimage.binary_dilation(rule, iterations=int((VR + 0.05) / G) + 1)
+    # copper zones of other nets (the L3 power corridors of board_power.apply_trunks; not the L4 +3V3 background)
+    pw = np.zeros_like(occ)
+    for z in B.Zones():
+        if z.GetIsRuleArea() or z.GetNetname() in ("GND", ""):
+            continue
+        for lid in z.GetLayerSet().CuStack():
+            if lid == pcbnew.In3_Cu and z.GetNetname() == "+3V3":
+                continue
+            fl = z.GetFilledPolysList(lid)
+            for oi in range(fl.OutlineCount()):
+                c = fl.COutline(oi)
+                pts = [(_mm(c.CPoint(k).x), _mm(c.CPoint(k).y)) for k in range(c.PointCount())]
+                if len(pts) < 3:
+                    continue
+                xa, ya = np.array(pts).T
+                i0, i1 = max(0, int(xa.min() / G)), min(nx - 1, int(xa.max() / G) + 1)
+                j0, j1 = max(0, int(ya.min() / G)), min(ny - 1, int(ya.max() / G) + 1)
+                if i0 > i1 or j0 > j1:
+                    continue
+                X, Y = np.meshgrid(xs[i0:i1 + 1], ys[j0:j1 + 1], indexing="ij")
+                pw[i0:i1 + 1, j0:j1 + 1] |= MPath(pts).contains_points(np.c_[X.ravel(), Y.ravel()]).reshape(X.shape)
+    occ |= ndimage.binary_dilation(pw, iterations=int((VR + CLR) / G) + 1)
     for hx, hy in HOLES:
         disk(hx, hy, 3.85)
     e = int(0.8 / G)
@@ -112,8 +134,8 @@ def stitch(B, m, rf_tracks, sig_vias):
 
     for sx, sy in sig_vias:
         done = False
-        for rad in (0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5):
-            for a in range(0, 360, 15):
+        for rad in [0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5] + [round(0.6 + 0.05 * k, 2) for k in range(19)]:
+            for a in range(0, 360, 15 if rad in (0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5) else 5):
                 x, y = sx + rad * math.cos(math.radians(a)), sy + rad * math.sin(math.radians(a))
                 if ok(x, y):
                     place(x, y)
