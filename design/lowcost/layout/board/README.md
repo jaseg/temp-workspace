@@ -44,16 +44,17 @@ Rule check of the drawn geometry: 0 same-layer crossings, 0 clearance, 0 corners
 beside every inter-block signal via (stitching module; the highway-end USB pair uses the phase GND via at (88.09, 31.41)).
 
 ## Not done / open (ranked)
-1. **Slow bias / control lines (`board_slow.py`, drawn before the power module):** L6 from the mcuif stubs (strip levels
-   y 41.8-44.6 nested in source order) up tap-row lanes 1 (VNEG_REF 35.09), 5 (ADC_REF_MID 52.7, DAC_TRIG 53.3),
-   6 (VOFS 57.3, VBIAS_A 57.85), 7 (VBIAS_K 61.8, VTAP_TH 62.35), 8 (TRIG_SEL 66.3, ADC_IN 66.85); L6->L3 vias between the
-   comparators' pad rows or just south of them (y 26.9-32.0, all north of y 33.2); an explicit L3 band under the
-   comparators (y 26.9 / 28.0 / 29.1 / 29.55 / 30.1 / 30.55 / 31.95 / 32.45, ADC_IN 1.1 mm from its neighbours) west to
-   x 27.6, then a grid search to the block ends. VTAP_TH is pure L6 (ends on the R380 / R381 link; TP305 moved).
-   **Routed: ADC_REF_MID, ADC_IN, VBIAS_K, TRIG_SEL, VTAP_TH. Not routed: VBIAS_A, VNEG_REF, VOFS, DAC_TRIG** -
-   obstacle: west of x 27.6 the band runs into the pstrobe chain-A pad-cut keep-outs on L3 (x 19.2-24.4, y 28.75-31.6,
-   e.g. (23.78-24.42, 29.1-31.56), (22.18-23.08, 28.75-30.05)) and, north of them, ADC_IN's 1 mm zone; the remaining
-   lines must leave the band north before x 25 (needs re-ordered band levels) or go south of y 31.6. Not finished.
+1. **Slow bias / control lines: 1 of 9 routed (VTAP_TH, pure L6 up lane 7 to the R380 / R381 link).** With the power
+   trunks placed first (`board_power.apply_trunks`, as decided), the L3 VBUS trunk runs y 24.7-27.45 from x 22.5 to 87 and
+   loops round the pstrobe block (west leg x 4.5-6, y 22-50; along y 21.95-23.45 for x 9-22.5; bottom y 50-51.5 to J501),
+   and the +5V / -5V trunk runs y 19.95-20.7 from x 20.5 to 63. Every analog-side target (ADC_REF_MID (21.65, 20.8),
+   ADC_IN (19.06, 20.0), VBIAS_K (16.4, 20.3), VBIAS_A (15.4, 16.3), VOFS (1.0, 19.2), VNEG_REF (1.94, 19.2)) lies north of
+   VBUS, and DAC_TRIG (4.6, 41.0) / TRIG_SEL (9.25, 44.6) lie on / inside the VBUS loop; the only L3 gap left between the
+   two trunks at x 20.5-22.5 is 0.65 mm. An L6 crossing exists only at x 32.0-34.2 (between U305 and U306) with via spots
+   (32.15, 23.0), (32.85, 23.6), (33.5, 23.0), (34.15, 23.6), but north of it the same 0.65 mm gap blocks. `board_slow.py`
+   removes a line it cannot finish (no dangling copper). Needed from the power module: a >= 3 mm L3 gap in VBUS and the
+   +5V / -5V trunk around x 15-24, y 19-24.5, and a gap in the VBUS loop near x 6-10, y 44-46 for DAC_TRIG / TRIG_SEL.
+   (Without the trunks, 5 of 9 were routed - see the history.)
 2. Power (second agent's `board_power.py`): its current output is reported verbatim below; the rail corridors are its job.
 3. TAP8 / TAP9 use an L1 hop (two vias per net, over L2 ground) - the only fast nets with a section on L1.
 4. Phase still has the old open points (strobe lines load to about 41 R against 49.9 R terminations; effective tap spacing
@@ -62,22 +63,24 @@ beside every inter-block signal via (stitching module; the highway-end USB pair 
    excluded from the L3 fast-net check).
 
 ## Check results (last run, verbatim)
-Order in gen_board.py: blocks -> signal routes -> slow lines (board_slow) -> planes -> stitching -> silk -> routes.json ->
-`board_power.apply` (the old single-step module; `apply_trunks` / `apply_rest` did not exist yet) -> fill -> checks.
-- check_board: `missing 0, extra 4 (H1-H4), footprint 0, value 0, pad-net 0, nets with unrouted connections (after fill) 9,
-  clearance < 0.1 mm 0, track corners > 45 deg 22, tracks leaving a pad off-axis 2 (C111.1, R737.1), RF 0, courtyard 0,
-  unconnected items 12`. Unrouted signals: DAC_TRIG, VBIAS_A, VNEG_REF, VOFS (slow lines, see above). Unrouted supplies
-  (power module): +5V (1), -2V5 (1), -5V (1), GND (1). The 22 corners (+2V5 / -2V5 / +5V / VTAP_N joints) and C111.1 are in
-  board_power.py copper; the signal routing has 0 clearance, 0 corners, 0 crossings.
+Order in gen_board.py: blocks -> signal routes -> planes -> `board_power.apply_trunks` (VBUS, +5V, -5V) -> `board_slow` ->
+stitching -> silk -> routes.json -> `board_power.apply_rest` (last) -> fill -> checks.
+- check_board: `missing 0, extra 4 (H1-H4), footprint 0, value 0, pad-net 0, nets with unrouted connections (after fill) 11,
+  clearance < 0.1 mm 0, track corners > 45 deg 0, tracks leaving a pad off-axis 1 (R737.1), RF 0, courtyard 0,
+  unconnected items 25`. Unrouted signals: the 8 slow lines above. Unrouted supplies after apply_rest: +2V5 (6), -2V5 (9)
+  (power module, reported to the power agent); VBUS, +5V, -5V complete.
 - rule 10: `fast-net segments on L3: 0`; `L1/L6 samples 8170, without filled GND on L2/L5: 449` = 417 via antipads + 25 PTH
   antipads + 7 deliberate L2 windows; **0 real plane holes**; L4 `+3V3` one polygon.
-- Stitching: 29 GND vias beside inter-block signal vias (0.7-1.0 mm), 11 signal vias without room within 1 mm (listed by
-  `board_stitch.stitch`), 13 RF fence vias, 346 grid vias.
-- DRC jlc4 + parity: `total 482: error 11, warning 471` = 11 unconnected_items (the unrouted nets above); 0 clearance,
-  0 crossing, 0 shorting. Warnings: 199 'Note' field, 199 + 12 library version, 30 DNP (KiCad 7), 10 net_conflict
-  (TL401-403, J601 shell), 8 track_dangling + 7 via_dangling (unfinished slow lines), 2 silk_over_copper, 2 silk_overlap,
-  1 hole_to_hole + 1 holes_co_located (+2V5 vias of board_power.py at (32.95 / 32.55, 23.75) and (32.15, 48.15)).
+- Stitching: 27 GND vias beside inter-block signal vias (0.7-1.5 mm), 5 without room within 1.5 mm: (73.0, 23.25) TAP9 hop,
+  (4.6, 41.0) DAC_TRIG, (71.0, 47.1) TRIG_SEL mcuif, (16.4, 14.47) VBIAS_K, (1.0, 19.2) VOFS; 12 RF fence vias, 323 grid vias.
+- DRC jlc4 + parity: `total 504: error 24, warning 480` = 24 unconnected_items (the unrouted nets above); 0 clearance,
+  0 crossing, 0 shorting, 0 hole errors. Warnings: 199 'Note' field, 199 + 12 library version, 30 DNP (KiCad 7),
+  14 via_dangling + 12 track_dangling (stub ends of the unrouted slow lines and supply vias), 10 net_conflict
+  (TL401-403, J601 shell), 2 silk_over_copper, 2 silk_overlap.
 - ERC (re-run): `total 18: warning 18` (9 footprint_link_issues, 9 lib_symbol_mismatch), 0 errors.
+- Renders looked at (L1-L6, all, three details): signal routing as intended; L2 / L5 solid apart from the deliberate
+  windows; L3 shows the power corridors and no slow lines; the top pour stays out of the phase front column (x 0-9.5,
+  deliberate block keep-out).
 
 ## History (short)
 21 Nov: a 4-layer attempt and a first six-layer pass were auto-routed and failed on same-layer crossings at the fpga south

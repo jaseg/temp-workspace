@@ -129,3 +129,30 @@ The rails are therefore split over two layers by role:
   longer or the corridor necks around it.
 - Order of work on the board: signal vias first (L6 buses), then the L3 corridors (board_power.py), then
   the L3 slow lines around them.
+
+## 9. L3 space allocation between power trunks and slow lines (lead, final)
+
+Two agents fought over L3: with slow lines first the trunks could not complete, with trunks first only one
+slow line routed. Every layer has an east-west structure in the band between the analog and phase blocks
+(L1 phase-strobe pair at y about 23, L6 tap staircase and COARSE at y 20.9..22.9, L3 trunks), so north-south
+slow lines need reserved gaps. One owner now handles both modules, with this allocation:
+
+- The slow lines only have to reach the analog block's SOUTH-EDGE interfaces (y 22.5; the block brings its
+  nets there) and the trigger front end / pstrobe-side targets (DAC_TRIG near (4.6, 41.0), TRIG_SEL near
+  (9.25, 44.6)). They do not need to cross the +5V / -5V runs inside the analog block.
+- Keep-free areas on L3 for power copper (trunks and rest alike):
+  - A: x 0..31, y 21.5..24.6 (strip in front of the analog south-edge interfaces),
+  - B: x 0..12.5, y 24.6..48 (west side: trigger front end targets),
+  - C: x 26..31, y 24.6..33.5 (the slow lines' way north from their band under the comparators).
+- VBUS therefore does not loop around the pstrobe block on L3. It runs its band y about 24.7..27.5 only for
+  x >= 31, crosses channel C on L6 (1.5 mm strip, three-via arrays; L6 is free there between the staircase
+  at y <= 22.9 and the JTAG band, which starts at x 37), reaches the pstrobe landing at (22.83, 26.4), and the
+  other two choke landings ((18.95, 31.65), (19.85, 43.05)) by local joins on L6 or L1 inside the pstrobe
+  rectangle (clear of its strobe input serpentine and bottom-side parts).
+- Slow-line bundle: nine tracks, 0.15 mm at 0.3 mm pitch = about 3 mm; ADC_IN at the edge of the bundle with
+  1 mm spacing to its neighbour. Route: mcuif north edge (L6) -> tap-row lanes (L6) -> via to L3 at
+  y 26.9..32 -> west in the band under the comparators -> channel C -> strip A west to each analog interface
+  x, or on through B to the front-end targets.
+- Order in gen_board.py: signals -> apply_trunks (respecting A, B, C) -> slow lines (using A, B, C) -> pours,
+  stitching, silkscreen -> apply_rest (also respecting A, B, C; +2V5 / -2V5 reach the analog interfaces and
+  the front end by passing strip A / area B on L6, or at their far west / east ends).
