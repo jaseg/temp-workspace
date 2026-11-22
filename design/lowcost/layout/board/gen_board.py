@@ -31,23 +31,14 @@ W_BUS = 0.11                    # L6 bus tracks (0.11 / 0.11 at 0.22 pitch)
 FAST_RX = re.compile(r"^/(TAP\d+|COARSE|FPGA_CLK|MCU_CLK|SPI_\w+|ADC_TRIG|fpga_clock/JTAG_\w+|fpga_clock/DBG2|"
                      r"FPGA_DONE|FPGA_RECONFIG|I2C_\w+|S_STROBE_\w|PH_STROBE_\w|USB_D\w)$")
 
-m = bl.new_master(W, H)
-B = m.b
-for fp in B.GetFootprints():
-    if fp.GetReference().startswith("H"):
-        fp.SetBoardOnly(True)
-        fp.Value().SetVisible(False)
-        fp.Reference().SetVisible(False)
-for k, (x, y) in POS.items():
-    bl.merge(B, f"blocks/{k}/{k}.kicad_pcb", x, y, layer_map=None if k in NATIVE6 else bl.LAYER_MAP_4TO6)
+# --fast: reuse the cached board state just before the power / slow-line stages (written by every full run as
+# SCR/pre_power.kicad_pcb + pre_power.json); skips merge, signal routes and planes (development only)
+FAST = "--fast" in sys.argv
+CACHE = os.path.join(SCR, "pre_power.kicad_pcb")
 
 
 def loc(v):
     return round(pcbnew.ToMM(v.x) - bl.ORG[0], 4), round(pcbnew.ToMM(v.y) - bl.ORG[1], 4)
-
-
-def near(a, b, tol=0.02):
-    return abs(a[0] - b[0]) < tol and abs(a[1] - b[1]) < tol
 
 
 def zbox(z):
@@ -56,319 +47,352 @@ def zbox(z):
                                       pcbnew.ToMM(bb.GetRight()) - bl.ORG[0], pcbnew.ToMM(bb.GetBottom()) - bl.ORG[1]))
 
 
-def segs(net, layer=None):
-    return [t for t in B.GetTracks() if not isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net and
-            (layer is None or t.GetLayerName() == layer)]
+if not FAST:
+    m = bl.new_master(W, H)
+    B = m.b
+    for fp in B.GetFootprints():
+        if fp.GetReference().startswith("H"):
+            fp.SetBoardOnly(True)
+            fp.Value().SetVisible(False)
+            fp.Reference().SetVisible(False)
+    for k, (x, y) in POS.items():
+        bl.merge(B, f"blocks/{k}/{k}.kicad_pcb", x, y, layer_map=None if k in NATIVE6 else bl.LAYER_MAP_4TO6)
 
 
-def vias(net):
-    return [t for t in B.GetTracks() if isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net]
 
 
-def seg_at(net, p, layer=None):
-    """segments of net with an end at p -> [(track, this_end, other_end)]"""
-    out = []
-    for t in segs(net, layer):
-        a, b = loc(t.GetStart()), loc(t.GetEnd())
-        if near(a, p):
-            out.append((t, a, b))
-        elif near(b, p):
-            out.append((t, b, a))
-    return out
+    def near(a, b, tol=0.02):
+        return abs(a[0] - b[0]) < tol and abs(a[1] - b[1]) < tol
 
 
-def kill_via(net, p):
-    for v in vias(net):
-        if near(loc(v.GetPosition()), p):
-            B.Remove(v)
-            return True
-    return False
 
 
-# ---------------------------------------------------------------- block zones -> board planes
-x0p, y0p = POS["pstrobe"]
-L2_CUTS = []
-for z in list(B.Zones()):
-    if z.GetIsRuleArea():
-        b_ = zbox(z)
-        # review (kept): the phase block's all-layer north_cut keep-out (the pstrobe rectangle) must not survive
-        if z.IsOnLayer(pcbnew.In1_Cu) and z.IsOnLayer(pcbnew.F_Cu) and abs(b_[0] - x0p) < 0.3 and \
-                abs(b_[1] - y0p) < 0.6 and (b_[2] - b_[0]) > 12:
-            B.Remove(z)
+    def segs(net, layer=None):
+        return [t for t in B.GetTracks() if not isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net and
+                (layer is None or t.GetLayerName() == layer)]
+
+
+    def vias(net):
+        return [t for t in B.GetTracks() if isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net]
+
+
+    def seg_at(net, p, layer=None):
+        """segments of net with an end at p -> [(track, this_end, other_end)]"""
+        out = []
+        for t in segs(net, layer):
+            a, b = loc(t.GetStart()), loc(t.GetEnd())
+            if near(a, p):
+                out.append((t, a, b))
+            elif near(b, p):
+                out.append((t, b, a))
+        return out
+
+
+    def kill_via(net, p):
+        for v in vias(net):
+            if near(loc(v.GetPosition()), p):
+                B.Remove(v)
+                return True
+        return False
+
+
+    # ---------------------------------------------------------------- block zones -> board planes
+    x0p, y0p = POS["pstrobe"]
+    L2_CUTS = []
+    for z in list(B.Zones()):
+        if z.GetIsRuleArea():
+            b_ = zbox(z)
+            # review (kept): the phase block's all-layer north_cut keep-out (the pstrobe rectangle) must not survive
+            if z.IsOnLayer(pcbnew.In1_Cu) and z.IsOnLayer(pcbnew.F_Cu) and abs(b_[0] - x0p) < 0.3 and \
+                    abs(b_[1] - y0p) < 0.6 and (b_[2] - b_[0]) > 12:
+                B.Remove(z)
+                continue
+            if z.IsOnLayer(pcbnew.In1_Cu):
+                L2_CUTS.append(z)
             continue
-        if z.IsOnLayer(pcbnew.In1_Cu):
-            L2_CUTS.append(z)
-        continue
-    if z.GetNetname() == "GND":
-        B.Remove(z)                                # replaced by board-wide GND planes / pours
-    elif z.GetNetname() == "+3V3" and z.IsOnLayer(pcbnew.In3_Cu):
-        B.Remove(z)                                # the L4 background plane
-    elif z.IsOnLayer(pcbnew.In3_Cu):
-        z.SetAssignedPriority(5)                   # block rail islands (+1V2, VTAP_P / VTAP_N strips)
-for t in list(B.GetTracks()):                      # fpga +1V2 L4 track over U501 GND vias (old short)
-    if not isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == "+1V2" and t.GetLayer() == pcbnew.In3_Cu:
+        if z.GetNetname() == "GND":
+            B.Remove(z)                                # replaced by board-wide GND planes / pours
+        elif z.GetNetname() == "+3V3" and z.IsOnLayer(pcbnew.In3_Cu):
+            B.Remove(z)                                # the L4 background plane
+        elif z.IsOnLayer(pcbnew.In3_Cu):
+            z.SetAssignedPriority(5)                   # block rail islands (+1V2, VTAP_P / VTAP_N strips)
+    for t in list(B.GetTracks()):                      # fpga +1V2 L4 track over U501 GND vias (old short)
+        if not isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == "+1V2" and t.GetLayer() == pcbnew.In3_Cu:
+            B.Remove(t)
+    for z in L2_CUTS:                                  # L3 cleared under every L2 cut-out (node windows, pad cuts)
+        ol = z.Outline()
+        pts = [loc(ol.CVertex(i)) for i in range(ol.COutline(0).PointCount())]
+        if len(pts) >= 3:
+            m.keepout(pts, layers=("In2.Cu",), tracks=True, vias=False)
+
+    LOG = []          # (net, layer(s), lane / corridor, length)
+    VTHV = [loc(v.GetPosition())[0] for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
+            v.GetNetname().startswith('/trigger_phase/VTH')]
+    RF = {}
+
+
+    def T(net, w, pts, layer, lane, ch=0.1):
+        q = m.track(net, w, pts, layer, ch=ch)
+        LOG.append((net, layer, lane, round(bl.plen(q), 3)))
+        return q
+
+
+    # (the phase VTH rails are on L3 inside the native six-layer phase block since 22 Nov)
+
+    # ---------------------------------------------------------------- L1: S_STROBE pair (analog E edge is 1.0 mm below fpga W)
+    # fpga S_STROBE_P ends at (56, 9.865), the analog P interface is (56, 10.865) = where fpga's N ends: P jogs 1 mm
+    # south inside the fpga margin; N's L6 hop is extended 1 mm south so its up-via meets the analog N at y 11.865
+    ip = [i for i in json.load(open("blocks/fpga/fpga.ifaces.json"))["ifaces"] if i["net"] == "/S_STROBE_P"][0]
+    ia = {i["net"]: i for i in json.load(open("blocks/analog/analog.ifaces.json"))["ifaces"]}
+    fP = (ip["x"] + 56.0, ip["y"] + 0.5)
+    aP = (ia["/S_STROBE_P"]["x"] + 0.0, ia["/S_STROBE_P"]["y"] + 1.0)
+    aN = (ia["/S_STROBE_N"]["x"] + 0.0, ia["/S_STROBE_N"]["y"] + 1.0)
+    NOT_PLACED = []
+    # the fpga block now ends both strobes on the analog E rows (gen_fpga.py, 22 Nov): the stubs abut, nothing to draw
+    assert abs(aP[1] - fP[1]) < 0.01, (aP, fP)
+    RF["/S_STROBE_P"] = RF["/S_STROBE_N"] = W_RF
+
+    # ---------------------------------------------------------------- L1: BUF_OUT_T analog S (15.75) -> phase N (8.79), y 22.5
+    a_end, p_end = (15.75, 22.5), (8.79, 22.5)
+    YB = 22.35                      # BUF_OUT_T run; the PH_STROBE pair passes south of it (y 22.85 / 23.21)
+    for t, e, o in seg_at("/BUF_OUT_T", a_end, "F.Cu"):
+        B.Remove(t); a_from = o
+    for t, e, o in seg_at("/BUF_OUT_T", p_end, "F.Cu"):
+        t.SetStart(m.P(p_end[0], YB + 0.6)); t.SetEnd(m.P(*o))
+    T("/BUF_OUT_T", W_RF, [a_from, (a_end[0], YB - 0.6), (a_end[0] - 0.6, YB), (p_end[0] + 0.6, YB),
+                           (p_end[0], YB + 0.6)], "F.Cu", "analog S -> phase N along y 22.35 (L1)")
+
+    # ---------------------------------------------------------------- L1: PH_STROBE pair fpga W -> pstrobe N inputs
+    # fpga W exits P (56, 21.85) north / N south (pins swapped 22 Nov); west along the exit rows to x 25, 45-degree step
+    # down to y 22.85 / 23.21 (south of BUF_OUT_T, north of the phase strip parts), west, south into (10.00 / 10.60, 25.00).
+    # N is the inner line of both bends: two equal 45-degree bumps (south) on its upper run make it equal to P.
+    ipf = {i["net"]: (i["x"] + 56.0, i["y"] + 0.5) for i in json.load(open("blocks/fpga/fpga.ifaces.json"))["ifaces"]}
+    ips = {i["net"]: (i["x"] + 9.5, i["y"] + 25.0) for i in json.load(open("blocks/pstrobe/pstrobe.ifaces.json"))["ifaces"]}
+    sP, sN = ipf["/PH_STROBE_P"], ipf["/PH_STROBE_N"]
+    eP, eN = ips["/PH_STROBE_P"], ips["/PH_STROBE_N"]
+    YP2, YN2 = 22.85, 23.21
+    XP, XN = 24.0, 24.2
+    PP = [sP, (XP + (YP2 - sP[1]), sP[1]), (XP, YP2), (eP[0] + 0.3, YP2), (eP[0], YP2 + 0.3), eP]
+
+
+    def n_pts(h):
+        q = [sN]
+        for xb in (33.0, 29.5):                        # bumps (west-going): down at xb, flat 0.6, up
+            q += [(xb, sN[1]), (xb - h, sN[1] + h), (xb - h - 0.6, sN[1] + h), (xb - 2 * h - 0.6, sN[1])]
+        return q + [(XN + (YN2 - sN[1]), sN[1]), (XN, YN2), (eN[0] + 0.3, YN2), (eN[0], YN2 + 0.3), eN]
+
+
+    lo, hi = 0.0, 0.6
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if bl.plen(n_pts(mid)) < bl.plen(PP) else (lo, mid)
+    T("/PH_STROBE_P", W_RF, PP, "F.Cu", "L1 fpga W y 21.85 -> y 22.85 -> pstrobe N (10.00, 25.00)", ch=0.0001)
+    T("/PH_STROBE_N", W_RF, n_pts(mid), "F.Cu", "L1 fpga W y 22.19 -> y 23.21 -> pstrobe N (10.60, 25.00), 2 bumps h %.3f" % mid,
+      ch=0.0001)
+    RF["/PH_STROBE_P"] = RF["/PH_STROBE_N"] = W_RF
+    RF["/BUF_OUT_T"] = W_RF
+
+    # ---------------------------------------------------------------- L6: COARSE + TAP0..7 west staircase
+    # fpga stubs: vertical B pieces at x 58.0 + 0.5 k down to y 22.5 (k 0 COARSE, 1..8 TAP0..7); phase TAP ends: via at
+    # (x_k, 23.92) with a B stub north to y 22.5.  Lanes y = 20.90 + 0.22 k (COARSE northmost), above the comparator
+    # GND via row (y 23.07) and below the analog block's B parts; TAP k drops at its comparator via.
+    WEST = ["/COARSE"] + [f"/TAP{k}" for k in range(8)]
+    fpga_if = {i["net"]: (i["x"] + 56.0, i["y"] + 0.5) for i in json.load(open("blocks/fpga/fpga.ifaces.json"))["ifaces"]}
+    phase_if = {i["net"]: (i["x"], i["y"] + 22.5) for i in json.load(open("blocks/phase/phase.ifaces.json"))["ifaces"]}
+
+
+    def fpga_stub_top(net):
+        """remove the fpga's vertical S-edge stub of net; return its upper end (where the fan-out diagonal ends)"""
+        e = fpga_if[net]
+        (t, _, o), = seg_at(net, e, "B.Cu")
         B.Remove(t)
-for z in L2_CUTS:                                  # L3 cleared under every L2 cut-out (node windows, pad cuts)
-    ol = z.Outline()
-    pts = [loc(ol.CVertex(i)) for i in range(ol.COutline(0).PointCount())]
-    if len(pts) >= 3:
-        m.keepout(pts, layers=("In2.Cu",), tracks=True, vias=False)
-
-LOG = []          # (net, layer(s), lane / corridor, length)
-VTHV = [loc(v.GetPosition())[0] for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
-        v.GetNetname().startswith('/trigger_phase/VTH')]
-RF = {}
+        return o
 
 
-def T(net, w, pts, layer, lane, ch=0.1):
-    q = m.track(net, w, pts, layer, ch=ch)
-    LOG.append((net, layer, lane, round(bl.plen(q), 3)))
-    return q
-
-
-# (the phase VTH rails are on L3 inside the native six-layer phase block since 22 Nov)
-
-# ---------------------------------------------------------------- L1: S_STROBE pair (analog E edge is 1.0 mm below fpga W)
-# fpga S_STROBE_P ends at (56, 9.865), the analog P interface is (56, 10.865) = where fpga's N ends: P jogs 1 mm
-# south inside the fpga margin; N's L6 hop is extended 1 mm south so its up-via meets the analog N at y 11.865
-ip = [i for i in json.load(open("blocks/fpga/fpga.ifaces.json"))["ifaces"] if i["net"] == "/S_STROBE_P"][0]
-ia = {i["net"]: i for i in json.load(open("blocks/analog/analog.ifaces.json"))["ifaces"]}
-fP = (ip["x"] + 56.0, ip["y"] + 0.5)
-aP = (ia["/S_STROBE_P"]["x"] + 0.0, ia["/S_STROBE_P"]["y"] + 1.0)
-aN = (ia["/S_STROBE_N"]["x"] + 0.0, ia["/S_STROBE_N"]["y"] + 1.0)
-NOT_PLACED = []
-# the fpga block now ends both strobes on the analog E rows (gen_fpga.py, 22 Nov): the stubs abut, nothing to draw
-assert abs(aP[1] - fP[1]) < 0.01, (aP, fP)
-RF["/S_STROBE_P"] = RF["/S_STROBE_N"] = W_RF
-
-# ---------------------------------------------------------------- L1: BUF_OUT_T analog S (15.75) -> phase N (8.79), y 22.5
-a_end, p_end = (15.75, 22.5), (8.79, 22.5)
-YB = 22.35                      # BUF_OUT_T run; the PH_STROBE pair passes south of it (y 22.85 / 23.21)
-for t, e, o in seg_at("/BUF_OUT_T", a_end, "F.Cu"):
-    B.Remove(t); a_from = o
-for t, e, o in seg_at("/BUF_OUT_T", p_end, "F.Cu"):
-    t.SetStart(m.P(p_end[0], YB + 0.6)); t.SetEnd(m.P(*o))
-T("/BUF_OUT_T", W_RF, [a_from, (a_end[0], YB - 0.6), (a_end[0] - 0.6, YB), (p_end[0] + 0.6, YB),
-                       (p_end[0], YB + 0.6)], "F.Cu", "analog S -> phase N along y 22.35 (L1)")
-
-# ---------------------------------------------------------------- L1: PH_STROBE pair fpga W -> pstrobe N inputs
-# fpga W exits P (56, 21.85) north / N south (pins swapped 22 Nov); west along the exit rows to x 25, 45-degree step
-# down to y 22.85 / 23.21 (south of BUF_OUT_T, north of the phase strip parts), west, south into (10.00 / 10.60, 25.00).
-# N is the inner line of both bends: two equal 45-degree bumps (south) on its upper run make it equal to P.
-ipf = {i["net"]: (i["x"] + 56.0, i["y"] + 0.5) for i in json.load(open("blocks/fpga/fpga.ifaces.json"))["ifaces"]}
-ips = {i["net"]: (i["x"] + 9.5, i["y"] + 25.0) for i in json.load(open("blocks/pstrobe/pstrobe.ifaces.json"))["ifaces"]}
-sP, sN = ipf["/PH_STROBE_P"], ipf["/PH_STROBE_N"]
-eP, eN = ips["/PH_STROBE_P"], ips["/PH_STROBE_N"]
-YP2, YN2 = 22.85, 23.21
-XP, XN = 24.0, 24.2
-PP = [sP, (XP + (YP2 - sP[1]), sP[1]), (XP, YP2), (eP[0] + 0.3, YP2), (eP[0], YP2 + 0.3), eP]
-
-
-def n_pts(h):
-    q = [sN]
-    for xb in (33.0, 29.5):                        # bumps (west-going): down at xb, flat 0.6, up
-        q += [(xb, sN[1]), (xb - h, sN[1] + h), (xb - h - 0.6, sN[1] + h), (xb - 2 * h - 0.6, sN[1])]
-    return q + [(XN + (YN2 - sN[1]), sN[1]), (XN, YN2), (eN[0] + 0.3, YN2), (eN[0], YN2 + 0.3), eN]
-
-
-lo, hi = 0.0, 0.6
-for _ in range(60):
-    mid = (lo + hi) / 2
-    lo, hi = (mid, hi) if bl.plen(n_pts(mid)) < bl.plen(PP) else (lo, mid)
-T("/PH_STROBE_P", W_RF, PP, "F.Cu", "L1 fpga W y 21.85 -> y 22.85 -> pstrobe N (10.00, 25.00)", ch=0.0001)
-T("/PH_STROBE_N", W_RF, n_pts(mid), "F.Cu", "L1 fpga W y 22.19 -> y 23.21 -> pstrobe N (10.60, 25.00), 2 bumps h %.3f" % mid,
-  ch=0.0001)
-RF["/PH_STROBE_P"] = RF["/PH_STROBE_N"] = W_RF
-RF["/BUF_OUT_T"] = W_RF
-
-# ---------------------------------------------------------------- L6: COARSE + TAP0..7 west staircase
-# fpga stubs: vertical B pieces at x 58.0 + 0.5 k down to y 22.5 (k 0 COARSE, 1..8 TAP0..7); phase TAP ends: via at
-# (x_k, 23.92) with a B stub north to y 22.5.  Lanes y = 20.90 + 0.22 k (COARSE northmost), above the comparator
-# GND via row (y 23.07) and below the analog block's B parts; TAP k drops at its comparator via.
-WEST = ["/COARSE"] + [f"/TAP{k}" for k in range(8)]
-fpga_if = {i["net"]: (i["x"] + 56.0, i["y"] + 0.5) for i in json.load(open("blocks/fpga/fpga.ifaces.json"))["ifaces"]}
-phase_if = {i["net"]: (i["x"], i["y"] + 22.5) for i in json.load(open("blocks/phase/phase.ifaces.json"))["ifaces"]}
-
-
-def fpga_stub_top(net):
-    """remove the fpga's vertical S-edge stub of net; return its upper end (where the fan-out diagonal ends)"""
-    e = fpga_if[net]
-    (t, _, o), = seg_at(net, e, "B.Cu")
-    B.Remove(t)
-    return o
-
-
-def phase_stub_via(net):
-    e = phase_if[net]
-    (t, _, o), = seg_at(net, e, "B.Cu")
-    B.Remove(t)
-    return o
-
-
-for k, net in enumerate(WEST):
-    top = fpga_stub_top(net)
-    y = round(20.90 + 0.22 * k, 3)
-    if net == "/COARSE":
-        # COARSE (U304, phase NW) arrives from the west north of TAP0, then passes under the analog block's
-        # south row at y 22.45 (between the FB track y 21.9 and the VSW_GND row y 22.95) to the phase stub top
-        pe = phase_if[net]
-        T(net, W_BUS, [top, (top[0], y), (23.6, y), (23.6 - (22.45 - y), 22.45), (pe[0] + 0.3, 22.45),
-                       (pe[0], 22.75)], "B.Cu", "L6 lane y 20.90 / y 22.45 (north of TAP0)", ch=0.1)
-        # the phase stub started at (4.45, 22.5): shorten it to begin at 22.75
-        for t, e, o in seg_at(net, pe, "B.Cu"):
-            t.SetStart(m.P(pe[0], 22.75)); t.SetEnd(m.P(*o))
-        continue
-    v = phase_stub_via(net)
-    T(net, W_BUS, [top, (top[0], y), (v[0], y), v], "B.Cu", f"L6 west staircase lane y {y:.2f}", ch=0.1)
-
-# ---------------------------------------------------------------- USB 90 R pair power S -> mcuif N (L1, then L6)
-# The east TAPs (U311 / U312) run east on the L6 highway (y 29.35-30.6), so the pair crosses that band on L1:
-# from the power stubs (82.6 / 83.0, 22.5) east on L1 north of U311's pins, south on L1 in the gap U311|U312
-# (x 86.25 / 86.65), vias (86.25, 31.0) / (87.1, 31.3) below the highway, L6 diagonal between the phase GND via
-# (88.09, 31.41) and the VTAP_N via (88.09, 33.66) into tap-row lane 13 (x 89.0 / 89.4, between node window 13
-# (86.80-88.60) and the tap-14 jumpers (89.92)), south, vias east of the C357 GND via (88.09, 43.59), F into mcuif.
-W_USB = 0.18
-pDP, pDM = (82.6, 22.5), (83.0, 22.5)
-# the VTH2 rail (L1, comparator centre line y 27.755) and the highway TAP14 / TAP15 (L6, y 30.35 / 30.6) both cross the
-# pair's path: L1 down to above VTH2, L6 under it, L1 again under the highway lanes, L6 from y 31.1 on
-T("/USB_DP", W_USB, [pDP, (82.6, 22.95), (82.9, 23.25), (86.0, 23.25), (86.4, 23.65), (86.4, 27.2)], "F.Cu",
-  "L1 north of U311, gap U311|U312", ch=0.0001)
-T("/USB_DM", W_USB, [pDM, (83.0, 22.55), (83.3, 22.85), (86.4, 22.85), (86.9, 23.35), (86.9, 26.7)],
-  "F.Cu", "L1 north of U311, gap U311|U312", ch=0.0001)
-m.via(86.4, 27.2, "/USB_DP"); m.via(86.9, 26.7, "/USB_DM")
-T("/USB_DP", W_USB, [(86.4, 27.2), (86.4, 29.4)], "B.Cu", "L6 under the VTH2 rail")
-T("/USB_DM", W_USB, [(86.9, 26.7), (86.9, 29.9)], "B.Cu", "L6 under the VTH2 rail")
-m.via(86.4, 29.4, "/USB_DP"); m.via(86.9, 29.9, "/USB_DM")
-T("/USB_DP", W_USB, [(86.4, 29.4), (86.4, 31.06)], "F.Cu", "L1 over the highway TAP14 / TAP15")
-T("/USB_DM", W_USB, [(86.9, 29.9), (86.9, 30.96), (87.39, 31.45)], "F.Cu", "L1 over the highway TAP14 / TAP15",
-  ch=0.0001)
-m.via(86.4, 31.06, "/USB_DP"); m.via(87.39, 31.45, "/USB_DM")
-T("/USB_DP", W_USB, [(86.4, 31.06), (89.0, 33.66), (89.0, 43.35), (88.0, 44.35)], "B.Cu", "L6 tap-row lane 13",
-  ch=0.0001)
-T("/USB_DM", W_USB, [(87.39, 31.45), (89.4, 33.46), (89.4, 43.7), (89.6, 43.9)], "B.Cu", "L6 tap-row lane 13",
-  ch=0.0001)
-m.via(88.0, 44.35, "/USB_DP"); m.via(89.6, 43.9, "/USB_DM")
-T("/USB_DP", W_USB, [(88.0, 44.35), (88.0, 45.0)], "F.Cu", "via to mcuif F stub")
-T("/USB_DM", W_USB, [(89.6, 43.9), (88.5, 45.0)], "F.Cu", "via to mcuif F stub")
-for gx, gy in ((90.35, 44.1),):          # ground via beside the mcuif-end signal vias (the phase GND via 88.09 /
-    m.via(gx, gy, "GND")                 # 31.41 sits beside the highway-end pair)
-
-# ---------------------------------------------------------------- slow lines whose analog end is a B column: L3 vias
-# (VBIAS_A / VBIAS_K: via at y 20.3 on the B column; ADC_IN / ADC_REF_MID: their existing vias) - the B stubs
-# below are removed so the L6 COARSE lane passes
-for net, yv in (("/VBIAS_A", 16.3), ("/VBIAS_K", 20.3), ("/ADC_IN", None), ("/ADC_REF_MID", None)):
-    e = (ia[net]["x"], ia[net]["y"] + 1.0)
-    (t, _, o), = seg_at(net, e, "B.Cu")
-    if yv is None:
+    def phase_stub_via(net):
+        e = phase_if[net]
+        (t, _, o), = seg_at(net, e, "B.Cu")
         B.Remove(t)
-    else:
-        t.SetStart(m.P(*o)); t.SetEnd(m.P(e[0], yv))
-        m.via(e[0], yv, net)
+        return o
 
-# ---------------------------------------------------------------- L6: JTAG group (TOPOLOGY.md section 7)
-# fpga slots x 62.5-64.5: straight south to an upper band under the comparator bodies (y 24.75 + 0.3 j, between the
-# +3V3 via row y 24.25 and the R380 network / VTH via row), west, south through tap-row lanes 2 / 3 / 4 (between a
-# node window and the next summing jumpers), 45-degree jogs in the strip y 42.3-44.7 onto the J501 interfaces.
-JT = ["/fpga_clock/DBG2", "/fpga_clock/JTAG_TCK", "/fpga_clock/JTAG_TMS", "/fpga_clock/JTAG_TDI", "/fpga_clock/JTAG_TDO"]
-LANE_C = lambda n: 30.58 + 4.514 * n                 # tap-row lane centre between window n and the jumpers of n + 1
-JLANE = {JT[0]: LANE_C(2) - 0.15, JT[1]: LANE_C(2) + 0.15, JT[2]: LANE_C(3) - 0.15, JT[3]: LANE_C(3) + 0.15,
-         JT[4]: LANE_C(4)}
-mc_if = {i["net"]: (i["x"] + 27.0, i["y"] + 45.0) for i in json.load(open("blocks/mcuif/mcuif.ifaces.json"))["ifaces"]}
-for j, net in enumerate(JT):
-    top = fpga_stub_top(net)
-    yb = round(24.75 + 0.3 * j, 3)
-    xl = round(JLANE[net], 3)
-    tx, ty = mc_if[net]
-    ya = 42.3
-    T(net, W_BUS, [top, (top[0], yb), (xl, yb), (xl, ya), (tx, ya + abs(tx - xl)), (tx, ty)], "B.Cu",
-      f"L6 band y {yb:.2f}, tap-row lane x {xl:.2f}", ch=0.1)
 
-# ---------------------------------------------------------------- L6: MCU group + TAP15..TAP10 drop through gap U309|U310
-# slots x 65.0 + 0.5 i (i 0-9 MCU group, 10-15 TAP15..TAP10) fan into a column x 68.1 + 0.25 i (gap U309|U310, whose
-# vias were moved under the bodies in gen_phase.py), down to the highway lanes y 29.35 + 0.25 (15 - i) and east.
-# TAP10 (northmost) peels first to U310, ..., TAP15 to U312 (under-body vias, the pin-7 one approached 0.5 mm east of
-# the VTH via below it); the MCU group (south) turns south into tap-row lanes 9-12 and jogs onto the mcuif interfaces.
-MG = ["/MCU_CLK", "/SPI_CS", "/I2C_SDA", "/FPGA_DONE", "/SPI_MOSI", "/SPI_MISO", "/SPI_SCK", "/I2C_SCL",
-      "/FPGA_RECONFIG", "/ADC_TRIG"] + [f"/TAP{k}" for k in range(15, 9, -1)]
-MLANE = {"/MCU_CLK": (LANE_C(10) - 0.5, 42.0),           # lane 10 (west slot): frees the ADC_IN / TRIG_SEL stubs
-         "/SPI_CS": (LANE_C(10) - 0.25, 42.05), "/I2C_SDA": (LANE_C(10), 41.95),
-         "/FPGA_DONE": (LANE_C(10) + 0.25, 41.85), "/SPI_MOSI": (LANE_C(11) - 0.42, 41.9),
-         "/SPI_MISO": (LANE_C(11) - 0.19, 42.0), "/SPI_SCK": (LANE_C(11) + 0.04, 42.1),
-         "/I2C_SCL": (LANE_C(11) + 0.27, 42.0), "/FPGA_RECONFIG": (LANE_C(12) - 0.13, 42.0),
-         "/ADC_TRIG": (LANE_C(12) + 0.12, 41.9)}
-Y0 = 22.7
-for i, net in enumerate(MG):
-    top = fpga_stub_top(net)
-    sx = top[0]
-    cx = round(68.1 + 0.25 * i, 3)
-    yh = round(29.35 + 0.25 * (15 - i), 3)
-    pts = [top, (sx, Y0), (cx, Y0 + abs(cx - sx)), (cx, yh)]
-    if net.startswith("/TAP"):
-        vx, vy = phase_if[net]
-        xr = vx + 0.5 if any(abs(vx - x) < 0.02 for x in VTHV) else vx
-        tail = [(xr, yh), (xr, vy + abs(xr - vx)), (vx, vy)]
-        T(net, W_BUS, pts + tail, "B.Cu", f"L6 drop x {cx:.2f}, highway y {yh:.2f}, peel x {xr:.2f}", ch=0.1)
-    else:
-        xl, ya = MLANE[net]
-        xl = round(xl, 3)
+    for k, net in enumerate(WEST):
+        top = fpga_stub_top(net)
+        y = round(20.90 + 0.22 * k, 3)
+        if net == "/COARSE":
+            # COARSE (U304, phase NW) arrives from the west north of TAP0, then passes under the analog block's
+            # south row at y 22.45 (between the FB track y 21.9 and the VSW_GND row y 22.95) to the phase stub top
+            pe = phase_if[net]
+            T(net, W_BUS, [top, (top[0], y), (23.6, y), (23.6 - (22.45 - y), 22.45), (pe[0] + 0.3, 22.45),
+                           (pe[0], 22.75)], "B.Cu", "L6 lane y 20.90 / y 22.45 (north of TAP0)", ch=0.1)
+            # the phase stub started at (4.45, 22.5): shorten it to begin at 22.75
+            for t, e, o in seg_at(net, pe, "B.Cu"):
+                t.SetStart(m.P(pe[0], 22.75)); t.SetEnd(m.P(*o))
+            continue
+        v = phase_stub_via(net)
+        T(net, W_BUS, [top, (top[0], y), (v[0], y), v], "B.Cu", f"L6 west staircase lane y {y:.2f}", ch=0.1)
+
+    # ---------------------------------------------------------------- USB 90 R pair power S -> mcuif N (L1, then L6)
+    # The east TAPs (U311 / U312) run east on the L6 highway (y 29.35-30.6), so the pair crosses that band on L1:
+    # from the power stubs (82.6 / 83.0, 22.5) east on L1 north of U311's pins, south on L1 in the gap U311|U312
+    # (x 86.25 / 86.65), vias (86.25, 31.0) / (87.1, 31.3) below the highway, L6 diagonal between the phase GND via
+    # (88.09, 31.41) and the VTAP_N via (88.09, 33.66) into tap-row lane 13 (x 89.0 / 89.4, between node window 13
+    # (86.80-88.60) and the tap-14 jumpers (89.92)), south, vias east of the C357 GND via (88.09, 43.59), F into mcuif.
+    W_USB = 0.18
+    pDP, pDM = (82.6, 22.5), (83.0, 22.5)
+    # the VTH2 rail (L1, comparator centre line y 27.755) and the highway TAP14 / TAP15 (L6, y 30.35 / 30.6) both cross the
+    # pair's path: L1 down to above VTH2, L6 under it, L1 again under the highway lanes, L6 from y 31.1 on
+    T("/USB_DP", W_USB, [pDP, (82.6, 22.95), (82.9, 23.25), (86.0, 23.25), (86.4, 23.65), (86.4, 27.2)], "F.Cu",
+      "L1 north of U311, gap U311|U312", ch=0.0001)
+    T("/USB_DM", W_USB, [pDM, (83.0, 22.55), (83.3, 22.85), (86.4, 22.85), (86.9, 23.35), (86.9, 26.7)],
+      "F.Cu", "L1 north of U311, gap U311|U312", ch=0.0001)
+    m.via(86.4, 27.2, "/USB_DP"); m.via(86.9, 26.7, "/USB_DM")
+    T("/USB_DP", W_USB, [(86.4, 27.2), (86.4, 29.4)], "B.Cu", "L6 under the VTH2 rail")
+    T("/USB_DM", W_USB, [(86.9, 26.7), (86.9, 29.9)], "B.Cu", "L6 under the VTH2 rail")
+    m.via(86.4, 29.4, "/USB_DP"); m.via(86.9, 29.9, "/USB_DM")
+    T("/USB_DP", W_USB, [(86.4, 29.4), (86.4, 31.06)], "F.Cu", "L1 over the highway TAP14 / TAP15")
+    T("/USB_DM", W_USB, [(86.9, 29.9), (86.9, 30.96), (87.39, 31.45)], "F.Cu", "L1 over the highway TAP14 / TAP15",
+      ch=0.0001)
+    m.via(86.4, 31.06, "/USB_DP"); m.via(87.39, 31.45, "/USB_DM")
+    T("/USB_DP", W_USB, [(86.4, 31.06), (89.0, 33.66), (89.0, 43.35), (88.0, 44.35)], "B.Cu", "L6 tap-row lane 13",
+      ch=0.0001)
+    T("/USB_DM", W_USB, [(87.39, 31.45), (89.4, 33.46), (89.4, 43.7), (89.6, 43.9)], "B.Cu", "L6 tap-row lane 13",
+      ch=0.0001)
+    m.via(88.0, 44.35, "/USB_DP"); m.via(89.6, 43.9, "/USB_DM")
+    T("/USB_DP", W_USB, [(88.0, 44.35), (88.0, 45.0)], "F.Cu", "via to mcuif F stub")
+    T("/USB_DM", W_USB, [(89.6, 43.9), (88.5, 45.0)], "F.Cu", "via to mcuif F stub")
+    for gx, gy in ((90.35, 44.1),):          # ground via beside the mcuif-end signal vias (the phase GND via 88.09 /
+        m.via(gx, gy, "GND")                 # 31.41 sits beside the highway-end pair)
+
+    # ---------------------------------------------------------------- slow lines whose analog end is a B column: L3 vias
+    # (VBIAS_A / VBIAS_K: via at y 20.3 on the B column; ADC_IN / ADC_REF_MID: their existing vias) - the B stubs
+    # below are removed so the L6 COARSE lane passes
+    for net, yv in (("/VBIAS_A", 16.3), ("/VBIAS_K", 20.3), ("/ADC_IN", None), ("/ADC_REF_MID", None)):
+        e = (ia[net]["x"], ia[net]["y"] + 1.0)
+        (t, _, o), = seg_at(net, e, "B.Cu")
+        if yv is None:
+            B.Remove(t)
+        else:
+            t.SetStart(m.P(*o)); t.SetEnd(m.P(e[0], yv))
+            m.via(e[0], yv, net)
+
+    # ---------------------------------------------------------------- L6: JTAG group (TOPOLOGY.md section 7)
+    # fpga slots x 62.5-64.5: straight south to an upper band under the comparator bodies (y 24.75 + 0.3 j, between the
+    # +3V3 via row y 24.25 and the R380 network / VTH via row), west, south through tap-row lanes 2 / 3 / 4 (between a
+    # node window and the next summing jumpers), 45-degree jogs in the strip y 42.3-44.7 onto the J501 interfaces.
+    JT = ["/fpga_clock/DBG2", "/fpga_clock/JTAG_TCK", "/fpga_clock/JTAG_TMS", "/fpga_clock/JTAG_TDI", "/fpga_clock/JTAG_TDO"]
+    LANE_C = lambda n: 30.58 + 4.514 * n                 # tap-row lane centre between window n and the jumpers of n + 1
+    JLANE = {JT[0]: LANE_C(2) - 0.15, JT[1]: LANE_C(2) + 0.15, JT[2]: LANE_C(3) - 0.15, JT[3]: LANE_C(3) + 0.15,
+             JT[4]: LANE_C(4)}
+    mc_if = {i["net"]: (i["x"] + 27.0, i["y"] + 45.0) for i in json.load(open("blocks/mcuif/mcuif.ifaces.json"))["ifaces"]}
+    for j, net in enumerate(JT):
+        top = fpga_stub_top(net)
+        yb = round(24.75 + 0.3 * j, 3)
+        xl = round(JLANE[net], 3)
         tx, ty = mc_if[net]
-        tail = [(xl, yh), (xl, ya), (tx, ya + abs(tx - xl)), (tx, ty)]
-        T(net, W_BUS, pts + tail, "B.Cu", f"L6 drop x {cx:.2f}, highway y {yh:.2f}, lane x {xl:.2f}", ch=0.1)
-# TAP8 / TAP9 (U309, west of the drop gap) cannot reach U309 on L6 (the column of gap U309|U310 and the highway wall
-# it off): from their eastmost fpga slots (73.5 / 73.0) they hop to L1 right below the fpga edge and run west on L1
-# along y 22.75 / 23.15 (over the L6 fan, north of U310's cap and U309's pins, L2 ground below) straight into U309's
-# output pads 7 / 6 from above.  U309's under-body output vias + stubs are removed (no longer needed).
-for net, sx, yv, yf in (("/TAP8", 73.5, 22.75, 22.75), ("/TAP9", 73.0, 23.25, 23.15)):
-    top = fpga_stub_top(net)
-    T(net, W_BUS, [top, (sx, yv)], "B.Cu", "L6 fpga stub to L1 hop via")
-    m.via(sx, yv, net)
-    vx, vy = phase_if[net]
-    for t, e, o in seg_at(net, (vx, vy), "F.Cu"):
-        B.Remove(t)
-        padxy = o
-    kill_via(net, (vx, vy))
-    pts = [(sx, yv)] + ([(sx - (yv - yf), yf)] if yv != yf else []) + [(vx, yf), padxy]
-    T(net, W_BUS, pts, "F.Cu", f"L1 hop y {yf:.2f} over the fan into U309 pad", ch=0.1)
-m.via(74.1, 23.35, "GND")              # ground via beside the two hop vias
-# ---------------------------------------------------------------- slow bias / control lines (board_slow.py)
-# block ends: VOFS / VNEG_REF at their analog vias (1.0 / 1.94, 19.2; the B stubs below are removed), DAC_TRIG / TRIG_SEL
-# on a via placed on the phase B stub (4.6, 41.0) / (9.25, 44.6) (stub ends beyond removed), VTAP_TH on the R380 / R381 link
-for net, x in (("/VOFS", 1.0), ("/VNEG_REF", 1.94)):
-    for t, e, o in seg_at(net, (x, 22.5), "B.Cu"):
-        B.Remove(t)
-for net, (x, yc) in (("/DAC_TRIG", (4.6, 41.0)), ("/TRIG_SEL", (9.25, 44.6))):
-    for t in segs(net, "B.Cu"):
-        a_, b_ = loc(t.GetStart()), loc(t.GetEnd())
-        if abs(a_[0] - x) < 0.02 and abs(b_[0] - x) < 0.02 and max(a_[1], b_[1]) > yc:
-            lo, hi = sorted((a_[1], b_[1]))
-            if lo >= yc - 1e-6:
-                B.Remove(t)
-            else:
-                t.SetStart(m.P(x, lo)); t.SetEnd(m.P(x, yc))
-    m.via(x, yc, net)
+        ya = 42.3
+        T(net, W_BUS, [top, (top[0], yb), (xl, yb), (xl, ya), (tx, ya + abs(tx - xl)), (tx, ty)], "B.Cu",
+          f"L6 band y {yb:.2f}, tap-row lane x {xl:.2f}", ch=0.1)
 
-bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
-print("NOT PLACED:")
-for r in NOT_PLACED:
-    print("  ", r)
-print("routes (net, layer, lane, length mm):")
-for r in LOG:
-    print("  ", r)
-if "--nofinish" in sys.argv:
-    sys.exit(0)
+    # ---------------------------------------------------------------- L6: MCU group + TAP15..TAP10 drop through gap U309|U310
+    # slots x 65.0 + 0.5 i (i 0-9 MCU group, 10-15 TAP15..TAP10) fan into a column x 68.1 + 0.25 i (gap U309|U310, whose
+    # vias were moved under the bodies in gen_phase.py), down to the highway lanes y 29.35 + 0.25 (15 - i) and east.
+    # TAP10 (northmost) peels first to U310, ..., TAP15 to U312 (under-body vias, the pin-7 one approached 0.5 mm east of
+    # the VTH via below it); the MCU group (south) turns south into tap-row lanes 9-12 and jogs onto the mcuif interfaces.
+    MG = ["/MCU_CLK", "/SPI_CS", "/I2C_SDA", "/FPGA_DONE", "/SPI_MOSI", "/SPI_MISO", "/SPI_SCK", "/I2C_SCL",
+          "/FPGA_RECONFIG", "/ADC_TRIG"] + [f"/TAP{k}" for k in range(15, 9, -1)]
+    MLANE = {"/MCU_CLK": (LANE_C(10) - 0.5, 42.0),           # lane 10 (west slot): frees the ADC_IN / TRIG_SEL stubs
+             "/SPI_CS": (LANE_C(10) - 0.25, 42.05), "/I2C_SDA": (LANE_C(10), 41.95),
+             "/FPGA_DONE": (LANE_C(10) + 0.25, 41.85), "/SPI_MOSI": (LANE_C(11) - 0.42, 41.9),
+             "/SPI_MISO": (LANE_C(11) - 0.19, 42.0), "/SPI_SCK": (LANE_C(11) + 0.04, 42.1),
+             "/I2C_SCL": (LANE_C(11) + 0.27, 42.0), "/FPGA_RECONFIG": (LANE_C(12) - 0.13, 42.0),
+             "/ADC_TRIG": (LANE_C(12) + 0.12, 41.9)}
+    Y0 = 22.7
+    for i, net in enumerate(MG):
+        top = fpga_stub_top(net)
+        sx = top[0]
+        cx = round(68.1 + 0.25 * i, 3)
+        yh = round(29.35 + 0.25 * (15 - i), 3)
+        pts = [top, (sx, Y0), (cx, Y0 + abs(cx - sx)), (cx, yh)]
+        if net.startswith("/TAP"):
+            vx, vy = phase_if[net]
+            xr = vx + 0.5 if any(abs(vx - x) < 0.02 for x in VTHV) else vx
+            tail = [(xr, yh), (xr, vy + abs(xr - vx)), (vx, vy)]
+            T(net, W_BUS, pts + tail, "B.Cu", f"L6 drop x {cx:.2f}, highway y {yh:.2f}, peel x {xr:.2f}", ch=0.1)
+        else:
+            xl, ya = MLANE[net]
+            xl = round(xl, 3)
+            tx, ty = mc_if[net]
+            tail = [(xl, yh), (xl, ya), (tx, ya + abs(tx - xl)), (tx, ty)]
+            T(net, W_BUS, pts + tail, "B.Cu", f"L6 drop x {cx:.2f}, highway y {yh:.2f}, lane x {xl:.2f}", ch=0.1)
+    # TAP8 / TAP9 (U309, west of the drop gap) cannot reach U309 on L6 (the column of gap U309|U310 and the highway wall
+    # it off): from their eastmost fpga slots (73.5 / 73.0) they hop to L1 right below the fpga edge and run west on L1
+    # along y 22.75 / 23.15 (over the L6 fan, north of U310's cap and U309's pins, L2 ground below) straight into U309's
+    # output pads 7 / 6 from above.  U309's under-body output vias + stubs are removed (no longer needed).
+    for net, sx, yv, yf in (("/TAP8", 73.5, 22.75, 22.75), ("/TAP9", 73.0, 23.25, 23.15)):
+        top = fpga_stub_top(net)
+        T(net, W_BUS, [top, (sx, yv)], "B.Cu", "L6 fpga stub to L1 hop via")
+        m.via(sx, yv, net)
+        vx, vy = phase_if[net]
+        for t, e, o in seg_at(net, (vx, vy), "F.Cu"):
+            B.Remove(t)
+            padxy = o
+        kill_via(net, (vx, vy))
+        pts = [(sx, yv)] + ([(sx - (yv - yf), yf)] if yv != yf else []) + [(vx, yf), padxy]
+        T(net, W_BUS, pts, "F.Cu", f"L1 hop y {yf:.2f} over the fan into U309 pad", ch=0.1)
+    m.via(74.1, 23.35, "GND")              # ground via beside the two hop vias
+    # ---------------------------------------------------------------- slow bias / control lines (board_slow.py)
+    # block ends: VOFS / VNEG_REF at their analog vias (1.0 / 1.94, 19.2; the B stubs below are removed), DAC_TRIG / TRIG_SEL
+    # on a via placed on the phase B stub (4.6, 41.0) / (9.25, 44.6) (stub ends beyond removed), VTAP_TH on the R380 / R381 link
+    for net, x in (("/VOFS", 1.0), ("/VNEG_REF", 1.94)):
+        for t, e, o in seg_at(net, (x, 22.5), "B.Cu"):
+            B.Remove(t)
+    for net, (x, yc) in (("/DAC_TRIG", (4.6, 41.0)), ("/TRIG_SEL", (9.25, 44.6))):
+        for t in segs(net, "B.Cu"):
+            a_, b_ = loc(t.GetStart()), loc(t.GetEnd())
+            if abs(a_[0] - x) < 0.02 and abs(b_[0] - x) < 0.02 and max(a_[1], b_[1]) > yc:
+                lo, hi = sorted((a_[1], b_[1]))
+                if lo >= yc - 1e-6:
+                    B.Remove(t)
+                else:
+                    t.SetStart(m.P(x, lo)); t.SetEnd(m.P(x, yc))
+        m.via(x, yc, net)
 
-# ---------------------------------------------------------------- planes, stitching (minimal), silk, project
-import board_finish as bf
-for t in B.GetTracks():
-    if t.GetClass() == "PCB_TRACK" and t.GetNetname() in RF and t.GetLayerName() == "F.Cu":
-        m.rf_keepout([loc(t.GetStart()), loc(t.GetEnd())], pcbnew.ToMM(t.GetWidth()), layer="F.Cu")
-bf.planes(B, m)
-for z in list(B.Zones()):                          # L4 belongs to board_power.py (second agent): +3V3 background + islands
-    if not z.GetIsRuleArea() and z.IsOnLayer(pcbnew.In3_Cu) and z.GetNetname() == "+3V3":
-        B.Remove(z)
-for z in B.Zones():
-    if not z.GetIsRuleArea():
-        z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
+    print("NOT PLACED:")
+    for r in NOT_PLACED:
+        print("  ", r)
+    print("routes (net, layer, lane, length mm):")
+    for r in LOG:
+        print("  ", r)
+    if "--nofinish" in sys.argv:
+        sys.exit(0)
+
+    # ---------------------------------------------------------------- planes, stitching (minimal), silk, project
+    import board_finish as bf
+    for t in B.GetTracks():
+        if t.GetClass() == "PCB_TRACK" and t.GetNetname() in RF and t.GetLayerName() == "F.Cu":
+            m.rf_keepout([loc(t.GetStart()), loc(t.GetEnd())], pcbnew.ToMM(t.GetWidth()), layer="F.Cu")
+    bf.planes(B, m)
+    for z in list(B.Zones()):                          # L4 belongs to board_power.py (second agent): +3V3 background + islands
+        if not z.GetIsRuleArea() and z.IsOnLayer(pcbnew.In3_Cu) and z.GetNetname() == "+3V3":
+            B.Remove(z)
+    for z in B.Zones():
+        if not z.GetIsRuleArea():
+            z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    bl.save_board(B, CACHE)
+    json.dump({"mc_if": mc_if, "phase_if": phase_if, "RF": RF, "LOG": LOG, "NOT_PLACED": NOT_PLACED},
+              open(CACHE.replace(".kicad_pcb", ".json"), "w"))
+else:
+    m = bl.Block("master")
+    B = m.b = pcbnew.LoadBoard(CACHE)
+    m.nets = {str(k): v for k, v in B.GetNetsByName().items()}
+    _c = json.load(open(CACHE.replace(".kicad_pcb", ".json")))
+    mc_if = {k: tuple(v) for k, v in _c["mc_if"].items()}
+    phase_if = {k: tuple(v) for k, v in _c["phase_if"].items()}
+    RF, LOG, NOT_PLACED = _c["RF"], [tuple(x) for x in _c["LOG"]], _c["NOT_PLACED"]
+    import board_finish as bf
+
 # power trunks (VBUS, +5V, -5V: reserved first, they carry the current), then the slow lines around them
 import board_power
 board_power.apply_trunks(B)
