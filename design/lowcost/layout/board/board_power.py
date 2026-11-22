@@ -581,6 +581,9 @@ TRUNKS = {
         ([(74.45, 16.2), (75.8, 17.55), (78.4, 17.55), (79.85, 19.0), (81.5, 19.0), (82.7, 20.2), (82.7, 22.4),
           (81.9, 23.2), (6.8, 23.2), (6.0, 24.0), (6.0, 28.5)], 1.5),
         ([(28.5, 23.2), (28.5, 9.4), (27.8, 8.7), (27.15, 8.7)], 1.0),     # hold amplifier
+        # branch (ii): after the L6 hop (x 82.7 -> 90.0 at y 21.2) down inside the east edge, west along y 50.8
+        ([(90.0, 20.2), (90.0, 22.0), (91.0, 23.0), (97.8, 23.0), (98.6, 23.8), (98.6, 48.0), (95.8, 50.8),
+          (31.0, 50.8), (29.88, 49.68)], 1.5),
     ],
     "-2V5": [  # band y 25.0, down x 13 / x 5.2 west of the pstrobe column, along the bottom, east on y 47
         ([(83.75, 18.5), (84.6, 19.35), (84.6, 24.2), (83.8, 25.0), (13.8, 25.0), (13.0, 25.8), (13.0, 29.4),
@@ -594,7 +597,12 @@ TRUNKS = {
 }
 # L6 (B.Cu) tracks: J501 pin 1 programmer supply (0.5 mm, TOPOLOGY.md section 8)
 L6_TRACKS = {"VBUS": [([(22.78, 48.65), (28.6, 54.47), (32.47, 54.47)], 0.5)]}
-HOPS = []                 # (rail, L6 polyline, width) with a 3-via array at each end; none used
+# L6 hops: (rail, L6 polyline board mm, width); a 3-via array (0.8 mm pitch) sits on each end, oriented along
+# the L3 corridor it lands on (dir = unit vector of that corridor)
+HOPS = [("+2V5", [(82.7, 21.2), (90.0, 21.2)], 1.5, [(0.0, 1.0), (0.0, 1.0)])]
+JOIN_W = 0.6              # local L6 joins of stranded landing vias
+JOIN_MAX = 25.0
+STAIRCASE = (0.0, 20.5, 56.0, 23.5)      # board mm: L6 COARSE / TAP staircase band, no joins there
 BRANCH_W = 0.8
 BRANCH_MAX = 6.0
 BRANCH_CLR = 0.2          # branch track to foreign via / copper
@@ -645,6 +653,7 @@ def remove_old(board, nets):
         board.Delete(v)
     old_t = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() in names and
              ((t.GetLayer() == L3 and round(t.GetWidth() / MM, 2) in (0.8, 1.0, 1.5)) or
+              (t.GetLayer() == pcbnew.B_Cu and round(t.GetWidth() / MM, 2) in (JOIN_W, 1.5)) or
               (t.GetLayer() == pcbnew.B_Cu and t.GetNetname() == "VBUS" and round(t.GetWidth() / MM, 2) == 0.5))]
     for t in old_t:
         board.Delete(t)
@@ -789,6 +798,201 @@ def _branches(board, nets, pts, corr_abs, report):
     return out
 
 
+def _add_via(board, net, x, y):
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(fmm(x), fmm(y)))
+    v.SetWidth(fmm(VIA_D))
+    v.SetDrill(fmm(VIA_DRILL))
+    v.SetViaType(pcbnew.VIATYPE_THROUGH)
+    v.SetNetCode(board.FindNet(net).GetNetCode())
+    board.Add(v)
+
+
+def net_components(board, names):
+    """{net: [component, ...]}; component = list of (kind, ref, x, y) of pads / vias (union-find over pads,
+    tracks, vias and filled zone islands that touch on a common copper layer; call after zone fill)."""
+    sys.path.insert(0, __file__.rsplit("/", 1)[0])
+    import boardlib as bl
+    codes = {board.FindNet(n).GetNetCode(): n for n in names if board.FindNet(n) is not None}
+    items = []
+    for fp in board.GetFootprints():
+        for p in fp.Pads():
+            if p.GetNetCode() in codes:
+                items.append(p)
+    items += [t for t in board.GetTracks() if t.GetNetCode() in codes]
+    for z in board.Zones():
+        if z.GetIsRuleArea() or z.GetNetCode() not in codes:
+            continue
+        for lay in z.GetLayerSet().CuStack():
+            fl = z.GetFilledPolysList(lay)
+            for i in range(fl.OutlineCount()):
+                sub = pcbnew.SHAPE_POLY_SET()
+                sub.AddOutline(fl.Outline(i))
+                for h in range(fl.HoleCount(i)):
+                    sub.AddHole(fl.Hole(i, h))
+                items.append(("zone", z.GetNetCode(), lay, sub, sub.BBox()))
+    par = list(range(len(items)))
+
+    def find(i):
+        while par[i] != i:
+            par[i] = par[par[i]]
+            i = par[i]
+        return i
+
+    def info(it):
+        if isinstance(it, tuple):
+            return it[1], {it[2]}, it[4]
+        return it.GetNetCode(), {l_ for l_ in bl.CU_LAYERS.values() if it.IsOnLayer(l_)}, it.GetBoundingBox()
+    inf = [info(it) for it in items]
+    byn = {}
+    for i in range(len(items)):
+        byn.setdefault(inf[i][0], []).append(i)
+    out = {}
+    for code, idx in byn.items():
+        for a_ in range(len(idx)):
+            i = idx[a_]
+            for j in idx[a_ + 1:]:
+                common = inf[i][1] & inf[j][1]
+                if not common or not inf[i][2].Intersects(inf[j][2]) or find(i) == find(j):
+                    continue
+                A, C = items[i], items[j]
+                if isinstance(A, tuple) and isinstance(C, tuple):
+                    continue
+                for lay in common:
+                    if isinstance(A, tuple):
+                        hit = C.GetEffectiveShape(lay).Collide(A[3], 0)
+                    elif isinstance(C, tuple):
+                        hit = A.GetEffectiveShape(lay).Collide(C[3], 0)
+                    else:
+                        hit = A.GetEffectiveShape(lay).Collide(C.GetEffectiveShape(lay), 0)
+                    if hit:
+                        par[find(i)] = find(j)
+                        break
+        comps = {}
+        for i in idx:
+            it = items[i]
+            if isinstance(it, tuple):
+                continue
+            if isinstance(it, pcbnew.PAD):
+                q = it.GetPosition()
+                desc = ("pad", f"{it.GetParentFootprint().GetReference()}.{it.GetNumber()}", q.x / MM, q.y / MM,
+                        it.GetAttribute() == pcbnew.PAD_ATTRIB_PTH, it.IsOnLayer(pcbnew.B_Cu))
+            elif it.GetClass() == "PCB_VIA":
+                q = it.GetPosition()
+                desc = ("via", "", q.x / MM, q.y / MM, True, True)
+            else:
+                continue
+            comps.setdefault(find(i), []).append(desc)
+        out[codes[code]] = sorted(comps.values(), key=len, reverse=True)
+    return out
+
+
+def _l6_join(board, net, src_pts, dst_pts, report):
+    """Route one JOIN_W track on B.Cu from any src point to any dst point (0.1 mm grid, local window)."""
+    global RES
+    ox, oy = _org(board)
+    allp = src_pts + dst_pts
+    box = board_box(board)
+    win = (max(box[0], min(p[0] for p in allp) - 6), max(box[1], min(p[1] for p in allp) - 6),
+           min(box[2], max(p[0] for p in allp) + 6), min(box[3], max(p[1] for p in allp) + 6))
+    old = RES
+    RES = 0.1
+    try:
+        G = Grid(win)
+        hw = JOIN_W / 2
+        c = CLEAR + hw
+        obst = (G.X < box[0] + 0.5 + hw) | (G.X > box[2] - 0.5 - hw) | (G.Y < box[1] + 0.5 + hw) | \
+            (G.Y > box[3] - 0.5 - hw)
+        obst |= (G.X - ox >= STAIRCASE[0] - hw) & (G.X - ox <= STAIRCASE[2] + hw) & \
+            (G.Y - oy >= STAIRCASE[1] - hw) & (G.Y - oy <= STAIRCASE[3] + hw)
+        for t in board.GetTracks():
+            if t.GetNetname() == net:
+                continue
+            if t.GetClass() == "PCB_VIA":
+                q = t.GetPosition()
+                G.disk(obst, q.x / MM, q.y / MM, t.GetWidth() / MM / 2 + c)
+            elif t.GetLayer() == pcbnew.B_Cu:
+                a_, b_ = t.GetStart(), t.GetEnd()
+                seg_mask(G, obst, (a_.x / MM, a_.y / MM), (b_.x / MM, b_.y / MM), t.GetWidth() / MM / 2 + c)
+        for f in board.GetFootprints():
+            for pd in f.Pads():
+                if pd.GetNetname() == net or not pd.IsOnLayer(pcbnew.B_Cu):
+                    continue
+                bb = pd.GetBoundingBox()
+                i0, j0 = G.ij(bb.GetX() / MM - c, bb.GetY() / MM - c)
+                i1, j1 = G.ij(bb.GetRight() / MM + c, bb.GetBottom() / MM + c)
+                obst[max(i0, 0):max(i1 + 1, 0), max(j0, 0):max(j1 + 1, 0)] = True
+        for z in board.Zones():                       # windows (In1 / In2 / B keep-outs) and B rule areas
+            if z.GetIsRuleArea() and (z.GetLayerSet().Contains(pcbnew.In1_Cu) or z.GetLayerSet().Contains(L3) or
+                                      z.GetLayerSet().Contains(pcbnew.B_Cu)):
+                o = z.Outline()
+                for i in range(o.OutlineCount()):
+                    pp = poly_points(o, i)
+                    if len(pp) >= 3:
+                        G.poly(obst, pp, grow=hw + 0.1)
+        for (x, y, r) in other_holes(board, {}):
+            G.disk(obst, x, y, r + c)
+        free = ~obst
+        src = set()
+        for (x, y) in src_pts:
+            m = G.empty()
+            G.disk(m, x, y, 0.12)
+            src.update(np.flatnonzero(m.ravel()).tolist())
+        targets = {}
+        for k, (x, y) in enumerate(dst_pts):
+            m = G.empty()
+            G.disk(m, x, y, 0.12)
+            for cc in np.flatnonzero(m.ravel()).tolist():
+                targets[cc] = k
+        ff = free.ravel()
+        for cc in list(src) + list(targets):
+            ff[cc] = True                              # own via centres
+        k, path = dijkstra(free, src, targets)
+        if k is None:
+            return None
+        poly = simplify(free, [divmod(cc, G.nx) for cc in path])
+        line = [G.xy(i, j) for i, j in poly]
+        sp = min(src_pts, key=lambda p: math.hypot(p[0] - line[0][0], p[1] - line[0][1]))
+        line[0] = sp
+        line[-1] = dst_pts[k]
+        L = sum(math.hypot(q[0] - p[0], q[1] - p[1]) for p, q in zip(line[:-1], line[1:]))
+        if L > JOIN_MAX:
+            return None
+        return line
+    finally:
+        RES = old
+
+
+def join_stranded(board, nets, report, l6occ):
+    """After a fill: every rail component that is not the main one gets one local L6 join to the main one."""
+    ox, oy = _org(board)
+    names = [nets[r] for r in ISLANDS if r in nets]
+    comps = net_components(board, names)
+    joins, still = [], []
+    for net, cl in comps.items():
+        if len(cl) < 2:
+            continue
+        main = [(d[2], d[3]) for d in cl[0] if d[0] == "via" or d[4]]
+        for comp in cl[1:]:
+            src = [(d[2], d[3]) for d in comp if d[0] == "via" or d[4]]
+            if not src:
+                still.append((net, [(d[1], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp], "no via / PTH"))
+                continue
+            dst = sorted(main, key=lambda p: min(math.hypot(p[0] - q[0], p[1] - q[1]) for q in src))[:12]
+            line = _l6_join(board, net, src, dst, report)
+            if line is None:
+                still.append((net, [(d[1] or d[0], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp],
+                              "no L6 path"))
+                continue
+            _add_track(board, net, line, JOIN_W, pcbnew.B_Cu)
+            main += src
+            rel = [(round(x - ox, 3), round(y - oy, 3)) for x, y in line]
+            joins.append((net, rel))
+            l6occ.append(dict(net=net, kind="join", layer="B.Cu", width=JOIN_W, pts=rel))
+    report["l6_joins"] = joins
+    report["stranded"] = still
+
+
 def apply(board, json_path=None, png_path=None):
     """L4 = one +3V3 plane; L3 = table-driven corridors + routed branches; VTAP tracks; L6 J501 feed.
     Call on a freshly merged board, then fill all zones, then verify()."""
@@ -835,10 +1039,27 @@ def apply(board, json_path=None, png_path=None):
             _add_track(board, nets[rail], line, BRANCH_W, L3)
             occ.append(dict(net=nets[rail], kind="track", layer="In2.Cu", width=BRANCH_W,
                             pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in line]))
+    l6occ = []
     for rail, lst in L6_TRACKS.items():
         for line, w in lst:
             _add_track(board, nets[rail], [(x + ox, y + oy) for x, y in line], w, pcbnew.B_Cu)
+            l6occ.append(dict(net=nets[rail], kind="track", layer="B.Cu", width=w, pts=line))
     report["l6_clearance"] = _check_l6(board)
+    for rail, line, w, dirs in HOPS:
+        if rail not in nets:
+            continue
+        _add_track(board, nets[rail], [(x + ox, y + oy) for x, y in line], w, pcbnew.B_Cu)
+        l6occ.append(dict(net=nets[rail], kind="hop", layer="B.Cu", width=w, pts=line))
+        for (x, y), d in zip((line[0], line[-1]), dirs):
+            arr = [(x + k * VIA_PITCH * d[0], y + k * VIA_PITCH * d[1]) for k in (-1, 0, 1)]
+            for (u, v) in arr:
+                _add_via(board, nets[rail], u + ox, v + oy)
+            l6occ.append(dict(net=nets[rail], kind="via_array", layer="all", dia=VIA_D, pts=arr))
+    report["hop_clearance"] = _check_hops(board)
+    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+    join_stranded(board, nets, report, l6occ)
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L6.json"), "w") as f:
+        json.dump(dict(note="B.Cu (L6) copper added by board_power.py, board mm", items=l6occ), f, indent=1)
     report["branches"] = {r: len(v) for r, v in br.items()}
     report["corr"] = corr
     report["l3"] = occ
@@ -852,6 +1073,35 @@ def apply(board, json_path=None, png_path=None):
     _LAST.clear()
     _LAST.update(report)
     return report
+
+
+def _check_hops(board):
+    """B.Cu / via clearance of the hop strips (mm, < 0.15 listed)."""
+    ox, oy = _org(board)
+    probs = []
+    for rail, line, w, dirs in HOPS:
+        L = [(x + ox, y + oy) for x, y in line]
+        for t in board.GetTracks():
+            if t.GetNetname() == rail:
+                continue
+            if t.GetClass() == "PCB_VIA" or t.GetLayer() == pcbnew.B_Cu:
+                a, b = t.GetStart(), t.GetEnd()
+                for p, q in zip(L[:-1], L[1:]):
+                    for (x, y) in ((a.x / MM, a.y / MM), (b.x / MM, b.y / MM)):
+                        d = _pt_seg(x, y, p, q) - w / 2 - t.GetWidth() / MM / 2
+                        if d < 0.15:
+                            probs.append((round(x - ox, 2), round(y - oy, 2), t.GetNetname(), round(d, 2)))
+        for f in board.GetFootprints():
+            for pd in f.Pads():
+                if pd.GetNetname() == rail or not pd.IsOnLayer(pcbnew.B_Cu):
+                    continue
+                q0 = pd.GetPosition()
+                rr = max(pd.GetSize().x, pd.GetSize().y) / MM / 2
+                for p, q in zip(L[:-1], L[1:]):
+                    d = _pt_seg(q0.x / MM, q0.y / MM, p, q) - w / 2 - rr
+                    if d < 0.15:
+                        probs.append((f.GetReference(), pd.GetNumber(), round(d, 2)))
+    return probs
 
 
 def _check_l6(board):
@@ -1026,6 +1276,14 @@ def main(argv):
     print("VTAP:", rep.get("strip_problems"))
     print("L6 J501 feed clearance problems:", rep.get("l6_clearance"))
     print("landing vias not branched:", rep.get("unreached"))
+    print("hop clearance problems:", rep.get("hop_clearance"))
+    print("L6 joins:", rep.get("l6_joins"))
+    print("still stranded:", rep.get("stranded"))
+    comps = net_components(board, [BACKGROUND] + [rail_nets(board)[r] for r in ISLANDS if r in rail_nets(board)])
+    for n, cl in comps.items():
+        if len(cl) > 1:
+            print("components", n, [[(d[1] or d[0], round(d[2] - 100, 2), round(d[3] - 100, 2)) for d in c][:4]
+                                    for c in cl[1:]])
     print(table(res))
     if len(args) > 2:
         sys.path.insert(0, __file__.rsplit("/", 1)[0])

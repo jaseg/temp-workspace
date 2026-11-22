@@ -47,7 +47,7 @@ beside every inter-block signal via (stitching module; the highway-end USB pair 
 1. **Nine slow lines (L3 plan of TOPOLOGY.md section 8):** not drawn. The free L6 tap-row lanes west of the drop column are
    n = 0 (30.58), 1 (35.09), 5 (53.15), 6 (57.66), 8 (66.69) plus one spare track in lanes 2-4; lane 7 (62.18) holds the phase
    VTAP_TH B column. Lanes east of x 68 cannot be used for slow lines (their L3 change-over vias would sit in the L6 highway).
-   The L3 part waits for `board_power_L3.json` (corridor geometry), which did not exist when this run ended. The analog-side
+   `board_power_L3.json` (corridor geometry) appeared at the end of this run; the L3 part was not started. The analog-side
    L3 vias are in place (VBIAS_A (15.4, 16.3), VBIAS_K (16.4, 20.3), ADC_IN (19.06, 20.0), ADC_REF_MID (21.65, 20.8)).
 2. Power (second agent's `board_power.py`): its current output is reported verbatim below; the rail corridors are its job.
 3. TAP8 / TAP9 use an L1 hop (two vias per net, over L2 ground) - the only fast nets with a section on L1.
@@ -57,7 +57,25 @@ beside every inter-block signal via (stitching module; the highway-end USB pair 
    excluded from the L3 fast-net check).
 
 ## Check results (last run, verbatim)
-CHECKS_PLACEHOLDER
+- check_board: `missing 0, extra 4 (H1-H4), footprint 0, value 0, pad-net 0, nets with unrouted connections (after fill) 16,
+  clearance < 0.1 mm 1, track corners > 45 deg 28, tracks leaving a pad off-axis 1 (R737.1), RF width 0, RF pour gap 0,
+  courtyard overlaps 0, unconnected items 24`. Unrouted: the nine slow lines (ADC_IN, ADC_REF_MID, DAC_TRIG, TRIG_SEL,
+  VBIAS_A, VBIAS_K, VNEG_REF, VOFS, VTAP_TH), the rails +2V5 (5), +3V3 (1), +5V (3), -2V5 (3), -5V (1), VBUS (1), GND (1).
+  The 1 clearance (VBUS / VREFP on B.Cu at (22.73, 48.60)) and all 28 corners (VTAP_P / VTAP_N 90-degree joints, one +5V
+  53-degree joint) are in the copper added by `board_power.py` (second agent, in progress); 0 in the signal routing.
+- rule 10: `fast-net segments on L3: 0` (FPGA_DONE excluded as a static config line); `L1/L6 samples 8155, without filled
+  GND on L2/L5: 449` = 417 via antipads (the plane clearance around a via the track passes or ends in) + 25 through-hole pad
+  antipads + 7 deliberate L2 cut-outs (listed windows: tap pads / hold nodes); **0 real plane holes**; L5 is solid apart
+  from via / PTH antipads. L4: `+3V3` one polygon (board_power.py section-8 plane).
+- Stitching (`board_stitch.py`): 14 GND vias beside inter-block signal vias (6 signal vias have no room for one within
+  1.1 mm; the USB highway-end pair uses the phase GND via at (88.09, 31.41)), 14 RF fence vias, 363 grid vias.
+- DRC jlc4 + parity: `total 515: error 20, warning 495` = 19 unconnected_items (the unrouted nets above) + 1 tracks_crossing
+  (VBUS L6 feeder of board_power.py over the mcuif VREFP B track at (22.73, 48.60)); warnings 199
+  footprint_symbol_field_mismatch ('Note'), 199 lib_footprint_mismatch + 12 lib_footprint_issues (library version), 30
+  footprint_symbol_mismatch (DNP; KiCad 7 cannot store it), 18 track_dangling + 15 via_dangling (stubs / vias of the
+  unrouted slow lines and rails), 10 net_conflict (TL401-403 GND pins, J601 shell), 8 isolated_copper (pour slivers),
+  2 silk_over_copper, 2 silk_overlap. 0 clearance errors in the signal routing.
+- ERC (after the schematic change): `total 18: warning 18` (9 footprint_link_issues, 9 lib_symbol_mismatch), 0 errors.
 
 ## History (short)
 21 Nov: a 4-layer attempt and a first six-layer pass were auto-routed and failed on same-layer crossings at the fpga south
