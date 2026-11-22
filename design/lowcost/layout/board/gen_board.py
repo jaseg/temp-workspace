@@ -229,14 +229,15 @@ for k, net in enumerate(WEST):
 # (86.80-88.60) and the tap-14 jumpers (89.92)), south, vias east of the C357 GND via (88.09, 43.59), F into mcuif.
 W_USB = 0.18
 pDP, pDM = (82.6, 22.5), (83.0, 22.5)
-T("/USB_DP", W_USB, [pDP, (82.6, 22.95), (82.9, 23.25), (85.85, 23.25), (86.25, 23.65), (86.25, 31.0)], "F.Cu",
+T("/USB_DP", W_USB, [pDP, (82.6, 22.95), (82.9, 23.25), (86.0, 23.25), (86.4, 23.65), (86.4, 31.06)], "F.Cu",
   "L1 north of U311, gap U311|U312", ch=0.0001)
-T("/USB_DM", W_USB, [pDM, (83.0, 22.55), (83.3, 22.85), (86.25, 22.85), (86.65, 23.25), (86.65, 30.85), (87.1, 31.3)],
+T("/USB_DM", W_USB, [pDM, (83.0, 22.55), (83.3, 22.85), (86.4, 22.85), (86.8, 23.25), (86.8, 30.86), (87.39, 31.45)],
   "F.Cu", "L1 north of U311, gap U311|U312", ch=0.0001)
-m.via(86.25, 31.0, "/USB_DP"); m.via(87.1, 31.3, "/USB_DM")
-T("/USB_DP", W_USB, [(86.25, 31.0), (89.0, 33.75), (89.0, 43.35), (88.0, 44.35)], "B.Cu", "L6 tap-row lane 13",
+m.via(86.4, 31.06, "/USB_DP"); m.via(87.39, 31.45, "/USB_DM")
+T("/USB_DP", W_USB, [(86.4, 31.06), (89.0, 33.66), (89.0, 43.35), (88.0, 44.35)], "B.Cu", "L6 tap-row lane 13",
   ch=0.0001)
-T("/USB_DM", W_USB, [(87.1, 31.3), (89.4, 33.6), (89.4, 43.7), (89.6, 43.9)], "B.Cu", "L6 tap-row lane 13", ch=0.0001)
+T("/USB_DM", W_USB, [(87.39, 31.45), (89.4, 33.46), (89.4, 43.7), (89.6, 43.9)], "B.Cu", "L6 tap-row lane 13",
+  ch=0.0001)
 m.via(88.0, 44.35, "/USB_DP"); m.via(89.6, 43.9, "/USB_DM")
 T("/USB_DP", W_USB, [(88.0, 44.35), (88.0, 45.0)], "F.Cu", "via to mcuif F stub")
 T("/USB_DM", W_USB, [(89.6, 43.9), (88.5, 45.0)], "F.Cu", "via to mcuif F stub")
@@ -281,9 +282,9 @@ for j, net in enumerate(JT):
 MG = ["/MCU_CLK", "/SPI_CS", "/I2C_SDA", "/FPGA_DONE", "/SPI_MOSI", "/SPI_MISO", "/SPI_SCK", "/I2C_SCL",
       "/FPGA_RECONFIG", "/ADC_TRIG"] + [f"/TAP{k}" for k in range(15, 9, -1)]
 MLANE = {"/MCU_CLK": (LANE_C(9), 42.0), "/SPI_CS": (LANE_C(10) - 0.25, 42.05), "/I2C_SDA": (LANE_C(10), 41.95),
-         "/FPGA_DONE": (LANE_C(10) + 0.25, 41.85), "/SPI_MOSI": (LANE_C(11) - 0.37, 41.9),
-         "/SPI_MISO": (LANE_C(11) - 0.12, 42.0), "/SPI_SCK": (LANE_C(11) + 0.13, 42.1),
-         "/I2C_SCL": (LANE_C(11) + 0.38, 42.0), "/FPGA_RECONFIG": (LANE_C(12) - 0.13, 42.0),
+         "/FPGA_DONE": (LANE_C(10) + 0.25, 41.85), "/SPI_MOSI": (LANE_C(11) - 0.42, 41.9),
+         "/SPI_MISO": (LANE_C(11) - 0.19, 42.0), "/SPI_SCK": (LANE_C(11) + 0.04, 42.1),
+         "/I2C_SCL": (LANE_C(11) + 0.27, 42.0), "/FPGA_RECONFIG": (LANE_C(12) - 0.13, 42.0),
          "/ADC_TRIG": (LANE_C(12) + 0.12, 41.9)}
 Y0 = 22.7
 for i, net in enumerate(MG):
@@ -303,12 +304,22 @@ for i, net in enumerate(MG):
         tx, ty = mc_if[net]
         tail = [(xl, yh), (xl, ya), (tx, ya + abs(tx - xl)), (tx, ty)]
         T(net, W_BUS, pts + tail, "B.Cu", f"L6 drop x {cx:.2f}, highway y {yh:.2f}, lane x {xl:.2f}", ch=0.1)
-for net in ("/TAP8", "/TAP9"):
-    NOT_PLACED.append((net, "U309 (x 63.5-68) lies west of the drop gap U309|U310 and its outputs would have to be the "
-                       "WESTmost tracks of the column (turning west), but the fpga slots put TAP9 / TAP8 eastmost "
-                       "(x 73.0 / 73.5); giving them slots between JTAG and MCU needs their L1 escapes (U501 pins "
-                       "16 / 17 -> 9 / 10) to cross the DONE / RECONFIG L1 runs (fpga local y 18.1 / 18.5), and "
-                       "moving those to L3 collides with the +3V3 / GND via cluster at fpga local (4.3-4.9, 13.9-15.6)"))
+# TAP8 / TAP9 (U309, west of the drop gap) cannot reach U309 on L6 (the column of gap U309|U310 and the highway wall
+# it off): from their eastmost fpga slots (73.5 / 73.0) they hop to L1 right below the fpga edge and run west on L1
+# along y 22.75 / 23.15 (over the L6 fan, north of U310's cap and U309's pins, L2 ground below) straight into U309's
+# output pads 7 / 6 from above.  U309's under-body output vias + stubs are removed (no longer needed).
+for net, sx, yv, yf in (("/TAP8", 73.5, 22.75, 22.75), ("/TAP9", 73.0, 23.25, 23.15)):
+    top = fpga_stub_top(net)
+    T(net, W_BUS, [top, (sx, yv)], "B.Cu", "L6 fpga stub to L1 hop via")
+    m.via(sx, yv, net)
+    vx, vy = phase_if[net]
+    for t, e, o in seg_at(net, (vx, vy), "F.Cu"):
+        B.Remove(t)
+        padxy = o
+    kill_via(net, (vx, vy))
+    pts = [(sx, yv)] + ([(sx - (yv - yf), yf)] if yv != yf else []) + [(vx, yf), padxy]
+    T(net, W_BUS, pts, "F.Cu", f"L1 hop y {yf:.2f} over the fan into U309 pad", ch=0.1)
+m.via(74.1, 23.35, "GND")              # ground via beside the two hop vias
 bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
 print("NOT PLACED:")
 for r in NOT_PLACED:
@@ -333,6 +344,14 @@ for z in B.Zones():
         z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
 import board_power
 board_power.apply(B)
+import board_stitch
+SIGV = [(86.4, 31.06), (87.39, 31.45), (88.0, 44.35), (89.6, 43.9), (73.5, 22.75), (73.0, 23.25)] + \
+    [loc(v.GetPosition()) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
+     v.GetNetname() in ("/VBIAS_A", "/VBIAS_K", "/ADC_IN", "/ADC_REF_MID")]
+RFT = [(loc(t.GetStart()), loc(t.GetEnd()), pcbnew.ToMM(t.GetWidth())) for t in B.GetTracks()
+       if t.GetClass() == "PCB_TRACK" and t.GetNetname() in ("/BUF_OUT_T", "/PH_STROBE_P", "/PH_STROBE_N")]
+NST = board_stitch.stitch(B, m, RFT, SIGV)
+print("GND stitching:", NST)
 bf.silk(B, m)
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 bl.save_board(B, OUT)
@@ -376,14 +395,39 @@ def rule10(B, step=0.25):
 
 
 r10 = rule10(B)
+
+
+def classify(B, no_ref):
+    """split the samples without filled GND into deliberate cut-outs, via / PTH antipads (the plane's clearance
+    around a via or through-hole pad the track passes or ends in) and real plane holes"""
+    from collections import Counter
+    P = lambda x, y: pcbnew.VECTOR2I(pcbnew.FromMM(x + bl.ORG[0]), pcbnew.FromMM(y + bl.ORG[1]))
+    cuts = {"F.Cu": [z for z in B.Zones() if z.GetIsRuleArea() and z.IsOnLayer(pcbnew.In1_Cu)],
+            "B.Cu": [z for z in B.Zones() if z.GetIsRuleArea() and z.IsOnLayer(pcbnew.In4_Cu)]}
+    vv = [loc(v.GetPosition()) + (v.GetNetname(),) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA)]
+    pp = [loc(p.GetPosition()) + (p.GetNetname(), pcbnew.ToMM(max(p.GetSize().x, p.GetSize().y)) / 2)
+          for f in B.GetFootprints() for p in f.Pads() if p.GetAttribute() in (pcbnew.PAD_ATTRIB_PTH, pcbnew.PAD_ATTRIB_NPTH)]
+    cls, real = Counter(), []
+    for net, lay, (x, y) in no_ref:
+        if any(z.Outline().Contains(P(x, y)) for z in cuts[lay]):
+            cls["deliberate cut-out (listed L2 / L5 window)"] += 1
+        elif any(math.hypot(x - a, y - b) < 0.55 and n != "GND" for a, b, n in vv):
+            cls["via antipad"] += 1
+        elif any(math.hypot(x - a, y - b) < r + 0.4 and n != "GND" for a, b, n, r in pp):
+            cls["PTH antipad"] += 1
+        else:
+            cls["REAL plane hole"] += 1
+            real.append((net, lay, round(x, 2), round(y, 2)))
+    return cls, real
 print(f"rule 10: fast-net segments on L3: {len(r10['fast_on_L3'])}; L1/L6 samples {r10['samples']}, "
       f"without filled GND on L2/L5: {len(r10['no_ref'])}")
-from collections import Counter
-for k_, v_ in Counter((a_[0], a_[1]) for a_ in r10["no_ref"]).most_common(20):
-    print("   ", k_, v_)
+CLS, REAL = classify(B, r10["no_ref"])
+print("   classes:", dict(CLS))
+for r_ in REAL[:30]:
+    print("    real hole:", r_)
 for z_ in r10["L4"]:
     print("   L4 zone", z_)
-json.dump({"log": LOG, "not_placed": NOT_PLACED, "rf": RF, "rule10": {k: (v if k in ("samples", "L4") else len(v)) for k, v in r10.items()},
+json.dump({"log": LOG, "not_placed": NOT_PLACED, "rf": RF, "rule10_classes": dict(CLS), "stitch": NST, "rule10": {k: (v if k in ("samples", "L4") else len(v)) for k, v in r10.items()},
            "rule10_detail": r10}, open(os.path.join(HERE, "routes.json"), "w"), indent=1)
 c = bl.check_board(OUT, rf_widths=RF, verbose=8)
 json.dump({k: v for k, v in c.items() if k != "details"}, open(os.path.join(SCR, "check.json"), "w"), indent=1)

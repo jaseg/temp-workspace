@@ -167,7 +167,7 @@ def silk(B, m):
         t = m.text(s, x, y, size, layer, rot)
         t.SetTextThickness(pcbnew.FromMM(0.15))
         return t
-    txt("scope-fe  rev A", 20.0, 55.6, 1.0)
+    txt("scope-fe rev A, 6L", 20.0, 55.6, 1.0)
     txt("SIG IN", 3.2, 7.3, 0.8)
     # review: "EXT CLK" was at y 46.6, 20 mm below J102 (y 26.5); no free silk room next to J102 (TP103 / TP104,
     # U304): its F.Fab value text EXT_CLK labels it (rule 9)
@@ -176,7 +176,7 @@ def silk(B, m):
         pass
     txt("PHASE", 22.0, 52.2, 0.8)
     txt("MCU / IF", 20.0, 53.9, 0.8)
-    txt("JLC06161H-3313", 16.0, 55.6, 0.8, "B.SilkS")
+    txt("6L JLC06161H-3313", 16.0, 55.6, 0.8, "B.SilkS")
 
 
 def write_pro(path, rf_nets):

@@ -88,3 +88,44 @@ under the node windows. Every supply via lands inside its zone; no supply runs a
   (below the under-body output vias, above the VTH via row), which needs the fpga slot order
   `... | MCU | TAP9 TAP8 | TAP15 ... TAP10` - and that order needs the fpga's DONE / RECONFIG F runs (local y 18.1 / 18.5)
   moved, because the TAP F escapes would cross them.
+
+## 8. Power and slow-layer plan, revised by the lead (supersedes section 6 and the L3 parts of sections 2 and 5)
+
+Two automatic attempts showed that seven rails cannot be planar on one layer next to a +3V3 background.
+The rails are therefore split over two layers by role:
+
+- **L4 (In3): +3V3 only, one solid unsplit plane over the whole board.** No islands, no strips (the FPGA
+  block's small +1V2 island at its east edge may stay if it does not cut the plane). L4 is cleared only
+  under the node windows.
+- **L3 (In2): the minor rails as nested corridors, plus the slow lines.** Corridor strips are 1.5 mm wide
+  (1.0 mm allowed for a short neck), pairs separated by 0.3 mm, 45-degree corners, each rail one connected
+  piece of copper from its regulator output vias to every load via (short 0.8-1.0 mm branches to the vias).
+  Suggested nesting, all starting at the power block (x 74..100, y 0..22.5):
+  - `-5V`, `+5V`: west along the top edge (y about 0.6..4) over the FPGA and analog blocks to the input
+    stage in the top-left corner. Outermost pair.
+  - `+2V5`, `-2V5`, branch (i): west along the band between the analog and phase blocks (y about 22..25)
+    to the hold amplifier / level shifter vias, on to the west edge, then south along x about 1..8 to the
+    trigger front chain (y 30..40).
+  - `+2V5`, `-2V5`, branch (ii): from the power block south just inside the east edge, past the east end
+    of the tap row, then west along y about 45..46.5 (the mcuif north edge) to U701 and the bias dividers.
+    The tap-row VTAP tracks end west of this branch; VTAP_P / VTAP_N are fed from it at the east end
+    through their 0 R links.
+  - `VBUS`: with branch (i) along the y 22..25 band to x about 21, then south as the pstrobe choke column
+    (x about 19..23, y 26..49). J501 pin 1 gets VBUS by one 0.5 mm track on L6 (it is only a programmer
+    supply pin).
+  - `+1V2`: short local strip from the power block to the FPGA (or the block's L4 island).
+  - A rail may hop to L6 as a 1.5 mm strip with a three-via array at each end where a crossing is
+    unavoidable; at most three hops on the whole board, each listed in the README.
+- **VTAP_P / VTAP_N**: 0.5 mm tracks on L3 along the tap row at the y of their resistor vias.
+- **VTH (comparator threshold rail)**: on **L1**, as a 0.3 mm track at the comparators' centre line under
+  the SOIC bodies between their pin rows (pins 2 and 4 reach it with short inward stubs). Nothing of VTH on
+  L3 or L6.
+- **Slow bias and control lines** (VBIAS_A, VBIAS_K, VOFS, VNEG_REF, DAC_TRIG, VTAP_TH, ADC_REF_MID,
+  TRIG_SEL, ADC_IN): they leave the mcuif block on B.Cu, cross the 45..46.5 corridor and the tap row on
+  **L6 in tap-row lanes** (slow lines are allowed on L6; lanes not used by the fast groups), change to
+  **L3 just north of the tap row** (via at y about 32.3..32.8, south edge of the highway band), and run
+  on L3 north / west to the analog block and the trigger front end, passing under the L6 highway and
+  between the L3 corridors. They never cross an L3 corridor: where one would, the line stays on L6 a little
+  longer or the corridor necks around it.
+- Order of work on the board: signal vias first (L6 buses), then the L3 corridors (board_power.py), then
+  the L3 slow lines around them.

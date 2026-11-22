@@ -1,18 +1,6 @@
 {
  "log": [
   [
-   "/trigger_phase/VTH1",
-   "In2.Cu",
-   "VTH rail moved B -> L3 (phase)",
-   29.624
-  ],
-  [
-   "/trigger_phase/VTH2",
-   "In2.Cu",
-   "VTH rail moved B -> L3 (phase)",
-   29.624
-  ],
-  [
    "/BUF_OUT_T",
    "F.Cu",
    "analog S -> phase N along y 22.35 (L1)",
@@ -87,26 +75,26 @@
   [
    "/USB_DP",
    "F.Cu",
-   "power S stub to via (L1)",
-   0.5
+   "L1 north of U311, gap U311|U312",
+   11.95
   ],
   [
    "/USB_DM",
    "F.Cu",
-   "power S stub to via (L1)",
-   0.666
+   "L1 north of U311, gap U311|U312",
+   12.584
   ],
   [
    "/USB_DP",
    "B.Cu",
-   "L6 gap U311|U312, tap-row lane 13",
-   26.055
+   "L6 tap-row lane 13",
+   14.781
   ],
   [
    "/USB_DM",
    "B.Cu",
-   "L6 gap U311|U312, tap-row lane 13",
-   25.274
+   "L6 tap-row lane 13",
+   13.365
   ],
   [
    "/USB_DP",
@@ -119,102 +107,159 @@
    "F.Cu",
    "via to mcuif F stub",
    1.556
-  ]
- ],
- "not_placed": [
-  [
-   "/TAP8",
-   "U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; the 18-track fan-in to a column needs >= 3 mm of free L6 height there"
-  ],
-  [
-   "/TAP9",
-   "U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; the 18-track fan-in to a column needs >= 3 mm of free L6 height there"
-  ],
-  [
-   "/TAP10",
-   "U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; the 18-track fan-in to a column needs >= 3 mm of free L6 height there"
-  ],
-  [
-   "/TAP11",
-   "U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; the 18-track fan-in to a column needs >= 3 mm of free L6 height there"
-  ],
-  [
-   "/TAP12",
-   "U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; the 18-track fan-in to a column needs >= 3 mm of free L6 height there"
-  ],
-  [
-   "/TAP13",
-   "U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; the 18-track fan-in to a column needs >= 3 mm of free L6 height there"
-  ],
-  [
-   "/TAP14",
-   "U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; the 18-track fan-in to a column needs >= 3 mm of free L6 height there"
-  ],
-  [
-   "/TAP15",
-   "U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; the 18-track fan-in to a column needs >= 3 mm of free L6 height there"
   ],
   [
    "/fpga_clock/DBG2",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 band y 24.75, tap-row lane x 39.46",
+   50.613
   ],
   [
    "/fpga_clock/JTAG_TCK",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 band y 25.05, tap-row lane x 39.76",
+   51.814
   ],
   [
    "/fpga_clock/JTAG_TMS",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 band y 25.35, tap-row lane x 43.97",
+   48.615
   ],
   [
    "/fpga_clock/JTAG_TDI",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 band y 25.65, tap-row lane x 44.27",
+   48.735
   ],
   [
    "/fpga_clock/JTAG_TDO",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 band y 25.95, tap-row lane x 48.64",
+   44.578
   ],
   [
    "/MCU_CLK",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 68.10, highway y 33.10, lane x 71.21",
+   33.361
   ],
   [
    "/SPI_CS",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 68.35, highway y 32.85, lane x 75.47",
+   37.301
   ],
   [
    "/I2C_SDA",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 68.60, highway y 32.60, lane x 75.72",
+   37.568
   ],
   [
    "/FPGA_DONE",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 68.85, highway y 32.35, lane x 75.97",
+   35.128
   ],
   [
    "/SPI_MOSI",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 69.10, highway y 32.10, lane x 79.81",
+   39.46
   ],
   [
    "/SPI_MISO",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 69.35, highway y 31.85, lane x 80.04",
+   39.045
   ],
   [
    "/SPI_SCK",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 69.60, highway y 31.60, lane x 80.27",
+   38.63
   ],
   [
    "/I2C_SCL",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 69.85, highway y 31.35, lane x 80.50",
+   38.418
   ],
   [
    "/FPGA_RECONFIG",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 70.10, highway y 31.10, lane x 84.62",
+   41.456
   ],
   [
    "/ADC_TRIG",
-   "the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, 23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the DONE / RECONFIG F runs (local y 18.1 / 18.5)"
+   "B.Cu",
+   "L6 drop x 70.35, highway y 30.85, lane x 84.87",
+   41.679
+  ],
+  [
+   "/TAP15",
+   "B.Cu",
+   "L6 drop x 70.60, highway y 30.60, peel x 93.45",
+   35.931
+  ],
+  [
+   "/TAP14",
+   "B.Cu",
+   "L6 drop x 70.85, highway y 30.35, peel x 92.68",
+   33.865
+  ],
+  [
+   "/TAP13",
+   "B.Cu",
+   "L6 drop x 71.10, highway y 30.10, peel x 84.42",
+   25.196
+  ],
+  [
+   "/TAP12",
+   "B.Cu",
+   "L6 drop x 71.35, highway y 29.85, peel x 83.65",
+   23.254
+  ],
+  [
+   "/TAP11",
+   "B.Cu",
+   "L6 drop x 71.60, highway y 29.60, peel x 75.39",
+   14.793
+  ],
+  [
+   "/TAP10",
+   "B.Cu",
+   "L6 drop x 71.85, highway y 29.35, peel x 74.62",
+   12.933
+  ],
+  [
+   "/TAP8",
+   "B.Cu",
+   "L6 fpga stub to L1 hop via",
+   0.85
+  ],
+  [
+   "/TAP8",
+   "F.Cu",
+   "L1 hop y 22.75 over the fan into U309 pad",
+   10.87
+  ],
+  [
+   "/TAP9",
+   "B.Cu",
+   "L6 fpga stub to L1 hop via",
+   2.0
+  ],
+  [
+   "/TAP9",
+   "F.Cu",
+   "L1 hop y 23.15 over the fan into U309 pad",
+   8.742
   ]
  ],
+ "not_placed": [],
  "rf": {
   "/S_STROBE_P": 0.16,
   "/S_STROBE_N": 0.16,
@@ -224,55 +269,501 @@
  },
  "rule10": {
   "fast_on_L3": 0,
-  "samples": 5207,
-  "no_ref": 419,
+  "samples": 8163,
+  "no_ref": 433,
   "L4": [
    [
-    "/VTAP_N",
-    1,
+    "+3V3",
+    2,
     [
-     26.27,
-     32.26,
-     98.68,
-     37.35
+     0.25,
+     0.25,
+     99.75,
+     56.75
     ]
    ],
    [
-    "/VTAP_P",
-    1,
+    "+5V",
+    2,
     [
-     26.27,
-     37.65,
-     98.68,
-     42.74
+     1.72,
+     4.45,
+     75.7,
+     20.7
+    ]
+   ],
+   [
+    "-5V",
+    3,
+    [
+     1.72,
+     3.4,
+     91.6,
+     17.92
+    ]
+   ],
+   [
+    "VBUS",
+    2,
+    [
+     10.45,
+     4.7,
+     89.95,
+     55.9
+    ]
+   ],
+   [
+    "-2V5",
+    7,
+    [
+     0.65,
+     4.83,
+     93.18,
+     50.57
+    ]
+   ],
+   [
+    "+2V5",
+    8,
+    [
+     6.81,
+     4.83,
+     91.32,
+     50.57
     ]
    ],
    [
     "+1V2",
-    1,
+    4,
     [
-     59.4,
-     8.6,
-     74.0,
-     16.6
-    ]
-   ],
-   [
-    "+3V3",
-    1,
-    [
-     0.3,
-     0.3,
-     99.7,
-     56.7
+     60.32,
+     8.08,
+     82.22,
+     22.67
     ]
    ]
   ]
  },
  "rule10_detail": {
   "fast_on_L3": [],
-  "samples": 5207,
+  "samples": 8163,
   "no_ref": [
+   [
+    "/TAP9",
+    "F.Cu",
+    [
+     72.9,
+     23.15
+    ]
+   ],
+   [
+    "/TAP9",
+    "F.Cu",
+    [
+     72.6426,
+     23.15
+    ]
+   ],
+   [
+    "/TAP9",
+    "F.Cu",
+    [
+     73.0,
+     23.25
+    ]
+   ],
+   [
+    "/TAP9",
+    "F.Cu",
+    [
+     72.9,
+     23.15
+    ]
+   ],
+   [
+    "/TAP9",
+    "B.Cu",
+    [
+     73.0,
+     21.25
+    ]
+   ],
+   [
+    "/TAP9",
+    "B.Cu",
+    [
+     73.0,
+     21.5
+    ]
+   ],
+   [
+    "/TAP9",
+    "B.Cu",
+    [
+     73.0,
+     21.75
+    ]
+   ],
+   [
+    "/TAP9",
+    "B.Cu",
+    [
+     73.0,
+     22.0
+    ]
+   ],
+   [
+    "/TAP9",
+    "B.Cu",
+    [
+     73.0,
+     23.0
+    ]
+   ],
+   [
+    "/TAP9",
+    "B.Cu",
+    [
+     73.0,
+     23.25
+    ]
+   ],
+   [
+    "/TAP8",
+    "F.Cu",
+    [
+     73.5,
+     22.75
+    ]
+   ],
+   [
+    "/TAP8",
+    "F.Cu",
+    [
+     73.2484,
+     22.75
+    ]
+   ],
+   [
+    "/TAP8",
+    "B.Cu",
+    [
+     73.5,
+     21.9
+    ]
+   ],
+   [
+    "/TAP8",
+    "B.Cu",
+    [
+     73.5,
+     22.1833
+    ]
+   ],
+   [
+    "/TAP8",
+    "B.Cu",
+    [
+     73.5,
+     22.4667
+    ]
+   ],
+   [
+    "/TAP8",
+    "B.Cu",
+    [
+     73.5,
+     22.75
+    ]
+   ],
+   [
+    "/TAP10",
+    "B.Cu",
+    [
+     74.374,
+     27.25
+    ]
+   ],
+   [
+    "/TAP10",
+    "B.Cu",
+    [
+     74.124,
+     27.0
+    ]
+   ],
+   [
+    "/TAP10",
+    "B.Cu",
+    [
+     72.5,
+     21.9
+    ]
+   ],
+   [
+    "/TAP10",
+    "B.Cu",
+    [
+     72.5,
+     22.1667
+    ]
+   ],
+   [
+    "/TAP11",
+    "B.Cu",
+    [
+     75.394,
+     27.25
+    ]
+   ],
+   [
+    "/TAP11",
+    "B.Cu",
+    [
+     75.394,
+     27.0
+    ]
+   ],
+   [
+    "/TAP11",
+    "B.Cu",
+    [
+     72.0,
+     21.25
+    ]
+   ],
+   [
+    "/TAP11",
+    "B.Cu",
+    [
+     72.0,
+     21.54
+    ]
+   ],
+   [
+    "/TAP11",
+    "B.Cu",
+    [
+     72.0,
+     21.83
+    ]
+   ],
+   [
+    "/TAP12",
+    "B.Cu",
+    [
+     83.402,
+     27.25
+    ]
+   ],
+   [
+    "/TAP12",
+    "B.Cu",
+    [
+     83.152,
+     27.0
+    ]
+   ],
+   [
+    "/TAP12",
+    "B.Cu",
+    [
+     71.5,
+     21.9
+    ]
+   ],
+   [
+    "/TAP12",
+    "B.Cu",
+    [
+     71.5,
+     22.1667
+    ]
+   ],
+   [
+    "/TAP13",
+    "B.Cu",
+    [
+     84.422,
+     27.25
+    ]
+   ],
+   [
+    "/TAP13",
+    "B.Cu",
+    [
+     84.422,
+     27.0
+    ]
+   ],
+   [
+    "/TAP13",
+    "B.Cu",
+    [
+     71.0,
+     21.25
+    ]
+   ],
+   [
+    "/TAP13",
+    "B.Cu",
+    [
+     71.0,
+     21.54
+    ]
+   ],
+   [
+    "/TAP13",
+    "B.Cu",
+    [
+     71.0,
+     21.83
+    ]
+   ],
+   [
+    "/TAP14",
+    "B.Cu",
+    [
+     92.43,
+     27.25
+    ]
+   ],
+   [
+    "/TAP14",
+    "B.Cu",
+    [
+     92.18,
+     27.0
+    ]
+   ],
+   [
+    "/TAP14",
+    "B.Cu",
+    [
+     70.5,
+     21.9
+    ]
+   ],
+   [
+    "/TAP14",
+    "B.Cu",
+    [
+     70.5,
+     22.1667
+    ]
+   ],
+   [
+    "/TAP15",
+    "B.Cu",
+    [
+     93.45,
+     27.25
+    ]
+   ],
+   [
+    "/TAP15",
+    "B.Cu",
+    [
+     93.45,
+     27.0
+    ]
+   ],
+   [
+    "/TAP15",
+    "B.Cu",
+    [
+     70.0,
+     21.25
+    ]
+   ],
+   [
+    "/TAP15",
+    "B.Cu",
+    [
+     70.0,
+     21.54
+    ]
+   ],
+   [
+    "/FPGA_RECONFIG",
+    "B.Cu",
+    [
+     69.0,
+     18.6
+    ]
+   ],
+   [
+    "/FPGA_RECONFIG",
+    "B.Cu",
+    [
+     69.0,
+     18.8563
+    ]
+   ],
+   [
+    "/I2C_SCL",
+    "B.Cu",
+    [
+     80.504,
+     33.7107
+    ]
+   ],
+   [
+    "/FPGA_DONE",
+    "B.Cu",
+    [
+     75.97,
+     33.7203
+    ]
+   ],
+   [
+    "/FPGA_DONE",
+    "B.Cu",
+    [
+     66.5,
+     19.0
+    ]
+   ],
+   [
+    "/FPGA_DONE",
+    "B.Cu",
+    [
+     66.5,
+     19.2643
+    ]
+   ],
+   [
+    "/fpga_clock/JTAG_TDI",
+    "B.Cu",
+    [
+     64.0,
+     16.25
+    ]
+   ],
+   [
+    "/fpga_clock/JTAG_TMS",
+    "B.Cu",
+    [
+     63.5,
+     16.35
+    ]
+   ],
+   [
+    "/fpga_clock/DBG2",
+    "B.Cu",
+    [
+     62.5,
+     18.1
+    ]
+   ],
+   [
+    "/fpga_clock/DBG2",
+    "B.Cu",
+    [
+     62.5,
+     18.3519
+    ]
+   ],
    [
     "/USB_DM",
     "F.Cu",
@@ -333,24 +824,16 @@
     "/USB_DM",
     "B.Cu",
     [
-     83.6,
-     22.8
+     87.39,
+     31.45
     ]
    ],
    [
     "/USB_DM",
     "B.Cu",
     [
-     83.4,
-     23.0
-    ]
-   ],
-   [
-    "/USB_DM",
-    "B.Cu",
-    [
-     83.6,
-     22.8
+     87.5727,
+     31.6327
     ]
    ],
    [
@@ -373,72 +856,48 @@
     "/USB_DP",
     "B.Cu",
     [
-     83.05,
-     23.45
+     86.4,
+     31.06
     ]
    ],
    [
     "/USB_DP",
     "B.Cu",
     [
-     83.3045,
-     23.45
-    ]
-   ],
-   [
-    "/USB_DP",
-    "B.Cu",
-    [
-     82.6,
-     23.0
-    ]
-   ],
-   [
-    "/USB_DP",
-    "B.Cu",
-    [
-     82.825,
-     23.225
-    ]
-   ],
-   [
-    "/USB_DP",
-    "B.Cu",
-    [
-     83.05,
-     23.45
+     86.5857,
+     31.2457
     ]
    ],
    [
     "/USB_DM",
     "F.Cu",
     [
-     83.2,
-     22.8
+     87.1933,
+     31.2533
     ]
    ],
    [
     "/USB_DM",
     "F.Cu",
     [
-     83.4,
-     23.0
+     87.39,
+     31.45
     ]
    ],
    [
     "/USB_DP",
     "F.Cu",
     [
-     82.6,
-     22.75
+     86.4,
+     30.8045
     ]
    ],
    [
     "/USB_DP",
     "F.Cu",
     [
-     82.6,
-     23.0
+     86.4,
+     31.06
     ]
    ],
    [
@@ -1533,22 +1992,6 @@
     "/I2C_SDA",
     "B.Cu",
     [
-     69.6,
-     9.1068
-    ]
-   ],
-   [
-    "/I2C_SDA",
-    "B.Cu",
-    [
-     69.6,
-     9.3609
-    ]
-   ],
-   [
-    "/I2C_SDA",
-    "B.Cu",
-    [
      68.2967,
      9.865
     ]
@@ -1559,6 +2002,22 @@
     [
      68.0333,
      9.865
+    ]
+   ],
+   [
+    "/I2C_SDA",
+    "B.Cu",
+    [
+     69.6,
+     9.1068
+    ]
+   ],
+   [
+    "/I2C_SDA",
+    "B.Cu",
+    [
+     69.6,
+     9.3609
     ]
    ],
    [
@@ -1575,22 +2034,6 @@
     [
      70.4,
      1.7
-    ]
-   ],
-   [
-    "/I2C_SCL",
-    "B.Cu",
-    [
-     70.95,
-     2.2
-    ]
-   ],
-   [
-    "/I2C_SCL",
-    "B.Cu",
-    [
-     70.76,
-     2.39
     ]
    ],
    [
@@ -1635,6 +2078,22 @@
    ],
    [
     "/I2C_SCL",
+    "B.Cu",
+    [
+     70.95,
+     2.2
+    ]
+   ],
+   [
+    "/I2C_SCL",
+    "B.Cu",
+    [
+     70.76,
+     2.39
+    ]
+   ],
+   [
+    "/I2C_SCL",
     "F.Cu",
     [
      70.675,
@@ -1651,18 +2110,10 @@
    ],
    [
     "/FPGA_RECONFIG",
-    "B.Cu",
+    "F.Cu",
     [
-     69.0,
-     18.6
-    ]
-   ],
-   [
-    "/FPGA_RECONFIG",
-    "B.Cu",
-    [
-     69.0,
-     18.86
+     59.7727,
+     13.865
     ]
    ],
    [
@@ -1687,14 +2138,6 @@
     [
      69.0,
      18.6
-    ]
-   ],
-   [
-    "/FPGA_RECONFIG",
-    "F.Cu",
-    [
-     59.7727,
-     13.865
     ]
    ],
    [
@@ -1739,34 +2182,18 @@
    ],
    [
     "/FPGA_DONE",
-    "B.Cu",
+    "F.Cu",
     [
-     66.5,
-     19.0
-    ]
-   ],
-   [
-    "/FPGA_DONE",
-    "B.Cu",
-    [
-     66.5,
-     19.25
+     58.8333,
+     1.9833
     ]
    ],
    [
     "/FPGA_DONE",
     "F.Cu",
     [
-     57.475,
-     5.125
-    ]
-   ],
-   [
-    "/FPGA_DONE",
-    "F.Cu",
-    [
-     57.25,
-     4.9
+     59.0167,
+     2.1667
     ]
    ],
    [
@@ -1813,16 +2240,32 @@
     "/FPGA_DONE",
     "F.Cu",
     [
-     58.8333,
-     1.9833
+     57.475,
+     5.125
     ]
    ],
    [
     "/FPGA_DONE",
     "F.Cu",
     [
-     59.0167,
-     2.1667
+     57.25,
+     4.9
+    ]
+   ],
+   [
+    "/FPGA_DONE",
+    "F.Cu",
+    [
+     66.2438,
+     19.0
+    ]
+   ],
+   [
+    "/FPGA_DONE",
+    "F.Cu",
+    [
+     66.5,
+     19.0
     ]
    ],
    [
@@ -1847,22 +2290,6 @@
     [
      60.3,
      13.065
-    ]
-   ],
-   [
-    "/FPGA_DONE",
-    "F.Cu",
-    [
-     66.2438,
-     19.0
-    ]
-   ],
-   [
-    "/FPGA_DONE",
-    "F.Cu",
-    [
-     66.5,
-     19.0
     ]
    ],
    [
@@ -1974,6 +2401,14 @@
     "F.Cu",
     [
      56.4,
+     7.7
+    ]
+   ],
+   [
+    "/S_STROBE_N",
+    "F.Cu",
+    [
+     56.4,
      11.865
     ]
    ],
@@ -1983,14 +2418,6 @@
     [
      56.0,
      11.865
-    ]
-   ],
-   [
-    "/S_STROBE_N",
-    "F.Cu",
-    [
-     56.4,
-     7.7
     ]
    ],
    [
@@ -2421,7 +2848,7 @@
     "/ADC_TRIG",
     "B.Cu",
     [
-     68.2,
+     67.79,
      11.865
     ]
    ],
@@ -2429,7 +2856,7 @@
     "/ADC_TRIG",
     "B.Cu",
     [
-     67.79,
+     68.2,
      11.865
     ]
    ],
@@ -2459,18 +2886,18 @@
    ],
    [
     "/TAP8",
-    "B.Cu",
+    "F.Cu",
     [
      73.5,
-     21.9
+     21.6477
     ]
    ],
    [
     "/TAP8",
-    "B.Cu",
+    "F.Cu",
     [
      73.5,
-     22.2
+     21.9
     ]
    ],
    [
@@ -2498,54 +2925,6 @@
     ]
    ],
    [
-    "/TAP8",
-    "F.Cu",
-    [
-     73.5,
-     21.6477
-    ]
-   ],
-   [
-    "/TAP8",
-    "F.Cu",
-    [
-     73.5,
-     21.9
-    ]
-   ],
-   [
-    "/TAP9",
-    "B.Cu",
-    [
-     73.0,
-     21.25
-    ]
-   ],
-   [
-    "/TAP9",
-    "B.Cu",
-    [
-     73.0,
-     21.5
-    ]
-   ],
-   [
-    "/TAP9",
-    "B.Cu",
-    [
-     73.0,
-     21.75
-    ]
-   ],
-   [
-    "/TAP9",
-    "B.Cu",
-    [
-     73.0,
-     22.0
-    ]
-   ],
-   [
     "/TAP9",
     "F.Cu",
     [
@@ -2559,22 +2938,6 @@
     [
      73.0,
      21.25
-    ]
-   ],
-   [
-    "/TAP10",
-    "B.Cu",
-    [
-     72.5,
-     21.9
-    ]
-   ],
-   [
-    "/TAP10",
-    "B.Cu",
-    [
-     72.5,
-     22.2
     ]
    ],
    [
@@ -2611,38 +2974,6 @@
    ],
    [
     "/TAP11",
-    "B.Cu",
-    [
-     72.0,
-     21.25
-    ]
-   ],
-   [
-    "/TAP11",
-    "B.Cu",
-    [
-     72.0,
-     21.5
-    ]
-   ],
-   [
-    "/TAP11",
-    "B.Cu",
-    [
-     72.0,
-     21.75
-    ]
-   ],
-   [
-    "/TAP11",
-    "B.Cu",
-    [
-     72.0,
-     22.0
-    ]
-   ],
-   [
-    "/TAP11",
     "F.Cu",
     [
      72.0,
@@ -2655,22 +2986,6 @@
     [
      72.0,
      21.25
-    ]
-   ],
-   [
-    "/TAP12",
-    "B.Cu",
-    [
-     71.5,
-     21.9
-    ]
-   ],
-   [
-    "/TAP12",
-    "B.Cu",
-    [
-     71.5,
-     22.2
     ]
    ],
    [
@@ -2699,34 +3014,18 @@
    ],
    [
     "/TAP13",
-    "B.Cu",
+    "F.Cu",
+    [
+     71.0,
+     20.9906
+    ]
+   ],
+   [
+    "/TAP13",
+    "F.Cu",
     [
      71.0,
      21.25
-    ]
-   ],
-   [
-    "/TAP13",
-    "B.Cu",
-    [
-     71.0,
-     21.5
-    ]
-   ],
-   [
-    "/TAP13",
-    "B.Cu",
-    [
-     71.0,
-     21.75
-    ]
-   ],
-   [
-    "/TAP13",
-    "B.Cu",
-    [
-     71.0,
-     22.0
     ]
    ],
    [
@@ -2743,38 +3042,6 @@
     [
      69.45,
      16.8
-    ]
-   ],
-   [
-    "/TAP13",
-    "F.Cu",
-    [
-     71.0,
-     20.9906
-    ]
-   ],
-   [
-    "/TAP13",
-    "F.Cu",
-    [
-     71.0,
-     21.25
-    ]
-   ],
-   [
-    "/TAP14",
-    "B.Cu",
-    [
-     70.5,
-     21.9
-    ]
-   ],
-   [
-    "/TAP14",
-    "B.Cu",
-    [
-     70.5,
-     22.2
     ]
    ],
    [
@@ -2811,22 +3078,6 @@
    ],
    [
     "/TAP15",
-    "B.Cu",
-    [
-     70.0,
-     21.25
-    ]
-   ],
-   [
-    "/TAP15",
-    "B.Cu",
-    [
-     70.0,
-     21.5
-    ]
-   ],
-   [
-    "/TAP15",
     "F.Cu",
     [
      70.0,
@@ -2839,22 +3090,6 @@
     [
      70.0,
      21.25
-    ]
-   ],
-   [
-    "/fpga_clock/DBG2",
-    "B.Cu",
-    [
-     62.5,
-     18.1
-    ]
-   ],
-   [
-    "/fpga_clock/DBG2",
-    "B.Cu",
-    [
-     62.5,
-     18.3588
     ]
    ],
    [
@@ -2917,6 +3152,22 @@
     "/TAP7",
     "F.Cu",
     [
+     64.4,
+     15.3745
+    ]
+   ],
+   [
+    "/TAP7",
+    "F.Cu",
+    [
+     64.4,
+     15.6277
+    ]
+   ],
+   [
+    "/TAP7",
+    "F.Cu",
+    [
      62.525,
      17.7
     ]
@@ -2935,30 +3186,6 @@
     [
      62.0,
      17.7
-    ]
-   ],
-   [
-    "/TAP7",
-    "F.Cu",
-    [
-     64.4,
-     15.3745
-    ]
-   ],
-   [
-    "/TAP7",
-    "F.Cu",
-    [
-     64.4,
-     15.6277
-    ]
-   ],
-   [
-    "/fpga_clock/JTAG_TDI",
-    "B.Cu",
-    [
-     64.0,
-     16.25
     ]
    ],
    [
@@ -3007,14 +3234,6 @@
     [
      64.0,
      15.5
-    ]
-   ],
-   [
-    "/fpga_clock/JTAG_TMS",
-    "B.Cu",
-    [
-     63.5,
-     16.35
     ]
    ],
    [
@@ -3078,30 +3297,6 @@
     "B.Cu",
     [
      63.2,
-     16.25
-    ]
-   ],
-   [
-    "/fpga_clock/JTAG_TCK",
-    "B.Cu",
-    [
-     62.9,
-     15.7
-    ]
-   ],
-   [
-    "/fpga_clock/JTAG_TCK",
-    "B.Cu",
-    [
-     63.1,
-     15.5
-    ]
-   ],
-   [
-    "/fpga_clock/JTAG_TCK",
-    "B.Cu",
-    [
-     63.2,
      15.5
     ]
    ],
@@ -3127,6 +3322,30 @@
     [
      63.2,
      16.25
+    ]
+   ],
+   [
+    "/fpga_clock/JTAG_TCK",
+    "B.Cu",
+    [
+     63.2,
+     16.25
+    ]
+   ],
+   [
+    "/fpga_clock/JTAG_TCK",
+    "B.Cu",
+    [
+     62.9,
+     15.7
+    ]
+   ],
+   [
+    "/fpga_clock/JTAG_TCK",
+    "B.Cu",
+    [
+     63.1,
+     15.5
     ]
    ],
    [
@@ -3326,7 +3545,7 @@
     "F.Cu",
     [
      92.18,
-     24.195
+     26.7125
     ]
    ],
    [
@@ -3334,7 +3553,7 @@
     "F.Cu",
     [
      92.18,
-     23.925
+     27.0
     ]
    ],
    [
@@ -3342,7 +3561,7 @@
     "F.Cu",
     [
      93.45,
-     24.195
+     26.7125
     ]
    ],
    [
@@ -3350,7 +3569,7 @@
     "F.Cu",
     [
      93.45,
-     23.925
+     27.0
     ]
    ],
    [
@@ -3358,7 +3577,7 @@
     "F.Cu",
     [
      83.152,
-     24.195
+     26.7125
     ]
    ],
    [
@@ -3366,7 +3585,7 @@
     "F.Cu",
     [
      83.152,
-     23.925
+     27.0
     ]
    ],
    [
@@ -3374,7 +3593,7 @@
     "F.Cu",
     [
      84.422,
-     24.195
+     26.7125
     ]
    ],
    [
@@ -3382,7 +3601,7 @@
     "F.Cu",
     [
      84.422,
-     23.925
+     27.0
     ]
    ],
    [
@@ -3390,7 +3609,7 @@
     "F.Cu",
     [
      74.124,
-     24.195
+     26.7125
     ]
    ],
    [
@@ -3398,7 +3617,7 @@
     "F.Cu",
     [
      74.124,
-     23.925
+     27.0
     ]
    ],
    [
@@ -3406,7 +3625,7 @@
     "F.Cu",
     [
      75.394,
-     24.195
+     26.7125
     ]
    ],
    [
@@ -3414,39 +3633,7 @@
     "F.Cu",
     [
      75.394,
-     23.925
-    ]
-   ],
-   [
-    "/TAP8",
-    "F.Cu",
-    [
-     65.096,
-     24.195
-    ]
-   ],
-   [
-    "/TAP8",
-    "F.Cu",
-    [
-     65.096,
-     23.925
-    ]
-   ],
-   [
-    "/TAP9",
-    "F.Cu",
-    [
-     66.366,
-     24.195
-    ]
-   ],
-   [
-    "/TAP9",
-    "F.Cu",
-    [
-     66.366,
-     23.925
+     27.0
     ]
    ],
    [
@@ -3628,43 +3815,73 @@
   ],
   "L4": [
    [
-    "/VTAP_N",
-    1,
+    "+3V3",
+    2,
     [
-     26.27,
-     32.26,
-     98.68,
-     37.35
+     0.25,
+     0.25,
+     99.75,
+     56.75
     ]
    ],
    [
-    "/VTAP_P",
-    1,
+    "+5V",
+    2,
     [
-     26.27,
-     37.65,
-     98.68,
-     42.74
+     1.72,
+     4.45,
+     75.7,
+     20.7
+    ]
+   ],
+   [
+    "-5V",
+    3,
+    [
+     1.72,
+     3.4,
+     91.6,
+     17.92
+    ]
+   ],
+   [
+    "VBUS",
+    2,
+    [
+     10.45,
+     4.7,
+     89.95,
+     55.9
+    ]
+   ],
+   [
+    "-2V5",
+    7,
+    [
+     0.65,
+     4.83,
+     93.18,
+     50.57
+    ]
+   ],
+   [
+    "+2V5",
+    8,
+    [
+     6.81,
+     4.83,
+     91.32,
+     50.57
     ]
    ],
    [
     "+1V2",
-    1,
+    4,
     [
-     59.4,
-     8.6,
-     74.0,
-     16.6
-    ]
-   ],
-   [
-    "+3V3",
-    1,
-    [
-     0.3,
-     0.3,
-     99.7,
-     56.7
+     60.32,
+     8.08,
+     82.22,
+     22.67
     ]
    ]
   ]

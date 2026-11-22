@@ -43,9 +43,19 @@ POWER_BLOCK = (74.0, 0.0, 100.0, 22.5)   # board mm (origin = board top-left)
 
 BACKGROUND = "+3V3"
 # routing order: the strips first (fixed rows), then the short +1V2, then the long rails
-ISLANDS = ["/VTAP_N", "/VTAP_P", "+1V2", "+5V", "-5V", "VBUS", "-2V5", "+2V5"]
+ISLANDS = ["+1V2", "VBUS", "+5V", "-5V", "-2V5", "+2V5"]
 RAILS = [BACKGROUND] + ISLANDS
-FEED = {"/VTAP_P": "+2V5", "/VTAP_N": "-2V5"}   # strips start at the via nearest to this rail (0R link)
+FEED = {}
+STRIPS = ["/VTAP_P", "/VTAP_N"]     # L3 tracks along the tap row (not plane rails, 12.5 mA each)
+L3 = pcbnew.In2_Cu
+STRIP_W = 0.5                       # VTAP track width on L3
+STRIP_CLR = 0.3                     # VTAP track to foreign via
+FEED_W = 1.5                        # L3 feeder width
+VIA_D, VIA_DRILL, VIA_PITCH = 0.45, 0.2, 0.8
+L3_COST = {"VBUS": 12.0}            # step-cost factor on L3 (VBUS = 220 mA stays on L4); default below
+L3_COST_DEFAULT = 2.5
+HOP_COST = 40.0                     # cost of one L4<->L3 change (in grid steps)
+PRIO_FEED = 3
 
 
 def fmm(v):
@@ -422,26 +432,202 @@ def _components(mask):
 
 RESERVE_R = 1.75      # soft reservation half-width around the straight MST links of rails not yet routed
 RESERVE_COST = 3.0    # extra cost factor per step inside a reservation
-ORDERS = 30           # routing orders tried (the first is ISLANDS as listed; others seeded shuffles)
+ORDERS = 12           # routing orders tried (the first is ISLANDS as listed; others seeded shuffles)
+
+
+def seg_mask(G, m, p, q, r):
+    """mark grid cells within r of segment p-q."""
+    x0, x1 = min(p[0], q[0]) - r, max(p[0], q[0]) + r
+    y0, y1 = min(p[1], q[1]) - r, max(p[1], q[1]) + r
+    i0, j0 = G.ij(x0, y0)
+    i1, j1 = G.ij(x1, y1)
+    i0, j0 = max(i0 - 1, 0), max(j0 - 1, 0)
+    i1, j1 = min(i1 + 2, G.ny), min(j1 + 2, G.nx)
+    if i0 >= i1 or j0 >= j1:
+        return
+    X, Y = G.X[i0:i1, j0:j1], G.Y[i0:i1, j0:j1]
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    L2 = dx * dx + dy * dy
+    if L2 < 1e-12:
+        d2 = (X - p[0]) ** 2 + (Y - p[1]) ** 2
+    else:
+        t = np.clip(((X - p[0]) * dx + (Y - p[1]) * dy) / L2, 0, 1)
+        d2 = (X - p[0] - t * dx) ** 2 + (Y - p[1] - t * dy) ** 2
+    m[i0:i1, j0:j1] |= d2 <= r * r
+
+
+def strip_tracks(board, nets_all):
+    """VTAP_P / VTAP_N on L3: a 0.5 mm track tree (0.1 mm grid router, octilinear) from the 0R-link via (the via
+    of the net farthest from its row) to every resistor via of the net, >= STRIP_CLR from every foreign via,
+    out of the In2 keep-outs (node windows), clear of the existing L3 tracks. Returns ({net: [lines]}, problems)."""
+    global RES
+    allv = [(t.GetPosition().x / MM, t.GetPosition().y / MM, t.GetWidth() / MM / 2, t.GetNetname())
+            for t in board.GetTracks() if t.GetClass() == "PCB_VIA"]
+    nets = [n for n in STRIPS if board.FindNet(n) is not None and sum(1 for v in allv if v[3] == n) >= 2]
+    if not nets:
+        return {}, []
+    own = {n: [(x, y) for (x, y, r, m) in allv if m == n] for n in nets}
+    xs = [p[0] for n in nets for p in own[n]]
+    ys = [p[1] for n in nets for p in own[n]]
+    bb = board_box(board)
+    sub = (max(bb[0], min(xs) - 4), max(bb[1], min(ys) - 4), min(bb[2], max(xs) + 4), min(bb[3], max(ys) + 4))
+    old = RES
+    RES = 0.1
+    try:
+        G = Grid(sub)
+        hw = STRIP_W / 2
+        base = (G.X < bb[0] + 0.5 + hw) | (G.X > bb[2] - 0.5 - hw) | (G.Y < bb[1] + 0.5 + hw) | (G.Y > bb[3] - 0.5 - hw)
+        for z in board.Zones():
+            if is_pour_keepout(z) and z.GetLayerSet().Contains(L3):
+                o = z.Outline()
+                for i in range(o.OutlineCount()):
+                    pp = poly_points(o, i)
+                    if len(pp) >= 3:
+                        G.poly(base, pp, grow=CLEAR + hw)
+        for t in board.GetTracks():
+            if t.GetClass() == "PCB_TRACK" and t.GetLayer() == L3 and t.GetNetname() not in nets:
+                a_, b_ = t.GetStart(), t.GetEnd()
+                seg_mask(G, base, (a_.x / MM, a_.y / MM), (b_.x / MM, b_.y / MM), t.GetWidth() / MM / 2 + CLEAR + hw)
+        for (x, y, r) in other_holes(board, {}):
+            G.disk(base, x, y, r + CLEAR + hw)
+        out, problems = {}, []
+        drawn = {}
+
+        def route(net, others):
+            obst = base.copy()
+            for (x, y, r, m) in allv:
+                if m != net:
+                    G.disk(obst, x, y, r + STRIP_CLR + hw)
+            for o in others:
+                for line in drawn.get(o, []):
+                    for p_, q_ in zip(line[:-1], line[1:]):
+                        seg_mask(G, obst, p_, q_, 2 * hw + STRIP_CLR)
+            free = ~obst
+            pts_ = own[net]
+            yrow = sorted(p[1] for p in pts_)[len(pts_) // 2]
+            feed = max(pts_, key=lambda p: abs(p[1] - yrow))
+            tree = set()
+            m = G.empty()
+            G.disk(m, feed[0], feed[1], 0.12)
+            tree.update(np.flatnonzero((m & free).ravel()).tolist())
+            todo = [p for p in pts_ if p != feed]
+            lines, miss = [], []
+            while todo:
+                targets = {}
+                for k, p in enumerate(todo):
+                    mm_ = G.empty()
+                    G.disk(mm_, p[0], p[1], 0.12)
+                    for c in np.flatnonzero((mm_ & free).ravel()).tolist():
+                        targets[c] = k
+                src = {c for c in tree if free.ravel()[c]}
+                k, path = dijkstra(free, src, targets) if targets and src else (None, None)
+                if k is None:
+                    miss += todo
+                    break
+                poly = simplify(free, [divmod(c, G.nx) for c in path])
+                line = [G.xy(i, j) for i, j in poly]
+                lines.append(line)
+                for a2, b2 in zip(poly[:-1], poly[1:]):
+                    for i, j in line_cells(a2[0], a2[1], b2[0], b2[1]):
+                        tree.add(i * G.nx + j)
+                todo.pop(k)
+            return lines, miss
+        order = sorted(nets, key=lambda n: -max(abs(p[1] - sorted(q[1] for q in own[n])[len(own[n]) // 2])
+                                                 for p in own[n]))
+        for attempt in (order, order[::-1]):
+            drawn.clear()
+            miss_all = []
+            for n in attempt:
+                lines, miss = route(n, [o for o in attempt if o != n and o in drawn])
+                drawn[n] = lines
+                miss_all += [(n, round(x - 100, 3), round(y - 100, 3)) for x, y in miss]
+            if not miss_all:
+                break
+        out = dict(drawn)
+        problems = miss_all
+    finally:
+        RES = old
+    return out, problems
+
+
+def _pt_seg(x, y, p, q):
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    L2 = dx * dx + dy * dy
+    t = 0 if L2 < 1e-12 else max(0, min(1, ((x - p[0]) * dx + (y - p[1]) * dy) / L2))
+    return math.hypot(x - p[0] - t * dx, y - p[1] - t * dy)
 
 
 class Planner:
-    def __init__(self, board):
+    def __init__(self, board, strips):
         self.nets = rail_nets(board)
         self.pts = landing_points(board, self.nets)
         self.box = box = board_box(board)
         self.G = G = Grid(box)
-        base = G.empty()
-        base |= (G.X < box[0] + EDGE) | (G.X > box[2] - EDGE) | (G.Y < box[1] + EDGE) | (G.Y > box[3] - EDGE)
+        edge = (G.X < box[0] + EDGE) | (G.X > box[2] - EDGE) | (G.Y < box[1] + EDGE) | (G.Y > box[3] - EDGE)
+        holes = other_holes(board, self.nets)
+        # ---- L4
         self.keep = G.empty()
         for ko in l4_keepouts(board):
             G.poly(self.keep, ko)
-        base |= dilate(self.keep, CLEAR)
-        for (x, y, r) in other_holes(board, self.nets):
+        base = edge | dilate(self.keep, CLEAR)
+        for (x, y, r) in holes:
             G.disk(base, x, y, r + CLEAR)
         self.base = base
+        # ---- L3: keep-outs on In2, foreign In2 tracks, VTAP tracks (1 mm), holes, edge
+        k3 = G.empty()
+        for z in board.Zones():
+            if is_pour_keepout(z) and z.GetLayerSet().Contains(L3):
+                o = z.Outline()
+                for i in range(o.OutlineCount()):
+                    pp = poly_points(o, i)
+                    if len(pp) >= 3:
+                        G.poly(k3, pp)
+        b3 = edge | dilate(k3, CLEAR)
+        for (x, y, r) in holes:
+            G.disk(b3, x, y, r + CLEAR)
+        self.l3_tracks = []
+        for t in board.GetTracks():
+            if t.GetClass() == "PCB_TRACK" and t.GetLayer() == L3:
+                a, b = t.GetStart(), t.GetEnd()
+                self.l3_tracks.append(((a.x / MM, a.y / MM), (b.x / MM, b.y / MM), t.GetWidth() / MM, t.GetNetname()))
+        for line_set in strips.values():
+            for line in line_set:
+                for p, q in zip(line[:-1], line[1:]):
+                    seg_mask(G, b3, p, q, STRIP_W / 2 + 1.0)
+        self.base3 = b3
+        # ---- where a 3-via array may sit: away from F.Cu / B.Cu / In2 copper and every through item
+        vb = edge.copy()
+        rv = VIA_D / 2 + 0.15
+        for t in board.GetTracks():
+            if t.GetClass() == "PCB_VIA":
+                p = t.GetPosition()
+                G.disk(vb, p.x / MM, p.y / MM, t.GetWidth() / MM / 2 + rv)
+            elif t.GetLayer() in (pcbnew.F_Cu, pcbnew.B_Cu, L3):
+                a, b = t.GetStart(), t.GetEnd()
+                seg_mask(G, vb, (a.x / MM, a.y / MM), (b.x / MM, b.y / MM), t.GetWidth() / MM / 2 + rv)
+        for f in board.GetFootprints():
+            for pd in f.Pads():
+                bb = pd.GetBoundingBox()
+                x0, y0, x1, y1 = bb.GetX() / MM - rv, bb.GetY() / MM - rv, bb.GetRight() / MM + rv, bb.GetBottom() / MM + rv
+                i0, j0 = G.ij(x0, y0)
+                i1, j1 = G.ij(x1, y1)
+                vb[max(i0, 0):max(i1 + 1, 0), max(j0, 0):max(j1 + 1, 0)] = True
+        for z in board.Zones():                       # F / B copper zones (pads' pours) and keep-outs
+            ls = z.GetLayerSet()
+            if z.GetIsRuleArea() and z.GetDoNotAllowVias():     # copper pours flow around a new via
+                o = z.Outline()
+                for i in range(o.OutlineCount()):
+                    pp = poly_points(o, i)
+                    if len(pp) >= 3:
+                        G.poly(vb, pp, grow=rv)
+        for line_set in strips.values():
+            for line in line_set:
+                for p, q in zip(line[:-1], line[1:]):
+                    seg_mask(G, vb, p, q, STRIP_W / 2 + rv + 0.2)
+        vb |= self.keep | k3
+        # the array (centre +- 0.8 mm in any direction) fits where a disk of 0.8 mm is free of forbidden centres
+        self.hop_ok = ~dilate(vb, VIA_PITCH + RES * 0.5)
         self.groups = {r: cluster(self.pts[r]) for r in ISLANDS if self.pts.get(r)}
-        # per-rail foreign landing obstacles and reservation fields
         self.foreign = {}
         self.resv = {}
         for rail in self.groups:
@@ -460,39 +646,78 @@ class Planner:
                     if 0 <= i < G.ny and 0 <= j < G.nx:
                         lm[i, j] = True
             self.resv[rail] = dilate(lm, RESERVE_R)
-            # strips: their short row links (tap pitch) are a hard reservation for every other rail
-            hm = G.empty()
-            if rail in FEED:
-                for p, q in _mst(self.groups[rail]):
-                    if math.hypot(p[0] - q[0], p[1] - q[1]) <= 6.0:
-                        a, b = G.ij(*p), G.ij(*q)
-                        for i, j in line_cells(a[0], a[1], b[0], b[1]):
-                            hm[i, j] = True
-            self.hard = getattr(self, "hard", {})
-            self.hard[rail] = dilate(hm, 0.5) if hm.any() else hm
+        self.free3_static = ~dilate(self.base3, FEED_W / 2)
 
     def start_group(self, rail):
         groups = self.groups[rail]
         bx0, by0 = self.box[0], self.box[1]
-        if rail in FEED and self.pts.get(FEED[rail]):
-            fx = [(x, y) for (x, y, _) in self.pts[FEED[rail]]]
-            return min(range(len(groups)), key=lambda k: min(math.hypot(p[0] - q[0], p[1] - q[1])
-                                                              for p in groups[k] for q in fx))
         for k, g in enumerate(groups):
             if any(POWER_BLOCK[0] <= p[0] - bx0 <= POWER_BLOCK[2] and POWER_BLOCK[1] <= p[1] - by0
                    <= POWER_BLOCK[3] for p in g):
                 return k
         return 0
 
-    def route_rail(self, rail, placed, later):
+    def dijkstra2(self, free4, free3, hop, sources, targets, cost4, l3f):
+        """two-layer search: state = layer * N + cell. Sources / targets on L4 only."""
+        ny, nx = free4.shape
+        N = nx * ny
+        f4 = free4.ravel().tolist()
+        f3 = free3.ravel().tolist()
+        hp = hop.ravel().tolist()
+        c4 = cost4.ravel().tolist()
+        dist, prev, h = {}, {}, []
+        for s0 in sources:
+            if f4[s0]:
+                dist[s0] = 0.0
+                prev[s0] = -1
+                heapq.heappush(h, (0.0, s0))
+        while h:
+            d, u = heapq.heappop(h)
+            if d > dist.get(u, 1e18):
+                continue
+            if u < N and u in targets:
+                path = []
+                while u != -1:
+                    path.append(u)
+                    u = prev[u]
+                return targets[path[0]], path[::-1]
+            lay, c = divmod(u, N)
+            i, j = divmod(c, nx)
+            if hp[c]:
+                if lay == 0 and f3[c]:
+                    v, nd = N + c, d + HOP_COST
+                elif lay == 1 and f4[c]:
+                    v, nd = c, d + HOP_COST
+                else:
+                    v = None
+                if v is not None and nd < dist.get(v, 1e18):
+                    dist[v] = nd
+                    prev[v] = u
+                    heapq.heappush(h, (nd, v))
+            fl = f4 if lay == 0 else f3
+            for di, dj, cc in DIRS:
+                ii, jj = i + di, j + dj
+                if 0 <= ii < ny and 0 <= jj < nx:
+                    w = ii * nx + jj
+                    if not fl[w]:
+                        continue
+                    nd = d + cc * ((1.0 + c4[w]) if lay == 0 else l3f)
+                    v = lay * N + w
+                    if nd < dist.get(v, 1e18):
+                        dist[v] = nd
+                        prev[v] = u
+                        heapq.heappush(h, (nd, v))
+        return None, None
+
+    def route_rail(self, rail, placed, placed3, later):
         G = self.G
-        nx = G.nx
+        nx, N = G.nx, G.nx * G.ny
         obst = self.base | dilate(placed, CLEAR + GAP) | self.foreign[rail]
-        for o in later:
-            obst |= self.hard[o]
         cost = np.zeros((G.ny, G.nx))
         for o in later:
             cost += RESERVE_COST * self.resv[o]
+        free3 = self.free3_static & ~dilate(placed3, CLEAR + GAP + FEED_W / 2)
+        l3f = L3_COST.get(rail, L3_COST_DEFAULT)
         frees = {}
         groups = self.groups[rail]
         start = self.start_group(rail)
@@ -508,7 +733,8 @@ class Planner:
             return disks[k]
         tree.update(gcells(start))
         todo = set(range(len(groups))) - {start}
-        segs, unreached, length = [], [], 0.0
+        segs, feeds, hops, unreached, length = [], [], [], [], 0.0
+        m3 = G.empty()
         while todo:
             hit = None
             for w in WIDTHS:
@@ -520,23 +746,51 @@ class Planner:
                 src = {c for c in tree if ff[c]}
                 if not targets or not src:
                     continue
-                k, path = dijkstra(free, src, targets, cost)
+                hop = self.hop_ok & frees.setdefault(2.0, ~dilate(obst, 1.0)) & free3
+                k, path = self.dijkstra2(free, free3, hop, src, targets, cost, l3f)
                 if k is not None:
                     hit = (k, path, w, free)
                     break
             if hit is None:
-                unreached += [groups[k] for k in sorted(todo)]
-                break
+                # stuck (e.g. the start is boxed in): grow a second tree from the next group; reported as
+                # missing links by verify() if the trees never meet
+                k0 = min(todo)
+                unreached.append(groups[k0])
+                tree.update(gcells(k0))
+                todo.discard(k0)
+                continue
             k, path, w, free = hit
-            poly = simplify(free, [divmod(c, nx) for c in path])
-            line = [G.xy(i, j) for i, j in poly]
-            segs.append((line, w))
-            length += sum(math.hypot(q[0] - p[0], q[1] - p[1]) for p, q in zip(line[:-1], line[1:]))
-            for a, b in zip(poly[:-1], poly[1:]):
-                for i, j in line_cells(a[0], a[1], b[0], b[1]):
-                    tree.add(i * nx + j)
+            # split into layer runs
+            runs, cur, lay = [], [], 0
+            for u in path:
+                l_, c = divmod(u, N)
+                if l_ != lay and cur:
+                    runs.append((lay, cur))
+                    hops.append(G.xy(*divmod(c, nx)))
+                    cur = []
+                lay = l_
+                cur.append(divmod(c, nx))
+            runs.append((lay, cur))
+            for lay, cells in runs:
+                fm = free if lay == 0 else free3
+                poly = simplify(fm, cells) if len(cells) > 1 else cells
+                line = [G.xy(i, j) for i, j in poly]
+                if lay == 0:
+                    segs.append((line, w))
+                    for a, b in zip(poly[:-1], poly[1:]):
+                        for i, j in line_cells(a[0], a[1], b[0], b[1]):
+                            tree.add(i * nx + j)
+                else:
+                    feeds.append((line, FEED_W))
+                    for p_, q_ in zip(line[:-1], line[1:]):
+                        seg_mask(G, m3, p_, q_, FEED_W / 2)
+                    if len(line) == 1:
+                        G.disk(m3, line[0][0], line[0][1], FEED_W / 2)
+                length += sum(math.hypot(q[0] - p[0], q[1] - p[1]) for p, q in zip(line[:-1], line[1:]))
             tree.update(gcells(k))
             todo.discard(k)
+        for (x, y) in hops:
+            G.disk(m3, x, y, 1.3)
         parts = []
         for line, w in segs:
             for p, q in zip(line[:-1], line[1:]):
@@ -545,6 +799,8 @@ class Planner:
                 parts.append(octagon(p[0], p[1], w / 2))
         for (x, y, r) in self.pts[rail]:
             parts.append(octagon(x, y, r + LAND))
+        for (x, y) in hops:
+            parts.append(octagon(x, y, 1.3))
         shape = chamfer_close(union(parts))
         box = self.box
         clip = polyset([(box[0] + 0.3, box[1] + 0.3), (box[2] - 0.3, box[1] + 0.3), (box[2] - 0.3, box[3] - 0.3),
@@ -553,11 +809,33 @@ class Planner:
         m = G.empty()
         for i in range(shape.OutlineCount()):
             G.poly(m, poly_points(shape, i))
+        # L3 feeder shapes (one zone per connected feeder)
+        fparts = []
+        for line, w in feeds:
+            for p, q in zip(line[:-1], line[1:]):
+                fparts.append(seg_rect(p, q, w))
+            for p in line:
+                fparts.append(octagon(p[0], p[1], w / 2))
+        for (x, y) in hops:
+            fparts.append(octagon(x, y, 1.3))
+        fshape = chamfer_close(union(fparts)) if fparts else None
+        # via arrays: 3 vias at each hop, along the adjoining L3 run
+        arrays = []
+        for (x, y) in hops:
+            d = None
+            for line, _ in feeds:
+                for p in (line[0], line[-1]):
+                    if abs(p[0] - x) < 1e-6 and abs(p[1] - y) < 1e-6 and len(line) > 1:
+                        q = line[1] if p is line[0] else line[-2]
+                        L = math.hypot(q[0] - p[0], q[1] - p[1])
+                        d = ((q[0] - p[0]) / L, (q[1] - p[1]) / L)
+            d = d or (1.0, 0.0)
+            arrays.append([(x + k * VIA_PITCH * d[0], y + k * VIA_PITCH * d[1]) for k in (-1, 0, 1)])
         wmin = min((w for _, w in segs), default=None)
-        return dict(shape=shape, segs=segs, unreached=unreached, wmin=wmin, length=length, raster=m)
+        return dict(shape=shape, segs=segs, feeds=feeds, fshape=fshape, arrays=arrays, unreached=unreached,
+                    wmin=wmin, length=length, raster=m, raster3=m3)
 
     def bg_isolated(self, placed):
-        """+3V3 landing points the background cannot reach (raster estimate)."""
         G = self.G
         free = ~(dilate(placed, CLEAR + 0.1) | self.keep)
         free &= (G.X > self.box[0] + 0.4) & (G.X < self.box[2] - 0.4) & (G.Y > self.box[1] + 0.4) & \
@@ -578,30 +856,31 @@ class Planner:
 
     def run(self, order):
         G = self.G
-        placed = G.empty()
+        placed, placed3 = G.empty(), G.empty()
         out = {}
         for n, rail in enumerate(order):
-            d = self.route_rail(rail, placed, [r for r in order[n + 1:]])
+            d = self.route_rail(rail, placed, placed3, order[n + 1:])
             placed |= d["raster"]
+            placed3 |= d["raster3"]
             out[rail] = d
         bad = self.bg_isolated(placed)
         unr = sum(len(g) for d in out.values() for g in d["unreached"])
+        nfeed = sum(len(d["arrays"]) for d in out.values())
         narrow = sum(1 for d in out.values() for _, w in d["segs"] if w < 1.5)
-        score = (unr + len(bad), narrow, sum(d["length"] for d in out.values()))
+        score = (unr + len(bad), nfeed + narrow, sum(d["length"] for d in out.values()))
         return score, out, bad
 
 
-def plan(board, report, orders=None):
-    P = Planner(board)
+def plan(board, report, strips, orders=None):
+    P = Planner(board, strips)
     rails = [r for r in ISLANDS if r in P.groups]
     import random
     rnd = random.Random(1)
     cands = [rails]
-    strips = [r for r in rails if r.startswith("/VTAP")]
-    rest = [r for r in rails if r not in strips]
     for _ in range((orders or ORDERS) - 1):
-        rnd.shuffle(rest)
-        cands.append(strips + rest[:])
+        o = rails[:]
+        rnd.shuffle(o)
+        cands.append(o)
     best = None
     for order in cands:
         score, out, bad = P.run(order)
@@ -614,33 +893,35 @@ def plan(board, report, orders=None):
     report["order"] = order
     report["score"] = score
     report["bg_isolated_raster"] = bad
-    report["grid"] = (P.G.nx, P.G.ny)
     return P.nets, P.pts, islands, P.box
 
 
 def remove_old(board, nets):
-    names = set(nets.values())
+    names = set(nets.values()) | set(STRIPS)
     kill = []
     for z in board.Zones():
+        nm = str(z.GetZoneName())
         if z.GetIsRuleArea():
-            if str(z.GetZoneName()) == "L4_window":
+            if nm == "L4_window":
                 kill.append(z)
             continue
-        if z.GetLayerSet().Contains(LAYER) and z.GetNetname() in names:
+        if (z.GetLayerSet().Contains(LAYER) and z.GetNetname() in names) or nm.startswith("L3_feed"):
             kill.append(z)
     for z in kill:
         board.Delete(z)
 
 
-def new_zone(board, net, shape, prio, name):
+def new_zone(board, net, shape, prio, name, layer=LAYER):
     z = pcbnew.ZONE(board)
-    z.SetLayer(LAYER)
+    z.SetLayer(layer)
     z.SetNetCode(board.FindNet(net).GetNetCode())
     z.SetAssignedPriority(prio)
     z.SetLocalClearance(fmm(CLEAR))
     z.SetMinThickness(fmm(MINW))
     z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
-    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    # background: drop isolated +3V3 scraps; islands / feeders: keep every piece (a piece cut off by foreign
+    # holes is still reported by verify() as a missing link instead of silently vanishing)
+    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS if prio == PRIO_BG else pcbnew.ISLAND_REMOVAL_MODE_NEVER)
     z.SetZoneName(name)
     cp = pcbnew.SHAPE_POLY_SET(shape)
     cp.thisown = False                     # the zone takes ownership
@@ -653,20 +934,64 @@ def new_zone(board, net, shape, prio, name):
 _LAST = {}
 
 
-def apply(board, orders=None):
-    """Build the L4 power layer on a merged board. Returns a report dict. Call ZONE_FILLER afterwards."""
+def apply(board, orders=None, json_path=None):
+    """Build L4 (+ L3 feeders, VTAP tracks) on a freshly merged board. Returns a report. Fill zones afterwards."""
+    import json
+    import os
     report = {}
     nets = rail_nets(board)
     remove_old(board, nets)
     replicate_keepouts(board, landing_points(board, nets), report)
-    nets, pts, islands, box = plan(board, report, orders)
+    strips, sprob = strip_tracks(board, nets)
+    report["strip_clearance_problems"] = sprob
+    occ = []
+    for net, lines in strips.items():
+        code = board.FindNet(net).GetNetCode()
+        for line in lines:
+            for p, q in zip(line[:-1], line[1:]):
+                t = pcbnew.PCB_TRACK(board)
+                t.SetStart(pcbnew.VECTOR2I(fmm(p[0]), fmm(p[1])))
+                t.SetEnd(pcbnew.VECTOR2I(fmm(q[0]), fmm(q[1])))
+                t.SetWidth(fmm(STRIP_W))
+                t.SetLayer(L3)
+                t.SetNetCode(code)
+                board.Add(t)
+            occ.append(dict(net=net, kind="track", layer="In2.Cu", width=STRIP_W,
+                            pts=[(round(x, 4), round(y, 4)) for x, y in line]))
+    nets, pts, islands, box = plan(board, report, strips, orders)
     bg = polyset([(box[0] + 0.3, box[1] + 0.3), (box[2] - 0.3, box[1] + 0.3), (box[2] - 0.3, box[3] - 0.3),
                   (box[0] + 0.3, box[3] - 0.3)])
     new_zone(board, nets[BACKGROUND], bg, PRIO_BG, "L4_+3V3")
     for rail, d in islands.items():
         new_zone(board, nets[rail], d["shape"], PRIO_ISLAND, "L4_" + rail.lstrip("/"))
-    report["islands"] = {r: dict(wmin=d["wmin"], unreached=d["unreached"], segs=d["segs"])
-                         for r, d in islands.items()}
+        code = board.FindNet(nets[rail]).GetNetCode()
+        if d["fshape"] is not None:
+            for i in range(d["fshape"].OutlineCount()):
+                sub = pcbnew.SHAPE_POLY_SET()
+                sub.AddOutline(d["fshape"].Outline(i))
+                new_zone(board, nets[rail], sub, PRIO_FEED, f"L3_feed_{rail.lstrip('/')}_{i}", L3)
+                occ.append(dict(net=nets[rail], kind="zone", layer="In2.Cu",
+                                pts=[(round(x, 4), round(y, 4)) for x, y in poly_points(sub, 0)]))
+        for arr in d["arrays"]:
+            for (x, y) in arr:
+                v = pcbnew.PCB_VIA(board)
+                v.SetPosition(pcbnew.VECTOR2I(fmm(x), fmm(y)))
+                v.SetWidth(fmm(VIA_D))
+                v.SetDrill(fmm(VIA_DRILL))
+                v.SetViaType(pcbnew.VIATYPE_THROUGH)
+                v.SetNetCode(code)
+                board.Add(v)
+            occ.append(dict(net=nets[rail], kind="via_array", layer="all", dia=VIA_D,
+                            pts=[(round(x, 4), round(y, 4)) for x, y in arr]))
+    report["islands"] = {r: dict(wmin=d["wmin"], unreached=d["unreached"], segs=d["segs"], feeds=d["feeds"],
+                                 arrays=d["arrays"]) for r, d in islands.items()}
+    report["strips"] = strips
+    report["l3"] = occ
+    jp = json_path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L3.json")
+    with open(jp, "w") as f:
+        json.dump(dict(note="L3 (In2.Cu) copper occupied by board_power.py: board coordinates are pcbnew mm "
+                       "(board origin at pcbnew (100, 100)); keep slow lines >= 0.3 mm away", items=occ), f, indent=1)
+    report["json"] = jp
     _LAST.clear()
     _LAST.update(report)
     return report
@@ -707,80 +1032,62 @@ def _unconnected_per_net(board, codes):
 
 
 def verify(board):
+    """Per rail: L4 filled polygons, landing points inside the L4 fill (missing listed), L3 feeders and via arrays,
+    planned min trunk / feeder width, missing links per net (union-find over pads / tracks / vias / filled zones
+    after fill); plus the board-wide pcbnew GetUnconnectedCount() and the sum over the rail nets."""
     nets = rail_nets(board)
     pts = landing_points(board, nets)
     res = {}
-    zones = {}
+    zones, z3 = {}, {}
     for z in board.Zones():
-        if not z.GetIsRuleArea() and z.GetLayerSet().Contains(LAYER):
+        if z.GetIsRuleArea():
+            continue
+        if z.GetLayerSet().Contains(LAYER):
             zones.setdefault(z.GetNetname(), []).append(z)
-    codes = {r: board.FindNet(n).GetNetCode() for r, n in nets.items()}
+        if z.GetLayerSet().Contains(L3) and str(z.GetZoneName()).startswith("L3_feed"):
+            z3.setdefault(z.GetNetname(), []).append(z)
+    allnets = dict(nets)
+    for sn in STRIPS:
+        if board.FindNet(sn) is not None:
+            allnets[sn] = sn
+    codes = {r: board.FindNet(n).GetNetCode() for r, n in allnets.items()}
     unc = _unconnected_per_net(board, codes)
-    segs = _LAST.get("islands", {})
-    for rail, net in nets.items():
-        fills = []
-        for z in zones.get(net, []):
-            f = pcbnew.SHAPE_POLY_SET(z.GetFilledPolysList(LAYER))
-            f.Unfracture(pcbnew.SHAPE_POLY_SET.PM_FAST)       # holes separate: widths ignore via holes
-            fills.append(f)
+    isl = _LAST.get("islands", {})
+    for rail, net in allnets.items():
+        if rail in STRIPS:
+            res[rail] = dict(net=net, polygons=0, landing=None, inside=None, missing=[], feeders=0, arrays=0,
+                             wmin=STRIP_W, fw=None, unconnected=unc.get(rail), kind="L3 track")
+            continue
+        fills = [z.GetFilledPolysList(LAYER) for z in zones.get(net, [])]
         npoly = sum(f.OutlineCount() for f in fills)
         inside, missing = 0, []
-        poly_of = []
         for (x, y, r) in pts[rail]:
             v = pcbnew.VECTOR2I(fmm(x), fmm(y))
-            hit = None
-            for fi, f in enumerate(fills):
-                for k in range(f.OutlineCount()):
-                    if f.Contains(v, k):
-                        hit = (fi, k)
-                        break
-                if hit:
-                    break
-            if hit:
+            if any(f.Contains(v) for f in fills):
                 inside += 1
-                poly_of.append(hit)
             else:
                 missing.append((round(x - 100, 3), round(y - 100, 3)))
-        # width achieved along the planned centre lines (distance to the fill outline, holes ignored)
-        wmin = None
-        if rail in segs and fills:
-            ws = []
-            for line, w in segs[rail]["segs"]:
-                for p, q in zip(line[:-1], line[1:]):
-                    L = math.hypot(q[0] - p[0], q[1] - p[1])
-                    n = max(int(L / 0.25), 1)
-                    for k in range(n + 1):
-                        s = np.array((p[0] + (q[0] - p[0]) * k / n, p[1] + (q[1] - p[1]) * k / n))
-                        v = pcbnew.VECTOR2I(fmm(s[0]), fmm(s[1]))
-                        best = None
-                        for f in fills:
-                            for kk in range(f.OutlineCount()):
-                                if f.Contains(v, kk):
-                                    A, B = _outline_segments(f, kk)
-                                    best = 2 * _dist_to_segments(s, A, B)
-                        # sample points near landing vias sit at outline ends of the path: skip those
-                        if best is not None:
-                            near_end = min(math.hypot(s[0] - a[0], s[1] - a[1]) for a in (line[0], line[-1]))
-                            if near_end > w:
-                                ws.append(min(best, 9.99))
-            wmin = round(min(ws), 2) if ws else None
+        f3 = sum(z.GetFilledPolysList(L3).OutlineCount() for z in z3.get(net, []))
+        d = isl.get(rail, {})
         res[rail] = dict(net=net, polygons=npoly, landing=len(pts[rail]), inside=inside, missing=missing,
-                         single=len(set(poly_of)) <= 1, wmin=wmin,
-                         planned_wmin=segs.get(rail, {}).get("wmin"), unconnected=unc.get(rail))
+                         feeders=f3, arrays=len(d.get("arrays", [])), wmin=d.get("wmin"),
+                         fw=FEED_W if d.get("feeds") else None, unconnected=unc.get(rail),
+                         kind="background" if rail == BACKGROUND else "island")
     res["_pcbnew_total"] = unc["_pcbnew_total"]
+    res["_rails_total"] = sum((unc.get(r) or 0) for r in allnets)
     return res
 
 
 def table(res):
-    tot = res.pop("_pcbnew_total", None)
-    lines = ["rail     polys  landing  in-fill  one-poly  w_min(mm)  planned  unconnected(net)    missing"]
+    lines = ["rail      L4-polys  landing  in-L4-fill  L3-feeders  via-arrays(3)  min-trunk  feeder-w  missing-links"]
     for r, d in res.items():
-        lines.append(f"{r:8s} {d['polygons']:5d}  {d['landing']:7d}  {d['inside']:7d}  {str(d['single']):8s}  "
-                     f"{str(d['wmin']):9s}  {str(d['planned_wmin']):7s}  {str(d['unconnected']):18s}  "
-                     f"{d['missing'] if d['missing'] else '-'}")
-    if tot is not None:
-        lines.append(f"pcbnew GetUnconnectedCount() board-wide after fill: {tot}")
-        res["_pcbnew_total"] = tot
+        if r.startswith("_"):
+            continue
+        lines.append(f"{r:9s} {d['polygons']:8d}  {str(d['landing']):7s}  {str(d['inside']):10s}  {d['feeders']:10d}  "
+                     f"{d['arrays']:13d}  {str(d['wmin']):9s}  {str(d['fw']):8s}  {d['unconnected']}"
+                     + (f"   NOT IN FILL {d['missing']}" if d["missing"] else ""))
+    lines.append(f"missing links summed over rail nets: {res.get('_rails_total')};  "
+                 f"pcbnew GetUnconnectedCount() board-wide: {res.get('_pcbnew_total')}")
     return "\n".join(lines)
 
 
@@ -794,6 +1101,7 @@ def main(argv):
     res = verify(board)
     board.Save(argv[2])
     print("routing order", rep["order"], "score", rep["score"][:2], "bg isolated (raster)", rep["bg_isolated_raster"])
+    print("VTAP L3 vias not reached:", rep.get("strip_clearance_problems"))
     print("keep-outs replicated on In3.Cu:", rep.get("keepouts_added"), " skipped:", rep.get("keepout_skipped", []))
     for r, d in rep["islands"].items():
         if d["unreached"]:
@@ -803,6 +1111,7 @@ def main(argv):
         sys.path.insert(0, __file__.rsplit("/", 1)[0])
         import boardlib as bl
         bl.render(argv[2], argv[3], layers=("In3.Cu", "Edge.Cuts"))
+        bl.render(argv[2], argv[3].replace(".png", "_L3.png"), layers=("In2.Cu", "Edge.Cuts"))
     return 0
 
 

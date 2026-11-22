@@ -286,9 +286,9 @@ for k in range(NT // 2):
             V(xcap - 0.7, cp[1] + dy, "+3V3")
         T("+3V3", 0.45, [cp, (xcap - 0.4, cp[1]), (xcap - 0.7, cp[1] - 0.3), (xcap - 0.7, cp[1] - 1.05)], ch=0)
         if k == 4:      # U309: cap GND via 0.53 mm west, clear of the JTAG drop at board x 62.5
-            gq = (xcap - 0.7, cg[1] - 0.73)          # above the +3V3 via pair, west of the JTAG drop
+            gq = (xcap - 0.7, cg[1] - 0.65)          # above the +3V3 via pair, west of the JTAG drop, below TAP7's lane
             gv(*gq)
-            T("GND", W_GND, [cg, (xcap, cg[1] - 0.35), (xcap - 0.38, cg[1] - 0.73), gq], ch=0)
+            T("GND", W_GND, [cg, (xcap, cg[1] - 0.35), (xcap - 0.3, cg[1] - 0.65), gq], ch=0)
         else:
             gv(xcap, cg[1] - 0.62)
             T("GND", W_GND, [cg, (xcap, cg[1] - 0.62)], ch=0)
@@ -639,7 +639,8 @@ blk.keepout(bl.rect_pts(XT[0] + X_P12 - PITCH / 2 - 0.1, AX - (YL + W_STR / 2 + 
 for q, w in KEEP:
     blk.rf_keepout(q, w)
 blk.keepout(bl.rect_pts(0.0, 0.0, 9.5, BH), ("F.Cu",))       # dense front column: no top pour
-blk.keepout(bl.rect_pts(9.5, 0.0, 26.5, 2.5), ("F.Cu",))
+# (22 Nov: the north-strip F pour keep-out x 9.5-26.5 is gone: C301 / C306 are on B now and the PH_STROBE pair
+# runs there on L1, so the strip gets its ground pour)
 
 # ============================================================================= drawings, save
 blk.edge_rect(0, 0, BW, BH, layer="Dwgs.User")
