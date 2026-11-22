@@ -17,23 +17,27 @@ from common import new_sheet, R, C, decoupler, MCU_DBG_FPGA
 IO, PWR = "bidirectional", "power_in"
 
 # (pin, pin name per UG842, net, how) ; how: h = hierarchical label, l = local label, nc
-BANK1 = [(9, "IOR2A", "TAP0", "h"), (10, "IOR2B", "TAP1", "h"), (11, "IOR3A", "TAP2", "h"),
-         (13, "IOR10B", "TAP3", "h"), (14, "IOR6B/MO/D6", "TAP4", "h"), (15, "IOR6D/MCLK/D4", "TAP5", "h"),
-         (16, "IOR6F", "TAP6", "h"), (17, "IOR6G", "TAP7", "h"), (18, "IOR6H", "TAP8", "h"),
-         (19, "IOR6J/DOUT/WE_N", "TAP9", "h"), (20, "IOR10A", "TAP10", "h"), (21, "IOR7B/GCLKC_3", "TAP11", "h"),
-         (22, "IOR9A/SI/D2", "TAP12", "h"), (23, "IOR8B", "TAP13", "h"), (24, "IOR8A/SO/D1", "TAP14", "h"),
-         (27, "IOR7A/GCLKT_3/SSPI_CS_N/D0", "TAP15", "h"), (28, "IOR6I/DIN/CLKHOLD_N", "SPI_SCK", "h"),
-         (29, "IOR6E/FASTRD_N/D3", "SPI_MOSI", "h"), (30, "IOR6C/MCS_N/D5", "SPI_MISO", "h"),
-         (31, "IOR6A/MI/D7", "SPI_CS", "h"), (33, "IOR5A/GCLKT_2/RPLL_T_in", "FPGA_CLK", "l"),
-         (32, "IOR5B/GCLKC_2/RPLL_C_in", None, "nc"), (34, "IOR3B", "CLK2_FPGA", "l")]
+# Pin plan after the 6-layer layout permutation (22 Nov 2026, fpga block, TOPOLOGY.md section 1): TAP0..5 and
+# COARSE on the top pins (west-going L6 bundle), TAP6/7 on the free west pins, TAP8..15 on the bottom / lower east
+# pins, SPI / ADC_TRIG / CLK2 on the upper east pins.  Old map: TAP0..15 = 9,10,11,13-24,27, SPI SCK/MOSI/MISO/CS =
+# 28/29/30/31, COARSE 47, ADC_TRIG 41, CLK2 34, NC 8 / 32.
+BANK1 = [(9, "IOR2A", "TAP9", "h"), (10, "IOR2B", "TAP10", "h"), (11, "IOR3A", "TAP11", "h"),
+         (13, "IOR10B", "TAP12", "h"), (14, "IOR6B/MO/D6", "TAP13", "h"), (15, "IOR6D/MCLK/D4", "TAP14", "h"),
+         (16, "IOR6F", "TAP15", "h"), (17, "IOR6G", "ADC_TRIG", "h"), (18, "IOR6H", None, "nc"),
+         (19, "IOR6J/DOUT/WE_N", "SPI_SCK", "h"), (20, "IOR10A", "SPI_MISO", "h"), (21, "IOR7B/GCLKC_3", "SPI_MOSI", "h"),
+         (22, "IOR9A/SI/D2", None, "nc"), (23, "IOR8B", "SPI_CS", "h"), (24, "IOR8A/SO/D1", "CLK2_FPGA", "l"),
+         (27, "IOR7A/GCLKT_3/SSPI_CS_N/D0", "COARSE", "h"), (28, "IOR6I/DIN/CLKHOLD_N", "TAP0", "h"),
+         (29, "IOR6E/FASTRD_N/D3", "TAP1", "h"), (30, "IOR6C/MCS_N/D5", "TAP2", "h"),
+         (31, "IOR6A/MI/D7", "TAP3", "h"), (33, "IOR5A/GCLKT_2/RPLL_T_in", "FPGA_CLK", "l"),
+         (32, "IOR5B/GCLKC_2/RPLL_C_in", "TAP4", "h"), (34, "IOR3B", "TAP5", "h")]
 BANK0 = [(40, "IOT16A", "PH_STROBE_P", "h"), (39, "IOT16B", "PH_STROBE_N", "h"),
          (38, "IOT17A", "S_STROBE_P", "h"), (35, "IOT17B", "S_STROBE_N", "h"),
-         (41, "IOT15B", "ADC_TRIG", "h"), (47, "IOT10A/GCLKT_0", "COARSE", "h"),
+         (41, "IOT15B", "TAP6", "h"), (47, "IOT10A/GCLKT_0", "TAP7", "h"),
          (48, "IOT9B/RECONFIG_N", "FPGA_RECONFIG", "h"), (46, "IOT12A/DONE", "FPGA_DONE", "h"),
          (45, "IOT12B/READY", "FPGA_READY", "l"), (44, "IOT13A/JTAGSEL_N", "JTAGSEL_N", "l"),
          (43, "IOT14A/MODE0", "FPGA_MODE0", "l"), (42, "IOT14B/MODE1", "FPGA_MODE1", "l"),
          (3, "IOT7B/TCK", "JTAG_TCK", "l"), (4, "IOT7A/TMS", "JTAG_TMS", "l"), (5, "IOT8A/TDI", "JTAG_TDI", "l"),
-         (7, "IOT8B/TDO", "JTAG_TDO", "l"), (6, "IOT9A/SCLK", "DBG2", "l"), (8, "IOT10B/GCLKC_0", None, "nc")]
+         (7, "IOT8B/TDO", "JTAG_TDO", "l"), (6, "IOT9A/SCLK", "DBG2", "l"), (8, "IOT10B/GCLKC_0", "TAP8", "h")]
 TOP = [(12, "VCC", "+1V2"), (37, "VCC", "+1V2"), (36, "VCCX", "+3V3"), (1, "VCCIO0", "+3V3"),
        (25, "VCCIO1", "+3V3")]
 BOT = [(2, "VSS"), (26, "VSS"), (49, "EPAD")]
@@ -185,13 +189,12 @@ def main():
     sh.stub(y, "4", "GND", kind="gnd")
     decoupler(sh, "+3V3", (g(50), g(85)), ("100n", "100n", "10u"))
     sh.text("MS5351M: CLK0 -> FPGA_CLK (RPLL_T_in pin 33), CLK1 -> MCU_CLK (STM32 HSE bypass),\n"
-            "CLK2 -> FPGA pin 34 (spare clock / beat mode). One 100 nF each at VDD and VDDO.",
+            "CLK2 -> FPGA pin 24 (spare clock / beat mode). One 100 nF each at VDD and VDDO.",
             (g(25), g(98)))
-    sh.text("Pin plan (UG842): Bank1 = TAP0..15 (COS3502 outputs, LVCMOS33 in), SPI slave, FPGA_CLK;\n"
-            "Bank0 = strobes (OSER10, pairs IOT16A/B and IOT17A/B), ADC_TRIG, COARSE (GCLKT_0), config, JTAG,\n"
-            "DBG2 (pin 6, IOT9A/SCLK, to J501 pin 5).\n"
-            "TAP pins may be swapped within Bank1 for routing (update this table).\n"
-            "Unused: 8 (IOT10B/GCLKC_0), 32 (GCLKC_2).", (g(150), g(200)))
+    sh.text("Pin plan (UG842), permuted for the 6-layer fan-out: TAP0..5 = 28-32, 34; TAP6/7 = 41, 47;\n"
+            "TAP8..15 = 8-11, 13-16; COARSE = 27 (GCLKT_3); SPI SCK/MISO/MOSI/CS = 19/20/21/23; ADC_TRIG 17;\n"
+            "CLK2 24; FPGA_CLK 33 (RPLL_T_in). Strobes OSER10 on IOT16A/B, IOT17A/B; config, JTAG, DBG2 (pin 6) fixed.\n"
+            "Unused: 18, 22.", (g(150), g(200)))
     sh.save()
 
 

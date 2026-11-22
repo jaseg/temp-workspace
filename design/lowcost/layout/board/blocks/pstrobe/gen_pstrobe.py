@@ -5,7 +5,7 @@ GVA-84+ (VBUS through bead + 2.2 uH) -> 100 nF -> launch node PSTRB_A/K with the
 (NT402/NT403, two GND vias) and the DNP BAT15 clamp -> 50 R output to the phase block (tap 0).
 
 Both chains come from chain(s): s = +1 chain A (north, local y 0-8.5), s = -1 chain K, mirrored about the
-tap axis y = 11.5 (board 37.5).  Every two-terminal part, track, via, stub and keep-out is mirrored; the two
+tap axis y = 12.5 (board 37.5).  Every two-terminal part, track, via, stub and keep-out is mirrored; the two
 ICs (TRF37D73 WSON, GVA-84+ SOT-89) cannot be mirrored (chiral pin-outs): they keep rotation 0 / 90 in both
 chains, with their RF pins on the mirrored line points (identical electrical path).
 Run: cd blocks/pstrobe && python3 gen_pstrobe.py
@@ -78,6 +78,12 @@ XO = 14.60             # output column: GVA bead on the corner, C421 below, laun
 XG = XO - 1.47 - 1.50  # GVA centre x (pin 3 at XO - 1.47: courtyard edge = bead courtyard edge)
 XD = XO + 0.47 + 0.95  # clamp column (vertical SOD-323 beside C421)
 L_STUB = 80.0 / bl.PS_MM50
+XR_IN, YR_IN = 2.30, YL + 2.00   # 47 R (horizontal, under the TRF courtyard) centre; PH_STROBE pad east
+XV2, XG2 = 3.45, 4.10            # L6 -> L1 return via and its GND via on the 47 R row
+# PH_STROBE entries on the NORTH edge (TOPOLOGY section 4), both chains: P (chain A) west, N (chain K) east
+X_P, X_N = 0.50, 1.10            # board x 10.00 / 10.60 at board y 25.00
+X_KC = 2.37                      # K line L6 column under the corridor: phase C309 / vias end at local x 1.79,
+                                 # L302 pad 2 starts at 2.95 (blocks/phase B.Cu, board x 11.29..12.45 clear)
 
 
 def snap(ref, net, x=None, y=None):
@@ -104,8 +110,17 @@ def chain(s):
     n_padin, n_padout, n_gin, n_gout, n_gbias, n_stub = N(C_O, 2), N(C_I, 1), N(G, 1), N(G, 3), N(FBG, 2), N(NT, 1)
     yl, ys, yr = my(YL), my(YS), my(YR)
     # ---------------------------------------------------------------- RF parts
-    two(C_IN, X_IN, my(YL - 1.00), NS("S"), n_rfin)       # input leg: C412 (pad 2 just above the line)
-    two(R_IN, X_IN, my(YL - 2.87), NS("N"), PIN)         # 47 R above it, courtyards touching
+    # input leg BELOW the line (toward the axis): C412 vertical (pad 2 just below the line), 47 R horizontal
+    # under the TRF with its PH_STROBE pad east -> return via VA2 / VK2 (the north-west corner is free for the
+    # two PH_STROBE entries and their L6 dive vias, TOPOLOGY section 4)
+    # (A only: in K the TRF's pin-1 caps, which cannot be mirrored, occupy the axis side, and the K leg keeps
+    #  its column toward the south edge, which no longer carries an entry; equal length is solved to TRF pin 2)
+    if A:
+        two(C_IN, X_IN, YL + 1.00, "N", n_rfin)
+        two(R_IN, XR_IN, YR_IN, "E", PIN)
+    else:
+        two(C_IN, X_IN, my(YL - 1.00), "N", n_rfin)
+        two(R_IN, X_IN, my(YL - 2.87), "S", PIN)
     bplace(U, XT, yl + 0.25, 0)                          # pins 2 / 7 on the line (both chains: rotation 0)
     assert abs(blk.pad(U, "2")[1] - yl) < 1e-6
     two(FB, X1, yl - s * 0.48, NS("N"), n_bias)          # bead pad 1 centred on the corner, body away from the stub
@@ -123,9 +138,15 @@ def chain(s):
     two(C_OUT, XO, my(YL + 1.40), NS("N"), n_gout)
     two(D, XD, my(YS - 1.35), NS("S"), OUT)              # DNP clamp: cathode pad on the output row's edge
     # ---------------------------------------------------------------- RF tracks
-    y0 = 0.0 if A else BH
-    rf(PIN, [(X_IN, y0), (R_IN, "@" + PIN)], f"{PIN[1:]} input")
-    rf(n_in1, [(R_IN, "@" + n_in1), (C_IN, "@" + n_in1)], f"{U} in 1")
+    # L1 return segment of the PH_STROBE input: 47 R pad -> via (L6 -> L1), GND via beside it (mirrored)
+    v2, g2 = ((XV2, YR_IN), (XG2, YR_IN)) if A else ((X_IN, BH - 0.40), (1.15, BH - 0.40))
+    rf(PIN, [(R_IN, "@" + PIN), v2], f"{PIN[1:]} L1 return")
+    blk.via(*v2, PIN)
+    gv(*g2)
+    if A:
+        rf(n_in1, [(C_IN, "@" + n_in1), (X_IN, YR_IN - 0.20), (X_IN + 0.20, YR_IN), (R_IN, "@" + n_in1)], f"{U} in 1")
+    else:
+        rf(n_in1, [(R_IN, "@" + n_in1), (C_IN, "@" + n_in1)], f"{U} in 1")
     rf(n_rfin, [(C_IN, "@" + n_rfin), (X_IN, yl), (U, "2")], f"{U} RFIN")
     rf(n_rfout, [(U, "7"), (X1, yl)], f"{U} RFOUT")
     rf(n_rfout, [(X1, yl), (C_O, "@" + n_rfout)], f"{U} RFOUT b")   # 90-degree joint inside the bead pad
@@ -194,11 +215,8 @@ def chain(s):
     snap(C10U, "GND", y=gvs[0][1] - 0.15)
     ct = blk.pad(C10U, "@+3V3")
     blk.track("+3V3", W_PWR, [ct, (va[0] - abs(ct[1] - va[1]), ct[1]), va], layer="B.Cu")
-    two(CX, 0.60, yc - 0.15, "S", "+3V3", side="B")
-    cxp, cxg = blk.pad(CX, "@+3V3"), blk.pad(CX, "@GND")
-    blk.track("+3V3", 0.4, [cxp, (cxp[0], ct[1]), ct], layer="B.Cu", ch=0.06)
-    gt = blk.pad(C10U, "@GND")
-    blk.track("GND", 0.4, [cxg, (cxg[0], gt[1]), gt], layer="B.Cu")
+    # (the spare 100 nF CX moved to the bias-tee cold cap C434 / C435 below: the north-west B.Cu strip now
+    #  carries the PH_STROBE L6 lines)
     # ---------------------------------------------------------------- TRF bias tee on B.Cu (straight chain)
     pb = blk.pad(FB, "2")
     yt = my(YL - 1.80)
@@ -215,6 +233,12 @@ def chain(s):
     for d in (-0.75, 0.75):                               # +3V3 enters through the capacitor pad
         blk.via(cc[0], cc[1] + d, "+3V3")
     blk.track("+3V3", 0.56, [(cc[0], cc[1] - 0.75), (cc[0], cc[1] + 0.75)], layer="B.Cu")
+    # spare 100 nF CX on B below C434 / C435: +3V3 pad onto the cold cap's inner +3V3 via, own GND via
+    two(CX, cc[0], my(4.45), NS("N"), "+3V3", side="B")
+    cxp, cxg = blk.pad(CX, "@+3V3"), blk.pad(CX, "@GND")
+    blk.track("+3V3", 0.4, [cxp, (cc[0], cc[1] + s * 0.75)], layer="B.Cu")
+    blk.track("GND", W_GND, [cxg, (cxg[0], my(5.55))], layer="B.Cu")
+    gv(cxg[0], my(5.55))
     two(RD, pb[0] + 1.40, my(0.54), "W", n_bias, side="B")  # 1 k beside the 1210 (outer side)
     r1, r2 = blk.pad(RD, "@" + n_bias), blk.pad(RD, "@+3V3")
     l1 = blk.pad(L, "@" + n_bias)
@@ -258,10 +282,79 @@ def chain(s):
     blk.track("GND", 0.4, [g2, (g10[0], g2[1]), g10], layer="B.Cu", ch=0.12)
     blk.track("GND", W_GND, [g10, (g10[0] + 0.60, g10[1])], layer="B.Cu")
     gv(g10[0] + 0.60, g10[1])
-    return {"stub": l_st, "out": blk.route_len(f"{OUT[1:]} drop") + blk.route_len(f"{OUT[1:]} output"), "in": blk.route_len(f"{PIN[1:]} input")}
+    return {"stub": l_st, "out": blk.route_len(f"{OUT[1:]} drop") + blk.route_len(f"{OUT[1:]} output"),
+            "ret": blk.route_len(f"{PIN[1:]} L1 return"), "PIN": PIN,
+            "leg": blk.route_len(f"{U} in 1") + blk.route_len(f"{U} RFIN")}
 
 
 RES = {"A": chain(+1), "K": chain(-1)}
+
+# ============================================================================= PH_STROBE inputs (TOPOLOGY s. 4)
+# Both enter on the north edge on L1 (0.16 mm), take L1 -> via -> L6 -> via -> L1 and land on the 47 R of their
+# chain (netlist: PH_STROBE_P -> R407 chain A, PH_STROBE_N -> R411 chain K).  L6 over L5 (0.0994 mm 3313) is
+# the same microstrip as L1 over L2: 0.16 mm = 50.2 R, 5.925 ps/mm, so L1 and L6 millimetres add 1:1.
+# K: dives at the corner, runs down the west strip, passes under the trigger corridor in the clear B.Cu
+# channel at x 2.37 (phase C309 / GND vias end at 1.79, L302 pad 2 starts at 2.95) and surfaces at VK2.
+# A: same structure, its L6 detour is a U in the free B.Cu band between the 47 R row and the stub (solved for
+# equal total length).  A GND via stands beside every signal via.
+RFPOLY_B = []
+YV2A, YV2K = YR_IN, 2 * AX - YR_IN
+
+
+def l6(net, pts, name):
+    q = blk.track(net, W, pts, layer="B.Cu", name=name, z=50)
+    RFPOLY_B.append((q, W))
+    return q
+
+
+VA1, GA1 = (1.00, 1.35), (1.60, 0.95)
+VK1, GK1 = (X_N, 0.45), (1.70, 0.45)
+inA = rf("/PH_STROBE_P", [(X_P, 0.0), (X_P, 0.85), VA1], "PH_STROBE_P L1 entry")
+inK = rf("/PH_STROBE_N", [(X_N, 0.0), VK1], "PH_STROBE_N L1 entry")
+for v, n_ in ((VA1, "/PH_STROBE_P"), (VK1, "/PH_STROBE_N")):
+    blk.via(*v, n_)
+for g_ in (GA1, GK1):
+    gv(*g_)
+YV2K = BH - 0.40
+pts_K = [VK1, (0.80, 0.45), (0.45, 0.80), (0.45, 8.20), (X_KC, 8.20 + X_KC - 0.45), (X_KC, 15.95),
+         (X_KC - 0.30, 16.25), (X_IN + 0.30, 16.25), (X_IN, 16.55), (X_IN, YV2K)]
+
+
+N_SERP, P_SERP, Y_BOT, Y_RET = 7, 0.70, 9.00, 6.95   # A detour: serpentine on B.Cu, same-net gap 0.54 mm
+
+
+def pts_A(yt):
+    """VA1 -> west strip -> leg 0 down at x 2.45 -> N_SERP legs (pitch 0.7, between yt and Y_BOT, the last one
+    up to the return lane Y_RET) -> west along Y_RET -> 45 degrees into VA2"""
+    p = [VA1, (1.00, 5.60), (1.45, 6.05), (1.95, 6.05), (2.45, 6.55), (2.45, Y_BOT)]
+    x = 2.45
+    for i in range(1, N_SERP + 1):
+        x += P_SERP
+        p += [(x, p[-1][1])]
+        p += [(x, Y_RET if i == N_SERP else (yt if i % 2 else Y_BOT))]
+    return p + [(XV2 + Y_RET - YV2A, Y_RET), (XV2, YV2A)]
+
+
+def cl(pts):
+    return bl.plen(bl.chamfer(pts, 0.2) if len(pts) > 2 else pts)      # as blk.track draws it
+
+
+L_K = cl([(X_N, 0.0), VK1]) + cl(pts_K) + RES["K"]["ret"] + RES["K"]["leg"]       # north edge -> TRF pin 2
+fixedA = cl([(X_P, 0.0), (X_P, 0.85), VA1]) + RES["A"]["ret"] + RES["A"]["leg"]
+lo, hi = 7.45, Y_BOT - 0.45                     # amplitude: yt in [7.45, 8.55]; length falls as yt rises
+assert cl(pts_A(lo)) >= L_K - fixedA >= cl(pts_A(hi)), (cl(pts_A(lo)), L_K - fixedA, cl(pts_A(hi)))
+for _ in range(60):
+    mid = (lo + hi) / 2
+    lo, hi = (mid, hi) if cl(pts_A(mid)) > L_K - fixedA else (lo, mid)
+YT = (lo + hi) / 2
+XE = YT
+l6("/PH_STROBE_P", pts_A(YT), "PH_STROBE_P L6")
+l6("/PH_STROBE_N", pts_K, "PH_STROBE_N L6")
+INP = {}
+for k_, net_ in (("A", "PH_STROBE_P"), ("K", "PH_STROBE_N")):
+    e_, m_, r_ = (blk.route_len(f"{net_} L1 entry"), blk.route_len(f"{net_} L6"), blk.route_len(f"{net_} L1 return"))
+    INP[k_] = (e_, m_, r_, e_ + m_ + r_, RES[k_]["leg"], e_ + m_ + r_ + RES[k_]["leg"])
+assert abs(INP["A"][5] - INP["K"][5]) < 0.1, INP
 
 # ============================================================================= pours, keep-outs
 IN = 0.15
@@ -270,8 +363,11 @@ for r in REG.values():
     blk.zone("GND", ["In1.Cu"], r, clearance=0.2, prio=0)
     blk.zone("GND", ["F.Cu"], r, clearance=0.25, prio=0)
     blk.zone("GND", ["B.Cu"], r, clearance=0.25, prio=0)
+    blk.zone("GND", ["In4.Cu"], r, clearance=0.2, prio=0)        # L5: solid ground (reference of the L6 lines)
 for q, w in RFPOLY:
     blk.rf_keepout(q, w, gap=2 * w + 0.03)
+for q, w in RFPOLY_B:
+    blk.rf_keepout(q, w, gap=2 * w + 0.03, layer="B.Cu")
 
 # ============================================================================= 6L pad compensation
 # (same method as blocks/analog) pF/mm from boardlib.microstrip (mask corrected): L2 at H2 (3313, er 4.1); where
@@ -328,8 +424,11 @@ for f_ in blk.fps.values():
                         "L2 cut" if cut else "-", ((c_mm(across, H3) * along - c_line) if cut else ex2) * 1e3))
 
 # ============================================================================= interfaces, outline
-blk.iface("PH_STROBE_P", X_IN, 0.0, "F.Cu", "N", "pair", W, "chain A input, R407 47 R here; FPGA U501")
-blk.iface("PH_STROBE_N", X_IN, BH, "F.Cu", "S", "pair", W, "chain K input (mirror), R411 47 R here; match P/N")
+blk.iface("PH_STROBE_P", X_P, 0.0, "F.Cu", "N", "pair", W,
+          f"chain A (R407); board (10.00, 25.00); edge -> TRF pin 2 {INP['A'][5]:.3f} mm; FPGA U501 pin 40")
+blk.iface("PH_STROBE_N", X_N, 0.0, "F.Cu", "N", "pair", W,
+          f"chain K (R411); board (10.60, 25.00); edge -> TRF pin 2 {INP['K'][5]:.3f} mm (L6 under the corridor at "
+          f"board x 11.87); FPGA U501 pin 39")
 blk.iface("PSTRB_A", BW, 9.75, "F.Cu", "E", "rf50", W, "to phase tap 0 (phase iface 26.5 / 34.75 board)")
 blk.iface("PSTRB_K", BW, 15.25, "F.Cu", "E", "rf50", W, "to phase tap 0 (phase iface 26.5 / 40.25 board)")
 blk.iface("+3V3", 0, 0, "In3.Cu", "-", "supply", None, "TRF VCC and bias tees: via pairs, L4 (In3) x 0-12")
@@ -360,7 +459,11 @@ for nm in blk.routes:
         print(f"{nm:28s} {blk.routes[nm]['width']:5.2f} {L_:7.3f} {L_ * bl.PS_MM50:6.1f}")
 for k, r in RES.items():
     print(f"chain {k}: stub {r['stub']:.3f} mm = {r['stub'] * bl.PS_MM50:.1f} ps; output (C421/C431 pad -> edge) "
-          f"{r['out']:.3f} mm; input (edge -> 47 R) {r['in']:.3f} mm")
+          f"{r['out']:.3f} mm")
+for k, (e_, m_, r_, t_, lg_, tt_) in INP.items():
+    print(f"input {k}: L1 entry {e_:.3f} + L6 {m_:.3f} + L1 return {r_:.3f} = {t_:.3f} mm to the 47 R; + leg {lg_:.3f}"
+          f" = {tt_:.3f} mm = {tt_ * bl.PS_MM50:.2f} ps to TRF pin 2 (+ 2 vias)")
+print(f"input A-K mismatch to TRF pin 2 {(INP['A'][5] - INP['K'][5]) * 1e3:.1f} um; A serpentine top y {YT:.3f}")
 print("impedance (JLC06161H-3313, L1 over L2 h 0.0994 mm er 4.1, mask corrected; L6 over L5 identical)")
 for z_ in (50,):
     w_ = bl.width_for_6l(z_)
@@ -432,7 +535,7 @@ def render(png, layers, crop):
 if "--norender" not in sys.argv:
     lay = ("F.Cu", "B.Cu", "F.SilkS", "F.Fab", "Dwgs.User")
     render(os.path.join(HERE, "pstrobe.png"), lay, (-0.5, -0.5, 17.5, 25.5))
-    render(os.path.join(HERE, "pstrobe_detail.png"), lay, (-0.3, -0.3, 9.3, 9.8))
+    render(os.path.join(HERE, "pstrobe_detail.png"), ("F.Cu", "B.Cu", "F.Fab", "Dwgs.User"), (-0.3, -0.3, 9.3, 19.5))
     render(os.path.join(HERE, "pstrobe_detail_L1L2.png"), ("F.Cu", "In1.Cu", "F.Fab", "Dwgs.User"),
            (-0.3, 3.0, 17.3, 10.0))
     render(os.path.join(SCR, "pstrobe_f.png"), ("F.Cu", "F.Fab", "Dwgs.User"), (-0.5, -0.5, 17.5, 25.5))

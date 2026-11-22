@@ -4,23 +4,23 @@
  "ifaces": [
   {
    "net": "/PH_STROBE_P",
-   "x": 0.52,
+   "x": 0.5,
    "y": 0.0,
    "layer": "F.Cu",
    "side": "N",
    "class": "pair",
    "width": 0.16,
-   "note": "chain A input, R407 47 R here; FPGA U501"
+   "note": "chain A (R407); board (10.00, 25.00); edge -> TRF pin 2 30.512 mm; FPGA U501 pin 40"
   },
   {
    "net": "/PH_STROBE_N",
-   "x": 0.52,
-   "y": 25.0,
+   "x": 1.1,
+   "y": 0.0,
    "layer": "F.Cu",
-   "side": "S",
+   "side": "N",
    "class": "pair",
    "width": 0.16,
-   "note": "chain K input (mirror), R411 47 R here; match P/N"
+   "note": "chain K (R411); board (10.60, 25.00); edge -> TRF pin 2 30.512 mm (L6 under the corridor at board x 11.87); FPGA U501 pin 39"
   },
   {
    "net": "/PSTRB_A",
