@@ -135,11 +135,11 @@
       },
       {
         "netclass": "RF50",
-        "pattern": "/PH_STROBE_N"
+        "pattern": "/S_STROBE_N"
       },
       {
         "netclass": "RF50",
-        "pattern": "/PH_STROBE_P"
+        "pattern": "/S_STROBE_P"
       },
       {
         "netclass": "USB90",
