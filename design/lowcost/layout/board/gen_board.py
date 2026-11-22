@@ -325,9 +325,14 @@ for t in B.GetTracks():
     if t.GetClass() == "PCB_TRACK" and t.GetNetname() in RF and t.GetLayerName() == "F.Cu":
         m.rf_keepout([loc(t.GetStart()), loc(t.GetEnd())], pcbnew.ToMM(t.GetWidth()), layer="F.Cu")
 bf.planes(B, m)
+for z in list(B.Zones()):                          # L4 belongs to board_power.py (second agent): +3V3 background + islands
+    if not z.GetIsRuleArea() and z.IsOnLayer(pcbnew.In3_Cu) and z.GetNetname() == "+3V3":
+        B.Remove(z)
 for z in B.Zones():
     if not z.GetIsRuleArea():
         z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+import board_power
+board_power.apply(B)
 bf.silk(B, m)
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 bl.save_board(B, OUT)
