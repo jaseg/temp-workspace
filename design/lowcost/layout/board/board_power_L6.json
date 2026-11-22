@@ -1,4 +1,49 @@
 {
  "note": "B.Cu (L6) copper added by board_power.py, board mm",
- "items": []
+ "items": [
+  {
+   "net": "+2V5",
+   "kind": "maze",
+   "layer": "B.Cu",
+   "width": 0.6,
+   "pts": [
+    [
+     91.8,
+     22.6
+    ],
+    [
+     91.4,
+     22.2
+    ],
+    [
+     83.4,
+     22.2
+    ],
+    [
+     82.4,
+     21.2
+    ],
+    [
+     82.4,
+     20.0
+    ],
+    [
+     81.6,
+     19.2
+    ]
+   ]
+  },
+  {
+   "net": "+2V5",
+   "kind": "maze_via",
+   "layer": "all",
+   "dia": 0.45,
+   "pts": [
+    [
+     91.8,
+     22.6
+    ]
+   ]
+  }
+ ]
 }
