@@ -289,8 +289,8 @@ for k in range(NT // 2):
             V(xcap - 0.7, cp[1] + dy, "+3V3")
         T("+3V3", 0.45, [cp, (xcap - 0.4, cp[1]), (xcap - 0.7, cp[1] - 0.3), (xcap - 0.7, cp[1] - 1.05)], ch=0)
         if k == 4:      # U309: cap GND via 0.53 mm west, clear of the JTAG drop at board x 62.5
-            gq = (xcap - 0.7, cg[1] - 0.65)          # above the +3V3 via pair, west of the JTAG drop, below TAP7's lane
-            gv(*gq)
+            gq = (xcap - 0.43, cg[1] - 0.65)         # NE of the +3V3 via pair (power clearance 0.15), west of the
+            gv(*gq)                                  # JTAG drop (board x 62.5), below TAP7's lane (y 22.66)
             T("GND", W_GND, [cg, (xcap, cg[1] - 0.35), (xcap - 0.3, cg[1] - 0.65), gq], ch=0)
         else:
             gv(xcap, cg[1] - 0.62)

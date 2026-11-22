@@ -569,16 +569,18 @@ TRUNKS = {
         ([(76.45, 14.5), (83.0, 14.5), (87.4, 10.1), (87.4, 6.05)], 1.5),
     ],
     "+5V": [   # second: y 3 along the top, down at x 15 to the BUF802 / servo supply vias
-        ([(74.45, 12.6), (73.3, 11.45), (73.3, 3.8), (72.5, 3.0), (16.8, 3.0), (15.0, 4.8), (15.0, 8.2)], 1.5),
+        ([(74.45, 12.6), (73.3, 11.45), (73.3, 3.8), (72.5, 3.0), (16.8, 3.0), (15.0, 4.8), (15.0, 8.2), (13.9, 9.3)], 1.5),
         ([(74.95, 19.2), (73.3, 17.55), (73.3, 11.45)], 1.5),
     ],
-    "+1V2": [  # power block LDO -> FPGA (the fpga block's own L4 +1V2 island stays)
+    "+1V2": [  # power block LDO -> FPGA, all on L3 (no +1V2 copper on L4)
         ([(81.5, 21.4), (75.8, 21.4), (75.25, 21.95)], 1.5),
         ([(75.25, 21.95), (74.5, 21.2), (71.5, 21.2), (69.25, 18.95), (69.25, 16.4)], 1.5),
+        ([(69.25, 16.4), (68.45, 15.6), (68.45, 14.5), (62.75, 8.8), (61.05, 8.8)], 1.0),
     ],
     "+2V5": [  # band y 23.2 (north member), then down x 6 to the trigger front chain
         ([(74.45, 16.2), (75.8, 17.55), (78.4, 17.55), (79.85, 19.0), (81.5, 19.0), (82.7, 20.2), (82.7, 22.4),
           (81.9, 23.2), (6.8, 23.2), (6.0, 24.0), (6.0, 28.5)], 1.5),
+        ([(28.5, 23.2), (28.5, 9.4), (27.8, 8.7), (27.15, 8.7)], 1.0),     # hold amplifier
     ],
     "-2V5": [  # band y 25.0, down x 13 / x 5.2 west of the pstrobe column, along the bottom, east on y 47
         ([(83.75, 18.5), (84.6, 19.35), (84.6, 24.2), (83.8, 25.0), (13.8, 25.0), (13.0, 25.8), (13.0, 29.4),
@@ -605,9 +607,47 @@ def _org(board):
     return b[0], b[1]
 
 
+def _old_arrays(board, names):
+    """vias of rail nets that form a straight 3-via array at 0.8 mm pitch (earlier board_power output)."""
+    by = {}
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_VIA" and t.GetNetname() in names:
+            p = t.GetPosition()
+            by.setdefault(t.GetNetname(), []).append((p.x / MM, p.y / MM, t))
+    kill = set()
+    for n, vs in by.items():
+        for a in vs:
+            for b in vs:
+                if b is a:
+                    continue
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                if abs(math.hypot(dx, dy) - VIA_PITCH) > 0.02:
+                    continue
+                for c in vs:
+                    if abs(c[0] - (b[0] + dx)) < 0.02 and abs(c[1] - (b[1] + dy)) < 0.02:
+                        kill.update([id(a[2]), id(b[2]), id(c[2])])
+                        kill_items[id(a[2])] = a[2]
+                        kill_items[id(b[2])] = b[2]
+                        kill_items[id(c[2])] = c[2]
+    return [kill_items[k] for k in kill]
+
+
+kill_items = {}
+
+
 def remove_old(board, nets):
-    """In3: delete every copper zone except +3V3 and the fpga block's +1V2 island; drop own earlier output."""
+    """In3: delete every copper zone except +3V3; drop earlier board_power output (L3/L4 zones, 3-via arrays,
+    0.8 / 1.5 mm L3 tracks and the L6 J501 feed of the rail nets)."""
     ox, oy = _org(board)
+    names = set(nets.values()) - {BACKGROUND}
+    kill_items.clear()
+    for v in _old_arrays(board, names):
+        board.Delete(v)
+    old_t = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() in names and
+             ((t.GetLayer() == L3 and round(t.GetWidth() / MM, 2) in (0.8, 1.0, 1.5)) or
+              (t.GetLayer() == pcbnew.B_Cu and t.GetNetname() == "VBUS" and round(t.GetWidth() / MM, 2) == 0.5))]
+    for t in old_t:
+        board.Delete(t)
     kill = []
     for z in board.Zones():
         nm = str(z.GetZoneName())
@@ -622,7 +662,8 @@ def remove_old(board, nets):
             bb = z.GetBoundingBox()
             inside = (FPGA_RECT[0] <= bb.GetX() / MM - ox and bb.GetRight() / MM - ox <= FPGA_RECT[2] and
                       FPGA_RECT[1] <= bb.GetY() / MM - oy and bb.GetBottom() / MM - oy <= FPGA_RECT[3])
-            if z.GetNetname() == "+1V2" and inside:
+            if z.GetNetname() == BACKGROUND:
+                kill.append(z)          # re-created whole-board below
                 continue
             kill.append(z)
     for z in kill:
