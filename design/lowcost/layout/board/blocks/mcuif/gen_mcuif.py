@@ -15,6 +15,7 @@ interface stubs within 0.5 mm of y 0.  Hand-drawn, planned fan-out (no router). 
 B.Cu lane order leaving the west side (N->S): BOOT0, RX, TX, DBG1, NRST, VREFP, BIAS_K, BIAS_A, VOFS, DAC_TRIG.
 The J501 bus (RX, TX, DBG1, NRST) enters the north-row pins from above; JTAG leaves the south row on F.Cu."""
 import sys, os, math, json
+os.environ["BL_STACKUP"] = "6L"            # native 6-layer block (JLC06161H-3313): supplies land on L4 (In3)
 sys.path.insert(0, "../..")
 import pcbnew
 import boardlib as bl
@@ -37,7 +38,7 @@ def zdiff(w, s):
     return 2 * z0 * (1 - 0.48 * math.exp(-0.96 * s / bl.H)), z0, ee
 
 
-W90, S90 = 0.295, 0.205
+W90, S90 = 0.19, 0.31                       # 90 R pair at the 0.5 mm pin pitch, microstrip over L2 0.0994 mm
 ZD, Z0U, EEU = zdiff(W90, S90)
 
 
@@ -435,7 +436,7 @@ for k in (5, 7, 9, 11, 13):
 for ref, net, sup in (("R725", "/VTAP_P", "+2V5"), ("R726", "/VTAP_N", "-2V5")):
     a, s = P(ref, "@" + net), P(ref, "@" + sup)
     T(net, 0.4, [a, (a[0], 0.85)])
-    stub(net, a[0], 0.85, 0.4, f"{ref} 0 R from {sup} (In2 via pair at the part)", cls="supply")
+    stub(net, a[0], 0.85, 0.4, f"{ref} 0 R from {sup} (L4 via pair at the part)", cls="supply")
     T(sup, 0.4, [s, (s[0], 4.85)])
     V(sup, (s[0], 4.15), (s[0], 4.85))
 la, lk = P("R730", "@LED"), P("R730", "@Net-(D701-K)")
@@ -496,7 +497,7 @@ blk.zone("GND", ["In1.Cu"], bl.rect_pts(0, 0, W, H - 0.5), 0.2)
 blk.zone("GND", ["F.Cu"], bl.rect_pts(0, 0.5, W, H - 0.5), 0.2, minw=0.2)
 blk.zone("GND", ["B.Cu"], bl.rect_pts(0, 0.5, W, H - 0.5), 0.2, minw=0.2)
 for n in ("+3V3", "+2V5", "-2V5", "VBUS"):
-    blk.iface(n, 0, 0, "In2.Cu", "-", "supply", None, "via pairs at the caps / THT pins of J501; In2 region by the integrator")
+    blk.iface(n, 0, 0, "In3.Cu", "-", "supply", None, "via pairs at the caps / THT pins of J501; L4 (In3) region by the integrator")
 blk.edge_rect(0, 0, W, H, "Dwgs.User")
 blk.save(HERE)
 path = os.path.join(HERE, "mcuif.kicad_pcb")

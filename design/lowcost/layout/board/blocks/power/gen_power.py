@@ -7,6 +7,7 @@ Local mm, origin = block top-left = board (74, 0); +x east (J601 on the board's 
 Run: cd blocks/power && python3 gen_power.py [--norender]
 """
 import sys, os, math
+os.environ["BL_STACKUP"] = "6L"            # native 6-layer block (JLC06161H-3313, RULES rule 10): supplies land on L4 (In3)
 sys.path.insert(0, "../..")
 import boardlib as bl
 import pcbnew
@@ -18,7 +19,7 @@ BW, BH = 26.0, 22.5
 HOLE = (23.0, 3.0)                       # M3 hole at board (97, 3): keep 3.5 mm
 blk = bl.Block("power")
 nl = blk.nl
-W_USB, S_USB = 0.25, 0.15                # 90 R edge-coupled pair (IPC-2141: 91 R), see diff90()
+W_USB, S_USB = 0.18, 0.22                # 90 R edge-coupled microstrip over L2 at 0.0994 mm (IPC-2141: 89 R), pitch 0.40 kept
 WP, WS = 0.6, 0.25                       # power / signal track widths
 VD, VDR = 0.6, 0.3                       # power vias
 
@@ -163,7 +164,7 @@ for nm_, r_ in blk.routes.items():
     if r_["net"] in (DP, DM):
         for q in r_["pts"]:
             blk.rf_keepout(q, W_USB, gap=2 * W_USB)
-blk.iface(DP, 8.6, BH, "F.Cu", "S", "pair", W_USB, "90 R pair to U704.34 (mcuif); pitch 0.40, w 0.25 / s 0.15")
+blk.iface(DP, 8.6, BH, "F.Cu", "S", "pair", W_USB, "90 R pair to U704.34 (mcuif); pitch 0.40, w 0.18 / s 0.22 (6L)")
 blk.iface(DM, 9.0, BH, "F.Cu", "S", "pair", W_USB, "90 R pair to U704.33 (mcuif)")
 # --- CC pull-downs (B side)
 T("/power/CC2", [(17.81, 11.75), (16.7, 11.75)], WS)
@@ -193,7 +194,7 @@ T("GND", [("D601", "1"), (23.0, 18.0)], 0.8)
 G(22.2, 22.1); G(23.8, 22.1)
 T("VBUS", [("FB601", "2"), (13.45, 19.0), (14.0, 18.45), (14.0, 17.4)], 0.8)
 V(14.0, 18.3, "VBUS"); V(14.0, 17.4, "VBUS")
-blk.iface("VBUS", 14.0, 17.85, "In2", "S", "supply", None, "via pair at FB601; VBUS In2 strip along the S edge (pstrobe GVA chokes)")
+blk.iface("VBUS", 14.0, 17.85, "In3.Cu", "S", "supply", None, "via pair at FB601; VBUS L4 strip along the S edge (pstrobe GVA chokes)")
 # --- VBUS on B.Cu: FB601 vias -> C602 / C601 -> U601.3 and up to the boost (vias beside C603 / U603.5)
 Z("VBUS", "B.Cu", [(7.0, 6.0), (9.6, 6.0), (9.6, 4.9), (11.0, 4.9), (11.0, 6.0), (13.95, 6.0), (13.95, 16.6),
                    (14.4, 16.6), (14.4, 18.9), (13.25, 18.9), (13.25, 9.4), (7.0, 9.4)], prio=4)
@@ -218,7 +219,7 @@ T("GND", [("C606", "2"), (3.85, 0.54)], WS, "B.Cu"); G(3.85, 0.54)
 G(12.3, 2.4)
 for k in (5.0, 6.0):
     blk.via(0.45, k, "+3V3")
-blk.iface("+3V3", 0.45, 5.5, "In2", "W", "supply", None, "via pair from the U601 tab polygon (B.Cu)")
+blk.iface("+3V3", 0.45, 5.5, "In3.Cu", "W", "supply", None, "via pair from the U601 tab polygon (B.Cu)")
 # --- +5V4F: FB602.2 -> F polygon over the LDO inputs; F track east -> via -> B -> U605.1 / C623 / EN
 T("/power/+5V4F", [("FB602", "2"), (5.0, 9.6)], WP)
 V(5.0, 9.6, "/power/+5V4F")
@@ -247,7 +248,7 @@ T("/power/VFB_N5", [("U605", "5"), (17.1, 3.75), (17.6, 4.25), ("R606", "1")], W
 T("/power/VFB_N5", [("R605", "2"), (17.6, 4.75)], WS)
 T("GND", [("R606", "2"), (17.6, 6.4)], WS); G(17.6, 6.4)
 T("GND", [("C620", "2"), (14.3, 6.0), (14.1, 6.2)], WS)
-# -5V: FB603.2 -> via pair (In2 iface) -> B: C627 / C622
+# -5V: FB603.2 -> via pair (L4 iface) -> B: C627 / C622
 T("-5V", [("FB603", "2"), (15.72, 9.3)], 0.5)
 V(15.72, 9.3, "-5V"); V(16.8, 8.46, "-5V")
 T("-5V", [("FB603", "2"), (16.8, 8.46)], 0.5)
@@ -255,7 +256,7 @@ T("-5V", [(15.72, 9.3), (15.72, 6.2)], 0.5, "B.Cu")
 for c in ("C622", "C627"):
     x, y = blk.pad(c, "2")
     T("GND", [(x, y), (14.1, y)], WS, "B.Cu"); G(14.1, y)
-blk.iface("-5V", 15.72, 9.3, "In2", "W", "supply", None, "via pair at FB603; In2 tongue to U607 tab and W along the top band")
+blk.iface("-5V", 15.72, 9.3, "In3.Cu", "W", "supply", None, "via pair at FB603; L4 tongue to U607 tab and W along the top band")
 # --- LDO stack (F): GND pins -> via under the body, outputs west to the caps and iface vias
 for u, y in LDO.items():
     T("GND", [(u, "2"), (3.2, y)], WS); blk.via(3.2, y, "GND")
@@ -271,9 +272,9 @@ T("+2V5", [("C624", "1"), (0.45, 16.2)], WP); blk.via(0.45, 16.2, "+2V5")
 T("+1V2", [("U602", "5"), (1.25, 21.15)], WP)
 T("+1V2", [(1.25, 21.15), ("C608", "1")], WP)
 T("+1V2", [(1.25, 21.15), (1.25, 21.95)], WP); blk.via(1.25, 21.95, "+1V2")
-blk.iface("+5V", 0.45, 12.6, "In2", "W", "supply", None, "via at C616 (+ B bulk C617); In2 tongue W to the input stage")
-blk.iface("+2V5", 0.45, 16.2, "In2", "W", "supply", None, "via at C624 (+ B bulk C625)")
-blk.iface("+1V2", 1.25, 21.95, "In2", "W", "supply", None, "via at C608 (+ B bulk C609)")
+blk.iface("+5V", 0.45, 12.6, "In3.Cu", "W", "supply", None, "via at C616 (+ B bulk C617); L4 tongue W to the input stage")
+blk.iface("+2V5", 0.45, 16.2, "In3.Cu", "W", "supply", None, "via at C624 (+ B bulk C625)")
+blk.iface("+1V2", 1.25, 21.95, "In3.Cu", "W", "supply", None, "via at C608 (+ B bulk C609)")
 Z("+3V3", "F.Cu", [(4.55, 18.7), (7.0, 18.7), (7.0, 21.9), (4.55, 21.9)], prio=3)
 blk.via(6.6, 19.0, "+3V3")
 T("GND", [("C607", "2"), (6.25, 21.6), (5.75, 22.1), (5.6, 22.1)], WS); G(5.6, 22.1)
@@ -297,7 +298,7 @@ T("-2V5", [(10.22, 18.7), ("C629", "1")], 0.5, "B.Cu")
 V(9.75, 18.0, "-2V5"); V(9.75, 19.0, "-2V5")
 T("-2V5", [(9.75, 18.0), (9.75, 19.0)], 0.5, "B.Cu")
 T("-2V5", [(9.75, 18.5), (10.22, 18.5)], 0.5, "B.Cu")
-blk.iface("-2V5", 9.75, 18.5, "In2", "S", "supply", None, "via pair at C628 / R607 (B)")
+blk.iface("-2V5", 9.75, 18.5, "In3.Cu", "S", "supply", None, "via pair at C628 / R607 (B)")
 T("GND", [("R608", "2"), (10.2, 9.4)], WS, "B.Cu")
 T("GND", [("C602", "2"), (9.3, 8.7)], WS, "B.Cu")
 T("VBUS", [(15.1, 13.5), (13.6, 13.5)], 0.4, "B.Cu")

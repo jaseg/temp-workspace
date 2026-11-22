@@ -9,8 +9,8 @@
    "layer": "F.Cu",
    "side": "S",
    "class": "pair",
-   "width": 0.25,
-   "note": "90 R pair to U704.34 (mcuif); pitch 0.40, w 0.25 / s 0.15"
+   "width": 0.18,
+   "note": "90 R pair to U704.34 (mcuif); pitch 0.40, w 0.18 / s 0.22 (6L)"
   },
   {
    "net": "/USB_DM",
@@ -19,24 +19,24 @@
    "layer": "F.Cu",
    "side": "S",
    "class": "pair",
-   "width": 0.25,
+   "width": 0.18,
    "note": "90 R pair to U704.33 (mcuif)"
   },
   {
    "net": "VBUS",
    "x": 14.0,
    "y": 17.85,
-   "layer": "In2",
+   "layer": "In3.Cu",
    "side": "S",
    "class": "supply",
    "width": null,
-   "note": "via pair at FB601; VBUS In2 strip along the S edge (pstrobe GVA chokes)"
+   "note": "via pair at FB601; VBUS L4 strip along the S edge (pstrobe GVA chokes)"
   },
   {
    "net": "+3V3",
    "x": 0.45,
    "y": 5.5,
-   "layer": "In2",
+   "layer": "In3.Cu",
    "side": "W",
    "class": "supply",
    "width": null,
@@ -46,27 +46,27 @@
    "net": "-5V",
    "x": 15.72,
    "y": 9.3,
-   "layer": "In2",
+   "layer": "In3.Cu",
    "side": "W",
    "class": "supply",
    "width": null,
-   "note": "via pair at FB603; In2 tongue to U607 tab and W along the top band"
+   "note": "via pair at FB603; L4 tongue to U607 tab and W along the top band"
   },
   {
    "net": "+5V",
    "x": 0.45,
    "y": 12.6,
-   "layer": "In2",
+   "layer": "In3.Cu",
    "side": "W",
    "class": "supply",
    "width": null,
-   "note": "via at C616 (+ B bulk C617); In2 tongue W to the input stage"
+   "note": "via at C616 (+ B bulk C617); L4 tongue W to the input stage"
   },
   {
    "net": "+2V5",
    "x": 0.45,
    "y": 16.2,
-   "layer": "In2",
+   "layer": "In3.Cu",
    "side": "W",
    "class": "supply",
    "width": null,
@@ -76,7 +76,7 @@
    "net": "+1V2",
    "x": 1.25,
    "y": 21.95,
-   "layer": "In2",
+   "layer": "In3.Cu",
    "side": "W",
    "class": "supply",
    "width": null,
@@ -86,7 +86,7 @@
    "net": "-2V5",
    "x": 9.75,
    "y": 18.5,
-   "layer": "In2",
+   "layer": "In3.Cu",
    "side": "S",
    "class": "supply",
    "width": null,

@@ -230,7 +230,7 @@
    "side": "N",
    "class": "supply",
    "width": 0.4,
-   "note": "R725 0 R from +2V5 (In2 via pair at the part)"
+   "note": "R725 0 R from +2V5 (L4 via pair at the part)"
   },
   {
    "net": "/VTAP_N",
@@ -240,7 +240,7 @@
    "side": "N",
    "class": "supply",
    "width": 0.4,
-   "note": "R726 0 R from -2V5 (In2 via pair at the part)"
+   "note": "R726 0 R from -2V5 (L4 via pair at the part)"
   },
   {
    "net": "/FPGA_RECONFIG",
@@ -269,8 +269,8 @@
    "layer": "F.Cu",
    "side": "N",
    "class": "pair",
-   "width": 0.295,
-   "note": "90 R diff (w 0.295 s 0.205) from J601 / U608; 9.57 mm in block"
+   "width": 0.19,
+   "note": "90 R diff (w 0.19 s 0.31) from J601 / U608; 9.57 mm in block"
   },
   {
    "net": "/USB_DM",
@@ -279,48 +279,48 @@
    "layer": "F.Cu",
    "side": "N",
    "class": "pair",
-   "width": 0.295,
+   "width": 0.19,
    "note": "90 R diff; 9.57 mm in block"
   },
   {
    "net": "+3V3",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "via pairs at the caps / THT pins of J501; In2 region by the integrator"
+   "note": "via pairs at the caps / THT pins of J501; L4 (In3) region by the integrator"
   },
   {
    "net": "+2V5",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "via pairs at the caps / THT pins of J501; In2 region by the integrator"
+   "note": "via pairs at the caps / THT pins of J501; L4 (In3) region by the integrator"
   },
   {
    "net": "-2V5",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "via pairs at the caps / THT pins of J501; In2 region by the integrator"
+   "note": "via pairs at the caps / THT pins of J501; L4 (In3) region by the integrator"
   },
   {
    "net": "VBUS",
    "x": 0,
    "y": 0,
-   "layer": "In2.Cu",
+   "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "via pairs at the caps / THT pins of J501; In2 region by the integrator"
+   "note": "via pairs at the caps / THT pins of J501; L4 (In3) region by the integrator"
   }
  ]
 }
