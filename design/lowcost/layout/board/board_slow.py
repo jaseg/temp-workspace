@@ -207,6 +207,7 @@ def draw(B, m, ifs, vtap_th_end, log=print):
     returns {net: [ok, length mm, vias]}"""
     res = {}
     vias = {}
+    before = {t.m_Uuid.AsString() for t in B.GetTracks()}
     for net, ys, lx, via in EAST:
         sx, sy = ifs[net]
         end = via if via else vtap_th_end
@@ -240,4 +241,12 @@ def draw(B, m, ifs, vtap_th_end, log=print):
             log(f"slow line {net}: no L3 path {a} -> {b}")
             continue
         res[net][1] += plen(q)
+    # a line that could not be completed is removed again (no dangling half-routes)
+    for net, v in res.items():
+        if v[0]:
+            continue
+        for t in list(B.GetTracks()):
+            if t.GetNetname() == net and t.m_Uuid.AsString() not in before:
+                B.Remove(t)
+        v[1], v[2] = 0.0, 0
     return {k: (v[0], round(v[1], 2), v[2]) for k, v in res.items()}

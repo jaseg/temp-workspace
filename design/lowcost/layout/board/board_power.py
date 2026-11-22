@@ -1594,6 +1594,67 @@ def pad_axis_ends(board, net, line, layer):
     return line
 
 
+def fix_corners(board, rails, passes=3):
+    """Chamfer every degree-2 joint sharper than 45 degrees on the L3 / L6 tracks of the rail nets (outside pads):
+    both legs are shortened by c and a 45-degree-ish connecting segment is added."""
+    sys.path.insert(0, __file__.rsplit("/", 1)[0])
+    import boardlib as bl
+    names = set(rails)
+    fixed = 0
+    for _ in range(passes):
+        pads = [pd for f in board.GetFootprints() for pd in f.Pads() if pd.GetNetname() in names]
+        ends = {}
+        for t in board.GetTracks():
+            if t.GetClass() != "PCB_TRACK" or t.GetNetname() not in names or t.GetLayer() not in (L3, pcbnew.B_Cu):
+                continue
+            for which in ("s", "e"):
+                q = t.GetStart() if which == "s" else t.GetEnd()
+                ends.setdefault((t.GetNetname(), t.GetLayer(), q.x, q.y), []).append((t, which))
+        changed = False
+        for (n, l, x, y), lst in ends.items():
+            if len(lst) != 2:
+                continue
+            if any(pd.GetNetname() == n and pd.IsOnLayer(l) and pd.HitTest(pcbnew.VECTOR2I(x, y)) for pd in pads):
+                continue
+            others = []
+            for t, which in lst:
+                o = t.GetEnd() if which == "s" else t.GetStart()
+                others.append((o.x, o.y))
+            tdeg = bl.turn_deg(others[0], (x, y), others[1])
+            if tdeg <= 45.5:
+                continue
+            (t1, w1), (t2, w2) = lst
+            L1 = math.hypot(others[0][0] - x, others[0][1] - y)
+            L2 = math.hypot(others[1][0] - x, others[1][1] - y)
+            if tdeg > 150:                         # reversal: the shorter leg overlaps the longer one: drop it
+                short, sw = (t1, w1) if L1 < L2 else (t2, w2)
+                board.Delete(short)
+                fixed += 1
+                changed = True
+                break
+            c = min(fmm(0.25), L1 / 2.01, L2 / 2.01)
+            p1 = (int(x + (others[0][0] - x) * c / L1), int(y + (others[0][1] - y) * c / L1))
+            p2 = (int(x + (others[1][0] - x) * c / L2), int(y + (others[1][1] - y) * c / L2))
+            for (t, which), p_ in ((lst[0], p1), (lst[1], p2)):
+                if which == "s":
+                    t.SetStart(pcbnew.VECTOR2I(*p_))
+                else:
+                    t.SetEnd(pcbnew.VECTOR2I(*p_))
+            nt = pcbnew.PCB_TRACK(board)
+            nt.SetStart(pcbnew.VECTOR2I(*p1))
+            nt.SetEnd(pcbnew.VECTOR2I(*p2))
+            nt.SetWidth(min(t1.GetWidth(), t2.GetWidth()))
+            nt.SetLayer(l)
+            nt.SetNetCode(t1.GetNetCode())
+            board.Add(nt)
+            _ADDED.append((n, l, [(p1[0] / MM, p1[1] / MM), (p2[0] / MM, p2[1] / MM)], nt.GetWidth() / MM))
+            fixed += 1
+            changed = True
+        if not changed:
+            break
+    return fixed
+
+
 def selfcheck(board):
     """DRC-like check of the copper added by apply(): clearance (< 0.2 mm, crossings included) of every added
     track against foreign tracks / vias / pads on its layer, joints sharper than 45 degrees, ends inside pads
@@ -1668,7 +1729,11 @@ def selfcheck(board):
     return dict(clearance=clr, corners=corner, pad_axis=axis)
 
 
-TRUNK_RAILS = ["VBUS", "+5V", "-5V"]   # apply_trunks(): drawn before the slow bias lines
+TRUNK_RAILS = ["+1V2", "-5V", "+5V", "VBUS"]   # apply_trunks() (in this order), before the slow bias lines
+# escapes of the +/-2V5 regulator outputs out of the power block, reserved in the trunk stage
+ESCAPES = {"-2V5": [([(83.75, 18.5), (84.6, 19.35), (84.6, 24.2), (83.8, 25.0), (76.0, 25.0)], 1.5)],
+           "+2V5": [([(74.45, 16.2), (75.8, 17.55), (78.4, 17.55), (79.85, 19.0), (81.5, 19.0), (82.7, 20.2),
+                      (82.7, 22.4), (81.9, 23.2), (74.0, 23.2)], 1.5)]}
 EDGE_STRIP_NETS = ("VBUS", "+5V", "-5V")
 MAZE_WIDTHS_NET = {"VBUS": (1.5, 1.2, 1.0, 0.8)}   # VBUS ~220 mA: 0.8 only as a reported last resort
 BRANCH_W_NET = {"VBUS": 1.0}
@@ -1936,6 +2001,10 @@ def apply(board, json_path=None, png_path=None, stage="all"):
         report["strip_problems"] = "VTAP L3 tracks already on the board: kept"
     corr = {r: [([(x + ox, y + oy) for x, y in line], w) for line, w in lst]
             for r, lst in TRUNKS.items() if r in nets and r in sel}
+    if stage == "trunks":
+        for r, lst in ESCAPES.items():
+            if r in nets:
+                corr[r] = [([(x + ox, y + oy) for x, y in line], w) for line, w in lst]
     if ROUTE_CORRIDORS:
         corr = route_corridors(board, nets, corr, report)
     pts = landing_points(board, nets)
@@ -1944,10 +2013,10 @@ def apply(board, json_path=None, png_path=None, stage="all"):
         for i in range(shp.OutlineCount()):
             sub = pcbnew.SHAPE_POLY_SET()
             sub.AddOutline(shp.Outline(i))
-            new_zone(board, nets[rail], sub, PRIO_L3, f"L3_{rail}_{i}", L3)
+            new_zone(board, nets[rail], sub, PRIO_L3, f"L3_{rail}_{stage}_{i}", L3)
             occ.append(dict(net=nets[rail], kind="zone", layer="In2.Cu",
                             pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in poly_points(sub, 0)]))
-    br = _branches(board, nets, pts, corr, report)
+    br = _branches(board, nets, pts, {r: v for r, v in corr.items() if r in sel}, report)
     for rail, lines in br.items():
         for line in lines:
             line = pad_axis_ends(board, nets[rail], smooth45(line), L3)
@@ -1979,13 +2048,16 @@ def apply(board, json_path=None, png_path=None, stage="all"):
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     maze_connect(board, nets, report, l6occ, occ, rails=(sel if stage == "trunks" else None),
                  strips=(stage != "trunks"))
+    report["corners_fixed"] = report.get("corners_fixed", 0) + fix_corners(board, [nets[r] for r in ISLANDS if r in nets])
+    board.BuildConnectivity()
+    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     if stage == "trunks":
         res_items = []
         for it in occ + l6occ:
             res_items.append(it)
         for z in board.Zones():
             nm = str(z.GetZoneName())
-            if nm.startswith("L4_edge_") or (nm.startswith("L3_") and z.GetNetname() in [nets[r] for r in sel]):
+            if nm.startswith("L4_edge_") or (nm.startswith("L3_") and "_trunks_" in nm):
                 o = z.Outline()
                 for i in range(o.OutlineCount()):
                     res_items.append(dict(net=z.GetNetname(), kind="zone",

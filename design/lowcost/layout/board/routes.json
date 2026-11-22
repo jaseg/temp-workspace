@@ -286,31 +286,31 @@
    "/ADC_REF_MID",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   44.34
+   0.0
   ],
   [
    "/DAC_TRIG",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   45.33
+   0.0
   ],
   [
    "/VOFS",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   44.69
+   0.0
   ],
   [
    "/VBIAS_A",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   51.64
+   0.0
   ],
   [
    "/VBIAS_K",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   53.82
+   0.0
   ],
   [
    "/VTAP_TH",
@@ -322,19 +322,19 @@
    "/TRIG_SEL",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   56.46
+   0.0
   ],
   [
    "/ADC_IN",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   60.58
+   0.0
   ],
   [
    "/VNEG_REF",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   21.36
+   0.0
   ]
  ],
  "not_placed": [
@@ -379,11 +379,15 @@
   "/BUF_OUT_T": 0.16
  },
  "stitch": {
-  "beside signal vias": 36,
+  "beside signal vias": 27,
   "RF fences": 12,
-  "grid": 305,
-  "signal vias without a ground via": 4,
+  "grid": 323,
+  "signal vias without a ground via": 5,
   "lacking": [
+   [
+    73.0,
+    23.25
+   ],
    [
     4.6,
     41.0
