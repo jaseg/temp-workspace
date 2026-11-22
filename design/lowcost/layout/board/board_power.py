@@ -875,7 +875,7 @@ def net_components(board, names):
                 continue
             if isinstance(it, pcbnew.PAD):
                 q = it.GetPosition()
-                desc = ("pad", f"{it.GetParentFootprint().GetReference()}.{it.GetNumber()}", q.x / MM, q.y / MM,
+                desc = ("pad", f"{pcbnew.Cast_to_FOOTPRINT(it.GetParent()).GetReference() if hasattr(pcbnew, 'Cast_to_FOOTPRINT') else it.GetParentAsString()}.{it.GetNumber()}", q.x / MM, q.y / MM,
                         it.GetAttribute() == pcbnew.PAD_ATTRIB_PTH, it.IsOnLayer(pcbnew.B_Cu))
             elif it.GetClass() == "PCB_VIA":
                 q = it.GetPosition()
