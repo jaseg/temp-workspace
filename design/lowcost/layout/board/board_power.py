@@ -1574,6 +1574,7 @@ def selfcheck(board):
     return dict(clearance=clr, corners=corner, pad_axis=axis)
 
 
+EDGE_STRIP_ONE = True     # one rail at most on the L4 top-edge strip
 EDGE_STRIP = (0.3, 2.3)    # board y of the L4 edge strip (top edge); +3V3 plane stays one piece below it
 
 
@@ -1585,7 +1586,7 @@ def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
     left = []
     done_nets = set()
     for net, items, why in still:
-        if net in done_nets:
+        if net in done_nets or (done_nets and EDGE_STRIP_ONE):
             left.append((net, items, why))
             continue
         done_nets.add(net)
@@ -1607,7 +1608,7 @@ def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
         y0, y1 = oy + EDGE_STRIP[0], oy + EDGE_STRIP[1]
         shp = polyset([(x0 + 0.5, y0), (x1 - 0.5, y0), (x1, y0 + 0.5), (x1, y1 - 0.5), (x1 - 0.5, y1),
                        (x0 + 0.5, y1), (x0, y1 - 0.5), (x0, y0 + 0.5)])
-        new_zone(board, net, shp, PRIO_ISLAND, f"L4_edge_{net}", LAYER)
+        ez = new_zone(board, net, shp, PRIO_ISLAND, f"L4_edge_{net}", LAYER)
         occ.append(dict(net=net, kind="L4_edge_strip", layer="In3.Cu", pts=[(round(x0 - ox, 2), round(y0 - oy, 2)),
                                                                             (round(x1 - ox, 2), round(y1 - oy, 2))]))
         M = Maze(board)
@@ -1653,6 +1654,8 @@ def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
         report.setdefault("edge_strips", []).append((net, round(x0 - ox, 1), round(x1 - ox, 1), ok))
         if not ok:
             left.append((net, items, "edge strip: no route to the strip"))
+            board.Delete(ez)                      # (tracks already added to the strip stay: harmless stubs)
+            done_nets.discard(net)
     board.BuildConnectivity()
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     return left
