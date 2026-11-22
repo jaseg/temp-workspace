@@ -2482,3 +2482,92 @@ def main(argv):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
+
+
+# ============================================================================= review (22 Nov): widen thin rail tracks
+WIDEN_NETS = ("+2V5", "-2V5", "+5V", "-5V", "VBUS")
+WIDEN_STEPS = (0.6, 0.5, 0.4)      # tried widest first; a segment keeps its width if none fits
+WIDEN_CLR = 0.3                    # to slow-line copper and other rail zones on the same layer (as the slow-line rule)
+WIDEN_CLR_OTHER = 0.2              # to any other track / via / pad (board rule 0.1)
+SLOW_NETS = ("/VBIAS_A", "/VBIAS_K", "/VOFS", "/VNEG_REF", "/DAC_TRIG", "/VTAP_TH", "/ADC_REF_MID", "/TRIG_SEL",
+             "/ADC_IN")
+
+
+def widen(board, nets=WIDEN_NETS, steps=WIDEN_STEPS, clr=WIDEN_CLR, max_w=0.5, layers=(pcbnew.In2_Cu, pcbnew.B_Cu)):
+    """Post-pass over the maze tracks: every segment of a minor rail at <= max_w mm on L3 / L6 is widened to the
+    widest of `steps` that keeps `clr` to all other-net copper on its layer (tracks, vias, pads; the GND pour re-flows),
+    stays outside every track keep-out rule area on that layer and >= EDGE from the board edge. Segment ends touching
+    a pad of a fine-pitch part keep their width (no pad-to-pad bridging). Returns {net: [widened mm, kept mm]}."""
+    org = _org(board)
+    bb = board.GetBoardEdgesBoundingBox()
+    ex0, ey0, ex1, ey1 = (pcbnew.ToMM(v) for v in (bb.GetX(), bb.GetY(), bb.GetRight(), bb.GetBottom()))
+    rep = {}
+    for lid in layers:
+        others = []
+        for t in board.GetTracks():
+            if t.IsOnLayer(lid):
+                others.append((t.GetNetCode(), t, t.GetEffectiveShape(lid), t.GetBoundingBox()))
+        for f in board.GetFootprints():
+            for p in f.Pads():
+                if p.IsOnLayer(lid):
+                    others.append((p.GetNetCode(), p, p.GetEffectiveShape(lid), p.GetBoundingBox()))
+        kos = [z for z in board.Zones() if z.GetIsRuleArea() and z.IsOnLayer(lid) and z.GetDoNotAllowTracks()]
+        rz = [z for z in board.Zones() if not z.GetIsRuleArea() and z.IsOnLayer(lid) and z.GetNetname() != "GND"]
+        for t in list(board.GetTracks()):
+            if isinstance(t, pcbnew.PCB_VIA) or t.GetLayer() != lid or t.GetNetname() not in nets:
+                continue
+            w0 = pcbnew.ToMM(t.GetWidth())
+            r = rep.setdefault(t.GetNetname(), [0.0, 0.0])
+            if w0 > max_w + 1e-6:
+                continue
+            L = pcbnew.ToMM(t.GetLength())
+            a, b = t.GetStart(), t.GetEnd()
+            # ends on a pad of the same net: keep the width (pad neighbours, fine pitch)
+            if any(o is not t and isinstance(o, pcbnew.PAD) and nc == t.GetNetCode() and
+                   (o.HitTest(a) or o.HitTest(b)) for nc, o, _, _ in others):
+                r[1] += L
+                continue
+            done = False
+            for w in steps:
+                if w <= w0 + 1e-6:
+                    break
+                seg = pcbnew.SHAPE_SEGMENT(a, b, pcbnew.FromMM(w))
+                sbb = t.GetBoundingBox()
+                sbb.Inflate(pcbnew.FromMM(w / 2 + clr + 0.05))
+                ok = True
+                for nc, o, sh, obb in others:
+                    if nc == t.GetNetCode() or not sbb.Intersects(obb):
+                        continue
+                    c_ = clr if o.GetNetname() in SLOW_NETS else WIDEN_CLR_OTHER
+                    if seg.Collide(sh, pcbnew.FromMM(c_)):
+                        ok = False
+                        break
+                if ok:
+                    for z in kos:
+                        if z.Outline().Collide(pcbnew.SEG(a, b), pcbnew.FromMM(w / 2)):
+                            ok = False
+                            break
+                if ok:
+                    for z in rz:
+                        if z.GetNetCode() != t.GetNetCode() and \
+                                z.Outline().Collide(pcbnew.SEG(a, b), pcbnew.FromMM(w / 2 + clr)):
+                            ok = False
+                            break
+                if ok:
+                    xs = [pcbnew.ToMM(a.x), pcbnew.ToMM(b.x)]
+                    ys = [pcbnew.ToMM(a.y), pcbnew.ToMM(b.y)]
+                    m = EDGE + w / 2
+                    ok = min(xs) - ex0 >= m and ex1 - max(xs) >= m and min(ys) - ey0 >= m and ey1 - max(ys) >= m
+                if ok:
+                    t.SetWidth(pcbnew.FromMM(w))
+                    # update this segment's entry so later segments see the new width
+                    for i, (nc, o, sh, obb) in enumerate(others):
+                        if o is t:
+                            others[i] = (nc, t, t.GetEffectiveShape(lid), t.GetBoundingBox())
+                            break
+                    r[0] += L
+                    done = True
+                    break
+            if not done:
+                r[1] += L
+    return {k: [round(v[0], 1), round(v[1], 1)] for k, v in rep.items()}

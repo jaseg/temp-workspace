@@ -1,7 +1,8 @@
 # Low-cost sampling oscilloscope front end
 
 2 GHz / 3 Gbps equivalent-time sampling front end (diode-bridge sampler, 16-tap delay-line phase
-recovery, GW1NZ-1 FPGA, user-supplied STM32G474). Start with `docs/theory-of-operation.md`.
+recovery, GW1NZ-1 FPGA, on-board STM32G474CBT6, USB-C), one six-layer 100 x 57 mm board. Start with
+`docs/theory-of-operation.md`.
 
 ## Directory map
 
@@ -11,8 +12,8 @@ recovery, GW1NZ-1 FPGA, user-supplied STM32G474). Start with `docs/theory-of-ope
 | `sim/input/`, `sim/sampler/`, `sim/strobe/`, `sim/phase/`, `sim/phase_array/` | ngspice + Python simulations; `RESULT.md`, plots and JSON in each |
 | `kicad/` | generated KiCad 7 hierarchical schematic (7 sheets), `export/` netlist, PDF, SVG/PNG; see `kicad/README.md` |
 | `kicad/gen/` | schematic generators, netlist checks, BOM generator |
-| `layout/board/` | the integrated board (`scope-fe.kicad_pcb` / `.kicad_pro`), generators `gen_board.py` + `board_fix.py`, blocks under `blocks/`, `RULES.md`, renders; NOT finished, status and review in its README |
-| `layout/input_stage/`, `layout/sampler/`, `layout/phase_trigger/` | superseded stand-alone fragments (geometry references only; refs and nets do not match the schematic) |
+| `layout/board/` | the integrated six-layer board (JLC06161H-3313, 100 x 57 mm): `scope-fe.kicad_pcb` / `.kicad_pro`, generator `gen_board.py` with `board_slow.py`, `board_power.py`, `board_stitch.py`, `board_finish.py`, six blocks under `blocks/<name>/gen_<name>.py` on `boardlib.py`; `RULES.md` (layout rules), `TOPOLOGY.md` (routing plan), README (as built, check results, review), renders `scope-fe-L1..L6.png`, `scope-fe-all.png`, `scope-fe-detail-*.png` |
+| `layout/input_stage/`, `layout/sampler/`, `layout/phase_trigger/` | the three old four-layer fragments, superseded by `layout/board/`; left at their git-tag state for reference (refs and nets do not match the schematic) |
 | `tools/` | KiCad nightly DRC / ERC wrappers (`run_drc.sh --rules jlc4 --parity`, `run_erc.sh`) |
 | `docs/` | `theory-of-operation.md`, `bom.md` / `bom.csv` (generated) |
 
@@ -32,11 +33,15 @@ cd sim/phase_array && python3 run.py && python3 extra.py && python3 bridge_rev.p
 # schematic, netlist checks, exports and BOM (docs/bom.md, docs/bom.csv)
 cd kicad/gen && python3 test_schlib.py && python3 gen_all.py      # --no-export skips PDF/SVG/PNG
 
-# layout fragments
-cd layout/input_stage   && python3 gen_input_stage.py
-cd layout/sampler       && python3 gen_sampler.py
-cd layout/phase_trigger && python3 gen_phase_trigger.py
+# board: blocks (each writes blocks/<name>/<name>.kicad_pcb), then the integrated board (about 80 s)
+cd layout/board/blocks/<name> && python3 gen_<name>.py     # analog, phase, pstrobe, fpga, power, mcuif
+cd layout/board && python3 gen_board.py                     # writes scope-fe.kicad_pcb, runs check_board
+
+# checks with the KiCad nightly CLI (on scratch copies; see tools/README.md)
+tools/run_drc.sh --rules jlc4 --parity layout/board/scope-fe.kicad_pcb
+tools/run_erc.sh
 ```
 
 The `.kicad_sch`, `.kicad_pcb`, `export/` and BOM files are generated; edit the generators, not the outputs.
-KiCad ERC and pcbnew DRC are not part of these scripts and have not been run.
+Last results: DRC 0 errors / 0 unconnected (450 warnings, all library / symbol-field / parity artefacts, listed in
+`layout/board/README.md`), ERC 0 errors (18 library warnings).

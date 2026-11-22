@@ -171,11 +171,24 @@ def silk(B, m):
     txt("SIG IN", 3.2, 7.3, 0.8)
     # review: "EXT CLK" was at y 46.6, 20 mm below J102 (y 26.5); no free silk room next to J102 (TP103 / TP104,
     # U304): its F.Fab value text EXT_CLK labels it (rule 9)
-    txt("USB", 95.0, 19.65, 0.8)
-    for s, x, y in (("ANALOG", 40.0, 0.9), ("FPGA", 65.0, 23.2), ("POWER", 88.0, 23.2)):
-        pass
-    txt("PHASE", 22.0, 52.2, 0.8)
-    txt("MCU / IF", 20.0, 53.9, 0.8)
+    # review: was (95.0, 19.65), over the D601 pads (silk_over_copper) and inside its outline: vertical, west of J601
+    txt("USB", 89.9, 13.5, 0.8, rot=90)
+    # block / connector labels (review): ANALOG comes from the analog block
+    txt("FPGA", 64.5, 21.3, 0.8)
+    txt("POWER", 83.5, 21.8, 0.8)
+    txt("PHASE", 40.0, 44.6, 0.8)
+    txt("MCU / IF", 64.0, 51.2, 0.8)
+    txt("PROG J501", 61.5, 54.6, 0.8)
+    # U603 / L601 library silk overlap (silk_overlap): drop L601's silk segments that touch U603's silk
+    u603, l601 = B.FindFootprintByReference("U603"), B.FindFootprintByReference("L601")
+    if u603 and l601:
+        ub = [g.GetBoundingBox() for g in u603.GraphicalItems() if g.GetLayer() == pcbnew.F_SilkS]
+        for g in list(l601.GraphicalItems()):
+            if g.GetLayer() == pcbnew.F_SilkS:
+                gb = g.GetBoundingBox()
+                gb.Inflate(pcbnew.FromMM(0.15))
+                if any(gb.Intersects(b) for b in ub):
+                    l601.Remove(g)
     txt("6L JLC06161H-3313", 16.0, 55.6, 0.8, "B.SilkS")
 
 
@@ -257,3 +270,68 @@ def in2_reference_check(B, step=0.25):
                 x, y = loc(p)
                 bad.append((t.GetNetname(), round(x, 2), round(y, 2), what))
     return n, bad
+
+
+def cleanup(B, m):
+    """Review (22 Nov): dangling copper reported by KiCad DRC (track_dangling / via_dangling), removed or completed.
+    Every item is matched by net and board-mm coordinates; returns the list of what was changed."""
+    P = lambda x, y: pcbnew.VECTOR2I(pcbnew.FromMM(x + bl.ORG[0]), pcbnew.FromMM(y + bl.ORG[1]))
+    loc = lambda v: (round(pcbnew.ToMM(v.x) - bl.ORG[0], 3), round(pcbnew.ToMM(v.y) - bl.ORG[1], 3))
+    near = lambda a, b: abs(a[0] - b[0]) < 0.02 and abs(a[1] - b[1]) < 0.02
+    done = []
+
+    def kill_seg(net, layer, p, q):
+        for t in list(B.GetTracks()):
+            if not isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net and t.GetLayerName() == layer:
+                a, b = loc(t.GetStart()), loc(t.GetEnd())
+                if (near(a, p) and near(b, q)) or (near(a, q) and near(b, p)):
+                    B.Remove(t)
+                    done.append(("track removed", net, layer, p, q))
+                    return True
+        return False
+
+    def kill_via(net, p):
+        for v in list(B.GetTracks()):
+            if isinstance(v, pcbnew.PCB_VIA) and v.GetNetname() == net and near(loc(v.GetPosition()), p):
+                B.Remove(v)
+                done.append(("via removed", net, p))
+                return True
+        return False
+
+    # VTAP_P / VTAP_N: the mcuif interface stubs north of the R725 / R726 vias lead nowhere (board_power feeds the vias on L3)
+    kill_seg("/VTAP_P", "B.Cu", (90.6, 45.85), (90.6, 45.0))
+    kill_seg("/VTAP_N", "B.Cu", (92.45, 45.85), (92.45, 45.0))
+    # VTH1 / VTH2 rails (L1) overhang their end pin stubs (vertical, from y 30.225 north) by 0.3 mm at both ends: each end
+    # stub turns into the rail with a 45-degree bend instead (rail ends 0.2 mm inside the stub x, stub ends at y 27.95)
+    for net, ends in (("/trigger_phase/VTH1", ((28.684, 0.3), (58.908, -0.3))),
+                      ("/trigger_phase/VTH2", ((64.796, 0.3), (95.02, -0.3)))):
+        for x0, d in ends:
+            xs = round(x0 + d, 3)                        # stub x
+            xr = round(xs + (0.2 if d > 0 else -0.2), 3)  # new rail end
+            for t in B.GetTracks():
+                if isinstance(t, pcbnew.PCB_VIA) or t.GetNetname() != net or t.GetLayerName() != "F.Cu":
+                    continue
+                a, b = loc(t.GetStart()), loc(t.GetEnd())
+                if near(a, (x0, 27.75)):
+                    t.SetStart(P(xr, 27.75)); done.append(("rail end moved", net, xr))
+                elif near(b, (x0, 27.75)):
+                    t.SetEnd(P(xr, 27.75)); done.append(("rail end moved", net, xr))
+                elif near(a, (xs, 27.75)) and abs(b[0] - xs) < 0.02 and b[1] > 27.9:
+                    t.SetStart(P(xs, 27.95))
+                elif near(b, (xs, 27.75)) and abs(a[0] - xs) < 0.02 and a[1] > 27.9:
+                    t.SetEnd(P(xs, 27.95))
+            m.track(net, 0.2, [(xs, 27.95), (xr, 27.75)], "F.Cu", ch=0.0001)
+    # U302 (TLV3801) exposed-pad via (7.94, 31.1) on -2V5 touched only F.Cu: tie it to its partner via (7.14, 31.1) on L3
+    m.track("-2V5", 0.3, [(7.14, 31.1), (7.94, 31.1)], "In2.Cu", ch=0.0001)
+    done.append(("L3 tie", "-2V5", (7.14, 31.1), (7.94, 31.1)))
+    # -2V5 via (17.85, 24.51) at R305.2 only joined two B tracks: replace it by a B track with 45-degree bends
+    if kill_via("-2V5", (17.85, 24.51)):
+        kill_seg("-2V5", "B.Cu", (17.2, 24.51), (17.85, 24.51))
+        kill_seg("-2V5", "B.Cu", (17.8, 24.6), (17.6, 24.8))
+        kill_seg("-2V5", "B.Cu", (17.6, 24.8), (17.6, 25.0))
+        # R305 is vertical: leave pad 2 southwards, then east onto the existing diagonal at (17.6, 25.0)
+        m.track("-2V5", 0.3, [(17.2, 24.51), (17.2, 24.85), (17.35, 25.0), (17.6, 25.0)], "B.Cu", ch=0.0001)
+    # VBUS: pstrobe landing vias (22.78, 26.345 / 27.045) fed only by the B stub from C418.1 (the L6 hop feeds C418.1)
+    if kill_via("VBUS", (22.78, 26.345)) | kill_via("VBUS", (22.78, 27.045)):
+        kill_seg("VBUS", "B.Cu", (22.78, 25.725), (22.78, 27.045))
+    return done

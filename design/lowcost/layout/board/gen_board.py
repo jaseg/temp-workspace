@@ -490,6 +490,11 @@ if _d and _h:
 # (the fill alone leaves the via in a clearance notch after a reload)
 # (the corridor neck between the via and the J-connector THT pads 29.9-32.5 / 50.6 is below the zone's min width)
 m.track("+2V5", 0.5, [(29.88, 49.68), (30.35, 50.15), (32.8, 50.15)], "In2.Cu", ch=0.0001)
+# review (22 Nov): dangling copper from the DRC (VTAP stubs, VTH rail overhangs, -2V5 / VBUS one-layer vias)
+print("review cleanup:", bf.cleanup(B, m))
+pcbnew.ZONE_FILLER(B).Fill(B.Zones())
+# review: widen the minor-rail maze tracks (0.3-0.5 mm) where 0.3 mm to all other copper allows
+print("rail widening [widened mm, kept mm]:", board_power.widen(B))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 B.BuildConnectivity()
 PWR = board_power.verify(B)
