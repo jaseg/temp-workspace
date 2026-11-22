@@ -105,7 +105,7 @@ def stitch(B, m, rf_tracks, sig_vias):
         return 0 <= i < occ.shape[0] and 0 <= j < occ.shape[1] and not occ[i, j]
 
     def place(x, y):
-        m.via(round(x, 3), round(y, 3), "GND")
+        m.via(round(float(x), 3), round(float(y), 3), "GND")
         r = VR * 2 + CLR + 0.05
         i, j, k = int(round(x / G)), int(round(y / G)), int(r / G) + 1
         occ[max(0, i - k):i + k + 1, max(0, j - k):j + k + 1] = True
