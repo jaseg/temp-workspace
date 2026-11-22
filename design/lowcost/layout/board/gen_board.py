@@ -21,7 +21,7 @@ import boardlib as bl
 W, H = 100.0, 57.0
 POS = {"analog": (0.0, 1.0), "phase": (0.0, 22.5), "pstrobe": (9.5, 25.0), "fpga": (56.0, 0.5),
        "power": (74.0, 0.0), "mcuif": (27.0, 45.0)}
-NATIVE6 = {"analog", "pstrobe", "fpga", "power", "mcuif"}          # phase is still a 4-layer file
+NATIVE6 = {"analog", "phase", "pstrobe", "fpga", "power", "mcuif"}   # all blocks native 6-layer (22 Nov)
 OUT = os.path.join(HERE, "scope-fe.kicad_pcb")
 SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board6/int"
 os.makedirs(SCR, exist_ok=True)
@@ -115,6 +115,8 @@ for z in L2_CUTS:                                  # L3 cleared under every L2 c
         m.keepout(pts, layers=("In2.Cu",), tracks=True, vias=False)
 
 LOG = []          # (net, layer(s), lane / corridor, length)
+VTHV = [loc(v.GetPosition())[0] for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
+        v.GetNetname().startswith('/trigger_phase/VTH')]
 RF = {}
 
 
@@ -124,24 +126,7 @@ def T(net, w, pts, layer, lane, ch=0.1):
     return q
 
 
-# ---------------------------------------------------------------- phase: VTH rail B.Cu -> L3 (static threshold)
-# the rail segments between its end vias move to In2 (L3); the short B pieces into R380 / R381 stay on B
-for net in ("/trigger_phase/VTH1", "/trigger_phase/VTH2"):
-    vx = sorted(loc(v.GetPosition())[0] for v in vias(net))
-    for t in segs(net, "B.Cu"):
-        a, b = loc(t.GetStart()), loc(t.GetEnd())
-        if abs(a[1] - b[1]) > 0.02 or abs(a[0] - b[0]) < 3:
-            continue
-        xa, xb = sorted((a[0], b[0]))
-        inner = [x for x in vx if xa - 0.02 <= x <= xb + 0.02]
-        lo, hi = min(inner), max(inner)
-        y = a[1]
-        B.Remove(t)
-        m.track(net, 0.3, [(lo, y), (hi, y)], "In2.Cu")
-        for p, q in ((xa, lo), (hi, xb)):
-            if q - p > 0.02:
-                m.track(net, 0.3, [(p, y), (q, y)], "B.Cu")
-        LOG.append((net, "In2.Cu", "VTH rail moved B -> L3 (phase)", round(hi - lo, 3)))
+# (the phase VTH rails are on L3 inside the native six-layer phase block since 22 Nov)
 
 # ---------------------------------------------------------------- L1: S_STROBE pair (analog E edge is 1.0 mm below fpga W)
 # fpga S_STROBE_P ends at (56, 9.865), the analog P interface is (56, 10.865) = where fpga's N ends: P jogs 1 mm
@@ -236,28 +221,27 @@ for k, net in enumerate(WEST):
     v = phase_stub_via(net)
     T(net, W_BUS, [top, (top[0], y), (v[0], y), v], "B.Cu", f"L6 west staircase lane y {y:.2f}", ch=0.1)
 
-# ---------------------------------------------------------------- L6: USB 90 R pair power S -> mcuif N
-# power F stubs end at (82.6 / 83.0, 22.5): vias (DP 23.25 / DM 22.80, staggered), east on L6 north of the U311 output
-# vias (y 23.92), south in the gap U311 | U312 (x 86.25 / 86.65, clear of the via column 85.69), a 45-degree jog
-# under the comparators to tap-row lane 13 (x 89.03 / 89.43, between node window 13 (86.80-88.60) and the tap-14
-# jumpers (89.92)), south to y 42.4, jog west, vias, F stubs into the mcuif interfaces (88.0 / 88.5, 45.0).
+# ---------------------------------------------------------------- USB 90 R pair power S -> mcuif N (L1, then L6)
+# The east TAPs (U311 / U312) run east on the L6 highway (y 29.35-30.6), so the pair crosses that band on L1:
+# from the power stubs (82.6 / 83.0, 22.5) east on L1 north of U311's pins, south on L1 in the gap U311|U312
+# (x 86.25 / 86.65), vias (86.25, 31.0) / (87.1, 31.3) below the highway, L6 diagonal between the phase GND via
+# (88.09, 31.41) and the VTAP_N via (88.09, 33.66) into tap-row lane 13 (x 89.0 / 89.4, between node window 13
+# (86.80-88.60) and the tap-14 jumpers (89.92)), south, vias east of the C357 GND via (88.09, 43.59), F into mcuif.
 W_USB = 0.18
 pDP, pDM = (82.6, 22.5), (83.0, 22.5)
-T("/USB_DP", W_USB, [pDP, (82.6, 23.0)], "F.Cu", "power S stub to via (L1)")
-T("/USB_DM", W_USB, [pDM, (83.0, 22.6), (83.4, 23.0)], "F.Cu", "power S stub to via (L1)")
-m.via(82.6, 23.0, "/USB_DP"); m.via(83.4, 23.0, "/USB_DM")
-# jog x 86.25 / 86.65 -> 89.0 / 89.4 at y 28.2-31.0 passes between the VTH via row (y 28.93, x 85.69) and the phase
-# GND via (88.09, 31.41); lane 13 down to y 43.7, vias east of the C357 GND via (88.09, 43.59), F diagonals into
-# the mcuif stubs
-T("/USB_DP", W_USB, [(82.6, 23.0), (83.05, 23.45), (85.85, 23.45), (86.25, 23.85), (86.25, 28.2), (89.0, 30.95),
-                     (89.0, 43.35), (88.0, 44.35)], "B.Cu", "L6 gap U311|U312, tap-row lane 13", ch=0.0001)
-T("/USB_DM", W_USB, [(83.4, 23.0), (83.6, 22.8), (86.0, 22.8), (86.65, 23.45), (86.65, 27.8), (89.4, 30.55),
-                     (89.4, 43.7), (89.6, 43.9)], "B.Cu", "L6 gap U311|U312, tap-row lane 13", ch=0.0001)
+T("/USB_DP", W_USB, [pDP, (82.6, 22.95), (82.9, 23.25), (85.85, 23.25), (86.25, 23.65), (86.25, 31.0)], "F.Cu",
+  "L1 north of U311, gap U311|U312", ch=0.0001)
+T("/USB_DM", W_USB, [pDM, (83.0, 22.55), (83.3, 22.85), (86.25, 22.85), (86.65, 23.25), (86.65, 30.85), (87.1, 31.3)],
+  "F.Cu", "L1 north of U311, gap U311|U312", ch=0.0001)
+m.via(86.25, 31.0, "/USB_DP"); m.via(87.1, 31.3, "/USB_DM")
+T("/USB_DP", W_USB, [(86.25, 31.0), (89.0, 33.75), (89.0, 43.35), (88.0, 44.35)], "B.Cu", "L6 tap-row lane 13",
+  ch=0.0001)
+T("/USB_DM", W_USB, [(87.1, 31.3), (89.4, 33.6), (89.4, 43.7), (89.6, 43.9)], "B.Cu", "L6 tap-row lane 13", ch=0.0001)
 m.via(88.0, 44.35, "/USB_DP"); m.via(89.6, 43.9, "/USB_DM")
 T("/USB_DP", W_USB, [(88.0, 44.35), (88.0, 45.0)], "F.Cu", "via to mcuif F stub")
 T("/USB_DM", W_USB, [(89.6, 43.9), (88.5, 45.0)], "F.Cu", "via to mcuif F stub")
-for gx, gy in ((82.0, 23.6), (83.9, 22.2), (90.35, 44.1)):          # ground vias beside the signal vias
-    m.via(gx, gy, "GND")
+for gx, gy in ((90.35, 44.1),):          # ground via beside the mcuif-end signal vias (the phase GND via 88.09 /
+    m.via(gx, gy, "GND")                 # 31.41 sits beside the highway-end pair)
 
 # ---------------------------------------------------------------- slow lines whose analog end is a B column: L3 vias
 # (VBIAS_A / VBIAS_K: via at y 20.3 on the B column; ADC_IN / ADC_REF_MID: their existing vias) - the B stubs
@@ -271,23 +255,60 @@ for net, yv in (("/VBIAS_A", 16.3), ("/VBIAS_K", 20.3), ("/ADC_IN", None), ("/AD
         t.SetStart(m.P(*o)); t.SetEnd(m.P(e[0], yv))
         m.via(e[0], yv, net)
 
-# phase TAP8..15 B stubs (y 23.92 -> 22.5) end on the fpga's middle-group stubs: removed, the comparator vias stay
-BLOCK_EAST = ("U309's output vias (65.10 / 66.37, 23.92) and pin-5 GND via (67.64, 23.97) lie directly under the fpga "
-              "MCU-group slots (65.0-69.5, 22.5); U310's cap vias (70.85, 23.61 / 24.25), (71.55, 23.07) under the TAP slots; "
-              "the 18-track fan-in to a column needs >= 3 mm of free L6 height there")
-BLOCK_MID = ("the only comparator gaps are 4.4 mm wide (U308|U309 x 59.0-63.4, U309|U310 x 68.0-72.5); gap 1 holds R380 / "
-             "R381 / C354 / C355 + GND vias (59.04 / 64.66, 27.0), VTAP_TH B column x 61.93 and U309 cap vias (61.83, "
-             "23.61 / 24.25), (62.53, 23.07); TAP8 / TAP9 (U309, x 65.1 / 66.37) sit between the gaps and need a slot "
-             "order JTAG | MCU | TAP9 TAP8 | TAP15..10 that the fpga's F escapes cannot give without crossing the "
-             "DONE / RECONFIG F runs (local y 18.1 / 18.5)")
-for k in range(8, 16):
-    net = f"/TAP{k}"
-    phase_stub_via(net)
-    NOT_PLACED.append((net, BLOCK_EAST))
-for net in ("/fpga_clock/DBG2", "/fpga_clock/JTAG_TCK", "/fpga_clock/JTAG_TMS", "/fpga_clock/JTAG_TDI",
-            "/fpga_clock/JTAG_TDO", "/MCU_CLK", "/SPI_CS", "/I2C_SDA", "/FPGA_DONE", "/SPI_MOSI", "/SPI_MISO",
-            "/SPI_SCK", "/I2C_SCL", "/FPGA_RECONFIG", "/ADC_TRIG"):
-    NOT_PLACED.append((net, BLOCK_MID))
+# ---------------------------------------------------------------- L6: JTAG group (TOPOLOGY.md section 7)
+# fpga slots x 62.5-64.5: straight south to an upper band under the comparator bodies (y 24.75 + 0.3 j, between the
+# +3V3 via row y 24.25 and the R380 network / VTH via row), west, south through tap-row lanes 2 / 3 / 4 (between a
+# node window and the next summing jumpers), 45-degree jogs in the strip y 42.3-44.7 onto the J501 interfaces.
+JT = ["/fpga_clock/DBG2", "/fpga_clock/JTAG_TCK", "/fpga_clock/JTAG_TMS", "/fpga_clock/JTAG_TDI", "/fpga_clock/JTAG_TDO"]
+LANE_C = lambda n: 30.58 + 4.514 * n                 # tap-row lane centre between window n and the jumpers of n + 1
+JLANE = {JT[0]: LANE_C(2) - 0.15, JT[1]: LANE_C(2) + 0.15, JT[2]: LANE_C(3) - 0.15, JT[3]: LANE_C(3) + 0.15,
+         JT[4]: LANE_C(4)}
+mc_if = {i["net"]: (i["x"] + 27.0, i["y"] + 45.0) for i in json.load(open("blocks/mcuif/mcuif.ifaces.json"))["ifaces"]}
+for j, net in enumerate(JT):
+    top = fpga_stub_top(net)
+    yb = round(24.75 + 0.3 * j, 3)
+    xl = round(JLANE[net], 3)
+    tx, ty = mc_if[net]
+    ya = 42.3
+    T(net, W_BUS, [top, (top[0], yb), (xl, yb), (xl, ya), (tx, ya + abs(tx - xl)), (tx, ty)], "B.Cu",
+      f"L6 band y {yb:.2f}, tap-row lane x {xl:.2f}", ch=0.1)
+
+# ---------------------------------------------------------------- L6: MCU group + TAP15..TAP10 drop through gap U309|U310
+# slots x 65.0 + 0.5 i (i 0-9 MCU group, 10-15 TAP15..TAP10) fan into a column x 68.1 + 0.25 i (gap U309|U310, whose
+# vias were moved under the bodies in gen_phase.py), down to the highway lanes y 29.35 + 0.25 (15 - i) and east.
+# TAP10 (northmost) peels first to U310, ..., TAP15 to U312 (under-body vias, the pin-7 one approached 0.5 mm east of
+# the VTH via below it); the MCU group (south) turns south into tap-row lanes 9-12 and jogs onto the mcuif interfaces.
+MG = ["/MCU_CLK", "/SPI_CS", "/I2C_SDA", "/FPGA_DONE", "/SPI_MOSI", "/SPI_MISO", "/SPI_SCK", "/I2C_SCL",
+      "/FPGA_RECONFIG", "/ADC_TRIG"] + [f"/TAP{k}" for k in range(15, 9, -1)]
+MLANE = {"/MCU_CLK": (LANE_C(9), 42.0), "/SPI_CS": (LANE_C(10) - 0.25, 42.05), "/I2C_SDA": (LANE_C(10), 41.95),
+         "/FPGA_DONE": (LANE_C(10) + 0.25, 41.85), "/SPI_MOSI": (LANE_C(11) - 0.37, 41.9),
+         "/SPI_MISO": (LANE_C(11) - 0.12, 42.0), "/SPI_SCK": (LANE_C(11) + 0.13, 42.1),
+         "/I2C_SCL": (LANE_C(11) + 0.38, 42.0), "/FPGA_RECONFIG": (LANE_C(12) - 0.13, 42.0),
+         "/ADC_TRIG": (LANE_C(12) + 0.12, 41.9)}
+Y0 = 22.7
+for i, net in enumerate(MG):
+    top = fpga_stub_top(net)
+    sx = top[0]
+    cx = round(68.1 + 0.25 * i, 3)
+    yh = round(29.35 + 0.25 * (15 - i), 3)
+    pts = [top, (sx, Y0), (cx, Y0 + abs(cx - sx)), (cx, yh)]
+    if net.startswith("/TAP"):
+        vx, vy = phase_if[net]
+        xr = vx + 0.5 if any(abs(vx - x) < 0.02 for x in VTHV) else vx
+        tail = [(xr, yh), (xr, vy + abs(xr - vx)), (vx, vy)]
+        T(net, W_BUS, pts + tail, "B.Cu", f"L6 drop x {cx:.2f}, highway y {yh:.2f}, peel x {xr:.2f}", ch=0.1)
+    else:
+        xl, ya = MLANE[net]
+        xl = round(xl, 3)
+        tx, ty = mc_if[net]
+        tail = [(xl, yh), (xl, ya), (tx, ya + abs(tx - xl)), (tx, ty)]
+        T(net, W_BUS, pts + tail, "B.Cu", f"L6 drop x {cx:.2f}, highway y {yh:.2f}, lane x {xl:.2f}", ch=0.1)
+for net in ("/TAP8", "/TAP9"):
+    NOT_PLACED.append((net, "U309 (x 63.5-68) lies west of the drop gap U309|U310 and its outputs would have to be the "
+                       "WESTmost tracks of the column (turning west), but the fpga slots put TAP9 / TAP8 eastmost "
+                       "(x 73.0 / 73.5); giving them slots between JTAG and MCU needs their L1 escapes (U501 pins "
+                       "16 / 17 -> 9 / 10) to cross the DONE / RECONFIG L1 runs (fpga local y 18.1 / 18.5), and "
+                       "moving those to L3 collides with the +3V3 / GND via cluster at fpga local (4.3-4.9, 13.9-15.6)"))
 bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
 print("NOT PLACED:")
 for r in NOT_PLACED:

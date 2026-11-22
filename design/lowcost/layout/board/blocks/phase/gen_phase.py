@@ -13,6 +13,7 @@ pstrobe cut-out: local x 9.5-26.5, y 3.5-22.5 except the axis corridor y 12-18.
 Run: cd blocks/phase && python3 gen_phase.py
 """
 import math, os, sys, json
+os.environ["BL_STACKUP"] = "6L"            # 22 Nov: native 6-layer block (In2 = L3 slow, In3 = L4 power), merge with layer_map=None
 sys.path.insert(0, "../..")
 import boardlib as bl
 import pcbnew
@@ -25,8 +26,7 @@ BW, BH = 99.5, 22.5
 
 # ============================================================================= six-layer RF geometry (phase two)
 # RULES rule 10: L1 over L2 = 3313 prepreg 0.0994 mm, er 4.1 (boardlib STACKUPS["6L"], solder-mask corrected).
-# The block file itself stays a 4-copper-layer board (F / In1 GND / In2 supply / B) that the integrator merges
-# with LAYER_MAP_4TO6 (In1 -> L2, In2 -> L4); only the impedance / delay maths use the 6-layer stack-up.
+# 22 Nov 2026: native 6-layer file (F / In1 L2 GND / In2 L3 slow: VTH rails / In3 L4 power: VTAP strips / In4 / B).
 H6, ER6 = bl.STACKUPS["6L"]["H"], bl.STACKUPS["6L"]["ER"]
 
 
@@ -275,17 +275,38 @@ for k in range(NT // 2):
     cp = P(cref, "@+3V3")
     cg = P(cref, "@GND")
     T("+3V3", 0.5, [(p8[0], cp[1]), cp], ch=0)       # starts inside the long pin-8 pad
-    for dy in (-0.4, -1.05):
-        V(xcap - 0.7, cp[1] + dy, "+3V3")
-    T("+3V3", 0.45, [cp, (xcap - 0.4, cp[1]), (xcap - 0.7, cp[1] - 0.3), (xcap - 0.7, cp[1] - 1.05)], ch=0)
-    gv(xcap, cg[1] - 0.62)
-    T("GND", W_GND, [cg, (xcap, cg[1] - 0.62)], ch=0)
-    gv(p5[0], p5[1] - 1.3)
-    T("GND", 0.6, [p5, (p5[0], p5[1] - 1.3)], ch=0)
+    YUB = YC - 0.75                                  # under-body via row (22 Nov, board drop of the east TAPs)
+    if k == 5:
+        # U310: its cap vias sat in the L6 fan-in of the MCU / TAP drop (board x 68-72.5): +3V3 via under the body
+        # at pin 8, the cap's GND pad goes to the F ground pour
+        V(p8[0], YUB, "+3V3")
+        T("+3V3", 0.5, [p8, (p8[0], YUB)], ch=0)
+    else:
+        for dy in (-0.4, -1.05):
+            V(xcap - 0.7, cp[1] + dy, "+3V3")
+        T("+3V3", 0.45, [cp, (xcap - 0.4, cp[1]), (xcap - 0.7, cp[1] - 0.3), (xcap - 0.7, cp[1] - 1.05)], ch=0)
+        if k == 4:      # U309: cap GND via 0.53 mm west, clear of the JTAG drop at board x 62.5
+            gq = (xcap - 0.7, cg[1] - 0.73)          # above the +3V3 via pair, west of the JTAG drop
+            gv(*gq)
+            T("GND", W_GND, [cg, (xcap, cg[1] - 0.35), (xcap - 0.38, cg[1] - 0.73), gq], ch=0)
+        else:
+            gv(xcap, cg[1] - 0.62)
+            T("GND", W_GND, [cg, (xcap, cg[1] - 0.62)], ch=0)
+    if k == 4:          # U309: pin-5 GND via under the body (out of the fan-in)
+        gv(p5[0], YUB)
+        T("GND", 0.6, [p5, (p5[0], YUB)], ch=0)
+    else:
+        gv(p5[0], p5[1] - 1.3)
+        T("GND", 0.6, [p5, (p5[0], p5[1] - 1.3)], ch=0)
     # outputs: via at the pin, B.Cu stub to the north edge
     for pin in ("7", "6"):
         px, py = P(ref, pin)
         net = nn(ref, pin)
+        if k >= 4:      # U309-U312: via under the body, reached from the L6 highway below (TOPOLOGY.md section 7)
+            V(px, YUB, net)
+            T(net, W_SIG, [(px, py), (px, YUB)], ch=0)
+            blk.iface(net, px, YUB, "B.Cu", "-", "slow", W_SIG, "comparator output, via under the body")
+            continue
         V(px, py - 1.35, net)
         T(net, W_SIG, [(px, py), (px, py - 1.35)], ch=0)
         T(net, W_SIG, [(px, py - 1.35), (px, 0.0)], layer="B.Cu", ch=0)
@@ -298,8 +319,12 @@ XVTH = xg
 x_r380, x_r381 = xg - 1.55, xg + 1.55
 place2("R380", x_r380, VTH_Y, "h", "/trigger_phase/VTH1", side="B")
 place2("R381", x_r381, VTH_Y, "h", "/VTAP_TH", side="B")
-T("/trigger_phase/VTH1", 0.3, [(VTH_X["/trigger_phase/VTH1"][0], VTH_Y), P("R380", "@/trigger_phase/VTH1")], layer="B.Cu", ch=0)
-T("/trigger_phase/VTH2", 0.3, [P("R381", "@/trigger_phase/VTH2"), (VTH_X["/trigger_phase/VTH2"][-1], VTH_Y)], layer="B.Cu", ch=0)
+# 22 Nov: the rails run on L3 (In2) between their pin vias (static threshold); only the last piece into R380 / R381 is B
+v1, v2 = sorted(VTH_X["/trigger_phase/VTH1"]), sorted(VTH_X["/trigger_phase/VTH2"])
+T("/trigger_phase/VTH1", 0.3, [(v1[0], VTH_Y), (v1[-1], VTH_Y)], layer="In2.Cu", ch=0)
+T("/trigger_phase/VTH1", 0.3, [(v1[-1], VTH_Y), P("R380", "@/trigger_phase/VTH1")], layer="B.Cu", ch=0)
+T("/trigger_phase/VTH2", 0.3, [(v2[0], VTH_Y), (v2[-1], VTH_Y)], layer="In2.Cu", ch=0)
+T("/trigger_phase/VTH2", 0.3, [P("R381", "@/trigger_phase/VTH2"), (v2[0], VTH_Y)], layer="B.Cu", ch=0)
 T("/VTAP_TH", 0.25, [P("R380", "@/VTAP_TH"), P("R381", "@/VTAP_TH")], layer="B.Cu", ch=0)
 for cref, rref, net in (("C354", "R380", "/trigger_phase/VTH1"), ("C355", "R381", "/trigger_phase/VTH2")):
     rp = P(rref, "@" + net)
@@ -307,7 +332,7 @@ for cref, rref, net in (("C354", "R380", "/trigger_phase/VTH1"), ("C355", "R381"
     g = P(cref, "@GND")
     cq = P(cref, "@" + net)
     T(net, 0.3, [rp, cq], layer="B.Cu", ch=0)
-    gx = g[0] + (-0.75 if net.endswith("1") else 0.75)
+    gx = g[0] - 0.75          # 22 Nov: both GND vias west (C355's east via sat on the U309 under-body TAP8 via)
     gv(gx, g[1])
     T("GND", W_GND, [g, (gx, g[1])], layer="B.Cu", ch=0)
 # VTAP_TH down to the south edge on B.Cu (between taps 7 and 8, clear of the jumpers), TP305 on B
@@ -327,10 +352,10 @@ for tap, cn, cp_ in ((1, "C358", "C356"), (13, "C359", "C357")):
         gv(x, g[1] + 0.62 * s)
         T("GND", W_GND, [g, (x, g[1] + 0.62 * s)], ch=0)
 # VTAP_N / VTAP_P to the south edge: via into the In2 strip, B.Cu straight down between the taps
-for net, xx, yy in (("VTAP_N", XT[3] + 0.85, AX - Y_RV + 0.2), ("VTAP_P", XT[4] + 0.85, AX + Y_RV + 1.0)):
-    V(xx, yy, net)
-    T(net, 0.3, [(xx, yy), (xx, BH)], layer="B.Cu", ch=0)
-    blk.iface(net, xx, BH, "B.Cu", "S", "supply", 0.3, "In2 strip under the taps (drawn by this block)")
+# 22 Nov: the B.Cu feed columns (x 43.86 / 48.37) are gone (they sat in the JTAG tap-row lanes); the L4 strips are fed
+# on L4 from the mcuif R725 / R726 vias by the board's power islands (board_power.py)
+for net in ("VTAP_N", "VTAP_P"):
+    blk.iface(net, 0, 0, "In3.Cu", "-", "supply", None, "L4 strip under the taps (drawn by this block), fed on L4")
 
 # ============================================================================= front chain
 # Column x 0-9.5 (full height): J102, shunts, U301 TMUX136, U302 TLV3801, CMP_P / CMP_N network, U304.
@@ -598,15 +623,15 @@ IN = 0.2
 blk_ol = [(IN, IN), (BW - IN, IN), (BW - IN, BH - IN), (26.5 + IN, BH - IN), (26.5 + IN, 18.0 - IN),
           (9.5 - IN, 18.0 - IN), (9.5 - IN, BH - IN), (IN, BH - IN)]
 blk.zone("GND", ["In1.Cu"], blk_ol, clearance=0.2)
-blk.keepout(north_cut, ("F.Cu", "In1.Cu", "In2.Cu", "B.Cu"))
+blk.keepout(north_cut, ("F.Cu", "In1.Cu", "In3.Cu", "B.Cu"))
 # node / SMA cut-outs: L2 (block In1) AND L4 (block In2 -> In3) cleared; the integrator clears L3 under every L2
 # cut-out, so the hold nodes reference L5 (1.37 mm) as they referenced In2 (1.29 mm) on the 4-layer board
 for c in CUT:
-    blk.keepout(c, ("In1.Cu", "In2.Cu"))
-blk.keepout(bl.rect_pts(0.0, YJ - 0.95, jx + 1.9, YJ + 0.95), ("In1.Cu", "In2.Cu"))
+    blk.keepout(c, ("In1.Cu", "In2.Cu", "In3.Cu"))
+blk.keepout(bl.rect_pts(0.0, YJ - 0.95, jx + 1.9, YJ + 0.95), ("In1.Cu", "In2.Cu", "In3.Cu"))
 XV0, XV1 = XT[0] - 3.2, X15 + 1.5
-blk.zone("VTAP_N", ["In2.Cu"], bl.rect_pts(XV0, AX - (Y_RV + 1.4), XV1, AX - 0.15), clearance=0.3, prio=1)
-blk.zone("VTAP_P", ["In2.Cu"], bl.rect_pts(XV0, AX + 0.15, XV1, AX + Y_RV + 1.4), clearance=0.3, prio=1)
+blk.zone("VTAP_N", ["In3.Cu"], bl.rect_pts(XV0, AX - (Y_RV + 1.4), XV1, AX - 0.15), clearance=0.3, prio=1)
+blk.zone("VTAP_P", ["In3.Cu"], bl.rect_pts(XV0, AX + 0.15, XV1, AX + Y_RV + 1.4), clearance=0.3, prio=1)
 # F.Cu GND pour (keeps 2 w from every RF trace) - the integrator may keep or replace it
 blk.zone("GND", ["F.Cu"], blk_ol, clearance=0.2, prio=0)
 blk.keepout(bl.rect_pts(XT[0] + X_P12 - PITCH / 2 - 0.1, AX - (YL + W_STR / 2 + 2 * W_STR),

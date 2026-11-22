@@ -105,82 +105,82 @@
   {
    "net": "/TAP8",
    "x": 65.096,
-   "y": 0.0,
+   "y": 4.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "-",
    "class": "slow",
    "width": 0.2,
-   "note": "comparator output"
+   "note": "comparator output, via under the body"
   },
   {
    "net": "/TAP9",
    "x": 66.366,
-   "y": 0.0,
+   "y": 4.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "-",
    "class": "slow",
    "width": 0.2,
-   "note": "comparator output"
+   "note": "comparator output, via under the body"
   },
   {
    "net": "/TAP10",
    "x": 74.124,
-   "y": 0.0,
+   "y": 4.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "-",
    "class": "slow",
    "width": 0.2,
-   "note": "comparator output"
+   "note": "comparator output, via under the body"
   },
   {
    "net": "/TAP11",
    "x": 75.394,
-   "y": 0.0,
+   "y": 4.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "-",
    "class": "slow",
    "width": 0.2,
-   "note": "comparator output"
+   "note": "comparator output, via under the body"
   },
   {
    "net": "/TAP12",
    "x": 83.152,
-   "y": 0.0,
+   "y": 4.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "-",
    "class": "slow",
    "width": 0.2,
-   "note": "comparator output"
+   "note": "comparator output, via under the body"
   },
   {
    "net": "/TAP13",
    "x": 84.422,
-   "y": 0.0,
+   "y": 4.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "-",
    "class": "slow",
    "width": 0.2,
-   "note": "comparator output"
+   "note": "comparator output, via under the body"
   },
   {
    "net": "/TAP14",
    "x": 92.18,
-   "y": 0.0,
+   "y": 4.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "-",
    "class": "slow",
    "width": 0.2,
-   "note": "comparator output"
+   "note": "comparator output, via under the body"
   },
   {
    "net": "/TAP15",
    "x": 93.45,
-   "y": 0.0,
+   "y": 4.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "-",
    "class": "slow",
    "width": 0.2,
-   "note": "comparator output"
+   "note": "comparator output, via under the body"
   },
   {
    "net": "/VTAP_TH",
@@ -194,23 +194,23 @@
   },
   {
    "net": "/VTAP_N",
-   "x": 43.859,
-   "y": 22.5,
-   "layer": "B.Cu",
-   "side": "S",
+   "x": 0,
+   "y": 0,
+   "layer": "In3.Cu",
+   "side": "-",
    "class": "supply",
-   "width": 0.3,
-   "note": "In2 strip under the taps (drawn by this block)"
+   "width": null,
+   "note": "L4 strip under the taps (drawn by this block), fed on L4"
   },
   {
    "net": "/VTAP_P",
-   "x": 48.373,
-   "y": 22.5,
-   "layer": "B.Cu",
-   "side": "S",
+   "x": 0,
+   "y": 0,
+   "layer": "In3.Cu",
+   "side": "-",
    "class": "supply",
-   "width": 0.3,
-   "note": "In2 strip under the taps (drawn by this block)"
+   "width": null,
+   "note": "L4 strip under the taps (drawn by this block), fed on L4"
   },
   {
    "net": "/BUF_OUT_T",
