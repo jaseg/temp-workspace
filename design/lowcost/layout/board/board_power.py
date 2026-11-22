@@ -1176,6 +1176,7 @@ def gap_arrays(board, nets, report, l6occ):
 
 
 MAZE_RES = 0.2
+_MAZE_VIAS = {}
 MAZE_WIDTHS = (0.8, 0.6, 0.5)
 MAZE_CLR = 0.2            # to foreign copper (+ half a grid cell of rasterisation margin)
 MAZE_BPAD = 0.3           # extra margin around bottom-side pads
@@ -1429,6 +1430,7 @@ def fix_3v3_island(board, nets, report, l6occ):
 
 def maze_connect(board, nets, report, l6occ, occ, rounds=4):
     """Connect every stranded component of every rail to its main component with the L3 / L6 maze router."""
+    _MAZE_VIAS.clear()
     ox, oy = _org(board)
     names = [nets[r] for r in ISLANDS if r in nets] + [n for n in STRIPS if board.FindNet(n) is not None]
     stats = {n: dict(length=0.0, wmin=None, vias=0, routes=0) for n in names}
@@ -1482,6 +1484,7 @@ def maze_connect(board, nets, report, l6occ, occ, rounds=4):
                     (occ if L == 0 else l6occ).append(rec)
                 for (x, y) in vias:
                     _add_via(board, net, x, y)
+                    _MAZE_VIAS.setdefault(net, set()).add((round(x, 3), round(y, 3)))
                     l6occ.append(dict(net=net, kind="maze_via", layer="all", dia=VIA_D,
                                       pts=[(round(x - ox, 3), round(y - oy, 3))]))
                 st["vias"] += len(vias)
@@ -1700,9 +1703,22 @@ def draw_plan(board, path, corr, br, pts):
                 if len(pp) >= 3:
                     ax.add_patch(plt.Polygon([(x - ox, y - oy) for x, y in pp], fc="0.75", ec="none"))
     for t in board.GetTracks():
-        if t.GetClass() == "PCB_TRACK" and t.GetLayer() == L3 and t.GetNetname() in col:
+        if t.GetClass() == "PCB_TRACK" and t.GetLayer() in (L3, pcbnew.B_Cu) and t.GetNetname() in col:
             a, b = t.GetStart(), t.GetEnd()
-            ax.plot([a.x / MM - ox, b.x / MM - ox], [a.y / MM - oy, b.y / MM - oy], color=col[t.GetNetname()], lw=1)
+            wmm = round(t.GetWidth() / MM, 2)
+            if t.GetLayer() == L3 and wmm not in MAZE_WIDTHS:
+                ax.plot([a.x / MM - ox, b.x / MM - ox], [a.y / MM - oy, b.y / MM - oy], color=col[t.GetNetname()], lw=1)
+            elif wmm in MAZE_WIDTHS:      # maze-routed pieces: thin dashed (L3 solid colour, L6 grey-edged)
+                ax.plot([a.x / MM - ox, b.x / MM - ox], [a.y / MM - oy, b.y / MM - oy], color=col[t.GetNetname()],
+                        lw=1.6, ls=(0, (3, 2)) if t.GetLayer() == L3 else (0, (1, 1.5)))
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_VIA" and t.GetNetname() in col and t.GetNetname() in _MAZE_VIAS:
+            q = t.GetPosition()
+            if (round(q.x / MM, 3), round(q.y / MM, 3)) in _MAZE_VIAS[t.GetNetname()]:
+                ax.scatter([q.x / MM - ox], [q.y / MM - oy], marker="s", s=18, facecolors="none",
+                           edgecolors=col[t.GetNetname()], zorder=6)
+    ax.plot([], [], color="k", lw=1.6, ls=(0, (3, 2)), label="maze route L3")
+    ax.plot([], [], color="k", lw=1.6, ls=(0, (1, 1.5)), label="maze route L6")
     for rail, lines in corr.items():
         for line, w in lines:
             ax.plot([x - ox for x, y in line], [y - oy for x, y in line], color=col.get(rail, "k"), lw=w * 7.5,
