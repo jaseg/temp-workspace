@@ -54,7 +54,7 @@ def V(x, y, net):
 
 
 # ---------------- placement
-CX, CY = 8.6, 11.165                 # pin 38 (S_STROBE_P) at y 9.365 = the analog iface: S_STROBE_P is one straight line
+CX, CY = 8.6, 11.165                 # pin 38 (S_STROBE_P) at y 9.365; its W exit jogs 1.0 mm south to the analog E row (y 10.365 local)
 U502X, U502Y = 11.1, 2.2
 bplace("U501", CX, CY, 90)
 bplace("U502", U502X, U502Y, 180)    # left: 6 CLK2, 7 VDD, 8 GND, 9 CLK1, 10 CLK0 (top->bottom); right: 5 SDA, 4 SCL, 3 XB, 2 XA, 1 VDD
@@ -83,7 +83,7 @@ for ref, x, y in (("R502", 1.2, 0.75), ("R503", 1.2, 1.75), ("R504", 1.2, 2.75),
 ORDER = (["/COARSE"] + [f"/TAP{i}" for i in range(8)] +
          [C(n) for n in ("DBG2", "JTAG_TCK", "JTAG_TMS", "JTAG_TDI", "JTAG_TDO", "MCU_CLK", "SPI_CS", "I2C_SDA",
                          "FPGA_DONE", "SPI_MOSI", "SPI_MISO", "SPI_SCK", "I2C_SCL", "FPGA_RECONFIG", "ADC_TRIG")] +
-         [f"/TAP{i}" for i in range(8, 16)])
+         [f"/TAP{i}" for i in range(15, 7, -1)])          # east group reversed (TAP8 eastmost), 22 Nov
 SLOT = {n: round(2.0 + 0.5 * k, 3) for k, n in enumerate(ORDER)}
 YE = 21.2                                            # via row of the L1-routed nets near the edge (staggered)
 
@@ -100,13 +100,14 @@ def edge(net, note, w=WS):
 RF = {}
 # ---------------- strobes (L1, 0.16 mm)
 p38 = up(38)
-T("/S_STROBE_P", W50, [p38, (0.0, p38[1])], name="S_P")
+YSP = p38[1] + 1.0                  # analog E interface row (board 10.865): one 45-degree jog in the W margin, no vias
+T("/S_STROBE_P", W50, [p38, (2.9, p38[1]), (1.9, YSP), (0.0, YSP)], ch=0.0001, name="S_P")
 RF["/S_STROBE_P"] = W50
-blk.iface("/S_STROBE_P", 0.0, p38[1], "F.Cu", "W", "pair", W50, "U501.38; one straight F.Cu line, no vias; R401 in analog")
+blk.iface("/S_STROBE_P", 0.0, YSP, "F.Cu", "W", "pair", W50, "U501.38; one straight F.Cu line, no vias; R401 in analog")
 # S_STROBE_N (termination only): pin 35 north, west over the L6 bundle at y 6.9, via at the W edge, L6 down under S_P,
 # via, 0.4 mm F stub to the analog iface
 p35 = up(35)
-YSN = 10.365
+YSN = 11.365                         # analog N row (board 11.865)
 T("/S_STROBE_N", W50, [p35, (p35[0], 6.9), (0.4, 6.9), (0.4, 7.3)], ch=0.3, name="S_N")
 T("/S_STROBE_N", W50, [(0.4, 7.3), (0.4, YSN)], "B.Cu", name="S_N")
 T("/S_STROBE_N", W50, [(0.4, YSN), (0.0, YSN)], name="S_N")
@@ -129,18 +130,25 @@ def ph_pts(p, xd, yo, yh=None):
     return head + [(xd + 0.4, yh), (xd, yh + 0.4), (xd, yo - 0.4), (xd - 0.4, yo), (0.0, yo)]
 
 
-PHN = ph_pts(p39, 0.9, YPN)
-LN = bl.plen(PHN)
-lo, hi = YPN + 0.2, YPN + 0.5                      # PH_P exit y solved for equal length
+def ph2(p, yh, x0, ydn, xd, yo):
+    """pin -> west at yh -> 45 deg down to ydn from x0 (below the S_STROBE_P exit) -> west -> down the margin at xd"""
+    head = [p] if abs(yh - p[1]) < 1e-6 else [p, (5.15, p[1]), (5.15 - (p[1] - yh), yh)]
+    return head + [(x0, yh), (x0 - (ydn - yh), ydn), (xd + 0.4, ydn), (xd, ydn + 0.4), (xd, yo - 0.4), (xd - 0.4, yo),
+                   (0.0, yo)]
+
+
+PHP = ph2(p39, p39[1], 3.4, p39[1] + 1.0, 0.9, YPN)      # pin 39 = PH_STROBE_P (swapped 22 Nov), outer
+LP = bl.plen(PHP)
+lo, hi = YPN + 0.2, YPN + 0.6                      # PH_N exit y solved for equal length
 for _ in range(60):
     mid = (lo + hi) / 2
-    lo, hi = (mid, hi) if bl.plen(ph_pts(p40, 1.26, mid, 10.12)) < LN else (lo, mid)
+    lo, hi = (mid, hi) if bl.plen(ph2(p40, 10.12, 3.6, 10.12 + 1.005, 1.26, mid)) < LP else (lo, mid)
 YPP = round(mid, 4)
-T("/PH_STROBE_N", W50, PHN, ch=0.0001, name="PH_N")
-T("/PH_STROBE_P", W50, ph_pts(p40, 1.26, YPP, 10.12), ch=0.0001, name="PH_P")
+T("/PH_STROBE_P", W50, PHP, ch=0.0001, name="PH_P")
+T("/PH_STROBE_N", W50, ph2(p40, 10.12, 3.6, 10.12 + 1.005, 1.26, YPP), ch=0.0001, name="PH_N")
 RF["/PH_STROBE_N"] = RF["/PH_STROBE_P"] = W50
-blk.iface("/PH_STROBE_N", 0.0, YPN, "F.Cu", "W", "pair", W50, "U501.39; pair with P, equal length; 47 R R411 in pstrobe")
-blk.iface("/PH_STROBE_P", 0.0, YPP, "F.Cu", "W", "pair", W50, "U501.40; pair with N, equal length; 47 R R407 in pstrobe")
+blk.iface("/PH_STROBE_P", 0.0, YPN, "F.Cu", "W", "pair", W50, "U501.39; pair with N, equal length; 47 R R407 in pstrobe")
+blk.iface("/PH_STROBE_N", 0.0, YPP, "F.Cu", "W", "pair", W50, "U501.40; pair with P, equal length; 47 R R411 in pstrobe")
 
 # ---------------- west bundle: COARSE + TAP0..4 from the top pins (L1 stub north, via stair, L6 west and south)
 TOPP = [(27, "/COARSE"), (28, "/TAP0"), (29, "/TAP1"), (30, "/TAP2"), (31, "/TAP3"), (32, "/TAP4")]
@@ -223,14 +231,14 @@ for pin, net, yr in ((6, "/TAP7", 17.2), (8, C("DBG2"), 17.6)):
     edge(net, f"U501.{pin}")
 
 # ---------------- TAP8..10 (bottom pins 9..11) and TAP11..15 (east pins 13..17): L1, via at YE, L6 stub
-for pin, net, yr in ((9, "/TAP8", 16.9), (10, "/TAP9", 16.6), (11, "/TAP10", 16.3)):
+for pin, net, yr in ((9, "/TAP15", 16.9), (10, "/TAP14", 16.6), (11, "/TAP13", 16.3)):
     p = up(pin)
     s = SLOT[net]
     T(net, WS, [p, (p[0], yr), (s, yr), (s, ye(net))], ch=0.3)
     V(s, ye(net), net)
     T(net, WS, [(s, ye(net)), (s, H)], "B.Cu")
     edge(net, f"U501.{pin}")
-for pin, net in ((13, "/TAP11"), (14, "/TAP12"), (15, "/TAP13"), (16, "/TAP14"), (17, "/TAP15")):
+for pin, net in ((13, "/TAP12"), (14, "/TAP11"), (15, "/TAP10"), (16, "/TAP9"), (17, "/TAP8")):
     p = up(pin)
     s = SLOT[net]
     T(net, WS, [p, (s, p[1]), (s, ye(net))], ch=0.3)

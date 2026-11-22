@@ -5,7 +5,7 @@
   {
    "net": "/S_STROBE_P",
    "x": 0.0,
-   "y": 9.365,
+   "y": 10.365,
    "layer": "F.Cu",
    "side": "W",
    "class": "pair",
@@ -15,7 +15,7 @@
   {
    "net": "/S_STROBE_N",
    "x": 0.0,
-   "y": 10.365,
+   "y": 11.365,
    "layer": "F.Cu",
    "side": "W",
    "class": "pair",
@@ -23,24 +23,24 @@
    "note": "U501.35; F - via - B - via - F, terminated only; R405 in analog"
   },
   {
-   "net": "/PH_STROBE_N",
+   "net": "/PH_STROBE_P",
    "x": 0.0,
    "y": 21.35,
    "layer": "F.Cu",
    "side": "W",
    "class": "pair",
    "width": 0.16,
-   "note": "U501.39; pair with P, equal length; 47 R R411 in pstrobe"
+   "note": "U501.39; pair with N, equal length; 47 R R407 in pstrobe"
   },
   {
-   "net": "/PH_STROBE_P",
+   "net": "/PH_STROBE_N",
    "x": 0.0,
-   "y": 21.6864,
+   "y": 21.6893,
    "layer": "F.Cu",
    "side": "W",
    "class": "pair",
    "width": 0.16,
-   "note": "U501.40; pair with N, equal length; 47 R R407 in pstrobe"
+   "note": "U501.40; pair with P, equal length; 47 R R411 in pstrobe"
   },
   {
    "net": "/COARSE",
@@ -203,7 +203,7 @@
    "note": "U501.8"
   },
   {
-   "net": "/TAP8",
+   "net": "/TAP15",
    "x": 14.0,
    "y": 22.0,
    "layer": "B.Cu",
@@ -213,7 +213,7 @@
    "note": "U501.9"
   },
   {
-   "net": "/TAP9",
+   "net": "/TAP14",
    "x": 14.5,
    "y": 22.0,
    "layer": "B.Cu",
@@ -223,7 +223,7 @@
    "note": "U501.10"
   },
   {
-   "net": "/TAP10",
+   "net": "/TAP13",
    "x": 15.0,
    "y": 22.0,
    "layer": "B.Cu",
@@ -233,7 +233,7 @@
    "note": "U501.11"
   },
   {
-   "net": "/TAP11",
+   "net": "/TAP12",
    "x": 15.5,
    "y": 22.0,
    "layer": "B.Cu",
@@ -243,7 +243,7 @@
    "note": "U501.13"
   },
   {
-   "net": "/TAP12",
+   "net": "/TAP11",
    "x": 16.0,
    "y": 22.0,
    "layer": "B.Cu",
@@ -253,7 +253,7 @@
    "note": "U501.14"
   },
   {
-   "net": "/TAP13",
+   "net": "/TAP10",
    "x": 16.5,
    "y": 22.0,
    "layer": "B.Cu",
@@ -263,7 +263,7 @@
    "note": "U501.15"
   },
   {
-   "net": "/TAP14",
+   "net": "/TAP9",
    "x": 17.0,
    "y": 22.0,
    "layer": "B.Cu",
@@ -273,7 +273,7 @@
    "note": "U501.16"
   },
   {
-   "net": "/TAP15",
+   "net": "/TAP8",
    "x": 17.5,
    "y": 22.0,
    "layer": "B.Cu",

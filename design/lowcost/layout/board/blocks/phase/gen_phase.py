@@ -367,19 +367,18 @@ V(XU1, YU1, VSW)
 T(VSW, 0.3, [(XU1, YU1), (XU1, 0.45), (18.65, 0.45), (18.9, 0.7), (18.9, 1.25)], layer="B.Cu", ch=0.3)
 # VCC pin 10 -> east, north beside BUF_OUT_T, C301 (+2V5 / VSW) in the north strip, +2V5 via pair
 XVC = 9.32
-place2("C301", 10.2, 1.4, "v", VSW)
+# 22 Nov (integration): C301 / C306 moved to B under the strip (C301 VSW pad straight onto the VSW B bar, +2V5 via
+# pair between the two caps) and U302's VCC run ends in its own via, so the F side above the pstrobe north-edge
+# inputs (board x 10.0 / 10.6) is free for the PH_STROBE pair on L1
+T("+2V5", 0.3, [p10, (XVC, p10[1]), (XVC, 2.2)], ch=0.06)
+V(XVC, 2.2, "+2V5")
+place2("C301", 10.4, 1.5, "v", VSW, side="B")
+place2("C306", 11.8, 1.5, "v", "GND", side="B")   # second U302 100 n; GND pad into the B pour
 c1v, c1p = P("C301", "@" + VSW), P("C301", "@+2V5")
-T("+2V5", 0.3, [p10, (XVC, p10[1]), (XVC, c1p[1] + 0.45), (XVC + 0.45, c1p[1]), c1p], ch=0.06)
-place2("C306", 11.6, 1.4, "v", "GND")       # second U302 100 n, at the +2V5 via pair
-T("+2V5", 0.3, [c1p, P("C306", "@+2V5")], ch=0)
-T("+2V5", 0.3, [(10.85, c1p[1]), (10.85, c1p[1] - 0.6)], ch=0)
-g = P("C306", "@GND")
-gv(g[0] + 0.7, g[1] + 0.3)
-T("GND", 0.3, [g, (g[0] + 0.4, g[1]), (g[0] + 0.7, g[1] + 0.3)], ch=0)
-V(10.85, c1p[1], "+2V5")
-V(10.85, c1p[1] - 0.6, "+2V5")
-V(c1v[0], 0.45, VSW)
-T(VSW, 0.3, [c1v, (c1v[0], 0.45)], ch=0)
+T("+2V5", 0.3, [c1p, P("C306", "@+2V5")], layer="B.Cu", ch=0)
+V(11.1, c1p[1], "+2V5")
+V(11.1, c1p[1] - 0.63, "+2V5")
+T(VSW, 0.3, [c1v, (c1v[0], 0.45)], layer="B.Cu", ch=0)
 # VSW network on B in the north strip: C302, C303 (GND), R304 (GND), R305 (-2V5), TP301
 for x, ref in ((13.0, "C302"), (14.4, "C303"), (15.8, "R304"), (17.2, "R305")):
     place2(ref, x, 1.5, "v", VSW, side="B")

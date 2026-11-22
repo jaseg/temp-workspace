@@ -19,18 +19,18 @@ IO, PWR = "bidirectional", "power_in"
 # (pin, pin name per UG842, net, how) ; how: h = hierarchical label, l = local label, nc
 # Pin plan after the 6-layer layout permutation (22 Nov 2026, fpga block, layout/board/TOPOLOGY.md section 1):
 # COARSE + TAP0..4 on the top pins 27-32 and TAP5/6 on the free west pins 41/47 (west-going L6 bundle), TAP7 on 6,
-# TAP8..15 on 9-11 and 13-17, ADC_TRIG 18, SPI SCK/MISO/MOSI/CS 20/21/22/24 (L6 lanes under the package), DBG2 8.
+# TAP15..TAP8 (reversed, 22 Nov: east bus order) on 9-11 and 13-17, PH_STROBE_P / _N on 39 / 40 (swapped, 22 Nov), ADC_TRIG 18, SPI SCK/MISO/MOSI/CS 20/21/22/24 (L6 lanes under the package), DBG2 8.
 # Old map: TAP0..15 = 9,10,11,13-24,27; SPI SCK/MOSI/MISO/CS = 28/29/30/31; COARSE 47; ADC_TRIG 41; DBG2 6; NC 8/32.
-BANK1 = [(9, "IOR2A", "TAP8", "h"), (10, "IOR2B", "TAP9", "h"), (11, "IOR3A", "TAP10", "h"),
-         (13, "IOR10B", "TAP11", "h"), (14, "IOR6B/MO/D6", "TAP12", "h"), (15, "IOR6D/MCLK/D4", "TAP13", "h"),
-         (16, "IOR6F", "TAP14", "h"), (17, "IOR6G", "TAP15", "h"), (18, "IOR6H", "ADC_TRIG", "h"),
+BANK1 = [(9, "IOR2A", "TAP15", "h"), (10, "IOR2B", "TAP14", "h"), (11, "IOR3A", "TAP13", "h"),
+         (13, "IOR10B", "TAP12", "h"), (14, "IOR6B/MO/D6", "TAP11", "h"), (15, "IOR6D/MCLK/D4", "TAP10", "h"),
+         (16, "IOR6F", "TAP9", "h"), (17, "IOR6G", "TAP8", "h"), (18, "IOR6H", "ADC_TRIG", "h"),
          (19, "IOR6J/DOUT/WE_N", None, "nc"), (20, "IOR10A", "SPI_SCK", "h"), (21, "IOR7B/GCLKC_3", "SPI_MISO", "h"),
          (22, "IOR9A/SI/D2", "SPI_MOSI", "h"), (23, "IOR8B", None, "nc"), (24, "IOR8A/SO/D1", "SPI_CS", "h"),
          (27, "IOR7A/GCLKT_3/SSPI_CS_N/D0", "COARSE", "h"), (28, "IOR6I/DIN/CLKHOLD_N", "TAP0", "h"),
          (29, "IOR6E/FASTRD_N/D3", "TAP1", "h"), (30, "IOR6C/MCS_N/D5", "TAP2", "h"),
          (31, "IOR6A/MI/D7", "TAP3", "h"), (33, "IOR5A/GCLKT_2/RPLL_T_in", "FPGA_CLK", "l"),
          (32, "IOR5B/GCLKC_2/RPLL_C_in", "TAP4", "h"), (34, "IOR3B", "CLK2_FPGA", "l")]
-BANK0 = [(40, "IOT16A", "PH_STROBE_P", "h"), (39, "IOT16B", "PH_STROBE_N", "h"),
+BANK0 = [(40, "IOT16A", "PH_STROBE_N", "h"), (39, "IOT16B", "PH_STROBE_P", "h"),
          (38, "IOT17A", "S_STROBE_P", "h"), (35, "IOT17B", "S_STROBE_N", "h"),
          (41, "IOT15B", "TAP5", "h"), (47, "IOT10A/GCLKT_0", "TAP6", "h"),
          (48, "IOT9B/RECONFIG_N", "FPGA_RECONFIG", "h"), (46, "IOT12A/DONE", "FPGA_DONE", "h"),
@@ -192,7 +192,7 @@ def main():
             "CLK2 -> FPGA pin 34 (spare clock / beat mode). One 100 nF each at VDD and VDDO.",
             (g(25), g(98)))
     sh.text("Pin plan (UG842), permuted for the 6-layer fan-out: COARSE 27 (GCLKT_3), TAP0..4 = 28-32,\n"
-            "TAP5/6 = 41/47, TAP7 = 6, TAP8..15 = 9-11, 13-17; ADC_TRIG 18; SPI SCK/MISO/MOSI/CS = 20/21/22/24;\n"
+            "TAP5/6 = 41/47, TAP7 = 6, TAP15..8 = 9-11, 13-17 (reversed, board fan-out); ADC_TRIG 18; SPI SCK/MISO/MOSI/CS = 20/21/22/24;\n"
             "DBG2 8 (to J501 pin 5); FPGA_CLK 33, CLK2 34. Strobes OSER10 on IOT16A/B, IOT17A/B; config, JTAG fixed.\n"
             "Unused: 19, 23.", (g(150), g(200)))
     sh.save()

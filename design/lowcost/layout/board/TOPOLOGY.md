@@ -69,3 +69,22 @@ the strobe: treat as sensitive, not fast).
 shifter, TLV3801, U701, tap readout), +1V2 (to the FPGA), VBUS (to the GVA-84+ chokes in pstrobe and to
 J501 pin 1), VTAP_P / VTAP_N strips under the tap row (fed from +2V5 / -2V5 at the east end). L4 is cleared
 under the node windows. Every supply via lands inside its zone; no supply runs as a track.
+
+## 7. Revision of 22 Nov 2026 (integration, second pass)
+- Section 1 order as built in the fpga block: `COARSE | TAP0..TAP7 | DBG2 TCK TMS TDI TDO | MCU_CLK SPI_CS I2C_SDA FPGA_DONE
+  SPI_MOSI SPI_MISO SPI_SCK I2C_SCL FPGA_RECONFIG ADC_TRIG | TAP15 TAP14 ... TAP8` (east group reversed, TAP8 eastmost:
+  pins 9, 10, 11, 13, 14, 15, 16, 17 = TAP15 ... TAP8 in gen_fpga_clock.py). Intended: the middle group and the east TAPs
+  drop south together to the highway; turning east, TAP8 / TAP9 are northmost and peel north first to U309, then
+  TAP10 / 11 to U310 and so on; the MCU group lies south of them and turns south into its lanes; JTAG turns west.
+- PH_STROBE_P / _N now on U501 pins 39 / 40 (swapped), so the pair reaches the pstrobe inputs (10.00 / 10.60, 25.00)
+  without a crossing; it runs on L1 along y 21.85 / 22.19, then 22.85 / 23.21 (south of BUF_OUT_T at y 22.35).
+- S_STROBE_P / _N: the fpga block now ends them on the analog E rows (board y 10.865 / 11.865): abutting, no vias on P.
+- NOT yet buildable (blocker, see README): the drop of the 23-track middle + east group. U309 (x 63.5-68) sits directly
+  under the MCU-group slots (x 65.0-69.5); its output vias (65.10 / 66.37, 23.92) and pin-5 GND via are in the fan-in area;
+  each comparator gap is only 4.4 mm (17 tracks at 0.25 mm). A buildable variant needs: (a) comparator outputs U309-U312
+  on vias under the SOIC body (about y 26.9, L1 stub from pins 6 / 7) and the cap / pin-5 vias moved off y 23-24.3,
+  (b) R380 / R381 / C354 / C355 + the VTAP_TH column out of the U308|U309 gap, (c) JTAG through gap U308|U309, MCU + TAP
+  through gap U309|U310, with TAP8 / TAP9 reaching U309 from that gap on a short west-going L6 band at y 27.4 / 27.75
+  (below the under-body output vias, above the VTH via row), which needs the fpga slot order
+  `... | MCU | TAP9 TAP8 | TAP15 ... TAP10` - and that order needs the fpga's DONE / RECONFIG F runs (local y 18.1 / 18.5)
+  moved, because the TAP F escapes would cross them.

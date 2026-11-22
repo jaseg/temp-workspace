@@ -135,6 +135,14 @@
       },
       {
         "netclass": "RF50",
+        "pattern": "/PH_STROBE_N"
+      },
+      {
+        "netclass": "RF50",
+        "pattern": "/PH_STROBE_P"
+      },
+      {
+        "netclass": "RF50",
         "pattern": "/S_STROBE_N"
       },
       {
