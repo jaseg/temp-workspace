@@ -610,7 +610,7 @@ JOIN_MAX = 25.0
 STAIRCASE = (0.0, 20.5, 56.0, 23.5)      # board mm: L6 COARSE / TAP staircase band, no joins there
 BRANCH_W = 0.8
 BRANCH_MAX = 6.0
-BRANCH_CLR = 0.4          # branch track to foreign via / copper
+BRANCH_CLR = 0.3          # branch track to foreign via / copper
 FPGA_RECT = (56.0, 0.5, 74.0, 22.5)
 PRIO_L3 = 3
 ROUTE_CORRIDORS = False   # corridors as hand-drawn ZONES (they flow around foreign vias)
@@ -1264,7 +1264,7 @@ class Maze:
         RES = MAZE_RES
         try:
             G = self.G
-            m = MAZE_CLR + MAZE_RES / 2 + 0.15     # + chamfer / diagonal-segment allowance
+            m = MAZE_CLR + MAZE_RES / 2 + 0.06     # + 45-degree chamfer allowance (chamfer 0.12)
             c3, c6, cv = self.static.copy(), self.static.copy(), self.static.copy()
             rv = VIA_D / 2
             for key, kind, geom, r, n in self.items:
@@ -1517,7 +1517,7 @@ def smooth45(line):
             out.append(p)
     if len(out) < 3:
         return out
-    return bl.chamfer(out, 0.2)
+    return bl.chamfer(out, 0.12)
 
 
 def selfcheck(board):
@@ -1583,7 +1583,12 @@ def edge_strip_fallback(board, nets, report, l6occ, occ, stats, still):
     ox, oy = _org(board)
     names = [nets[r] for r in ISLANDS if r in nets]
     left = []
+    done_nets = set()
     for net, items, why in still:
+        if net in done_nets:
+            left.append((net, items, why))
+            continue
+        done_nets.add(net)
         comps = net_components(board, [net]).get(net, [])
         real = [c for c in comps if any(d[0] != "zone" for d in c)]
         if len(real) < 2:
