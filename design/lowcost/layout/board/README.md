@@ -44,25 +44,16 @@ Rule check of the drawn geometry: 0 same-layer crossings, 0 clearance, 0 corners
 beside every inter-block signal via (stitching module; the highway-end USB pair uses the phase GND via at (88.09, 31.41)).
 
 ## Not done / open (ranked)
-1. **Nine slow lines (TOPOLOGY.md section 8): not drawn.** `board_slow.py` (planner: fixed layer sequence / via points,
-   octilinear grid search per single-layer leg) exists but is NOT called by gen_board.py. Measured against the current
-   board (after `board_power.apply`), the obstacles are:
-   - L3: the +2V5 / -2V5 / VBUS corridors run across the board at y 22.7-23.6 / 24.5-25.4 / 26.3-27.2 from x about 5-26
-     to 85-89, +2V5 turns north at x 28.3-28.7 (y 8.5-22.4), VBUS turns south at x 21.4-21.9 (y 27.5-47), -2V5 south at
-     x 12.7-13.8 and x 4.4-6.0, and VTAP_N / VTAP_P run along the whole tap row (y 32.9 / 41.3). The only L3 space south
-     of the corridors that the mcuif lines can reach is the channel y 27.5-32.4 (x 22-88), closed in the west by VBUS.
-   - L6 crossings of the corridor band: COARSE (y 20.9, x 23.6-58; y 22.45, x 4.45-22.15), the TAP0-7 staircase, the JTAG
-     band (y 24.75-25.95, x 39.4-64.5) and the MCU fan wall it off except a passage x 26.75-28.6 (between the comparator
-     GND via (26.41, 23.07) and TAP0's drop x 28.98). Its south end lies under U305's pin 1 / 8 pads and the VTH1 rail
-     start (28.68, 27.755), its north end between COARSE (L6, y 20.9) and the PH_STROBE pair (L1, y 21.85): vias fit only
-     in y 21.28-21.45 there - room for about two lines, not six.
-   - Tap-row crossing on L6: via spots in the channel exist only in lanes 5 (2 lines), 6 and 8 (one each, under U308 /
-     U309 between the pad rows) and 7 (the VTAP_TH column); MCU_CLK's jog (lane 9 -> 73.35) encloses the ADC_IN / TRIG_SEL
-     stubs (71.0 / 71.5): MCU_CLK must move to lane 10 first.
-   - VOFS / VNEG_REF (analog x 1.0 / 1.94) and DAC_TRIG / TRIG_SEL (phase x 4.6 / 9.25) sit behind the -2V5 / VBUS
-     verticals (pockets x 0-4.4 and x 6-21, y 33-50) with no L3 or L6 path from the mcuif.
-   Needed (power module / lead): a 2-3 mm wide L3 gap in the corridor band near x 24-28 (or a slow channel along y 20-22
-   west of x 28), a gap in the VBUS / -2V5 verticals at y 29-31 for the west group, then the plan above is drawable.
+1. **Slow bias / control lines (`board_slow.py`, drawn before the power module):** L6 from the mcuif stubs (strip levels
+   y 41.8-44.6 nested in source order) up tap-row lanes 1 (VNEG_REF 35.09), 5 (ADC_REF_MID 52.7, DAC_TRIG 53.3),
+   6 (VOFS 57.3, VBIAS_A 57.85), 7 (VBIAS_K 61.8, VTAP_TH 62.35), 8 (TRIG_SEL 66.3, ADC_IN 66.85); L6->L3 vias between the
+   comparators' pad rows or just south of them (y 26.9-32.0, all north of y 33.2); an explicit L3 band under the
+   comparators (y 26.9 / 28.0 / 29.1 / 29.55 / 30.1 / 30.55 / 31.95 / 32.45, ADC_IN 1.1 mm from its neighbours) west to
+   x 27.6, then a grid search to the block ends. VTAP_TH is pure L6 (ends on the R380 / R381 link; TP305 moved).
+   **Routed: ADC_REF_MID, ADC_IN, VBIAS_K, TRIG_SEL, VTAP_TH. Not routed: VBIAS_A, VNEG_REF, VOFS, DAC_TRIG** -
+   obstacle: west of x 27.6 the band runs into the pstrobe chain-A pad-cut keep-outs on L3 (x 19.2-24.4, y 28.75-31.6,
+   e.g. (23.78-24.42, 29.1-31.56), (22.18-23.08, 28.75-30.05)) and, north of them, ADC_IN's 1 mm zone; the remaining
+   lines must leave the band north before x 25 (needs re-ordered band levels) or go south of y 31.6. Not finished.
 2. Power (second agent's `board_power.py`): its current output is reported verbatim below; the rail corridors are its job.
 3. TAP8 / TAP9 use an L1 hop (two vias per net, over L2 ground) - the only fast nets with a section on L1.
 4. Phase still has the old open points (strobe lines load to about 41 R against 49.9 R terminations; effective tap spacing

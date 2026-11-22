@@ -290,7 +290,8 @@ for j, net in enumerate(JT):
 # the VTH via below it); the MCU group (south) turns south into tap-row lanes 9-12 and jogs onto the mcuif interfaces.
 MG = ["/MCU_CLK", "/SPI_CS", "/I2C_SDA", "/FPGA_DONE", "/SPI_MOSI", "/SPI_MISO", "/SPI_SCK", "/I2C_SCL",
       "/FPGA_RECONFIG", "/ADC_TRIG"] + [f"/TAP{k}" for k in range(15, 9, -1)]
-MLANE = {"/MCU_CLK": (LANE_C(9), 42.0), "/SPI_CS": (LANE_C(10) - 0.25, 42.05), "/I2C_SDA": (LANE_C(10), 41.95),
+MLANE = {"/MCU_CLK": (LANE_C(10) - 0.5, 42.0),           # lane 10 (west slot): frees the ADC_IN / TRIG_SEL stubs
+         "/SPI_CS": (LANE_C(10) - 0.25, 42.05), "/I2C_SDA": (LANE_C(10), 41.95),
          "/FPGA_DONE": (LANE_C(10) + 0.25, 41.85), "/SPI_MOSI": (LANE_C(11) - 0.42, 41.9),
          "/SPI_MISO": (LANE_C(11) - 0.19, 42.0), "/SPI_SCK": (LANE_C(11) + 0.04, 42.1),
          "/I2C_SCL": (LANE_C(11) + 0.27, 42.0), "/FPGA_RECONFIG": (LANE_C(12) - 0.13, 42.0),
@@ -329,6 +330,30 @@ for net, sx, yv, yf in (("/TAP8", 73.5, 22.75, 22.75), ("/TAP9", 73.0, 23.25, 23
     pts = [(sx, yv)] + ([(sx - (yv - yf), yf)] if yv != yf else []) + [(vx, yf), padxy]
     T(net, W_BUS, pts, "F.Cu", f"L1 hop y {yf:.2f} over the fan into U309 pad", ch=0.1)
 m.via(74.1, 23.35, "GND")              # ground via beside the two hop vias
+# ---------------------------------------------------------------- slow bias / control lines (board_slow.py)
+# block ends: VOFS / VNEG_REF at their analog vias (1.0 / 1.94, 19.2; the B stubs below are removed), DAC_TRIG / TRIG_SEL
+# on a via placed on the phase B stub (4.6, 41.0) / (9.25, 44.6) (stub ends beyond removed), VTAP_TH on the R380 / R381 link
+for net, x in (("/VOFS", 1.0), ("/VNEG_REF", 1.94)):
+    for t, e, o in seg_at(net, (x, 22.5), "B.Cu"):
+        B.Remove(t)
+for net, (x, yc) in (("/DAC_TRIG", (4.6, 41.0)), ("/TRIG_SEL", (9.25, 44.6))):
+    for t in segs(net, "B.Cu"):
+        a_, b_ = loc(t.GetStart()), loc(t.GetEnd())
+        if abs(a_[0] - x) < 0.02 and abs(b_[0] - x) < 0.02 and max(a_[1], b_[1]) > yc:
+            lo, hi = sorted((a_[1], b_[1]))
+            if lo >= yc - 1e-6:
+                B.Remove(t)
+            else:
+                t.SetStart(m.P(x, lo)); t.SetEnd(m.P(x, yc))
+    m.via(x, yc, net)
+import board_slow
+SLOW = board_slow.draw(B, m, mc_if, phase_if["/VTAP_TH"])
+print("slow lines:", SLOW)
+for net, (ok, L_, nv) in SLOW.items():
+    LOG.append((net, "B.Cu+In2.Cu", "slow line (board_slow.py): L6 tap-row lane, L3 north", L_))
+    if not ok:
+        NOT_PLACED.append((net, "board_slow: no L3 path (see log)"))
+
 bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
 print("NOT PLACED:")
 for r in NOT_PLACED:
@@ -351,17 +376,24 @@ for z in list(B.Zones()):                          # L4 belongs to board_power.p
 for z in B.Zones():
     if not z.GetIsRuleArea():
         z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
-import board_power
-board_power.apply(B)
 import board_stitch
 SIGV = [(86.4, 27.2), (86.9, 26.7), (86.4, 29.4), (86.9, 29.9), (86.4, 31.06), (87.39, 31.45), (88.0, 44.35), (89.6, 43.9), (73.5, 22.75), (73.0, 23.25)] + \
     [loc(v.GetPosition()) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
-     v.GetNetname() in ("/VBIAS_A", "/VBIAS_K", "/ADC_IN", "/ADC_REF_MID")]
+     v.GetNetname() in ("/VBIAS_A", "/VBIAS_K", "/ADC_IN", "/ADC_REF_MID", "/VOFS", "/VNEG_REF", "/DAC_TRIG",
+                        "/TRIG_SEL")]
 RFT = [(loc(t.GetStart()), loc(t.GetEnd()), pcbnew.ToMM(t.GetWidth())) for t in B.GetTracks()
        if t.GetClass() == "PCB_TRACK" and t.GetNetname() in ("/BUF_OUT_T", "/PH_STROBE_P", "/PH_STROBE_N")]
 NST = board_stitch.stitch(B, m, RFT, SIGV)
 print("GND stitching:", NST)
 bf.silk(B, m)
+# routes.json first (board_power.py reads it), then the power module as the LAST copper step
+json.dump({"log": LOG, "not_placed": NOT_PLACED, "rf": RF, "stitch": NST}, open(os.path.join(HERE, "routes.json"), "w"),
+          indent=1)
+import board_power
+try:
+    board_power.apply(B)
+except Exception as e_:                            # the module belongs to the power agent: report, do not fix
+    print("board_power.apply FAILED:", repr(e_))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 bl.save_board(B, OUT)
 bf.write_pro(OUT.replace(".kicad_pcb", ".kicad_pro"), sorted(RF))

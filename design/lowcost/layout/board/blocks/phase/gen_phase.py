@@ -338,11 +338,13 @@ for cref, rref, net in (("C354", "R380", "/trigger_phase/VTH1"), ("C355", "R381"
     gx = g[0] - 0.75          # 22 Nov: both GND vias west (C355's east via sat on the U309 under-body TAP8 via)
     gv(gx, g[1])
     T("GND", W_GND, [g, (gx, g[1])], layer="B.Cu", ch=0)
-# VTAP_TH down to the south edge on B.Cu (between taps 7 and 8, clear of the jumpers), TP305 on B
+# 22 Nov: VTAP_TH no longer runs down to the south edge here: the board brings it up tap-row lane 7 on L6 and ends on
+# the R380 / R381 link (x 62.35); TP305 sits north of the link (B), clear of the L6 lanes
 xv = XT[8] - 3.65
-T("/VTAP_TH", 0.25, [(xv, VTH_Y), (xv, BH)], layer="B.Cu", ch=0)
-bplace("TP305", xv, BH - 1.3, 0, side="B")
-blk.iface("/VTAP_TH", xv, BH, "B.Cu", "S", "slow", 0.25, "R380/R381 1 k to VTH1/VTH2")
+yt = VTH_Y - 1.52
+bplace("TP305", xv, yt, 0, side="B")
+T("/VTAP_TH", 0.25, [(xv, yt), (xv, VTH_Y)], layer="B.Cu", ch=0)
+blk.iface("/VTAP_TH", xv + 0.42, VTH_Y, "B.Cu", "S", "slow", 0.25, "R380/R381 1 k link; the board joins from the south (lane 7)")
 
 # --- VTAP strips (In2) decoupling: C358/C359 (VTAP_N) and C356/C357 (VTAP_P), mirror images, at taps 1 / 13
 for tap, cn, cp_ in ((1, "C358", "C356"), (13, "C359", "C357")):

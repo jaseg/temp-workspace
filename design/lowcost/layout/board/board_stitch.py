@@ -112,8 +112,8 @@ def stitch(B, m, rf_tracks, sig_vias):
 
     for sx, sy in sig_vias:
         done = False
-        for rad in (0.75, 0.9, 1.1):
-            for a in range(0, 360, 30):
+        for rad in (0.7, 0.8, 0.9, 1.0):
+            for a in range(0, 360, 15):
                 x, y = sx + rad * math.cos(math.radians(a)), sy + rad * math.sin(math.radians(a))
                 if ok(x, y):
                     place(x, y)

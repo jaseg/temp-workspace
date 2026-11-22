@@ -3,6 +3,7 @@
 
     import board_power
     board_power.apply(board)            # after all blocks are merged and all supply vias exist
+    board.BuildConnectivity()
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     print(board_power.table(board_power.verify(board)))
 
@@ -600,7 +601,7 @@ TRUNKS = {
     ],
 }
 # L6 (B.Cu) tracks: J501 pin 1 programmer supply (0.5 mm, TOPOLOGY.md section 8)
-L6_TRACKS = {"VBUS": [([(22.78, 48.65), (28.6, 54.47), (32.47, 54.47)], 0.5)]}
+L6_TRACKS = {}            # J501 pin 1 (VBUS) is joined by the maze router like any other stranded load
 # L6 hops: (rail, L6 polyline board mm, width); a 3-via array (0.8 mm pitch) sits on each end, oriented along
 # the L3 corridor it lands on (dir = unit vector of that corridor)
 HOPS = []                 # none needed (the +2V5 east branch passes north of the -2V5 / VBUS landing vias)
@@ -609,7 +610,7 @@ JOIN_MAX = 25.0
 STAIRCASE = (0.0, 20.5, 56.0, 23.5)      # board mm: L6 COARSE / TAP staircase band, no joins there
 BRANCH_W = 0.8
 BRANCH_MAX = 6.0
-BRANCH_CLR = 0.2          # branch track to foreign via / copper
+BRANCH_CLR = 0.27         # branch track to foreign via / copper
 FPGA_RECT = (56.0, 0.5, 74.0, 22.5)
 PRIO_L3 = 3
 ROUTE_CORRIDORS = False   # corridors as hand-drawn ZONES (they flow around foreign vias)
@@ -670,20 +671,29 @@ def remove_old(board, nets):
         board.Delete(t)
     import json
     import os
-    jp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L6.json")
-    if os.path.exists(jp):
-        segs = set()
+    segs, vpos = set(), set()
+    for fn in ("board_power_L6.json", "board_power_L3.json"):
+        jp = os.path.join(os.path.dirname(os.path.abspath(__file__)), fn)
+        if not os.path.exists(jp):
+            continue
         for it in json.load(open(jp)).get("items", []):
-            if it.get("kind") in ("join", "hop", "track"):
-                P = it["pts"]
+            P = it.get("pts", [])
+            if it.get("kind") in ("join", "hop", "track", "maze"):
                 for a_, b_ in zip(P[:-1], P[1:]):
                     segs.add((round(a_[0] + ox, 2), round(a_[1] + oy, 2), round(b_[0] + ox, 2), round(b_[1] + oy, 2)))
-        for t in [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetLayer() == pcbnew.B_Cu
-                  and t.GetNetname() in names]:
-            a_, b_ = t.GetStart(), t.GetEnd()
-            k = (round(a_.x / MM, 2), round(a_.y / MM, 2), round(b_.x / MM, 2), round(b_.y / MM, 2))
-            if k in segs or (k[2], k[3], k[0], k[1]) in segs:
+            if it.get("kind") in ("maze_via", "via_array"):
+                for q in P:
+                    vpos.add((round(q[0] + ox, 2), round(q[1] + oy, 2)))
+    for t in [t for t in board.GetTracks() if t.GetNetname() in names | set(STRIPS)]:
+        if t.GetClass() == "PCB_VIA":
+            q = t.GetPosition()
+            if (round(q.x / MM, 2), round(q.y / MM, 2)) in vpos:
                 board.Delete(t)
+            continue
+        a_, b_ = t.GetStart(), t.GetEnd()
+        k = (round(a_.x / MM, 2), round(a_.y / MM, 2), round(b_.x / MM, 2), round(b_.y / MM, 2))
+        if k in segs or (k[2], k[3], k[0], k[1]) in segs:
+            board.Delete(t)
     kill = []
     for z in board.Zones():
         nm = str(z.GetZoneName())
@@ -711,10 +721,10 @@ def new_zone(board, net, shape, prio, name, layer=LAYER):
     z.SetLayer(layer)
     z.SetNetCode(board.FindNet(net).GetNetCode())
     z.SetAssignedPriority(prio)
-    z.SetLocalClearance(fmm(CLEAR))
-    z.SetMinThickness(fmm(MINW))
+    z.SetLocalClearance(fmm(0.2 if layer == L3 else CLEAR))
+    z.SetMinThickness(fmm(0.5 if layer == L3 else MINW))
     z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
-    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS if prio == PRIO_BG else pcbnew.ISLAND_REMOVAL_MODE_NEVER)
+    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
     z.SetZoneName(name)
     cp = pcbnew.SHAPE_POLY_SET(shape)
     cp.thisown = False
@@ -935,8 +945,7 @@ def _branches(board, nets, pts, corr_abs, report):
                     report.setdefault("unreached", []).append((rail, round(x - bb[0], 3), round(y - bb[1], 3),
                                                                f"{L:.1f} mm from corridor"))
                     continue
-                line[-1] = (x, y)
-                out[rail].append(line)
+                out[rail].append(line)            # ends inside the via copper (no off-grid snap)
                 drawn.append((rail, line))
     finally:
         RES = old
@@ -1017,6 +1026,8 @@ def net_components(board, names):
         for i in idx:
             it = items[i]
             if isinstance(it, tuple):
+                if it[2] == L3:
+                    comps.setdefault(find(i), []).append(("zone", "", 0.0, 0.0, False, False, it[3]))
                 continue
             if isinstance(it, pcbnew.PAD):
                 q = it.GetPosition()
@@ -1028,7 +1039,7 @@ def net_components(board, names):
             else:
                 continue
             comps.setdefault(find(i), []).append(desc)
-        out[codes[code]] = sorted(comps.values(), key=len, reverse=True)
+        out[codes[code]] = sorted(comps.values(), key=lambda c: sum(1 for d in c if d[0] != "zone"), reverse=True)
     return out
 
 
@@ -1176,6 +1187,8 @@ def gap_arrays(board, nets, report, l6occ):
 
 
 MAZE_RES = 0.2
+MAZE_ORDER = []          # natural net order (tested best on the 22 Nov board)
+_ADDED = []
 _MAZE_VIAS = {}
 MAZE_WIDTHS = (0.8, 0.6, 0.5)
 MAZE_CLR = 0.2            # to foreign copper (+ half a grid cell of rasterisation margin)
@@ -1285,7 +1298,58 @@ class Maze:
         finally:
             RES = old
 
-    def route(self, net, src, dst, w, cores):
+    def add_track(self, net, line, w, layer):
+        key = 3 if layer == L3 else 6
+        for p, q in zip(line[:-1], line[1:]):
+            self.items.append((key, "seg", (p, q), w / 2, net))
+
+    def add_via(self, net, x, y):
+        self.items.append(("all", "disk", (x, y), VIA_D / 2, net))
+
+    def comp_cells(self, comp):
+        """L3 cells (well inside) of the filled zone pieces of one component."""
+        global RES
+        old = RES
+        RES = MAZE_RES
+        try:
+            out = set()
+            for d in comp:
+                if d[0] != "zone":
+                    continue
+                sp = d[6]
+                for i in range(sp.OutlineCount()):
+                    m = self.G.empty()
+                    self.G.poly(m, poly_points(sp, i))
+                    m &= ~dilate(~m, 0.45)
+                    out.update(np.flatnonzero(m.ravel()).tolist())
+            return out
+        finally:
+            RES = old
+
+    def zone_cells(self, net, pts_in, want_in):
+        """L3 cells of this net's filled zone pieces that contain (want_in=True) / do not contain any of pts_in."""
+        global RES
+        old = RES
+        RES = MAZE_RES
+        try:
+            out = set()
+            for z in self.board.Zones():
+                if z.GetIsRuleArea() or z.GetNetname() != net or not z.GetLayerSet().Contains(L3):
+                    continue
+                fl = z.GetFilledPolysList(L3)
+                for i in range(fl.OutlineCount()):
+                    has = any(fl.Contains(pcbnew.VECTOR2I(fmm(x), fmm(y)), i) for x, y, _ in pts_in)
+                    if has != want_in:
+                        continue
+                    m = self.G.empty()
+                    self.G.poly(m, poly_points(fl, i))
+                    m &= ~dilate(~m, 0.45)            # stay well inside the piece
+                    out.update(np.flatnonzero(m.ravel()).tolist())
+            return out
+        finally:
+            RES = old
+
+    def route(self, net, src, dst, w, cores, force=False, src_cells=(), dst_cells=()):
         """src / dst: lists of (x, y, layers) with layers a subset of {0: L3, 1: L6}. Returns list of runs
         [(layer, [(x, y), ...])] and via points, or None."""
         global RES
@@ -1310,18 +1374,28 @@ class Maze:
             for (x, y, lays) in src:
                 for c in cells(x, y):
                     for L in lays:
-                        fl[L][c] = True
+                        if force:
+                            fl[L][c] = True
+                        if not fl[L][c]:
+                            continue
                         u = L * N + c
                         if u not in dist:
                             dist[u] = 0.0
                             prev[u] = -1
                             heapq.heappush(h, (0.0, u))
-            tg = set()
+            for c in src_cells:
+                if fl[0][c] and c not in dist:
+                    dist[c] = 0.0
+                    prev[c] = -1
+                    heapq.heappush(h, (0.0, c))
+            tg = set(c for c in dst_cells if fl[0][c])
             for (x, y, lays) in dst:
                 for c in cells(x, y):
                     for L in lays:
-                        fl[L][c] = True
-                        tg.add(L * N + c)
+                        if force:
+                            fl[L][c] = True
+                        if fl[L][c]:
+                            tg.add(L * N + c)
             found = None
             while h:
                 d, u = heapq.heappop(h)
@@ -1428,7 +1502,74 @@ def fix_3v3_island(board, nets, report, l6occ):
     report["3v3_vias"] = added
 
 
-def maze_connect(board, nets, report, l6occ, occ, rounds=4):
+def smooth45(line):
+    """cut every joint sharper than 45 degrees (90 / 135-degree octilinear turns) with 45-degree chamfers."""
+    sys.path.insert(0, __file__.rsplit("/", 1)[0])
+    import boardlib as bl
+    out = [line[0]]
+    for p in line[1:]:
+        if math.hypot(p[0] - out[-1][0], p[1] - out[-1][1]) > 1e-6:
+            out.append(p)
+    if len(out) < 3:
+        return out
+    return bl.chamfer(out, 0.3)
+
+
+def selfcheck(board):
+    """DRC-like check of the copper added by apply(): clearance (< 0.2 mm, crossings included) of every added
+    track against foreign tracks / vias / pads on its layer, joints sharper than 45 degrees, ends inside pads
+    off the pad axis."""
+    sys.path.insert(0, __file__.rsplit("/", 1)[0])
+    import boardlib as bl
+    clr, corner, axis = [], [], []
+    tracks = [t for t in board.GetTracks()]
+    pads = [p for f in board.GetFootprints() for p in f.Pads()]
+    addset = {(n, l, round(a[0], 3), round(a[1], 3), round(b[0], 3), round(b[1], 3))
+              for n, l, line, w in _ADDED for a, b in zip(line[:-1], line[1:])}
+    mine = []
+    for t in tracks:
+        if t.GetClass() != "PCB_TRACK":
+            continue
+        a, b = t.GetStart(), t.GetEnd()
+        k = (t.GetNetname(), t.GetLayer(), round(a.x / MM, 3), round(a.y / MM, 3), round(b.x / MM, 3), round(b.y / MM, 3))
+        if k in addset:
+            mine.append(t)
+    for t in mine:
+        lay = t.GetLayer()
+        sh = t.GetEffectiveShape(lay)
+        tb = t.GetBoundingBox()
+        tb.Inflate(fmm(1.0))
+        for o in tracks:
+            if o.GetNetname() == t.GetNetname() or not (o.GetClass() == "PCB_VIA" or o.GetLayer() == lay):
+                continue
+            if not tb.Intersects(o.GetBoundingBox()):
+                continue
+            if sh.Collide(o.GetEffectiveShape(lay), fmm(0.2) - 1):
+                p = o.GetPosition()
+                clr.append((t.GetNetname(), o.GetNetname(), board.GetLayerName(lay), round(p.x / MM - 100, 2),
+                            round(p.y / MM - 100, 2)))
+        for pd in pads:
+            if pd.GetNetname() == t.GetNetname() or not pd.IsOnLayer(lay):
+                continue
+            if not tb.Intersects(pd.GetBoundingBox()):
+                continue
+            if sh.Collide(pd.GetEffectiveShape(lay), fmm(0.2) - 1):
+                clr.append((t.GetNetname(), f"{pcbnew.Cast_to_FOOTPRINT(pd.GetParent()).GetReference()}."
+                                            f"{pd.GetNumber()}", board.GetLayerName(lay)))
+    for n, l, line, w in _ADDED:
+        for a, b, c in zip(line[:-2], line[1:-1], line[2:]):
+            if bl.turn_deg(a, b, c) > 45.5:
+                corner.append((n, round(b[0] - 100, 2), round(b[1] - 100, 2)))
+        for e, o in ((line[0], line[1]), (line[-1], line[-2])):
+            for pd in pads:
+                if pd.GetNetname() == n and pd.IsOnLayer(l) and pd.HitTest(pcbnew.VECTOR2I(fmm(e[0]), fmm(e[1]))):
+                    ang = (math.degrees(math.atan2(o[1] - e[1], o[0] - e[0])) - pd.GetOrientationDegrees()) % 90
+                    if min(ang, 90 - ang) > 1.0:
+                        axis.append((n, round(e[0] - 100, 2), round(e[1] - 100, 2)))
+    return dict(clearance=clr, corners=corner, pad_axis=axis)
+
+
+def maze_connect(board, nets, report, l6occ, occ, rounds=8):
     """Connect every stranded component of every rail to its main component with the L3 / L6 maze router."""
     _MAZE_VIAS.clear()
     ox, oy = _org(board)
@@ -1437,53 +1578,65 @@ def maze_connect(board, nets, report, l6occ, occ, rounds=4):
     still = []
     for rnd in range(rounds):
         comps = net_components(board, names)
-        todo = [(n, cl) for n, cl in comps.items() if len(cl) > 1]
+        todo = [(n, cl) for n, cl in comps.items() if sum(1 for c in cl if any(d[0] != "zone" for d in c)) > 1]
+        report.setdefault("maze_rounds", []).append({n: sum(1 for c in cl if any(d[0] != "zone" for d in c))
+                                                     for n, cl in todo})
         if not todo:
             break
+        # nets that failed in an earlier round go first (they get the scarce channels)
+        failed = {n for n, *_ in still}
+        todo.sort(key=lambda t: (t[0] not in failed, MAZE_ORDER.index(t[0]) if t[0] in MAZE_ORDER else 99))
         M = Maze(board)
         progress = False
         still = []
         for net, cl in todo:
             def ends(comp):
-                e = []
-                for d in comp:
-                    if d[0] == "via" or d[4]:
-                        e.append((d[2], d[3], (0, 1)))
-                    elif d[5]:
-                        e.append((d[2], d[3], (1,)))
+                e = [(d[2], d[3], (0, 1)) for d in comp if d[0] == "via"]
+                if not e:
+                    e = [(d[2], d[3], (0, 1)) for d in comp if d[0] == "pad" and d[4]]
                 return e
-            cores = M.masks(net)
             main = ends(cl[0])
             for comp in cl[1:]:
+                if all(d[0] == "zone" for d in comp):
+                    continue                          # copper-only piece: no load stranded
                 src = ends(comp)
                 if not src or not main:
                     still.append((net, [(d[1] or d[0], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp][:4],
                                   "no via / pad on L3 or L6"))
                     continue
                 dst = sorted(main, key=lambda p: min(math.hypot(p[0] - q[0], p[1] - q[1]) for q in src))[:40]
+                cores = M.masks(net)                  # includes everything routed so far
+                sc = M.comp_cells(comp)
+                dc = M.comp_cells(cl[0])
                 res = None
-                for w in MAZE_WIDTHS:
-                    res = M.route(net, src, dst, w, cores)
+                for force in (False, True):
+                    for w in MAZE_WIDTHS:
+                        res = M.route(net, src, dst, w, cores, force, sc, dc)
+                        if res:
+                            break
                     if res:
                         break
                 if not res:
-                    still.append((net, [(d[1] or d[0], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp][:4],
-                                  "no route"))
+                    still.append((net, [(d[1] or d[0], round(d[2] - ox, 2), round(d[3] - oy, 2)) for d in comp
+                                        if d[0] != "zone"][:4], "no route"))
                     continue
                 runs, vias = res
-                runs = _snap_ends(runs, src, dst)
                 st = stats[net]
                 for L, line in runs:
                     layer = L3 if L == 0 else pcbnew.B_Cu
                     if len(line) < 2:
                         continue
+                    line = smooth45(line)
                     _add_track(board, net, line, w, layer)
+                    M.add_track(net, line, w, layer)
+                    _ADDED.append((net, layer, line, w))
                     st["length"] += sum(math.hypot(q[0] - p[0], q[1] - p[1]) for p, q in zip(line[:-1], line[1:]))
                     rec = dict(net=net, kind="maze", layer="In2.Cu" if L == 0 else "B.Cu", width=w,
                                pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in line])
                     (occ if L == 0 else l6occ).append(rec)
                 for (x, y) in vias:
                     _add_via(board, net, x, y)
+                    M.add_via(net, x, y)
                     _MAZE_VIAS.setdefault(net, set()).add((round(x, 3), round(y, 3)))
                     l6occ.append(dict(net=net, kind="maze_via", layer="all", dia=VIA_D,
                                       pts=[(round(x - ox, 3), round(y - oy, 3))]))
@@ -1492,6 +1645,7 @@ def maze_connect(board, nets, report, l6occ, occ, rounds=4):
                 st["wmin"] = w if st["wmin"] is None else min(st["wmin"], w)
                 main += src
                 progress = True
+        board.BuildConnectivity()
         pcbnew.ZONE_FILLER(board).Fill(board.Zones())
         if not progress:
             break
@@ -1579,9 +1733,12 @@ def apply(board, json_path=None, png_path=None):
             occ.append(dict(net=nets[rail], kind="zone", layer="In2.Cu",
                             pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in poly_points(sub, 0)]))
     br = _branches(board, nets, pts, corr, report)
+    _ADDED.clear()
     for rail, lines in br.items():
         for line in lines:
+            line = smooth45(line)
             _add_track(board, nets[rail], line, BRANCH_W, L3)
+            _ADDED.append((nets[rail], L3, line, BRANCH_W))
             occ.append(dict(net=nets[rail], kind="track", layer="In2.Cu", width=BRANCH_W,
                             pts=[(round(x - ox, 3), round(y - oy, 3)) for x, y in line]))
     l6occ = []
@@ -1602,6 +1759,7 @@ def apply(board, json_path=None, png_path=None):
             l6occ.append(dict(net=nets[rail], kind="via_array", layer="all", dia=VIA_D, pts=arr))
     report["hop_clearance"] = _check_hops(board)
     fix_3v3_island(board, nets, report, l6occ)
+    board.BuildConnectivity()
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     maze_connect(board, nets, report, l6occ, occ)
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_power_L6.json"), "w") as f:
@@ -1788,6 +1946,7 @@ def verify(board):
         res[rail] = d
     res["_pcbnew_total"] = unc["_pcbnew_total"]
     res["_rails_total"] = sum((unc.get(r) or 0) for r in allnets)
+    res["_selfcheck"] = selfcheck(board)
     return res
 
 
@@ -1805,6 +1964,12 @@ def table(res):
                          f"{d.get('maze_vias', 0)}")
     lines.append(f"missing links over the rail nets: {res['_rails_total']};  pcbnew GetUnconnectedCount() board-wide: "
                  f"{res['_pcbnew_total']}")
+    sc = res.get("_selfcheck", {})
+    lines.append(f"self-check of added copper: clearance/crossing {len(sc.get('clearance', []))}, corners > 45 deg "
+                 f"{len(sc.get('corners', []))}, off-axis pad exits {len(sc.get('pad_axis', []))}")
+    for k in ("clearance", "corners", "pad_axis"):
+        if sc.get(k):
+            lines.append(f"  {k}: {sc[k][:8]}")
     return "\n".join(lines)
 
 
@@ -1834,6 +1999,7 @@ def main(argv):
                   and "VTH" in t.GetNetname()]:
             board.Delete(t)
     rep = apply(board)
+    board.BuildConnectivity()
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     res = verify(board)
     board.Save(args[1])
@@ -1844,10 +2010,12 @@ def main(argv):
     print("corridor gaps:", rep.get("corridor_gaps"))
     print("+3V3 vias added (power-block F.Cu polygon without via):", rep.get("3v3_vias"))
     print("still stranded:", rep.get("stranded"))
+    print("maze rounds (components per net):", rep.get("maze_rounds"))
     comps = net_components(board, [BACKGROUND] + [rail_nets(board)[r] for r in ISLANDS if r in rail_nets(board)])
     for n, cl in comps.items():
         if len(cl) > 1:
-            print("components", n, [[(d[1] or d[0], round(d[2] - 100, 2), round(d[3] - 100, 2)) for d in c][:4]
+            print("components", n, [[(d[1] or d[0], round(d[2] - 100, 2), round(d[3] - 100, 2)) for d in c
+                                     if d[0] != "zone"][:4]
                                     for c in cl[1:]])
     print(table(res))
     if len(args) > 2:

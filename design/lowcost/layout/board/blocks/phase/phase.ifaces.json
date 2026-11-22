@@ -184,13 +184,13 @@
   },
   {
    "net": "/VTAP_TH",
-   "x": 61.929,
-   "y": 22.5,
+   "x": 62.349,
+   "y": 6.425,
    "layer": "B.Cu",
    "side": "S",
    "class": "slow",
    "width": 0.25,
-   "note": "R380/R381 1 k to VTH1/VTH2"
+   "note": "R380/R381 1 k link; the board joins from the south (lane 7)"
   },
   {
    "net": "/VTAP_N",

@@ -165,8 +165,8 @@
   [
    "/MCU_CLK",
    "B.Cu",
-   "L6 drop x 68.10, highway y 33.10, lane x 71.21",
-   33.361
+   "L6 drop x 68.10, highway y 33.10, lane x 75.22",
+   37.261
   ],
   [
    "/SPI_CS",
@@ -281,9 +281,80 @@
    "F.Cu",
    "L1 hop y 23.15 over the fan into U309 pad",
    8.742
+  ],
+  [
+   "/ADC_REF_MID",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   56.08
+  ],
+  [
+   "/DAC_TRIG",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   45.04
+  ],
+  [
+   "/VOFS",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   45.15
+  ],
+  [
+   "/VBIAS_A",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   51.19
+  ],
+  [
+   "/VBIAS_K",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   77.55
+  ],
+  [
+   "/VTAP_TH",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   23.67
+  ],
+  [
+   "/TRIG_SEL",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   79.85
+  ],
+  [
+   "/ADC_IN",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   76.86
+  ],
+  [
+   "/VNEG_REF",
+   "B.Cu+In2.Cu",
+   "slow line (board_slow.py): L6 tap-row lane, L3 north",
+   23.16
   ]
  ],
- "not_placed": [],
+ "not_placed": [
+  [
+   "/DAC_TRIG",
+   "board_slow: no L3 path (see log)"
+  ],
+  [
+   "/VOFS",
+   "board_slow: no L3 path (see log)"
+  ],
+  [
+   "/VBIAS_A",
+   "board_slow: no L3 path (see log)"
+  ],
+  [
+   "/VNEG_REF",
+   "board_slow: no L3 path (see log)"
+  ]
+ ],
  "rf": {
   "/S_STROBE_P": 0.16,
   "/S_STROBE_N": 0.16,
@@ -297,14 +368,14 @@
   "deliberate cut-out (listed L2 / L5 window)": 7
  },
  "stitch": {
-  "beside signal vias": 14,
-  "RF fences": 14,
-  "grid": 357,
-  "signal vias without a ground via": 6
+  "beside signal vias": 29,
+  "RF fences": 13,
+  "grid": 346,
+  "signal vias without a ground via": 11
  },
  "rule10": {
   "fast_on_L3": 0,
-  "samples": 8155,
+  "samples": 8170,
   "no_ref": 449,
   "L4": [
    [
@@ -321,7 +392,7 @@
  },
  "rule10_detail": {
   "fast_on_L3": [],
-  "samples": 8155,
+  "samples": 8170,
   "no_ref": [
    [
     "/TAP9",
