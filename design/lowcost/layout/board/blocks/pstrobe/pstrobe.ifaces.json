@@ -53,14 +53,14 @@
    "note": "TRF VCC and bias tees: via pairs, L4 (In3) x 0-12"
   },
   {
-   "net": "VBUS",
+   "net": "/+5V1",
    "x": 0,
    "y": 0,
    "layer": "In3.Cu",
    "side": "-",
    "class": "supply",
    "width": null,
-   "note": "GVA-84+ tees: via pairs at C418 / C428, L4 (In3) x 10-15"
+   "note": "GVA-84+ tees (+5V1, was VBUS): via pairs at C419 / C429 (both chains alike) and at C420 / C430, L4 x 9-15"
   }
  ]
 }

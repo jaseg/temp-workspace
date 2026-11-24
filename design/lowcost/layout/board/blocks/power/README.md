@@ -1,32 +1,71 @@
-# Block "power": USB-C, protection, boost, LDOs, LM27761, LM337 (refs 6xx, 53 parts, both sides)
-Run `python3 gen_power.py [--norender]` -> `power.kicad_pcb`, `power.ifaces.json`, `power.png`, `power_detail.png` (USB fan-out / U608). KiCad 7.0.11; DRC with the nightly (`tools/run_drc.sh --rules jlc4`).
-**Size: 26.0 x 22.5 mm at board (74, 0), as in FLOORPLAN.** J601 on the right board edge (board y 8.2-18.8). M3 hole (97, 3): 3.5 mm keep-out (rule area, all layers).
-Placement: boost top-left (L601 / U603 / D602 / C610 / C611; hot loop SW -> D602 -> C610 -> GND -> U603.2 about 4 x 2.5 mm, SW copper is a 3 x 3 mm F polygon), LM27761 top-middle (flying cap C618 north-east, C619 / C620 at the pins), LDO stack U604 / U606 / U602 left (inputs east on a +5V4F / +3V3 F polygon, outputs west), USBLC6 U608 flow-through between J601 and the pair, PTC / TVS / FB601 along the bottom edge. B side: U601 AMS1117 (tab = +3V3 B polygon, heat sink), U607 LM337, all 0805 bulk caps, CC pull-downs, ADJ divider.
-## Checks
-- check_board (53 refs of the power membership): 0 missing / extra / footprint / value / pad-net / no-net, 0 clearance, 0 corners > 45 deg, 0 off-axis pad exits, 0 USB width deviations, 0 pour-gap hits (2 w around the USB lines). Unrouted: only the plane-fed outputs +3V3, +5V, +2V5, +1V2, -5V (1 link each, see open points). VBUS, GND and all /power/* nets are routed in the block (In1 GND zone drawn in the block; the board plane replaces it).
-- Courtyards (F.CrtYd / B.CrtYd, BooleanIntersection > 0.005 mm2): **0**; all courtyards inside the block.
-- Nightly DRC (jlc4): 71 = 5 unconnected_items (the plane-fed nets above), 14 via_dangling (In2 supply vias), 2 track_dangling (USB pair ends at the S edge), 1 invalid_outline (no Edge.Cuts in a block), 47 lib_footprint_mismatch + 1 lib_footprint_issues (library version), 1 silk_overlap warning (L601 / U603 library silk lines touch; not silk over pad). 0 courtyard, clearance, hole, track-width, silk-over-pad, text errors. Refdes on F.Fab / B.Fab.
-## USB (90 R pair, F.Cu over In1, w 0.25 / s 0.15 = 91 R by IPC-2141, Z0 60 R single)
-| route | mm |
-|---|---|
-| J601 B6 (DP outer) -> U608.6 / B7 (DM outer) -> U608.4 | 3.75 / 3.75 |
-| inner A6 (DP): 1.11 F + 1.41 B.Cu hop (2 vias, crossing of the C receptacle's two rows) ; inner A7 (DM) 3.02 F | |
-| flow-through U608.6-1 / 4-3 under the body | 2.28 / 2.28 |
-| U608.1 / .3 -> S edge (pair) DP / DM | 12.30 / 11.64 (0.66 mm = 4 ps skew, irrelevant at 12 Mb/s) |
-## Interfaces (local mm; board = local + (74, 0))
-| net | local x, y | layer / side | note |
+# Block "power": USB-C, protection, TPS62A01A x2, TPS63802, LM27762 x2 (refs 6xx, 61 parts, both sides)
+Run `python3 gen_power.py [--norender]` -> `power.kicad_pcb`, `power.ifaces.json`, `power.png` (F), `power_b.png` (B),
+`power_detail.png` (U603 / L601). KiCad 7.0.11; DRC with the nightly (`tools/run_drc.sh --rules jlc4`).
+Power tree: `docs/research/power-tree.md` (24 Nov 2026). **Size 26.0 x 22.5 mm at board (74, 0), unchanged.** J601, U608,
+F601, D601, FB601, R601 / R602 and the USB pair are unchanged. M3 hole (97, 3): 3.5 mm keep-out (F, In1, In2, B).
+
+## Placement (local mm)
+| cell | side | where | layout (datasheet layout section) |
 |---|---|---|---|
-| /USB_DP, /USB_DM | 8.6 / 9.0, 22.5 | F.Cu S, pair | to U704.34 / .33 (mcuif). FLOORPLAN had no entry (USB added later). |
-| VBUS | 14.0, 17.4-18.3 | via pair, In2 S | at FB601; VBUS also on a B.Cu polygon (U601, C601/C602, boost) |
-| +3V3 | 0.45, 5.0 / 6.0 | via pair, In2 W | from the U601 tab polygon (B) |
-| -5V | 15.72, 9.3 + 16.8, 8.46 | via pair, In2 W | at FB603 |
-| +5V / +2V5 / +1V2 | 0.45, 12.6 / 0.45, 16.2 / 1.25, 21.95 | via, In2 W | at C616 / C624 / C608 |
-| -2V5 | 9.75, 18.0 / 19.0 | via pair, In2 S | at R607 / C628 (B) |
-## Deviations / local helpers
-- VBUS_IN joins the two connector VBUS pad pairs on B.Cu (0.6/0.3 vias beside the pads, under the shell, 0.7 mm track), one via per side (~1 A). A4/B9 -> F601 on F.
-- Local helpers: `bplace` (B placement + flip), `two`, `diff90`, `courtyard_overlaps`, `render`. boardlib.py not edited.
+| U601 TPS62A01A VBUS -> +3V3 | F | x 0-9.5, y 0-8 | C603 10u straddles VIN (3) / GND (1) on the IC layer; SW (2) leaves between the C603 pads (0.9 mm gap, 0.35 mm track, 3.9 mm) to L602; C604 GND returns to C603 / pin 1 in one GND polygon (5 vias); R609 / R610 / C631 at FB (5) on the side away from SW |
+| U602 TPS62A01A +3V3 -> +1V2 | B | mirror image of U601, under it | C609 / C607 at VIN, L603, C605 + C608 at the output |
+| U603 TPS63802 VBUS -> +5V1 | F | x 9.5-19.5, y 0-10 (east-most free area, 17 mm from the analog block) | C601 at VIN (10), C610 / C611 at VOUT (6); L601 east between L1 (9) / L2 (7) on two polygons; GND (8) runs between them under L601 to 3 vias; AGND (3) by its own track to pin 8; FB divider R603 / R604 south-west, away from L1 / L2 |
+| U604 LM27762 +5V1F -> +5V / -5V | F | x 0-8, y 9-16 | C613 100n + C612 22u at VIN (3) / GND (4) on the IC layer (DECOUPLING-4); C626 CCP at CP (5); C618 C1 at pins 10 / 9; R613 / R614 at FB+ (north), R605 / R606 at FB- (south); EP 2 vias |
+| U605 LM27762 +3V3_CP -> +/-2V5 | F | x 0-8, y 16-22.5 | same cell; C625 CIN, C619 CCP, C624 C1 |
+| beads, LDO output caps | B / F | under the LM27762 cells and east of them | FB602 / C617 / C621 / FB603 / C627 / FB605 / R617 / C629 / FB607 / C628 / C630 / FB606 on B; FB604 on F |
+| C632 47u (DNP damper) | B | under U603, on the VBUS input | |
+Not placed here: C606, C614, C615, C616, C620, C622 (power sheet, placed at their loads in other blocks per kicad/README.md);
+`floorplan.membership` still maps them to "power" (integrator: move them to analog / pstrobe / phase).
+
+## Supply paths
+- VBUS: FB601 -> vias (14.0, 17.4 / 18.3) -> B strip (1.1-1.4 mm, x 13-14.2) -> 3 vias (10.45-12.05, 3.3) -> F polygon
+  over U603 VIN / C601 and along the top edge to U601 VIN / C603 / C602 (~6 mOhm, 5 mV at 0.75 A).
+- +5V1: F polygon C610 / C611 -> 3 vias -> B polygon -> FB602 (B) -> +5V1F to U604 VIN / EN+ / EN- (B 0.4 mm);
+  GVA-84+ feed: B 0.5 mm track to the via pair (12.3, 20.9 / 21.7), directly from the output caps, not through FB602.
+- +3V3: U601 output polygon (L602 / C604) -> 2 vias to the L4 plane and to U602's input polygon (B).
+- In2 (slow / static layer, rule 10) carries two block-internal lines: +1V2 sense R611 -> (8.0, 1.2) -> top edge y 0.4 ->
+  x 0.5 -> (1.0, 7.9); PG_5V1 U603.5 -> (10.05, 6.45) -> x 8.3 -> (7.9, 18.6). The integrator's L3 copper must avoid them.
+
+## Regulator input headroom (layout drops included)
+| | Vin at the pin | needed | margin |
+|---|---|---|---|
+| U601 +3V3 0.67 A | 4.59-5.25 V (VBUS minus 5 mV B strip) | 3.53 V (100 % mode) | >= 1.06 V |
+| U602 +1V2 30 mA | 3.25-3.38 V | 1.2 V + 0.03 V | >= 2.0 V |
+| U603 +5V1 0.34 A | 4.59-5.25 V | buck-boost, any VIN 2.3-5.5 V | n/a |
+| U604 +4.80 / -4.64 V 41 mA | 5.03-5.15 V after FB602 (12 mV) | 4.82 V (OUT+), 4.89 V (OUT-, RNEG 4 R) | 0.21 V / 0.14 V |
+| U605 +/-2.50 V 50 mA | 3.24-3.37 V after FB605 (8 mV) | 2.54 V / 2.82 V (RNEG 5 R assumed) | 0.70 V / 0.42 V |
+
+## Interfaces (local mm; board = local + (74, 0))
+| net | local x, y | layer | note |
+|---|---|---|---|
+| /USB_DP, /USB_DM | 8.6 / 9.0, 22.5 | F.Cu S, pair | unchanged |
+| VBUS | 14.0, 17.85 | via pair | unchanged position; now feeds J501 pin 1 only |
+| +3V3 | 8.72, 6.05 | via pair | U601 output |
+| +5V | 9.05, 8.77 | via | FB604 output |
+| -5V | 0.45, 14.0 | via | FB603 / C627 |
+| +2V5 | 10.45, 15.3 | via | FB606 output |
+| -2V5 | 0.6, 20.75 | via | FB607 / C629 |
+| +1V2 | 1.0, 7.9 | via | C605 / C608 (B) |
+| /+5V1 | 12.3, 21.3 | via pair (20.9 / 21.7) | NEW: GVA-84+ chokes L404.2 / L406.2, C418-C420 / C428-C430 (pstrobe), 0.34 A |
+
+## Interface changes
+- Moved (old -> new, local mm): +3V3 (0.45, 5.5) -> (8.72, 6.05); +5V (0.45, 12.6) -> (9.05, 8.77); -5V (15.72, 9.3) ->
+  (0.45, 14.0); +2V5 (0.45, 16.2) -> (10.45, 15.3); -2V5 (9.75, 18.5) -> (0.6, 20.75); +1V2 (1.25, 21.95) -> (1.0, 7.9).
+  Reason: new regulators and footprints; the old W-edge via positions sit under the LM27762 cells.
+- New: /+5V1 at (12.3, 21.3) S. The board's old VBUS L3 / L4 run to the GVA chokes must carry /+5V1 instead
+  (0.34 A, same width); VBUS to J501 only.
+- In2 tracks inside the block (above). Hole keep-out now also on In2.
+
+## Checks (24 Nov 2026)
+- check_board (61 refs = power membership minus the 6 moved capacitors): 0 missing / extra / footprint / value / pad-net,
+  0 clearance, 0 corners > 45 deg, 0 off-axis pad exits, 0 USB width / pour-gap faults, 0 courtyard overlaps.
+  Unrouted: +3V3 (2) only: R609 sense via and the FB605 +3V3 via are joined by the L4 +3V3 plane (plane-fed).
+- Nightly DRC jlc4: 72 = 56 lib_footprint_mismatch + 2 lib_footprint_issues (library version / project library),
+  9 via_dangling (supply interface vias, plane-fed), 2 track_dangling (USB pair ends at the S edge), 2 unconnected_items
+  (+3V3, plane-fed), 1 invalid_outline (no Edge.Cuts in a block). 0 clearance, courtyard, hole, track-width, silk errors.
+
 ## Open points
-- Plane-fed inside the block (need In2 copper in the power region, the integrator draws it): +3V3 (U601 polygon <-> U602 input / C607), -5V (FB603 <-> U607 tab vias at board (76, 14.5)), +5V / +2V5 / +1V2 (LDO output <-> B bulk C617 / C625 / C609, via in / beside the pad). FLOORPLAN's power In2 list (VBUS, +5V4F, -5V_LDO) must therefore become: -5V and +3V3 regions under x 74-90, plus tongues W for +5V / +2V5 / +1V2.
-- USB pair leaves S into the phase block; the integrator must carry it to U704 (90 R, keep F.Cu over In1 or change layer with GND vias).
-- 0.85 A through single 0.6/0.3 VBUS_IN vias; AMS1117 dissipates ~0.8 W into the B +3V3 polygon (about 50 mm2) plus In2: check the temperature.
-- Pair impedance from IPC-2141 only (no field solver); JLC calculator check advised.
+- Thermal: U601 0.30 W max into its GND polygon (about 8 mm2 on F) + 5 vias + In1 / L4; U603 0.20 W; not simulated.
+- U601 / U602 HF input caps (C602 / C607 0402) sit 2 mm from the pins (the 0805 CIN is at the pins).
+- LDO output caps of U604 / U605 are on B behind one via each (C617, C621, C628, C630).
+- Pair impedance from IPC-2141 only.

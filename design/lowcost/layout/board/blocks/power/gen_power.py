@@ -106,32 +106,52 @@ two("R601", 15.0, 15.9, "E", "/power/CC1", "B")
 
 
 # ============================================================================= buck cell (TPS62A01A, SOT-563)
-def buck(u, cin, cin_hf, lx, cout, cout_hf, rtop, rbot, cff, cx, cy, side, vin, vout, sw):
+def buck(u, cin, cin_hf, lx, cout, rtop, rbot, cff, cx, cy, side, vin, vout, sw):
     """chip rot 180: VIN / SW / GND (pins 3 / 2 / 1) face +sx, EN / FB / PG face -sx.  CIN (0805) straddles pins 3 / 1
     beside the chip with SW leaving between its pads (0.9 mm gap) to the inductor; COUT returns to the CIN ground.
-    sx = +1 on F; on B the cell is the mirror image (sx = -1)."""
+    sx = +1 on F; on B the cell is the mirror image (sx = -1).  Returns X(dx) -> local x."""
     sx = 1 if side == "F" else -1
     X = lambda dx: cx + sx * dx
-    E, W = ("E", "W") if sx > 0 else ("W", "E")
+    E = "E" if sx > 0 else "W"
     bplace(u, cx, cy, 180, side)
     two(cin, X(2.35), cy, "N", vin, side)
     two(lx, X(4.7), cy + 1.075, "N", sw, side)
-    two(cout, X(4.2), cy + 4.1, E, vout, side)
+    two(cout, X(4.15), cy + 4.05, E, vout, side)
     two(rtop, X(-1.85), cy - 0.55, "N", vout, side)
     two(rbot, X(-1.85), cy + 1.33, "S", "GND", side)
     if cff:
         two(cff, X(-2.8), cy - 0.55, "N", vout, side)
-    if cout_hf:
-        two(cout_hf, X(1.45), cy + 4.1, E, vout, side)
-    if cin_hf:
-        two(cin_hf, X(0.95), cy - 2.25, E, vin, side)
+    two(cin_hf, X(0.95), cy - 2.25, E, vin, side)
     return X
 
 
-XB1 = buck("U601", "C603", "C602", "L602", "C604", None, "R609", "R610", "C631", 3.4, 3.0, "F",
+def buck_routes(X, cy, side, vin, vout, sw, fb, cff):
+    """copper of one buck cell (mirror-image on B): SW track, VIN / GND / VOUT polygons, EN, FB divider"""
+    L_ = "F.Cu" if side == "F" else "B.Cu"
+    xs = lambda pts: [(X(x - 3.4), y) for x, y in pts]          # cell geometry drawn for the F cell at cx = 3.4
+    T(sw, xs([(4.15, cy), (8.1, cy)]), 0.35, L_)                   # pin 2 -> between the CIN pads -> inductor pad 1
+    Z("GND", L_, xs([(4.3, 3.3), (6.75, 3.3), (6.75, 6.0), (7.55, 6.0), (7.55, 8.0), (4.3, 8.0)]), prio=3)
+    Z(vout, L_, xs([(6.95, 4.45), (9.25, 4.45), (9.25, 8.0), (7.9, 8.0), (7.9, 5.9), (6.95, 5.9)]), prio=4)
+    T(vin, xs([(2.65, 2.5), (2.65, 2.0), (3.05, 1.6), (4.1, 1.6)]), WS, L_)          # EN (pin 4) = VIN
+    T(fb, xs([(2.65, 3.0), (1.55, 3.0)]), WS, L_)
+    T(fb, xs([(1.55, 2.96), (1.55, 3.82)]), WS, L_)
+    if cff:
+        T(vout, xs([(0.6, 1.95), (1.55, 1.95)]), WS, L_)
+        T(fb, xs([(0.6, 2.95), (1.55, 2.95)]), WS, L_)
+    for x, y in xs([(5.0, 4.9), (6.0, 4.9), (5.0, 6.0), (6.0, 6.0), (5.4, 7.3)]):
+        G(x, y)
+    T("GND", xs([(3.87, 0.75), (3.25, 0.75), (3.25, 1.0)]), WS, L_)   # CIN_hf ground
+    G(*xs([(3.25, 1.0)])[0])
+    for x, y in xs([(8.35, 6.05), (8.95, 6.05)]):                  # VOUT vias (L4 +3V3 / B +3V3 for U602)
+        if side == "F":
+            V(x, y, vout, bl.VIA_D, bl.VIA_DRILL)
+
+
+XB1 = buck("U601", "C603", "C602", "L602", "C604", "R609", "R610", "C631", 3.4, 3.0, "F",
            "VBUS", "+3V3", "Net-(U601-SW)")
-XB2 = buck("U602", "C609", "C607", "L603", "C605", "C608", "R611", "R612", None, 6.15, 3.0, "B",
+XB2 = buck("U602", "C609", "C607", "L603", "C605", "R611", "R612", None, 6.15, 3.0, "B",
            "+3V3", "+1V2", "Net-(U602-SW)")
+two("C608", 1.0, 8.95, "N", "+1V2", "B")     # 1u at the +1V2 output (U602 COUT HF)
 
 # ============================================================================= U603 TPS63802 buck-boost (F, top-middle)
 bplace("U603", 10.95, 4.9, 0)            # W: EN MODE AGND FB PG (1-5); E: VIN L1 GND L2 VOUT (10, 9, 8, 7, 6)
@@ -143,48 +163,317 @@ two("R603", 10.0, 7.65, "N", "/+5V1")    # FB divider south of the chip, away fr
 two("R604", 10.0, 9.53, "S", "GND")
 two("C632", 11.8, 1.7, "W", "VBUS", "B")  # DNP VBUS damper (tantalum) under the converters' input
 
-
 # ============================================================================= LM27762 cell (WSON-12, F)
-def lm(u, cin, cin_hf, ccp, c1, rp_top, rp_bot, rn_top, rn_bot, cx, cy, ccp_0603):
+CY4, CY5, CXL = 11.95, 19.0, 4.8
+
+
+def lm(u, cin, cin_hf, ccp, c1, rp_top, rp_bot, rn_top, rn_bot, cx, cy):
     """rot 0: W column PGOOD FB+ VIN GND CP OUT- (1-6), E column EN+ OUT+ C1+ C1- EN- FB- (12-7).
     CIN at pins 3 / 4 (W), CCP south-west, C1 at pins 10 / 9 (E), FB+ divider north, FB- divider south."""
     bplace(u, cx, cy, 0)
+    n = lambda p: nl.net_of(u, p)
     if cin_hf:
-        two(cin_hf, cx - 2.1, cy, "N", nl.net_of(u, "3"))
-        two(cin, cx - 3.55, cy, "N", nl.net_of(u, "3"))
+        two(cin_hf, cx - 2.1, cy, "N", n("3"))
+        two(cin, cx - 3.55, cy, "N", n("3"))
     else:
-        two(cin, cx - 2.45, cy, "N", nl.net_of(u, "3"))
-    if ccp_0603:
-        two(ccp, cx - 2.42, cy + 2.75, "E", nl.net_of(u, "5"))
+        two(cin, cx - 2.45, cy, "N", n("3"))
+    if ccp == "C619":
+        two(ccp, cx - 2.42, cy + 2.75, "E", n("5"))
     else:
-        two(ccp, cx - 2.65, cy + 3.0, "E", nl.net_of(u, "5"))
-    if c1.startswith("C618"):
-        two(c1, cx + 2.2, cy, "N", nl.net_of(u, "10"))
-    else:
-        two(c1, cx + 1.93, cy, "N", nl.net_of(u, "10"))
-    two(rp_top, cx, cy - 2.4, "W", nl.net_of(u, "2"))      # FB+ <-> OUT+
-    two(rp_bot, cx - 1.88, cy - 2.4, "E", nl.net_of(u, "2"))   # GND <-> FB+
-    two(rn_top, cx, cy + 2.5, "E", nl.net_of(u, "7"))      # OUT- <-> FB-
-    two(rn_bot, cx + 1.88, cy + 2.5, "W", nl.net_of(u, "7"))   # FB- <-> GND
+        two(ccp, cx - 2.65, cy + 3.0, "E", n("5"))
+    two(c1, cx + (2.2 if c1 == "C618" else 2.05), cy, "N", n("10"))
+    two(rp_top, cx, cy - 2.55, "W", n("2"))        # FB+ <-> OUT+
+    two(rp_bot, cx - 1.88, cy - 2.55, "E", n("2"))  # GND <-> FB+
+    two(rn_top, cx, cy + 2.5, "E", n("7"))         # OUT- <-> FB-
+    two(rn_bot, cx + 1.88, cy + 2.5, "W", n("7"))   # FB- <-> GND
 
 
-lm("U604", "C612", "C613", "C626", "C618", "R613", "R614", "R605", "R606", 4.8, 11.0, False)
-lm("U605", "C625", None, "C619", "C624", "R615", "R616", "R607", "R608", 4.8, 17.85, True)
+def lm_routes(u, cin, cin_hf, ccp, c1, cx, cy):
+    n = lambda p: nl.net_of(u, p)
+    y = lambda k: cy + (-1.25, -0.75, -0.25, 0.25, 0.75, 1.25)[k - 1]      # W pins 1-6
+    ye = lambda k: cy + {12: -1.25, 11: -0.75, 10: -0.25, 9: 0.25, 8: 0.75, 7: 1.25}[k]
+    xw, xe = cx - 0.95, cx + 0.95
+    W2 = 0.25
+    T("GND", [(xw, y(1)), (cx - 0.3, y(1))], W2)                              # PGOOD (GND) into the EP
+    G(cx, cy - 0.6); G(cx, cy + 0.6)                                         # EP vias
+    # FB+ (pin 2) west, north to the divider
+    T(n("2"), [(xw, y(2)), (cx - 1.45, y(2)), (cx - 1.45, cy - 2.55)], 0.2)
+    T(n("2"), [(cx - 1.37, cy - 2.55), (cx - 0.51, cy - 2.55)], 0.2)
+    xc = blk.pad(cin_hf or cin, "@" + bl.canon(n("3")))[0]
+    if cin_hf:                                                               # CIN 0402 straight at pins 3 / 4
+        T(n("3"), [(xw, y(3)), (xc, y(3))], W2)
+        T("GND", [(xw, y(4)), (xc, y(4))], W2)
+        xb = blk.pad(cin, "1")[0]
+        T(n("3"), [(xc, cy - 0.6), (xb, cy - 0.6)], 0.4)
+        T("GND", [(xc, cy + 0.6), (xb, cy + 0.6)], 0.4)
+    else:                                                                    # CIN 0805: jog into the pads
+        T(n("3"), [(xw, y(3)), (cx - 1.75, y(3)), (cx - 1.95, y(3) - 0.2), (cx - 1.95, y(3) - 0.4)], W2)
+        T("GND", [(xw, y(4)), (cx - 1.75, y(4)), (cx - 1.95, y(4) + 0.2), (cx - 1.95, y(4) + 0.4)], W2)
+    ycp = blk.pad(ccp, "1")[1]
+    T(n("5"), [(xw, y(5)), (cx - 1.45, y(5)), (cx - 1.45, ycp - 0.25)], W2)     # CP south into CCP
+    yr = cy + 2.5
+    T(n("6"), [(xw, y(6)), (xw, yr - 0.15), (xw + 0.15, yr), (cx - 0.51, yr)], W2)   # OUT- to R(top)
+    V(xw, cy + 1.8, n("6"), bl.VIA_D, bl.VIA_DRILL)                          # OUT- to the B output capacitor
+    # east
+    T(n("12"), [(xe, ye(12)), (xe, cy - 1.85)], 0.2)
+    V(xe, cy - 1.85, n("12"), bl.VIA_D, bl.VIA_DRILL)                        # EN+ via (B)
+    return xe, ye
+
+
+def lm_east(u, c1, cx, cy, xe, ye, ytop):
+    n = lambda p: nl.net_of(u, p)
+    W2 = 0.25
+    # OUT+ (pin 11) east, north at x + 1.5
+    if abs(ytop - (cy - 2.55)) < 1e-6:
+        T(n("11"), [(xe, ye(11)), (cx + 1.5, ye(11)), (cx + 1.5, ytop), (cx + 0.51, ytop)], W2)
+    else:
+        T(n("11"), [(xe, ye(11)), (cx + 1.5, ye(11)), (cx + 1.5, ytop)], W2)
+        T(n("11"), [(cx + 1.5, cy - 2.55), (cx + 0.51, cy - 2.55)], W2)
+    T(n("11"), [(cx + 1.5, cy - 1.95), (cx + 1.95, cy - 1.95)], W2)
+    V(cx + 1.95, cy - 1.95, n("11"), bl.VIA_D, bl.VIA_DRILL)                 # OUT+ to the B output capacitor
+    x1, y1 = blk.pad(c1, "1")
+    x2, y2 = blk.pad(c1, "2")
+    xi = x1 - 0.25 if c1 == "C618" else x1
+    if c1 == "C618":                                                         # 0603: jog into the pads
+        T(n("10"), [(xe, ye(10)), (cx + 1.5, ye(10)), (cx + 1.6, ye(10) - 0.1), (x1 - 0.1, ye(10) - 0.1)], W2)
+        T(n("9"), [(xe, ye(9)), (cx + 1.5, ye(9)), (cx + 1.6, ye(9) + 0.1), (x1 - 0.1, ye(9) + 0.1)], W2)
+    else:                                                                    # 0402: pads in line with pins 10 / 9
+        T(n("10"), [(xe, ye(10)), (x1 - 0.05, ye(10))], W2)
+        T(n("9"), [(xe, ye(9)), (x1 - 0.05, ye(9))], W2)
+    # EN- (pin 8) east, south to its via
+    T(n("8"), [(xe, ye(8)), (cx + 1.45, ye(8)), (cx + 1.45, ye(8) + 0.4), (cx + 1.85, ye(8) + 0.8),
+               (cx + 1.95, ye(8) + 0.8)], 0.2)
+    V(cx + 1.95, ye(8) + 0.8, n("8"), bl.VIA_D, bl.VIA_DRILL)
+    # FB- (pin 7) south to the divider
+    yr = cy + 2.5
+    T(n("7"), [(xe, ye(7)), (xe, yr)], 0.2)
+    T(n("7"), [(cx + 0.51, yr), (cx + 1.37, yr)], 0.2)
+
+
+lm("U604", "C612", "C613", "C626", "C618", "R613", "R614", "R605", "R606", CXL, CY4)
+lm("U605", "C625", None, "C619", "C624", "R615", "R616", "R607", "R608", CXL, CY5)
+two("FB604", 7.45, 8.77, "W", "/power/+5V_LDO")        # OUT+ bead on F north-east of U604
 
 # ============================================================================= B side: beads, LDO output capacitors
 PLACE_B = [  # ref, x, y, first-side, net
+    ("FB602", 11.7, 9.3, "N", "/+5V1"),             # +5V1 -> +5V1F (U604 input)
+    ("C617", 8.6, 10.0, "W", "/power/+5V_LDO"),      # U604 OUT+
+    ("C621", 2.0, 12.0, "E", "/power/-5V_LDO"),      # U604 OUT-
+    ("FB603", 2.0, 14.25, "E", "/power/-5V_LDO"),
+    ("C627", 1.6, 15.5, "W", "-5V"),
+    ("FB605", 2.0, 16.95, "W", "/power/+3V3_CP"),    # +3V3 -> U605 input
+    ("R617", 2.4, 19.2, "W", "/power/+3V3_CP"),      # PG pull-up
+    ("C629", 0.6, 19.7, "S", "-2V5"),
+    ("FB607", 2.0, 21.4, "E", "/power/-2V5_LDO"),
+    ("C628", 6.9, 21.4, "W", "/power/-2V5_LDO"),     # U605 OUT-
+    ("C630", 8.6, 17.05, "W", "/power/+2V5_LDO"),    # U605 OUT+
+    ("FB606", 8.75, 15.3, "W", "/power/+2V5_LDO"),
 ]
-for ref, x, y, f, n in PLACE_B:
-    two(ref, x, y, f, n, "B")
+for ref, x, y, f, n_ in PLACE_B:
+    two(ref, x, y, f, n_, "B")
 
 placed = set(blk.fps)
 mine = sorted(r for r, c in nl.comps.items() if c["sheet"].startswith("/power") and r not in MOVED)
 print("not placed:", sorted(set(mine) - placed))
-print(bl.courtyard_overlaps(blk.b))
+
+# ============================================================================= routing: USB (unchanged)
+DP, DM = "/USB_DP", "/USB_DM"
+W_FO = W_USB                                # fan-out at the 0.5 mm connector pitch
+T(DP, [(17.81, 12.75), (15.7, 12.75)], W_FO, name="DP fanout")
+T(DP, [(15.7, 12.75), (15.2, 12.75), (15.0, 12.55), (14.14, 12.55)], W_FO, name="DP fanout")
+T(DP, [(17.81, 13.75), (16.7, 13.75)], W_FO, name="DP inner")
+blk.via(16.7, 13.75, DP)
+T(DP, [(16.7, 13.75), (15.7, 12.75)], W_FO, "B.Cu", name="DP hop")
+blk.via(15.7, 12.75, DP)
+T(DM, [(17.81, 13.25), (16.2, 13.25), (15.2, 14.25)], W_FO, name="DM inner")
+T(DM, [(17.81, 14.25), (15.2, 14.25)], W_FO, name="DM fanout")
+T(DM, [(15.2, 14.25), (15.0, 14.45), (14.14, 14.45)], W_FO, name="DM fanout")
+T(DP, [(14.14, 12.55), (11.86, 12.55)], W_USB, name="DP esd")
+T(DM, [(14.14, 14.45), (11.86, 14.45)], W_USB, name="DM esd")
+T("GND", [(11.86, 13.5), (11.1, 13.5)], WS)
+G(11.1, 13.5)
+T("VBUS", [(14.14, 13.5), (15.1, 13.5)], WS)
+blk.via(15.1, 13.5, "VBUS")
+T(DP, [(11.86, 12.55), (11.0, 12.55), (10.25, 13.3), (9.4, 13.3), (8.6, 14.1), (8.6, BH)], W_USB, name="DP pair")
+T(DM, [(11.86, 14.45), (11.0, 14.45), (10.25, 13.7), (9.57, 13.7), (9.0, 14.27), (9.0, BH)], W_USB, name="DM pair")
+for nm_, r_ in blk.routes.items():
+    if r_["net"] in (DP, DM):
+        for q in r_["pts"]:
+            blk.rf_keepout(q, W_USB, gap=2 * W_USB)
+blk.iface(DP, 8.6, BH, "F.Cu", "S", "pair", W_USB, "90 R pair to U704.34 (mcuif); pitch 0.40, w 0.18 / s 0.22 (6L)")
+blk.iface(DM, 9.0, BH, "F.Cu", "S", "pair", W_USB, "90 R pair to U704.33 (mcuif)")
+# --- CC pull-downs (B side)
+T("/power/CC2", [(17.81, 11.75), (16.7, 11.75)], WS)
+blk.via(16.7, 11.75, "/power/CC2")
+T("/power/CC2", [(16.7, 11.75), (16.03, 11.08), ("R602", "1")], WS, "B.Cu")
+T("/power/CC1", [(17.81, 14.75), (16.7, 14.75)], WS)
+blk.via(16.7, 14.75, "/power/CC1")
+T("/power/CC1", [(16.7, 14.75), (16.7, 15.45), (16.25, 15.9), ("R601", "1")], WS, "B.Cu")
+for r in ("R601", "R602"):
+    x, y = blk.pad(r, "2")
+    yv = y + 0.75 if r == "R602" else y - 0.7
+    T("GND", [(x, y), (x, yv)], WS, "B.Cu")
+    G(x, yv)
+# --- connector GND to the shell, VBUS_IN joined on B.Cu (vias beside the pads, under the body)
+T("GND", [(17.81, 10.25), (17.81, 9.3)], 0.5)
+T("GND", [(17.81, 16.75), (17.81, 17.7)], 0.5)
+T("/power/VBUS_IN", [(17.81, 11.05), (18.6, 11.05), (18.95, 11.4), (18.95, 11.5)], 0.45)
+T("/power/VBUS_IN", [(17.81, 15.95), (18.6, 15.95), (18.95, 15.6), (18.95, 15.5)], 0.45)
+V(18.95, 11.5, "/power/VBUS_IN")
+V(18.95, 15.5, "/power/VBUS_IN")
+T("/power/VBUS_IN", [(18.95, 11.5), (18.95, 15.5)], 0.7, "B.Cu")
+T("/power/VBUS_IN", [(17.81, 15.95), (16.3, 15.95), (15.45, 16.8), ("F601", "1")], WP)
+# --- PTC -> TVS / FB601 -> VBUS
+T("/power/VBUS_F", [("F601", "2"), (16.5, 21.6), (17.35, 20.75), ("D601", "2")], 0.8)
+T("/power/VBUS_F", [("F601", "2"), ("FB601", "1")], 0.8)
+T("GND", [("D601", "1"), (23.0, 18.0)], 0.8)
+G(22.2, 22.1); G(23.8, 22.1)
+T("VBUS", [("FB601", "2"), (13.45, 19.0), (14.0, 18.45), (14.0, 17.4)], 0.8)
+V(14.0, 18.3, "VBUS"); V(14.0, 17.4, "VBUS")
+blk.iface("VBUS", 14.0, 17.85, "In3.Cu", "S", "supply", None,
+          "via pair at FB601; J501 pin 1 only (the GVA-84+ chokes moved to +5V1)")
+T("VBUS", [(15.1, 13.5), (13.6, 13.5)], 0.4, "B.Cu")
+
+# ============================================================================= routing: VBUS input of U601 / U603
+# F polygon: C603 / U601.3 / C602 (top-left) along the top edge to C601 / U603.10 / EN / MODE; fed from the B strip
+Z("VBUS", "F.Cu", [(3.9, 0.3), (12.5, 0.3), (12.5, 2.05), (14.35, 2.05), (14.35, 3.4), (12.6, 3.4), (12.6, 4.02),
+                   (9.3, 4.02), (9.3, 2.0), (6.6, 2.0), (6.6, 2.62), (3.9, 2.62)], prio=5)
+for x in (10.45, 11.25, 12.05):
+    V(x, 3.3, "VBUS")
+Z("VBUS", "B.Cu", [(9.6, 0.5), (10.95, 0.5), (10.95, 3.05), (14.2, 3.05), (14.2, 16.6), (14.4, 16.6), (14.4, 18.9),
+                   (13.05, 18.9), (13.05, 3.95), (9.6, 3.95)], prio=4)
+T("VBUS", [(10.05, 4.4), (9.45, 4.4), (9.45, 3.8)], 0.2)                    # U603 MODE (2) = VIN; EN (1) in the polygon
+
+# ============================================================================= routing: U601 (+3V3, F) / U602 (+1V2, B)
+buck_routes(XB1, 3.0, "F", "VBUS", "+3V3", "Net-(U601-SW)", "Net-(U601-FB)", True)
+buck_routes(XB2, 3.0, "B", "+3V3", "+1V2", "Net-(U602-SW)", "Net-(U602-FB)", False)
+# U601 VOUT sense: R609 / C631 top pads -> +3V3 via (L4 plane)
+T("+3V3", [(1.05, 1.95), (1.05, 1.2)], WS)
+blk.via(1.05, 1.2, "+3V3")
+blk.iface("+3V3", 8.72, 6.05, "In3.Cu", "W", "supply", None,
+          "via pair at L602 / C604 (U601 output) into the L4 +3V3 plane; also feeds U602 (B)")
+# U602 input on B: +3V3 polygon from the L602 / C604 vias west over U602 / C609 / C607
+Z("+3V3", "B.Cu", [(2.95, 0.45), (9.35, 0.45), (9.35, 7.0), (8.6, 7.0), (8.6, 1.95), (5.65, 1.95), (5.65, 2.62),
+                   (2.95, 2.62)], prio=5)
+# U602 output: C605 -> C608 -> +1V2 via; VOUT sense R611 via In2 (slow / static layer, rule 10) to the same via
+T("+1V2", [(1.0, 7.05), (1.0, 8.47)], 0.5, "B.Cu")
+blk.via(1.0, 7.9, "+1V2")
+T("+1V2", [(8.0, 1.94), (8.0, 1.2)], WS, "B.Cu")
+blk.via(8.0, 1.2, "+1V2")
+T("+1V2", [(8.0, 1.2), (7.2, 0.4), (0.9, 0.4), (0.5, 0.8), (0.5, 7.4), (1.0, 7.9)], 0.2, "In2.Cu")
+blk.iface("+1V2", 1.0, 7.9, "In3.Cu", "W", "supply", None, "via at C605 / C608 (U602 output, B)")
+
+
+# ============================================================================= routing: U603 buck-boost
+T("GND", [(10.05, 4.9), (11.5, 4.9)], 0.2)                                 # AGND (3) by its own trace to GND (8)
+Z("Net-(U603-L1)", "F.Cu", [(11.9, 4.28), (14.5, 4.28), (15.6, 3.18), (15.6, 2.45), (18.1, 2.45), (18.1, 3.7),
+                            (16.0, 3.7), (14.75, 4.52), (11.9, 4.52)], prio=6, ch=0.1)
+Z("Net-(U603-L2)", "F.Cu", [(11.9, 5.28), (14.75, 5.28), (16.0, 6.1), (18.1, 6.1), (18.1, 7.35), (15.6, 7.35),
+                            (15.6, 6.62), (14.5, 5.52), (11.9, 5.52)], prio=6, ch=0.1)
+Z("GND", "F.Cu", [(11.9, 4.72), (14.9, 4.72), (15.9, 3.95), (18.4, 3.95), (18.4, 5.85), (15.9, 5.85),
+                  (14.9, 5.08), (11.9, 5.08)], prio=3, ch=0.1)
+for x in (16.0, 16.95, 17.9):
+    G(x, 4.9)
+Z("/+5V1", "F.Cu", [(11.85, 5.75), (14.2, 5.75), (14.2, 7.9), (10.7, 7.9), (10.7, 6.3), (11.85, 6.3)], prio=5)
+for x, y in ((11.45, 6.55), (12.45, 6.55), (12.45, 7.25)):
+    V(x, y, "/+5V1", bl.VIA_D, bl.VIA_DRILL)
+G(14.6, 0.8); G(14.6, 1.6)                                                 # C601 ground
+G(14.6, 8.8); G(14.6, 9.6)                                                 # C610 ground
+T("Net-(U603-FB)", [(10.05, 5.4), (9.45, 5.4), (9.45, 8.16), (10.0, 8.16)], 0.2)
+T("Net-(U603-FB)", [(10.0, 8.16), (10.0, 9.02)], 0.2)
+T("/+5V1", [(10.0, 7.14), (10.9, 7.14)], 0.25)                             # R603 top -> C611
+T("GND", [(10.0, 10.04), (10.0, 10.75)], 0.25)
+G(10.0, 10.75)                                                             # R604 / C617 (B) ground
+# PG (pin 5) -> via -> In2 -> U605 EN+ / EN- network (B)
+T("/power/PG_5V1", [(10.05, 5.9), (10.05, 6.45)], 0.2)
+blk.via(10.05, 6.45, "/power/PG_5V1")
+T("/power/PG_5V1", [(10.05, 6.45), (8.3, 8.2), (8.3, 18.2), (7.9, 18.6)], 0.2, "In2.Cu")
+blk.via(7.9, 18.6, "/power/PG_5V1")
+# +5V1 on B: polygon under C610 / C611 -> FB602 (B) -> +5V1F network; strip south to the GVA-84+ interface
+Z("/+5V1", "B.Cu", [(10.9, 6.3), (12.85, 6.3), (12.85, 9.0), (10.9, 9.0)], prio=5)
+T("/+5V1", [(12.6, 8.8), (12.6, 20.0), (12.3, 20.3), (12.3, 21.7)], 0.5, "B.Cu")
+V(12.3, 20.9, "/+5V1"); V(12.3, 21.7, "/+5V1")
+blk.iface("/+5V1", 12.3, 21.3, "In3.Cu", "S", "supply", None,
+          "NEW: via pair, +5V1 (TPS63802 output, 0.29 / 0.34 A) to the GVA-84+ chokes L404.2 / L406.2 (pstrobe); "
+          "replaces the old VBUS strip along the S edge")
+
+# ============================================================================= routing: U604 (+5V / -5V)
+xe, ye = lm_routes("U604", "C612", "C613", "C626", "C618", CXL, CY4)
+lm_east("U604", "C618", CXL, CY4, xe, ye, 8.77)
+T("/power/+5V1F", [(1.25, 11.0), (1.25, 10.1)], 0.4)
+V(1.25, 10.1, "/power/+5V1F", bl.VIA_D, bl.VIA_DRILL)
+T("+5V", [("FB604", "2"), (9.05, 8.77)], 0.4)
+V(9.05, 8.77, "+5V", bl.VIA_D, bl.VIA_DRILL)
+blk.iface("+5V", 9.05, 8.77, "In3.Cu", "W", "supply", None, "via at FB604 (U604 OUT+ 4.80 V, 41 mA)")
+# B: +5V1F from FB602 to U604 VIN / EN+ / EN-
+T("/power/+5V1F", [("FB602", "2"), (11.7, 11.6), (6.2, 11.6)], 0.4, "B.Cu")
+T("/power/+5V1F", [(CXL + 1.95, CY4 + 1.55), (CXL + 1.95, 12.15), (6.2, 11.6), (6.2, 10.55),
+                   (5.75, 10.1), (1.25, 10.1)], 0.4, "B.Cu")
+# B: OUT+ via -> C617;  OUT- via -> C621 / FB603 -> C627 / -5V via
+T("/power/+5V_LDO", [(CXL + 1.95, CY4 - 1.95), (blk.pad("C617", "1")[0], CY4 - 1.95)], 0.4, "B.Cu")
+T("/power/-5V_LDO", [(2.95, 12.0), (3.85, 12.0), (3.85, CY4 + 1.8)], 0.4, "B.Cu")
+T("/power/-5V_LDO", [(3.85, CY4 + 1.8), (3.85, 14.0)], 0.4, "B.Cu")
+T("/power/-5V_LDO", [(3.85, 14.0), (3.6, 14.25), (2.79, 14.25)], 0.4, "B.Cu")
+T("-5V", [(1.12, 15.5), (1.12, 14.25)], 0.4, "B.Cu")
+T("-5V", [(1.21, 14.25), (0.7, 14.25), (0.45, 14.0)], 0.4, "B.Cu")
+V(0.45, 14.0, "-5V", bl.VIA_D, bl.VIA_DRILL)
+blk.iface("-5V", 0.45, 14.0, "In3.Cu", "W", "supply", None, "via at FB603 / C627 (U604 OUT- -4.64 V, 41 mA)")
+
+# ============================================================================= routing: U605 (+2V5 / -2V5)
+xe, ye = lm_routes("U605", "C625", None, "C619", "C624", CXL, CY5)
+lm_east("U605", "C624", CXL, CY5, xe, ye, 16.45)
+T("/power/+3V3_CP", [(2.35, 18.05), (1.21, 18.05)], 0.4)
+V(1.21, 18.05, "/power/+3V3_CP", bl.VIA_D, bl.VIA_DRILL)
+T("/power/+3V3_CP", [(1.21, 16.95), (1.21, 18.05)], 0.4, "B.Cu")
+T("/power/+3V3_CP", [(1.89, 19.2), (1.89, 18.74), (1.22, 18.07)], 0.25, "B.Cu")
+T("+3V3", [(0.45, 16.1), (2.79, 16.1), (2.79, 16.95)], 0.3, "B.Cu")
+V(0.45, 16.1, "+3V3", bl.VIA_D, bl.VIA_DRILL)
+# PG network (B): R617 -> EN+ / EN- vias, In2 via from U603 PG
+T("/power/PG_5V1", [(2.91, 19.2), (3.3, 19.2), (3.5, 19.0), (6.0, 19.0), (6.75, 19.75), (CXL + 1.95, CY5 + 1.55)],
+  0.2, "B.Cu")
+T("/power/PG_5V1", [(6.0, 19.0), (6.0, 17.4), (CXL + 0.95, CY5 - 1.85)], 0.2, "B.Cu")
+T("/power/PG_5V1", [(6.0, 19.0), (7.5, 19.0), (7.9, 18.6)], 0.2, "B.Cu")
+# OUT+ via -> C630 -> FB606 -> +2V5 via
+T("/power/+2V5_LDO", [(CXL + 1.95, CY5 - 1.95), (7.65, CY5 - 1.95)], 0.4, "B.Cu")
+T("/power/+2V5_LDO", [(7.8, 16.4), (7.8, 15.5)], 0.4, "B.Cu")
+T("+2V5", [(9.54, 15.3), (10.45, 15.3)], 0.4, "B.Cu")
+V(10.45, 15.3, "+2V5", bl.VIA_D, bl.VIA_DRILL)
+blk.iface("+2V5", 10.45, 15.3, "In3.Cu", "W", "supply", None, "via at FB606 (U605 OUT+ 2.50 V, 48 mA)")
+# OUT- via -> FB607 / C628;  -2V5: C629 + via
+T("/power/-2V5_LDO", [(2.79, 21.4), (5.95, 21.4)], 0.4, "B.Cu")
+T("/power/-2V5_LDO", [(3.85, CY5 + 1.8), (3.85, 21.4)], 0.4, "B.Cu")
+T("-2V5", [(0.6, 20.18), (0.6, 20.75)], 0.4, "B.Cu")
+T("-2V5", [(0.6, 20.75), (0.6, 21.25), (0.75, 21.4), (1.21, 21.4)], 0.4, "B.Cu")
+V(0.6, 20.75, "-2V5", bl.VIA_D, bl.VIA_DRILL)
+blk.iface("-2V5", 0.6, 20.75, "In3.Cu", "W", "supply", None, "via at FB607 / C629 (U605 OUT- -2.50 V, 50 mA)")
+G(7.75, CY4 + 2.5)                                                       # R606 ground
+T("GND", [(7.19, CY5 + 2.5), (7.19, 20.81), (7.75, 20.25)], 0.25)
+G(7.75, 20.25)                                                           # R608 ground
+
+# ============================================================================= grounds: F / B pours, In1 plane of the block
+for l_ in ("F.Cu", "B.Cu"):
+    blk.zone("GND", (l_,), R(0, 0, BW, BH), prio=0)
+blk.zone("GND", ("In1.Cu",), R(0, 0, BW, BH), prio=0)
+blk.keepout([(HOLE[0] + 3.5 * math.cos(a_ * math.pi / 8), HOLE[1] + 3.5 * math.sin(a_ * math.pi / 8)) for a_ in range(16)],
+            ("F.Cu", "In1.Cu", "In2.Cu", "B.Cu"), tracks=True, vias=True)
 blk.edge_rect(0, 0, BW, BH, "Dwgs.User")
-blk.circle(HOLE[0], HOLE[1], 3.5, "Dwgs.User", 0.05)
-out = blk.save(SCR)
-_bb = pcbnew.LoadBoard(out).ComputeBoundingBox(False)
+out = blk.save(HERE)
+
+for nm_ in blk.routes:
+    if blk.routes[nm_]["net"] in (DP, DM):
+        print(f"{nm_:12s} {blk.route_len(nm_):6.2f} mm")
+print("USB pair: w %.2f s %.2f -> Z0 %.1f R, Zdiff %.1f R (IPC-2141)" % ((W_USB, S_USB) + diff90(W_USB, S_USB)))
+import floorplan as fpl
+REFS = sorted(r_ for r_, b_ in fpl.membership(nl).items() if b_ == "power" and r_ not in MOVED)
+RF = {DP: W_USB, DM: W_USB}
+res = bl.check_board(out, refs=REFS, rf_widths=RF, verbose=40)
+for k_ in ('unrouted', 'corner', 'pad_axis', 'clearance'):
+    print(k_, res['details'][k_] if 'details' in res else '')
+_fb = pcbnew.LoadBoard(out)
+pcbnew.ZONE_FILLER(_fb).Fill(_fb.Zones())
+_rout = os.path.join(SCR, "power_filled.kicad_pcb")
+_fb.Save(_rout)
+_bb = _fb.ComputeBoundingBox(False)
 _ox, _oy = pcbnew.ToMM(_bb.GetX()), pcbnew.ToMM(_bb.GetY())
 
 
@@ -192,9 +481,14 @@ def render(png, layers, crop):
     """kicad-cli page-size-mode 2 puts the SVG origin at the board bbox; shift the crop (local mm)"""
     x0, y0, x1, y1 = crop
     o = (100.0 - _ox, 100.0 - _oy)
-    bl.render(out, png, layers, crop=(x0 + o[0], y0 + o[1], x1 + o[0], y1 + o[1]), tmpdir=SCR)
+    bl.render(_rout, png, layers, crop=(x0 + o[0], y0 + o[1], x1 + o[0], y1 + o[1]), tmpdir=SCR)
 
 
-full = (-0.5, -0.5, BW + 0.5, BH + 0.5)
-render(os.path.join(SCR, "p_f.png"), ("F.Cu", "F.Fab", "F.CrtYd", "Dwgs.User"), full)
-render(os.path.join(SCR, "p_b.png"), ("B.Cu", "B.Fab", "B.CrtYd", "Dwgs.User"), full)
+if "--norender" not in sys.argv:
+    full = (-0.5, -0.5, BW + 0.5, BH + 0.5)
+    render(os.path.join(HERE, "power.png"), ("F.Cu", "F.SilkS", "F.Fab", "Dwgs.User"), full)
+    render(os.path.join(HERE, "power_b.png"), ("B.Cu", "B.Fab", "Dwgs.User"), full)
+    render(os.path.join(HERE, "power_detail.png"), ("F.Cu", "F.Fab", "Dwgs.User"), (8.5, 0.0, 19.5, 10.5))
+    render(os.path.join(SCR, "power_f.png"), ("F.Cu", "F.Fab", "F.CrtYd", "Dwgs.User"), full)
+    render(os.path.join(SCR, "power_b.png"), ("B.Cu", "B.Fab", "B.CrtYd", "Dwgs.User"), full)
+    render(os.path.join(SCR, "power_in2.png"), ("In2.Cu", "F.Fab", "Dwgs.User"), full)

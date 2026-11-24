@@ -73,11 +73,22 @@ X_IN = 0.52            # input leg column (iface on the N / S edge); R407 and C4
 XT = 2.74              # TRF37D73 centre x (courtyard touches the leg parts' courtyards)
 X1 = XT + 1.60 + 0.47  # TRF bias bead on the corner, C416 below it (first column of the U-folded pi pad)
 YR = YL + 2.55         # U row: R410 series, R408 / R409 shunts inside the U
-X2 = X1 + 2.94         # second column: C417
+XRS1 = X1 + 1.29       # first shunt R408 / R412 (0603 since 24 Nov) and series pad 1 column
+XRS2 = XRS1 + 1.20     # second shunt (0402) column: its courtyard touches the 0603's
+X2 = XRS2 + 0.95       # second column: C417 (courtyard touches the second shunt's); U 0.45 mm wider than in 0402
 XO = 14.60             # output column: GVA bead on the corner, C421 below, launch node at YS
 XG = XO - 1.47 - 1.50  # GVA centre x (pin 3 at XO - 1.47: courtyard edge = bead courtyard edge)
+DL = 1.00              # TRF bias-tee choke offset east of the bead via (24 Nov, BIASTEE-6)
 XD = XO + 0.47 + 0.95  # clamp column (vertical SOD-323 beside C421)
-L_STUB = 80.0 / bl.PS_MM50
+# RF-2 (24 Nov): the shorted end is NT pad 1 -> 1.0 mm net-tie bar (0.5 mm wide over L2) -> GND via IN NT pad 2
+# (net-tie pads carry no paste, so the via is not a solder trap) -> L2.  Its inductance is counted as stub delay
+# (dt = L / Z0) and the drawn stub is shortened by it so the stub is 80 ps electrically.
+Z_TIE, EE_TIE = bl.microstrip_6l(0.5)
+L_TIE_PH = Z_TIE * math.sqrt(EE_TIE) / bl.C0 * 1.0              # pH (ohm * ps/mm * mm)
+H_VIA = bl.STACKUPS["6L"]["H"] + 0.035 / 2 + 0.0152 / 2        # L1 centre to L2, mm
+L_VIA_PH = 200.0 * H_VIA * (math.log(4 * H_VIA / 0.2) + 1)     # pH (0.2 h (ln(4h/d) + 1) nH, mm)
+DT_SHORT = (L_TIE_PH + L_VIA_PH) / 50.0                         # ps
+L_STUB = (80.0 - DT_SHORT) / bl.PS_MM50
 XR_IN, YR_IN = 2.30, YL + 2.00   # 47 R (horizontal, under the TRF courtyard) centre; PH_STROBE pad east
 XV2, XG2 = 3.45, 4.10            # L6 -> L1 return via and its GND via on the 47 R row
 # PH_STROBE entries on the NORTH edge (TOPOLOGY section 4), both chains: P (chain A) west, N (chain K) east
@@ -126,10 +137,9 @@ def chain(s):
     two(FB, X1, yl - s * 0.48, NS("N"), n_bias)          # bead pad 1 centred on the corner, body away from the stub
     snap(FB, n_rfout, y=yl)
     two(C_O, X1, my(YL + 1.40), NS("N"), n_rfout)        # DC block down the first column
-    two(RSER, X1 + 1.47, yr, "W", n_padin)               # pi pad series 68 R on the U row
-    xa_, xb_ = blk.pad(RSER, "@" + n_padin)[0], blk.pad(RSER, "@" + n_padout)[0]
-    two(RS1, xa_, my(YR - 1.42), NS("S"), n_padin)       # shunts above the series pads, inside the U
-    two(RS2, xb_, my(YR - 1.42), NS("S"), n_padout)
+    two(RSER, XRS1 + 0.51, yr, "W", n_padin)             # pi pad series 68 R on the U row
+    two(RS1, XRS1, my(YR - 1.95), NS("S"), n_padin)      # 0603 shunt above series pad 1, inside the U
+    two(RS2, XRS2, my(YR - 1.42), NS("S"), n_padout)     # 0402 shunt; its node track drops into series pad 2
     two(C_I, X2, my(YL + 1.40), NS("S"), n_padout)       # DC block up the second column
     bplace(G, XG, yl - 1.95, 90)                         # GVA-84+: pin 1 W, pin 3 E on the line, tab north
     assert abs(blk.pad(G, "1")[1] - yl) < 1e-6 and blk.pad(G, "1")[0] < XG
@@ -153,7 +163,7 @@ def chain(s):
     rf(n_padin, [(C_O, "@" + n_padin), (X1, yr), (RSER, "@" + n_padin)], f"{U} pad in", ch=0.3)
     rf(n_padin, [(RSER, "@" + n_padin), (RS1, "@" + n_padin)], f"{U} shunt 1")
     rf(n_padout, [(RSER, "@" + n_padout), (X2, yr), (C_I, "@" + n_padout)], f"{U} pad out", ch=0.3)
-    rf(n_padout, [(RSER, "@" + n_padout), (RS2, "@" + n_padout)], f"{U} shunt 2")
+    rf(n_padout, [(RS2, "@" + n_padout), (XRS2, yr)], f"{U} shunt 2")
     rf(n_gin, [(C_I, "@" + n_gin), (X2, yl), (G, "1")], f"{G} IN", ch=0.3)
     rf(n_gout, [(G, "3"), (XO, yl)], f"{G} OUT")
     rf(n_gout, [(XO, yl), (C_OUT, "@" + n_gout)], f"{G} OUT b")      # joint inside the bead pad
@@ -173,17 +183,20 @@ def chain(s):
     two(NT, xe, my(YS - 0.5), NS("S"), n_stub)
     assert max(abs(a - b) for a, b in zip(blk.pad(NT, "@" + n_stub), (xe, ys))) < 1e-6
     gx, gy = blk.pad(NT, "2")
-    blk.track("GND", W_GND, [(gx, gy), (gx, my(YS - 2.32))])
-    gv(gx, my(YS - 1.64))
-    gv(gx, my(YS - 2.32))
+    gv(gx, gy)                                           # RF-2: GND via in NT pad 2, right at the tie bar
+    blk.track("GND", W_GND, [(gx, gy), (gx - 0.6, gy)])  # second via west (in K the TRF pin-1 cap via is below)
+    gv(gx - 0.6, gy)
     # clamp GND -> via beyond its pad
     x, y = blk.pad(D, "@GND")
     blk.track("GND", W_GND, [(x, y), (x, y - s * 0.62)])
     gv(x, y - s * 0.62)
-    for r in (RS1, RS2):                                 # shunt GND vias at the line level inside the U
-        x, y = blk.pad(r, "@GND")
-        blk.track("GND", W_GND, [(x, y), (x, yl)])
-        gv(x, yl)
+    # shunt GND vias inside the U at the line level, east of their pads (the bias-tee choke on B is above them)
+    x, y = blk.pad(RS2, "@GND")
+    blk.track("GND", W_GND, [(x, y), (x, yl), (x + 0.5, yl)])
+    gv(x + 0.5, yl)
+    x, y = blk.pad(RS1, "@GND")
+    blk.track("GND", W_GND, [(x, y), (x + 0.75, y)])
+    gv(x + 0.75, y)
     # ---------------------------------------------------------------- TRF GND pins -> EP, EP vias
     xu, yu = blk.loc(blk.fps[U].GetPosition())
     for pn in ("3", "4", "5", "6", "8"):
@@ -218,11 +231,14 @@ def chain(s):
     # (the spare 100 nF CX moved to the bias-tee cold cap C434 / C435 below: the north-west B.Cu strip now
     #  carries the PH_STROBE L6 lines)
     # ---------------------------------------------------------------- TRF bias tee on B.Cu (straight chain)
+    # BIASTEE-6 (24 Nov): the 1210 moved DL east, so the bead's via is no longer in choke pad 1 (0.15 mm gap); a
+    # short B track enters the pad along its axis
     pb = blk.pad(FB, "2")
     yt = my(YL - 1.80)
     blk.track(n_bias, 0.5, [pb, (pb[0], yt)])
     blk.via(pb[0], yt, n_bias)
-    two(L, pb[0] + 1.40, yt, "W", n_bias, side="B")      # 1210 pad 1 over the via
+    two(L, pb[0] + 1.40 + DL, yt, "W", n_bias, side="B")
+    blk.track(n_bias, 0.5, [(pb[0], yt), blk.pad(L, "@" + n_bias)], layer="B.Cu")
     lc = blk.pad(L, "@+3V3")
     two(CC, lc[0] + 1.85, yt, "W", "+3V3", side="B")      # cold-pad 100 nF along the chain (courtyards touch)
     cc = blk.pad(CC, "@+3V3")
@@ -239,47 +255,56 @@ def chain(s):
     blk.track("+3V3", 0.4, [cxp, (cc[0], cc[1] + s * 0.75)], layer="B.Cu")
     blk.track("GND", W_GND, [cxg, (cxg[0], my(5.55))], layer="B.Cu")
     gv(cxg[0], my(5.55))
-    two(RD, pb[0] + 1.40, my(0.54), "W", n_bias, side="B")  # 1 k beside the 1210 (outer side)
+    two(RD, pb[0] + 1.40 + DL, my(0.54), "W", n_bias, side="B")  # 1 k beside the 1210 (outer side)
     r1, r2 = blk.pad(RD, "@" + n_bias), blk.pad(RD, "@+3V3")
     l1 = blk.pad(L, "@" + n_bias)
     blk.track(n_bias, 0.4, [r1, (l1[0] + 0.35, r1[1]), (l1[0], r1[1] + s * 0.35), l1], layer="B.Cu")
     blk.track("+3V3", 0.4, [r2, (lc[0] - 0.35, r2[1]), (lc[0], r2[1] + s * 0.35), lc], layer="B.Cu")
-    bplace(TP1, pb[0], my(YL - 1.80 + 1.58 + 1.01), 0, "B")   # test point below the 1210
+    bplace(TP1, l1[0], my(YL - 1.80 + 1.58 + 1.01), 0, "B")   # test point below the 1210
     blk.track(n_bias, 0.4, [l1, blk.pad(TP1, "1")], layer="B.Cu")
     # ---------------------------------------------------------------- GVA GND tab vias
     xg_, yg_ = blk.loc(blk.fps[G].GetPosition())
-    for dx in (-0.45, 0.45):
+    for dx in (0.12, 0.67):                               # 24 Nov: east half of the tab (C434 moved east)
         for dy in (-1.2, 0.0):
             gv(xg_ + dx, yg_ + dy)
-    # ---------------------------------------------------------------- GVA bias tee on B.Cu (VBUS)
+    # ---------------------------------------------------------------- GVA bias tee on B.Cu (+5V1, was VBUS)
+    # BIASTEE-4 / -6 (24 Nov): the 2.2 uH stands 1.25 mm east of the bead via (B track into its pad, no via in the
+    # pad); cold pad -> C418 1 nF and C419 100 nF stacked at it (identical in A and K), each with its own GND via
+    # (none in a pad); +5V1 enters through C419: via pair beside its pad
+    P5 = "/+5V1"
     pg = blk.pad(FBG, "2")
     yv = my(YL - 1.55)
     blk.track(n_gbias, 0.5, [pg, (XO, yv)])
     blk.via(XO, yv, n_gbias)
-    two(LG, XO, my(YL - 1.55 - 1.062), NS("S"), n_gbias, side="B")   # 2.2 uH straight on from the bead via
+    two(LG, XO + 1.25, my(YL - 1.55 - 1.062), NS("S"), n_gbias, side="B")
     snap(LG, n_gbias, y=yv)
-    lv = blk.pad(LG, "@VBUS")
-    two(CG1, XO - 0.85 - 0.95, lv[1], "E", "VBUS", side="B")       # cold-pad 1 nF across the VBUS pad
-    c1v = blk.pad(CG1, "@VBUS")
-    blk.track("VBUS", 0.64, [lv, c1v], layer="B.Cu")
-    g = blk.pad(CG1, "@GND")
-    gv(*g)                                                         # GND via in the pad (under the GVA tab)
-    for d in (0.62, 1.32):                                         # VBUS enters through the capacitor pad
-        blk.via(c1v[0], c1v[1] + s * d, "VBUS")
-    blk.track("VBUS", 0.5, [c1v, (c1v[0], c1v[1] + s * 1.32)], layer="B.Cu")
-    bplace(TP2, XO, my(4.56), 0, "B")
-    blk.track(n_gbias, 0.4, [(XO, yv), blk.pad(TP2, "1")], layer="B.Cu")
-    # VBUS bulk: 10 uF 0805 + 100 nF on B.Cu below the GVA, own via pair and GND via
-    two(CG10, 11.25, my(7.00), "W", "VBUS", side="B")
-    two(CG2, 11.25, my(7.00 - 0.98 - 0.47), "W", "VBUS", side="B")
-    p10, g10 = blk.pad(CG10, "@VBUS"), blk.pad(CG10, "@GND")
-    p2, g2 = blk.pad(CG2, "@VBUS"), blk.pad(CG2, "@GND")
+    lb = blk.pad(LG, "@" + n_gbias)
+    blk.track(n_gbias, 0.5, [(XO, yv), lb], layer="B.Cu")
+    lv = blk.pad(LG, "@" + P5)
+    XCG = XO - 0.65
+    two(CG1, XCG, lv[1], "E", P5, side="B")                        # 1 nF on the cold pad's row
+    two(CG2, XCG, lv[1] + s * 0.94, "E", P5, side="B")             # 100 nF below it (courtyards touch)
+    c1v, c2v = blk.pad(CG1, "@" + P5), blk.pad(CG2, "@" + P5)
+    blk.track(P5, 0.64, [lv, c1v], layer="B.Cu")
+    blk.track(P5, 0.5, [c1v, c2v], layer="B.Cu")
+    for c in (CG1, CG2):
+        g = blk.pad(c, "@GND")
+        gv(g[0] - 0.62, g[1])
+        blk.track("GND", W_GND, [g, (g[0] - 0.62, g[1])], layer="B.Cu")
+    va = (c2v[0] - 0.23, c2v[1] + s * 0.73)
+    vb = (va[0] - 0.65, va[1])
+    for v in (va, vb):
+        blk.via(*v, P5)
+    blk.track(P5, 0.5, [c2v, (c2v[0], va[1] - s * 0.23), va, vb], layer="B.Cu", ch=0)
+    bplace(TP2, lb[0], my(4.56), 0, "B")                          # test point straight below the choke pad
+    blk.track(n_gbias, 0.4, [lb, blk.pad(TP2, "1")], layer="B.Cu")
+    # +5V1 bulk: 10 uF 0805 on B.Cu below the GVA, own via pair and GND via
+    two(CG10, 11.25, my(7.00), "W", P5, side="B")
+    p10, g10 = blk.pad(CG10, "@" + P5), blk.pad(CG10, "@GND")
     for d in (-0.40, 0.40):
-        blk.via(p10[0] - 0.90, p10[1] + d, "VBUS")
-    blk.track("VBUS", 0.6, [(p10[0] - 0.90, p10[1] - 0.40), (p10[0] - 0.90, p10[1] + 0.40)], layer="B.Cu")
-    blk.track("VBUS", 0.6, [(p10[0] - 0.90, p10[1]), p10], layer="B.Cu")
-    blk.track("VBUS", 0.4, [p2, (p10[0], p2[1]), p10], layer="B.Cu", ch=0.12)
-    blk.track("GND", 0.4, [g2, (g10[0], g2[1]), g10], layer="B.Cu", ch=0.12)
+        blk.via(p10[0] - 0.90, p10[1] + d, P5)
+    blk.track(P5, 0.6, [(p10[0] - 0.90, p10[1] - 0.40), (p10[0] - 0.90, p10[1] + 0.40)], layer="B.Cu")
+    blk.track(P5, 0.6, [(p10[0] - 0.90, p10[1]), p10], layer="B.Cu")
     blk.track("GND", W_GND, [g10, (g10[0] + 0.60, g10[1])], layer="B.Cu")
     gv(g10[0] + 0.60, g10[1])
     return {"stub": l_st, "out": blk.route_len(f"{OUT[1:]} drop") + blk.route_len(f"{OUT[1:]} output"),
@@ -432,7 +457,8 @@ blk.iface("PH_STROBE_N", X_N, 0.0, "F.Cu", "N", "pair", W,
 blk.iface("PSTRB_A", BW, 9.75, "F.Cu", "E", "rf50", W, "to phase tap 0 (phase iface 26.5 / 34.75 board)")
 blk.iface("PSTRB_K", BW, 15.25, "F.Cu", "E", "rf50", W, "to phase tap 0 (phase iface 26.5 / 40.25 board)")
 blk.iface("+3V3", 0, 0, "In3.Cu", "-", "supply", None, "TRF VCC and bias tees: via pairs, L4 (In3) x 0-12")
-blk.iface("VBUS", 0, 0, "In3.Cu", "-", "supply", None, "GVA-84+ tees: via pairs at C418 / C428, L4 (In3) x 10-15")
+blk.iface("/+5V1", 0, 0, "In3.Cu", "-", "supply", None,
+          "GVA-84+ tees (+5V1, was VBUS): via pairs at C419 / C429 (both chains alike) and at C420 / C430, L4 x 9-15")
 blk.edge_rect(0, 0, BW, BH, layer="Dwgs.User")
 blk.line(0, CORR[0], BW, CORR[0], layer="Dwgs.User")
 blk.line(0, CORR[1], BW, CORR[1], layer="Dwgs.User")
@@ -463,6 +489,8 @@ for k, r in RES.items():
 for k, (e_, m_, r_, t_, lg_, tt_) in INP.items():
     print(f"input {k}: L1 entry {e_:.3f} + L6 {m_:.3f} + L1 return {r_:.3f} = {t_:.3f} mm to the 47 R; + leg {lg_:.3f}"
           f" = {tt_:.3f} mm = {tt_ * bl.PS_MM50:.2f} ps to TRF pin 2 (+ 2 vias)")
+print(f"stub short: tie {L_TIE_PH:.0f} pH + via {L_VIA_PH:.0f} pH -> {DT_SHORT:.2f} ps; drawn stub {L_STUB:.3f} mm "
+      f"= {L_STUB * bl.PS_MM50:.2f} ps, total {L_STUB * bl.PS_MM50 + DT_SHORT:.2f} ps")
 print(f"input A-K mismatch to TRF pin 2 {(INP['A'][5] - INP['K'][5]) * 1e3:.1f} um; A serpentine top y {YT:.3f}")
 print("impedance (JLC06161H-3313, L1 over L2 h 0.0994 mm er 4.1, mask corrected; L6 over L5 identical)")
 for z_ in (50,):
