@@ -141,3 +141,13 @@ are estimates; XR0420-R47M stock 65 (2nd source listed, its land not checked); b
 - Added DNP footprints: C631 120 pF (U601 Cff) and C632 47 uF 10 V tantalum (C22036, VBUS damper, section 7).
   Recheck RP-3 (24 Nov): C632 is now fitted by default (0.25 USD).
 - Generated BOM: **63.76 USD** (limit 80), against the 63.58 estimate in section 6.
+
+## LCSC verification (24 Nov 2026)
+
+- R603 / R604 are now **499k / 54.2k** 0.1 % (AR02BTC4993 C6466287, RT0402BRD0754K2L C852840): no 459k 0.1 % 0402 is
+  stocked on LCSC. VOUT = 0.5 x (1 + 499/54.2) = 5.103 V; with FB +/-1 % 5.05-5.15 V (within 5.04-5.16).
+- L601 is FXL0420-R47-M (C167200, 10.6k stock): 0.47 uH +/-20 %, 14 mR, Isat 7.6 typ / 9.5 A, same body and recommended
+  land (a 2.2 / b 5.2 / c 2.5 mm) as XR0420-R47M, which stays the alternative (C5307593, 65 stock).
+- C618 1u 0603 -> CL10B105KA8NNNC C29936 (25 V X7R), C619 4.7u 0603 -> 0603X475K160NT C99229 (16 V X5R): C15849 / C19666
+  had 0 LCSC stock. C616 / C620 2.2u 0402 10 V -> CL05A225KP5NSNC C107369. FB601 -> BLM21PG221SH1D C88994.
+- 0.1 % 25 ppm/K dividers: see `docs/bom.md` (LCSC column) and `kicad/gen/common.py` `LCSC_R01`.

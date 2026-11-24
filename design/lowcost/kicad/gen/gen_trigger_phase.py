@@ -162,7 +162,7 @@ def main():
     sh.gnd(r27["2"], dy=g(4), name="-2V5")
     c1 = C(sh, "100n", (pg[0] + g(5), yn + g(3)))
     sh.gnd(c1["2"])
-    c2 = C(sh, "1n", (pg[0] + g(10), yn + g(3)), lcsc="C1523", fields={"Note": "C0G, at U301.5"})
+    c2 = C(sh, "1n", (pg[0] + g(10), yn + g(3)), fields={"Note": "C0G, at U301.5"})
     sh.gnd(c2["2"])
     sh.label("VSW_GND", (pg[0] + g(14), yn))
     sh.add(TP, "TP", "VSW_GND", (pg[0] + g(14), yn), fp=TP_FP)

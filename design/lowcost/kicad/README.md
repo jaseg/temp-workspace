@@ -135,7 +135,7 @@ DS841-2.8E table 3-20, LV C6/I5), CLKDIV /5 -> PCLK 76.8 MHz. OSER10 (strobes) a
 | VBUS | USB-C 16P, F601 PTC 1.5 A, D601 SMAJ5.0A, FB601 220R 2 A, C632 47u tantalum damper (fitted) | USB | 4.60-5.25 V | 0.75 / 0.97 A | - | ~0.3 |
 | +3V3 | U601 TPS62A01ADRLR buck 2.4 MHz FPWM, L602 1 uH, R609 100k / R610 22.1k | VBUS | 3.315 V (3.21-3.42 incl. 1 % divider; 3.25-3.38 reference only) | 0.51 / 0.67 A | 4.60-5.25 V; 100 % mode needs 3.53 V: >= 1.07 V | 0.197 |
 | +1V2 | U602 TPS62A01ADRLR, L603 1 uH, R611 / R612 100k | +3V3 | 1.200 V (1.17-1.23) | 20 / 30 mA | 3.21-3.42 V: 2.0 V | 0.197 |
-| +5V1 | U603 TPS63802DLAR buck-boost FPWM, L601 0.47 uH, R603 459k / R604 49.9k (0.1 %) | VBUS | 5.10 V (5.04-5.16) | 0.29 / 0.34 A | regulates above and below VOUT | 0.951 |
+| +5V1 | U603 TPS63802DLAR buck-boost FPWM, L601 0.47 uH, R603 499k / R604 54.2k (0.1 %; was 459k / 49.9k, no stocked 459k 0.1 % 0402) | VBUS | 5.10 V (5.04-5.16) | 0.29 / 0.34 A | regulates above and below VOUT | 0.951 |
 | +5V / -5V | U604 LM27762DSSR (pump + LDOs) via FB602; FB604 / FB603 at the outputs | +5V1 | +4.80 / -4.64 V | 37 / 41 mA each | 5.02-5.15 V (<= 5.5 V); OUT+ >= 0.14 V; OUT- worst case 0.06-0.11 V (typ 0.26 V; RCP 4.5-5.5 R at 41 mA, recheck RP-2) | 0.960 |
 | +2V5 / -2V5 | U605 LM27762DSSR via FB605; FB606 / FB607 at the outputs; EN = PG_5V1 | +3V3 | +2.500 / -2.501 V (0.1 % dividers) | 40-48 / 42-50 mA | 3.24-3.37 V; OUT+ 0.70 V, OUT- 0.42 V (RNEG 5 R assumed) | 0.960 |
 
@@ -277,11 +277,15 @@ no part is added. Only new capacitor: C630. DNP footprint: C631 120 pF (U601 Cff
 
 ## BOM
 
-`docs/bom.md` (generated): **64.01 USD for one board** (C632 fitted, C618 / C619 LCSC numbers, 24 Nov 2026; 63.76 before) (MCU included, PCB
-excluded) against the 80 USD budget, 6.1 USD of it estimates. Largest lines: TRF37D73 x5 7.50, GW1NZ-1 6.68, BAT15-04W x18 6.58, GVA-84+ x2 5.98, BUF802 5.89,
-TLV3801 5.13, STM32G474CBT6 4.11. J501 (WR-WST footprint) is a 0 USD footprint-only line, not counted as a part.
-First order with LCSC minimum quantities ~88 USD. LCSC numbers that pointed at other parts were corrected (power LDOs,
-TVS, PTC) or removed (several resistor values) on 21 Nov 2026.
+`docs/bom.md` (generated): **73.14 USD for one board** (24 Nov 2026, every line with an LCSC number verified on
+lcsc.com, prices from the LCSC price ladders; 64.01 with the earlier estimates) (MCU included, PCB excluded) against the
+80 USD budget. The rise is mostly the SMA connectors (now the stocked Samtec SMA-J-P-H-ST-EM1 C5199907 that matches the
+footprint, 2 x 5.34 instead of 2 x 1.99 estimated for an out-of-stock generic part) and the 0.1 % thin-film dividers.
+Largest lines: TRF37D73 x5 7.51, GW1NZ-1 6.68, BAT15-04W x18 6.58, GVA-84+ x2 5.98 (Mouser), BUF802 5.89, SMA x2 10.68,
+TLV3801 5.13 (Mouser), STM32G474CBT6 4.63. J501 (WR-WST footprint, not on LCSC) is a 0 USD footprint-only line.
+LCSC numbers live in the symbol field `LCSC` (generators; generic passives in `gen/common.py` tables `LCSC_R`,
+`LCSC_R0603`, `LCSC_R01` (0.1 %), `LCSC_C`, `LCSC_C0603`, `LCSC_C_C0G`, `LCSC_C_X7R`); the verified stock / price data
+is `gen/lcsc_parts.py`. Verification method and the parts changed by it: `docs/bom.md` section "LCSC verification".
 
 ## Open points
 
@@ -292,13 +296,11 @@ Integration (21 Nov 2026):
 - STM32 (21 Nov 2026; ADC trigger revised 24 Nov): ADC1/2 from TIM2_TRGO, PB11 = TIM2_CH4 frame mark (EXTSEL code in
   RM0440 not read, verify); the OPAMP/DAC3-4
   mapping is from the ST HAL OPAMP header (stm32g4xx_hal_opamp.h). PB4 (SPI1_MISO) and PB6 (FPGA_DONE, an input) carry the UCPD dead-battery pull-downs until
-  firmware sets PWR_CR3.UCPD_DBDIS. USB-C 16P, USBLC6-2SC6 and the LED are price estimates; check the STM32G474CBT6
-  price on the LCSC page (only search snapshots read).
-- Stock: BAT15-03W (C5310874) 0 at LCSC; TRF37D73 25 at LCSC (Mouser has stock); SMA
-  edge connectors not sourced (2 x ~2 USD estimate). TP2272 no longer used (U701 is a TLV9001IDBVR, LCSC C398363).
-- LCSC numbers missing: 43 fitted BOM lines (24 Nov 2026), mostly 0402 C0G values (1.5p, 2.2p, 3.3p, 100p, 470p,
-  220p), 1 % resistor values, the 0.1 % power dividers, 2.2u 0402, the 50k trimmer, the green LED, the SMA connectors
-  and the GVA-84+ (Mouser); list in `docs/bom.md` (empty LCSC column).
+  firmware sets PWR_CR3.UCPD_DBDIS. USB-C 16P, USBLC6-2SC6, the LED and the STM32G474CBT6 prices are now from the LCSC product pages (24 Nov 2026).
+- Stock (24 Nov 2026): BAT15-03W (C5310874) 0 at LCSC and JLC: order DigiKey BAT1503WE6327HTSA1CT-ND; TRF37D73 25 at
+  LCSC (5 needed), TMUX136 32, BUF802 54, TLV3801 43, STM32G474CBT6 20, 300k 0.1 % (C4262495) 139, 280k 0.1 %
+  (C4091415) 48, C101 1.5 pF 100 V (C2179899) 45: low, re-check at order. TP2272 no longer used.
+- LCSC numbers: all assigned and verified (24 Nov 2026); J501 Würth 490107671612 is not on LCSC (footprint only).
 - Control voltages (21 Nov 2026): DS12288 DAC/OPAMP load limits and the VREFBUF reset state (high-Z) taken from
   adc.md / the brief, PDF not re-read; PA6 sees about -0.4 V / 0.17 mA substrate injection while the DAC is off
   (reset, bootloader): within the absolute maximum as remembered, check IINJ in DS12288; the input_stage layout fragment
@@ -306,8 +308,8 @@ Integration (21 Nov 2026):
   (-1.46..-0.50 / +0.10..+1.40 V, firmware limit 1.30 V) cover the strobe_arms trim span +/-0.9..1.3 V; the re-simulation
   of the as-built 39.4 / 69.4 ps phase lines is still open.
 - Tap hold caps are 0.5 pF (nearest stocked C0G value, LCSC C1544) instead of 0.47 pF.
-- Power tree (24 Nov 2026): LCSC numbers to assign for the 0.1 % 0402 divider resistors (class price 0.02 USD) and
-  2.2u 0402 10 V (C616 / C620); C618 C15849 and C619 C19666 assigned in the repair round (from memory: confirm stock).
+- Power tree (24 Nov 2026): 0.1 % dividers, C616 / C620 (C107369 10 V) and C618 / C619 (C29936 25 V X7R, C99229 16 V
+  X5R; C15849 / C19666 had 0 LCSC stock) assigned and verified; R603 / R604 now 499k / 54.2k (VOUT 5.103 V).
 - Sampler ADC must sample before the S_STROBE falling edge (+167 ns at 3.0 MHz) - FPGA/MCU firmware timing.
 - Phase strobe stubs 80 ps (13.503 mm at 5.925 ps/mm on the six-layer board) per sim/phase_array. Six-layer tap
   lines: signal 69.4 ps, strobe 39.4 ps per tap (pitch 4.514 mm), about 30 ps effective, not re-simulated.

@@ -262,7 +262,7 @@ def main():
     place(tvs, "2", (xt, yv))
     sh.gnd(tvs["1"])
     fb1 = sh.add("Device:FerriteBead_Small", "FB601", "220R@100MHz 2A", (0, 0), rot=90, fp=FP["FB0805"],
-                 lcsc="C85840")
+                 lcsc="C88994", mpn="BLM21PG221SH1D")
     place(fb1, "1", (xt + g(5), yv))
     sh.wire(f["2"], fb1["1"])
     sh.label("VBUS_F", (xt, yv - 0.0))
@@ -312,11 +312,11 @@ def main():
     sh.label("PG_5V1", (pg[0] - g(6), pg[1] + g(5)), rot=180)
     l1, l2 = u3["9"], u3["7"]
     yl = l1[1] - g(3)
-    lb = sh.add("Device:L", "L601", "0.47u", (0, 0), rot=90, fp="scope-fe:L_XR0420_4.4x4.2mm", lcsc="C5307593",
-                mpn="XR0420-R47M",
-                fields={"Price": "0.106 USD (LCSC 5+)",
-                        "Note": "0.47 uH +/-20 %, Isat 9.5 A, 14 mR; 65 in stock, 2nd source FEXU0420SR47MBHCB "
-                                "C49232844 (4.1 x 4.1, land not checked)"})
+    lb = sh.add("Device:L", "L601", "0.47u", (0, 0), rot=90, fp="scope-fe:L_XR0420_4.4x4.2mm", lcsc="C167200",
+                mpn="FXL0420-R47-M",
+                fields={"Price": "0.294 USD (LCSC 5+)",
+                        "Note": "0.47 uH +/-20 %, Isat 7.6 typ / 9.5 max A, 14 mR, 4.4 x 4.2 x 2.0 mm, land a 2.2 / "
+                                "b 5.2 / c 2.5 mm = XR0420 (same footprint); alt. XR0420-R47M C5307593 (low stock)"})
     place(lb, "1", (l1[0], yl))
     sh.wire(l1, lb["1"])
     sh.wire(l2, lb["2"])
@@ -326,9 +326,10 @@ def main():
     sh.gnd((a[0], yb))
     vo, fb = u3["6"], u3["4"]
     xd = vo[0] + g(4)
-    rt = vpart(sh, "R", "R603", "459k 0.1%", (xd, vo[1]), gnd=False,
-               fields={"Note": "0.1 % (E192): VOUT = 0.5 V x (1 + 459k/49.9k) = 5.10 V"})
-    vpart(sh, "R", "R604", "49.9k 0.1%", rt["2"], fields=PCT)
+    rt = vpart(sh, "R", "R603", "499k 0.1%", (xd, vo[1]), gnd=False,
+               fields={"Note": "0.1 %: VOUT = 0.5 V x (1 + 499k/54.2k) = 5.10 V (was 459k/49.9k: no stocked "
+                               "459k 0.1 % 0402 on LCSC, 24 Nov 2026)"})
+    vpart(sh, "R", "R604", "54.2k 0.1%", rt["2"], fields=PCT)
     sh.path([fb, (fb[0] + g(2), fb[1]), (fb[0] + g(2), rt["2"][1]), rt["2"]])
     for k, ref in enumerate(("C610", "C611")):
         vpart(sh, "C", ref, "22u", (xd + g(6 + 6 * k), vo[1]),
@@ -348,9 +349,9 @@ def main():
     lm27762(sh, "U604", (X4, Y3), "+5V1F", vin_y=vo[1],
             cin=[("C613", "100n", {"fields": {"Note": "U604 pin 3, closest"}}),
                  ("C612", "22u", {"fields": {"Note": "U604 CIN on the IC layer at pin 3 (moved; DECOUPLING-4)"}})],
-            c1=("C618", "1u", {"size": "0603", "lcsc": "C15849", "mpn": "CL10A105KB8NNNC",
-                                 "fields": {"Note": "flying cap C1, 50 V X5R 0603 (recheck RP-9; LCSC # from the "
-                                                    "basic-parts list, stock to confirm at order)"}}),
+            c1=("C618", "1u", {"size": "0603", "lcsc": "C29936", "mpn": "CL10B105KA8NNNC",
+                                 "fields": {"Note": "flying cap C1, 25 V X7R 0603 (recheck RP-9; C15849 50 V X5R "
+                                                    "had 0 LCSC stock on 24 Nov 2026)"}}),
             ccp=("C626", "10u", {"fields": {"Note": "CCP at pin 5 (moved from the LM337 ADJ)"}}),
             outp=("+5V_LDO", [("C617", "10u", {"fields": {"Note": "OUT+ at pin 11 (moved)"}})], "FB604", "+5V"),
             outn=("-5V_LDO", [("C621", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB603", "-5V"),
@@ -388,9 +389,10 @@ def main():
     lm27762(sh, "U605", (xu5, yu5), "+3V3_CP",
             cin=[("C625", "10u", {"fields": {"Note": "U605 CIN on the IC layer at pin 3 (moved from +2V5)"}})],
             c1=("C624", "1u", {"fields": {"Note": "flying cap C1 (moved from +2V5)"}}),
-            ccp=("C619", "4.7u", {"size": "0603", "lcsc": "C19666", "mpn": "CL10A475KO8NNNC",
+            ccp=("C619", "4.7u", {"size": "0603", "lcsc": "C99229", "mpn": "0603X475K160NT",
                                     "fields": {"Note": "CCP at pin 5, 16 V X5R 0603: about 3 uF at 3.3 V (>= 2 uF "
-                                                       "effective, DS 7.2.2.4.1; recheck RP-9, stock to confirm)"}}),
+                                                       "effective, DS 7.2.2.4.1; recheck RP-9; C19666 had 0 LCSC "
+                                                       "stock on 24 Nov 2026)"}}),
             outp=("+2V5_LDO", [("C630", "10u", {"fields": {"Note": "NEW: OUT+ at pin 11 (DS: >= 2.2 uF)"}})],
                   "FB606", "+2V5"),
             outn=("-2V5_LDO", [("C628", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB607", "-2V5"),

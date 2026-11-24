@@ -81,7 +81,7 @@ def main():
 
     # ------------------------------------------------------------------ SIG_IN SMA and VIN line
     j1 = sh.add("Connector:Conn_Coaxial", "J", "SIG_IN", (g(10), Y0), mirror="y", fp=SMA_FP,
-                mpn="SMA edge-launch 50R (Samtec SMA-J-P-H-ST-EM1 or equivalent)")
+                lcsc="C5199907", mpn="SMA-J-P-H-ST-EM1")
     sh.gnd(j1["2"])
     VINX = g(87)                   # Ctop left pin
     sh.wire(j1["1"], (VINX, Y0))
@@ -103,7 +103,7 @@ def main():
     u1 = sh.add(buf, "U", "BUF802IRGTR", (Bx, By), fp=BUF_FP, lcsc="C4370628", mpn="BUF802IRGTR",
                 fields={"Price": "5.89 USD (LCSC)"})
     ctop = C(sh, "1.5p", (g(90), Y0), rot=90, size="0402",
-             fields={"Note": "C0G +/-0.05 pF 100 V"})
+             fields={"Note": "C0G +/-0.1 pF 100 V (KEMET CBR04C159B1GAC; +/-0.05 pF 100 V 0402 not stocked on LCSC, 24 Nov 2026)"})
     GA = (g(96), Y0)
     sh.wire(ctop["2"], GA)
     cbot = C(sh, "3.3p", (g(96), Y0 + g(6)), size="0402", fields={"Note": "C0G +/-0.1 pF"})
@@ -211,7 +211,7 @@ def main():
     TAP = (g(52), Ys)
     sh.wire(prev, TAP)
     sh.label("TAP", (g(48), Ys))
-    r100 = R(sh, "100k", (g(52), Ys + g(3)), lcsc="C25741", fields={"Note": "0.1 %"})
+    r100 = R(sh, "100k", (g(52), Ys + g(3)), fields={"Note": "0.1 %"})
     sh.wire(TAP, r100["1"])
     sh.gnd(r100["2"])
     cp = C(sh, "18p", (g(58), Ys + g(3)), fields={"Note": "C0G"})
@@ -237,7 +237,7 @@ def main():
     sh.wire((FBX, cint["1"][1]), cint["1"])
     sh.path([cint["2"], (OX2, cint["2"][1]), (OX2, po2[1])])
     # Rf1 from BUF802 OUT
-    rf1 = R(sh, "10.0k", (Ox, Ys + g(21)), rot=90, lcsc="C25744", fields={"Note": "0.1 %"})
+    rf1 = R(sh, "10.0k", (Ox, Ys + g(21)), rot=90, fields={"Note": "0.1 %"})
     sh.wire((FBX, rf1["1"][1]), rf1["1"])
     sh.path([rf1["2"], (FBT[0], rf1["2"][1]), FBT])
     # Rofs from VOFS
@@ -254,7 +254,7 @@ def main():
     rf2 = R(sh, "22.1k", (FBX, Ys + g(31)), fields={"Note": "0.1 %"})
     sh.wire((FBX, Ys + g(28)), rf2["1"])
     rv = sh.add("Device:R_Potentiometer_Trim", "RV", "50k", (FBX, Ys + g(40)),
-                fp="Potentiometer_SMD:Potentiometer_Bourns_3314J_Vertical", mpn="Bourns 3314J-1-503E")
+                fp="Potentiometer_SMD:Potentiometer_Bourns_3314J_Vertical", lcsc="C50895", mpn="3314J-1-503E")
     sh.wire(rf2["2"], rv["1"])
     sh.path([rv["2"], (rv["2"][0] + g(2), rv["2"][1]), (rv["2"][0] + g(2), rv["3"][1] + g(2)),
              (rv["3"][0], rv["3"][1] + g(2))])
@@ -301,7 +301,7 @@ def main():
     # ------------------------------------------------------------------ EXT_CLK SMA
     YE = g(176)
     j2 = sh.add("Connector:Conn_Coaxial", "J", "EXT_CLK", (g(10), YE), mirror="y", fp=SMA_FP,
-                mpn="SMA edge-launch 50R (Samtec SMA-J-P-H-ST-EM1 or equivalent)")
+                lcsc="C5199907", mpn="SMA-J-P-H-ST-EM1")
     sh.gnd(j2["2"])
     rt = R(sh, "49.9", (g(30), YE + g(4)), dnp=True, fields={"Note": "DNP unless trigger_phase has no 50R"})
     sh.wire(j2["1"], (g(44), YE))

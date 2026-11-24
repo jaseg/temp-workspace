@@ -271,7 +271,7 @@ def main():
         sh.wire(c2["2"], a)
         c3 = C(sh, "100n", P(96, Y), rot=90)
         sh.wire(b, c3["1"])
-        gv = sh.add(GVA, "U", "GVA-84+", P(110, Y), fp=SOT89, mpn="GVA-84+", fields=GVA_F)
+        gv = sh.add(GVA, "U", "GVA-84+", P(110, Y), fp=SOT89, lcsc="C5445191", mpn="GVA-84+", fields=GVA_F)
         sh.wire(c3["2"], gv["1"])
         sh.gnd(gv["2"])
         # +5V1 bias (TPS63802 on the power sheet): rail at Y-22 from 120 to 146, caps 1n (nearest), 100n, 10u

@@ -75,27 +75,73 @@ FP = {
     "C0805": "Capacitor_SMD:C_0805_2012Metric", "C1206": "Capacitor_SMD:C_1206_3216Metric",
     "FB0603": "Inductor_SMD:L_0603_1608Metric", "FB0805": "Inductor_SMD:L_0805_2012Metric",
 }
-# entries removed 2026-11-21 whose C number pointed at another value (24.9k, 25.5k, 30k, 40.2k, 60.4k,
-# 16.5k, 78.7k, 499k, 1.54M): fill in after an LCSC search
-# Removed 2026-11-21 (C number was another value on lcsc.com): 24.9k, 25.5k, 30k, 40.2k, 60.4k, 16.5k, 78.7k,
-# 499k, 1.54M, 2.2u (0603 part), 220p (0603 part), 4.7u (0402, no stock). Fill in after an LCSC search.
-LCSC_R = {"0": "C17168", "10": "C25077", "22": "C25092", "33": "C25105", "120": "C25079", "1k": "C11702",
-          "2.2k": "C25879", "4.7k": "C25900", "5.1k": "C25905", "10k": "C25744", "20k": "C25765",
-          "49.9k": "C25897", "100k": "C25741"}
-LCSC_C = {"100n": "C1525", "1u": "C52923", "10n": "C15195", "10u": "C15850", "22u": "C45783", "18p": "C1549"}
+# LCSC numbers, all verified on lcsc.com (product-detail JSON) on 24 Nov 2026: part number, value, tolerance,
+# rating, package and stock; data and stock/prices in lcsc_parts.py (docs/bom.md "LCSC verification").
+# Generic passives: UNI-ROYAL 0402WGF thick film 1 % 0402 (JLC basic where available); 0.1 % 25 ppm/K thin film 0402
+# (YAGEO RT0402BRD07 where stocked); 0402 C0G FH 0402CG; Samsung X5R/X7R. One number per value / package / rating.
+LCSC_R = {"0": "C17168", "10": "C25077", "22": "C25092", "24.9": "C5099", "33": "C25105", "43": "C270600",
+          "47": "C25118", "49.9": "C25120", "68": "C25131", "82": "C25136", "91": "C270574", "100": "C25076",
+          "120": "C25079", "470": "C25117", "499": "C4125", "1k": "C11702", "1.00k": "C11702", "1.5k": "C25867",
+          "2.0k": "C4109", "2.2k": "C25879", "2.7k": "C25885", "4.7k": "C25900", "5.1k": "C25905",
+          "7.5k": "C25918", "8.87k": "C36953", "10k": "C25744", "10.0k": "C25744", "17.8k": "C129766",
+          "18k": "C25762", "20k": "C25765", "22.1k": "C43473", "30k": "C25776", "49.9k": "C25897",
+          "100k": "C25741", "4.99M": "C137963"}
+LCSC_R0603 = {"0": "C21189", "82": "C23255", "100": "C22775"}
+# 0.1 % 25 ppm/K thin film 0402 (value without the " 0.1%" suffix)
+LCSC_R01 = {"10k": "C190095", "10.0k": "C190095", "14.7k": "C281774", "22.1k": "C2692911", "24.9k": "C852664",
+            "34.0k": "C852733", "49.9k": "C852808", "54.2k": "C852840", "100k": "C852472", "105k": "C2984407",
+            "120k": "C852501", "130k": "C852515", "280k": "C4091415", "300k": "C4262495", "499k": "C6466287"}
+# 0402 unless noted by the size rule in C(): pF/nF and 1u/2.2u 0402, 10u/22u 0805
+LCSC_C = {"0.5p": "C1544", "1.5p": "C2179899", "2.2p": "C1559", "3.3p": "C76906", "18p": "C1549", "47p": "C1567",
+          "100p": "C1546", "120p": "C40059", "220p": "C39122", "470p": "C75274", "1n": "C1523", "10n": "C15195",
+          "100n": "C1525", "1u": "C52923", "2.2u": "C107369", "10u": "C15850", "22u": "C45783"}
+LCSC_C0603 = {"1u": "C29936", "4.7u": "C99229"}
+LCSC_C_C0G = {"1n": "C53547"}          # parts whose Note asks for C0G where the default is X7R
+LCSC_C_X7R = {"1u": "C49210445"}       # parts whose Note asks for X7R where the default is X5R
+
+
+def _note(kw) -> str:
+    return str((kw.get("fields") or {}).get("Note", ""))
+
+
+def _mpn(lcsc: str) -> str:
+    try:
+        from lcsc_parts import PARTS
+    except ImportError:
+        return ""
+    return PARTS.get(lcsc, {}).get("mpn", "")
 
 
 def R(sh: Sheet, value: str, at, rot: int = 0, size: str = "0402", ref: str = "R", **kw):
     fp = FP["R" + size]
-    return sh.add("Device:R", ref, value, at, rot=rot, fp=fp, lcsc=kw.pop("lcsc", LCSC_R.get(value, "")), **kw)
+    base = value.replace(" 0.1%", "")
+    if value.endswith("0.1%") or "0.1 %" in _note(kw):
+        table = LCSC_R01
+    else:
+        table = LCSC_R0603 if size == "0603" else LCSC_R
+    lcsc = kw.pop("lcsc", "") or table.get(base, "")
+    if lcsc and not kw.get("mpn"):
+        kw["mpn"] = _mpn(lcsc)
+    return sh.add("Device:R", ref, value, at, rot=rot, fp=fp, lcsc=lcsc, **kw)
 
 
 def C(sh: Sheet, value: str, at, rot: int = 0, size: str | None = None, ref: str = "C", **kw):
     if size is None:
         # pF/nF values and 1u/2.2u are 0402 (SPEC decision 9); bulk (4.7u and up) 0805
         size = "0402" if value.endswith(("p", "n")) or value in ("1u", "2.2u") else "0805"
-    return sh.add("Device:C", ref, value, at, rot=rot, fp=FP["C" + size],
-                  lcsc=kw.pop("lcsc", LCSC_C.get(value, "")), **kw)
+    note = _note(kw)
+    if size == "0603":
+        table = LCSC_C0603
+    elif "C0G" in note and value in LCSC_C_C0G:
+        table = LCSC_C_C0G
+    elif "X7R" in note and value in LCSC_C_X7R:
+        table = LCSC_C_X7R
+    else:
+        table = LCSC_C
+    lcsc = kw.pop("lcsc", "") or table.get(value, "")
+    if lcsc and not kw.get("mpn"):
+        kw["mpn"] = _mpn(lcsc)
+    return sh.add("Device:C", ref, value, at, rot=rot, fp=FP["C" + size], lcsc=lcsc, **kw)
 
 
 def decoupler(sh: Sheet, rail: str, at, values=("100n",), pitch: float = 7.62, gnd: str = "GND"):

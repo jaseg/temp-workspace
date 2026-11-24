@@ -106,7 +106,7 @@ def main():
     sh.stub(rin, "1", "VREFP")
     X = o[0] + g(3)
     yf, yc = minus[1] + g(10), minus[1] + g(15)
-    rf = R(sh, "10.0k", (x, yf), rot=90, ref="R732", lcsc="C25744", fields={"Note": "0.1 % 25 ppm/K"})
+    rf = R(sh, "10.0k", (x, yf), rot=90, ref="R732", fields={"Note": "0.1 % 25 ppm/K"})
     cf = C(sh, "100n", (x, yc), rot=90, ref="C722")
     sh.path([M, (M[0], yc), cf["1"]])
     sh.wire((M[0], yf), rf["1"])
@@ -270,7 +270,8 @@ def mcu_section(sh):
                 fp="Jumper:SolderJumper-2_P1.3mm_Open_RoundedPad1.0x1.5mm")
     sh.stub(jp, "1", "BOOT0")
     sh.stub(jp, "2", "+3V3", kind="power")
-    d = sh.add("Device:LED", "D", "green", (g(122), g(184)), rot=90, fp="LED_SMD:LED_0603_1608Metric")
+    d = sh.add("Device:LED", "D", "green", (g(122), g(184)), rot=90, fp="LED_SMD:LED_0603_1608Metric", lcsc="C12624",
+               mpn="KT-0603G")
     sh.stub(d, "2", "+3V3", kind="power")
     k = d["1"]
     rl = R(sh, "1k", (k[0], k[1] + 2.54 + 3.81))

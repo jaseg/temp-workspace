@@ -195,8 +195,8 @@ def chain(s):
     blk.track("GND", W_GND, [(x, y), (x, yl), (x + 0.5, yl)])
     gv(x + 0.5, yl)
     x, y = blk.pad(RS1, "@GND")
-    blk.track("GND", W_GND, [(x, y), (x + 0.75, y)])
-    gv(x + 0.75, y)
+    blk.track("GND", W_GND, [(x, y), (x + 0.80, y)])                # hole edge 0.225 mm off the 0603 pad
+    gv(x + 0.80, y)
     # ---------------------------------------------------------------- TRF GND pins -> EP, EP vias
     xu, yu = blk.loc(blk.fps[U].GetPosition())
     for pn in ("3", "4", "5", "6", "8"):
@@ -211,23 +211,28 @@ def chain(s):
     two(C100, p1[0] + 0.96, yc, "S", "+3V3")
     c1, c2 = blk.pad(C1N, "@+3V3"), blk.pad(C100, "@+3V3")
     blk.track("+3V3", 0.25, [p1, c1])
-    vx = c2[0] + 0.85
-    va, vb = (vx, c2[1]), (vx, c2[1] - 0.75)
-    blk.track("+3V3", W_PWR, [c1, c2, va, vb])
-    blk.track("+3V3", W_PWR, [va, vb], layer="B.Cu")
+    # VIAS-OUT-OF-PADS (24 Nov): no via in a soldered pad (tented vias only, RULES.md rule 12).  The 10 uF used
+    # to sit on B with its GND pad over the two 0402 GND vias and its +3V3 pad beside the via pair; it now lies
+    # horizontal on B between the PH_STROBE_P L6 line and the via pair, which moved north of it (x = its +3V3
+    # pad), so every via is >= 0.2 mm (hole edge) outside every pad.  F: pins -> 0402s -> track east and north
+    # to the via pair (current passes the capacitors first).
+    vx = c2[0] + 0.94
+    va, vb = (vx, c2[1] - 1.43), (vx, c2[1] - 2.08)
+    blk.track("+3V3", W_PWR, [c1, c2, (vx - 0.19, c2[1]), (vx, c2[1] - 0.19), va, vb])
     for v in (va, vb):
         blk.via(*v, "+3V3")
     gvs = []
     for c in (C1N, C100):
         x, y = blk.pad(c, "@GND")
-        blk.track("GND", W_GND, [(x, y), (x, y - 0.55)])
-        gv(x, y - 0.55)
-        gvs.append((x, y - 0.55))
-    # 10 uF on B.Cu under the pin-1 caps (GND pad over the two GND vias), spare 100 nF beside it
-    two(C10U, (gvs[0][0] + gvs[1][0]) / 2, yc, "S", "+3V3", side="B")
-    snap(C10U, "GND", y=gvs[0][1] - 0.15)
-    ct = blk.pad(C10U, "@+3V3")
-    blk.track("+3V3", W_PWR, [ct, (va[0] - abs(ct[1] - va[1]), ct[1]), va], layer="B.Cu")
+        blk.track("GND", W_GND, [(x, y), (x, y - 0.60)])
+        gv(x, y - 0.60)
+        gvs.append((x, y - 0.60))
+    # 10 uF on B.Cu: GND pad (west) below the C1N GND via, +3V3 pad (east) below the via pair, short B necks
+    two(C10U, vx - 0.95, c2[1] - 0.38, "W", "GND", side="B")
+    assert abs(blk.pad(C10U, "@GND")[0] - gvs[0][0]) < 1e-6
+    cg_, ct = blk.pad(C10U, "@GND"), blk.pad(C10U, "@+3V3")
+    blk.track("GND", W_GND, [cg_, gvs[0]], layer="B.Cu")
+    blk.track("+3V3", W_PWR, [ct, va, vb], layer="B.Cu")
     # (the spare 100 nF CX moved to the bias-tee cold cap C434 / C435 below: the north-west B.Cu strip now
     #  carries the PH_STROBE L6 lines)
     # ---------------------------------------------------------------- TRF bias tee on B.Cu (straight chain)
@@ -244,8 +249,9 @@ def chain(s):
     cc = blk.pad(CC, "@+3V3")
     blk.track("+3V3", 0.64, [lc, cc], layer="B.Cu")
     g = blk.pad(CC, "@GND")
-    blk.track("GND", W_GND, [g, (g[0], g[1] + s * 0.65)], layer="B.Cu")
-    gv(g[0], g[1] + s * 0.65)
+    # its GND via lands (through) in the GVA tab on F in chain A: 0.06 mm east so the whole via is inside the tab
+    blk.track("GND", W_GND, [g, (g[0], g[1] + s * 0.59), (g[0] + 0.06, g[1] + s * 0.65)], layer="B.Cu")
+    gv(g[0] + 0.06, g[1] + s * 0.65)
     for d in (-0.75, 0.75):                               # +3V3 enters through the capacitor pad
         blk.via(cc[0], cc[1] + d, "+3V3")
     blk.track("+3V3", 0.56, [(cc[0], cc[1] - 0.75), (cc[0], cc[1] + 0.75)], layer="B.Cu")
@@ -264,9 +270,12 @@ def chain(s):
     blk.track(n_bias, 0.4, [l1, blk.pad(TP1, "1")], layer="B.Cu")
     # ---------------------------------------------------------------- GVA GND tab vias
     xg_, yg_ = blk.loc(blk.fps[G].GetPosition())
-    for dx in (0.12, 0.67):                               # 24 Nov: east half of the tab (C434 moved east)
-        for dy in (-1.2, 0.0):
-            gv(xg_ + dx, yg_ + dy)
+    # GVA tab = an exposed thermal / RF-ground pad: vias IN it are allowed (README 'Vias out of pads': Mini-Circuits
+    # mounting layout PL-075 has plated holes in the tab), 0.2 mm drill, wholly inside the tab, tented on B and
+    # never under a B pad.  A: east half of the tab (C434 below on B); K: one column west of the 10 uF on B.
+    for dx, dy in (((0.05, -1.2), (0.05, 0.0), (0.55, -1.2), (0.55, 0.0)) if A else
+                   ((-0.38, -1.2), (-0.38, -0.6), (-0.38, 0.0))):
+        gv(xg_ + dx, yg_ + dy)
     # ---------------------------------------------------------------- GVA bias tee on B.Cu (+5V1, was VBUS)
     # BIASTEE-4 / -6 (24 Nov): the 2.2 uH stands 1.25 mm east of the bead via (B track into its pad, no via in the
     # pad); cold pad -> C418 1 nF and C419 100 nF stacked at it (identical in A and K), each with its own GND via
@@ -305,8 +314,8 @@ def chain(s):
         blk.via(p10[0] - 0.90, p10[1] + d, P5)
     blk.track(P5, 0.6, [(p10[0] - 0.90, p10[1] - 0.40), (p10[0] - 0.90, p10[1] + 0.40)], layer="B.Cu")
     blk.track(P5, 0.6, [(p10[0] - 0.90, p10[1]), p10], layer="B.Cu")
-    blk.track("GND", W_GND, [g10, (g10[0] + 0.60, g10[1])], layer="B.Cu")
-    gv(g10[0] + 0.60, g10[1])
+    blk.track("GND", W_GND, [g10, (g10[0] + 0.85, g10[1])], layer="B.Cu")   # hole edge 0.25 mm off the pad
+    gv(g10[0] + 0.85, g10[1])
     return {"stub": l_st, "out": blk.route_len(f"{OUT[1:]} drop") + blk.route_len(f"{OUT[1:]} output"),
             "ret": blk.route_len(f"{PIN[1:]} L1 return"), "PIN": PIN,
             "leg": blk.route_len(f"{U} in 1") + blk.route_len(f"{U} RFIN")}
