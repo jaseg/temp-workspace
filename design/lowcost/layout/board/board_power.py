@@ -34,12 +34,13 @@ G = 0.1                                   # grid (mm)
 BW, BH = 100.0, 57.0
 NX, NY = int(round(BW / G)) + 1, int(round(BH / G)) + 1
 OX, OY = bl.ORG
-CLR = 0.15                                # rail copper to foreign copper (board rule 0.1)
+CLR = 0.18                                # rail copper to foreign copper (Power netclass 0.15)
 MARG = 0.75 * G                           # rasterisation margin
 EDGE = 0.5                                # copper to board edge
 VIA_D, VIA_DRILL = bl.VIA_D, bl.VIA_DRILL
 L6_FACTOR = 3.0                           # step cost on L6 relative to L3
 VIA_COST = 4.0                            # mm-equivalent per layer change
+CLR_TIGHT = 0.16                          # fallback clearance where nothing fits at CLR
 CUT_MARGIN = 0.6                          # L3 power copper to L3 cut-outs (node windows, pad cuts)
 EXTRA = {"/ADC_IN": 0.35, "/VBIAS_A": 0.15, "/VBIAS_K": 0.15, "/VOFS": 0.15, "/VNEG_REF": 0.15, "/DAC_TRIG": 0.15,
          "/VTAP_TH": 0.15, "/ADC_REF_MID": 0.15, "/TRIG_SEL": 0.15}     # extra clearance (slow lines 0.3, ADC_IN 0.5)
@@ -176,6 +177,21 @@ class Model:
             elif n != net:
                 draw_seg(obs[ln], a, e, r + EXTRA.get(n, 0.0))
         for fp in b.GetFootprints():
+            for gi in fp.GraphicalItems():           # copper drawn in footprints (TL401-TL403 lines, net ties)
+                if gi.GetClass() not in ("PCB_SHAPE", "FP_SHAPE"):
+                    continue
+                ln = lid.get(gi.GetLayer())
+                if ln is None:
+                    continue
+                wv = pcbnew.ToMM(gi.GetWidth()) / 2
+                try:
+                    if gi.GetShape() == pcbnew.SHAPE_T_POLY:
+                        for pl in _poly_list(gi.GetPolyShape()):
+                            draw_poly(obs[ln], pl, wv)
+                        continue
+                except Exception:
+                    pass
+                draw_seg(obs[ln], _loc(gi.GetStart()), _loc(gi.GetEnd()), max(wv, 0.05))
             for p in fp.Pads():
                 n = p.GetNetname()
                 x0, y0, x1, y1 = _pad_shape(p)
@@ -337,15 +353,16 @@ def _guide_cost(guide):
     return np.where(m, 1.0, 2.0)
 
 
-def route_once(dist, novia, src, dst, w, gcost, win):
+def route_once(dist, novia, src, dst, w, gcost, win, clr=None):
     """Dijkstra on the two layers inside win; src / dst {layer: bool mask}; returns [(layer, [(x, y)...])] runs or
     None.  A cell is free for width w if its distance to foreign copper >= w/2 + CLR + MARG."""
     i0, j0, i1, j1 = win
     sx, sy = i1 - i0 + 1, j1 - j0 + 1
     N = sx * sy
-    need = w / 2 + CLR + MARG
+    clr = CLR if clr is None else clr
+    need = w / 2 + clr + MARG
     free = [dist[ln][i0:i1 + 1, j0:j1 + 1] >= need for ln in LNAMES]
-    vneed = VIA_D / 2 + CLR + MARG
+    vneed = VIA_D / 2 + clr + MARG
     viaok = ((dist["In2.Cu"][i0:i1 + 1, j0:j1 + 1] >= vneed) & (dist["B.Cu"][i0:i1 + 1, j0:j1 + 1] >= vneed) &
              (dist["F.Cu"][i0:i1 + 1, j0:j1 + 1] >= vneed) & ~novia[i0:i1 + 1, j0:j1 + 1])
     S = [src[ln][i0:i1 + 1, j0:j1 + 1] & free[k] for k, ln in enumerate(LNAMES)]
@@ -504,6 +521,13 @@ def route_rail(board, m, model, net, widths, guide, report, use_l6=True):
                 r = route_once(dist, novia, src, dst, w, gcost, win)
                 if r is not None:
                     cands.append((w, r))
+            if not cands:                            # tight spot: 0.3 mm at the Power class clearance 0.15 + margin
+                for w in (0.4, 0.3):
+                    r = route_once(dist, novia, src, dst, w, gcost, win, clr=CLR_TIGHT)
+                    if r is not None:
+                        cands.append((w, r))
+                        report.setdefault("tight", []).append((net, w))
+                        break
             if cands:
                 lmin = min(c[1][1] for c in cands)
                 for w, r in cands:                  # widest whose cost is within 25 % + 3 mm of the cheapest
@@ -570,11 +594,11 @@ def _via_layers(board, v):
     c = v.GetPosition()
     r = v.GetWidth() / 2
     lays = set()
+    pc = _loc(c)
     for t in board.GetTracks():
         if t.GetClass() == "PCB_TRACK" and t.GetNetname() == net:
-            for q in (t.GetStart(), t.GetEnd()):
-                if math.hypot(q.x - c.x, q.y - c.y) <= r + t.GetWidth() / 2:
-                    lays.add(t.GetLayer())
+            if _pt_seg(pc, _loc(t.GetStart()), _loc(t.GetEnd())) <= pcbnew.ToMM(r + t.GetWidth() / 2) - 0.01:
+                lays.add(t.GetLayer())
     for fp in board.GetFootprints():
         for p in fp.Pads():
             if p.GetNetname() == net and p.HitTest(c):
@@ -585,6 +609,13 @@ def _via_layers(board, v):
                 if z.GetFilledPolysList(l_).Contains(c):
                     lays.add(l_)
     return lays
+
+
+def _pt_seg(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dy * dy
+    t = 0 if L2 < 1e-12 else max(0, min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
+    return math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)
 
 
 def fix_dangling(board, m, nets):
@@ -606,14 +637,74 @@ def fix_dangling(board, m, nets):
             m.track(v.GetNetname(), 0.4, [p, q], "In2.Cu", ch=0.0001)
             out.append(("L3 tie", v.GetNetname(), p, q))
             continue
-        ntr = sum(1 for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() == v.GetNetname()
-                  and any(math.hypot(*(np.subtract(_loc(e), p))) < 0.05 for e in (t.GetStart(), t.GetEnd())))
-        if len(L) == 1 and ntr >= 2:
+        trs = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() == v.GetNetname()
+               and min(math.hypot(*np.subtract(_loc(t.GetStart()), p)), math.hypot(*np.subtract(_loc(t.GetEnd()), p))) < 0.2]
+        thru = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() == v.GetNetname()
+                and _pt_seg(p, _loc(t.GetStart()), _loc(t.GetEnd())) < 0.2 and t not in trs]
+        ntr = len(trs)
+        if len(L) == 1 and (ntr >= 2 or (thru and ntr == 0)):
             board.Remove(v)
             out.append(("removed", v.GetNetname(), p))
+        elif len(L) == 1 and ntr == 1:
+            # a stub: the via and its one track go if the track's far end is joined to something else
+            t = trs[0]
+            a_, b_ = _loc(t.GetStart()), _loc(t.GetEnd())
+            far = b_ if math.hypot(a_[0] - p[0], a_[1] - p[1]) < math.hypot(b_[0] - p[0], b_[1] - p[1]) else a_
+            others = [u for u in board.GetTracks() if u is not t and u is not v and u.GetNetname() == v.GetNetname()
+                      and (u.GetClass() == "PCB_VIA" and math.hypot(*np.subtract(_loc(u.GetPosition()), far)) < 0.25
+                           or u.GetClass() == "PCB_TRACK" and _pt_seg(far, _loc(u.GetStart()), _loc(u.GetEnd())) < 0.05)]
+            pads = [pd for fp in board.GetFootprints() for pd in fp.Pads() if pd.GetNetname() == v.GetNetname() and
+                    pd.HitTest(pcbnew.VECTOR2I(pcbnew.FromMM(far[0] + OX), pcbnew.FromMM(far[1] + OY)))]
+            if others or pads:
+                board.Remove(t)
+                board.Remove(v)
+                out.append(("stub removed", v.GetNetname(), p))
+            else:
+                out.append(("left", v.GetNetname(), p, len(L), ntr))
         else:
             out.append(("left", v.GetNetname(), p, len(L), ntr))
     return out
+
+
+def prune_tracks(board, nets):
+    """remove rail tracks on L3 / L6 with an end that touches nothing of their net (router leftovers)"""
+    gone = []
+    for _ in range(10):
+        hit = False
+        for t in list(board.GetTracks()):
+            if t.GetClass() != "PCB_TRACK" or t.GetNetname() not in nets or t.GetLayerName() not in LNAMES:
+                continue
+            net = t.GetNetname()
+            for e in (t.GetStart(), t.GetEnd()):
+                pe = _loc(e)
+                ok = False
+                for u in board.GetTracks():
+                    if u is t or u.GetNetname() != net:
+                        continue
+                    if u.GetClass() == "PCB_VIA":
+                        ok = math.hypot(*np.subtract(_loc(u.GetPosition()), pe)) <= pcbnew.ToMM(u.GetWidth()) / 2
+                    elif u.GetLayer() == t.GetLayer():
+                        ok = _pt_seg(pe, _loc(u.GetStart()), _loc(u.GetEnd())) <= pcbnew.ToMM(u.GetWidth()) / 2 + 0.005
+                    if ok:
+                        break
+                if not ok:
+                    for fp in board.GetFootprints():
+                        for pd in fp.Pads():
+                            if pd.GetNetname() == net and pd.IsOnLayer(t.GetLayer()) and pd.HitTest(e):
+                                ok = True
+                if not ok:
+                    for z in board.Zones():
+                        if not z.GetIsRuleArea() and z.GetNetname() == net and z.IsOnLayer(t.GetLayer()) and \
+                                z.GetFilledPolysList(t.GetLayer()).Contains(e):
+                            ok = True
+                if not ok:
+                    gone.append((net, t.GetLayerName(), _loc(t.GetStart()), _loc(t.GetEnd())))
+                    board.Remove(t)
+                    hit = True
+                    break
+        if not hit:
+            break
+    return gone
 
 
 def apply(board, m):
@@ -627,6 +718,8 @@ def apply(board, m):
     for net, guide in STRIPS:
         route_rail(board, m, model, net, (0.6, 0.5, 0.4, 0.3), guide, report)
     report["dangling"] = fix_dangling(board, m, [r[0] for r in RAILS] + [r[0] for r in STRIPS])
+    report["dangling"] += fix_dangling(board, m, [r[0] for r in RAILS] + [r[0] for r in STRIPS])
+    report["pruned"] = prune_tracks(board, [r[0] for r in RAILS] + [r[0] for r in STRIPS])
     return report
 
 

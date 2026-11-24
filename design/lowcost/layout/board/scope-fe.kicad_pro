@@ -180,6 +180,10 @@
       {
         "netclass": "Power",
         "pattern": "VBUS"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "/+5V1"
       }
     ]
   },

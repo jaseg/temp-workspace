@@ -424,7 +424,7 @@ if "--prepower" in sys.argv:
     bl.save_board(B, os.path.join(SCR, "prepower.kicad_pcb"))
     sys.exit(0)
 _rp = board_power.apply(B, m)
-print("power: failed", _rp.get("failed"), "| no landing", _rp.get("no_landing"), "| vias", _rp.get("vias"), "| dangling", _rp.get("dangling"))
+print("power: failed", _rp.get("failed"), "| no landing", _rp.get("no_landing"), "| vias", _rp.get("vias"), "| dangling", _rp.get("dangling"), "| tight", _rp.get("tight"), "| pruned", _rp.get("pruned"))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 print("rail widening [mm widened]:", board_power.widen(B, m))
 import board_stitch
@@ -443,7 +443,7 @@ NST = board_stitch.stitch(B, m, RFT, SIGV)
 # instead of the stitching margin 0.2), every spot within 1.5 mm (0.05 mm steps)
 if NST.get("lacking"):
     _clr0 = board_stitch.CLR
-    board_stitch.CLR = 0.12
+    board_stitch.CLR = 0.17                      # >= the Power netclass clearance 0.15
     _occ = board_stitch.build_mask(B)
     board_stitch.CLR = _clr0
     _still = []

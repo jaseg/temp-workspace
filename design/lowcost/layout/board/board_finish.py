@@ -226,7 +226,7 @@ def write_pro(path, rf_nets):
             "netclass_patterns": [{"netclass": "RF50", "pattern": n} for n in rf_nets] +
                                  [{"netclass": "USB90", "pattern": "/USB_D*"}] +
                                  [{"netclass": "Power", "pattern": p} for p in
-                                  ("+3V3", "+5V", "-5V", "+2V5", "-2V5", "+1V2", "VBUS")]},
+                                  ("+3V3", "+5V", "-5V", "+2V5", "-2V5", "+1V2", "VBUS", "/+5V1")]},
         "schematic": {"legacy_lib_dir": "", "legacy_lib_list": []},
         "sheets": [], "text_variables": {}}
     with open(path, "w") as f:

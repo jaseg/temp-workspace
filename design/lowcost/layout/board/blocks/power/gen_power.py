@@ -155,10 +155,12 @@ two("C608", 1.0, 8.95, "N", "+1V2", "B")     # 1u at the +1V2 output (U602 COUT 
 
 # ============================================================================= U603 TPS63802 buck-boost (F, top-middle)
 bplace("U603", 10.95, 4.9, 0)            # W: EN MODE AGND FB PG (1-5); E: VIN L1 GND L2 VOUT (10, 9, 8, 7, 6)
-two("C601", 13.45, 1.75, "S", "VBUS")    # CIN at VIN (10) / GND, IC layer
-two("L601", 16.95, 4.9, "N", "Net-(U603-L1)")
-two("C610", 13.45, 8.05, "N", "/+5V1")   # COUT at VOUT (6) / GND
-two("C611", 11.45, 8.45, "N", "/+5V1")
+# 24 Nov (user review): L601 right against the L1 / L2 pins (courtyards touching), C601 / C610 / C611 turned 90 degrees
+# (horizontal) so they sit north / south of the inductor, VIN / VOUT pad on the IC's east pin column
+two("L601", 14.95, 4.9, "N", "Net-(U603-L1)")
+two("C601", 12.65, 1.04, "W", "VBUS")    # CIN: VBUS pad at x 11.7 straight above VIN (10), GND pad east
+two("C610", 12.65, 8.76, "W", "/+5V1")   # COUT: +5V1 pad at x 11.7 straight below VOUT (6), GND pad east
+two("C611", 12.65, 10.76, "W", "/+5V1")
 two("R603", 10.0, 7.65, "N", "/+5V1")    # FB divider south of the chip, away from L1 / L2
 two("R604", 10.0, 9.53, "S", "GND")
 two("C632", 11.8, 1.7, "W", "VBUS", "B")  # DNP VBUS damper (tantalum) under the converters' input
@@ -336,7 +338,7 @@ T("VBUS", [(15.1, 13.5), (13.6, 13.5)], 0.4, "B.Cu")
 
 # ============================================================================= routing: VBUS input of U601 / U603
 # F polygon: C603 / U601.3 / C602 (top-left) along the top edge to C601 / U603.10 / EN / MODE; fed from the B strip
-Z("VBUS", "F.Cu", [(3.9, 0.3), (12.5, 0.3), (12.5, 2.05), (14.35, 2.05), (14.35, 3.4), (12.6, 3.4), (12.6, 4.02),
+Z("VBUS", "F.Cu", [(3.9, 0.3), (12.3, 0.3), (12.3, 4.02),
                    (9.3, 4.02), (9.3, 2.0), (6.6, 2.0), (6.6, 2.62), (3.9, 2.62)], prio=5)
 for x in (10.45, 11.25, 12.05):
     V(x, 3.3, "VBUS")
@@ -366,22 +368,25 @@ blk.iface("+1V2", 1.0, 7.9, "In3.Cu", "W", "supply", None, "via at C605 / C608 (
 
 # ============================================================================= routing: U603 buck-boost
 T("GND", [(10.05, 4.9), (11.5, 4.9)], 0.2)                                 # AGND (3) by its own trace to GND (8)
-Z("Net-(U603-L1)", "F.Cu", [(11.9, 4.28), (14.5, 4.28), (15.6, 3.18), (15.6, 2.45), (18.1, 2.45), (18.1, 3.7),
-                            (16.0, 3.7), (14.75, 4.52), (11.9, 4.52)], prio=6, ch=0.1)
-Z("Net-(U603-L2)", "F.Cu", [(11.9, 5.28), (14.75, 5.28), (16.0, 6.1), (18.1, 6.1), (18.1, 7.35), (15.6, 7.35),
-                            (15.6, 6.62), (14.5, 5.52), (11.9, 5.52)], prio=6, ch=0.1)
-Z("GND", "F.Cu", [(11.9, 4.72), (14.9, 4.72), (15.9, 3.95), (18.4, 3.95), (18.4, 5.85), (15.9, 5.85),
-                  (14.9, 5.08), (11.9, 5.08)], prio=3, ch=0.1)
-for x in (16.0, 16.95, 17.9):
+# switch nodes: pin 9 (L1) / pin 7 (L2) -> 45-degree flare -> L601 pads (x 13.7-16.2, y 2.3-3.8 / 6.0-7.5)
+Z("Net-(U603-L1)", "F.Cu", [(11.9, 4.28), (13.05, 4.28), (13.75, 3.58), (13.75, 2.35), (16.15, 2.35), (16.15, 3.75),
+                            (14.05, 3.75), (13.28, 4.52), (11.9, 4.52)], prio=6, ch=0.1)
+Z("Net-(U603-L2)", "F.Cu", [(11.9, 5.28), (13.28, 5.28), (14.05, 6.05), (16.15, 6.05), (16.15, 7.45), (13.75, 7.45),
+                            (13.75, 6.22), (13.05, 5.52), (11.9, 5.52)], prio=6, ch=0.1)
+# PGND (8) east under L601, between its pads, to 3 vias
+Z("GND", "F.Cu", [(11.9, 4.72), (13.45, 4.72), (14.25, 3.95), (16.6, 3.95), (16.6, 5.85), (14.25, 5.85),
+                  (13.45, 5.08), (11.9, 5.08)], prio=3, ch=0.1)
+for x in (14.6, 15.4, 16.2):
     G(x, 4.9)
-Z("/+5V1", "F.Cu", [(11.85, 5.75), (14.2, 5.75), (14.2, 7.9), (10.7, 7.9), (10.7, 6.3), (11.85, 6.3)], prio=5)
+Z("/+5V1", "F.Cu", [(11.85, 5.75), (12.5, 5.75), (12.85, 6.1), (12.85, 7.6), (12.3, 8.0), (12.3, 11.55),
+                    (10.75, 11.55), (10.75, 6.3), (11.85, 6.3)], prio=5)
 for x, y in ((11.45, 6.55), (12.45, 6.55), (12.45, 7.25)):
     V(x, y, "/+5V1", bl.VIA_D, bl.VIA_DRILL)
-G(14.6, 0.8); G(14.6, 1.6)                                                 # C601 ground
-G(14.6, 8.8); G(14.6, 9.6)                                                 # C610 ground
+G(14.55, 0.65); G(14.55, 1.45)                                             # C601 ground
+G(14.55, 8.76); G(14.55, 9.76); G(14.55, 10.76)                            # C610 / C611 ground
 T("Net-(U603-FB)", [(10.05, 5.4), (9.45, 5.4), (9.45, 8.16), (10.0, 8.16)], 0.2)
 T("Net-(U603-FB)", [(10.0, 8.16), (10.0, 9.02)], 0.2)
-T("/+5V1", [(10.0, 7.14), (10.9, 7.14)], 0.25)                             # R603 top -> C611
+T("/+5V1", [(10.0, 7.14), (10.9, 7.14)], 0.25)                             # R603 top -> +5V1 polygon
 T("GND", [(10.0, 10.04), (10.0, 10.75)], 0.25)
 G(10.0, 10.75)                                                             # R604 / C617 (B) ground
 # PG (pin 5) -> via -> In2 -> U605 EN+ / EN- network (B)
@@ -488,7 +493,8 @@ if "--norender" not in sys.argv:
     full = (-0.5, -0.5, BW + 0.5, BH + 0.5)
     render(os.path.join(HERE, "power.png"), ("F.Cu", "F.SilkS", "F.Fab", "Dwgs.User"), full)
     render(os.path.join(HERE, "power_b.png"), ("B.Cu", "B.Fab", "Dwgs.User"), full)
-    render(os.path.join(HERE, "power_detail.png"), ("F.Cu", "F.Fab", "Dwgs.User"), (8.5, 0.0, 19.5, 10.5))
+    render(os.path.join(HERE, "power_detail.png"), ("F.Cu", "F.Fab", "Dwgs.User"), (8.5, 0.0, 19.5, 12.0))
+    render(os.path.join(HERE, "power_detail_bucks.png"), ("F.Cu", "F.Fab", "Dwgs.User"), (0.0, 0.0, 10.5, 9.0))
     render(os.path.join(SCR, "power_f.png"), ("F.Cu", "F.Fab", "F.CrtYd", "Dwgs.User"), full)
     render(os.path.join(SCR, "power_b.png"), ("B.Cu", "B.Fab", "B.CrtYd", "Dwgs.User"), full)
     render(os.path.join(SCR, "power_in2.png"), ("In2.Cu", "F.Fab", "Dwgs.User"), full)
