@@ -11,7 +11,7 @@ Signal path, left to right (top of the sheet):
   CMP_N -> 1 uF -> 49.9 R dummy; CMP_P/CMP_N bridged by 2 x 470 R -> U304 SN65LVDS2 -> COARSE.
 Taps (ladder): BAT15-04W gate (pin 3 common on the line), 0.47 pF C0G hold caps to PSTRB_A (anode
 node) / PSTRB_K (cathode node), 2.2 k to VTAP_N (anode node) / VTAP_P (cathode node), 2 x 1 k summing to
-COS3502 IN+, IN- = VTAP_TH (1 k + 100 nF per row), OUT -> TAPn. Strobe lines end in 49.9 R.
+COS3502 IN+, IN- = VTAP_TH (1 k + 100 nF per row), OUT -> TAPn. Strobe lines end in 43 R (loaded 41.3 R).
 
 Pinouts (datasheets, checked):
   TMUX136 RSE UQFN-10 (SCDS367E table 5-1): 1 A1, 2 A2, 3 B1, 4 B2, 5 GND, 6 EN (low active), 7 COM2,
@@ -414,9 +414,14 @@ def main():
             # terminations
             for (yy, xx, net) in ((yl, last + 14, "line"), (yK, last + 20, "PSTRB_K"), (yA, last + 26, "PSTRB_A")):
                 sh.wire(P(last + (4 if yy == yl else 6), yy), P(xx, yy))
-                rr = R(sh, "49.9", P(xx, yy + 3), fields={"Note": f"{net} end termination, at the last tap"})
+                if net == "line":
+                    rr = R(sh, "49.9", P(xx, yy + 3), fields={"Note": f"{net} end termination, at the last tap"})
+                else:       # loaded strobe line 41.3 R (layout/board/blocks/phase/README.md, validation RF-3)
+                    rr = R(sh, "43", P(xx, yy + 3),
+                           fields={"Note": f"{net} end termination, at the last tap: 43 R = loaded line 41.3 R"})
                 sh.gnd(rr["2"])
-            sh.text("END TERMINATIONS\n49.9 R 0402 to GND\n(L2 via at the pad)", P(last + 10, yl + 12), size=T)
+            sh.text("END TERMINATIONS 0402 to GND\n(L2 via at the pad): line 49.9 R,\n"
+                    "PSTRB_A/K 43 R (loaded 41.3 R)", P(last + 10, yl + 12), size=T)
 
     # ================================================================== comparator power, VTAP_TH, rails
     yb0 = 200
@@ -469,7 +474,7 @@ def main():
             "12 dB pad 82/91/82: line +/-0.21 V (data),\n0.42 V steps; 10-90 % 225-250 ps at the taps.",
             P(172, 10), size=T)
     sh.text("COARSE: 2 x 470 R bridge (high-Z tap,\nTRF input drop < 5 %). SN65LVDS2 at 3V3\n"
-            "-> FPGA pin 47. Good to ~100-150 MHz edges.", P(148, 72), size=T)
+            "-> FPGA pin 27 (GCLKT_3). Good to ~100-150 MHz edges.", P(148, 72), size=T)
     sh.text("DELAY LINE (SPEC decision 4, co-propagating): signal line 75 ps per tap (0.26 mm / 59 R trace, meander\n"
             "9.929 mm between taps, loaded to ~50 R by each gate ~0.37 pF); strobe lines PSTRB_A/K 40 ps per tap\n"
             "(0.16 mm / 72.8 R trace, 4.514 mm pitch, loaded); effective tap spacing 75 - 40 = 35 ps, 16 taps = 560 ps window.\n"

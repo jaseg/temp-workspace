@@ -7,6 +7,15 @@ Pinout source: Gowin UG842-1.6.8E "GW1NZ-1 Pinout" (pin list, QN48 column) and U
 VCCIO1 25; VCCX 36; VSS 2, 26; EPAD to GND. DS841-2.8E: GW1NZ-1 has no true LVDS (LVDS column NONE for
 all pins; "GW1NZ-1 only supports ELVDS output"); emulated LVDS needs VCCIO 2.5 V and an external resistor
 network, so the strobes here are complementary LVCMOS33 outputs on True/Comp pairs (IOT16A/B, IOT17A/B).
+
+Clock plan (24 Nov 2026, SPEC decision 18; validation THEORY-1 / IO-1): FPGA_CLK 24 MHz from the MS5351M -> rPLL
+IDIV 1, FBDIV 16, ODIV 2: VCO 768 MHz (400-800), CLKOUT = FCLK 384 MHz (<= 400 MHz, DS841-2.8E table 3-20, LV C6/I5),
+CLKDIV /5 -> PCLK 76.8 MHz; OSER10 / IDES10 (DDR) at 768 Mbit/s (<= 1100, table 3-16), 1.302 ns per bit.
+PH_STROBE 48 MHz = 16 bits, S_STROBE 3.0 MHz = 256 bits (= 16 phase strobes).
+MS5351M VDD / VDDO (pins 1 / 7) run from +3V3_CLK: FB608 bead from +3V3 with C508 / C509 100 nF (one per pin),
+C510 10 uF and C623 1 uF (moved from the old LM27761 input) behind it (power-tree.md section 2).
+Crystal Y501 C9006 (YXC X322525MOB4SI) is a CL 12 pF part: firmware sets XTAL_CL = 10 pF (largest MS5351M setting;
+with ~2 pF stray about 12 pF; validation PARTS-7). An 8 pF crystal would also fit the 8 pF setting.
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -134,7 +143,7 @@ def main():
 
     # programming header J501: Würth WR-WST 490107671612 (2x08 Redfit IDC direct-to-board, footprint only),
     # same part and pinout as the yanartas sensing board J3 (odd pins left, even pins right):
-    #  1 VBUS (5 V)  2 HOST_RX (100 R)  3 +3V3  4 HOST_TX (100 R)  5 DBG2 (FPGA pin 6)  6 GND
+    #  1 VBUS (5 V)  2 HOST_RX (100 R)  3 +3V3  4 HOST_TX (100 R)  5 DBG2 (FPGA pin 8)  6 GND
     #  7 TCK  8 UC_SWDIO  9 TMS  10 UC_SWCLK  11 TDI  12 DBG1  13 TDO  14 UC_NRST  15 GND  16 GND
     j = sh.add("Connector_Generic:Conn_02x08_Odd_Even", "J501", "WR-WST 490107671612", (g(280), g(130)),
                fp="scope-fe:Würth_WR-WST_debug_490107671612_2x08_P2.54mm_Vertical", lcsc="NA",
@@ -162,7 +171,7 @@ def main():
     for pin, net in (("8", "UC_SWDIO"), ("10", "UC_SWCLK"), ("12", "DBG1"), ("14", "UC_NRST")):
         sh.stub(j, pin, net, length=g(20), kind="hlabel", shape=dict(MCU_DBG_FPGA)[net])
     sh.text("J501 programming header: Würth WR-WST 490107671612 (Redfit IDC, footprint only),\n"
-            "pinout of the yanartas sensing board J3. FPGA JTAG (TCK/TMS/TDI/TDO, DBG2 = FPGA pin 6)\n"
+            "pinout of the yanartas sensing board J3. FPGA JTAG (TCK/TMS/TDI/TDO, DBG2 = FPGA pin 8)\n"
             "and the STM32G474 SWD / UART / NRST / DBG1 (mcu_if; NRST 100 nF at the MCU).\n"
             "HOST_RX/HOST_TX named as on the sensing board (MCU = host): HOST_RX = MCU RX (PA10).\n"
             "1 VBUS 2 HOST_RX 3 +3V3 4 HOST_TX 5 DBG2 6 GND 7 TCK 8 SWDIO\n"
@@ -172,8 +181,11 @@ def main():
     ck = sh.add("Oscillator:Si5351A-B-GT", "U", "MS5351M", (g(70), g(60)),
                 fp="Package_SO:MSOP-10_3x3mm_P0.5mm", lcsc="C1509083",
                 fields={"Price": "0.91 USD (LCSC)", "Note": "Si5351A-B-GT compatible, I2C addr 0x60"})
-    sh.stub(ck, "1", "+3V3", kind="power")
-    sh.stub(ck, "7", "+3V3", kind="power")
+    p1, p7 = ck["1"], ck["7"]
+    yt = min(p1[1], p7[1]) - g(3)
+    sh.path([p7, (p7[0], yt), (p1[0], yt), p1])
+    sh.wire((p1[0], yt), (p1[0] - g(5), yt))
+    sh.label("+3V3_CLK", (p1[0] - g(5), yt), rot=180)
     sh.stub(ck, "8", "GND", kind="gnd")
     sh.stub(ck, "4", "I2C_SCL", length=5.08, kind="hlabel", shape="input")
     sh.stub(ck, "5", "I2C_SDA", length=5.08, kind="hlabel", shape="bidirectional")
@@ -182,15 +194,36 @@ def main():
     series_out(sh, ck, "6", "33", "CLK2_FPGA")
     y = sh.add("Device:Crystal_GND24", "Y", "25MHz", (g(40), g(50)),
                fp="Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm", lcsc="C9006",
-               fields={"Note": "25 MHz, CL 8 pF (Si5351 internal load caps), ESR < 100R"})
+               fields={"Note": "25 MHz, CL 12 pF (C9006 YXC X322525MOB4SI): firmware XTAL_CL = 10 pF (PARTS-7)"})
     sh.wire(ck["2"], y["3"], via="vh")
     sh.path([ck["3"], (y["1"][0] - 2.54, ck["3"][1]), (y["1"][0] - 2.54, y["1"][1]), y["1"]])
     sh.power("GND", y["2"], dy=-2.54, rot=180)
     sh.stub(y, "4", "GND", kind="gnd")
-    decoupler(sh, "+3V3", (g(50), g(85)), ("100n", "100n", "10u"))
-    sh.text("MS5351M: CLK0 -> FPGA_CLK (RPLL_T_in pin 33), CLK1 -> MCU_CLK (STM32 HSE bypass),\n"
-            "CLK2 -> FPGA pin 34 (spare clock / beat mode). One 100 nF each at VDD and VDDO.",
-            (g(25), g(98)))
+    # +3V3_CLK: FB608 + C508 / C509 (one 100 nF per pin) + C510 10 uF + C623 1 uF (moved, power-tree.md)
+    xb, yb = g(22), g(85)
+    sh.power("+3V3", (xb - g(4), yb), dy=-2.54)
+    sh.wire((xb - g(4), yb), (xb, yb))
+    fbc = sh.add("Device:FerriteBead_Small", "FB608", "600R@100MHz", (xb, yb), rot=90,
+                 fp="Inductor_SMD:L_0603_1608Metric", lcsc="C85833", mpn="BLM18KG601SN1D",
+                 fields={"Price": "0.0166 USD (LCSC 50+)",
+                         "Note": "MS5351M supply filter (power-tree.md): 600 R @ 100 MHz, 0.15 R, 31-55 mA"})
+    dxy = (xb - fbc["1"][0], yb - fbc["1"][1])
+    fbc.at = (fbc.at[0] + dxy[0], fbc.at[1] + dxy[1])
+    xr = xb + g(36)
+    sh.wire(fbc["2"], (xr, yb))
+    for k, (ref, val, note) in enumerate((("C508", "100n", "at U502 pin 7 (VDDO), top side, GND via at the pad"),
+                                          ("C509", "100n", "at U502 pin 1 (VDD), GND via within 0.5 mm"),
+                                          ("C623", "1u", "moved from the power sheet: +3V3_CLK after FB608"),
+                                          ("C510", "10u", "+3V3_CLK bulk after FB608"))):
+        c = C(sh, val, (xb + g(9 + 6 * k), yb + 3.81), ref=ref, fields={"Note": note})
+        sh.gnd(c["2"])
+    sh.label("+3V3_CLK", (xr, yb))
+    sh.power("PWR_FLAG", (xr - g(3), yb), dy=-2.54)
+    sh.text("MS5351M: CLK0 -> FPGA_CLK 24 MHz (RPLL_T_in pin 33), CLK1 -> MCU_CLK 24 MHz (STM32 HSE bypass),\n"
+            "CLK2 -> FPGA pin 34 (spare clock / beat mode). VDD / VDDO on +3V3_CLK (FB608), 100 nF per pin.\n"
+            "FPGA rPLL: 24 MHz x 16 = FCLK 384 MHz (VCO 768 MHz, ODIV 2) -> OSER10 / IDES10 768 Mbit/s,\n"
+            "PH_STROBE 48 MHz = 16 bits, S_STROBE 3.0 MHz = 256 bits. XTAL_CL = 10 pF (12 pF crystal).",
+            (g(15), g(98)))
     sh.text("Pin plan (UG842), permuted for the 6-layer fan-out: COARSE 27 (GCLKT_3), TAP0..4 = 28-32,\n"
             "TAP5/6 = 41/47, TAP7 = 6, TAP15..8 = 9-11, 13-17 (reversed, board fan-out); ADC_TRIG 18; SPI SCK/MISO/MOSI/CS = 20/21/22/24;\n"
             "DBG2 8 (to J501 pin 5); FPGA_CLK 33, CLK2 34. Strobes OSER10 on IOT16A/B, IOT17A/B; config, JTAG fixed.\n"

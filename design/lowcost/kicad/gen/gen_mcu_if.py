@@ -10,8 +10,9 @@ VMID buffer are gone; the DAC outputs drive passive networks, one op-amp section
   PA5 DAC1_OUT2 -> VOFS (raw 0.2..2.7 V) -> Rofs into the OPA197 servo summing node (input sheet);
         mid-scale cancelled by Rmid from VNEG_REF.
   PA6 DAC2_OUT1 -> DAC_BIAS_A -> R733 7.5k / R734 4.7k divider to -2V5 -> VBIAS_A (-1.46..-0.50 V).
-  PB1 OPAMP3_VOUT (DAC3_CH2 follower) -> DAC_BIAS_K (100k R736 pull-down) -> R735 5.1k -> VBIAS_K
-        (+0.2..+2.7 V; 5.1k isolates the 10 nF on the sampler sheet, DAC/OPAMP CL <= 50 pF).
+  PB1 OPAMP3_VOUT (DAC3_CH2 follower) -> DAC_BIAS_K -> R735 4.7k -> VBIAS_K, R736 5.1k to GND
+        (24 Nov 2026, validation PARTS-4: 0.520 x Vdac = +0.10..+1.40 V, so the BAT15-04W reverse voltage stays
+        <= 2.9 V at the -1.5 V input clamp; R735 isolates the 10 nF on the sampler sheet, DAC/OPAMP CL <= 50 pF).
   PA2 OPAMP1_VOUT (DAC3_CH1 follower) -> DAC_TAPTH -> 30k/1k divider -> VTAP_TH.
   U701 TLV9001 on +/-2V5: VNEG_REF = -VREF+ x 10.0k/14.7k = -1.973 V (ratiometric to the DAC reference, so the
         VOFS mid-scale cancellation does not drift with the -2V5 regulator); drives only Rmid (34.0k)."""
@@ -55,7 +56,7 @@ PINS = [
     (3, "PC14", None, "nc", "spare"),
     (4, "PC15", None, "nc", "spare"),
     (16, "PB0", None, "nc", "spare"),
-    (17, "PB1", "DAC_BIAS_K", "l", "OPAMP3_VOUT follower of DAC3_CH2 -> 5.1k -> VBIAS_K"),
+    (17, "PB1", "DAC_BIAS_K", "l", "OPAMP3_VOUT follower of DAC3_CH2 -> 4.7k / 5.1k divider -> VBIAS_K"),
     (18, "PB2", None, "nc", "spare"),
     (40, "PB3", "SPI_SCK", "h", "SPI1_SCK (AF5), master"),
     (41, "PB4", "SPI_MISO", "h", "SPI1_MISO (AF5); UCPD dead-battery pull-down until disabled"),
@@ -65,7 +66,7 @@ PINS = [
     (45, "PB8", "BOOT0", "l", "BOOT0: 10k pull-down, JP701 to +3V3 for the bootloader"),
     (46, "PB9", "SPI_CS", "h", "GPIO, SPI chip select (software NSS); moved from PB10"),
     (22, "PB10", None, "nc", "spare"),
-    (25, "PB11", "ADC_TRIG", "h", "EXTI11 = ADC12 regular external trigger (EXTSEL EXTI11)"),
+    (25, "PB11", "ADC_TRIG", "h", "TIM2_CH4 (AF1) frame mark to FPGA pin 18; ADC12 triggered internally by TIM2_TRGO (OC4REF)"),
     (26, "PB12", None, "nc", "reserved: OPAMP4_VOUT (DAC4_CH1 follower, ADC_REF_MID trim option)"),
     (27, "PB13", "FPGA_RECONFIG", "h", "GPIO open-drain (FPGA RECONFIG_N); moved from PB2"),
     (28, "PB14", "LED", "l", "status LED D701, active low; moved from PC13"),
@@ -147,21 +148,24 @@ def main():
 
     # ---------------------------------------------------------------- VBIAS_K: DAC3_CH2 follower, isolation, pull-down
     xk, yk = g(185), g(118)
-    rk = R(sh, "5.1k", (xk + g(6), yk), rot=90, ref="R735", lcsc="C25905", fields={"Note": "isolates 10 nF (DAC CL <= 50 pF)"})
+    rk = R(sh, "4.7k", (xk + g(6), yk), rot=90, ref="R735", lcsc="C25900",
+           fields={"Note": "1 %; with R736: VBIAS_K = 0.520 Vdac, isolates the 10 nF (DAC CL <= 50 pF)"})
     K = (xk, yk)
     sh.wire(K, rk["1"])
     sh.wire((xk - g(6), yk), K)
     sh.label("DAC_BIAS_K", (xk - g(6), yk), rot=180)
-    rpd = R(sh, "100k", (xk, yk + g(5)), ref="R736", lcsc="C25741", fields={"Note": "reset state: VBIAS_K = 0 V"})
-    sh.wire(K, rpd["1"])
-    sh.gnd(rpd["2"])
     E = (rk["2"][0] + g(4), yk)
     sh.wire(rk["2"], E)
+    rpd = R(sh, "5.1k", (E[0] - g(2), yk + g(5)), ref="R736", lcsc="C25905",
+            fields={"Note": "1 %; VBIAS_K divider (max 1.40 V, PARTS-4) and reset state VBIAS_K = 0 V"})
+    sh.wire((E[0] - g(2), yk), rpd["1"])
+    sh.gnd(rpd["2"])
     sh.hlabel("VBIAS_K", E, "output")
-    sh.text("VBIAS_K = Vdac (DAC3_CH2 -> OPAMP3 follower -> PB1): +0.2..+2.7 V,\n"
-            "0.71 mV/LSB. R735 5.1k: DAC never sees the 10 nF; rectified\n"
-            "strobe current 4.3 uA x 6.1k = 26 mV (calibrated). Step <= 1 V at a time.\n"
-            "Reset: R736 100k -> 0 V.", (g(170), g(135)), size=T)
+    sh.text("VBIAS_K = 0.520 x Vdac (DAC3_CH2 -> OPAMP3 -> PB1 -> R735 4.7k / R736 5.1k):\n"
+            "+0.10..+1.40 V, 0.37 mV/LSB; nominal +1.3 V (sim/strobe_arms). Bridge reverse voltage\n"
+            "<= 1.40 + 1.5 V (CLL clamp) = 2.9 V < 4 V (PARTS-4). Thevenin 2.45k: rectified strobe\n"
+            "current 4.3 uA x 3.45k = 15 mV (calibrated). DAC load 9.8k (<= 0.28 mA). Reset: 0 V.",
+            (g(170), g(135)), size=T)
 
     # ---------------------------------------------------------------- VTAP_TH divider (unchanged), VTAP_P/N rails
     r5 = R(sh, "30k", (g(90), g(160)), ref="R723")

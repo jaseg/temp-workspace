@@ -123,4 +123,19 @@ Voltage ratings: 5 V nodes (C601, C610-C612) need >= 10 V parts; C45783 is 6.3 V
 
 ## 10. Open
 Hot-plug transient vs 6 V abs max; TMUX136 ramp; LM27762 RNEG at 3.3 V (assumed 5 ohm, 0.42 V margin); COS3502 / MCU / FPGA maxima
-are estimates; XR0420-R47M stock 65 (2nd source listed); 10 V 22u 0805 LCSC number; board footprints for VSON-HR-10 and WSON-12 (2 x 3).
+are estimates; XR0420-R47M stock 65 (2nd source listed, its land not checked); board footprints for VSON-HR-10
+(now `scope-fe:Texas_DLA0010A_VSON-HR-10_2x3mm_P0.5mm`) and WSON-12 (KiCad `WSON-12-1EP_3x2mm_P0.5mm_EP1x2.65`, matches DSS0012B).
+
+## 11. Corrections and additions made in the schematic (24 Nov 2026, `kicad/gen/gen_power.py`)
+- **Error fixed:** C45783 (CL21A226MAQNNNE) is a **25 V** 22u 0805 (LCSC page), not 6.3 V. C601, C604, C605, C610-C612
+  keep it; no 10 V part is needed (section 6 last line and section 10 item withdrawn).
+- **Error fixed:** C618 (1u 0603) carried C52923, an 0402 part number; the LCSC field is now empty (1u 0603 25 V to assign).
+- C614 (10n) is not left unused: it moves to BUF802 U101 pin 10 (VSO-, top side), the DECOUPLING-1 fix without a new part.
+- C606 and C622 (100n, not listed above) move to the TRF37D73 U401 / U402 VCC pins (PDN-7, +3V3); -5V keeps C627 1u at
+  FB603 plus the BUF802 local capacitors.
+- FB608 and C623 are drawn on the fpga_clock sheet (net +3V3_CLK). C508 / C509 (100n, one per MS5351M supply pin) and
+  C510 (10u) also move behind FB608: with about 8 uF effective the bead (about 1.5 uH at low frequency, assumed)
+  resonates near 45 kHz with Q about 3, instead of about 120 kHz with Q about 7 with 1.2 uF.
+- U605 PGOOD to GND (as U604). Divider resistors of U603-U605 are 0.1 % (R603 459k is an E192 value).
+- Added DNP footprints: C631 120 pF (U601 Cff) and C632 47 uF 10 V tantalum (C22036, VBUS damper, section 7).
+- Generated BOM: **63.76 USD** (limit 80), against the 63.58 estimate in section 6.

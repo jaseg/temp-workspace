@@ -1,15 +1,15 @@
 """strobe.kicad_sch: strobe drivers (design/lowcost/sim/strobe/RESULT.md, SPEC decision 3).
 
 Signal paths, left to right (all 50 R, 50 % duty square waves from complementary LVCMOS33 FPGA pins):
-  Sampler strobe (3.125 MHz):
+  Sampler strobe (3.0 MHz, SPEC decision 18):
     S_STROBE_P -> 47 R -> 100 nF -> TRF37D73 #1 -> 100 nF -> 12 dB pi pad (82/91/82 R) -> 100 nF
     -> TRF37D73 #2 -> 100 nF -> clip node with shorted stub TL (80 ps one-way, 13.2 mm) and a fitted BAT15-03W clamp
     -> T401 common-mode-choke balun (Murata DLW21SN900HQ2L) -> STRB_A / STRB_K (floating rails;
     47 pF blocks, 1 k termination and bias feeds are on the sampler sheet).
     S_STROBE_N: unused complement, AC dummy load 47 R + 100 nF + 49.9 R (keeps pin currents equal).
-  Phase strobe (50 MHz), one chain per polarity, identical layout:
+  Phase strobe (48 MHz), one chain per polarity, identical layout:
     PH_STROBE_P/N -> 47 R -> 100 nF -> TRF37D73 -> 100 nF -> 10 dB pi pad (100/68/100 R) -> 100 nF
-    -> GVA-84+ (VBUS via bead + 2.2 uH) -> 100 nF -> launch node with shorted stub
+    -> GVA-84+ (+5V1 via bead + 2.2 uH) -> 100 nF -> launch node with shorted stub
     (80 ps, 13.2 mm, sim/phase_array/RESULT.md)
     and a DNP BAT15-03W clamp -> PSTRB_A / PSTRB_K (strobe lines along the taps, trigger_phase sheet).
 
@@ -17,7 +17,10 @@ Bias tees (sim/bias_tee/RESULT.md): every TRF37D73 output: BLM15HD102SN1D bead w
 -> 47 uH LQH32CN470K23L (1210) with 1 k 0402 across it (kills the bead-L / 47 uH self-C resonance near 70 MHz,
 -0.5 -> -0.28 dB) -> cold end 100 nF (own cap, GND via at its pad, supply via beyond it). GVA-84+: bead + 2.2 uH
 LQM21PN2R2MGHL (its 80 ps shorted launch stub shorts everything below ~300 MHz, so the 2.2 uH is enough; DCR
-budget 0.15-0.18 V at 108-130 mA), cold end = the VBUS 1 nF / 100 nF / 10 uF.
+budget 0.06-0.18 V at 108-130 mA), cold end = the +5V1 1 nF / 100 nF / 10 uF. +5V1 (5.04-5.16 V) comes from the
+TPS63802 buck-boost on the power sheet (24 Nov 2026; was VBUS): Vd 4.86-5.10 V at any USB voltage (BIASTEE-1, PDN-8).
+Pad input shunts R402 / R408 / R412 are 0603 (100 mW; 44-65 mW with the saturated square, validation PARTS-1); the
+series and output resistors stay 0402 (<= 35 mW).
 
 Deviation from RESULT.md: an extra 100 nF block in front of TRF #2 / GVA-84+ (both RF inputs carry
 an internal DC bias and the pi pads' shunt resistors would otherwise load it).
@@ -125,8 +128,10 @@ def bias_tee(sh, x, Y, Yr, big, rail, cap_xs, tp_name):
 
 
 def pad(sh, x, Y, rs, rp):
-    """Pi pad centred at grid x on line Y: shunt rs at x-5 / x+5, series rp at x. Returns (left, right) points."""
-    s1 = R(sh, rs, P(x - 5, Y + 3))
+    """Pi pad centred at grid x on line Y: shunt rs at x-5 / x+5, series rp at x. Returns (left, right) points.
+    The input shunt (first part, driven by the saturated TRF37D73) is 0603 (validation PARTS-1)."""
+    s1 = R(sh, rs, P(x - 5, Y + 3), size="0603", lcsc={"100": "C22775"}.get(rs, ""),
+           fields={"Note": "0603 100 mW: input shunt of the pad, 44-65 mW with the saturated square (PARTS-1)"})
     s2 = R(sh, rs, P(x + 5, Y + 3))
     r = R(sh, rp, P(x, Y), rot=90)
     sh.gnd(s1["2"])
@@ -184,7 +189,7 @@ def main():
 
     # ================================================================== sampler strobe (row 1)
     Y = 40
-    sh.text("SAMPLER STROBE  S_STROBE 3.125 MHz, 50 % duty (160 / 160 ns), FPGA pins 38 (P) / 35 (N)",
+    sh.text("SAMPLER STROBE  S_STROBE 3.0 MHz, 50 % duty (167 / 167 ns), FPGA pins 38 (P) / 35 (N)",
             P(12, Y - 30), size=1.5)
     u1 = front(sh, "S_STROBE_P", shapes["S_STROBE_P"], Y)
     trf_supply(sh, u1, 50, Y, 64, "TRF1_OUT")
@@ -240,7 +245,7 @@ def main():
             "Edge 300-600 ps (FPGA) -> ~250 ps -> 133-152 ps.\n"
             "PWDN and NC pins to GND, EP: >= 5 vias to L2.\n"
             "Bias tee: bead (pad on the line) -> 47 uH || 1 k\n-> own 100 nF at the cold end (bias_tee RESULT).", P(46, Yn + 10), size=T)
-    sh.text("12 dB pi pad 82 / 91 / 82 R (0402):\n"
+    sh.text("12 dB pi pad 82 / 91 / 82 R (input shunt 0603):\n"
             "TRF #2 input ~+8.6 dBm square\n(abs. max +10 dBm).", P(78, Yn + 2), size=T)
     sh.text("CLIP STUB TL401: 80 ps one-way = 13.2 mm\n"
             "50 R microstrip (6.05 ps/mm). Tap right at\n"
@@ -251,8 +256,9 @@ def main():
             "(0805, 90 R CM @100 MHz, LCSC C97855)\n"
             "as 1:1 TL balun: line 1 = signal -> STRB_A,\n"
             "line 2 = GND -> STRB_K, rails float.\n"
-            "Within 5 mm of the bridge; STRB_A/K a\n"
-            "coupled 100 R pair, matched +/-0.2 mm.\n"
+            "STRB_A/K: 16.75 mm 50 R arms (99 ps), equal\n"
+            "+/-0.1 mm, uncoupled (sim/strobe_arms RESULT:\n"
+            "no second sampling instant; bias +/-1.3 V).\n"
             "Step at the bridge ~4.3-4.6 V (sim).", P(173, Y + 12), size=T)
 
     # ================================================================== phase strobe (rows 2, 3)
@@ -268,12 +274,13 @@ def main():
         gv = sh.add(GVA, "U", "GVA-84+", P(110, Y), fp=SOT89, mpn="GVA-84+", fields=GVA_F)
         sh.wire(c3["2"], gv["1"])
         sh.gnd(gv["2"])
-        # VBUS bias: rail at Y-16 from 120 to 132, caps 1n (nearest), 100n, 10u
+        # +5V1 bias (TPS63802 on the power sheet): rail at Y-22 from 120 to 146, caps 1n (nearest), 100n, 10u
         Yr = Y - 22
         sh.path([P(120, Yr), P(146, Yr)])
         rail_caps(sh, [134, 140, 146], Yr, ["1n", "100n", "10u"])
-        sh.power("VBUS", P(120, Yr), dy=-2.54)
-        bias_tee(sh, 120, Y, Yr, L22, "VBUS", (), f"GVA{n}_VD")
+        sh.wire(P(120, Yr), P(116, Yr))
+        sh.hlabel("+5V1", P(116, Yr), shapes["+5V1"], side="left")
+        bias_tee(sh, 120, Y, Yr, L22, "+5V1", (), f"GVA{n}_VD")
         sh.wire(gv["3"], P(120, Y))
         c4 = C(sh, "100n", P(140, Y), rot=90)
         sh.wire(P(120, Y), c4["1"])
@@ -297,15 +304,15 @@ def main():
         return u, gv
 
     Y2 = 105
-    sh.text("PHASE STROBE  PH_STROBE 50 MHz, 50 % duty, FPGA pins 40 (P) / 39 (N); one chain per polarity",
+    sh.text("PHASE STROBE  PH_STROBE 48 MHz, 50 % duty, FPGA pins 39 (P) / 40 (N); one chain per polarity",
             P(12, Y2 - 30), size=1.5)
     phase(Y2, "PH_STROBE_P", "PSTRB_A", 1)
-    sh.text("10 dB pi pad 100 / 68 / 100 R:\nGVA input ~+10 dBm square\n(abs. max +13 dBm).",
+    sh.text("10 dB pi pad 100 / 68 / 100 R (input shunt\n0603): GVA input ~+10 dBm square\n(abs. max +13 dBm).",
             P(78, Y2 + 12), size=T)
     sh.text("GVA-84+ (SOT-89): 1 IN, 3 OUT+DC, 2/4 GND.\n"
             "Vd 4.8-5.2 V, 108 mA; no Rbias at 5 V (datasheet\n"
-            "Fig. 2): pin 3 -> bead -> 2.2 uH -> VBUS,\n"
-            "Vd ~ VBUS - 0.15 V (130 mA: 0.18 V). Pin 3 max 5.8 V.\n"
+            "Fig. 2): pin 3 -> bead -> 2.2 uH -> +5V1 (5.10 V),\n"
+            "Vd 4.86-5.10 V (tee 0.06-0.18 V). Pin 3 max 5.8 V.\n"
             "2.2 uH is enough: the launch stub shorts < 300 MHz.\n"
             "Step 7.2 V into 50 R (sim, nominal).", P(102, Y2 + 12), size=T)
     sh.text("LAUNCH STUB: 80 ps one-way = 13.2 mm 50 R\n"
@@ -334,14 +341,15 @@ def main():
             "- Bias tees (sim/bias_tee): bead pad ON the 50 R line (no stub), chain perpendicular, compact;\n"
             "  TRF: 47 uH || 1 k + own 100 nF at the cold pad; supply enters through that cap.\n"
             "- Test points TRFx/GVAx: DC bias check only (expect ~3.2 V / ~4.8 V), not RF.\n"
-            "- Supplies: +3V3 6 x TRF37D73 ... 4 here (220 mA); VBUS 2 x GVA-84+ (216 mA).\n"
+            "- Supplies: +3V3 4 x TRF37D73 here (220 mA); +5V1 2 x GVA-84+ (216 mA), own track from the\n"
+            "  TPS63802 output caps C610/C611 (power sheet), not through FB602.\n"
             "- Open: large-signal edge of both blocks in saturation, CMC differential\n"
             "  bandwidth, reverse pulse (second edge) vs BAT15 BV: measure one chain early.",
             P(232, 14), size=T)
 
     names = {n for n, _ in hier_pins("strobe")}
     assert names == {"S_STROBE_P", "S_STROBE_N", "PH_STROBE_P", "PH_STROBE_N",
-                     "STRB_A", "STRB_K", "PSTRB_A", "PSTRB_K"}, names
+                     "STRB_A", "STRB_K", "PSTRB_A", "PSTRB_K", "+5V1"}, names
     split_wires(sh)
     sh.save()
 
@@ -391,7 +399,7 @@ def check(outdir):
       | {(u, p) for u in ("U401", "U402", "U403", "U405") for p in ("3", "4", "5", "6", "8", "9")})
     A(n, "+3V3", {(u, "1") for u in ("U401", "U402", "U403", "U405")} |
       {("L401", "2"), ("L402", "2"), ("L403", "2"), ("L405", "2")})
-    A(n, "VBUS", {("L404", "2"), ("L406", "2")})
+    A(n, "+5V1", {("L404", "2"), ("L406", "2")})
     # bias tees (sim/bias_tee/RESULT.md): RF pin -> bead -> 47 uH || 1 k (TRF) / 2.2 uH (GVA) -> rail, own 100 nF
     for u, fb, l, rd, cc in (("U401", "FB401", "L401", "R415", "C432"), ("U402", "FB402", "L402", "R416", "C433"),
                              ("U403", "FB403", "L403", "R417", "C434"), ("U405", "FB405", "L405", "R418", "C435")):
@@ -402,7 +410,7 @@ def check(outdir):
     for g_, fb, l in (("U404", "FB404", "L404"), ("U406", "FB406", "L406")):
         on((g_, "3"), (fb, "1"))
         on((fb, "2"), (l, "1"))
-        A(n, "VBUS", {(l, "2")})
+        A(n, "+5V1", {(l, "2")})
     # phase chains
     for r, c, u, fb, cp, rs, rr, c3, g, fg, c4 in (("R407", "C412", "U403", "FB403", "C416", "R408", "R410", "C417",
                                                    "U404", "FB404", "C421"),

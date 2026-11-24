@@ -1,4 +1,4 @@
-ERC report (2026-11-22T08:43:27, Encoding UTF8)
+ERC report (2026-11-24T10:13:51, Encoding UTF8)
 Report includes: Errors, Warnings, Exclusions
 
 ***** Sheet /
@@ -55,13 +55,7 @@ Report includes: Errors, Warnings, Exclusions
 ***** Sheet /power/
 [lib_symbol_mismatch]: Symbol 'USB_C_Receptacle_USB2.0_16P' doesn't match copy in library 'Connector'
     ; warning
-    @(31.75 mm, 50.80 mm): Symbol J601 [USB_C_Receptacle_USB2.0_16P]
-[lib_symbol_mismatch]: Symbol 'LM27761' doesn't match copy in library 'Regulator_SwitchedCapacitor'
-    ; warning
-    @(292.10 mm, 114.30 mm): Symbol U605 [LM27761]
-[footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
-    ; warning
-    @(292.10 mm, 114.30 mm): Symbol U605 [LM27761]
+    @(27.94 mm, 50.80 mm): Symbol J601 [USB_C_Receptacle_USB2.0_16P]
 
 ***** Sheet /mcu_if/
 [lib_symbol_mismatch]: Symbol 'STM32G474CBTx' doesn't match copy in library 'MCU_ST_STM32G4'
@@ -71,7 +65,7 @@ Report includes: Errors, Warnings, Exclusions
     ; warning
     @(134.62 mm, 232.41 mm): Symbol JP701 [SolderJumper_2_Open]
 
- ** ERC messages: 18  Errors 0  Warnings 18
+ ** ERC messages: 16  Errors 0  Warnings 16
 
  ** Ignored checks:
     - Global label only appears once in the schematic

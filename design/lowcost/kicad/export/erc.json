@@ -1,7 +1,7 @@
 {
     "$schema": "https://schemas.kicad.org/erc.v1.json",
     "coordinate_units": "mm",
-    "date": "2026-11-22T08:43:36",
+    "date": "2026-11-24T10:13:58",
     "ignored_checks": [
         {
             "description": "Global label only appears once in the schematic",
@@ -218,7 +218,7 @@
                                 "x": 50.8,
                                 "y": 63.5
                             },
-                            "uuid": "4dadf8ef-a8d4-5d15-ad00-f8cab37a7bf4"
+                            "uuid": "c9ee2540-1dde-538d-a15c-3eca3b56db7e"
                         }
                     ],
                     "severity": "warning",
@@ -266,7 +266,7 @@
                         {
                             "description": "Symbol J601 [USB_C_Receptacle_USB2.0_16P]",
                             "pos": {
-                                "x": 31.75,
+                                "x": 27.94,
                                 "y": 50.8
                             },
                             "uuid": "1d3b55d7-e23f-571a-aba7-4426f5ee9765"
@@ -274,36 +274,6 @@
                     ],
                     "severity": "warning",
                     "type": "lib_symbol_mismatch"
-                },
-                {
-                    "description": "Symbol 'LM27761' doesn't match copy in library 'Regulator_SwitchedCapacitor'",
-                    "items": [
-                        {
-                            "description": "Symbol U605 [LM27761]",
-                            "pos": {
-                                "x": 292.1,
-                                "y": 114.3
-                            },
-                            "uuid": "d762438a-5c05-54be-af81-55511b086e00"
-                        }
-                    ],
-                    "severity": "warning",
-                    "type": "lib_symbol_mismatch"
-                },
-                {
-                    "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
-                    "items": [
-                        {
-                            "description": "Symbol U605 [LM27761]",
-                            "pos": {
-                                "x": 292.1,
-                                "y": 114.3
-                            },
-                            "uuid": "d762438a-5c05-54be-af81-55511b086e00"
-                        }
-                    ],
-                    "severity": "warning",
-                    "type": "footprint_link_issues"
                 }
             ]
         },

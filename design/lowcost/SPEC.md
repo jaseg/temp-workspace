@@ -108,3 +108,21 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
     19. Variant if two ADCs run together and the ADC clock limit is lower (about 52 MHz, unverified): ADC 48 MHz, sampling
     strobe 2.4 MHz = 20 ADC clocks = 400 bits. An MCU timer triggers the ADC internally and marks the frame start on
     ADC_TRIG (PB11 -> FPGA); the FPGA aligns its strobe counter to it once (bit slips plus the output delay block).
+18. **Clock plan at 768 Mbit/s** (24 Nov 2026, validation THEORY-1 / IO-1; replaces the 960 Mbit/s of decision 17): 960 Mbit/s
+    needs FCLK 480 MHz, above the GW1NZ-1 rPLL limit (DS841-2.8E table 3-20, LV C6/I5: VCO 400-800 MHz, CLKOUT <= 400 MHz).
+    FPGA_CLK 24 MHz -> rPLL IDIV 1, FBDIV 16, ODIV 2: VCO 768 MHz, FCLK 384 MHz, PCLK 76.8 MHz (FCLK/5); OSER10 / IDES10 at
+    768 Mbit/s (limit 1100, table 3-16), 1.302 ns per bit. Phase strobe 48 MHz = 16 bits, sampling strobe 3.0 MHz = 256 bits
+    (= 16 phase strobes, = 20 ADC clocks at 60 MHz as before); variant 2.4 MHz = 320 bits. MCU and ADC unchanged.
+19. **Power tree with three regulator types** (24 Nov 2026, user instruction, `docs/research/power-tree.md`): TPS62A01A buck
+    VBUS -> +3V3 and +3V3 -> +1V2; TPS63802 buck-boost VBUS -> +5V1 (5.10 V, also the GVA-84+ drain supply); LM27762
+    +5V1 -> +4.80 / -4.64 V (nets +5V / -5V) and +3V3 -> +/-2.50 V (nets +2V5 / -2V5, enabled by the TPS63802 power good).
+    AMS1117, AP2112K, MT3608, LP2985, LM27761, LP5907 and LM337 are removed. Every regulator's input range, dropout and
+    margin are in that note.
+20. **Decoupling by moving existing capacitors first** (user instruction, 24 Nov 2026): the freed regulator capacitors go to
+    the new converters and to the load pins named in the validation (list in `kicad/README.md`); the only new capacitor is
+    C630 (U605 OUT+); C631 / C632 are DNP footprints.
+21. **Strobe arms and bias** (`sim/strobe_arms/RESULT.md`): the as-built 16.75 mm uncoupled 50 R balun arms stay; R204 sits
+    symmetrically in both arms; nominal bridge bias +/-1.3 V, trimmed per board. VBIAS_K is now 0.520 x DAC (R735 4.7k /
+    R736 5.1k, +0.10..+1.40 V) so the BAT15-04W reverse voltage stays below 4 V (validation PARTS-4).
+22. **Small part changes** (validation, 24 Nov 2026): PSTRB_A/K terminations R379 / R378 43 R (loaded line 41.3 R, RF-3);
+    pad input shunts R402 / R408 / R412 in 0603 (PARTS-1); MS5351M XTAL_CL = 10 pF for the 12 pF crystal (PARTS-7).

@@ -6,7 +6,8 @@ Signal path, left to right:
   -> U202 TPH2501 inverting level shift on +3V3/GND (1 k / 1 k, +in = ADC_REF_MID 0.725 V)
   -> R211 33 R + C207 220 pF -> ADC_IN (J701 pin 3 on mcu_if, STM32G474 PA0).
 Bridge rails: STRB_A / STRB_K (balun outputs, strobe sheet) -> 47 pF C0G -> node -> 24.9 R -> diodes;
-bias VBIAS_A (-1.00 V) / VBIAS_K (+1.00 V) through 1 k into the node; 1 k across the balun outputs.
+bias VBIAS_A / VBIAS_K (nominal -1.3 / +1.3 V with the as-built 99 ps arms, trimmed per board for efficiency
+~100 %, sim/strobe_arms/RESULT.md) through 1 k into the node; 1 k across the balun outputs.
 
 BAT15-04W (Infineon, SOT-323, series pair): pin 1 = anode D1, pin 2 = cathode D2, pin 3 = common
 (cathode D1 / anode D2). Each package is one leg of the bridge: pin 1 on the anode rail, pin 2 on the
@@ -147,11 +148,12 @@ def main():
 
     # ------------------------------------------------------------------ annotations
     sh.text("SAMPLER (sim/sampler/RESULT.md, SPEC decisions 1-3)\n"
-            "Gain hold/input 0.69, efficiency 69 % per strobe; 10-90 % 109 ps behind the BUF802 (65 ps ideal step).\n"
-            "Noise ~0.35 mV rms at the bridge input after deconvolution; pedestal +49 mV (null with rail CM via DACs).\n"
-            "Software: x_k = (v_k - 0.31 v_(k-1)) / 0.48 (calibrate per board). No bootstrap.\n"
+            "As built (99 ps arms, sim/strobe_arms) at bias +/-1.3 V: gain hold/input ~0.55, efficiency ~100-105 %,\n"
+            "aperture 100 ps (149 ps behind the BUF802), pedestal ~+36 mV (null with rail CM via DACs).\n"
+            "Noise ~0.35 mV rms at the bridge input after deconvolution. Software: x_k = (v_k - (1 - eff) v_(k-1)) / gain,\n"
+            "eff and gain calibrated per board (eff > 100 % gives a negative memory term). No bootstrap.\n"
             "ADC trigger 40 ns after the strobe (any 0-212 ns settles), synchronous ADC clock; the ADC must sample\n"
-            "BEFORE the S_STROBE falling edge (+160 ns): its reverse pulse shifts the hold by -13 mV (phase_array RESULT).",
+            "BEFORE the S_STROBE falling edge (+167 ns at 3.0 MHz): its reverse pulse shifts the hold by -13 mV (phase_array RESULT).",
             P(16, 14), size=T)
     sh.text("INPUT LEG: R201 0402 within 3 mm of the BUF802 OUT pin;\n"
             "R201 -> bridge input <= 3 mm (~18 ps), 0.36 mm trace\n"
@@ -161,10 +163,11 @@ def main():
     sh.text("STROBE: 50 % square from the balun (strobe sheet),\n"
             "shorted 80 ps stub -> ~130 ps pulse, 3 V class.\n"
             "STRB_A drives the anode rail (+ pulse), STRB_K\n"
-            "the cathode rail (- pulse). Balun -> C201/C202\n"
-            "<= 3 mm (~18 ps), 50 R, equal length (+/-0.1 mm);\n"
-            "rail C mismatch 0.30/0.45 pF -> 30 mVpp kick at\n"
-            "the trigger end.", P(16, 28), size=T)
+            "the cathode rail (- pulse). Balun -> C201/C202:\n"
+            "16.75 mm 50 R arms (99 ps), equal (+/-0.1 mm),\n"
+            "uncoupled (sim/strobe_arms). R204 symmetric:\n"
+            "both pads inline, equal distance from T401\n"
+            "(kick 209 -> 180 mVpp at the input).", P(16, 28), size=T)
     sh.text("BRIDGE: D201/D202 BAT15-04W, mirror-symmetric,\n"
             "both packages side by side, rails <= 2 mm.\n"
             "Rectified charge 1.75 pC (A) / 1.38 pC (K) per\n"
@@ -172,9 +175,10 @@ def main():
             "Strobe kick: 174 mVpp at bridge input,\n"
             "113 mVpp at BUF802 pin, 19 mVpp trigger end.", P(40, 150), size=T)
     sh.text("BIAS (mcu_if): VBIAS_A -0.50..-1.46 V (DAC/-2V5 divider,\n"
-            "2.9k), VBIAS_K +0.2..+2.7 V (DAC via 5.1k): reverse-biases the\n"
-            "bridge between strobes. 1 k x 47 pF: tau 47 ns.\n"
-            "10 nF at the cold end of each 1 k feed.", P(108, 36), size=T)
+            "2.9k), VBIAS_K +0.10..+1.40 V (DAC 4.7k/5.1k divider): reverse-\n"
+            "biases the bridge between strobes; nominal +/-1.3 V (strobe_arms:\n"
+            "aperture 100 ps, eff ~105 %, gain ~0.55, pedestal ~+36 mV),\n"
+            "trimmed per board. 1 k x 47 pF: tau 47 ns. 10 nF at the cold end.", P(108, 36), size=T)
     sh.text("HOLD NODE: C205 2.2 pF C0G + U201 Cin (1 pF CM) + pad.\n"
             "D202.3 -> C205 -> U201.3 < 2 mm, no via, no TP\n"
             "(leakage/C). Droop 1.25 % per 320 ns (model).\n"
