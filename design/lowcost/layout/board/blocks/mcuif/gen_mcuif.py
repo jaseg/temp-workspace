@@ -233,6 +233,9 @@ T("/mcu_if/VDDA", WP, [d5, fbv], "B.Cu")
 g6, g5, f3 = P("C716", "@GND"), P("C715", "@GND"), P("FB701", "@+3V3")
 T("GND", WP, [g6, (g6[0], 9.65), (sx(23), YS_IN - 1.05)], "B.Cu")
 T("GND", WP, [g5, (g5[0], 11.15), (g6[0], 11.15), g6], "B.Cu")
+# TIGHTEN (24 Nov): plane via at the C716 / C715 GND pad (0.9 mm, south-east); was 1.5 mm away at pin 23
+T("GND", WP, [g6, (g6[0] + 0.37, g6[1]), (g6[0] + 0.72, g6[1] + 0.35), (g6[0] + 0.72, g6[1] + 1.07)], "B.Cu")
+V("GND", (g6[0] + 0.72, g6[1] + 1.07))                     # south-east, clear of the F pin row (tips y 11.2) and the board edge
 T("+3V3", WP, [f3, (48.75, f3[1])], "B.Cu")
 V("+3V3", (48.75, f3[1]))
 

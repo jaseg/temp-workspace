@@ -86,3 +86,5 @@ Pad compensation (RF-6, 24 Nov): every in-line RF pad whose excess C over L2 (pa
 - The strobe arms are now 105.6 ps (sim/strobe_arms used 99 ps). Re-run sim/strobe_arms with 105.6 ps arms and the symmetric R204; then set the per-board bias trim from that. Expect a slightly wider aperture than the 100 ps at +/-1.3 V.
 - The pad-cut sizing (0 fF) is a per-section microstrip estimate. A field solver or TDR on the first board would confirm it.
 - NT402 / NT403 (pstrobe) still need the same stub-end recipe (RF-2). The C403 / C408 <-> C432 / C433 reference swap needs a decision from the schematic owner.
+
+- TIGHTEN (24 Nov): via-only rule area on L1 (pours allowed) over U101 pins 5-8 and their -5V copper to C112 / C113, so the board rail router cannot land a via between the VS- pins and their capacitors (it had put one between pins 5 / 6); the rail now ties into the vias behind C112.

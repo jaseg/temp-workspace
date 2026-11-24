@@ -42,3 +42,5 @@ TRIG_SEL PB6->PA1 (9), FPGA_DONE PB0->PB6 (43), SPI_CS PB10->PB9 (46), DBG1 PB9-
 ## Integration changes (24 Nov 2026)
 - VBIAS_K divider: R735 4.7k inline (U704.17 -> VBIAS_K), R736 5.1k now from VBIAS_K to GND at the output node (B row y 2.05,
   GND via at 36.75). check_board: 0 apart from the plane-fed supplies and the known R737.1 entry (fixed on the board).
+
+- TIGHTEN (24 Nov): C716 / C715 (VDDA, B) GND pad gets its own plane via 0.9 mm south-east (clear of the F pin row and the board edge); the return no longer goes only to the via at pin 23.

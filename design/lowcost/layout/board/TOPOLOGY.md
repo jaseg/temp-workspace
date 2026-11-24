@@ -158,7 +158,7 @@ slow lines need reserved gaps. One owner now handles both modules, with this all
   the front end by passing strip A / area B on L6, or at their far west / east ends).
 
 ## 10. Revision of 24 Nov 2026 (new power tree; supersedes the corridor / trunk parts of sections 8 and 9)
-- Sources (power block, board mm): +3V3 (82.7, 6.05) into L4; +1V2 (75.0, 7.9); +5V (83.05, 8.77); -5V (74.45, 14.0);
+- Sources (power block, board mm): +3V3 (80.68, 6.95) into L4 (TIGHTEN: vias behind C604, was 82.7, 6.05); +1V2 (75.0, 7.9); +5V (83.05, 8.77); -5V (74.45, 14.0);
   +2V5 (84.45, 15.3); -2V5 (74.6, 20.75); /+5V1 (86.3, 20.9 / 21.7, GVA-84+ chokes, replaces the old VBUS run);
   VBUS (88.0, 17.4 / 18.3) feeds J501 pin 1 only.
 - L4: +3V3 plane plus the FPGA +1V2 island, joined to the +1V2 source by an L4 finger at x 73.2-75.65 (the power block's
@@ -168,3 +168,7 @@ slow lines need reserved gaps. One owner now handles both modules, with this all
 - Minor rails: grid-routed tracks on L3 (L6 where L3 is not planar), widest that fits, guided: /+5V1 along y 25-27
   then the pstrobe choke column; +5V around the PG line's south end, up the power block's west edge and along the top
   edge (outer); -5V west at y 13-14 (inner); VTAP_P / VTAP_N along their tap-row via rows.
+- TIGHTEN (24 Nov): the -5V router no longer lands between BUF802 pins 5 / 6 (via-only rule area on L1 over the pin row
+  in the analog block); it ties into the block's vias behind C112. Power block: VBUS enters U603 / U601 through 3 vias
+  behind C601 (87.0, 0.65-1.95), /+5V1 leaves through 2 vias behind C611 (86.4, 10.95 / 11.65); U603 EN / MODE and FB use
+  short block-internal In2 lines (83.6, 4.15) -> (87.0, 1.95) and (83.65, 5.4) -> (88.71, 9.94).

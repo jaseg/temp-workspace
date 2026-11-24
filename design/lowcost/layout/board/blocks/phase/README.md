@@ -118,3 +118,5 @@ into 50.45 R loaded line fine. 40 / 70 ps re-simulation still open.
 - C306 moved 0.12 mm south; the +2V5 via at x 10.45 (under the board PH_STROBE_N run x 10.60) removed; C306's own GND via
   removed (it sat on the board's DAC_TRIG / TRIG_SEL L3 lines): its GND pad is fed by the board's B pour.
 - The phase L4 VTAP_P / VTAP_N strips are removed on the board (L4 = +3V3 only); board_power.py joins the tap-row vias on L3.
+
+- TIGHTEN (24 Nov): U310 cap C351 gets a GND via 0.6 mm east of its GND pad (just east of the board L6 fan-in, joined by the F pour); was 1.6 mm to the nearest GND via.

@@ -359,8 +359,10 @@ T("VBUS", [(15.1, 13.5), (13.6, 13.5)], 0.4, "B.Cu")
 # F polygon: C603 / U601.3 / C602 (top-left) along the top edge to C601 / U603.10 / EN / MODE; fed from the B strip
 # TIGHTEN (24 Nov): F polygon = vias behind C601 (13.0, 0.65-1.95) -> C601 VBUS pad -> U603 VIN (10), and a strip along
 # the top edge (north of C601's GND pad) to C603 -> U601 VIN (3); the vias at U603's pins are gone
+# (the strip widens to y 2.05 over L602 between x 6.6 and 8.65, so that the C607 GND via (6.3, 1.0) and the +1V2
+# sense via (8.0, 1.2) cannot cut it in two next to the board edge's copper clearance)
 Z("VBUS", "F.Cu", [(5.0, 0.3), (13.45, 0.3), (13.45, 2.25), (12.8, 2.25), (12.8, 4.02), (11.6, 4.02), (11.6, 1.15),
-                   (6.6, 1.15), (6.6, 2.62), (3.9, 2.62), (3.9, 2.2), (5.0, 2.2)], prio=5)
+                   (8.65, 1.15), (8.65, 2.05), (6.6, 2.05), (6.6, 2.62), (3.9, 2.62), (3.9, 2.2), (5.0, 2.2)], prio=5)
 for y in (0.65, 1.3, 1.95):
     V(13.0, y, "VBUS")
 Z("VBUS", "B.Cu", [(12.65, 0.4), (14.2, 0.4), (14.2, 16.6), (14.4, 16.6), (14.4, 18.9), (13.05, 18.9), (13.05, 2.6),

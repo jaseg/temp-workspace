@@ -325,6 +325,11 @@ FL.zone("-5V", ["F.Cu"], [(p8[0] - 0.13, 12.0), (12.80, 12.0), (12.80, 12.95), (
                           (11.37, 13.45), (11.37, 12.55), (p8[0] - 0.13, 12.55)])
 for xy in ((12.25, 12.0), (12.5, 12.65)):
     FL.via(*xy, "-5V")
+# TIGHTEN (24 Nov): no plane via between the VS- pins (5 / 6 / 8) and their capacitors: the board's -5V rail router
+# had landed a via between pins 5 and 6 (current reached the pins before C112).  Via-only rule area (pours allowed)
+# over the pin row and the pin-to-capacitor copper; the rail lands on the vias behind C112 / C113 instead.
+_ko = blk.keepout([FL.T(p) for p in rect(p5[0] - 0.4, p5[1] - 0.5, p8[0] + 0.4, YP + 0.2)], ("F.Cu",), vias=True)
+_ko.SetDoNotAllowCopperPour(False)
 # pin 10 (VSO-): along the pin row to C614 (top, mirror of C109 at pin 12), one via to C115 on B
 c614 = FL.pad("C614", "@-5V")
 YV10 = c614[1] - 0.31 - 0.24                 # via just above the C614 pad (outside it)

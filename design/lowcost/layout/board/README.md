@@ -33,13 +33,24 @@ IPC-2221 (10 K, inner 0.5 oz): 0.3 mm 0.27 A, 0.6 mm 0.45 A, 1.0 mm 0.65 A. Regu
 VBIAS_A's analog via moved to (15.4, 15.9) (the analog block's BUF_OUT_T moved).
 
 **Validation items done at board level**
-- PDN-2 type: U601 (0.30 W, hottest) 8 GND vias in its GND polygon, tied to U602's B GND polygon and L2 / L5 (power block).
+- PDN-2 type: U601 (0.30 W, hottest) GND polygon with 6 vias at the capacitor GND pads (TIGHTEN), shared with U602 (B).
 - ZONES-3: L2 / L5 GND clearance 0.15 mm, min width 0.15 mm; fpga east-pin vias and TAP8-15 via rows staggered to
   >= 1.0 mm (blocks/fpga/README.md). Not feasible: the COARSE / TAP0-4 via stair (0.57 mm pitch) and the mcuif row.
 - ZONES-4: GND via within 1 mm of 42 of 82 fast-net vias (validation: 22 of 72), incl. both S_STROBE_N vias (0.65 mm).
   The other 40 sit in the dense fpga fan-out, the TAP output vias and the mcuif row; no free spot within 1 mm there.
 - DECOUPLING-5 / -6 (fpga block), DECOUPLING-8 (C602 moved to U608 pin 5), U603 / L601 compacted (switch nodes 1.9 mm).
 - IO-3: not done (the schematic did not move CLK2 off pin 34).
+- TIGHTEN (24 Nov, user review of the power render): decoupling capacitors at their pins, plane vias at the capacitors.
+  U603: C601 / C610 courtyards on the chip's (0.0 mm), VBUS / +5V1 pad 0.93 mm from VIN / VOUT (was 2.0), GND pads
+  returned to PGND on L1 through the channel between the pin columns; input / output hot loop 3.1 x 3.9 -> 1.9 x 2.8 mm
+  (11.2 -> 2.8 mm2, now without plane vias in the loop); vias only behind the capacitors (none at the pins / under L601).
+  U601 / U602: COUT under CIN (output loop 4.35 x 4.05 -> 4.0 x 2.7 mm), vias moved from the middle of the GND polygon to
+  the capacitor pads, +3V3 vias behind C604 / C609. LM27762: GND vias at the CIN GND pads. Elsewhere (audit
+  `decap_audit.py` over this board): analog U101 -5V rail via between pins 5 / 6 removed (via-only rule area over the pin
+  row; the rail now lands on the vias behind C112), phase U310 C351 and mcuif C716 GND vias at the pads. Every primary
+  capacitor now passes (0 D1 / D2s / D2g) except C621 (B, GND via 1.15 mm); the 9 remaining flags are bulk / second
+  capacitors placed off the pins by design (C507, C510, C616, C505 / C506, C711, C714, C306, C717).
+  Review renders: `net_view.py` (net-coloured copper, vias, courtyards), e.g. blocks/power/power_netview_*.png.
 
 **Checks (last run)**
 - check_board: missing 0, extra 4 (H1-H4), footprint / value / pad-net 0, unrouted 0, clearance 0, corners > 45 deg 0,

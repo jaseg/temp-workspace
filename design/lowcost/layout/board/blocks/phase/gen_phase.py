@@ -284,6 +284,9 @@ for k in range(NT // 2):
         # at pin 8, the cap's GND pad goes to the F ground pour
         V(p8[0], YUB, "+3V3")
         T("+3V3", 0.5, [p8, (p8[0], YUB)], ch=0)
+        # TIGHTEN (24 Nov): GND via 0.6 mm east of the cap's GND pad, just east of the L6 fan-in (board x <= 72.0),
+        # joined to the pad by the F ground pour (was 1.6 mm to the nearest GND via)
+        gv(xcap + 0.85, cg[1] + 0.13)
     else:
         for dy in (-0.4, -1.05):
             V(xcap - 0.7, cp[1] + dy, "+3V3")
