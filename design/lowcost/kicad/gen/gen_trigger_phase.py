@@ -131,9 +131,9 @@ def main():
     rs1 = R(sh, "10k", (g(20), ysel), rot=90)
     sh.wire((g(14), ysel), rs1["1"])
     sh.wire(rs1["2"], u1["9"])
-    rs2 = R(sh, "18k", (g(36), ysel + g(3)), lcsc="")
+    rs2 = R(sh, "17.8k", (g(36), ysel + g(3)), fields={"Note": "1 %; 17.8k = the R107 line (was 18k)"})
     sh.gnd(rs2["2"], dy=g(4), name="-2V5")
-    sh.text("SEL: 3V3 GPIO -> -0.89 / +1.23 V\n= 0.0 / 2.1 V above VSW_GND", (g(9), ysel + g(5)), size=T)
+    sh.text("SEL: 3V3 GPIO -> -0.88 / +1.24 V\n= 0.0 / 2.1 V above VSW_GND (-2V5 = -2.44 V)", (g(9), ysel + g(5)), size=T)
     # A2, B2, EN to the local switch ground
     xj = u1["2"][0] - g(3)
     for p in ("2", "4", "6"):
@@ -166,7 +166,7 @@ def main():
     sh.gnd(c2["2"])
     sh.label("VSW_GND", (pg[0] + g(14), yn))
     sh.add(TP, "TP", "VSW_GND", (pg[0] + g(14), yn), fp=TP_FP)
-    sh.text("VSW_GND = -2.5 x 1.5k/4.2k = -0.89 V (switch ground)\nVCC-GND = 3.4 V; ramp 100-1000 us/V",
+    sh.text("VSW_GND = -2.44 x 1.5k/4.2k = -0.87 V (switch ground)\nVCC-GND = 3.39 V; ramp 100-1000 us/V",
             (pg[0] - g(8), yn + g(12)), size=T)
 
     # ================================================================== TLV3801
@@ -241,7 +241,7 @@ def main():
                     footprint=WSON, description="1-6 GHz RF gain block, 50 R", width=25.4)
     u3 = sh.add(trf, "U303", "TRF37D73", (g(140), yS + g(2)), fp=WSON, lcsc="C2151367", mpn="TRF37D73IDSGR",
                 fields={"Price": "1.50 USD (LCSC)"})
-    cin = C(sh, "1u", (g(124), yS), rot=90, fields={"Note": "X7R 0402, DC block"})
+    cin = C(sh, "1u", (g(124), yS), rot=90, fields={"Note": "X5R 25 V 0402, DC block"})
     sh.wire((xr + g(4), yS), cin["1"])
     sh.wire(cin["2"], u3["2"])
     pw = u3["5"]
@@ -280,7 +280,7 @@ def main():
     sh.power("+3V3", pt, dy=-2.54)
     dec_up(pt, pt[0] + g(8))
     # 1 uF -> 12 dB pi pad 82/91/82
-    cout = C(sh, "1u", (xo + g(5), po[1]), rot=90, fields={"Note": "X7R 0402, DC block"})
+    cout = C(sh, "1u", (xo + g(5), po[1]), rot=90, fields={"Note": "X5R 25 V 0402, DC block"})
     sh.wire((xo, po[1]), cout["1"])
     xa = xo + g(10)
     sh.wire(cout["2"], (xa, po[1]))
@@ -295,7 +295,7 @@ def main():
 
     # ================================================================== CMP_N dummy load, LVDS receiver
     xn = xr + g(5)
-    cn = C(sh, "1u", (xn + g(3), nN[1]), rot=90, fields={"Note": "X7R 0402"})
+    cn = C(sh, "1u", (xn + g(3), nN[1]), rot=90, fields={"Note": "X5R 25 V 0402"})
     sh.wire(nN, cn["1"])
     rdm = R(sh, "49.9", (cn["2"][0] + g(4), nN[1] + g(3)), fields={"Note": "dummy load = TRF input (equal load)"})
     sh.wire(cn["2"], rdm["1"])

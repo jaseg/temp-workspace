@@ -3,7 +3,7 @@
 Signal path, left to right:
   BUF_OUT_S (BUF802 OUT pin, input sheet) -> R201 10 R -> 4-diode bridge (D201, D202 = 2x BAT15-04W)
   -> hold node: C205 2.2 pF C0G -> U201 TPH2501 G = +3.0 (1.00 k / 499 R, +/-2.5 V)
-  -> U202 TPH2501 inverting level shift on +3V3/GND (1 k / 1 k, +in = ADC_REF_MID 0.725 V)
+  -> U202 TPH2501 inverting level shift on +3V3/GND (1 k / 1 k, +in = ADC_REF_MID 0.720 V)
   -> R211 33 R + C207 220 pF -> ADC_IN (J701 pin 3 on mcu_if, STM32G474 PA0).
 Bridge rails: STRB_A / STRB_K (balun outputs, strobe sheet) -> 47 pF C0G -> node -> 24.9 R -> diodes;
 bias VBIAS_A / VBIAS_K (nominal -1.3 / +1.3 V with the as-built 99 ps arms, trimmed per board for efficiency
@@ -100,7 +100,7 @@ def main():
     rf1 = R(sh, "1.00k", P(122, 112), rot=90, lcsc="C11702", fields={"Note": "1 %"})
     sh.wire(P(114, 112), rf1["1"])
     sh.path([rf1["2"], P(130, 112), P(130, 92)])
-    rg1 = R(sh, "499", P(114, 117), fields={"Note": "1 %"})
+    rg1 = R(sh, "510", P(114, 117), fields={"Note": "1 %, JLC basic (was 499 R: G 2.96 instead of 3.00, gain calibrated)"})
     sh.wire(P(114, 112), rg1["1"])
     sh.gnd(rg1["2"])
     sh.wire(u1["1"], P(139, 92))
@@ -182,11 +182,11 @@ def main():
     sh.text("HOLD NODE: C205 2.2 pF C0G + U201 Cin (1 pF CM) + pad.\n"
             "D202.3 -> C205 -> U201.3 < 2 mm, no via, no TP\n"
             "(leakage/C). Droop 1.25 % per 320 ns (model).\n"
-            "U201: G = 1 + 1.00k/499 = +3.0 on +/-2.5 V:\n"
+            "U201: G = 1 + 1.00k/510 = +2.96 on +/-2.5 V:\n"
             "+/-0.35 V hold -> +/-1.04 V.", P(116, 120), size=T)
     sh.text("LEVEL SHIFT U202 (+3V3/GND):\n"
-            "Vadc = 2 x 0.725 V - V(U201) = 1.45 V - V(U201)\n"
-            "-> 0.41..2.49 V at PA0. U201+U202 settle ~20 ns.", P(158, 112), size=T)
+            "Vadc = 2 x 0.720 V - V(U201) = 1.44 V - V(U201)\n"
+            "-> 0.40..2.48 V at PA0. U201+U202 settle ~20 ns.", P(158, 112), size=T)
     sh.text("ADC PIN: R211 33 R + C207 220 pF C0G placed at\n"
             "J701 pin 3 (mcu_if), PA0 ADC12_IN1, 6.5-cycle\n"
             "(108 ns) sampling at 60 MHz.", P(174, 70), size=T)

@@ -2,11 +2,13 @@
 
 Tree (24 Nov 2026; replaces AMS1117, AP2112K, MT3608, LP2985, LM27761, LP5907, LM337):
   USB-C VBUS -> F601 PTC 1.5 A -> D601 SMAJ5.0A -> FB601 -> VBUS (global, 4.60-5.25 V at the converters)
-  VBUS -> U601 TPS62A01A buck 2.4 MHz FPWM -> +3V3 3.315 V (TRF37D73 x5, COS3502, FPGA I/O, MCU, LVDS rx)  0.51 A
+  VBUS -> U601 TPS62A01A buck 2.4 MHz FPWM -> +3V3 3.327 V (TRF37D73 x5, COS3502, FPGA I/O, MCU, LVDS rx)  0.51 A
   +3V3 -> U602 TPS62A01A -> +1V2 (FPGA core, 1 ms soft start)                                              0.02 A
-  VBUS -> U603 TPS63802 buck-boost FPWM -> +5V1 5.10 V (GVA-84+ x2 on the strobe sheet; U604)              0.29 A
-  +5V1 -> FB602 -> +5V1F -> U604 LM27762 (pump + 2 LDOs) -> +4.80 V -> FB604 -> +5V ; -4.64 V -> FB603 -> -5V
-  +3V3 -> FB605 -> +3V3_CP -> U605 LM27762 -> +2.50 V -> FB606 -> +2V5 ; -2.50 V -> FB607 -> -2V5
+  VBUS -> U603 TPS63802 buck-boost FPWM -> +5V1 5.40 V (GVA-84+ x2 via 2.49 R each on the strobe sheet; U604) 0.30 A
+  +5V1 -> FB602 -> +5V1F -> U604 LM27762 (pump + 2 LDOs) -> +4.80 V -> FB604 -> +5V ; -4.81 V -> FB603 -> -5V
+  +3V3 -> FB605 -> +3V3_CP -> U605 LM27762 -> +2.52 V -> FB606 -> +2V5 ; -2.44 V -> FB607 -> -2V5
+Set-points and tolerances (24 Nov 2026, SPEC decision 25 / 26): 1 % thick-film JLC dividers except U603 (0.1 %, the
++5V1 window between the U604 OUT- headroom and 5.5 V is only +/-1.6 %); docs/research/power-tree.md section 12.
 U605 is enabled by the U603 power-good (PG_5V1): +/-2V5 rise after the BUF802 rails.
 Existing capacitors are re-used (moved) wherever possible; refs are kept so the board keeps its parts.
 Decoupling capacitors that belong at a load pin on another sheet are drawn here at the bottom (box "at the loads")
@@ -44,7 +46,8 @@ LM27762 = ic_symbol("LM27762DSS", left=[None, ("3", "VIN", PIN_PWR), ("12", "EN+
 BEAD = ("Device:FerriteBead_Small", FP["FB0603"], "BLM18KG601SN1D", "C85833")
 BEAD_F = {"Price": "0.0166 USD (LCSC 50+)", "Note": "600 R @ 100 MHz, 1.3 A, 0.15 R DC"}
 L1U = {"Price": "0.0763 USD (LCSC 10+)", "Note": "1 uH 2.5 A 1008 (FHD252010S-1R0MT); TI table 8-3: 1 uH"}
-PCT = {"Note": "0.1 % thin film (divider accuracy, power-tree.md section 3)"}
+PCT = {"Note": "1 % (LM27762 R2 / R4 >= 50k; power-tree.md section 12)"}
+PCT01 = {"Note": "0.1 % thin film: the +5V1 window (power-tree.md section 12)"}
 
 
 def place(sym, pin, pt):
@@ -326,10 +329,10 @@ def main():
     sh.gnd((a[0], yb))
     vo, fb = u3["6"], u3["4"]
     xd = vo[0] + g(4)
-    rt = vpart(sh, "R", "R603", "499k 0.1%", (xd, vo[1]), gnd=False,
-               fields={"Note": "0.1 %: VOUT = 0.5 V x (1 + 499k/54.2k) = 5.10 V (was 459k/49.9k: no stocked "
-                               "459k 0.1 % 0402 on LCSC, 24 Nov 2026)"})
-    vpart(sh, "R", "R604", "54.2k 0.1%", rt["2"], fields=PCT)
+    rt = vpart(sh, "R", "R603", "19.6k 0.1%", (xd, vo[1]), gnd=False,
+               fields={"Note": "0.1 %: VOUT = 0.5 V x (1 + 19.6k/2.0k) = 5.40 V (5.334-5.466 V incl. FB +/-1 % "
+                               "and 100 nA FB bias; was 499k/54.2k = 5.10 V)"})
+    vpart(sh, "R", "R604", "2.0k 0.1%", rt["2"], fields=PCT01)
     sh.path([fb, (fb[0] + g(2), fb[1]), (fb[0] + g(2), rt["2"][1]), rt["2"]])
     for k, ref in enumerate(("C610", "C611")):
         vpart(sh, "C", ref, "22u", (xd + g(6 + 6 * k), vo[1]),
@@ -338,8 +341,8 @@ def main():
     rail(sh, vo, (xh + g(8), vo[1]))
     sh.hlabel("+5V1", (xh, vo[1] - g(3)), "output")
     sh.wire((xh, vo[1]), (xh, vo[1] - g(3)))
-    sh.text("+5V1 = 5.10 V (5.04-5.16 V): GVA-84+ x2 bias tees on the strobe\n"
-            "sheet, own track from C610/C611 (not through FB602).\n"
+    sh.text("+5V1 = 5.40 V (5.334-5.466 V; OVP 5.5 V min): GVA-84+ x2 bias tees\n"
+            "on the strobe sheet via R419 / R420 2.49 R, own track from C610/C611.\n"
             "EN, MODE = VIN: always on, forced PWM 1.4-2.1 MHz.", (X3 - g(22), Y3 + g(19)), size=T)
     fb2 = bead(sh, "FB602", (xh + g(8), vo[1]))
 
@@ -349,16 +352,16 @@ def main():
     lm27762(sh, "U604", (X4, Y3), "+5V1F", vin_y=vo[1],
             cin=[("C613", "100n", {"fields": {"Note": "U604 pin 3, closest"}}),
                  ("C612", "22u", {"fields": {"Note": "U604 CIN on the IC layer at pin 3 (moved; DECOUPLING-4)"}})],
-            c1=("C618", "1u", {"size": "0603", "lcsc": "C29936", "mpn": "CL10B105KA8NNNC",
-                                 "fields": {"Note": "flying cap C1, 25 V X7R 0603 (recheck RP-9; C15849 50 V X5R "
-                                                    "had 0 LCSC stock on 24 Nov 2026)"}}),
+            c1=("C618", "1u", {"size": "0603",
+                                 "fields": {"Note": "flying cap C1, 50 V X5R 0603 (JLC basic C15849; was C29936 "
+                                                    "25 V X7R)"}}),
             ccp=("C626", "10u", {"fields": {"Note": "CCP at pin 5 (moved from the LM337 ADJ)"}}),
             outp=("+5V_LDO", [("C617", "10u", {"fields": {"Note": "OUT+ at pin 11 (moved)"}})], "FB604", "+5V"),
             outn=("-5V_LDO", [("C621", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB603", "-5V"),
-            rpos=("R613", "300k 0.1%", "R614", "100k 0.1%"), rneg=("R605", "280k 0.1%", "R606", "100k 0.1%"))
-    sh.text("U604: OUT+ = 1.2 V x (300k + 100k)/100k = +4.80 V; OUT- = -1.22 V x (280k + 100k)/100k = -4.64 V.\n"
-            "BUF802 VS = 9.30 V min (>= 9 V), each side >= 4.5 V. VIN 5.03-5.15 V (<= 5.5 V).\n"
-            "Headroom OUT- 0.14 V min (RNEG 4 R hot, 41 mA). EN+/EN- = VIN, PGOOD to GND.", (g(185), g(78)), size=T)
+            rpos=("R613", "300k", "R614", "100k"), rneg=("R605", "150k", "R606", "51k"))
+    sh.text("U604: OUT+ = 1.2 V x (300k + 100k)/100k = +4.800 V (4.656-4.944); OUT- = -1.22 V x (150k + 51k)/51k\n"
+            "= -4.808 V (4.664-4.952), 1 % dividers. BUF802 each side >= 4.65 V. VIN 5.319-5.466 V (<= 5.5 V).\n"
+            "Headroom OUT- 0.156 V min (RNEG 4.5 R, 41 mA, 26 mV LDO). EN+/EN- = VIN, PGOOD to GND.", (g(185), g(78)), size=T)
 
     # ------------------------------------------------------------------ U601 +3V3, U602 +1V2
     Yb = g(130)
@@ -366,14 +369,14 @@ def main():
          cin=[("C603", "10u", {"fields": {"Note": "U601 CIN at VIN(3)-GND(1), < 1 mm (moved)"}}),
               ("C602", "100n", {"fields": {"Note": "U601 pin 3 (moved)"}})],
          cout=[("C604", "22u", {"fields": {"Note": "U601 COUT (one 22 uF; +3V3 plane caps behind)"}})],
-         lref="L602", rtop=("R609", "100k"), rbot=("R610", "22.1k"), cff=("C631", "120p"))
+         lref="L602", rtop=("R609", "100k"), rbot=("R610", "22k"), cff=("C631", "120p"))
     buck(sh, "U602", (g(125), Yb), "+3V3", "+1V2",
          cin=[("C609", "10u", {"fields": {"Note": "U602 CIN at pin 3 (moved from +1V2)"}}),
               ("C607", "1u", {"fields": {"Note": "U602 pin 3"}})],
          cout=[("C605", "22u", {"fields": {"Note": "U602 COUT (moved from +3V3)"}}),
                ("C608", "1u", {})],
          lref="L603", rtop=("R611", "100k"), rbot=("R612", "100k"))
-    sh.text("U601: VOUT = 0.6 V x (1 + 100k/22.1k) = 3.315 V (FB 591-609 mV: 3.25-3.38 V).\n"
+    sh.text("U601: VOUT = 0.6 V x (1 + 100k/22k) = 3.327 V (3.224-3.433 V with FB and 1 %).\n"
             "100 % mode dropout VIN >= 3.53 V at 0.67 A: margin >= 1.07 V at VBUS 4.60 V.\n"
             "0.19 W typ / 0.30 W max, +27 / +45 K. C631 Cff footprint DNP.\n"
             "U602: 0.6 V x 2 = 1.200 V; soft start 1 ms -> 1.2 mV/us (GW1NZ VCC 0.6-6 mV/us).",
@@ -389,17 +392,17 @@ def main():
     lm27762(sh, "U605", (xu5, yu5), "+3V3_CP",
             cin=[("C625", "10u", {"fields": {"Note": "U605 CIN on the IC layer at pin 3 (moved from +2V5)"}})],
             c1=("C624", "1u", {"fields": {"Note": "flying cap C1 (moved from +2V5)"}}),
-            ccp=("C619", "4.7u", {"size": "0603", "lcsc": "C99229", "mpn": "0603X475K160NT",
+            ccp=("C619", "4.7u", {"size": "0603",
                                     "fields": {"Note": "CCP at pin 5, 16 V X5R 0603: about 3 uF at 3.3 V (>= 2 uF "
-                                                       "effective, DS 7.2.2.4.1; recheck RP-9; C19666 had 0 LCSC "
-                                                       "stock on 24 Nov 2026)"}}),
+                                                       "effective, DS 7.2.2.4.1; JLC basic C19666, same rating as "
+                                                       "the former C99229)"}}),
             outp=("+2V5_LDO", [("C630", "10u", {"fields": {"Note": "NEW: OUT+ at pin 11 (DS: >= 2.2 uF)"}})],
                   "FB606", "+2V5"),
             outn=("-2V5_LDO", [("C628", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB607", "-2V5"),
-            rpos=("R615", "130k 0.1%", "R616", "120k 0.1%"), rneg=("R607", "105k 0.1%", "R608", "100k 0.1%"),
+            rpos=("R615", "110k", "R616", "100k"), rneg=("R607", "100k", "R608", "100k"),
             en=("R617", "100k", "PG_5V1"))
-    sh.text("U605: OUT+ = 1.2 V x 250k/120k = +2.500 V; OUT- = -1.22 V x 205k/100k = -2.501 V\n"
-            "(0.1 % dividers: +/-1.7 %). VIN 3.24-3.37 V; headroom OUT+ 0.70 V, OUT- 0.42 V\n"
+    sh.text("U605: OUT+ = 1.2 V x 210k/100k = +2.520 V (2.456-2.584); OUT- = -1.22 V x 200k/100k = -2.440 V\n"
+            "(2.380-2.500; 1 % dividers). VIN 3.24-3.37 V; headroom OUT+ 0.66 V, OUT- 0.45 V\n"
             "(RNEG at 3.3 V not in the DS, 5 R assumed). EN+/EN- = U603 PG (R617 to VIN).", (g(208), g(166)), size=T)
 
     # ------------------------------------------------------------------ decoupling placed at the loads
@@ -409,11 +412,11 @@ def main():
             (g(10), yL - g(7)), size=T)
     remote = [("C606", "100n", "+3V3", "U401 pin 1 (TRF37D73 VCC) beside C404, top (PDN-7)", {}),
               ("C622", "100n", "+3V3", "U402 pin 1 (TRF37D73 VCC) beside C409, top (PDN-7)", {}),
-              ("C616", "2.2u", "+5V", "U101 pins 1/12 (BUF802 +5V) beside C108 (PDN-6), 10 V part", {}),
+              ("C616", "4.7u", "+5V", "U101 pins 1/12 (BUF802 +5V) beside C108 (PDN-6), 10 V part", {}),
               ("C614", "10n", "-5V", "U101 pin 10 (BUF802 VSO-) top side, between pin and R112 (DECOUPLING-1)", {}),
               ("C627", "1u", "-5V", "FB603 output (-5V load side)", {}),
               ("C615", "1u", "+2V5", "U302 pin 6 / U301 pin 10 (+2V5) (PDN-6)", {}),
-              ("C620", "2.2u", "-2V5", "U302 pin 3 (TLV3801 VEE) beside C307 (PDN-6)", {}),
+              ("C620", "4.7u", "-2V5", "U302 pin 3 (TLV3801 VEE) beside C307 (PDN-6), 10 V part", {}),
               ("C629", "100n", "-2V5", "FB607 output (-2V5 load side)", {})]
     for k, (ref, val, net, note, kw) in enumerate(remote):
         x = g(16 + 23 * k)

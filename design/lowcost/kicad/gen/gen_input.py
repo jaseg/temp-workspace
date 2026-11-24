@@ -4,9 +4,12 @@ EXT_CLK SMA.
 
 Values: design/lowcost/sim/input/RESULT.md (final network) and SPEC decisions 1 and 7.
 VOFS (21 Nov 2026): the directly driven summing node of sim/input again. VOFS is the raw STM32 DAC1_OUT2
-(0.2..2.7 V) through Rofs 24.9k; the mid-scale is cancelled by Rmid 34.0k (R123) from VNEG_REF (-1.973 V =
--0.680 x VREF+, U701 on mcu_if, ratiometric to the DAC) instead of from the -2V5 rail. Gsum = 1/Rf1 + 1/Rf2 +
-1/Rofs + 1/Rmid = 2/Rf1 with Rf2 nominal 32.9k = 22.1k + RV101 ~10.8k (LF gain 0.200, trim -8.3 %..+7.4 %).
+(0.2..2.7 V) through Rofs 24.9k; the mid-scale is cancelled by Rmid 33k (R123) from VNEG_REF (-1.933 V =
+-0.667 x VREF+, U701 on mcu_if, ratiometric to the DAC) instead of from the -2V5 rail. Gsum = 1/Rf1 + 1/Rf2 +
+1/Rofs + 1/Rmid = 2/Rf1 with Rf2 nominal 33.9k = 22k + RV101 ~11.9k (LF gain 0.200, trim -7.8 %..+8.0 %).
+Resistors 1 % thick film (24 Nov 2026, BOM optimisation; were 0.1 %): the LF/HF gain match is trimmed with RV101
+(1 % parts: up to +/-2.8 % LF gain error, inside the trim range), the offset scale and mid-scale by the
+firmware offset calibration (SPEC decision 25).
 
 BUF802 pinout (TI SBOS998E, Table 4-1, RGT VQFN-16 3x3, EP 1.68 mm isolated from the die):
 1 VS+, 2 IN, 3 In_Bias, 4 In_Aux, 5 VS-, 6 Aux_Bias, 7 R_Bias, 8 VS-, 9 NC, 10 VSO-, 11 OUT,
@@ -205,13 +208,13 @@ def main():
     x = TX
     prev = (TX, Ys)
     for cx in (g(28), g(36), g(44)):
-        r = R(sh, "300k", (cx, Ys), rot=90, fields={"Note": "0.1 %, 0402 50 V"})
+        r = R(sh, "300k", (cx, Ys), rot=90, fields={"Note": "1 %, 0402 50 V"})
         sh.wire(prev, r["1"])
         prev = r["2"]
     TAP = (g(52), Ys)
     sh.wire(prev, TAP)
     sh.label("TAP", (g(48), Ys))
-    r100 = R(sh, "100k", (g(52), Ys + g(3)), fields={"Note": "0.1 %"})
+    r100 = R(sh, "100k", (g(52), Ys + g(3)), fields={"Note": "1 %"})
     sh.wire(TAP, r100["1"])
     sh.gnd(r100["2"])
     cp = C(sh, "18p", (g(58), Ys + g(3)), fields={"Note": "C0G"})
@@ -237,21 +240,21 @@ def main():
     sh.wire((FBX, cint["1"][1]), cint["1"])
     sh.path([cint["2"], (OX2, cint["2"][1]), (OX2, po2[1])])
     # Rf1 from BUF802 OUT
-    rf1 = R(sh, "10.0k", (Ox, Ys + g(21)), rot=90, fields={"Note": "0.1 %"})
+    rf1 = R(sh, "10k", (Ox, Ys + g(21)), rot=90, fields={"Note": "1 %"})
     sh.wire((FBX, rf1["1"][1]), rf1["1"])
     sh.path([rf1["2"], (FBT[0], rf1["2"][1]), FBT])
     # Rofs from VOFS
-    rofs = R(sh, "24.9k", (g(58), Ys + g(24)), rot=90, fields={"Note": "0.1 % 25 ppm/K"})
+    rofs = R(sh, "24.9k", (g(58), Ys + g(24)), rot=90, fields={"Note": "1 %"})
     sh.wire(rofs["2"], (FBX, rofs["2"][1]))
     sh.wire(rofs["1"], (g(50), rofs["1"][1]))
     sh.hlabel("VOFS", (g(50), rofs["1"][1]), "input", side="left")
     # Rmid from VNEG_REF (explicit ref: the auto-numbered refs after it stay as they were)
-    rmid = R(sh, "34.0k", (g(58), Ys + g(27)), rot=90, ref="R123", fields={"Note": "0.1 % 25 ppm/K"})
+    rmid = R(sh, "33k", (g(58), Ys + g(27)), rot=90, ref="R123", fields={"Note": "1 %"})
     sh.wire(rmid["2"], (FBX, rmid["2"][1]))
     sh.wire(rmid["1"], (g(50), rmid["1"][1]))
     sh.hlabel("VNEG_REF", (g(50), rmid["1"][1]), "input", side="left")
-    # Rf2 = 22.1k + 50k trimmer (rheostat) to GND
-    rf2 = R(sh, "22.1k", (FBX, Ys + g(31)), fields={"Note": "0.1 %"})
+    # Rf2 = 22k + 50k trimmer (rheostat) to GND
+    rf2 = R(sh, "22k", (FBX, Ys + g(31)), fields={"Note": "1 %"})
     sh.wire((FBX, Ys + g(28)), rf2["1"])
     rv = sh.add("Device:R_Potentiometer_Trim", "RV", "50k", (FBX, Ys + g(40)),
                 fp="Potentiometer_SMD:Potentiometer_Bourns_3314J_Vertical", lcsc="C50895", mpn="3314J-1-503E")
@@ -273,18 +276,18 @@ def main():
 
     sh.text("Servo (differential integrator, OPA197 on +/-5 V):\n"
             "LF 5:1 alpha = 100k/(3x300k+100k) = 0.100, Rin 1.000 Mohm,\n"
-            "0.1 % 0402 string (3 x 50 V: +/-50 V peak). Tap the string at\n"
+            "1 % 0402 string (3 x 50 V: +/-50 V peak). Tap the string at\n"
             "the VIN pad with the first 300k, keep it off the 50R line.\n"
             "Cp 18p: tap RC 90k x 26 pF = Rpar x Cint, cancels feed-through.\n"
             "Loop BW = Ga/(2 pi Rf1 Cint) = 8.8 kHz.",
             (g(4), Ys + g(31)), size=TS)
     sh.text("FB node: Gsum = 1/Rf1 + 1/Rf2 + 1/Rofs + 1/Rmid = 2/Rf1\n"
             "-> LF gain alpha x Rf1 x Gsum = 0.200 (= HF gain).\n"
-            "Rf2 nominal 32.9k = 22.1k + RV ~10.8k (range -8.3 %..+7.4 %).\n"
+            "Rf2 nominal 33.9k = 22k + RV ~11.9k (range -7.8 %..+8.0 %).\n"
             "Trim once: 1 kHz square wave, flat top LF = HF.\n"
             "VOFS = DAC1_OUT2 0.2..2.7 V via Rofs 24.9k, mid-scale\n"
-            "cancelled by Rmid 34.0k from VNEG_REF (-1.973 V, mcu_if):\n"
-            "OUT offset = 0.580 - 0.402 x VOFS = +0.50..-0.50 V\n"
+            "cancelled by Rmid 33k from VNEG_REF (-1.933 V, mcu_if):\n"
+            "OUT offset = 0.586 - 0.402 x VOFS = +0.51..-0.50 V\n"
             "(+/-2.5 V at the input), 0.28 mV/LSB at OUT. VOFS and\n"
             "VNEG_REF must be quiet below 10 kHz (gain 0.4 / 0.29 to OUT).",
             (g(74), Ys + g(28)), size=TS)

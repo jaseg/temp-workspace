@@ -77,27 +77,27 @@ FP = {
 }
 # LCSC numbers, all verified on lcsc.com (product-detail JSON) on 24 Nov 2026: part number, value, tolerance,
 # rating, package and stock; data and stock/prices in lcsc_parts.py (docs/bom.md "LCSC verification").
-# Generic passives: UNI-ROYAL 0402WGF thick film 1 % 0402 (JLC basic where available); 0.1 % 25 ppm/K thin film 0402
-# (YAGEO RT0402BRD07 where stocked); 0402 C0G FH 0402CG; Samsung X5R/X7R. One number per value / package / rating.
-LCSC_R = {"0": "C17168", "10": "C25077", "22": "C25092", "24.9": "C5099", "33": "C25105", "43": "C270600",
-          "47": "C25118", "49.9": "C25120", "68": "C25131", "82": "C25136", "91": "C270574", "100": "C25076",
-          "120": "C25079", "470": "C25117", "499": "C4125", "1k": "C11702", "1.00k": "C11702", "1.5k": "C25867",
-          "2.0k": "C4109", "2.2k": "C25879", "2.7k": "C25885", "4.7k": "C25900", "5.1k": "C25905",
-          "7.5k": "C25918", "8.87k": "C36953", "10k": "C25744", "10.0k": "C25744", "17.8k": "C129766",
-          "18k": "C25762", "20k": "C25765", "22.1k": "C43473", "30k": "C25776", "49.9k": "C25897",
-          "100k": "C25741", "4.99M": "C137963"}
+# JLC class (24 Nov 2026, BOM optimisation): JLCPCB basic parts wherever one exists in the same package with an adequate
+# rating (basic list from the jlcpcb.com parts API, componentLibraryType "base"); 1 % thick film everywhere except the
+# U603 divider (0.1 %, docs/research/power-tree.md section 12). Generic passives: UNI-ROYAL 0402WGF 1 % 0402; FH 0402CG
+# C0G; Samsung X5R/X7R. One number per value / package / rating.
+LCSC_R = {"0": "C17168", "2.49": "C2085509", "10": "C25077", "22": "C25092", "24.9": "C5099", "33": "C25105",
+          "43": "C270600", "47": "C25118", "49.9": "C25120", "68": "C25131", "82": "C25136", "91": "C270574",
+          "100": "C25076", "120": "C25079", "470": "C25117", "510": "C25123", "1k": "C11702", "1.00k": "C11702",
+          "1.5k": "C25867", "2.0k": "C4109", "2.2k": "C25879", "2.7k": "C25885", "3.3k": "C25890", "4.7k": "C25900",
+          "5.1k": "C25905", "8.87k": "C36953", "10k": "C25744", "10.0k": "C25744", "15k": "C25756",
+          "17.8k": "C129766", "20k": "C25765", "22k": "C25768", "24.9k": "C25874", "33k": "C25779",
+          "51k": "C25794", "100k": "C25741", "110k": "C25745", "150k": "C25755", "300k": "C25774",
+          "4.99M": "C137963"}
 LCSC_R0603 = {"0": "C21189", "82": "C23255", "100": "C22775"}
-# 0.1 % 25 ppm/K thin film 0402 (value without the " 0.1%" suffix)
-LCSC_R01 = {"10k": "C190095", "10.0k": "C190095", "14.7k": "C281774", "22.1k": "C2692911", "24.9k": "C852664",
-            "34.0k": "C852733", "49.9k": "C852808", "54.2k": "C852840", "100k": "C852472", "105k": "C2984407",
-            "120k": "C852501", "130k": "C852515", "280k": "C4091415", "300k": "C4262495", "499k": "C6466287"}
-# 0402 unless noted by the size rule in C(): pF/nF and 1u/2.2u 0402, 10u/22u 0805
+# 0.1 % 25 ppm/K thin film 0402 (value without the " 0.1%" suffix): only the U603 TPS63802 divider
+LCSC_R01 = {"19.6k": "C852589", "2.0k": "C852711"}
+# 0402 unless noted by the size rule in C(): pF/nF and 1u/2.2u/4.7u 0402, 10u/22u 0805
 LCSC_C = {"0.5p": "C1544", "1.5p": "C2179899", "2.2p": "C1559", "3.3p": "C76906", "18p": "C1549", "47p": "C1567",
           "100p": "C1546", "120p": "C40059", "220p": "C39122", "470p": "C75274", "1n": "C1523", "10n": "C15195",
-          "100n": "C1525", "1u": "C52923", "2.2u": "C107369", "10u": "C15850", "22u": "C45783"}
-LCSC_C0603 = {"1u": "C29936", "4.7u": "C99229"}
+          "100n": "C1525", "1u": "C52923", "4.7u": "C23733", "10u": "C15850", "22u": "C45783"}
+LCSC_C0603 = {"1u": "C15849", "4.7u": "C19666"}
 LCSC_C_C0G = {"1n": "C53547"}          # parts whose Note asks for C0G where the default is X7R
-LCSC_C_X7R = {"1u": "C49210445"}       # parts whose Note asks for X7R where the default is X5R
 
 
 def _note(kw) -> str:
@@ -127,15 +127,13 @@ def R(sh: Sheet, value: str, at, rot: int = 0, size: str = "0402", ref: str = "R
 
 def C(sh: Sheet, value: str, at, rot: int = 0, size: str | None = None, ref: str = "C", **kw):
     if size is None:
-        # pF/nF values and 1u/2.2u are 0402 (SPEC decision 9); bulk (4.7u and up) 0805
-        size = "0402" if value.endswith(("p", "n")) or value in ("1u", "2.2u") else "0805"
+        # pF/nF values and 1u/2.2u/4.7u are 0402 (SPEC decision 9); bulk (10u and up) 0805
+        size = "0402" if value.endswith(("p", "n")) or value in ("1u", "2.2u", "4.7u") else "0805"
     note = _note(kw)
     if size == "0603":
         table = LCSC_C0603
     elif "C0G" in note and value in LCSC_C_C0G:
         table = LCSC_C_C0G
-    elif "X7R" in note and value in LCSC_C_X7R:
-        table = LCSC_C_X7R
     else:
         table = LCSC_C
     lcsc = kw.pop("lcsc", "") or table.get(value, "")

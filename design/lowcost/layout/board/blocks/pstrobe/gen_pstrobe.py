@@ -108,13 +108,13 @@ def chain(s):
     my = (lambda y: y) if A else (lambda y: 2 * AX - y)
     NS = (lambda d: d) if A else (lambda d: {"N": "S", "S": "N", "W": "W", "E": "E"}[d])
     R_IN, C_IN, U, FB, L, RD, CC, C1N, C100, C10U, CX, C_O, RS1, RSER, RS2, C_I, G, FBG, LG, CG1, CG2, CG10, C_OUT, \
-        D, TL, NT, TP1, TP2 = (
+        D, TL, NT, TP1, TP2, RG = (
             ("R407", "C412", "U403", "FB403", "L403", "R417", "C434", "C415", "C414", "C413", "C432", "C416", "R408",
              "R410", "R409", "C417", "U404", "FB404", "L404", "C418", "C419", "C420", "C421", "D402", "TL402", "NT402",
-             "TP403", "TP404") if A else
+             "TP403", "TP404", "R419") if A else
             ("R411", "C422", "U405", "FB405", "L405", "R418", "C435", "C425", "C424", "C423", "C433", "C426", "R412",
              "R414", "R413", "C427", "U406", "FB406", "L406", "C428", "C429", "C430", "C431", "D403", "TL403", "NT403",
-             "TP405", "TP406"))
+             "TP405", "TP406", "R420"))
     PIN = "/PH_STROBE_P" if A else "/PH_STROBE_N"
     OUT = "/PSTRB_A" if A else "/PSTRB_K"
     n_in1, n_rfin, n_rfout, n_bias = N(R_IN, 2), N(U, 2), N(U, 7), N(FB, 2)
@@ -279,8 +279,11 @@ def chain(s):
     # ---------------------------------------------------------------- GVA bias tee on B.Cu (+5V1, was VBUS)
     # BIASTEE-4 / -6 (24 Nov): the 2.2 uH stands 1.25 mm east of the bead via (B track into its pad, no via in the
     # pad); cold pad -> C418 1 nF and C419 100 nF stacked at it (identical in A and K), each with its own GND via
-    # (none in a pad); +5V1 enters through C419: via pair beside its pad
+    # (none in a pad); the cold node enters through C419.  24 Nov 2026 (SPEC decision 26): +5V1 is 5.40 V, so the
+    # drain feed has a series 2.49 R (R419 / R420, 0402) stacked below C419 / C429, 0.5 mm west so its node pad
+    # clears the bead via; the +5V1 via pair moved from beside C419 to below the resistor's +5V1 pad.
     P5 = "/+5V1"
+    NF = N(RG, 1)                                       # cold node: R pad 1, C418 / C419, choke cold pad
     pg = blk.pad(FBG, "2")
     yv = my(YL - 1.55)
     blk.track(n_gbias, 0.5, [pg, (XO, yv)])
@@ -289,22 +292,24 @@ def chain(s):
     snap(LG, n_gbias, y=yv)
     lb = blk.pad(LG, "@" + n_gbias)
     blk.track(n_gbias, 0.5, [(XO, yv), lb], layer="B.Cu")
-    lv = blk.pad(LG, "@" + P5)
+    lv = blk.pad(LG, "@" + NF)
     XCG = XO - 0.65
-    two(CG1, XCG, lv[1], "E", P5, side="B")                        # 1 nF on the cold pad's row
-    two(CG2, XCG, lv[1] + s * 0.94, "E", P5, side="B")             # 100 nF below it (courtyards touch)
-    c1v, c2v = blk.pad(CG1, "@" + P5), blk.pad(CG2, "@" + P5)
-    blk.track(P5, 0.64, [lv, c1v], layer="B.Cu")
-    blk.track(P5, 0.5, [c1v, c2v], layer="B.Cu")
+    two(CG1, XCG, lv[1], "E", NF, side="B")                        # 1 nF on the cold pad's row
+    two(CG2, XCG, lv[1] + s * 0.94, "E", NF, side="B")             # 100 nF below it (courtyards touch)
+    c1v, c2v = blk.pad(CG1, "@" + NF), blk.pad(CG2, "@" + NF)
+    blk.track(NF, 0.64, [lv, c1v], layer="B.Cu")
+    blk.track(NF, 0.5, [c1v, c2v], layer="B.Cu")
     for c in (CG1, CG2):
         g = blk.pad(c, "@GND")
         gv(g[0] - 0.62, g[1])
         blk.track("GND", W_GND, [g, (g[0] - 0.62, g[1])], layer="B.Cu")
-    va = (c2v[0] - 0.23, c2v[1] + s * 0.73)
-    vb = (va[0] - 0.65, va[1])
-    for v in (va, vb):
-        blk.via(*v, P5)
-    blk.track(P5, 0.5, [c2v, (c2v[0], va[1] - s * 0.23), va, vb], layer="B.Cu", ch=0)
+    # 2.49 R below C419, 0.24 mm gap between courtyards: C419 pad -> down the axis -> 45 deg -> down into the R pad
+    two(RG, XCG - 0.50, c2v[1] + s * 1.18, "E", NF, side="B")
+    rn, rp = blk.pad(RG, "@" + NF), blk.pad(RG, "@" + P5)
+    y1 = c2v[1] + s * 0.325                                         # just outside the C419 pad
+    blk.track(NF, 0.4, [c2v, (c2v[0], y1), (rn[0], y1 + s * abs(c2v[0] - rn[0])), rn], layer="B.Cu", ch=0)
+    # +5V1 reaches R419 / R420 from the 10 uF C420 / C430 (own via pair, below): supply -> 10 uF -> 2.49 R -> 100 nF
+    # / 1 nF -> choke, as in the schematic; no extra via (the old pair beside C419 is gone)
     bplace(TP2, lb[0], my(4.56), 0, "B")                          # test point straight below the choke pad
     blk.track(n_gbias, 0.4, [lb, blk.pad(TP2, "1")], layer="B.Cu")
     # +5V1 bulk: 10 uF 0805 on B.Cu below the GVA, own via pair and GND via
@@ -316,6 +321,11 @@ def chain(s):
     blk.track(P5, 0.6, [(p10[0] - 0.90, p10[1]), p10], layer="B.Cu")
     blk.track("GND", W_GND, [g10, (g10[0] + 0.85, g10[1])], layer="B.Cu")   # hole edge 0.25 mm off the pad
     gv(g10[0] + 0.85, g10[1])
+    # R419 / R420 +5V1 pad -> 10 uF pad: down the pad axis, one 45 deg leg, into the 10 uF pad from the north (A)
+    ye, xe = p10[1] - s * 1.0, p10[0] + 0.25                    # 0.28 mm outside the 0805 pad, clear of C432's via
+    yk = ye - s * abs(rp[0] - xe)                               # start of the 45 deg leg
+    assert s * (yk - rp[1]) > 0.35, (yk, rp)
+    blk.track(P5, 0.5, [rp, (rp[0], yk), (xe, ye), (xe, p10[1])], layer="B.Cu", ch=0)
     return {"stub": l_st, "out": blk.route_len(f"{OUT[1:]} drop") + blk.route_len(f"{OUT[1:]} output"),
             "ret": blk.route_len(f"{PIN[1:]} L1 return"), "PIN": PIN,
             "leg": blk.route_len(f"{U} in 1") + blk.route_len(f"{U} RFIN")}

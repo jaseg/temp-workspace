@@ -9,13 +9,15 @@ VMID buffer are gone; the DAC outputs drive passive networks, one op-amp section
   PA4 DAC1_OUT1 -> DAC_TRIG (raw 0.2..2.7 V) -> passive sum with -2V5 at the TLV3801 (trigger_phase).
   PA5 DAC1_OUT2 -> VOFS (raw 0.2..2.7 V) -> Rofs into the OPA197 servo summing node (input sheet);
         mid-scale cancelled by Rmid from VNEG_REF.
-  PA6 DAC2_OUT1 -> DAC_BIAS_A -> R733 7.5k / R734 4.7k divider to -2V5 -> VBIAS_A (-1.46..-0.50 V).
+  PA6 DAC2_OUT1 -> DAC_BIAS_A -> R733 5.1k / R734 3.3k divider to -2V5 -> VBIAS_A (-1.40..-0.42 V at -2.44 V).
   PB1 OPAMP3_VOUT (DAC3_CH2 follower) -> DAC_BIAS_K -> R735 4.7k -> VBIAS_K, R736 5.1k to GND
         (24 Nov 2026, validation PARTS-4: 0.520 x Vdac = +0.10..+1.40 V, so the BAT15-04W reverse voltage stays
         <= 2.9 V at the -1.5 V input clamp; R735 isolates the 10 nF on the sampler sheet, DAC/OPAMP CL <= 50 pF).
-  PA2 OPAMP1_VOUT (DAC3_CH1 follower) -> DAC_TAPTH -> 30k/1k divider -> VTAP_TH.
-  U701 TLV9001 on +/-2V5: VNEG_REF = -VREF+ x 10.0k/14.7k = -1.973 V (ratiometric to the DAC reference, so the
-        VOFS mid-scale cancellation does not drift with the -2V5 regulator); drives only Rmid (34.0k)."""
+  PA2 OPAMP1_VOUT (DAC3_CH1 follower) -> DAC_TAPTH -> 33k/1k divider -> VTAP_TH.
+  U701 TLV9001 on +/-2V5: VNEG_REF = -VREF+ x 10k/15k = -1.933 V (ratiometric to the DAC reference, so the
+        VOFS mid-scale cancellation does not drift with the -2V5 regulator); drives only Rmid (33k).
+  All network resistors 1 % thick film JLC basic parts (24 Nov 2026 BOM optimisation; R731/R732 were 0.1 %): ratio
+  errors move the VOFS mid-scale by up to +/-12 mV at OUT, removed by the firmware offset calibration."""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from schlib import g
@@ -79,10 +81,10 @@ def main():
     sh = new_sheet("mcu_if", comments=["STM32G474CBT6 on board (USB FS, SWD + UART on J501, SPI/I2C to FPGA/clock).",
                                        "Control voltages: DAC outputs into passive networks; U701 TLV9001 makes VNEG_REF."])
     T = 1.0
-    # ---------------------------------------------------------------- ADC_REF_MID divider (unchanged R703/R704/C702)
-    r3 = R(sh, "30k", (g(150), g(30)), ref="R703")
+    # ---------------------------------------------------------------- ADC_REF_MID divider R703/R704/C702 (JLC basic values)
+    r3 = R(sh, "10k", (g(150), g(30)), ref="R703")
     sh.stub(r3, "1", "VREFP")
-    r4 = R(sh, "10k", (g(150), g(40)), ref="R704")
+    r4 = R(sh, "3.3k", (g(150), g(40)), ref="R704")
     sh.wire(r3["2"], r4["1"])
     sh.gnd(r4["2"])
     c = C(sh, "10n", (g(156), g(40)), ref="C702")
@@ -90,7 +92,7 @@ def main():
     sh.gnd(c["2"])
     sh.path([(c["1"][0], r3["2"][1]), (c["1"][0] + g(6), r3["2"][1])])
     sh.hlabel("ADC_REF_MID", (c["1"][0] + g(6), r3["2"][1]), "output")
-    sh.text("ADC_REF_MID = VREF+ x 10k/40k = 0.725 V\n(level-shift reference on the sampler sheet)",
+    sh.text("ADC_REF_MID = VREF+ x 3.3k/13.3k = 0.720 V\n(level-shift reference on the sampler sheet)",
             (g(145), g(20)), size=T)
 
     # ---------------------------------------------------------------- VNEG_REF: U701 TLV9001 inverter from VREF+
@@ -101,12 +103,12 @@ def main():
     sh.power("GND", (plus[0] - g(3), plus[1]), dy=-g(3), rot=180)
     M = (minus[0] - g(4), minus[1])
     sh.wire(minus, M)
-    rin = R(sh, "14.7k", (M[0] - g(6), M[1]), rot=90, ref="R731", fields={"Note": "0.1 % 25 ppm/K"})
+    rin = R(sh, "15k", (M[0] - g(6), M[1]), rot=90, ref="R731", fields={"Note": "1 %"})
     sh.wire(rin["2"], M)
     sh.stub(rin, "1", "VREFP")
     X = o[0] + g(3)
     yf, yc = minus[1] + g(10), minus[1] + g(15)
-    rf = R(sh, "10.0k", (x, yf), rot=90, ref="R732", fields={"Note": "0.1 % 25 ppm/K"})
+    rf = R(sh, "10k", (x, yf), rot=90, ref="R732", fields={"Note": "1 %"})
     cf = C(sh, "100n", (x, yc), rot=90, ref="C722")
     sh.path([M, (M[0], yc), cf["1"]])
     sh.wire((M[0], yf), rf["1"])
@@ -124,27 +126,27 @@ def main():
     cn = C(sh, "100n", (x + g(20), y - g(12)), ref="C721")
     sh.power("GND", cn["1"], dy=-2.54, rot=180)
     sh.power("-2V5", cn["2"], dy=5.08)
-    sh.text("VNEG_REF = -VREF+ x R732/R731 = -1.973 V, ratiometric to the DACs\n"
+    sh.text("VNEG_REF = -VREF+ x R732/R731 = -1.933 V, ratiometric to the DACs\n"
             "(mid-scale of VOFS cancels independent of VREF+ and of -2V5).\n"
-            "Load: Rmid 34.0k on the input sheet only. C722 100n: 160 Hz.\n"
+            "Load: Rmid 33k on the input sheet only. C722 100n: 160 Hz.\n"
             "U701 TLV9001IDBVR on +/-2V5; C720/C721 at its pins 5/2.\n"
             "Reset: VREFBUF off (VREF+ ~0 V) -> VNEG_REF = 0 V.", (g(95), g(102)), size=T)
 
     # ---------------------------------------------------------------- VBIAS_A: divider DAC -> -2V5 (no op-amp)
     xa, ya = g(185), g(70)
-    ra = R(sh, "7.5k", (xa, ya), ref="R733", fields={"Note": "1 %"})
+    ra = R(sh, "5.1k", (xa, ya), ref="R733", fields={"Note": "1 %"})
     sh.stub(ra, "1", "DAC_BIAS_A")
-    rb = R(sh, "4.7k", (xa, ya + g(10)), ref="R734", lcsc="C25900", fields={"Note": "1 %"})
+    rb = R(sh, "3.3k", (xa, ya + g(10)), ref="R734", fields={"Note": "1 %"})
     sh.wire(ra["2"], rb["1"])
     sh.power("-2V5", rb["2"], dy=5.08)
     N = (xa + g(10), ra["2"][1])
     sh.wire(ra["2"], N)
     sh.hlabel("VBIAS_A", N, "output")
-    sh.text("VBIAS_A = 0.385 x Vdac - 0.615 x 2.5 V (Thevenin 2.89k,\n"
-            "with 10 nF on the sampler sheet: 5.5 kHz):\n"
-            "DAC 0.2..2.7 V -> -1.46..-0.50 V, 0.27 mV/LSB.\n"
-            "Reset (PA6 high-Z, clamped ~-0.4 V): about -1.7 V = reverse bias.\n"
-            "DAC load 12.2k to -2V5 (<= 0.43 mA).", (g(170), g(52)), size=T)
+    sh.text("VBIAS_A = 0.393 x Vdac - 0.607 x 2.44 V (Thevenin 2.00k,\n"
+            "with 10 nF on the sampler sheet: 8 kHz):\n"
+            "DAC 0.2..2.7 V -> -1.40..-0.42 V, 0.28 mV/LSB.\n"
+            "Reset (PA6 high-Z, clamped ~-0.4 V): about -1.64 V = reverse bias.\n"
+            "DAC load 8.4k to -2V5 (<= 0.61 mA).", (g(170), g(52)), size=T)
 
     # ---------------------------------------------------------------- VBIAS_K: DAC3_CH2 follower, isolation, pull-down
     xk, yk = g(185), g(118)
@@ -168,7 +170,7 @@ def main():
             (g(170), g(135)), size=T)
 
     # ---------------------------------------------------------------- VTAP_TH divider (unchanged), VTAP_P/N rails
-    r5 = R(sh, "30k", (g(90), g(160)), ref="R723")
+    r5 = R(sh, "33k", (g(90), g(160)), ref="R723")
     sh.stub(r5, "1", "DAC_TAPTH")
     r6 = R(sh, "1k", (g(90), g(170)), ref="R724")
     sh.wire(r5["2"], r6["1"])
@@ -178,7 +180,7 @@ def main():
     sh.gnd(c["2"])
     sh.path([(c["1"][0], r5["2"][1]), (c["1"][0] + g(6), r5["2"][1])])
     sh.hlabel("VTAP_TH", (c["1"][0] + g(6), r5["2"][1]), "output")
-    sh.text("VTAP_TH = Vdac/31: 3..90 mV, 0.02 mV/LSB (phase RESULT: 0..+80 mV)", (g(80), g(150)), size=T)
+    sh.text("VTAP_TH = Vdac/34: 6..79 mV, 0.02 mV/LSB (phase RESULT: 0..+80 mV)", (g(80), g(150)), size=T)
     for k, (rail, net) in enumerate((("+2V5", "VTAP_P"), ("-2V5", "VTAP_N"))):
         r = R(sh, "0", (g(140 + 20 * k), g(165)), rot=90, size="0603", ref=f"R{725 + k}")
         sh.stub(r, "1", rail, kind="power")
@@ -270,8 +272,8 @@ def mcu_section(sh):
                 fp="Jumper:SolderJumper-2_P1.3mm_Open_RoundedPad1.0x1.5mm")
     sh.stub(jp, "1", "BOOT0")
     sh.stub(jp, "2", "+3V3", kind="power")
-    d = sh.add("Device:LED", "D", "green", (g(122), g(184)), rot=90, fp="LED_SMD:LED_0603_1608Metric", lcsc="C12624",
-               mpn="KT-0603G")
+    d = sh.add("Device:LED", "D", "red", (g(122), g(184)), rot=90, fp="LED_SMD:LED_0603_1608Metric", lcsc="C2286",
+               mpn="KT-0603R")
     sh.stub(d, "2", "+3V3", kind="power")
     k = d["1"]
     rl = R(sh, "1k", (k[0], k[1] + 2.54 + 3.81))
