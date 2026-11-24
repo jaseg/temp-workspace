@@ -144,9 +144,9 @@ class Model:
         per layer {layer: bool} (L3 / L6, without SMD pads), own via / THT cells"""
         b = self.b
         obs = {ln: np.zeros((NX, NY), bool) for ln in LNAMES + ("F.Cu",)}
+        novia = np.zeros((NX, NY), bool)
         own = {ln: np.zeros((NX, NY), bool) for ln in LNAMES}
         own_pad = {ln: np.zeros((NX, NY), bool) for ln in LNAMES}
-        novia = np.zeros((NX, NY), bool)
         self.cutzone = np.zeros((NX, NY), bool)
         lid = {pcbnew.F_Cu: "F.Cu", pcbnew.In2_Cu: "In2.Cu", pcbnew.B_Cu: "B.Cu"}
         for t in b.GetTracks():
@@ -157,6 +157,11 @@ class Model:
                 if n == net:
                     for ln in LNAMES:
                         draw_seg(own[ln], c, c, r)
+                    ring = np.zeros((NX, NY), bool)
+                    draw_seg(ring, c, c, 0.5)
+                    core = np.zeros((NX, NY), bool)
+                    draw_seg(core, c, c, 0.15)
+                    novia |= ring & ~core           # hole-to-hole: a new via either reuses this one or keeps 0.5 mm
                 else:
                     for ln in obs:
                         draw_seg(obs[ln], c, c, r + EXTRA.get(n, 0.0))
@@ -179,9 +184,11 @@ class Model:
                     if not (tht or p.IsOnLayer(L_)):
                         continue
                     if n == net and n and ln in own:
-                        draw_rect(own_pad[ln], x0, y0, x1, y1)
                         if tht:
                             draw_rect(own[ln], x0, y0, x1, y1)
+                        else:                       # own SMD pad, shrunk by the clearance: paths may pass, not cross
+                            sh = CLR + MARG
+                            draw_rect(own_pad[ln], x0 + sh, y0 + sh, x1 - sh, y1 - sh)
                     elif n != net or not n:
                         draw_rect(obs[ln], x0, y0, x1, y1)
         for z in b.Zones():
@@ -531,7 +538,10 @@ def route_rail(board, m, model, net, widths, guide, report, use_l6=True):
             if len(pts) >= 2:
                 m.track(net, w, pts, ln, ch=0.15)
                 added.append((ln, pts, w))
-            if k < len(runs) - 1:
+            if k < len(runs) - 1 and not any(
+                    v.GetClass() == "PCB_VIA" and v.GetNetname() == net and
+                    math.hypot(_loc(v.GetPosition())[0] - pts[-1][0], _loc(v.GetPosition())[1] - pts[-1][1]) < 0.2
+                    for v in board.GetTracks()):
                 m.via(pts[-1][0], pts[-1][1], net)
                 report.setdefault("vias", {}).setdefault(net, 0)
                 report["vias"][net] += 1
@@ -549,9 +559,61 @@ def apply_l4_1v2(board, m, report):
            (73.2, 15.2), (73.2, 13.4), (73.95, 12.65), (73.95, 8.45)]
     z = m.zone("+1V2", ("In3.Cu",), pts, clearance=0.25, prio=5, minw=0.25)
     z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
-    m.track("+1V2", 0.8, [(73.7, 13.9), (73.7, 14.9)], "In3.Cu")     # explicit tie into the fpga block's island
+    m.track("+1V2", 0.6, [(73.55, 13.9), (73.55, 14.9)], "In3.Cu")   # explicit tie into the fpga block's island
     report["+1V2"] = "L4 finger (74.0-75.6, 7.35-14.3) to the fpga +1V2 island"
     return z
+
+
+def _via_layers(board, v):
+    """copper layers on which via v is connected (tracks ending in it, pads / filled zones of its net under it)"""
+    net = v.GetNetname()
+    c = v.GetPosition()
+    r = v.GetWidth() / 2
+    lays = set()
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_TRACK" and t.GetNetname() == net:
+            for q in (t.GetStart(), t.GetEnd()):
+                if math.hypot(q.x - c.x, q.y - c.y) <= r + t.GetWidth() / 2:
+                    lays.add(t.GetLayer())
+    for fp in board.GetFootprints():
+        for p in fp.Pads():
+            if p.GetNetname() == net and p.HitTest(c):
+                lays |= {l_ for l_ in (pcbnew.F_Cu, pcbnew.B_Cu) if p.IsOnLayer(l_)}
+    for z in board.Zones():
+        if not z.GetIsRuleArea() and z.GetNetname() == net:
+            for l_ in z.GetLayerSet().CuStack():
+                if z.GetFilledPolysList(l_).Contains(c):
+                    lays.add(l_)
+    return lays
+
+
+def fix_dangling(board, m, nets):
+    """rail vias connected on one layer only (DRC via_dangling): joined on L3 to a sibling via within 1.2 mm that is
+    connected on L3, or removed when they only join tracks on that one layer"""
+    out = []
+    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+    vias = [v for v in board.GetTracks() if v.GetClass() == "PCB_VIA" and v.GetNetname() in nets]
+    for v in vias:
+        L = _via_layers(board, v)
+        if len(L) >= 2:
+            continue
+        p = _loc(v.GetPosition())
+        sib = [u for u in vias if u is not v and u.GetNetname() == v.GetNetname() and
+               math.hypot(_loc(u.GetPosition())[0] - p[0], _loc(u.GetPosition())[1] - p[1]) < 1.2 and
+               pcbnew.In2_Cu in _via_layers(board, u)]
+        if sib:
+            q = _loc(sib[0].GetPosition())
+            m.track(v.GetNetname(), 0.4, [p, q], "In2.Cu", ch=0.0001)
+            out.append(("L3 tie", v.GetNetname(), p, q))
+            continue
+        ntr = sum(1 for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() == v.GetNetname()
+                  and any(math.hypot(*(np.subtract(_loc(e), p))) < 0.05 for e in (t.GetStart(), t.GetEnd())))
+        if len(L) == 1 and ntr >= 2:
+            board.Remove(v)
+            out.append(("removed", v.GetNetname(), p))
+        else:
+            out.append(("left", v.GetNetname(), p, len(L), ntr))
+    return out
 
 
 def apply(board, m):
@@ -564,6 +626,7 @@ def apply(board, m):
         route_rail(board, m, model, net, widths, guide, report)
     for net, guide in STRIPS:
         route_rail(board, m, model, net, (0.6, 0.5, 0.4, 0.3), guide, report)
+    report["dangling"] = fix_dangling(board, m, [r[0] for r in RAILS] + [r[0] for r in STRIPS])
     return report
 
 

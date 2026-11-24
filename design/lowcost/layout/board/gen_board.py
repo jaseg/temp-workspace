@@ -424,7 +424,7 @@ if "--prepower" in sys.argv:
     bl.save_board(B, os.path.join(SCR, "prepower.kicad_pcb"))
     sys.exit(0)
 _rp = board_power.apply(B, m)
-print("power: failed", _rp.get("failed"), "| no landing", _rp.get("no_landing"), "| vias", _rp.get("vias"))
+print("power: failed", _rp.get("failed"), "| no landing", _rp.get("no_landing"), "| vias", _rp.get("vias"), "| dangling", _rp.get("dangling"))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 print("rail widening [mm widened]:", board_power.widen(B, m))
 import board_stitch
