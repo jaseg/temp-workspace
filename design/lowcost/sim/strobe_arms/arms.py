@@ -11,7 +11,11 @@ input leg from the BUF802 model, unequal splitter, 2.2 pF hold + TPH2501 Cin) wi
   * hold node + 268 fF layout copper (THEORY-6)
   * 2.5 ns tail: once the diodes are off the hold-node charge is conserved, so the settled value follows from
     v(ls), v(inv) at any later time (same correction as sim/sampler).
-python3 arms.py [case-index ...]   -> results.json
+Rev. 2 (24 Nov 2026, as built after RF-1/RF-2/RF-4): arms 17.827 mm (105.6 ps), R204 inline on the bridge axis
+4.039 mm from T401.2 / T401.4 on both arms (r204_pos "axis"), TL401 80.0 ps incl. the via short, clamp D401 on a
+0.40 mm tap; bias per rail (bias_a / bias_k, VBIAS_A -1.46..-0.50 V, VBIAS_K +0.10..+1.40 V); falling-edge source
+(wave "fall", strobe_wave_fall.json from wave_fall.py); per-diode reverse voltage; DC input level v_dc.
+python3 arms.py [case-index ...]   -> results.json (CASES = rev. 2; OLD_CASES = the 99 ps study, python3 arms.py old)
 """
 from __future__ import annotations
 
@@ -34,7 +38,9 @@ import amp  # noqa: E402  (local copy of sim/sampler/amp.py)
 
 PS_MM = 5.925e-12
 C_HOLD, C_PAD, C_CM, C_DIFF, C_CU = 2.2e-12, 0.2e-12, 1.0e-12, 2.7e-12, 0.268e-12
-WAVE = json.load(open(os.path.join(HERE, "strobe_wave.json")))
+WAVES = {"rise": json.load(open(os.path.join(HERE, "strobe_wave.json"))),
+         "fall": json.load(open(os.path.join(HERE, "strobe_wave_fall.json")))}
+AB_MM, AB_R204 = 17.827, 4.039          # as built (layout/board/blocks/analog/README.md, 24 Nov 2026)
 
 
 @dataclasses.dataclass
@@ -57,11 +63,17 @@ class P:
     v_ls: float = 0.0
     in_bw: float = 10e9         # first-order input edge (35 ps) for the aperture runs
     src: str = "clean"          # "clean": 1.2 R source, no lead L (aperture); "buf802": sim/sampler model (kick-out)
+    r204_mm: float = 0.0        # r204_pos "axis": distance of R204 from the balun pads along each arm
+    clamp_mm: float = 0.0       # tap -> D401 line (as built 0.40 mm)
+    wave: str = "rise"          # "rise" (sampling edge) | "fall" (reverse pulse half a period later)
+    bias_a: float | None = None  # anode rail bias (V, negative); None = -v_rev / 2
+    bias_k: float | None = None  # cathode rail bias (V, positive); None = +v_rev / 2
+    v_dc: float = 0.0           # DC input level (input step is centred on it)
 
 
 def strobe_pwl(p: P) -> str:
-    t = np.array(WAVE["t"]) + p.t_strobe
-    v = np.array(WAVE["v"]) * 2 * p.scale
+    t = np.array(WAVES[p.wave]["t"]) + p.t_strobe
+    v = np.array(WAVES[p.wave]["v"]) * 2 * p.scale
     k = t > 0.05e-9
     pts = [(0.0, 0.0)] + list(zip(t[k], v[k]))
     return " ".join(f"{a:.5g} {b:.5g}" for a, b in pts)
@@ -109,7 +121,12 @@ def build(p: P) -> str:
     line(d, "drv", "tap", 1.37 * PS_MM)
     line(d, "tap", "stub_end", p.stub_td)
     d.add("Rstub stub_end 0 0.05")
-    d.add("Xclamp 0 tap dpk")                    # D401 BAT15-03W, K to the tap, A to GND
+    if p.clamp_mm:
+        line(d, "tap", "clp", p.clamp_mm * PS_MM)
+    else:
+        d.add("Rclp tap clp 1m")
+    d.add("Vclp 0 clp_a 0")
+    d.add("Xclamp clp_a clp dpk")                # D401 BAT15-03W, K to the tap, A to GND
     line(d, "tap", "bal_in", p.clip_mm * PS_MM)
     l_cm, l_leak = 1e-6, 0.3e-9
     d.add(f"Lb1 bal_in bal_a {l_cm}")
@@ -130,6 +147,12 @@ def build(p: P) -> str:
     if p.coupled:
         coupled(d, "a0", "sa", "k0", "sk", L * PS_MM)
         d.add(f"R204 a0 k0 {p.r204}")
+    elif p.r204_pos == "axis":
+        line(d, "a0", "a1", p.r204_mm * PS_MM)
+        line(d, "a1", "sa", (L - p.r204_mm) * PS_MM)
+        line(d, "k0", "k1", p.r204_mm * PS_MM)
+        line(d, "k1", "sk", (L - p.r204_mm) * PS_MM)
+        d.add(f"R204 a1 k1 {p.r204}")
     elif p.r204_pos == "asbuilt" and L > 3.9:
         line(d, "a0", "a1", 1.45 * PS_MM)
         line(d, "a1", "sa", (L - 1.45) * PS_MM)
@@ -154,8 +177,10 @@ def build(p: P) -> str:
     for n, s in (("a", "sa"), ("b", "sk")):
         d.cap0402(f"cblk{n}", s, f"rail_{n}", "47p")
         d.add(f"Crn{n} rail_{n} 0 0.15p")
-    d.add(f"Vba vba 0 {-p.v_rev / 2}")
-    d.add(f"Vbk vbk 0 {p.v_rev / 2}")
+    ba = -p.v_rev / 2 if p.bias_a is None else p.bias_a
+    bk = p.v_rev / 2 if p.bias_k is None else p.bias_k
+    d.add(f"Vba vba 0 {ba}")
+    d.add(f"Vbk vbk 0 {bk}")
     d.add("Rba rail_a vba 1k")
     d.add("Rbk rail_b vbk 1k")
     d.add("Vsa rail_a ra_x 0")
@@ -167,7 +192,7 @@ def build(p: P) -> str:
     for side in ("ls", "hs"):
         d.add(f"Xda_{side} ka {side} dpk")
         d.add(f"Xdk_{side} {side} kk dpk")
-    a, b = -p.in_step / 2, p.in_step / 2
+    a, b = p.v_dc - p.in_step / 2, p.v_dc + p.in_step / 2
     if p.in_bw:
         d.add(f"Vin in_e0 0 pwl(0 {a} {p.t_in:.6g} {a} {p.t_in + 1e-12:.6g} {b})")
         d.add("Rbw in_e0 in_f 1k")
@@ -208,6 +233,10 @@ def build(p: P) -> str:
     d.add(f".meas tran pk_late max par('v(ka)-v(kk)') from={t2:.6g}")
     d.add(f".meas tran rev_pk min par('v(ka)-v(kk)') from={ts:.6g}")
     d.add(f".meas tran pk_rail max par('v(sa)-v(sk)') from={ts:.6g}")
+    d.add(f".meas tran rev_d max par('max(max(v(ls)-v(ka), v(hs)-v(ka)), max(v(kk)-v(ls), v(kk)-v(hs)))') from={ts:.6g}")
+    d.add(f".meas tran tap_min min v(tap) from={ts:.6g}")
+    d.add(f".meas tran tap_max max v(tap) from={ts:.6g}")
+    d.add(f".meas tran i_clamp max i(vclp) from={ts:.6g}")
     d.add(f".meas tran kick_hs pp v(hs) from={ts:.6g}")
     d.add(f".meas tran kick_buf pp v(buf) from={ts:.6g}")
     d.add(f".meas tran kick_trig pp v(trig) from={ts:.6g}")
@@ -216,7 +245,8 @@ def build(p: P) -> str:
     return "\n".join(d.lines) + "\n"
 
 
-KEYS = ("end_ls", "end_inv", "pk_drive", "pk_late", "rev_pk", "pk_rail", "kick_hs", "kick_buf", "kick_trig", "qa")
+KEYS = ("end_ls", "end_inv", "pk_drive", "pk_late", "rev_pk", "pk_rail", "kick_hs", "kick_buf", "kick_trig", "qa",
+        "rev_d", "tap_min", "tap_max", "i_clamp")
 
 
 def run(p: P, wave: list[str] | None = None) -> dict:
@@ -275,7 +305,7 @@ def step_response(pool, p: P, xs=XS) -> dict:
 
 
 SYS = dict(src="buf802", in_bw=2e9)          # input through the BUF802 model behind a 2 GHz first-order edge
-CASES = [
+OLD_CASES = [
     ("lumped (no arms, old deck geometry)", P(arm_mm=0.0, r204_pos="sym")),
     ("as built: 16.75 mm arms, R204 as built", P()),
     ("as built, stub 80 ps (RF-2 fixed)", P(stub_td=80e-12)),
@@ -310,7 +340,100 @@ CASES = [
     ("system: 4 mm + tap at bridge, stub 80 ps, bias +/-1.15 V", P(arm_mm=4.0, r204_pos="sym", stub_td=80e-12, v_rev=2.3, **SYS)),
 ]
 
+AB = dict(arm_mm=AB_MM, r204_pos="axis", r204_mm=AB_R204, stub_td=80e-12, clamp_mm=0.4)
+LIM = dict(bias_a=-1.46, bias_k=1.40)     # control-range end points (kicad/README.md)
+CASES = [
+    ("AB2: as built rev. 2, bias +/-1.0 V", P(**AB)),
+    ("AB2, bias +/-1.2 V", P(v_rev=2.4, **AB)),
+    ("AB2, bias +/-1.3 V", P(v_rev=2.6, **AB)),
+    ("AB2, bias +/-1.4 V", P(v_rev=2.8, **AB)),
+    ("AB2, bias +/-1.35 V", P(v_rev=2.7, **AB)),
+    ("AB2, bias +/-1.35 V, strobe -25 %", P(v_rev=2.7, scale=0.75, **AB)),
+    ("AB2, bias +/-1.35 V, strobe +10 %", P(v_rev=2.7, scale=1.1, **AB)),
+    ("system: AB2, bias +/-1.35 V, BUF802 2 GHz", P(v_rev=2.7, **AB, **SYS)),
+    ("system: AB2, bias +/-1.3 V, BUF802 2 GHz", P(v_rev=2.6, **AB, **SYS)),
+    ("AB2, bias +/-1.3 V, strobe -25 %", P(v_rev=2.6, scale=0.75, **AB)),
+    ("AB2, bias +/-1.3 V, strobe +10 %", P(v_rev=2.6, scale=1.1, **AB)),
+    ("AB2, bias +/-0.9 V, strobe -25 %", P(v_rev=1.8, scale=0.75, **AB)),
+    ("AB2, bias -1.46 / +1.40 V (range ends)", P(**LIM, **AB)),
+    ("AB2, bias +/-1.0 V, strobe -25 %", P(scale=0.75, **AB)),
+    ("AB2, bias +/-1.4 V, strobe -25 %", P(v_rev=2.8, scale=0.75, **AB)),
+    ("AB2, bias +/-1.4 V, strobe +10 %", P(v_rev=2.8, scale=1.1, **AB)),
+    ("system: AB2, bias +/-1.0 V, BUF802 2 GHz", P(**AB, **SYS)),
+    ("system: AB2, bias +/-1.4 V, BUF802 2 GHz", P(v_rev=2.8, **AB, **SYS)),
+    ("17.827 mm arms, R204 sym at balun, 80 ps, +/-1.3 V (length only)",
+     P(arm_mm=AB_MM, r204_pos="sym", stub_td=80e-12, v_rev=2.6)),
+    ("AB2, bias +/-1.0 V, strobe -10 %", P(scale=0.9, **AB)),
+    ("AB2, bias +/-1.2 V, strobe -25 %", P(v_rev=2.4, scale=0.75, **AB)),
+    ("AB2, bias -1.46 / +1.40 V, strobe -25 %", P(scale=0.75, **LIM, **AB)),
+]
+# single runs (no step response): per-diode reverse voltage, sampling and falling edge, input DC level v_dc
+# input: +/-0.5 V = full scale at the bridge (sim/sampler), +/-1.5 V = BUF802 CLH/CLL clamp (overload)
+SINGLE = []
+for bname, bk in (("+/-1.0", dict()), ("+/-1.2", dict(v_rev=2.4)), ("+/-1.3", dict(v_rev=2.6)),
+                  ("+/-1.35", dict(v_rev=2.7)), ("+/-1.4", dict(v_rev=2.8)), ("-1.46/+1.40", LIM),
+                  ("-1.46/+1.30", dict(bias_a=-1.46, bias_k=1.30))):
+    for wave in ("rise", "fall"):
+        for vdc in (-1.5, -0.5, 0.0, 0.5, 1.5):
+            SINGLE.append((f"{wave} {bname} V, input {vdc:+.1f} V",
+                           P(wave=wave, v_dc=vdc, in_step=0.0, t_in=10e-9, src="buf802", **bk, **AB)))
+    for vdc in (-1.5, 0.0, 1.5):
+        SINGLE.append((f"fall {bname} V, input {vdc:+.1f} V, no clamp",
+                       P(wave="fall", v_dc=vdc, in_step=0.0, t_in=10e-9, src="buf802", **bk, **{**AB, "clamp_mm": 0.0})))
+        SINGLE.append((f"fall {bname} V, input {vdc:+.1f} V, strobe +10 %",
+                       P(wave="fall", v_dc=vdc, in_step=0.0, t_in=10e-9, src="buf802", scale=1.1, **bk, **AB)))
+
+
+def run_noclamp(p: P) -> dict:
+    """D401 removed (comparison only)"""
+    return run_text(build(p).replace("Xclamp clp_a clp dpk", "Rclamp_off clp 0 1g"))
+
+
+def run_text(text: str) -> dict:
+    with tempfile.NamedTemporaryFile("w", suffix=".cir", delete=False) as fh:
+        fh.write(text)
+        path = fh.name
+    try:
+        r = subprocess.run(["ngspice", "-b", path], capture_output=True, text=True, timeout=900)
+    finally:
+        os.unlink(path)
+    return {m.group(1): float(m.group(2)) for m in re.finditer(r"^(%s)\s*=\s*([-+0-9.eE]+)" % "|".join(KEYS), r.stdout, re.M)}
+
+
+def single(label: str, p: P) -> dict:
+    """hold node first brought to the steady state of repeated sampling edges at this input level (4 iterations),
+    then the requested edge from there; d_hold = hold-node change caused by that edge"""
+    v = p.v_dc
+    for _ in range(4):
+        v = run(dataclasses.replace(p, wave="rise", v_ls=v))["settled"]
+    q = dataclasses.replace(p, v_ls=v)
+    r = run_noclamp(q) if "no clamp" in label else run(q)
+    if "settled" not in r:
+        cg = C_HOLD + C_PAD + C_CU + C_CM
+        r["settled"] = r["end_ls"] + C_DIFF * (r["end_ls"] - r["end_inv"]) / cg
+    r["v_hold"] = v
+    r["d_hold"] = r["settled"] - v
+    return dict(params=dataclasses.asdict(q), quiet=r)
+
+
+if __name__ == "__main__" and sys.argv[1:2] == ["single"]:
+    path = os.path.join(HERE, "results.json")
+    res = {k: v for k, v in json.load(open(path)).items() if not k.startswith("S: ")}
+    with mp.Pool(4) as pool:
+        outs = pool.starmap(single, SINGLE)
+    for (label, _), r in zip(SINGLE, outs):
+        q = r["quiet"]
+        res["S: " + label] = r
+        print(f"{label:40s} hold {q['v_hold']:+.3f} fwd {q['pk_drive']:+.2f} late {q['pk_late']:+.2f} bridge rev {q['rev_pk']:.2f} V/diode {q['rev_d']:.2f} "
+              f"tap {q['tap_min']:+.2f}/{q['tap_max']:+.2f} Iclamp {q['i_clamp']*1e3:.0f} mA dhold {q['d_hold']*1e3:+.1f} mV "
+              f"kick hs/buf/trig {q['kick_hs']*1e3:.0f}/{q['kick_buf']*1e3:.0f}/{q['kick_trig']*1e3:.1f}", flush=True)
+    json.dump(res, open(path, "w"), indent=1)
+    sys.exit(0)
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["old"]:
+        CASES = OLD_CASES
+        del sys.argv[1]
     sel = [int(a) for a in sys.argv[1:]]
     path = os.path.join(HERE, "results.json")
     res = json.load(open(path)) if os.path.exists(path) else {}

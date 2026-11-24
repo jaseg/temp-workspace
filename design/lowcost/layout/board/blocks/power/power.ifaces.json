@@ -34,13 +34,13 @@
   },
   {
    "net": "+3V3",
-   "x": 8.72,
-   "y": 6.05,
+   "x": 6.68,
+   "y": 6.95,
    "layer": "In3.Cu",
    "side": "W",
    "class": "supply",
    "width": null,
-   "note": "via pair at L602 / C604 (U601 output) into the L4 +3V3 plane; also feeds U602 (B)"
+   "note": "via pair behind C604 (U601 output) into the L4 +3V3 plane; U602 (B) takes its input from L4 at C609"
   },
   {
    "net": "+1V2",
