@@ -277,3 +277,107 @@ Checked all 66 non-passive parts. Every pin in the netlist matches its datasheet
 - Op-amp supplies: TLV9001, TPH2501, OPA197 within ratings
 - BLM15HD102 / LQH32CN470 / LQM21PN2R2 / B5819W current and voltage ratings
 - 47 R series, dummy-load and PSTRB termination dissipation < 20 mW
+
+## Status after the fix round (24 Nov 2026)
+
+The fix round changed the schematic (new power tree, moved and added capacitors, part changes), the blocks and the
+integrated board, then two independent re-checks were run (`validation/recheck-fixes.md`, `validation/recheck-power.md`)
+and a repair round followed. Each "fixed" below was checked again for this table on the current files: pcbnew on a
+zone-refilled scratch copy of `layout/board/scope-fe.kicad_pcb` (coordinates in board mm minus 100, distances pad edge
+to pad edge unless stated), the netlist `kicad/export/scope-fe.net`, `docs/bom.csv`, and the documents named. Current
+checks: DRC jlc4 + schematic parity 0 errors, 0 unconnected, 450 warnings (library, field and parity artefacts); ERC 0
+errors (16 library warnings); BOM 473 references = netlist, 64.01 USD = sum of the lines; board 473 parts plus H1-H4.
+
+Status words: **fixed** (the finding no longer applies; how and where), **mitigated** (impact reduced or covered by
+simulation / calibration, cause kept), **partly** (part of the finding fixed), **open** (why), **documented** (a
+documentation-only finding corrected in the documents).
+
+### Findings of the first validation
+
+| Id | Status | How / where, or why open |
+|---|---|---|
+| RF-1 | mitigated | Arms kept (17.827 mm = 105.6 ps each, uncoupled), now simulated as built in `sim/strobe_arms` (rev. 2): no second sampling instant, 100 ps / 105 % at +/-1.3 V; SPEC decision 21 |
+| RF-2 | fixed | GND via centred in pad 2 of NT401, NT402 and NT403 (0.00 mm, board) |
+| RF-3 | partly | R378 / R379 = 43 R (netlist); 30 ps as built vs 35 ps simulated and `sim/phase_array` not re-run (ToO risk 3) |
+| RF-4 | fixed | R204 pads at y 10.79 / 11.81, symmetric about the bridge axis 11.30 (board); equal arms |
+| RF-5 | open | BUF_OUT_T route unchanged; PH_STROBE_P copper 0.34 mm from it (board); about 2 ps effect, no room for a GND finger |
+| RF-6 | open | documentation item; cut geometry not re-sampled |
+| RF-7 | fixed (+2V5) | No +2V5 via or track within 0.6 mm of BUF_OUT_T (board; nearest foreign copper is the VBIAS_A via, 0.21 mm edge gap, antipad clear of the trace); U301.10 fed by a via beside pin 9 (RF2-1). S_STROBE_N 0.20 mm pour gap not re-measured |
+| PDN-1 | fixed | AMS1117 replaced by U601 TPS62A01A buck (netlist); no AMS1117, MT3608, LM27761, LP5907, LP2985, AP2112 or LM337 left |
+| PDN-2 | fixed | Buck instead of LDO (netlist): no dropout issue, U601 0.19 / 0.30 W (kicad/README); GND vias at the capacitor pads (board) |
+| PDN-3 | fixed | LM337 removed; -2V5 from U605 LM27762 (ceramic-stable) with C628 10u 0805 on top, 0.75 mm from U605.6 (board) |
+| PDN-4 | fixed | LM27761 replaced by LM27762 with 10u 0805 at IN / OUT+ / OUT- (C612 22u, C617, C621, C628, C630; board, netlist) |
+| PDN-5 | fixed | MT3608 removed; +5V1 = 5.04-5.16 V, LM27762 VIN <= 5.5 V (recheck-power section 2; R603 459k / R604 49.9k in the netlist) |
+| PDN-6 | fixed | C616 2.2u F 1.37 mm from U101.1; C620 2.2u B on U302.9 (touching); C615 1u B 0.80 mm from U302.6 (board) |
+| PDN-7 | fixed | C606 / C622 100n F 1.56 mm from U401.1 / U402.1 beside C404 / C409 (board) |
+| PDN-8 | fixed | GVA chokes L404 / L406 on /+5V1 (board pad 2, netlist), not on the TPS63802 input |
+| DECOUPLING-1 | fixed | C614 10n F 0.51 mm from U101.10, GND via 0.92 mm (board) |
+| DECOUPLING-2 | open | U302 still has only bottom-side capacitors (C305, C307, C620); low, no top-side room |
+| DECOUPLING-3 | fixed | C303 1n F 0.40 mm from U301.5, GND via 0.65 mm; C301 B on U301.10 (board) |
+| DECOUPLING-4 | fixed | U604.3: C613 100n F 0.59 mm, C612 22u F 1.63 mm (board) |
+| DECOUPLING-5 | partly | C508 now F 0.44 mm from U502.7 with its GND via at 0.35 mm (board); the +3V3_CLK via still sits on the pin side of C508 (audit D2p, no room: CLK2 track) |
+| DECOUPLING-6 | partly | C505 GND via 0.70 mm (was 1.74); C502 / C506 still share the GND via at (59.55, 8.65) (board; no free spot) |
+| DECOUPLING-7 | mitigated | C309 100n moved to F, 0.54 mm from U303.1 (board); no 1 nF added |
+| DECOUPLING-8 | fixed | C602 100n B 0.19 mm from U608.5 (board) |
+| BIASTEE-1 | fixed | GVA drain from /+5V1: 4.84-5.09 V worst case (recheck-power section 3; nets verified on the board) |
+| BIASTEE-2 | mitigated | 100n now at the U401 / U402 VCC pins (PDN-7); the C403 / C408 vs C432 / C433 reference swap is not reconciled in the schematic |
+| BIASTEE-3 | open | six-layer tee parasitics not re-simulated; measure S21 on the first board |
+| BIASTEE-4 | fixed | C419 / C429 100n B beside the L404 / L406 cold pads, own GND vias, both placed alike (board) |
+| BIASTEE-5 | open | FB301 cut not added; not re-measured |
+| BIASTEE-6 | partly | no via inside any inductor pad (board); open vias remain in other soldered pads, see RF2-4 |
+| ZONES-1 | fixed | L3 GND at most 6.0 mm from a GND via anywhere in the tap row (board, 0.25 mm raster; was 23.2 mm) |
+| ZONES-2 | fixed | L6 GND at most 6.1 mm from a GND via inside the board (board; 7.6 mm only at the board corner; fingers were 13-19 mm) |
+| ZONES-3 | mitigated | FPGA fan-out vias staggered: slots at most 3.25 x 1.95 mm (recheck-fixes); COARSE / TAP0-4 via stair and mcuif row remain (no room) |
+| ZONES-4 | mitigated | GND via within 1 mm at all strobe vias incl. both S_STROBE_N vias; about half of the TAP / FPGA fan-out vias still without (no room) |
+| THEORY-1 | fixed | 768 Mbit/s (VCO 768 MHz, FCLK 384 MHz, PCLK 76.8 MHz): SPEC decision 18, `kicad/gen/gen_fpga_clock.py`, kicad/README, ToO section 6 |
+| THEORY-2 | mitigated | ToO figures restated for the as-built 30 ps / 480 ps (0.023 f stamps/s, 10 k/s from 430 kHz); `sim/phase_array` not re-run |
+| THEORY-3 | fixed | as BIASTEE-1 |
+| THEORY-4 | documented | ToO section 6 "Data rate": burst rate, SRAM burst length, sustained about 0.25 MS/s; no firmware exists |
+| THEORY-5 | mitigated | kick-out re-simulated with the final chain: 22 mVpp at the trigger end at +/-1.3 V (`sim/strobe_arms`); FPGA rejection of the coincident phase strobe documented (ToO section 5), not implemented |
+| THEORY-6 | open | input and sampler decks not re-run with the built node capacitances; stated in ToO key figures and risk 2 |
+| THEORY-7 | documented | ToO noise figure and correction factor (2.2) tied to the strobe case |
+| THEORY-8 | documented | ToO stub, six-layer line geometry, TRIG_LEVEL reset state, latch window, `sim/bias_tee` in section 10; kicad/README stale lines; SPEC decisions 4, 9, 17 marked superseded |
+| IO-1 | fixed | as THEORY-1 |
+| IO-2 | open | TAP0-3, TAP8-11, ADC_TRIG still on IOR6 pins; fabric capture in a 10.8 ns window (ToO risk 7) |
+| IO-3 | open | CLK2_FPGA still on pin 34 (schematic not changed) |
+| IO-4 | mitigated | UCPD_DBDIS before USART1 documented (kicad/README, ToO section 6) |
+| IO-5 | open | no Gowin place-and-route run |
+| IO-6 | documented | ADC_TRIG and DBG2 (pin 8) text in kicad/README; IDES pin 27 corrected |
+| PARTS-1 | mitigated | R402 / R408 / R412 in 0603 (netlist); R404 / R410 / R414 stay 0402 (lower dissipation) |
+| PARTS-2 | open | R401 / R407 / R411 still 47 R; set FPGA drive 8 mA in firmware |
+| PARTS-3 | open | T401 still on the Coilcraft 0805USB land |
+| PARTS-4 | partly | VBIAS_K limited to 1.40 V (R735 4.7k / R736 5.1k, netlist) and firmware limit 1.30 V; falling-edge overload still 3.93 V vs 4 V (RF2-7) |
+| PARTS-5 | open | documented, no change |
+| PARTS-6 | fixed | LM337 removed (netlist) |
+| PARTS-7 | mitigated | XTAL_CL = 10 pF for the 12 pF crystal plus about 2 pF board (gen_fpga_clock.py note) |
+| PARTS-8 | open | accepted (logic correct) |
+| PARTS-9 | partly | DNP parts (C631, D402, D403, R122) excluded from the placement file; KiCad 7 board has no DNP flag (4 parity warnings); D602 no longer exists |
+
+### Findings of the re-checks
+
+`validation/recheck-power.md` numbers its findings RP-1 to RP-9. The new or worse items of `validation/recheck-fixes.md`
+are numbered RF2-1 to RF2-9 as in the repair log (`layout/board/README.md`): RF2-1 +2V5 copper at BUF_OUT_T, RF2-2 ToO
+and root README not updated, RF2-3 plane vias at IC pins rather than at the capacitor, RF2-4 open vias in soldered pads,
+RF2-5 PH_STROBE_N over the TAP5 via antipad, RF2-6 supply copper next to fast nets, RF2-7 bridge diode reverse voltage on
+the falling edge, RF2-8 the first-validation items still open (above), RF2-9 DNP / part-number gaps.
+
+| Id | Status | How / where, or why open |
+|---|---|---|
+| RP-1 | fixed | C617 / C621 / C628 / C630 on F at OUT+ / OUT- of U604 / U605, 1.13 / 0.63 / 0.75 / 0.66 mm pad to pin, no via between (board) |
+| RP-2 | documented | OUT- worst-case headroom 0.06-0.11 V in kicad/README, power-tree.md, ToO section 7 |
+| RP-3 | fixed | C632 47u tantalum fitted (netlist, BOM C22036); plug-in transient to be measured |
+| RP-4 | open | CC pins not sensed (needs MCU pins and a schematic change); 1.5 A source requirement documented |
+| RP-5 | open | U603 PGND return 3.6 mm and LM27762 pump-capacitor returns 3.6-4.0 mm (C626 GND via 2.1 mm from its pad centre); rotating the capacitor would move it off CP |
+| RP-6 | documented | +3V3 3.21-3.42 V with the 1 % divider (kicad/README, power-tree.md, ToO) |
+| RP-7 | documented | 48 MHz harmonics noted (ToO section 7, kicad/README) |
+| RP-8 | mitigated | accepted: U602 switch node on B, Y501 on F, four planes between |
+| RP-9 | fixed | C618 C15849, C619 C19666 in the netlist and BOM (numbers from memory: confirm stock at order) |
+| RF2-1 | fixed | as RF-7: no +2V5 copper beside BUF_OUT_T (board) |
+| RF2-2 | documented | ToO (clock, power, sampler, phase detector, risks) and root README updated |
+| RF2-3 | partly | U704.24, U101.8 fixed (capacitor nearer the pin than the via, board). U502.1: the via now abuts C623's pad (0.2 mm) but is still on the pin side. Kept by design: U101.1 / .12, U501.1 (capacitor first in the copper path), U704.36 (pull-up feed). Open, no room: U704.1 / .48, U502.7, U310.8; the audit also flags U501.25 / .36 and U502.1 (D2s / D2p). Current `decap_audit.py`: D1 1 (U101.6, pins 5 / 6 share C112), D2s 8, D2g 3, D2p 10 |
+| RF2-4 | open | order note for resin-plugged, capped vias (SPEC decision 24, board README); vias not moved |
+| RF2-5 | fixed | TAP5 via 0.40 mm, 0.385 mm from the PH_STROBE_N edge; antipad clear of the trace (board) |
+| RF2-6 | partly | rail router keeps 0.15 mm extra from fast nets (rail edge >= 0.33 mm); FPGA pin necks 0.155-0.22 mm remain (0.5 mm pin pitch) |
+| RF2-7 | mitigated | firmware limit of 1.30 V on both bias magnitudes (SPEC decision 21, kicad/README, ToO): 3.93 V at overload against 4 V; CLH/CLL +/-1.2 V would add 0.3 V of margin (not done) |
+| RF2-8 | open | see the open rows above (RF-5, DECOUPLING-2, BIASTEE-3 / -5, IO-2 / -3 / -5, PARTS-2 / -3 / -5 / -8, THEORY-6) |
+| RF2-9 | partly | DNP parts off the placement file; 43 fitted BOM lines still without an LCSC number (docs/bom.md) |
