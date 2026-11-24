@@ -36,11 +36,11 @@ GVA-84+ move from VBUS to +5V1 fixes BIASTEE-1 and PDN-8 together.
 ## 3. Per-regulator table
 | | U601 TPS62A01A | U602 TPS62A01A | U603 TPS63802 | U604 LM27762 A | U605 LM27762 B |
 |---|---|---|---|---|---|
-| Vin in circuit | 4.60-5.25 | 3.25-3.38 | 4.60-5.25 | 5.03-5.15 (after FB602) | 3.24-3.37 (after FB605) |
-| Vout | 3.315 (100k/22.1k); FB 591-609 mV -> 3.25-3.38 | 1.200 (100k/100k) | 5.099 (459k/49.9k 0.1 %); FB +/-1 % -> 5.04-5.16 | +4.800 (300k/100k), -4.636 (280k/100k); FB +/-1.5 % | +2.500 (130k/120k), -2.501 (105k/100k), dividers 0.1 % |
+| Vin in circuit | 4.60-5.25 | 3.21-3.42 | 4.60-5.25 | 5.03-5.15 (after FB602) | 3.24-3.37 (after FB605) |
+| Vout | 3.315 (100k/22.1k); FB 591-609 mV -> 3.25-3.38, with the 1 % divider 3.21-3.42 (recheck RP-6) | 1.200 (100k/100k), 1.17-1.23 | 5.099 (459k/49.9k 0.1 %); FB +/-1 % -> 5.04-5.16 | +4.800 (300k/100k), -4.636 (280k/100k); FB +/-1.5 % | +2.500 (130k/120k), -2.501 (105k/100k), dividers 0.1 % |
 | Load typ/max | 0.51/0.67 A | 20/30 mA | 0.29/0.34 A | 37/41 mA each side | 40/48 (+), 42/50 (-) mA |
 | Dropout (DS) | 100 % mode: VIN >= VO + I(RDSON_HS 0.18 + R_L 0.05) = 3.53 V (sec. 7.3.2 eq. 1, table 6.5) | VIN-VO 2.1 V, n/a | buck-boost: regulates for VIN above and below VO (sec. 9.4) | OUT+ 45 mV at 100 mA (5.5 table, Fig 5-3, ~20 mV at 41 mA); OUT-: VCP = VIN - RNEG x I, RNEG 2.5 ohm (Fig 5-4, 4 ohm used hot), LDO 30 mV at 100 mA | same; RNEG at 3.3 V not specified, 5 ohm assumed |
-| Margin | >= 1.07 V | 2.1 V | n/a | OUT+ >= 0.14 V; OUT- 5.03 - 0.17 - 0.015 - 4.71 = 0.14 V | OUT+ 3.24 - 2.54 = 0.70 V; OUT- 3.24 - 0.25 - 0.03 - 2.54 = 0.42 V |
+| Margin | >= 1.07 V | 2.1 V | n/a | OUT+ >= 0.14 V; OUT- worst case 5.02 - (0.19..0.23) - (0.013..0.026) - 4.711 = 0.06-0.11 V, typ 0.26 V (recheck RP-2: RCP about 4.5 R at 41 mA, 5.5 R assumed at 5 V in) | OUT+ 3.24 - 2.54 = 0.70 V; OUT- 3.24 - 0.25 - 0.03 - 2.54 = 0.42 V |
 | Abs max / ROC | VIN 6.5 / 5.5 V: OK (hot-plug: sec. 7) | OK | VIN, VOUT 6.0 V; VOUT ROC <= 5.2 V: 5.16 OK | VIN 5.8 / 5.5 V: 5.15 OK (fixes PDN-5) | OK |
 | Dissipation, Tj at 25 C | 0.19 W typ / 0.30 W max (eta 0.90 / 0.88 assumed), RthJA 157 K/W -> +27 / +45 K | < 5 mW | 0.13 / 0.20 W (eta 0.92 / 0.90 est.), 81 K/W -> +11 / +16 K | 0.032 / 0.040 W (eq. 5), 62.2 K/W -> +2 K | 0.067 / 0.088 W, +4 / +6 K |
 | CIN (derated) | C603 10u 0805 25 V X5R (~5.5 uF at 5 V) + C602 100n; DS: 4.7 uF | C609 10u 0805 (~7 uF) + C607 1u | C601 22u 0805 (~6.5 uF at 5 V); DS: >= 4 uF effective | C612 22u 0805 (~6.5 uF) + C613 100n; DS 4.7 rec., >= 2 min | C625 10u 0805 (~7 uF) |
@@ -60,7 +60,8 @@ All capacitors are MLCC; every part above is specified for ceramic output capaci
 | -2V5 -> trigger level | 22 uV rms | 0.14 V/V | 3 uV rms |
 | TPS62A01A -> +3V3 | dIL 0.39 A pp (1 uH, 2.4 MHz) -> 0.4-0.9 mV pp on ~25-55 uF | FPGA allows 165 mV; FB605 + C625 + LM27762 PSRR (43-50 dB at 10 kHz, Fig 7-3/7-4) for +/-2V5 | uV level at +/-2V5 |
 | TPS63802 -> +5V1 -> GVA Vd | ~2.5 mV pp (0.5 A pp / 8 f C, 13 uF) | 2.2 uH tee + 10 uF cold end: -58 dB at 1.4 MHz | < 5 uV; LM27762 A input via FB602 + 22 uF |
-Frequencies: buck 2.4 MHz (2nd harmonic 4.8 MHz, clear of 3.125 MHz); LM27762 1.7-2.3 MHz; TPS63802 1.4 MHz (buck-boost) to 2.1 MHz
+Frequencies: buck 2.4 MHz (2nd harmonic 4.8 MHz; but 20 x 2.4 = 48.0 MHz and LM27762 24 x 2.0 = 48.0 MHz land on the
+PH strobe at nominal frequency, recheck RP-7: free-running, slow beats possible; look for beat spurs in a flat-input capture on bring-up); LM27762 1.7-2.3 MHz; TPS63802 1.4 MHz (buck-boost) to 2.1 MHz
 (boost) in FPWM, so its 2nd harmonic can sit near 3.125 MHz and harmonics near 48 MHz. Its residue at the sensitive nodes is below
 5 uV by the chain above, so an aliased beat stays far under the floor. TLV62569 (1.5 MHz, 2nd harmonic 3.0 MHz) was avoided for that reason.
 Ripple at the hold node from all paths: a few uV, << 0.35 mV. Accuracy of -2V5: FB-/1.5 % + 0.1 % divider = +/-1.7 % (+/-43 mV) vs LM337 +/-3 %;
@@ -138,4 +139,5 @@ are estimates; XR0420-R47M stock 65 (2nd source listed, its land not checked); b
   resonates near 45 kHz with Q about 3, instead of about 120 kHz with Q about 7 with 1.2 uF.
 - U605 PGOOD to GND (as U604). Divider resistors of U603-U605 are 0.1 % (R603 459k is an E192 value).
 - Added DNP footprints: C631 120 pF (U601 Cff) and C632 47 uF 10 V tantalum (C22036, VBUS damper, section 7).
+  Recheck RP-3 (24 Nov): C632 is now fitted by default (0.25 USD).
 - Generated BOM: **63.76 USD** (limit 80), against the 63.58 estimate in section 6.

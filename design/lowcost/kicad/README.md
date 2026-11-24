@@ -132,17 +132,19 @@ DS841-2.8E table 3-20, LV C6/I5), CLKDIV /5 -> PCLK 76.8 MHz. OSER10 (strobes) a
 
 | Rail | Regulator | From | Vout | Load typ / max | VIN at the part, dropout margin | Price |
 |---|---|---|---|---|---|---|
-| VBUS | USB-C 16P, F601 PTC 1.5 A, D601 SMAJ5.0A, FB601 220R 2 A | USB | 4.60-5.25 V | 0.75 / 0.97 A | - | ~0.3 |
-| +3V3 | U601 TPS62A01ADRLR buck 2.4 MHz FPWM, L602 1 uH, R609 100k / R610 22.1k | VBUS | 3.315 V (3.25-3.38) | 0.51 / 0.67 A | 4.60-5.25 V; 100 % mode needs 3.53 V: >= 1.07 V | 0.197 |
-| +1V2 | U602 TPS62A01ADRLR, L603 1 uH, R611 / R612 100k | +3V3 | 1.200 V | 20 / 30 mA | 3.25-3.38 V: 2.1 V | 0.197 |
+| VBUS | USB-C 16P, F601 PTC 1.5 A, D601 SMAJ5.0A, FB601 220R 2 A, C632 47u tantalum damper (fitted) | USB | 4.60-5.25 V | 0.75 / 0.97 A | - | ~0.3 |
+| +3V3 | U601 TPS62A01ADRLR buck 2.4 MHz FPWM, L602 1 uH, R609 100k / R610 22.1k | VBUS | 3.315 V (3.21-3.42 incl. 1 % divider; 3.25-3.38 reference only) | 0.51 / 0.67 A | 4.60-5.25 V; 100 % mode needs 3.53 V: >= 1.07 V | 0.197 |
+| +1V2 | U602 TPS62A01ADRLR, L603 1 uH, R611 / R612 100k | +3V3 | 1.200 V (1.17-1.23) | 20 / 30 mA | 3.21-3.42 V: 2.0 V | 0.197 |
 | +5V1 | U603 TPS63802DLAR buck-boost FPWM, L601 0.47 uH, R603 459k / R604 49.9k (0.1 %) | VBUS | 5.10 V (5.04-5.16) | 0.29 / 0.34 A | regulates above and below VOUT | 0.951 |
-| +5V / -5V | U604 LM27762DSSR (pump + LDOs) via FB602; FB604 / FB603 at the outputs | +5V1 | +4.80 / -4.64 V | 37 / 41 mA each | 5.03-5.15 V (<= 5.5 V); OUT+ and OUT- >= 0.14 V | 0.960 |
+| +5V / -5V | U604 LM27762DSSR (pump + LDOs) via FB602; FB604 / FB603 at the outputs | +5V1 | +4.80 / -4.64 V | 37 / 41 mA each | 5.02-5.15 V (<= 5.5 V); OUT+ >= 0.14 V; OUT- worst case 0.06-0.11 V (typ 0.26 V; RCP 4.5-5.5 R at 41 mA, recheck RP-2) | 0.960 |
 | +2V5 / -2V5 | U605 LM27762DSSR via FB605; FB606 / FB607 at the outputs; EN = PG_5V1 | +3V3 | +2.500 / -2.501 V (0.1 % dividers) | 40-48 / 42-50 mA | 3.24-3.37 V; OUT+ 0.70 V, OUT- 0.42 V (RNEG 5 R assumed) | 0.960 |
 
 Totals: 3 regulator types, 5 ICs, BOM +0.9 USD against the 7-type tree. +5V / -5V keep their net names (4.80 / -4.64 V):
 BUF802 VS >= 9.30 V (min 9 V). GVA-84+ drain 4.86-5.10 V at any USB voltage (+5V1, own track from C610 / C611).
 Sequencing: +3V3 1 ms soft start, +1V2 from +3V3 (1.2 mV/us), +/-5V with +5V1, +/-2V5 after the TPS63802 power good.
-Hottest part U601: 0.19 / 0.30 W, +27 / +45 K. Open: USB hot-plug ringing vs the 6.0 / 6.5 V abs max (C632 DNP damper),
+Hottest part U601: 0.19 / 0.30 W, +27 / +45 K. USB hot plug: C632 47u tantalum damper now FITTED (recheck RP-3: SMAJ5.0A
+clamps at about 9 V, U603 abs max 6.0 V); measure the plug-in transient on the first board. -5V headroom: check OUT- on a
+cold board at the low +5V1 corner; if short, a lower-DCR FB602 (do not lower |OUT-|: BUF802 VS- margin 55 mV). Open:
 TMUX136 supply ramp, LM27762 RNEG at 3.3 V, XR0420 stock 65 (second source C49232844, land not checked).
 
 ## MCU (STM32G474CBT6, LQFP-48, U704; on board since 21 Nov 2026)
@@ -201,7 +203,10 @@ DAC loads: TRIG 5.1k + 8.87k||2.0k = 6.7k (>= 5k, max 0.47 mA); VOFS 24.9k to a 
 (max 0.43 mA at 2.7 V); VBIAS_K 9.8k (OPAMP3 <= 0.28 mA at 2.7 V); VTAP_TH 31k. Bridge at reset: anode rail about -1.7 V,
 cathode rail 0 V, never forward-biased; with the DACs at code 0 -1.54 V / +0.0 V (OPAMP3 low limit). Nominal bias
 +/-1.3 V (VBIAS_A DAC 0.62 V, VBIAS_K DAC 2.50 V; sim/strobe_arms), trimmed per board for efficiency ~100 %; the
-VBIAS_K limit 1.40 V keeps the BAT15-04W reverse voltage <= 2.9 V at the -1.5 V input clamp (VR 4 V). Firmware: enable VREFBUF, DAC1/2/3 and OPAMP1/3 (with their self-calibration)
+VBIAS_K limit 1.40 V keeps the BAT15-04W reverse voltage <= 2.9 V at the -1.5 V input clamp (VR 4 V) for the static
+and sampling-edge case only; the S_STROBE falling edge adds about 1.1 V (sim/strobe_arms: 3.93 V at +/-1.3 V bias,
+4.03-4.18 V at the range ends or with a +10 % strobe, recheck RF2-7). Firmware rule: |VBIAS_A|, |VBIAS_K| <= 1.30 V
+(3.93 V at a full +/-1.5 V input overload, 160 ps pulse); larger bias only for strobe amplitudes below nominal. Firmware: enable VREFBUF, DAC1/2/3 and OPAMP1/3 (with their self-calibration)
 before the strobes; DAC_TRIG and VNEG_REF also before trusting the trigger.
 
 **-2V5 rail dependence** (24 Nov 2026: U605 LM27762, FB- reference -1.22 V +/-1.5 % with a 0.1 % divider: +/-1.7 % =
@@ -224,7 +229,21 @@ output; C609 10u + C607 1u -> U602 VIN; C605 22u + C608 1u -> U602 output; C601 
 C610 / C611 22u -> U603 VOUT (6) / GND (8), both loops tight on the top side; C613 100n (closest) + C612 22u -> U604
 pin 3 on the IC layer (DECOUPLING-4); C618 1u 0603 -> U604 C1+ / C1- (10 / 9); C626 10u -> U604 CP (5); C617 10u ->
 U604 OUT+ (11); C621 10u -> U604 OUT- (6); C625 10u -> U605 pin 3; C624 1u -> U605 C1; C619 4.7u 0603 -> U605 CP;
-C628 10u -> U605 OUT-; C630 10u (new) -> U605 OUT+. CIN and CCP grounds join at LM27762 pin 4; R1-R4 at the FB pins.
+C628 10u -> U605 OUT-; C630 10u (new) -> U605 OUT+. CIN and CCP grounds join at LM27762 pin 4.
+As built (REPAIR 24 Nov, recheck RP-1): all four LM27762 output capacitors on the IC layer (top) at their pins, no via
+between pin and capacitor, plane / rail vias behind the capacitors; the FB dividers of U604 and U605's FB- divider on
+the bottom under the cell, U605's FB+ divider (R615 / R616) on top north of C625. C602 100n sits at U608 (USBLC6) pin 5
+(VBUS), bottom side (DECOUPLING-8), not at U601. Capacitor-to-pin, as built (pad edge to pin pad edge, `decap_audit.py`):
+
+| Cap | Pin | Side | mm | Cap | Pin | Side | mm |
+|---|---|---|---|---|---|---|---|
+| C613 100n | U604.3 VIN | top | 0.59 | C625 10u | U605.3 VIN | top | 0.53 |
+| C618 1u | U604.10 / 9 C1 | top | 0.5 | C624 1u | U605.10 / 9 C1 | top | 0.5 |
+| C617 10u | U604.11 OUT+ | top | 1.13 | C630 10u | U605.11 OUT+ | top | 0.66 |
+| C621 10u | U604.6 OUT- | top | 0.63 | C628 10u | U605.6 OUT- | top | 0.75 |
+| C601 22u | U603.10 VIN | top | 0.93 | C610 22u | U603.6 VOUT | top | 0.93 |
+| C603 10u | U601.3 VIN | top | straddles pins 3 / 1 | C609 10u | U602.3 VIN | bottom | straddles pins 3 / 1 |
+| C602 100n | U608.5 VBUS | bottom | 0.80 | C508 / C509 | U502.7 / U502.1 | top | 0.44 / 0.89 |
 
 Moved to load pins on other sheets (drawn in the power sheet box "at the loads", net unchanged unless stated):
 
@@ -243,7 +262,7 @@ Moved to load pins on other sheets (drawn in the power sheet box "at the loads",
 
 Reference changes for the layout (24 Nov 2026, against `layout/board/scope-fe.kicad_pcb`):
 - Removed: D602 (SOD-123), U606 (SOT-23-5), U607 (SOT-223).
-- Added: C630 10u 0805; C631 120p 0402 DNP; C632 47u CP_EIA-3528-21_Kemet-B DNP; FB604-FB608 0603
+- Added: C630 10u 0805; C631 120p 0402 DNP; C632 47u CP_EIA-3528-21_Kemet-B (fitted since the recheck, RP-3); FB604-FB608 0603
   (BLM18KG601SN1D); L602, L603 1u L_1008_2520Metric; R609-R617 0402.
 - New footprint / part on an existing ref: U601, U602 SOT-563 (TPS62A01A); U603 `scope-fe:Texas_DLA0010A_VSON-HR-10_2x3mm_P0.5mm`;
   U604, U605 WSON-12-1EP_3x2mm_P0.5mm_EP1x2.65 (LM27762); L601 `scope-fe:L_XR0420_4.4x4.2mm`; FB602, FB603 0805 -> 0603;
@@ -253,12 +272,12 @@ Reference changes for the layout (24 Nov 2026, against `layout/board/scope-fe.ki
   capacitors above.
 
 DECOUPLING-2 / -3 (TLV3801 HF caps, TMUX136 C301 / C303 within 1 mm of pins 10 / 5) are placement items for the layout;
-no part is added. Only new capacitor: C630. DNP footprints: C631 120 pF (U601 Cff across R609), C632 47 uF 10 V tantalum
+no part is added. Only new capacitor: C630. DNP footprint: C631 120 pF (U601 Cff across R609); fitted damper C632 47 uF 10 V tantalum
 (VBUS hot-plug damper, at U601 / U603 input).
 
 ## BOM
 
-`docs/bom.md` (generated): **63.76 USD for one board** (24 Nov 2026 power tree; 62.85 before) (MCU included, PCB
+`docs/bom.md` (generated): **64.01 USD for one board** (C632 fitted, C618 / C619 LCSC numbers, 24 Nov 2026; 63.76 before) (MCU included, PCB
 excluded) against the 80 USD budget, 6.1 USD of it estimates. Largest lines: TRF37D73 x5 7.50, GW1NZ-1 6.68, BAT15-04W x18 6.58, GVA-84+ x2 5.98, BUF802 5.89,
 TLV3801 5.13, STM32G474CBT6 4.11. J501 (WR-WST footprint) is a 0 USD footprint-only line, not counted as a part.
 First order with LCSC minimum quantities ~88 USD. LCSC numbers that pointed at other parts were corrected (power LDOs,
@@ -277,20 +296,21 @@ Integration (21 Nov 2026):
   price on the LCSC page (only search snapshots read).
 - Stock: BAT15-03W (C5310874) 0 at LCSC; TRF37D73 25 at LCSC (Mouser has stock); SMA
   edge connectors not sourced (2 x ~2 USD estimate). TP2272 no longer used (U701 is a TLV9001IDBVR, LCSC C398363).
-- LCSC numbers missing (BOM `est`): 1.5p, 2.2p, 3.3p, 100p, 470p, 220p, 2.2u 0402, 4.7u 0603, 1% values (4.99M,
-  300k, 17.8k, 22.1k, 24.9, 499, 82, 91, 68, 47, 470, 49.9, 24.9k, 34.0k, 14.7k, 7.5k, 8.87k, 2.0k, 30k, 78.7k, 499k,
-  1.54M, 18k, 2.7k), 600R beads, 47 uH 1008, 120 nH 0402, 4.7 uH SRN4018, 50k trimmer.
+- LCSC numbers missing: 43 fitted BOM lines (24 Nov 2026), mostly 0402 C0G values (1.5p, 2.2p, 3.3p, 100p, 470p,
+  220p), 1 % resistor values, the 0.1 % power dividers, 2.2u 0402, the 50k trimmer, the green LED, the SMA connectors
+  and the GVA-84+ (Mouser); list in `docs/bom.md` (empty LCSC column).
 - Control voltages (21 Nov 2026): DS12288 DAC/OPAMP load limits and the VREFBUF reset state (high-Z) taken from
   adc.md / the brief, PDF not re-read; PA6 sees about -0.4 V / 0.17 mA substrate injection while the DAC is off
   (reset, bootloader): within the absolute maximum as remembered, check IINJ in DS12288; the input_stage layout fragment
   needs R119 24.9k and the new R123 (Rmid, VNEG_REF); trigger_phase fragment needs R383-R385. VBIAS_A / VBIAS_K ranges
-  (-1.46..-0.50 / +0.2..+2.7 V) cover the strobe RESULT window 0.5..1.2 V; the 40 / 75 ps re-simulation is still open.
+  (-1.46..-0.50 / +0.10..+1.40 V, firmware limit 1.30 V) cover the strobe_arms trim span +/-0.9..1.3 V; the re-simulation
+  of the as-built 39.4 / 69.4 ps phase lines is still open.
 - Tap hold caps are 0.5 pF (nearest stocked C0G value, LCSC C1544) instead of 0.47 pF.
-- Power tree (24 Nov 2026): LCSC numbers to assign for the 0.1 % 0402 divider resistors (class price 0.02 USD), 1u 0603
-  25 V (C618), 4.7u 0603 (C619), 2.2u 0402 10 V (C616); the C618 field carried an 0402 part number before.
+- Power tree (24 Nov 2026): LCSC numbers to assign for the 0.1 % 0402 divider resistors (class price 0.02 USD) and
+  2.2u 0402 10 V (C616 / C620); C618 C15849 and C619 C19666 assigned in the repair round (from memory: confirm stock).
 - Sampler ADC must sample before the S_STROBE falling edge (+167 ns at 3.0 MHz) - FPGA/MCU firmware timing.
-- Phase strobe stubs now 80 ps (13.2 mm) per sim/phase_array (strobe sheet; not part of the phase_trigger fragment,
-  which takes PSTRB_A/K from its X2/X3 interfaces); signal-line meander drawn 70 ps per tap for 75 ps, strobe lines 40 ps per tap (layout pitch 4.514 mm).
+- Phase strobe stubs 80 ps (13.503 mm at 5.925 ps/mm on the six-layer board) per sim/phase_array. Six-layer tap
+  lines: signal 69.4 ps, strobe 39.4 ps per tap (pitch 4.514 mm), about 30 ps effective, not re-simulated.
 - Remaining cosmetic text overlaps: power sheet value/power-symbol labels, COS3502 power units, MS5351M
   +3V3 pair.
 
@@ -299,9 +319,11 @@ Earlier:
 2. (Closed 21 Nov 2026) TP2272 was specified 2.7-36 V (datasheet Rev D.1), so +/-2.5 V was legal; it is no longer used.
    U701 TLV9001: 1.8-5.5 V, RRIO, Vos 0.4 mV typ / 1.6 mV max, 0.6 uV/K (TI SBOS833R), run at +/-2.5 V.
 3. MODE[1:0] = 00 for autoboot from internal flash is from memory of Gowin UG290; verify. Verify in Gowin
-   EDA that OSER10 can be placed on IOT16/IOT17 and IDES on pin 47 (GW1NZ-1 IO logic placement rules).
+   EDA that OSER10 + IODELAY can be placed on IOT16/IOT17 (both pins of each pair) and IDES10 on pin 27 (GW1NZ-1 IO
+   logic placement rules).
 4. USB power 0.75 A typ / 0.97 A max exceeds a default USB port (0.5/0.9 A): needs a 1.5 A-capable USB-C supply (no PD
-   negotiation on board). (AMS1117 dissipation: closed, buck since 24 Nov 2026.)
+   negotiation on board; CC1 / CC2 are not sensed, so the board cannot detect the source's current: recheck RP-4, kept
+   as a documented requirement; CC sensing would need two MCU ADC pins and a schematic change). (AMS1117 dissipation: closed, buck since 24 Nov 2026.)
 5. (Closed 24 Nov 2026) LM337 replaced by the LM27762 U605 (ceramic-stable).
 6. MS5351M exact equivalence to Si5351A (register map, crystal load) assumed from its datasheet claim.
 7. GVA-84+ chains (strobe sheet) are on +5V1 via their own chokes (24 Nov 2026; was VBUS).

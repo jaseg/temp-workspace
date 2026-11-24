@@ -172,3 +172,7 @@ slow lines need reserved gaps. One owner now handles both modules, with this all
   in the analog block); it ties into the block's vias behind C112. Power block: VBUS enters U603 / U601 through 3 vias
   behind C601 (87.0, 0.65-1.95), /+5V1 leaves through 2 vias behind C611 (86.4, 10.95 / 11.65); U603 EN / MODE and FB use
   short block-internal In2 lines (83.6, 4.15) -> (87.0, 1.95) and (83.65, 5.4) -> (88.71, 9.94).
+- REPAIR (24 Nov): +5V source (82.05, 7.0) behind FB604, -5V source (74.4, 13.6); the power block adds an In2 sense line
+  +2V5_LDO (81.6, 17.75) -> y 17.4 / 17.1 -> (74.56, 16.91) (U605 FB+ divider on top). U301 +2V5 now joins at C306's via
+  (11.1, 24.6) only (the vias beside BUF_OUT_T are gone). widen() checks foreign copper exactly.
+

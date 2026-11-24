@@ -70,6 +70,8 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
    the signal line takes 75 ps per tap (meander between taps; 0.26 mm / 59 R trace, 9.929 mm, drawn 70 ps per tap
    loaded to 50 R; delays raised from 35 / 70 ps so the meander keeps 0.5 mm same-net gaps), launched from the same end, so the effective tap spacing is
    75 - 40 = 35 ps. Verified in `sim/phase_array/` for 35 / 70 ps; the 40 / 75 ps layout is not re-simulated.
+   (Superseded for the geometry by the six-layer board of decision 15: 0.10 mm lines, 39.4 ps strobe and 69.4 ps signal
+   per tap, about 30 ps effective, PSTRB terminations 43 R (decision 22); not re-simulated.)
 5. **Tap readout**: 2.2 k to VTAP_P/VTAP_N (+/-2.5 V), 2 x 1 k summing to the comparator, threshold
    VTAP_TH 0..+80 mV; rising edges only (line feed-through, see `sim/phase/RESULT.md`).
 6. **TMUX136** on a local -0.9 V ground; **SN65LVDS2** coarse receiver bridged with 2 x 470 R; 100 R across
@@ -82,6 +84,7 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
    every RF trace must have its calculated width for its target impedance over its whole length, with ground
    pour clearance large enough (>= 2 x trace width, or the coplanar effect included in the calculation).
    Layer 2 solid ground, 0402 passives (0201 where a simulation asks for it), SMA edge-launch connectors.
+   (The stack-up is superseded by decision 15; the width and pour-gap rules still apply.)
 10. No switchable termination (user decision): external feed-through terminator.
 11. Programming header: Würth WR-WST 490107671612 with the yanartas sensing board J3 pinout (J501, footprint only).
 12. STM32G474 on board (user decision, 21 Nov 2026): STM32G474CBT6 LQFP-48 (U704) replaces the MCU header J701; USB FS
@@ -108,6 +111,7 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
     19. Variant if two ADCs run together and the ADC clock limit is lower (about 52 MHz, unverified): ADC 48 MHz, sampling
     strobe 2.4 MHz = 20 ADC clocks = 400 bits. An MCU timer triggers the ADC internally and marks the frame start on
     ADC_TRIG (PB11 -> FPGA); the FPGA aligns its strobe counter to it once (bit slips plus the output delay block).
+    (Serialiser rate and bit counts superseded by decision 18.)
 18. **Clock plan at 768 Mbit/s** (24 Nov 2026, validation THEORY-1 / IO-1; replaces the 960 Mbit/s of decision 17): 960 Mbit/s
     needs FCLK 480 MHz, above the GW1NZ-1 rPLL limit (DS841-2.8E table 3-20, LV C6/I5: VCO 400-800 MHz, CLKOUT <= 400 MHz).
     FPGA_CLK 24 MHz -> rPLL IDIV 1, FBDIV 16, ODIV 2: VCO 768 MHz, FCLK 384 MHz, PCLK 76.8 MHz (FCLK/5); OSER10 / IDES10 at
@@ -120,9 +124,17 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
     margin are in that note.
 20. **Decoupling by moving existing capacitors first** (user instruction, 24 Nov 2026): the freed regulator capacitors go to
     the new converters and to the load pins named in the validation (list in `kicad/README.md`); the only new capacitor is
-    C630 (U605 OUT+); C631 / C632 are DNP footprints.
-21. **Strobe arms and bias** (`sim/strobe_arms/RESULT.md`): the as-built 16.75 mm uncoupled 50 R balun arms stay; R204 sits
-    symmetrically in both arms; nominal bridge bias +/-1.3 V, trimmed per board. VBIAS_K is now 0.520 x DAC (R735 4.7k /
-    R736 5.1k, +0.10..+1.40 V) so the BAT15-04W reverse voltage stays below 4 V (validation PARTS-4).
+    C630 (U605 OUT+); C631 is a DNP footprint, C632 (VBUS damper) is fitted since the recheck (RP-3).
+21. **Strobe arms and bias** (`sim/strobe_arms/RESULT.md`, rev. 2): the as-built uncoupled 50 R balun arms stay (17.827 mm =
+    105.6 ps each); R204 sits symmetrically in both arms; nominal bridge bias +/-1.3 V, trimmed per board for an efficiency
+    of about 100 %. VBIAS_K is 0.520 x DAC (R735 4.7k / R736 5.1k, +0.10..+1.40 V; validation PARTS-4). Firmware keeps
+    |VBIAS_A| and |VBIAS_K| at or below 1.30 V: the S_STROBE falling edge adds about 1.1 V to the BAT15-04W reverse voltage,
+    3.93 V at a +/-1.5 V input overload (4 V rating). D401 stays fitted.
 22. **Small part changes** (validation, 24 Nov 2026): PSTRB_A/K terminations R379 / R378 43 R (loaded line 41.3 R, RF-3);
     pad input shunts R402 / R408 / R412 in 0603 (PARTS-1); MS5351M XTAL_CL = 10 pF for the 12 pF crystal (PARTS-7).
+23. **Decoupling layout rule** (user review, 24 Nov 2026): every decoupling capacitor sits at its supply pin on the IC's
+    side with the shortest loop, and the plane or rail vias sit at the capacitor (behind it), not at the IC pin. Converter
+    hot loops are closed on L1 (TPS63802 input / output 1.9 x 2.8 mm). `layout/board/decap_audit.py` checks the rule;
+    the exceptions without room are listed in `docs/VALIDATION.md` (RF2-3).
+24. **Plugged vias** (validation BIASTEE-6 / recheck RF2-4, 24 Nov 2026): the board is ordered with resin-plugged, capped
+    vias for the open vias that touch soldered pads (list in `layout/board/README.md`); the vias are not moved.

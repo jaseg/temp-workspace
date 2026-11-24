@@ -256,7 +256,7 @@ def main():
             "(0805, 90 R CM @100 MHz, LCSC C97855)\n"
             "as 1:1 TL balun: line 1 = signal -> STRB_A,\n"
             "line 2 = GND -> STRB_K, rails float.\n"
-            "STRB_A/K: 16.75 mm 50 R arms (99 ps), equal\n"
+            "STRB_A/K: 17.83 mm 50 R arms (105.6 ps, as built), equal\n"
             "+/-0.1 mm, uncoupled (sim/strobe_arms RESULT:\n"
             "no second sampling instant; bias +/-1.3 V).\n"
             "Step at the bridge ~4.3-4.6 V (sim).", P(173, Y + 12), size=T)

@@ -120,3 +120,9 @@ into 50.45 R loaded line fine. 40 / 70 ps re-simulation still open.
 - The phase L4 VTAP_P / VTAP_N strips are removed on the board (L4 = +3V3 only); board_power.py joins the tap-row vias on L3.
 
 - TIGHTEN (24 Nov): U310 cap C351 gets a GND via 0.6 mm east of its GND pad (just east of the board L6 fan-in, joined by the F pour); was 1.6 mm to the nearest GND via.
+
+## REPAIR (24 Nov, recheck RF2-1 / RF-7)
+- U301 pin 10 (+2V5): short F stub east and south to a 0.4 mm via beside pin 9 (1.5 mm from BUF_OUT_T's end), B track to
+  C301's +2V5 pad and north (x 9.03, under the old F track) to C306 / its via. The F track at x 9.20 beside BUF_OUT_T and
+  its two vias (0.105 mm via edge to the trace, antipads under it) are gone; L2 is solid under BUF_OUT_T. The pstrobe
+  cut-out (x >= 9.5) forbids a feed further east. Render: `phase_netview_u301.png`.

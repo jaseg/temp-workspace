@@ -1,7 +1,7 @@
 # layout/board: scope-fe integrated board (six layers), as built 24 Nov 2026
 
 One full run of `python3 gen_board.py` (about 80 s; `--prepower` stops before the supplies, `--powonly` after them; `--fast`
-is still broken) builds `scope-fe.kicad_pcb` / `.kicad_pro` / `routes.json`. Renders (`render` helper of boardlib, refilled
+is still broken) builds `scope-fe.kicad_pcb` / `.kicad_pro` / `routes.json`. Renders: `python3 render_board.py` (boardlib `render`, refilled
 copy): `scope-fe-L1.png` ... `L6`, `scope-fe-all.png`, `scope-fe-detail-{analog,fpga-south,mcu,power}.png`.
 
 ## As built (24 Nov 2026, new power tree)
@@ -38,7 +38,8 @@ VBIAS_A's analog via moved to (15.4, 15.9) (the analog block's BUF_OUT_T moved).
   >= 1.0 mm (blocks/fpga/README.md). Not feasible: the COARSE / TAP0-4 via stair (0.57 mm pitch) and the mcuif row.
 - ZONES-4: GND via within 1 mm of 42 of 82 fast-net vias (validation: 22 of 72), incl. both S_STROBE_N vias (0.65 mm).
   The other 40 sit in the dense fpga fan-out, the TAP output vias and the mcuif row; no free spot within 1 mm there.
-- DECOUPLING-5 / -6 (fpga block), DECOUPLING-8 (C602 moved to U608 pin 5), U603 / L601 compacted (switch nodes 1.9 mm).
+- DECOUPLING-5 / -6 (fpga block; C502 / C506 still share one GND via), DECOUPLING-8 (C602 moved to U608 pin 5), U603 /
+  L601 compacted (switch nodes 1.9 mm).
 - IO-3: not done (the schematic did not move CLK2 off pin 34).
 - TIGHTEN (24 Nov, user review of the power render): decoupling capacitors at their pins, plane vias at the capacitors.
   U603: C601 / C610 courtyards on the chip's (0.0 mm), VBUS / +5V1 pad 0.93 mm from VIN / VOUT (was 2.0), GND pads
@@ -47,24 +48,54 @@ VBIAS_A's analog via moved to (15.4, 15.9) (the analog block's BUF_OUT_T moved).
   U601 / U602: COUT under CIN (output loop 4.35 x 4.05 -> 4.0 x 2.7 mm), vias moved from the middle of the GND polygon to
   the capacitor pads, +3V3 vias behind C604 / C609. LM27762: GND vias at the CIN GND pads. Elsewhere (audit
   `decap_audit.py` over this board): analog U101 -5V rail via between pins 5 / 6 removed (via-only rule area over the pin
-  row; the rail now lands on the vias behind C112), phase U310 C351 and mcuif C716 GND vias at the pads. Every primary
-  capacitor now passes (0 D1 / D2s / D2g) except C621 (B, GND via 1.15 mm); the 9 remaining flags are bulk / second
-  capacitors placed off the pins by design (C507, C510, C616, C505 / C506, C711, C714, C306, C717).
+  row; the rail now lands on the vias behind C112), phase U310 C351 and mcuif C716 GND vias at the pads. At TIGHTEN every
+  primary capacitor passed D1 / D2s / D2g except C621 (then on B; on F since REPAIR); the 9 remaining flags were bulk /
+  second capacitors placed off the pins by design (C507, C510, C616, C505 / C506, C711, C714, C306, C717).
+  Audit of the current board (after REPAIR, with the per-pin class D2p): 78 capacitors, D1 1 (U101.6 / C116 on B: pins
+  5 / 6 share C112 on top), D2s 8, D2g 3, D2p 10; the D2p / D2s cases at the primary capacitors are the ones listed under
+  REPAIR (RF2-3) plus U501.25 / .36 (C505 / C506) and U502.1 (C509), see docs/VALIDATION.md.
   Review renders: `net_view.py` (net-coloured copper, vias, courtyards), e.g. blocks/power/power_netview_*.png.
+
+**REPAIR (24 Nov, independent re-check docs/validation/recheck-*.md)**
+- RP-1: LM27762 output capacitors C617 / C621 / C630 / C628 moved from B to the IC layer at OUT+ / OUT- (no vias between
+  pin and capacitor, rail vias behind them); dividers rearranged (blocks/power/README.md). +5V / -5V sources moved to
+  (82.05, 7.0) / (74.4, 13.6).
+- RF2-1: U301 pin 10 (+2V5) fed through a 0.4 mm via beside pin 9 and a B track to C301 / C306: no +2V5 copper or via
+  beside BUF_OUT_T any more (was 0.105 mm via edge), L2 solid under the trace.
+- RF2-5: TAP5 via 0.15 mm east, 0.4 mm: its antipad stays 0.03 mm clear of PH_STROBE_N's edge (L2 solid under it).
+- RF2-3 (vias at the IC pins): U704 pin 24 via now north of C712; U502 pin-1 end of the VDDO link lands at C623;
+  U101 pin 8 polygon starts at C113 (vias east of C113, not at the pin end). `decap_audit.py` has a new class D2p
+  (via nearer the pin than any capacitor pad of the net, per pin). Remaining D2p, kept: U101.1 / .12 and U501.1 (vias
+  join a polygon / tracks that end in the capacitor pad: cap first in the copper path), U704.36 (R727 I2C pull-up feed,
+  not a decoupling via), U704.48 / .1 (inner via is C710's (B) via; no room behind C713: bus track north, pins east /
+  south), U502.7 (C508 boxed in by the CLK2 track), U310.8 (the L6 fan-in west of C351), U604.3 (EN+ tie via); U201.5 (not in the re-check list, not examined).
+- board_power.widen(): exact distance check to foreign vias / tracks (raster missed a /+5V1 interface via), shrinks a
+  rail segment that would violate the netclass gap (+2V5 0.8 -> 0.6 mm at (87.1, 20.3); /+5V1 0.5 -> 0.4 mm at two
+  pstrobe choke joins).
+- RF2-6: the rail router keeps 0.15 mm extra from fast / clock / strobe / comparator nets (rail edge >= 0.33 mm on
+  L3 / L6; the VTAP_N / MCU_CLK, +2V5 / PH_STROBE_N and VTAP_N / U310A+ cases are gone). Left: block pin necks at the
+  FPGA (+3V3 / TAP8 0.155 mm, +1V2 / S_STROBE_P and +3V3 / S_STROBE_N 0.22 mm, set by the 0.5 mm pin pitch).
+- RF2-9: schematic DNP parts (C631, D402, D403, R122) are excluded from the pos file by gen_board.
+- floorplan.PLACED_IN: C606 / C614 / C616 / C622 / C402-C409 -> analog, C615 / C620 / J102 / R122 -> phase, J501 / R511 /
+  R512 -> mcuif.
+- Order note (RF2-4): open vias touch soldered pads at R107.2, C413.2, C423.2, C430.2, C420.2, C310, R377.1, R334.2 and
+  overlap R503-R505, U301.5, U304.5, C508.2: order with resin-plugged, capped vias (POFV / via-in-pad process) for
+  those, or tent-and-plug at least; not moved in this round.
+- Net-view crops: blocks/power/power_netview_lm27762*.png, blocks/phase/phase_netview_u301.png,
+  blocks/analog/analog_netview_u101.png, blocks/mcuif/mcuif_netview_u704.png, blocks/fpga/fpga_netview_{u502,tap5}.png.
 
 **Checks (last run)**
 - check_board: missing 0, extra 4 (H1-H4), footprint / value / pad-net 0, unrouted 0, clearance 0, corners > 45 deg 0,
   off-axis pad exits 0, RF width / pour gap 0, courtyard 0, unconnected 0.
 - gen_board checks: fast-net segments on L3 0; 371 L1 / L6 samples without L2 / L5 = 341 via antipads + 25 PTH antipads +
   5 deliberate windows, 0 real holes; L4 +3V3 one polygon.
-- DRC jlc4 + parity: `total 451: warning 451`, 0 errors, 0 unconnected: 199 'Note' field, 199 lib_footprint_mismatch,
-  32 DNP attribute, 11 lib_footprint_issues, 10 net_conflict (TL401-403 / J601 shell, as before).
+- DRC jlc4 + parity: `total 450: warning 450`, 0 errors, 0 unconnected: 199 field mismatch, 199 lib_footprint_mismatch,
+  31 attribute (4 'Do not populate': the KiCad 7 board format has no footprint DNP flag; C632 is fitted now; 27
+  exclude-from-BOM of TP / JP / NT footprints), 11 lib_footprint_issues, 10 net_conflict (TL401-403 / J601 shell).
 
 **Open**
 - +2V5 0.3 mm branch into the trigger front end (above); 52 router vias, i.e. about 26 short L6 sections (the 3-hop limit of
   TOPOLOGY.md section 8 is not kept: the router hops wherever L3 is not planar; each is a short track with a via at each end).
-- `floorplan.membership` still lists C606 / C614-C616 / C620 / C622 under power (the blocks override it).
-- C602 now sits at U608 (kicad/README.md still describes it as U601's HF input capacitor: schematic owner).
 - The fpga COARSE / TAP0-4 via stair still forms an L2 / L5 slot; 40 fast vias without a GND via within 1 mm.
 - No reference designators on silk (as before).
 

@@ -44,3 +44,8 @@ TRIG_SEL PB6->PA1 (9), FPGA_DONE PB0->PB6 (43), SPI_CS PB10->PB9 (46), DBG1 PB9-
   GND via at 36.75). check_board: 0 apart from the plane-fed supplies and the known R737.1 entry (fixed on the board).
 
 - TIGHTEN (24 Nov): C716 / C715 (VDDA, B) GND pad gets its own plane via 0.9 mm south-east (clear of the F pin row and the board edge); the return no longer goes only to the via at pin 23.
+
+## REPAIR (24 Nov, recheck RF2-3)
+- U704 pin 24: the +3V3 plane via moved from the pin's inner end to just north of C712's +3V3 pad (pin -> C712 -> via).
+  Pins 48 / 1: the inner via stays (it is C710's via on B; no room behind C713). Pin 36: the nearest +3V3 via is R727's
+  pull-up feed, not a decoupling via. Render: `mcuif_netview_u704.png`.

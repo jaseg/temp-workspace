@@ -44,3 +44,9 @@ The IDES / OSER10 placement on the new pins (COARSE on 27) is not yet checked in
   stair collides with the U502 / configuration area.
 - ZONES-4: S_STROBE_N runs west at y 6.6 to its via at (0.4, 6.6); GND vias 0.65 mm from both S_STROBE_N vias.
 - Checks: check_board (26 refs) all 0.
+
+## REPAIR (24 Nov, recheck RF2-3 / RF2-5)
+- U502: the VDDO link from pin 7 (B) now comes up at C623 (north of its pad), so pin 1 is fed through C509 / C623 and not
+  from a via at the pin. Pin 7's link via stays at the pin (C508 is boxed in by the CLK2 track; +3V3_CLK has no plane).
+- TAP5 via 0.15 mm east and 0.4 mm: centre 0.46 mm from the board's PH_STROBE_N run, antipad clear of the strobe edge.
+  Renders: `fpga_netview_u502.png`, `fpga_netview_tap5.png`.

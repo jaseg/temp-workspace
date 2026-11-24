@@ -44,6 +44,14 @@ CLR_TIGHT = 0.15                          # fallback clearance where nothing fit
 CUT_MARGIN = 0.6                          # L3 power copper to L3 cut-outs (node windows, pad cuts)
 EXTRA = {"/ADC_IN": 0.35, "/VBIAS_A": 0.15, "/VBIAS_K": 0.15, "/VOFS": 0.15, "/VNEG_REF": 0.15, "/DAC_TRIG": 0.15,
          "/VTAP_TH": 0.15, "/ADC_REF_MID": 0.15, "/TRIG_SEL": 0.15}     # extra clearance (slow lines 0.3, ADC_IN 0.5)
+# REPAIR (24 Nov, recheck RF2-6): fast / clock nets get 0.15 mm extra (rail edge >= 0.33 mm from them on L3 / L6)
+import re as _re
+_FAST = _re.compile(r"^/(TAP\d+|COARSE|FPGA_CLK|MCU_CLK|SPI_\w+|ADC_TRIG|S_STROBE_\w|PH_STROBE_\w|USB_D\w|"
+                    r"trigger_phase/CMP_\w+|trigger_phase/PH_\w+)$")
+
+
+def _xtra(n):
+    return EXTRA.get(n, 0.15 if _FAST.match(n or "") else 0.0)
 LAY = {"In2.Cu": pcbnew.In2_Cu, "B.Cu": pcbnew.B_Cu}
 LNAMES = ("In2.Cu", "B.Cu")
 
@@ -165,7 +173,7 @@ class Model:
                     novia |= ring & ~core           # hole-to-hole: a new via either reuses this one or keeps 0.5 mm
                 else:
                     for ln in obs:
-                        draw_seg(obs[ln], c, c, r + EXTRA.get(n, 0.0))
+                        draw_seg(obs[ln], c, c, r + _xtra(n))
                 continue
             ln = lid.get(t.GetLayer())
             if ln is None:
@@ -175,7 +183,7 @@ class Model:
             if n == net and ln in own:
                 draw_seg(own[ln], a, e, max(r, 0.5 * G))
             elif n != net:
-                draw_seg(obs[ln], a, e, r + EXTRA.get(n, 0.0))
+                draw_seg(obs[ln], a, e, r + _xtra(n))
         for fp in b.GetFootprints():
             for gi in fp.GraphicalItems():           # copper drawn in footprints (TL401-TL403 lines, net ties)
                 if gi.GetClass() not in ("PCB_SHAPE", "FP_SHAPE", "MGRAPHIC"):
@@ -850,6 +858,40 @@ def apply(board, m):
 
 
 # ============================================================================ widen
+_FOREIGN = {}
+POWER_CLASS = ("+3V3", "+5V", "-5V", "+2V5", "-2V5", "+1V2", "VBUS", "/+5V1")   # board_finish.write_pro Power netclass
+
+
+def _seg_seg(p1, p2, q1, q2):
+    """minimum distance between two segments (mm)"""
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    d1, d2 = cross(q1, q2, p1), cross(q1, q2, p2)
+    d3, d4 = cross(p1, p2, q1), cross(p1, p2, q2)
+    if d1 * d2 < 0 and d3 * d4 < 0:
+        return 0.0
+    return min(_pt_seg(p1, q1, q2), _pt_seg(p2, q1, q2), _pt_seg(q1, p1, p2), _pt_seg(q2, p1, p2))
+
+
+def _foreign(t, a, e):
+    """edge distances (centre line of t to the copper edge) of foreign vias / same-layer tracks near t"""
+    b = t.GetBoard()
+    if id(b) not in _FOREIGN:
+        _FOREIGN.clear()
+        _FOREIGN[id(b)] = [(x.GetNetname(), x.GetLayer(), x.GetClass() == "PCB_VIA", _loc(x.GetStart()), _loc(x.GetEnd()),
+                            pcbnew.ToMM(x.GetWidth()) / 2) for x in b.GetTracks()]
+    x0, x1 = min(a[0], e[0]) - 2.5, max(a[0], e[0]) + 2.5
+    y0, y1 = min(a[1], e[1]) - 2.5, max(a[1], e[1]) + 2.5
+    out = []
+    for net, lay, isv, s_, e_, r in _FOREIGN[id(b)]:
+        if net == t.GetNetname() or not (x0 < s_[0] < x1 and y0 < s_[1] < y1):
+            continue
+        if not isv and lay != t.GetLayer():
+            continue
+        out.append((_seg_seg(a, e, s_, e_) - r, net))
+    return out
+
+
 def widen(board, m, nets=None, step=0.1):
     """fatten every L3 / L6 rail segment to the widest width (<= the rail's WMAX) that keeps CLR to foreign copper"""
     wmax = {n: wm for n, _, wm, _ in RAILS}
@@ -871,6 +913,15 @@ def widen(board, m, nets=None, step=0.1):
                        for k in range(n + 1))
             w0 = pcbnew.ToMM(t.GetWidth())
             wfit = math.floor(((dmin - CLR - MARG) * 2) / step + 1e-6) * step
+            # REPAIR (24 Nov): exact check against foreign vias / same-layer tracks (the raster missed a /+5V1
+            # interface via next to a +2V5 T-join that snap_ends had moved after routing)
+            wex = min([math.floor(((q - (0.155 if (net in POWER_CLASS or fn in POWER_CLASS) else 0.105)) * 2) / 0.05
+                                  + 1e-6) * 0.05 for q, fn in _foreign(t, a, e)] + [9.0])
+            wfit = min(wfit, wex)
+            if w0 > wex + 1e-6 and wex >= 0.3:   # routed too wide for an exact neighbour: shrink (netclass gap + 5 um)
+                t.SetWidth(pcbnew.FromMM(round(wex, 3)))
+                out.setdefault("shrunk", []).append((net, tuple(round(v, 2) for v in a), round(w0, 2), round(wex, 2)))
+                continue
             wnew = min(wmax[net], wfit)
             if wnew > w0 + 1e-6:
                 t.SetWidth(pcbnew.FromMM(round(wnew, 3)))

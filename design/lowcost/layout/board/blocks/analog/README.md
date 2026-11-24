@@ -88,3 +88,8 @@ Pad compensation (RF-6, 24 Nov): every in-line RF pad whose excess C over L2 (pa
 - NT402 / NT403 (pstrobe) still need the same stub-end recipe (RF-2). The C403 / C408 <-> C432 / C433 reference swap needs a decision from the schematic owner.
 
 - TIGHTEN (24 Nov): via-only rule area on L1 (pours allowed) over U101 pins 5-8 and their -5V copper to C112 / C113, so the board rail router cannot land a via between the VS- pins and their capacitors (it had put one between pins 5 / 6); the rail now ties into the vias behind C112.
+
+## REPAIR (24 Nov, recheck RF2-3)
+- U101 pin 8 (VS-): the -5V polygon now starts at C113's pad and carries its two vias east of C113 (were at the pin end,
+  0.6 mm from pin 8): pin 8 -> C113 -> vias. check_board / DRC as before (plane-fed supply nets only). Render:
+  `analog_netview_u101.png`.
