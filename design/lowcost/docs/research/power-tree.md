@@ -1,0 +1,126 @@
+# Power tree redesign (findings PDN-1..8, DECOUPLING-4, BIASTEE-1, PARTS-6)
+
+Research note, 24 Nov 2026. Datasheets read: TI SLUSEG9E (TPS62A0x), SLVSEU9D (TPS63802), SNVSAF7C (LM27762), SBVS263B (TPS7A39),
+Diodes AP2112 rev, plus the load datasheets already in the project (TRF37D73, TLV3801, TPH2501, COS3502, Si5351/MS5351M, BUF802, GVA-84+, GW1NZ DS841).
+Prices: LCSC product pages read 24 Nov 2026 (unit price at the smallest break). Decision: 7 regulator types become 3; AMS1117, AP2112K, MT3608, LP2985, LM27761, LP5907 and LM337 go.
+
+## 1. Rail loads (netlist `kicad/export/scope-fe.net` + datasheets)
+| Rail | Loads (typ / max mA) | Typ | Max |
+|---|---|---|---|
+| +3V3 | TRF37D73 x5 265/325 (SLASE43 ICC 53/65); COS3502 x8 53/~69 (3.3 mA/ch typ, no max); STM32G474 ~40/~60 (est.); MS5351M 31/55 (IDD 24/38 + 3 outputs 2.2/5.6); GW1NZ VCCIO/VCCX ~20/~30 (est.); SN65LVDS2 4/7; TPH2501 U202 6.5/7.5; LED 2; +1V2 buck input 9/13; +/-2V5 converter input 82/98 | 513 | 667 |
+| +1V2 | GW1NZ-1 core (est.) | 20 | 30 |
+| +5V (now 4.80 V) | BUF802 35.5/40 (R_Bias 17.8k, CL mode); OPA197 1.0/1.3 | 37 | 41 |
+| -5V (now -4.64 V) | BUF802 35.5/40; OPA197 1.0/1.3 (-2V5 no longer hangs here) | 37 | 41 |
+| +2V5 | TLV3801 20/26.6; TPH2501 U201 6.5/7.5; VTAP_P 12.5 (16 x 2.2k pairs); CLH divider R108 1; TLV9001, TMUX136 0.1 | 40 | 48 |
+| -2V5 | TLV3801 20/26.6; U201 6.5/7.5; VTAP_N 12.5; CLL R110 1; R303/R305/R384/R734 networks + VNEG_REF ~2 | 42 | 50 |
+| +5V1 (new) | GVA-84+ x2 216/260 (108 typ, 130 max each); LM27762 A input 74/83 | 290 | 343 |
+
+## 2. Chosen tree
+```
+USB-C VBUS 4.75-5.25 V -> F601 PTC -> D601 TVS -> FB601 -> VBUS (4.60-5.25 V at the converters, 0.16 ohm chain at 0.95 A)
+ |- U601 TPS62A01A buck 2.4 MHz FPWM -> +3V3 3.315 V (TRF37D73 x5, COS3502, FPGA IO, MCU, LVDS rx)
+ |     |- U602 TPS62A01A buck 2.4 MHz FPWM -> +1V2 (FPGA core)
+ |     |- FB605 -> U605 LM27762 B (pump 2 MHz + LDOs) -> +2V5 / -2V5 -> FB606 / FB607 -> loads
+ |     |- FB608 (new) -> MS5351M VDD/VDDO;  FB701 (exists) -> MCU VDDA
+ |- U603 TPS63802 buck-boost FPWM 1.4-2.1 MHz -> +5V1 5.10 V
+       |- GVA-84+ x2 bias tees (direct, no bead)           -> Vd 4.86-5.10 V
+       |- FB602 -> +5V1F -> U604 LM27762 A -> OUT+ 4.80 V -> FB604 -> +5V ; OUT- -4.64 V -> FB603 -> -5V (BUF802, OPA197)
+```
+Net names +5V / -5V are kept (values 4.80 / -4.64 V) so the analog sheets need no edits. The buck-boost replaces the boost because the
+USB input spans the 5.1 V target (4.60-5.25 V): a boost cannot regulate when VIN > VOUT and pulse-skips near it (PDN-8). The
+GVA-84+ move from VBUS to +5V1 fixes BIASTEE-1 and PDN-8 together.
++3V3 is the buck directly, no LDO after it: ripple about 0.4-0.9 mV pp at 2.4 MHz (section 4) against the FPGA VCCIO allowance of 5 %
+(DS841 table 3-2 note 3), saturated TRF37D73 stages and COS3502 comparators with a 17 mV threshold; a 3.6 V buck + 0.7 A LDO would add
+0.2 W and a part for no visible gain. The clock and ADC supplies get LC filters instead (MS5351M: new FB608 + moved 1 uF; VDDA: FB701 exists).
+
+## 3. Per-regulator table
+| | U601 TPS62A01A | U602 TPS62A01A | U603 TPS63802 | U604 LM27762 A | U605 LM27762 B |
+|---|---|---|---|---|---|
+| Vin in circuit | 4.60-5.25 | 3.25-3.38 | 4.60-5.25 | 5.03-5.15 (after FB602) | 3.24-3.37 (after FB605) |
+| Vout | 3.315 (100k/22.1k); FB 591-609 mV -> 3.25-3.38 | 1.200 (100k/100k) | 5.099 (459k/49.9k 0.1 %); FB +/-1 % -> 5.04-5.16 | +4.800 (300k/100k), -4.636 (280k/100k); FB +/-1.5 % | +2.500 (130k/120k), -2.501 (105k/100k), dividers 0.1 % |
+| Load typ/max | 0.51/0.67 A | 20/30 mA | 0.29/0.34 A | 37/41 mA each side | 40/48 (+), 42/50 (-) mA |
+| Dropout (DS) | 100 % mode: VIN >= VO + I(RDSON_HS 0.18 + R_L 0.05) = 3.53 V (sec. 7.3.2 eq. 1, table 6.5) | VIN-VO 2.1 V, n/a | buck-boost: regulates for VIN above and below VO (sec. 9.4) | OUT+ 45 mV at 100 mA (5.5 table, Fig 5-3, ~20 mV at 41 mA); OUT-: VCP = VIN - RNEG x I, RNEG 2.5 ohm (Fig 5-4, 4 ohm used hot), LDO 30 mV at 100 mA | same; RNEG at 3.3 V not specified, 5 ohm assumed |
+| Margin | >= 1.07 V | 2.1 V | n/a | OUT+ >= 0.14 V; OUT- 5.03 - 0.17 - 0.015 - 4.71 = 0.14 V | OUT+ 3.24 - 2.54 = 0.70 V; OUT- 3.24 - 0.25 - 0.03 - 2.54 = 0.42 V |
+| Abs max / ROC | VIN 6.5 / 5.5 V: OK (hot-plug: sec. 7) | OK | VIN, VOUT 6.0 V; VOUT ROC <= 5.2 V: 5.16 OK | VIN 5.8 / 5.5 V: 5.15 OK (fixes PDN-5) | OK |
+| Dissipation, Tj at 25 C | 0.19 W typ / 0.30 W max (eta 0.90 / 0.88 assumed), RthJA 157 K/W -> +27 / +45 K | < 5 mW | 0.13 / 0.20 W (eta 0.92 / 0.90 est.), 81 K/W -> +11 / +16 K | 0.032 / 0.040 W (eq. 5), 62.2 K/W -> +2 K | 0.067 / 0.088 W, +4 / +6 K |
+| CIN (derated) | C603 10u 0805 25 V X5R (~5.5 uF at 5 V) + C602 100n; DS: 4.7 uF | C609 10u 0805 (~7 uF) + C607 1u | C601 22u 0805 (~6.5 uF at 5 V); DS: >= 4 uF effective | C612 22u 0805 (~6.5 uF) + C613 100n; DS 4.7 rec., >= 2 min | C625 10u 0805 (~7 uF) |
+| COUT (derated) | C604 22u 0805 (~12 uF) + +3V3 plane 7 x 10u (~42 uF) = ~54 uF; DS table 8-3 proven 10-2x22 uF nominal | C605 22u (~18 uF at 1.2 V) + C608 1u + C503 10u; DS 22 uF | C610 + C611 22u 0805 (~13 uF); DS >= 7 uF eff., 2 x 22 rec. above 3.6 V | CCP C626 10u 0805 (~5 uF, DS >= 2 uF); C1 C618 1u 0603 25 V; OUT+ C617 10u, OUT- C621 10u (~5 uF each, DS 2.2 uF) | CCP C619 4.7u 0603 (~2.5 uF); C1 C624 1u 0402; OUT+ new 10u 0805, OUT- C628 10u (~8 uF each) |
+| L / other | L602 1 uH 1008, 2.5 A (Isat 3.5 A); peak 0.87 A, ILIM 1.8 A max | L603 1 uH 1008 | L601 0.47 uH 4.4 x 4.2, +/-20 % (DS 0.37-0.57 uH eff.); Ipeak 0.65 A (eq. 2) | PGOOD to GND; EN+/EN- to VIN | EN+/EN- = U603 PG, 100k pull-up to U605 VIN |
+All capacitors are MLCC; every part above is specified for ceramic output capacitors (no ESR window). Effective values: 22u 6.3 V 0805
+~6.5 uF at 5 V / ~12 uF at 3.3 V; 10u 25 V 0805 ~5 uF at 5 V / ~7-8 uF at 2.5-3.3 V; 1u 0402 ~0.5 uF at 3-5 V (validation pdn.md factors).
++3V3 COUT above the proven 2 x 22 uF is the plane decoupling behind 15-70 mOhm of plane: keep only one 22 uF at U601 (C605 moves to
++1V2), fit a 0402 Cff footprint (120 pF, DS 8.2.2.3) on R1 and check the load step on the first build.
+
+## 4. Noise and PSRR path (sampler floor 0.35 mV rms at the hold node)
+| Path | Source | Attenuation | At the load |
+|---|---|---|---|
+| LM27762 pump -> +/-5V -> BUF802 | 1-2.5 mV pp at OUT (DS Fig 5-1, +/-3 V, 50-100 mA) | bead 600R (~19 ohm at 2 MHz, est.) into 1-5 uF at the load: -45 dB; BUF802 PSRR 49 dB (VS+) / 38 dB (VS-) at 100 kHz, >= 20 dB assumed at 2 MHz | < 1 uV at BUF802 out |
+| LM27762 LDO noise | 22 uV rms 10 Hz-100 kHz (5.5 table) | BUF802 PSRR >= 38 dB | < 0.3 uV rms |
+| LM27762 B -> -2V5 -> hold node | same 1-2.5 mV pp; 22 uV rms | FB607 + 2.2 uF: -45 dB; -2V5 to pedestal 0.09 V/V (theory sec. 7) | ripple < 1 uV, noise 2 uV rms (0.6 % of 0.35 mV) |
+| -2V5 -> trigger level | 22 uV rms | 0.14 V/V | 3 uV rms |
+| TPS62A01A -> +3V3 | dIL 0.39 A pp (1 uH, 2.4 MHz) -> 0.4-0.9 mV pp on ~25-55 uF | FPGA allows 165 mV; FB605 + C625 + LM27762 PSRR (43-50 dB at 10 kHz, Fig 7-3/7-4) for +/-2V5 | uV level at +/-2V5 |
+| TPS63802 -> +5V1 -> GVA Vd | ~2.5 mV pp (0.5 A pp / 8 f C, 13 uF) | 2.2 uH tee + 10 uF cold end: -58 dB at 1.4 MHz | < 5 uV; LM27762 A input via FB602 + 22 uF |
+Frequencies: buck 2.4 MHz (2nd harmonic 4.8 MHz, clear of 3.125 MHz); LM27762 1.7-2.3 MHz; TPS63802 1.4 MHz (buck-boost) to 2.1 MHz
+(boost) in FPWM, so its 2nd harmonic can sit near 3.125 MHz and harmonics near 48 MHz. Its residue at the sensitive nodes is below
+5 uV by the chain above, so an aliased beat stays far under the floor. TLV62569 (1.5 MHz, 2nd harmonic 3.0 MHz) was avoided for that reason.
+Ripple at the hold node from all paths: a few uV, << 0.35 mV. Accuracy of -2V5: FB-/1.5 % + 0.1 % divider = +/-1.7 % (+/-43 mV) vs LM337 +/-3 %;
+calibrated as before (trigger +/-6 mV, pedestal +/-4 mV). TLV3801 VCC-GND >= 2.5 x 0.983 - 7 mV bead - 9 mV track = 2.44 V >= 2.4 V min.
+BUF802: VS >= 4.73 + 4.57 = 9.30 V >= 9 V (ROC 5.3), each side >= 4.5 V. GVA Vd = 5.04..5.16 - tee 0.06..0.18 = **4.86-5.10 V** (spec 4.8-5.2),
+independent of USB voltage. LM27762 output is PFM at light load (DS 7.2.2.4.1): CCP kept >= 2 uF effective to avoid toggling.
+
+## 5. USB budget (4.75 V at the connector)
++3V3: 3.3 V x 0.513 A / 0.90 = 1.88 W; +5V1: 5.10 V x 0.290 A / 0.92 = 1.61 W; total 3.49 W -> **0.75 A typ** at 4.63 V (was 0.86 A).
+Sum of all maxima: 2.50 + 1.97 = 4.47 W -> 0.97 A. The 500 mA target is not reachable: the RF loads alone (5 x TRF37D73 0.87 W,
+2 x GVA-84+ 1.08 W) need 0.42 A from 4.75 V before losses. A 5 V / 1.5 A USB-C source stays required (as now).
+
+## 6. Parts (new and changed)
+| Ref | Part | Package | LCSC | USD/board |
+|---|---|---|---|---|
+| U601, U602 | TPS62A01ADRLR (FPWM) | SOT-563 1.6 x 1.6, P0.5; 1 GND, 2 SW, 3 VIN, 4 EN, 5 FB, 6 PG | C5181455 (10k stock) | 2 x 0.197 |
+| U603 | TPS63802DLAR | VSON-HR-10 2 x 3, P0.5, no EP; 1 EN, 2 MODE, 3 AGND, 4 FB, 5 PG, 6 VOUT, 7 L2, 8 GND, 9 L1, 10 VIN | C2845237 | 0.951 |
+| U604, U605 | LM27762DSSR | WSON-12 2 x 3, P0.5, EP 1.0 x 2.65 (GND); 1 PGOOD, 2 FB+, 3 VIN, 4 GND, 5 CP, 6 OUT-, 7 FB-, 8 EN-, 9 C1-, 10 C1+, 11 OUT+, 12 EN+ | C473398 (36k) | 2 x 0.960 |
+| L601 | 0.47 uH +/-20 %, XR0420-R47M (2nd source FEXU0420SR47MBHCB C49232844) | 4.4 x 4.2 | C5307593 (65 stock) | 0.106 |
+| L602, L603 | 1 uH 2.5 A, FHD252010S-1R0MT | 1008 | C843292 | 2 x 0.076 |
+| FB602-FB608 | 600R@100MHz 1.3 A, 0.15 ohm, BLM18KG601SN1D (FB602/603 retyped) | 0603 | C85833 | 7 x 0.017 |
+| C (new) | 10u 25 V X5R (U605 OUT+) | 0805 | C15850 | 0.031 |
+| R (new 9 + 6 changed) | U601 100k/22.1k; U602 100k/100k; U603 R603 459k, R604 49.9k; U604 300k/100k, 280k/100k; U605 130k/120k, 105k/100k; PG pull-up 100k; 0.1 % for U603-U605 dividers | 0402 | class | ~0.03 |
+Removed: AMS1117 0.203, AP2112K 0.238, MT3608 0.064, LP2985 0.291, LM27761 1.231, LP5907 0.337, LM337 0.436, D602 0.025, L601 4.7 uH est 0.10
+(2.93). Added 3.65. **BOM +0.73 USD -> about 63.58 USD** (limit 80). Regulator types 7 -> 3.
+Moved capacitors (no new decoupling except one 10u): C603 -> U601 in; C609 -> U602 in; C605 -> U602 out; C601 -> U603 in; C610/C611 -> U603 out;
+C612/C613 -> U604 in (top side at pin 3: fixes DECOUPLING-4); C618 -> U604 C1; C626 (old ADJ) -> U604 CCP; C617 -> U604 OUT+; C621 -> U604 OUT-;
+C625 -> U605 in; C624 -> U605 C1; C619 -> U605 CCP; C628 -> U605 OUT-; freed C616 2.2u -> U101 +5V beside C108, C620 2.2u -> U302.3 (-2V5),
+C615 1u -> U302.6 / U301.10 (+2V5) (PDN-6); C623 1u -> MS5351M VDD after FB608; C627 1u stays on -5V after FB603; C614 10n unused.
+Voltage ratings: 5 V nodes (C601, C610-C612) need >= 10 V parts; C45783 is 6.3 V (keep only on +3V3 / +1V2) - LCSC # for a 10 V 22u 0805 to assign.
+
+## 7. Layout notes (datasheet layout sections)
+- TPS62A01A (8.4.1): CIN between VIN (3) and GND (1) on the IC layer, < 1 mm; hot loop CIN-VIN-HS/LS FET-GND; inductor at SW (2), small SW copper;
+  COUT ground back to pin 1; FB divider at pin 5 away from SW.
+- TPS63802 (12.1): both CIN (10/8) and COUT (6/8) are hot loops (buck and boost phases); place both tight on the top side; L between L1 (9)
+  and L2 (7); AGND (3) by its own trace to GND near pin 8; FB (4) away from L1/L2. MODE (2) and EN (1) tied to VIN (never floating).
+- LM27762 (7.4.1): CIN, CCP and C1 on the IC layer; CIN and CCP grounds join at GND (4); COUT+/COUT- grounds to the EP; R1-R4 at the FB pins,
+  low ends to the EP ground. U605 placed in the power block like U604; the +/-2V5 beads at the regulator outputs.
+- GVA feed: track from the U603 output capacitors to the L404/L406 cold ends (not through FB602). Hot-plug: USB cable L + all-MLCC
+  input can ring above the 6.0 / 6.5 V abs max of U603 / U601 (SMAJ5.0A clamps at 9.2 V). Add a DNP footprint for a 1 ohm + 10 uF damper
+  (or 47 uF tantalum, C22036, 10 V) on VBUS and measure the plug-in transient on the first board.
+
+## 8. Sequencing
+- U601 soft start 1 ms (6.5 table): +3V3 ramps 3.3 mV/us (GW1NZ VCCIO/VCCX 0.1-10 mV/us, DS841 table 3-3). U602 EN = +3V3, starts at its
+  UVLO 2.3-2.5 V and ramps 1.2 mV/us (VCC 0.6-6 mV/us). AP2112K (20 us start-up) could exceed 6 mV/us: one reason for the buck.
+- U603 starts from VBUS; U604 EN+/EN- = VIN, so the BUF802 rails come with +5V1. U605 is enabled by U603 PG: +/-2V5 (and the CLH/CLL clamp
+  dividers, TMUX136, TLV3801) rise only after the BUF802 rails, so no clamp pin is driven above an unpowered BUF802 rail.
+- TLV3801 VCC and VEE come from one IC with one enable: they rise together. LM27762 gives no start-up slope: the TMUX136 100-1000 us/V
+  VCC ramp is unverified (open; bring-up step 1 already measures it).
+
+## 9. Alternatives rejected
+- TPS7A39 dual +/- LDO (+/-2V5 from +/-5 V): 5.67 USD at LCSC with 0 stock; 3 x 3 WSON. LM27762 does both rails for 0.96.
+- TPS65131 / TPS65132 split-rail converters: 4 x 4 QFN-24 or DSBGA + I2C, about 2 USD, and the outputs still need LDOs for the BUF802.
+- Keep MT3608 boost at 5.15 V: cannot regulate at USB 5.25 V and pulse-skips at D < 0.1 (PDN-8); non-synchronous diode loss.
+- Negative LDOs (TPS7A30, LT1964, ADP7182) for -2V5: 1.5-3 USD each and still need a separate +2V5 regulator.
+- TLV62569 1.5 MHz SOT-23-5: cheapest (0.067) but 2nd harmonic at 3.0 MHz near the 3.125 MHz strobe.
+- Buck to 3.6 V + LDO to 3.3 V: +0.15-0.2 W and one more part for loads that tolerate 1 mV ripple.
+- LM27762 B fed from +5V1: 0.25 W instead of 0.07 W and +0.05 A from USB.
+- Chinese dual-output charge-pump / split-rail parts: none with a verified datasheet and LCSC stock found in this pass (not evaluated).
+
+## 10. Open
+Hot-plug transient vs 6 V abs max; TMUX136 ramp; LM27762 RNEG at 3.3 V (assumed 5 ohm, 0.42 V margin); COS3502 / MCU / FPGA maxima
+are estimates; XR0420-R47M stock 65 (2nd source listed); 10 V 22u 0805 LCSC number; board footprints for VSON-HR-10 and WSON-12 (2 x 3).

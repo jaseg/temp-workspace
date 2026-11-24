@@ -1,178 +1,426 @@
-"""power.kicad_sch: USB-C 5 V input -> +3V3, +1V2, (boost +5V4) -> +5V, -5V, +2V5, -2V5.
+"""power.kicad_sch: USB-C 5 V in -> +3V3, +1V2, +5V1 -> +5V / -5V, +2V5 / -2V5 (docs/research/power-tree.md).
 
-Tree (see README for currents and prices):
-  USB-C VBUS -> PTC 1.5 A -> TVS -> ferrite -> VBUS (global; also feeds the GVA-84+ chains via their chokes)
-  VBUS -> AMS1117-3.3 -> +3V3 (FPGA IO, MS5351M, TRF37D73 x5-6, COS3502, LVDS rx)    ~0.45 A
-  +3V3 -> AP2112K-1.2 -> +1V2 (FPGA core)                                               ~0.03 A
-  VBUS -> MT3608 boost -> +5V4 -> ferrite + 22 uF -> +5V4F (post-filter)                ~0.2 A
-  +5V4F -> LP2985-5.0 -> +5V (BUF802, OPA197)                                          ~0.04 A
-  +5V4F -> LM27761 (charge pump + LDO, -4.98 V) -> ferrite -> -5V (BUF802, OPA197, -2V5) ~0.09 A
-  +5V4F -> LP5907-2.5 -> +2V5 (TLV3801, TMUX136, hold amps, VTAP_P, op-amps)            ~0.05 A
-  -5V -> LM337 (-2.50 V) -> -2V5 (TLV3801 VEE, hold amps, VTAP_N, op-amps)              ~0.04 A
-The boost exists because the LM27761 needs VIN >= |VOUT| + 2 ohm x I + 30 mV dropout: from USB alone
-(4.75 V worst case) it cannot make the -4.5 V the BUF802 needs. +5V4 = 0.6 V x (1 + 78.7k/10k) = 5.32 V
-(below the LM27761 / LP5907 5.5 V maximum)."""
+Tree (24 Nov 2026; replaces AMS1117, AP2112K, MT3608, LP2985, LM27761, LP5907, LM337):
+  USB-C VBUS -> F601 PTC 1.5 A -> D601 SMAJ5.0A -> FB601 -> VBUS (global, 4.60-5.25 V at the converters)
+  VBUS -> U601 TPS62A01A buck 2.4 MHz FPWM -> +3V3 3.315 V (TRF37D73 x5, COS3502, FPGA I/O, MCU, LVDS rx)  0.51 A
+  +3V3 -> U602 TPS62A01A -> +1V2 (FPGA core, 1 ms soft start)                                              0.02 A
+  VBUS -> U603 TPS63802 buck-boost FPWM -> +5V1 5.10 V (GVA-84+ x2 on the strobe sheet; U604)              0.29 A
+  +5V1 -> FB602 -> +5V1F -> U604 LM27762 (pump + 2 LDOs) -> +4.80 V -> FB604 -> +5V ; -4.64 V -> FB603 -> -5V
+  +3V3 -> FB605 -> +3V3_CP -> U605 LM27762 -> +2.50 V -> FB606 -> +2V5 ; -2.50 V -> FB607 -> -2V5
+U605 is enabled by the U603 power-good (PG_5V1): +/-2V5 rise after the BUF802 rails.
+Existing capacitors are re-used (moved) wherever possible; refs are kept so the board keeps its parts.
+Decoupling capacitors that belong at a load pin on another sheet are drawn here at the bottom (box "at the loads")
+with a Note field naming the pin; kicad/README.md lists them for the layout."""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from schlib import g
+from schlib import g, ic_symbol
 from common import new_sheet, R, C, FP
 
-RAILS = {"+5V", "-5V", "+3V3", "+2V5", "-2V5", "+1V2", "VBUS", "GND"}
+PIN_IN, PIN_PWR, PIN_OUT, PIN_P, PIN_OC = "input", "power_in", "power_out", "passive", "open_collector"
+
+TPS62A01 = ic_symbol("TPS62A01ADRL", left=[("3", "VIN", PIN_PWR), ("4", "EN", PIN_IN)],
+                     right=[("2", "SW", PIN_OUT), ("5", "FB", PIN_IN), ("6", "PG", PIN_OC)],
+                     bottom=[("1", "GND", PIN_PWR)], footprint="Package_TO_SOT_SMD:SOT-563",
+                     description="TI TPS62A01A 1 A sync. buck, 2.4 MHz forced PWM, SOT-563 (DRL): "
+                                 "1 GND 2 SW 3 VIN 4 EN 5 FB 6 PG")
+TPS63802 = ic_symbol("TPS63802DLA", left=[("10", "VIN", PIN_PWR), ("1", "EN", PIN_IN), ("2", "MODE", PIN_IN),
+                                          ("5", "PG", PIN_OC)],
+                     right=[("6", "VOUT", PIN_OUT), ("4", "FB", PIN_IN)],
+                     top=[("9", "L1", PIN_P), None, None, ("7", "L2", PIN_P)],
+                     bottom=[("3", "AGND", PIN_PWR), ("8", "GND", PIN_PWR)],
+                     footprint="scope-fe:Texas_DLA0010A_VSON-HR-10_2x3mm_P0.5mm",
+                     description="TI TPS63802 2 A buck-boost, VSON-HR-10 (DLA): 1 EN 2 MODE 3 AGND 4 FB 5 PG "
+                                 "6 VOUT 7 L2 8 GND 9 L1 10 VIN")
+LM27762 = ic_symbol("LM27762DSS", left=[("3", "VIN", PIN_PWR), ("12", "EN+", PIN_IN), ("8", "EN-", PIN_IN),
+                                        ("1", "PGOOD", PIN_OC)],
+                    right=[("2", "FB+", PIN_IN), ("11", "OUT+", PIN_OUT), None, ("6", "OUT-", PIN_OUT),
+                           ("7", "FB-", PIN_IN)],
+                    top=[("10", "C1+", PIN_P), None, None, ("9", "C1-", PIN_P)],
+                    bottom=[("4", "GND", PIN_PWR), ("13", "EP", PIN_PWR), None, ("5", "CP", PIN_P)],
+                    footprint="Package_SON:WSON-12-1EP_3x2mm_P0.5mm_EP1x2.65",
+                    description="TI LM27762 inverting charge pump + positive and negative LDO, WSON-12 (DSS): "
+                                "1 PGOOD 2 FB+ 3 VIN 4 GND 5 CP 6 OUT- 7 FB- 8 EN- 9 C1- 10 C1+ 11 OUT+ 12 EN+, EP GND")
+
+BEAD = ("Device:FerriteBead_Small", FP["FB0603"], "BLM18KG601SN1D", "C85833")
+BEAD_F = {"Price": "0.0166 USD (LCSC 50+)", "Note": "600 R @ 100 MHz, 1.3 A, 0.15 R DC"}
+L1U = {"Price": "0.0763 USD (LCSC 10+)", "Note": "1 uH 2.5 A 1008 (FHD252010S-1R0MT); TI table 8-3: 1 uH"}
+PCT = {"Note": "0.1 % thin film (divider accuracy, power-tree.md section 3)"}
 
 
-def ns(sh, sym, pin, net, length=2.54):
-    if net is None:
-        return sh.stub(sym, pin, kind="nc")
-    if net == "GND":
-        return sh.stub(sym, pin, "GND", length=length, kind="gnd")
-    if net in RAILS:
-        return sh.stub(sym, pin, net, length=length, kind="power")
-    return sh.stub(sym, pin, net, length=length)
+def place(sym, pin, pt):
+    """Move sym so that its pin <pin> sits on pt (schematic mm)."""
+    p = sym[pin]
+    sym.at = (round(sym.at[0] + pt[0] - p[0], 3), round(sym.at[1] + pt[1] - p[1], 3))
+    return sym
 
 
-def two(sh, kind, value, at, n1, n2, rot=0, **kw):
-    if kind == "R":
-        s = R(sh, value, at, rot=rot, **kw)
-    elif kind == "C":
-        s = C(sh, value, at, rot=rot, **kw)
+def vpart(sh, kind, ref, value, top, gnd=True, **kw):
+    """Vertical two-pin part with pin 1 on 'top' (pin 2 below); pin 2 to a GND symbol if gnd."""
+    if kind == "C":
+        s = C(sh, value, top, ref=ref, **kw)
+    elif kind == "R":
+        s = R(sh, value, top, ref=ref, **kw)
     else:
-        lib, ref, fp = kind
-        s = sh.add(lib, ref, value, at, rot=rot, fp=fp, **kw)
-    ns(sh, s, "1", n1)
-    ns(sh, s, "2", n2)
+        lib, fp, lcsc = kind
+        s = sh.add(lib, ref, value, top, fp=fp, lcsc=lcsc, **kw)
+    place(s, "1", top)
+    if gnd:
+        sh.gnd(s["2"])
     return s
 
 
-def caps(sh, x, y, net, values):
-    for i, v in enumerate(values):
-        two(sh, "C", v, (x + i * g(6), y), net, "GND")
+def hpart(sh, kind, ref, value, left, **kw):
+    """Horizontal two-pin part with pin 1 on 'left' (pin 2 to the right)."""
+    if kind == "C":
+        s = C(sh, value, left, rot=90, ref=ref, **kw)
+    elif kind == "R":
+        s = R(sh, value, left, rot=90, ref=ref, **kw)
+    else:
+        lib, fp, lcsc = kind
+        s = sh.add(lib, ref, value, left, rot=90, fp=fp, lcsc=lcsc, **kw)
+    return place(s, "1", left)
+
+
+def bead(sh, ref, left, value="600R@100MHz"):
+    lib, fp, mpn, lcsc = BEAD
+    s = sh.add(lib, ref, value, left, rot=90, fp=fp, lcsc=lcsc, mpn=mpn, fields=BEAD_F)
+    return place(s, "1", left)
+
+
+def rail(sh, a, b):
+    sh.wire(a, b)
+
+
+def buck(sh, uref, at, vin_name, out_name, cin, cout, lref, rtop, rbot, cff=None):
+    """TPS62A01A cell. cin/cout: [(ref, value, kw)]; rtop/rbot: (ref, value); returns the IC."""
+    u = sh.add(TPS62A01, uref, "TPS62A01ADRLR", at, fp="Package_TO_SOT_SMD:SOT-563", lcsc="C5181455",
+               mpn="TPS62A01ADRLR",
+               fields={"Price": "0.197 USD (LCSC 5+)",
+                       "Note": "CIN at VIN(3)-GND(1) on the IC layer < 1 mm; L at SW(2); FB divider at pin 5"})
+    vin, en, sw, fb = u["3"], u["4"], u["2"], u["5"]
+    x0 = vin[0] - g(6 + 6 * len(cin))
+    rail(sh, (x0, vin[1]), vin)
+    sh.power(vin_name, (x0, vin[1]), dy=-2.54)
+    for k, (ref, val, kw) in enumerate(cin):
+        vpart(sh, "C", ref, val, (vin[0] - g(9 + 6 * k), vin[1]), **kw)
+    xe = vin[0] - g(3)
+    sh.path([en, (xe, en[1]), (xe, vin[1])])
+    sh.gnd(u["1"])
+    sh.nc(u["6"])
+    lpt = (sw[0] + g(3), sw[1])
+    sh.wire(sw, lpt)
+    lw = hpart(sh, ("Device:L", "Inductor_SMD:L_1008_2520Metric", "C843292"), lref, "1u", lpt,
+               mpn="FHD252010S-1R0MT", fields=L1U)
+    xd = lw["2"][0] + g(4)
+    y = sw[1]
+    rt = vpart(sh, "R", rtop[0], rtop[1], (xd, y), gnd=False)
+    rb = vpart(sh, "R", rbot[0], rbot[1], rt["2"])
+    sh.path([fb, (fb[0] + g(2), fb[1]), (fb[0] + g(2), rt["2"][1]), rt["2"]])
+    xe = xd
+    if cff:
+        cf = vpart(sh, "C", cff[0], cff[1], (xd + g(4), y), gnd=False, dnp=True,
+                   fields={"Note": "DNP: feed-forward footprint across R1 (TPS62A01 DS 8.2.2.3, 120 pF)"})
+        sh.wire(cf["2"], rt["2"])
+        xe = xd + g(4)
+    xs = []
+    for k, (ref, val, kw) in enumerate(cout):
+        x = xe + g(5 + 6 * k)
+        vpart(sh, "C", ref, val, (x, y), **kw)
+        xs.append(x)
+    xend = (xs[-1] if xs else xe) + g(5)
+    rail(sh, lw["2"], (xend, y))
+    sh.power(out_name, (xend, y), dy=-2.54)
+    return u, xend
+
+
+def lm27762(sh, uref, at, vin_label, cin, c1, ccp, outp, outn, rpos, rneg, en=None):
+    """LM27762 cell drawn with wires. vin_label: name of the local input rail (label at its left end).
+    c1, ccp: (ref, value, kw); outp/outn: (net label, [(ref, value, kw)] caps, bead ref, bead load rail);
+    rpos = (R1 ref, val, R2 ref, val) FB+; rneg = (R3 ref, val, R4 ref, val) FB-.
+    en: None -> EN+/EN- tied to VIN, PGOOD to GND; else (pull-up ref, value, label) -> EN+/EN- = label."""
+    u = sh.add(LM27762, uref, "LM27762DSSR", at, fp="Package_SON:WSON-12-1EP_3x2mm_P0.5mm_EP1x2.65",
+               lcsc="C473398", mpn="LM27762DSSR",
+               fields={"Price": "0.960 USD (LCSC 1+)",
+                       "Note": "CIN, CCP, C1 on the IC layer; CIN/CCP grounds join at pin 4; R1-R4 at the FB pins"})
+    vin = u["3"]
+    # input rail (left), CIN
+    x0 = vin[0] - g(14 + 6 * len(cin))
+    rail(sh, (x0, vin[1]), vin)
+    sh.label(vin_label, (x0, vin[1]), rot=180)
+    for k, (ref, val, kw) in enumerate(cin):
+        vpart(sh, "C", ref, val, (vin[0] - g(15 + 6 * k), vin[1]), **kw)
+    xe = vin[0] - g(3)
+    ep, en_m, pgd = u["12"], u["8"], u["1"]
+    if en is None:
+        sh.path([en_m, (xe, en_m[1]), (xe, vin[1])])
+        sh.wire(ep, (xe, ep[1]))
+    else:
+        rref, rval, lab = en
+        sh.path([ep, (xe, ep[1]), (xe, en_m[1])])
+        sh.wire(en_m, (xe, en_m[1]))
+        node = (xe, pgd[1] + g(3))
+        sh.wire((xe, en_m[1]), node)
+        xr = vin[0] - g(7)
+        pu = vpart(sh, "R", rref, rval, (xr, vin[1]), gnd=False,
+                   fields={"Note": "PG pull-up: U605 enabled by U603 power good (+/-2V5 after the BUF802 rails)"})
+        sh.path([pu["2"], (xr, node[1]), node])
+        sh.wire((xr, node[1]), (vin[0] - g(11), node[1]))
+        sh.label(lab, (vin[0] - g(11), node[1]), rot=180)
+    pe = (pgd[0] - g(1), pgd[1])
+    sh.wire(pgd, pe)
+    sh.gnd(pe)
+    # flying cap C1 above the body
+    c1p, c1n = u["10"], u["9"]
+    yc = c1p[1] - g(3)
+    ref, val, kw = c1
+    cfly = hpart(sh, "C", ref, val, (c1p[0], yc), **kw)
+    sh.wire(c1p, cfly["1"])
+    sh.wire(c1n, cfly["2"])
+    # GND / EP joined, CP cap
+    gp, epp, cp = u["4"], u["13"], u["5"]
+    yb = gp[1] + g(2)
+    sh.path([gp, (gp[0], yb), (epp[0], yb), epp])
+    sh.gnd((gp[0], yb))
+    ref, val, kw = ccp
+    vpart(sh, "C", ref, val, (cp[0], cp[1] + g(2)), **kw)
+    sh.wire(cp, (cp[0], cp[1] + g(2)))
+    # positive output: OUT+ (row 2) -> right g(5) -> up to the rail; FB+ (row 1) -> right g(2) -> up to the node
+    op, fbp = u["11"], u["2"]
+    xr0 = op[0]
+    yP = op[1] - g(10)
+    sh.path([op, (xr0 + g(5), op[1]), (xr0 + g(5), yP)])
+    r1r, r1v, r2r, r2v = rpos
+    xp = xr0 + g(9)
+    r1 = vpart(sh, "R", r1r, r1v, (xp, yP - 7.62), gnd=False, fields=PCT)    # pin 1 = node (top), pin 2 = rail
+    r2 = vpart(sh, "R", r2r, r2v, (xp, yP - 15.24), gnd=False, fields=PCT)   # pin 2 = node, pin 1 = GND (top)
+    sh.power("GND", r2["1"], dy=-2.54, rot=180)
+    sh.path([fbp, (xr0 + g(2), fbp[1]), (xr0 + g(2), r1["1"][1]), r1["1"]])
+    lab, caps, bref, load = outp
+    xs = xp + g(4)
+    for k, (ref, val, kw) in enumerate(caps):
+        vpart(sh, "C", ref, val, (xs + g(6 * k), yP), **kw)
+    xb = xs + g(6 * len(caps))
+    rail(sh, (xr0 + g(5), yP), (xb, yP))
+    sh.label(lab, (xr0 + g(5), yP))
+    b = bead(sh, bref, (xb, yP))
+    sh.wire(b["2"], (b["2"][0] + g(4), yP))
+    sh.power(load, (b["2"][0] + g(4), yP), dy=-2.54)
+    # negative output: OUT- (row 4) -> right g(5) -> down to the rail; FB- (row 5) -> right g(2) -> down to the node
+    on, fbn = u["6"], u["7"]
+    yN = on[1] + g(10)
+    sh.path([on, (xr0 + g(5), on[1]), (xr0 + g(5), yN)])
+    r3r, r3v, r4r, r4v = rneg
+    r3 = vpart(sh, "R", r3r, r3v, (xp, yN), gnd=False, fields=PCT)            # pin 1 = rail, pin 2 = node
+    vpart(sh, "R", r4r, r4v, r3["2"], fields=PCT)                             # node -> GND
+    sh.path([fbn, (xr0 + g(2), fbn[1]), (xr0 + g(2), r3["2"][1]), r3["2"]])
+    lab, caps, bref, load = outn
+    for k, (ref, val, kw) in enumerate(caps):
+        vpart(sh, "C", ref, val, (xs + g(6 * k), yN), **kw)
+    xb = xs + g(6 * len(caps))
+    rail(sh, (xr0 + g(5), yN), (xb, yN))
+    sh.label(lab, (xr0 + g(5), yN))
+    b = bead(sh, bref, (xb, yN))
+    sh.wire(b["2"], (b["2"][0] + g(4), yN))
+    sh.power(load, (b["2"][0] + g(4), yN), dy=2.54)
+    return u
 
 
 def main():
-    sh = new_sheet("power", comments=["Generated by gen/gen_power.py. Rails are global power symbols.",
-                                      "Prices: see README (LCSC single-piece, partly unverified)."])
-    FB = ("Device:FerriteBead_Small", "FB", FP["FB0805"])
-    # --- USB-C input
-    j = sh.add("Connector:USB_C_Receptacle_USB2.0_16P", "J", "USB-C 16P",
-               (g(25), g(40)), fp="Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
-               lcsc="C165948", mpn="HRO TYPE-C-31-M-12",
+    sh = new_sheet("power", comments=["Generated by gen/gen_power.py from docs/research/power-tree.md (24 Nov 2026).",
+                                      "Rails are global power symbols; +5V1 goes to the strobe sheet (GVA-84+).",
+                                      "Prices: LCSC product pages 24 Nov 2026 (power-tree.md section 6)."])
+    T = 1.0
+    # ------------------------------------------------------------------ USB-C input chain (wired)
+    j = sh.add("Connector:USB_C_Receptacle_USB2.0_16P", "J601", "USB-C 16P", (g(22), g(40)),
+               fp="Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", lcsc="C165948", mpn="HRO TYPE-C-31-M-12",
                fields={"Note": "USB 2.0 receptacle (data for the STM32G474 USB FS); source must allow ~1 A"})
-    ns(sh, j, "A4", "VBUS_IN")
     for pin, net in (("A6", "USB_DP"), ("B6", "USB_DP"), ("A7", "USB_DM"), ("B7", "USB_DM")):
-        ns(sh, j, pin, net, length=g(6))                 # both plug orientations tied by the labels
+        sh.stub(j, pin, net, length=g(6))
     sh.nc(j["A8"])
     sh.nc(j["B8"])
-    ns(sh, j, "A5", "CC1")
-    ns(sh, j, "B5", "CC2")
-    ns(sh, j, "A1", "GND")
-    ns(sh, j, "S1", "GND")
-    two(sh, "R", "5.1k", (g(50), g(52)), "CC1", "GND")
-    two(sh, "R", "5.1k", (g(56), g(52)), "CC2", "GND")
-    two(sh, ("Device:Polyfuse_Small", "F", "Fuse:Fuse_1206_3216Metric"), "1.5A hold PTC", (g(60), g(34)),
-        "VBUS_IN", "VBUS_F", rot=270, lcsc="C118413")
-    two(sh, ("Device:D_TVS", "D", "Diode_SMD:D_SMA"), "SMAJ5.0A", (g(72), g(40)), "GND", "VBUS_F", rot=90,
-        lcsc="C353442", fields={"Note": "unidirectional SMAJ5.0A, cathode to VBUS_F"})
-    two(sh, FB, "220R@100MHz 2A", (g(80), g(34)), "VBUS_F", "VBUS", rot=270, lcsc="C85840")
-    caps(sh, g(90), g(40), "VBUS", ["22u", "100n"])
-    sh.text("USB-C sink, 5.1k CC pull-downs (default USB power).\n"
-            "Total VBUS load ~0.9 A: use a 5 V / >=1.5 A USB-C supply.\n"
-            "D+/D- (both orientations) -> USBLC6-2SC6 ESD -> USB_DP/DM to the STM32G474 (mcu_if).", (g(15), g(68)))
-    esd = sh.add("Power_Protection:USBLC6-2SC6", "U608", "USBLC6-2SC6", (g(106), g(56)),
+    sh.stub(j, "A1", "GND", kind="gnd")
+    sh.stub(j, "S1", "GND", kind="gnd")
+    vb = j["A4"]
+    yv = vb[1]
+    xcc = vb[0] + g(4)
+    for k, (pin, ref) in enumerate((("A5", "R601"), ("B5", "R602"))):
+        p = j[pin]
+        x = vb[0] + g(8 + 5 * k)
+        sh.wire(p, (x, p[1]))
+        vpart(sh, "R", ref, "5.1k", (x, p[1]))
+    f = sh.add("Device:Polyfuse_Small", "F601", "1.5A hold PTC", (0, 0), rot=90, fp="Fuse:Fuse_1206_3216Metric",
+               lcsc="C118413")
+    place(f, "1", (vb[0] + g(24), yv))
+    sh.wire(vb, f["1"])
+    xt = f["2"][0] + g(5)
+    tvs = sh.add("Device:D_TVS", "D601", "SMAJ5.0A", (0, 0), rot=90, fp="Diode_SMD:D_SMA", lcsc="C353442",
+                 fields={"Note": "unidirectional SMAJ5.0A, cathode to VBUS_F (pin 2)"})
+    place(tvs, "2", (xt, yv))
+    sh.gnd(tvs["1"])
+    fb1 = sh.add("Device:FerriteBead_Small", "FB601", "220R@100MHz 2A", (0, 0), rot=90, fp=FP["FB0805"],
+                 lcsc="C85840")
+    place(fb1, "1", (xt + g(5), yv))
+    sh.wire(f["2"], fb1["1"])
+    sh.label("VBUS_F", (xt, yv - 0.0))
+    # VBUS rail: C602 / C603 (U601 input) are drawn at U601; C632 DNP damper here
+    xv = fb1["2"][0] + g(6)
+    sh.wire(fb1["2"], (xv + g(8), yv))
+    sh.power("VBUS", (xv + g(8), yv), dy=-2.54)
+    damp = sh.add("Device:C_Polarized", "C632", "47u 10V", (0, 0), fp="Capacitor_Tantalum_SMD:CP_EIA-3528-21_Kemet-B",
+                  lcsc="C22036", mpn="TAJB476K010RNJ", dnp=True,
+                  fields={"Note": "DNP: VBUS hot-plug damper (tantalum ESR ~1 R); fit if the plug-in ringing "
+                                  "exceeds 6 V at U601/U603 (power-tree.md section 7)"})
+    place(damp, "1", (xv, yv))
+    sh.gnd(damp["2"])
+    sh.text("USB-C sink, 5.1k CC pull-downs (default USB power, no PD).\n"
+            "VBUS load 0.75 A typ / 0.97 A max at 4.75 V: needs a 5 V >= 1.5 A USB-C supply.\n"
+            "F601 0.05-0.11 R + FB601 0.045 R: VBUS 4.60-5.25 V at the converters.\n"
+            "D+/D- (both orientations) -> U608 USBLC6-2SC6 -> USB_DP/DM (mcu_if).", (g(8), g(62)), size=T)
+    esd = sh.add("Power_Protection:USBLC6-2SC6", "U608", "USBLC6-2SC6", (g(30), g(85)),
                  fp="Package_TO_SOT_SMD:SOT-23-6", lcsc="C7519",
                  fields={"Note": "optional USB ESD array (pins 1/6 and 3/4 flow-through); may be left unfitted"})
-    ns(sh, esd, "1", "USB_DP")
-    ns(sh, esd, "3", "USB_DM")
+    sh.stub(esd, "1", "USB_DP")
+    sh.stub(esd, "3", "USB_DM")
     sh.stub(esd, "6", "USB_DP", length=g(3), kind="hlabel", shape="bidirectional")
     sh.stub(esd, "4", "USB_DM", length=g(3), kind="hlabel", shape="bidirectional")
-    ns(sh, esd, "5", "VBUS")
-    ns(sh, esd, "2", "GND")
+    sh.stub(esd, "5", "VBUS", kind="power")
+    sh.stub(esd, "2", "GND", kind="gnd")
 
-    # --- +3V3 and +1V2
-    u = sh.add("Regulator_Linear:AMS1117-3.3", "U", "AMS1117-3.3", (g(30), g(90)),
-               fp="Package_TO_SOT_SMD:SOT-223-3_TabPin2", lcsc="C6186", fields={"Price": "~0.06 USD"})
-    ns(sh, u, "3", "VBUS"); ns(sh, u, "2", "+3V3"); ns(sh, u, "1", "GND")
-    caps(sh, g(15), g(102), "VBUS", ["10u"])
-    caps(sh, g(42), g(102), "+3V3", ["22u", "22u", "100n"])
-    u = sh.add("Regulator_Linear:AP2112K-1.2", "U", "AP2112K-1.2", (g(85), g(90)),
-               fp="Package_TO_SOT_SMD:SOT-23-5", lcsc="C460310", fields={"Price": "0.24 USD (LCSC)"})
-    ns(sh, u, "1", "+3V3"); ns(sh, u, "3", "+3V3"); ns(sh, u, "5", "+1V2"); ns(sh, u, "2", "GND")
-    ns(sh, u, "4", None)
-    caps(sh, g(70), g(102), "+3V3", ["1u"])
-    caps(sh, g(97), g(102), "+1V2", ["1u", "10u"])
-    sh.text("+3V3: AMS1117 dissipates up to 0.85 W at 0.45 A: give the SOT-223 tab >= 2 cm2 copper.\n"
-            "Alternative if hot: split TRF37D73 supply onto a second AMS1117.", (g(15), g(115)))
+    # ------------------------------------------------------------------ U603 buck-boost -> +5V1
+    X3, Y3 = g(122), g(40)
+    u3 = sh.add(TPS63802, "U603", "TPS63802DLAR", (X3, Y3), fp="scope-fe:Texas_DLA0010A_VSON-HR-10_2x3mm_P0.5mm",
+                lcsc="C2845237", mpn="TPS63802DLAR",
+                fields={"Price": "0.951 USD (LCSC 1+)",
+                        "Note": "CIN (10/8) and COUT (6/8) both hot loops: tight on the top side; AGND(3) by its "
+                                "own trace to GND near pin 8; FB(4) away from L1/L2"})
+    vin = u3["10"]
+    x0 = vin[0] - g(20)
+    rail(sh, (x0, vin[1]), vin)
+    sh.power("VBUS", (x0, vin[1]), dy=-2.54)
+    vpart(sh, "C", "C601", "22u", (vin[0] - g(14), vin[1]),
+          fields={"Note": "U603 CIN at pins 10/8 (moved; >= 4 uF effective, 25 V part)"})
+    xe = vin[0] - g(3)
+    sh.path([u3["2"], (xe, u3["2"][1]), (xe, vin[1])])
+    sh.wire(u3["1"], (xe, u3["1"][1]))
+    pg = u3["5"]
+    sh.wire(pg, (pg[0] - g(8), pg[1]))
+    sh.label("PG_5V1", (pg[0] - g(8), pg[1]), rot=180)
+    l1, l2 = u3["9"], u3["7"]
+    yl = l1[1] - g(3)
+    lb = sh.add("Device:L", "L601", "0.47u", (0, 0), rot=90, fp="scope-fe:L_XR0420_4.4x4.2mm", lcsc="C5307593",
+                mpn="XR0420-R47M",
+                fields={"Price": "0.106 USD (LCSC 5+)",
+                        "Note": "0.47 uH +/-20 %, Isat 9.5 A, 14 mR; 65 in stock, 2nd source FEXU0420SR47MBHCB "
+                                "C49232844 (4.1 x 4.1, land not checked)"})
+    place(lb, "1", (l1[0], yl))
+    sh.wire(l1, lb["1"])
+    sh.wire(l2, lb["2"])
+    a, gg = u3["3"], u3["8"]
+    yb = a[1] + g(2)
+    sh.path([a, (a[0], yb), (gg[0], yb), gg])
+    sh.gnd((a[0], yb))
+    vo, fb = u3["6"], u3["4"]
+    xd = vo[0] + g(4)
+    rt = vpart(sh, "R", "R603", "459k", (xd, vo[1]), gnd=False,
+               fields={"Note": "0.1 % (E192): VOUT = 0.5 V x (1 + 459k/49.9k) = 5.10 V"})
+    vpart(sh, "R", "R604", "49.9k", rt["2"], fields=PCT)
+    sh.path([fb, (fb[0] + g(2), fb[1]), (fb[0] + g(2), rt["2"][1]), rt["2"]])
+    for k, ref in enumerate(("C610", "C611")):
+        vpart(sh, "C", ref, "22u", (xd + g(6 + 6 * k), vo[1]),
+              fields={"Note": "U603 COUT at pins 6/8 (moved; 2 x 22 uF, 25 V part)"})
+    xh = xd + g(20)
+    rail(sh, vo, (xh + g(8), vo[1]))
+    sh.hlabel("+5V1", (xh, vo[1] - g(3)), "output")
+    sh.wire((xh, vo[1]), (xh, vo[1] - g(3)))
+    sh.text("+5V1 = 5.10 V (5.04-5.16 V): GVA-84+ x2 bias tees on the strobe\n"
+            "sheet, own track from C610/C611 (not through FB602).\n"
+            "EN, MODE = VIN: always on, forced PWM 1.4-2.1 MHz.", (X3 - g(22), Y3 + g(14)), size=T)
+    fb2 = bead(sh, "FB602", (xh + g(8), vo[1]))
 
-    # --- boost +5V4 and post filter
-    b = sh.add("Regulator_Switching:MT3608", "U", "MT3608", (g(150), g(40)), fp="Package_TO_SOT_SMD:SOT-23-6",
-               lcsc="C84817", fields={"Price": "~0.06 USD"})
-    ns(sh, b, "5", "VBUS"); ns(sh, b, "4", "VBUS"); ns(sh, b, "2", "GND"); ns(sh, b, "6", None)
-    ns(sh, b, "1", "SW_BOOST"); ns(sh, b, "3", "FB_BOOST")
-    two(sh, ("Device:L", "L", "Inductor_SMD:L_Bourns-SRN4018"), "4.7uH 2A", (g(130), g(28)), "VBUS", "SW_BOOST",
-        rot=270, lcsc="")
-    two(sh, ("Device:D_Schottky", "D", "Diode_SMD:D_SOD-123"), "SS14 / B5819W", (g(172), g(28)), "+5V4",
-        "SW_BOOST", lcsc="C8598")
-    two(sh, "R", "78.7k", (g(180), g(45)), "+5V4", "FB_BOOST", size="0402")
-    two(sh, "R", "10k", (g(186), g(45)), "FB_BOOST", "GND")
-    caps(sh, g(194), g(45), "+5V4", ["22u", "22u"])
-    two(sh, FB, "600R@100MHz 1A", (g(215), g(36)), "+5V4", "+5V4F", rot=270, lcsc="")
-    caps(sh, g(225), g(45), "+5V4F", ["22u", "100n"])
-    sh.text("Boost 5.32 V (0.6 V x (1 + 78.7k/10k)), 1.2 MHz; ferrite + 22 uF pi filter -> +5V4F.\n"
-            "Keep the SW loop (MT3608, L, D, 22 uF) tight and away from the analog sheets.", (g(125), g(58)))
+    # ------------------------------------------------------------------ U604 LM27762: +/-5 V for the BUF802
+    X4 = g(205)                                     # VIN row of U604 = VOUT row of U603 (same Y)
+    sh.wire(fb2["2"], (X4 - g(34), vo[1]))          # -> start of the U604 input rail (label +5V1F there)
+    lm27762(sh, "U604", (X4, Y3), "+5V1F",
+            cin=[("C612", "22u", {"fields": {"Note": "U604 CIN on the IC layer at pin 3 (moved; DECOUPLING-4)"}}),
+                 ("C613", "100n", {"fields": {"Note": "U604 pin 3, closest"}})],
+            c1=("C618", "1u", {"size": "0603", "lcsc": "", "fields": {"Note": "flying cap C1, 25 V (moved)"}}),
+            ccp=("C626", "10u", {"fields": {"Note": "CCP at pin 5 (moved from the LM337 ADJ)"}}),
+            outp=("+5V_LDO", [("C617", "10u", {"fields": {"Note": "OUT+ at pin 11 (moved)"}})], "FB604", "+5V"),
+            outn=("-5V_LDO", [("C621", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB603", "-5V"),
+            rpos=("R613", "300k", "R614", "100k"), rneg=("R605", "280k", "R606", "100k"))
+    sh.text("U604: OUT+ = 1.2 V x (300k + 100k)/100k = +4.80 V; OUT- = -1.22 V x (280k + 100k)/100k = -4.64 V.\n"
+            "BUF802 VS = 9.30 V min (>= 9 V), each side >= 4.5 V. VIN 5.03-5.15 V (<= 5.5 V).\n"
+            "Headroom OUT- 0.14 V min (RNEG 4 R hot, 41 mA). EN+/EN- = VIN, PGOOD to GND.", (g(185), g(78)), size=T)
 
-    # --- +5V (LP2985-5.0)
-    u = sh.add("Regulator_Linear:LP2985-5.0", "U", "LP2985-5.0", (g(150), g(90)), fp="Package_TO_SOT_SMD:SOT-23-5",
-               lcsc="C74511", fields={"Price": "0.29 USD (LCSC)"})
-    ns(sh, u, "1", "+5V4F"); ns(sh, u, "3", "+5V4F"); ns(sh, u, "5", "+5V"); ns(sh, u, "2", "GND")
-    ns(sh, u, "4", "BP_5V")
-    two(sh, "C", "10n", (g(170), g(104)), "BP_5V", "GND")
-    caps(sh, g(132), g(104), "+5V4F", ["1u"])
-    caps(sh, g(178), g(104), "+5V", ["2.2u", "10u"])
+    # ------------------------------------------------------------------ U601 +3V3, U602 +1V2
+    Yb = g(130)
+    buck(sh, "U601", (g(40), Yb), "VBUS", "+3V3",
+         cin=[("C603", "10u", {"fields": {"Note": "U601 CIN at VIN(3)-GND(1), < 1 mm (moved)"}}),
+              ("C602", "100n", {"fields": {"Note": "U601 pin 3 (moved)"}})],
+         cout=[("C604", "22u", {"fields": {"Note": "U601 COUT (one 22 uF; +3V3 plane caps behind)"}})],
+         lref="L602", rtop=("R609", "100k"), rbot=("R610", "22.1k"), cff=("C631", "120p"))
+    buck(sh, "U602", (g(125), Yb), "+3V3", "+1V2",
+         cin=[("C609", "10u", {"fields": {"Note": "U602 CIN at pin 3 (moved from +1V2)"}}),
+              ("C607", "1u", {"fields": {"Note": "U602 pin 3"}})],
+         cout=[("C605", "22u", {"fields": {"Note": "U602 COUT (moved from +3V3)"}}),
+               ("C608", "1u", {})],
+         lref="L603", rtop=("R611", "100k"), rbot=("R612", "100k"))
+    sh.text("U601: VOUT = 0.6 V x (1 + 100k/22.1k) = 3.315 V (FB 591-609 mV: 3.25-3.38 V).\n"
+            "100 % mode dropout VIN >= 3.53 V at 0.67 A: margin >= 1.07 V at VBUS 4.60 V.\n"
+            "0.19 W typ / 0.30 W max, +27 / +45 K. C631 Cff footprint DNP.\n"
+            "U602: 0.6 V x 2 = 1.200 V; soft start 1 ms -> 1.2 mV/us (GW1NZ VCC 0.6-6 mV/us).",
+            (g(15), Yb + g(20)), size=T)
 
-    # --- -5V (LM27761)
-    m = sh.add("Regulator_SwitchedCapacitor:LM27761", "U", "LM27761", (g(230), g(90)),
-               fp="Package_SON:WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm", lcsc="C129351",
-               fields={"Price": "1.23 USD (LCSC, docs/research/prices.md)"})
-    ns(sh, m, "1", "+5V4F"); ns(sh, m, "6", "+5V4F"); ns(sh, m, "2", "GND"); ns(sh, m, "9", "GND")
-    ns(sh, m, "8", "CF_P"); ns(sh, m, "7", "CF_N"); ns(sh, m, "3", "CPOUT"); ns(sh, m, "4", "-5V_LDO")
-    ns(sh, m, "5", "VFB_N5")
-    two(sh, "C", "1u", (g(205), g(104)), "CF_P", "CF_N", size="0603")
-    two(sh, "C", "4.7u", (g(212), g(104)), "CPOUT", "GND", size="0603")
-    two(sh, "R", "1.54M", (g(250), g(104)), "-5V_LDO", "VFB_N5")
-    two(sh, "R", "499k", (g(256), g(104)), "VFB_N5", "GND")
-    caps(sh, g(262), g(104), "-5V_LDO", ["2.2u"])
-    two(sh, FB, "600R@100MHz 1A", (g(275), g(84)), "-5V_LDO", "-5V", rot=270, lcsc="")
-    caps(sh, g(285), g(92), "-5V", ["10u", "100n"])
-    sh.text("LM27761: VOUT = -1.22 V x (1 + 1.54M/499k) = -4.99 V. Pump output resistance 2 ohm, LDO dropout\n"
-            "30 mV at 100 mA (datasheet): needs VIN >= 5.2 V at 90 mA -> fed from the 5.32 V boost.\n"
-            "Ferrite + 10 uF after the LDO to keep pump residue (~MHz) off the BUF802.", (g(200), g(118)))
+    # ------------------------------------------------------------------ U605 LM27762: +/-2V5
+    xu5, yu5 = g(250), g(132)
+    s = (xu5 - g(38), yu5 - g(4))                    # U605 VIN row; its input rail starts at xu5 - g(28)
+    sh.power("+3V3", s, dy=-2.54)
+    b5 = bead(sh, "FB605", s)
+    sh.wire(b5["2"], (xu5 - g(28), s[1]))
+    lm27762(sh, "U605", (xu5, yu5), "+3V3_CP",
+            cin=[("C625", "10u", {"fields": {"Note": "U605 CIN on the IC layer at pin 3 (moved from +2V5)"}})],
+            c1=("C624", "1u", {"fields": {"Note": "flying cap C1 (moved from +2V5)"}}),
+            ccp=("C619", "4.7u", {"size": "0603", "fields": {"Note": "CCP at pin 5 (moved; >= 2 uF effective)"}}),
+            outp=("+2V5_LDO", [("C630", "10u", {"fields": {"Note": "NEW: OUT+ at pin 11 (DS: >= 2.2 uF)"}})],
+                  "FB606", "+2V5"),
+            outn=("-2V5_LDO", [("C628", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB607", "-2V5"),
+            rpos=("R615", "130k", "R616", "120k"), rneg=("R607", "105k", "R608", "100k"),
+            en=("R617", "100k", "PG_5V1"))
+    sh.text("U605: OUT+ = 1.2 V x 250k/120k = +2.500 V; OUT- = -1.22 V x 205k/100k = -2.501 V\n"
+            "(0.1 % dividers: +/-1.7 %). VIN 3.24-3.37 V; headroom OUT+ 0.70 V, OUT- 0.42 V\n"
+            "(RNEG at 3.3 V not in the DS, 5 R assumed). EN+/EN- = U603 PG (R617 to VIN).", (g(208), g(166)), size=T)
 
-    # --- +2V5 (LP5907) and -2V5 (LM337)
-    u = sh.add("Regulator_Linear:LP5907MFX-2.5", "U", "LP5907MFX-2.5", (g(150), g(150)),
-               fp="Package_TO_SOT_SMD:SOT-23-5", lcsc="C165132", fields={"Price": "0.34 USD (LCSC)"})
-    ns(sh, u, "1", "+5V4F"); ns(sh, u, "3", "+5V4F"); ns(sh, u, "5", "+2V5"); ns(sh, u, "2", "GND")
-    ns(sh, u, "4", None)
-    caps(sh, g(132), g(164), "+5V4F", ["1u"])
-    caps(sh, g(170), g(164), "+2V5", ["1u", "10u"])
-    v = sh.add("Regulator_Linear:LM337_SOT223", "U", "LM337", (g(230), g(150)),
-               fp="Package_TO_SOT_SMD:SOT-223-3_TabPin2", lcsc="C19267471", fields={"Price": "0.44 USD (LCSC, XBLW LM337S; check pinout)"})
-    ns(sh, v, "2", "-5V"); ns(sh, v, "3", "-2V5"); ns(sh, v, "1", "ADJ_N25")
-    two(sh, "R", "120", (g(250), g(160)), "-2V5", "ADJ_N25", lcsc="C25079")
-    two(sh, "R", "120", (g(256), g(160)), "ADJ_N25", "GND", lcsc="C25079")
-    two(sh, "C", "10u", (g(262), g(160)), "ADJ_N25", "GND")
-    caps(sh, g(212), g(164), "-5V", ["1u"])
-    caps(sh, g(270), g(160), "-2V5", ["10u", "100n"])
-    sh.text("+2V5: LP5907 (6.5 uV rms) from +5V4F. -2V5: LM337, -1.25 V x (1 + 120/120) = -2.50 V,\n"
-            "120R divider = 10 mA minimum load; 10 uF on ADJ lowers noise. Output cap: >= 10 uF (ESR-tolerant).",
-            (g(130), g(178)))
-    sh.text("Load estimate (A): +3V3 0.45 (TRF37D73 6 x 55 mA, FPGA, MS5351M, COS3502 x 8, LVDS rx),\n"
-            "+1V2 0.03, +5V 0.04, -5V 0.09 incl. -2V5 0.04, +2V5 0.05, VBUS direct 0.2 (GVA-84+ x 2).\n"
-            "VBUS total ~0.85 A.", (g(15), g(200)))
-    # PWR_FLAGs: these nets are driven (USB connector / regulators with passive output pins in their
-    # symbols), ERC power_pin_not_driven otherwise
-    for k, (net, rail) in enumerate([('GND', True), ('VBUS', True), ('-5V', True), ('+5V4F', False)]):
-        x, y = g(20 + 14 * k), g(215)
+    # ------------------------------------------------------------------ decoupling placed at the loads
+    yL = g(190)
+    sh.rect((g(8), yL - g(8)), (g(200), yL + g(22)))
+    sh.text("DECOUPLING PLACED AT THE LOADS (moved parts; same rail nets, location per Note / kicad/README.md)",
+            (g(10), yL - g(7)), size=T)
+    remote = [("C606", "100n", "+3V3", "U401 pin 1 (TRF37D73 VCC) beside C404, top (PDN-7)", {}),
+              ("C622", "100n", "+3V3", "U402 pin 1 (TRF37D73 VCC) beside C409, top (PDN-7)", {}),
+              ("C616", "2.2u", "+5V", "U101 pins 1/12 (BUF802 +5V) beside C108 (PDN-6), 10 V part", {}),
+              ("C614", "10n", "-5V", "U101 pin 10 (BUF802 VSO-) top side, between pin and R112 (DECOUPLING-1)", {}),
+              ("C627", "1u", "-5V", "FB603 output (-5V load side)", {}),
+              ("C615", "1u", "+2V5", "U302 pin 6 / U301 pin 10 (+2V5) (PDN-6)", {}),
+              ("C620", "2.2u", "-2V5", "U302 pin 3 (TLV3801 VEE) beside C307 (PDN-6)", {}),
+              ("C629", "100n", "-2V5", "FB607 output (-2V5 load side)", {})]
+    for k, (ref, val, net, note, kw) in enumerate(remote):
+        x = g(16 + 23 * k)
+        c = C(sh, val, (x, yL + g(3)), ref=ref, fields={"Note": "placed at " + note}, **kw)
+        sh.power(net, c["1"], dy=(2.54 if net.startswith("-") else -2.54) * (1 if net.startswith("-") else 1))
+        sh.gnd(c["2"])
+        sh.text(ref + ": " + note.split(" (")[0].replace(", top", "")[:22], (x - g(3), yL + g(12)), size=0.8)
+
+    # ------------------------------------------------------------------ notes, PWR_FLAGs
+    sh.text("Load (typ / max): +3V3 0.51 / 0.67 A, +1V2 20 / 30 mA, +5V1 0.29 / 0.34 A (GVA-84+ x2 + U604),\n"
+            "+5V / -5V 37 / 41 mA, +2V5 40 / 48 mA, -2V5 42 / 50 mA. USB: 0.75 A typ, 0.97 A all maxima.\n"
+            "Every regulator: VIN range, dropout and margin in docs/research/power-tree.md section 3.",
+            (g(210), g(190)), size=T)
+    flags = [("GND", True), ("VBUS", True), ("+3V3", True), ("+1V2", True), ("+5V", True), ("-5V", True),
+             ("+2V5", True), ("-2V5", True), ("+5V1F", False), ("+3V3_CP", False)]
+    for k, (net, israil) in enumerate(flags):
+        x, y = g(212 + 11 * (k % 10)), g(212)
         sh.power("PWR_FLAG", (x, y))
-        if rail:
+        if israil:
             sh.power(net, (x, y), dy=(2.54 if net == "GND" or net.startswith("-") else -2.54))
         else:
             sh.wire((x, y), (x, y + 2.54))
