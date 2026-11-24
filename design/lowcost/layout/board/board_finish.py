@@ -96,10 +96,10 @@ def planes(B, m):
     F.Cu / B.Cu GND pours"""
     edge = 0.3
     full = [(edge, edge), (W - edge, edge), (W - edge, H - edge), (edge, H - edge)]
-    zone(m, "GND", "In1.Cu", full, prio=0)
+    zone(m, "GND", "In1.Cu", full, prio=0, clr=0.15, minw=0.15)     # ZONES-3 (24 Nov): 0.15 web between 0.9 mm via pitch
     zone(m, "GND", "In2.Cu", full, prio=0, clr=0.2)
     zone(m, "+3V3", "In3.Cu", full, prio=0, clr=0.25)
-    zone(m, "GND", "In4.Cu", full, prio=0)
+    zone(m, "GND", "In4.Cu", full, prio=0, clr=0.15, minw=0.15)
     zone(m, "GND", "F.Cu", full, prio=0, clr=0.2)
     zone(m, "GND", "B.Cu", full, prio=0, clr=0.2)
 
@@ -322,15 +322,8 @@ def cleanup(B, m):
                     t.SetEnd(P(xs, 27.95))
             m.track(net, 0.2, [(xs, 27.95), (xr, 27.75)], "F.Cu", ch=0.0001)
     # U302 (TLV3801) exposed-pad via (7.94, 31.1) on -2V5 touched only F.Cu: tie it to its partner via (7.14, 31.1) on L3
-    m.track("-2V5", 0.3, [(7.14, 31.1), (7.94, 31.1)], "In2.Cu", ch=0.0001)
-    done.append(("L3 tie", "-2V5", (7.14, 31.1), (7.94, 31.1)))
-    # -2V5 via (17.85, 24.51) at R305.2 only joined two B tracks: replace it by a B track with 45-degree bends
-    if kill_via("-2V5", (17.85, 24.51)):
-        kill_seg("-2V5", "B.Cu", (17.2, 24.51), (17.85, 24.51))
-        kill_seg("-2V5", "B.Cu", (17.8, 24.6), (17.6, 24.8))
-        kill_seg("-2V5", "B.Cu", (17.6, 24.8), (17.6, 25.0))
-        # R305 is vertical: leave pad 2 southwards, then east onto the existing diagonal at (17.6, 25.0)
-        m.track("-2V5", 0.3, [(17.2, 24.51), (17.2, 24.85), (17.35, 25.0), (17.6, 25.0)], "B.Cu", ch=0.0001)
+    # (24 Nov: U302's -2V5 vias are joined by the board_power router like every other rail island)
+    # (24 Nov: the R305.2 -2V5 via is joined by the board_power router; the old B rework hit the new R417)
     # VBUS: pstrobe landing vias (22.78, 26.345 / 27.045) fed only by the B stub from C418.1 (the L6 hop feeds C418.1)
     if kill_via("VBUS", (22.78, 26.345)) | kill_via("VBUS", (22.78, 27.045)):
         kill_seg("VBUS", "B.Cu", (22.78, 25.725), (22.78, 27.045))

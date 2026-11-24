@@ -417,13 +417,13 @@ YV10 = 4.15                                 # 0.1 mm off the pin-1 pad corner
 V(XVC, YV10, "+2V5")
 c1p = P("C301", "@+2V5")
 T("+2V5", 0.4, [c1p, (c1p[0], YV10 + XVC - c1p[0]), (XVC, YV10)], layer="B.Cu", ch=0)
-place2("C306", 11.8, 1.5, "v", "GND", side="B")   # second U302 100 n at the north +2V5 via pair; GND pad into the B pour
+place2("C306", 11.8, 1.62, "v", "GND", side="B")   # second U302 100 n at the north +2V5 via pair; GND pad into the B pour
 c6p = P("C306", "@+2V5")
 T("+2V5", 0.4, [(XVC, 2.2), (XVC + 2.2 - c6p[1], c6p[1]), c6p], layer="B.Cu", ch=0)
-V(10.45, c6p[1], "+2V5")
-g6 = P("C306", "@GND")
-gv(g6[0] + 0.65, g6[1])                     # own GND via (was left to the board's B pour)
-T("GND", 0.4, [g6, (g6[0] + 0.65, g6[1])], layer="B.Cu", ch=0)
+# (24 Nov, board integration: the +2V5 via at x 10.45 sat under the board PH_STROBE_N run x 10.60; C306 moved
+# 0.12 mm south so its GND via clears the PH_STROBE_N run at board y 23.21)
+# (24 Nov, integration: C306's GND pad is fed by the board's B pour again; its own via sat on the board's L3
+# DAC_TRIG / TRIG_SEL slow lines at y 23.05 / 23.35)
 V(11.1, c6p[1], "+2V5")
 # VSW network on B in the north strip: R304 (GND), R305 (-2V5), TP301
 for x, ref in ((15.8, "R304"), (17.2, "R305")):

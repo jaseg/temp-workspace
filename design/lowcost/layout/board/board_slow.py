@@ -211,7 +211,7 @@ TAIL = {
     "/ADC_IN": [(21.0, 19.35), (20.35, 20.0), (19.06, 20.0)],          # north of R210's via (22.14, 19.97)
     "/ADC_REF_MID": [(22.25, 21.4), (21.65, 20.8)],
     "/VBIAS_K": [(17.8, 21.7), (16.4, 20.3)],
-    "/VBIAS_A": [(16.0, 22.0), (15.4, 21.4), (15.4, 16.3)],            # via on the B column south of BUF_OUT_T
+    "/VBIAS_A": [(16.0, 22.0), (15.4, 21.4), (15.4, 15.9)],            # via on the B column south of BUF_OUT_T
     "/VNEG_REF": [(7.9, 22.3), (7.75, 22.45), (2.74, 22.45), (1.94, 21.65), (1.94, 19.2)],
     "/VOFS": [(8.15, 22.6), (8.0, 22.75), (1.6, 22.75), (1.0, 22.15), (1.0, 19.2)],
     "/DAC_TRIG": [(14.77, 24.97), (14.57, 24.77), (14.57, 23.55), (14.07, 23.05), (9.0, 23.05), (8.3, 23.75),
@@ -221,7 +221,7 @@ TAIL = {
 }
 GRID_ORDER = ["/TRIG_SEL", "/DAC_TRIG"]      # area B: grid search from the end of TAIL to the target
 # L3 targets (existing vias of the blocks, or a via placed on the block's B stub by gen_board)
-TARGET = {"/ADC_REF_MID": (21.65, 20.8), "/ADC_IN": (19.06, 20.0), "/VBIAS_K": (16.4, 20.3), "/VBIAS_A": (15.4, 16.3),
+TARGET = {"/ADC_REF_MID": (21.65, 20.8), "/ADC_IN": (19.06, 20.0), "/VBIAS_K": (16.4, 20.3), "/VBIAS_A": (15.4, 15.9),
           "/VOFS": (1.0, 19.2), "/VNEG_REF": (1.94, 19.2), "/DAC_TRIG": (4.6, 41.0), "/TRIG_SEL": (9.25, 44.6)}
 
 

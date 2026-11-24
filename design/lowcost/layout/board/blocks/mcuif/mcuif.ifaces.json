@@ -140,7 +140,7 @@
    "side": "N",
    "class": "slow",
    "width": 0.15,
-   "note": "R735 5.1k from U704.17 -> sampler"
+   "note": "R735 4.7k / R736 5.1k divider from U704.17 -> sampler (0.10-1.40 V)"
   },
   {
    "net": "/VBIAS_A",

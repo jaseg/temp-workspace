@@ -154,7 +154,7 @@ place("R723", 43.3, COLY, "v", "/VTAP_TH")        # DAC_TAPTH -> VTAP_TH
 place("R724", 41.9, 2.05, "h", "GND")
 place("C709", 41.9, 3.09, "h", "GND")
 place("R735", 39.5, COLY, "v", "/VBIAS_K")        # DAC_BIAS_K -> VBIAS_K
-place("R736", 38.1, COLY + 0.51, "h", "GND")      # DAC_BIAS_K -> GND, at the input pad
+place("R736", 38.1, 2.05, "h", "GND")             # VBIAS_K -> GND at the output node (24 Nov: divider 4.7k / 5.1k)
 place("R733", 36.0, COLY, "v", "/VBIAS_A")        # DAC_BIAS_A -> VBIAS_A
 place("R734", 34.6, 2.05, "h", "-2V5")            # VBIAS_A -> -2V5
 # ADC_REF_MID divider (W1, above J501's east end)
@@ -372,11 +372,12 @@ for ref in ("R724", "C709"):
     T("GND", WP, [g, (40.75, g[1])])
     V("GND", (40.75, g[1]))
 # BIAS_K: R735 inline, R736 at the input pad
-column(COLX["BIAS_K"], YL["BIAS_K"], "/mcu_if/DAC_BIAS_K", "R735", "/VBIAS_K", WS, "R735 5.1k from U704.17 -> sampler")
-a, g = P("R736", "@DAC_BIAS_K"), P("R736", "@GND")
-T("/mcu_if/DAC_BIAS_K", WS, [a, P("R735", "@DAC_BIAS_K")])
-T("GND", WP, [g, (37.0, g[1])])
-V("GND", (37.0, g[1]))
+column(COLX["BIAS_K"], YL["BIAS_K"], "/mcu_if/DAC_BIAS_K", "R735", "/VBIAS_K", WS,
+       "R735 4.7k / R736 5.1k divider from U704.17 -> sampler (0.10-1.40 V)")
+a, g = P("R736", "@VBIAS_K"), P("R736", "@GND")
+T("/VBIAS_K", WS, [a, (COLX["BIAS_K"], a[1])])
+T("GND", WP, [g, (36.75, g[1])])
+V("GND", (36.75, g[1]))
 # BIAS_A: R733 inline, R734 to -2V5 at the output node
 column(COLX["BIAS_A"], YL["BIAS_A"], "/mcu_if/DAC_BIAS_A", "R733", "/VBIAS_A", WS, "R733 / R734 divider -> sampler")
 a, g = P("R734", "@VBIAS_A"), P("R734", "@-2V5")

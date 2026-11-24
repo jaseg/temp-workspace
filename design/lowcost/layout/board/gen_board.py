@@ -267,7 +267,7 @@ if not FAST:
     # ---------------------------------------------------------------- slow lines whose analog end is a B column: L3 vias
     # (VBIAS_A / VBIAS_K: via at y 20.3 on the B column; ADC_IN / ADC_REF_MID: their existing vias) - the B stubs
     # below are removed so the L6 COARSE lane passes
-    for net, yv in (("/VBIAS_A", 16.3), ("/VBIAS_K", 20.3), ("/ADC_IN", None), ("/ADC_REF_MID", None)):
+    for net, yv in (("/VBIAS_A", 15.9), ("/VBIAS_K", 20.3), ("/ADC_IN", None), ("/ADC_REF_MID", None)):
         e = (ia[net]["x"], ia[net]["y"] + 1.0)
         (t, _, o), = seg_at(net, e, "B.Cu")
         if yv is None:
@@ -374,9 +374,6 @@ if not FAST:
         if t.GetClass() == "PCB_TRACK" and t.GetNetname() in RF and t.GetLayerName() == "F.Cu":
             m.rf_keepout([loc(t.GetStart()), loc(t.GetEnd())], pcbnew.ToMM(t.GetWidth()), layer="F.Cu")
     bf.planes(B, m)
-    for z in list(B.Zones()):                          # L4 belongs to board_power.py (second agent): +3V3 background + islands
-        if not z.GetIsRuleArea() and z.IsOnLayer(pcbnew.In3_Cu) and z.GetNetname() == "+3V3":
-            B.Remove(z)
     for z in B.Zones():
         if not z.GetIsRuleArea():
             z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
@@ -403,20 +400,11 @@ else:
     def vias(net):
         return [t for t in B.GetTracks() if isinstance(t, pcbnew.PCB_VIA) and t.GetNetname() == net]
 
-# power trunks (VBUS, +5V, -5V: reserved first, they carry the current), then the slow lines around them
+# 24 Nov 2026: slow bias / control lines FIRST (explicit geometry, board_slow.py), then every supply rail by the
+# grid router of board_power.py around them (TOPOLOGY.md section 10)
 import board_power
 import board_slow
-board_power.SLOW_RESERVED[:] = board_slow.reserve(mc_if, phase_if["/VTAP_TH"])   # TOPOLOGY.md section 9
-# dead block via: the +2V5 via (11.1, 23.85) of the old L4 +2V5 island touches no track, pad or zone any more
-for v in vias("+2V5"):
-    if near(loc(v.GetPosition()), (11.1, 23.85)) and not any(
-            near(loc(t.GetStart()), (11.1, 23.85)) or near(loc(t.GetEnd()), (11.1, 23.85)) for t in segs("+2V5")):
-        B.Remove(v)
-_rt = board_power.apply_trunks(B)
-print("power trunks: stranded", _rt.get("stranded"), "| maze", {k: (round(v["length"], 1), v["wmin"])
-      for k, v in _rt.get("maze", {}).items() if v["routes"]}, "| hop problems", _rt.get("hop_clearance"))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
-import board_slow
 SLOW = board_slow.draw(B, m, mc_if, phase_if["/VTAP_TH"])
 print("slow lines:", SLOW)
 for net, (ok, L_, nv) in SLOW.items():
@@ -426,6 +414,19 @@ for net, (ok, L_, nv) in SLOW.items():
 if "--slowonly" in sys.argv:
     bl.save_board(B, os.path.join(SCR, "slow.kicad_pcb"))
     sys.exit(0)
+# the phase block's L4 VTAP strips go: L4 is +3V3 only (TOPOLOGY.md section 8); VTAP_P / VTAP_N run on L3
+for z in list(B.Zones()):
+    if not z.GetIsRuleArea() and z.IsOnLayer(pcbnew.In3_Cu) and z.GetNetname() in ("/VTAP_P", "/VTAP_N"):
+        B.Remove(z)
+# review (22 Nov): dangling block copper from the DRC (VTAP stubs, VTH rail overhangs, R305 via, TRIG_SEL pad entry)
+print("review cleanup:", bf.cleanup(B, m))
+if "--prepower" in sys.argv:
+    bl.save_board(B, os.path.join(SCR, "prepower.kicad_pcb"))
+    sys.exit(0)
+_rp = board_power.apply(B, m)
+print("power: failed", _rp.get("failed"), "| no landing", _rp.get("no_landing"), "| vias", _rp.get("vias"))
+pcbnew.ZONE_FILLER(B).Fill(B.Zones())
+print("rail widening [mm widened]:", board_power.widen(B, m))
 import board_stitch
 # R737.2 (TRIG_SEL pull-down, B side) sits in a B.Cu pour pocket (BOOT0, JP701, R729) whose neck no longer fills:
 # explicit B track to the neighbouring GND pad R729.2
@@ -475,31 +476,10 @@ bf.silk(B, m)
 # routes.json first (board_power.py reads it), then the power module as the LAST copper step
 json.dump({"log": LOG, "not_placed": NOT_PLACED, "rf": RF, "stitch": NST}, open(os.path.join(HERE, "routes.json"), "w"),
           indent=1)
-_rr = board_power.apply_rest(B)
-print("power rest: stranded", _rr.get("stranded"), "| unreached", _rr.get("unreached"))
-# the +2V5 maze join to C305.2 (B side, via-in-pad 7.54, 29.3) ends with a diagonal inside the pad: re-enter the pad
-# horizontally from the east (45-degree bends only)
-_d = [t for t in segs("+2V5", "B.Cu") if {loc(t.GetStart()), loc(t.GetEnd())} == {(8.8, 28.0), (7.6, 29.2)}]
-_h = [t for t in segs("+2V5", "B.Cu") if {loc(t.GetStart()), loc(t.GetEnd())} == {(7.6, 29.2), (7.3, 29.2)}]
-if _d and _h:
-    _w = pcbnew.ToMM(_d[0].GetWidth())
-    for t in _d + _h:
-        B.Remove(t)
-    m.track("+2V5", _w, [(8.8, 28.0), (8.3, 28.5), (8.3, 28.95), (7.95, 29.3), (7.54, 29.3)], "B.Cu", ch=0.0001)
-# U701.5 / C720.1 +2V5 via (29.88, 49.3) sits at the end of the +2V5 east-loop corridor: explicit L3 stub into it
-# (the fill alone leaves the via in a clearance notch after a reload)
-# (the corridor neck between the via and the J-connector THT pads 29.9-32.5 / 50.6 is below the zone's min width)
-m.track("+2V5", 0.5, [(29.88, 49.68), (30.35, 50.15), (32.8, 50.15)], "In2.Cu", ch=0.0001)
-# review (22 Nov): dangling copper from the DRC (VTAP stubs, VTH rail overhangs, -2V5 / VBUS one-layer vias)
-print("review cleanup:", bf.cleanup(B, m))
-pcbnew.ZONE_FILLER(B).Fill(B.Zones())
-# review: widen the minor-rail maze tracks (0.3-0.5 mm) where 0.3 mm to all other copper allows
-print("rail widening [widened mm, kept mm]:", board_power.widen(B))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 B.BuildConnectivity()
 PWR = board_power.verify(B)
 print(board_power.table(PWR))
-print("maze (rest):", {k: (round(v["length"], 1), v["wmin"], v["vias"]) for k, v in _rr.get("maze", {}).items()})
 if "--powonly" in sys.argv:
     bl.save_board(B, os.path.join(SCR, "powonly.kicad_pcb"))
     sys.exit(0)

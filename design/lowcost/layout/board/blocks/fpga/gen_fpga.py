@@ -59,15 +59,15 @@ U502X, U502Y = 11.1, 2.2
 bplace("U501", CX, CY, 90)
 bplace("U502", U502X, U502Y, 180)    # left: 6 CLK2, 7 VDD, 8 GND, 9 CLK1, 10 CLK0 (top->bottom); right: 5 SDA, 4 SCL, 3 XB, 2 XA, 1 VDD
 bplace("Y501", 16.3, 5.55, 90)
-bplace("R510", 6.9, 2.7, 270)         # CLK2 -> CLK2_FPGA (pin 34)
+bplace("R510", 7.2, 5.0, 270)         # CLK2 -> CLK2_FPGA (pin 34), straight above pin 34 (24 Nov: C508 took its spot)
 bplace("R508", 8.5, 5.0, 270)         # CLK0 -> FPGA_CLK (pin 33); CLK0 drops straight from pin 10 (24 Nov)
 bplace("R509", 11.3, 3.0, 180, "B")   # CLK1 -> MCU_CLK, on B under U502 (CLK1 via under the body, 24 Nov)
 # +3V3_CLK (24 Nov, DECOUPLING-5 / power-tree.md): FB608 from +3V3, C510 10u + C623 1u after it; C508 on TOP at pin 7
 # (VDDO) and C509 at pin 1 (VDD), each GND pad with its own via right beside it
-bplace("C508", 7.65, 2.18, 270)       # U502.7 VDDO, F, pad 1 on the pin-7 row, GND via (7.65, 3.45)
-bplace("C509", 13.3, 4.58, 270)       # U502.1 VDD, F, straight below pin 1, GND via (13.3, 5.75)
-bplace("C623", 12.45, 4.58, 270)      # 1u +3V3_CLK beside C509, GND via (12.45, 5.75)
-bplace("C507", 16.0, 10.75, 0, "B")   # 10u +3V3 (moved to B, 24 Nov: FB608 takes its F spot)
+bplace("C508", 7.45, 2.18, 270)       # U502.7 VDDO, F, pad 1 on the pin-7 row, GND via (7.45, 3.45)
+bplace("C509", 13.3, 5.0, 270)        # U502.1 VDD, F, straight below pin 1, GND via (13.3, 6.2)
+bplace("C623", 12.3, 5.0, 270)        # 1u +3V3_CLK beside C509, GND via (12.3, 6.2)
+bplace("C507", 16.0, 9.2, 0, "B")     # 10u +3V3 (moved to B under C510, 24 Nov: FB608 takes its F spot)
 bplace("C510", 16.0, 8.75, 0)         # 10u +3V3_CLK
 bplace("FB608", 15.8375, 10.6, 180)   # +3V3 (pad 1, via to L4) -> +3V3_CLK (pad 2, straight up to C510.1)
 bplace("C506", 4.05, 7.65, 180)      # pin 36 +3V3 (VCCX)
@@ -301,12 +301,12 @@ edge(C("MCU_CLK"), "MS5351M CLK1 via R509 33 R; L6 under U502 / U501 -> STM32 PF
 # FPGA_CLK: CLK0 (U502.10) -> R508 -> pin 33; CLK2 (U502.6) -> R510 -> pin 34 (both F.Cu, short, over L2)
 ck0, ck2 = blk.pad("U502", "10"), blk.pad("U502", "6")
 r8a, r8b = blk.pad("R508", "@Net-(U502-CLK0)"), blk.pad("R508", "@FPGA_CLK")
-T("Net-(U502-CLK0)", WS, [ck0, (r8a[0], ck0[1]), r8a], ch=0.0001)
+T("Net-(U502-CLK0)", WS, [ck0, (8.05, ck0[1]), (8.05, 3.7), (r8a[0], 3.7 + r8a[0] - 8.05), r8a], ch=0.0001)
 p33 = up(33)
-T("/fpga_clock/FPGA_CLK", WS, [r8b, (r8b[0], 5.6), (p33[0], 5.6 + abs(r8b[0] - p33[0])), p33], ch=0.0001)
+T("/fpga_clock/FPGA_CLK", WS, [r8b, (r8b[0], 5.85), (p33[0], 5.85 + abs(r8b[0] - p33[0])), p33], ch=0.0001)
 r10a, r10b = blk.pad("R510", "@Net-(U502-CLK2)"), blk.pad("R510", "@CLK2_FPGA")
-T("Net-(U502-CLK2)", WS, [ck2, (r10a[0], ck2[1]), r10a], ch=0.4)
-T("/fpga_clock/CLK2_FPGA", WS, [r10b, (r10b[0], 6.0), (up(34)[0], 6.3), up(34)], ch=0.0001)
+T("Net-(U502-CLK2)", WS, [ck2, (6.85, ck2[1]), (6.85, 3.85), (r10a[0], 3.85 + r10a[0] - 6.85), r10a], ch=0.0001)
+T("/fpga_clock/CLK2_FPGA", WS, [r10b, up(34)], ch=0.0001)
 
 u7, u8, u1 = blk.pad("U502", "7"), blk.pad("U502", "8"), blk.pad("U502", "1")
 CK3 = C("+3V3_CLK")
@@ -324,12 +324,18 @@ c23v, c23g = blk.pad("C623", "@" + CK3), blk.pad("C623", "@GND")
 T(CK3, 0.25, [u1, c9v])
 T(CK3, 0.25, [c23v, c9v])
 for g_ in (c9g, c23g):
-    T("GND", 0.3, [g_, (g_[0], 5.75)])
-    V(g_[0], 5.75, "GND")
+    T("GND", 0.3, [g_, (g_[0], 6.2)])
+    V(g_[0], 6.2, "GND")
 T("GND", 0.25, [u8, (10.6, u8[1])])
 V(10.6, u8[1], "GND")
 fbv = blk.pad("FB608", "@" + CK3)
 T(CK3, 0.4, [fbv, blk.pad("C510", "@" + CK3)])
+fb1 = blk.pad("FB608", "@+3V3")
+T("+3V3", 0.4, [fb1, (fb1[0], 11.35)])                  # FB608 input: via to the L4 +3V3 plane
+V(fb1[0], 11.35, "+3V3")
+c10g = blk.pad("C510", "@GND")
+T("GND", 0.4, [c10g, (c10g[0], 7.7)])                   # C510 GND: via straight north of its pad
+V(c10g[0], 7.7, "GND")
 # ---------------- supply necks (pad-wide 0.2 mm, then 0.4 mm) and the decoupling capacitors at the pins
 p36, p37, p25, p1, p12 = up(36), up(37), up(25), up(1), up(12)
 c506 = blk.pad("C506", "@+3V3")
@@ -339,11 +345,11 @@ c502 = blk.pad("C502", "@+1V2")
 T("+1V2", 0.2, [p37, (5.15, p37[1]), (5.15 - (p37[1] - c502[1]), c502[1]), c502], ch=0.0001)
 V(5.05, 8.3, "+1V2")
 T("+1V2", 0.25, [(5.05, 8.3), (5.05, 8.865)])
-# DECOUPLING-6 (24 Nov): C502 keeps the via between the pads, C506 gets its own via north of its pad
+# DECOUPLING-6: C506 / C502 keep the shared via between their GND pads (no other spot: the L6 west-bundle lanes
+# y 5.25-7.25 north, S_STROBE_P y 9.37 south, the L3 configuration lines x 1.15-2.95 west)
 V(3.55, 8.15, "GND")
+T("GND", 0.3, [blk.pad("C506", "@GND"), (blk.pad("C506", "@GND")[0], 8.15)])
 T("GND", 0.3, [blk.pad("C502", "@GND"), (blk.pad("C502", "@GND")[0], 8.15)])
-V(blk.pad("C506", "@GND")[0], 7.03, "GND")
-T("GND", 0.3, [blk.pad("C506", "@GND"), (blk.pad("C506", "@GND")[0], 7.03)])
 T("+3V3", 0.2, [p25, (p25[0], 7.45)])
 V(p25[0], 7.45, "+3V3")
 c504 = blk.pad("C504", "@+3V3")
@@ -721,15 +727,15 @@ job("xa", lambda: route("Net-(U502-XA)", ("U502", "2"), [("Y501", "@Net-(U502-XA
 job("xb", lambda: route("Net-(U502-XB)", ("U502", "3"), [("Y501", "@Net-(U502-XB)")], layer_pref=FPREF, via_cost=30))
 job("clk3v3", lambda: route(CK3, ("C510", "@" + CK3), [("C509", "@" + CK3), ("C623", "@" + CK3)], 0.3,
                              layer_pref=FPREF, via_cost=30))
-for ref, num, pr in (("FB608", "@+3V3", True),
+for ref, num, pr in (
                      ("C507", "@+3V3", True), ("C507", "@GND", True),
-                     ("C510", "@GND", True), ("C504", "@+3V3", True), ("C504", "@GND", True),
+ ("C504", "@+3V3", True), ("C504", "@GND", True),
                      ("C501", "@+1V2", True), ("C501", "@GND", True), ("C503", "@+1V2", True), ("C503", "@GND", True)):
     job("tie%s%s" % (ref, num), lambda ref=ref, num=num, pr=pr: tie(ref, num, pair=pr))
-def _c505g():                                        # DECOUPLING-6: own GND via 0.47 mm above the C505 GND pad
+def _c505g():                                        # DECOUPLING-6: own GND via 0.4 mm below the C505 GND pad
     g_ = blk.pad("C505", "@GND")
-    T("GND", 0.3, [g_, (g_[0], 6.15)])
-    V(g_[0], 6.15, "GND")
+    T("GND", 0.3, [g_, (g_[0], 7.6)])
+    V(g_[0], 7.6, "GND")
 job("c505g", _c505g)
 job("c505v", lambda: route("+3V3", ("C505", "@+3V3"), [("VIA", up(25)[0], 7.45)], 0.3, layer_pref=FPREF, via_cost=30))
 # configuration resistors (F, NW): net pad -> its L3 via, other pad -> own GND / +3V3 via; JP501 to R504
