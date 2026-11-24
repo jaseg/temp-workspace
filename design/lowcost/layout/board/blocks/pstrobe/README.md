@@ -57,16 +57,6 @@ Both: L1 -> via (+GND via) -> L6 over L5 -> via (+GND via) -> L1 -> 47 R. K's L6
 check_board (24 Nov): 0 missing/extra/footprint/value/pad-net, 0 clearance, 0 corners, 0 off-axis exits, 0 RF width, 0 RF pour gap, 0 courtyard overlaps; unrouted only +3V3 (3), /+5V1 (3), GND (1, A/K islands joined by the board plane).
 Nightly DRC jlc4 (24 Nov): `total 70: error 8, warning 62`: 7 unconnected (plane-fed), 12 via_dangling (L4 supply vias), 4 track_dangling (interface stubs), 1 invalid_outline, 46 lib_footprint_*. 0 courtyard/clearance/width/hole/silk. Renders `pstrobe.png`, `pstrobe_detail.png` looked at.
 
-## GVA-84+ drain feed resistors (24 Nov 2026, SPEC decision 26)
-+5V1 is 5.40 V now, so each chain gets a series 2.49 R 0402 (R419 chain A, R420 chain K) between the 10 uF (C420 / C430,
-own +5V1 via pair) and the cold-end node (C419 100 nF, C418 1 nF, choke cold pad): supply -> 10 uF -> 2.49 R -> 100 nF /
-1 nF -> choke (rule 7: the node still enters through C419). Placement, B side: R419 centre (13.95, 2.845) local, 0.5 mm
-west of the C419 column and 1.18 mm below it (0.24 mm courtyard gap) so its node pad clears the bead via (0.165 mm); node
-track C419 pad -> down 0.325 -> 45 deg -> down into the R pad (0.4 mm); +5V1 track (0.5 mm) R pad -> down -> 45 deg ->
-into the C420 pad from the north, clear of C432's GND via. The +5V1 via pair that sat beside C419 is removed. K mirrored.
-check_board 0 apart from the plane-fed interfaces; via_in_pad FAIL 0; RF geometry unchanged (stub, output, input lengths
-as before).
-
 ## Deviations / open points
 - Mirror: everything is mirrored except the TRF37D73 and GVA-84+ bodies (chiral) and the **chain-A input leg**. R407 is horizontal under U403 and C412 sits below the line, because the north edge now carries both entries. The mirror spot in K is taken by the TRF pin-1 caps and their GND vias (the TRF is not mirrored). The K leg keeps its column toward the S edge. Lumped parts; the electrical length to TRF pin 2 is equal.
 - The spare 100 nF C432 / C433 is on B under C434 / C435, with its own GND via, to free the west L6 strip.

@@ -9,8 +9,8 @@ Prices: LCSC product pages read 24 Nov 2026 (unit price at the smallest break). 
 |---|---|---|---|
 | +3V3 | TRF37D73 x5 265/325 (SLASE43 ICC 53/65); COS3502 x8 53/~69 (3.3 mA/ch typ, no max); STM32G474 ~40/~60 (est.); MS5351M 31/55 (IDD 24/38 + 3 outputs 2.2/5.6); GW1NZ VCCIO/VCCX ~20/~30 (est.); SN65LVDS2 4/7; TPH2501 U202 6.5/7.5; LED 2; +1V2 buck input 9/13; +/-2V5 converter input 82/98 | 513 | 667 |
 | +1V2 | GW1NZ-1 core (est.) | 20 | 30 |
-| +5V (4.80 V) | BUF802 35.5/40 (R_Bias 17.8k, CL mode); OPA197 1.0/1.3 | 37 | 41 |
-| -5V (-4.81 V since 24 Nov, section 12) | BUF802 35.5/40; OPA197 1.0/1.3 (-2V5 no longer hangs here) | 37 | 41 |
+| +5V (4.91 V since 24 Nov, section 12) | BUF802 35.5/40 (R_Bias 17.8k, CL mode); OPA197 1.0/1.3 | 37 | 41 |
+| -5V (-4.51 V since 24 Nov, section 12) | BUF802 35.5/40; OPA197 1.0/1.3 (-2V5 no longer hangs here) | 37 | 41 |
 | +2V5 | TLV3801 20/26.6; TPH2501 U201 6.5/7.5; VTAP_P 12.5 (16 x 2.2k pairs); CLH divider R108 1; TLV9001, TMUX136 0.1 | 40 | 48 |
 | -2V5 | TLV3801 20/26.6; U201 6.5/7.5; VTAP_N 12.5; CLL R110 1; R303/R305/R384/R734 networks + VNEG_REF ~2 | 42 | 50 |
 | +5V1 (new) | GVA-84+ x2 216/260 (108 typ, 130 max each); LM27762 A input 74/83 | 290 | 343 |
@@ -23,9 +23,9 @@ USB-C VBUS 4.75-5.25 V -> F601 PTC -> D601 TVS -> FB601 -> VBUS (4.60-5.25 V at 
  |     |- U602 TPS62A01A buck 2.4 MHz FPWM -> +1V2 (FPGA core)
  |     |- FB605 -> U605 LM27762 B (pump 2 MHz + LDOs) -> +2V5 / -2V5 [+2.520 / -2.440 V] -> FB606 / FB607 -> loads
  |     |- FB608 (new) -> MS5351M VDD/VDDO;  FB701 (exists) -> MCU VDDA
- |- U603 TPS63802 buck-boost FPWM 1.4-2.1 MHz -> +5V1 5.10 V [5.40 V, 19.6k/2.0k 0.1 %]
-       |- GVA-84+ x2 bias tees [each via its own 2.49 R, R419 / R420] -> Vd 4.86-5.10 V [4.82-5.20 V]
-       |- FB602 -> +5V1F -> U604 LM27762 A -> OUT+ 4.80 V -> FB604 -> +5V ; OUT- -4.64 V [-4.81 V] -> FB603 -> -5V (BUF802, OPA197)
+ |- U603 TPS63802 buck-boost FPWM 1.4-2.1 MHz -> +5V1 5.10 V [5.115 V, 12k/1.3k 0.1 %]
+       |- GVA-84+ x2 bias tees (direct, no bead)           -> Vd 4.86-5.10 V [4.85-5.17 V]
+       |- FB602 -> +5V1F -> U604 LM27762 A -> OUT+ 4.80 V [4.908 V] -> FB604 -> +5V ; OUT- -4.64 V [-4.514 V] -> FB603 -> -5V (BUF802, OPA197)
 ```
 Net names +5V / -5V are kept (values 4.80 / -4.64 V) so the analog sheets need no edits. The buck-boost replaces the boost because the
 USB input spans the 5.1 V target (4.60-5.25 V): a boost cannot regulate when VIN > VOUT and pulse-skips near it (PDN-8). The
@@ -37,12 +37,12 @@ GVA-84+ move from VBUS to +5V1 fixes BIASTEE-1 and PDN-8 together.
 ## 3. Per-regulator table
 | | U601 TPS62A01A | U602 TPS62A01A | U603 TPS63802 | U604 LM27762 A | U605 LM27762 B |
 |---|---|---|---|---|---|
-| Vin in circuit | 4.60-5.25 | 3.22-3.43 | 4.60-5.25 | 5.319-5.466 (after FB602; was 5.03-5.15) | 3.24-3.37 (after FB605) |
-| Vout | 3.327 (100k/22k 1 %; was 3.315 with 22.1k): 3.224-3.433 | 1.200 (100k/100k), 1.17-1.23 | 5.400 (19.6k/2.0k 0.1 %; was 5.103): 5.334-5.466 | +4.800 (300k/100k 1 %), -4.808 (150k/51k 1 %); 4.66-4.95 each | +2.520 (110k/100k 1 %), -2.440 (100k/100k 1 %); +/-2.5 % |
+| Vin in circuit | 4.60-5.25 | 3.22-3.43 | 4.60-5.25 | 5.039-5.177 (after FB602; was 5.03-5.15) | 3.24-3.37 (after FB605) |
+| Vout | 3.327 (100k/22k 1 %; was 3.315 with 22.1k): 3.224-3.433 | 1.200 (100k/100k), 1.17-1.23 | 5.115 (12k/1.3k 0.1 %; was 5.103): 5.054-5.177 | +4.908 (309k/100k 1 %): 4.760-5.056; -4.514 (270k/100k 1 %): 4.381-4.647 | +2.520 (110k/100k 1 %), -2.440 (100k/100k 1 %); +/-2.5 % |
 | Load typ/max | 0.51/0.67 A | 20/30 mA | 0.29/0.34 A | 37/41 mA each side | 40/48 (+), 42/50 (-) mA |
 | Dropout (DS) | 100 % mode: VIN >= VO + I(RDSON_HS 0.18 + R_L 0.05) = 3.53 V (sec. 7.3.2 eq. 1, table 6.5) | VIN-VO 2.1 V, n/a | buck-boost: regulates for VIN above and below VO (sec. 9.4) | OUT+ 45 mV at 100 mA (5.5 table, Fig 5-3, ~20 mV at 41 mA); OUT-: VCP = VIN - RNEG x I, RNEG 2.5 ohm (Fig 5-4, 4 ohm used hot), LDO 30 mV at 100 mA | same; RNEG at 3.3 V not specified, 5 ohm assumed |
-| Margin | >= 1.07 V | 2.0 V | n/a | OUT+ >= 0.355 V; OUT- worst case 5.319 - 41 mA x 4.5 R - 0.026 - 4.952 = 0.156 V, typ 0.38 V (section 12; was 0.06-0.11 V) | OUT+ 3.24 - 2.58 = 0.66 V; OUT- 3.24 - 0.25 - 0.03 - 2.50 = 0.45 V |
-| Abs max / ROC | VIN 6.5 / 5.5 V: OK (hot-plug: sec. 7) | OK | VIN, VOUT 6.0 V; VO ROC <= 5.2 V exceeded (5.47 V max, user-approved), VOUT OVP 5.5 V min: 34 mV margin (open, section 12) | VIN 5.8 / 5.5 V: 5.466 OK | OK |
+| Margin | >= 1.07 V | 2.0 V | n/a | OUT+ typ 0.19 V, dropout by <= 37 mV at the worst corner; OUT- worst case 5.039 - 41 mA x 4.5 R - 0.026 - 4.647 = 0.181 V, typ 0.39 V (section 12; was 0.06-0.11 V) | OUT+ 3.24 - 2.58 = 0.66 V; OUT- 3.24 - 0.25 - 0.03 - 2.50 = 0.45 V |
+| Abs max / ROC | VIN 6.5 / 5.5 V: OK (hot-plug: sec. 7) | OK | VIN, VOUT 6.0 V; VO ROC <= 5.2 V: 5.177 V OK; VOUT OVP 5.5 V min: 0.32 V margin | VIN 5.8 / 5.5 V: 5.177 OK | OK |
 | Dissipation, Tj at 25 C | 0.19 W typ / 0.30 W max (eta 0.90 / 0.88 assumed), RthJA 157 K/W -> +27 / +45 K | < 5 mW | 0.13 / 0.20 W (eta 0.92 / 0.90 est.), 81 K/W -> +11 / +16 K | 0.032 / 0.040 W (eq. 5), 62.2 K/W -> +2 K | 0.067 / 0.088 W, +4 / +6 K |
 | CIN (derated) | C603 10u 0805 25 V X5R (~5.5 uF at 5 V) + C602 100n; DS: 4.7 uF | C609 10u 0805 (~7 uF) + C607 1u | C601 22u 0805 (~6.5 uF at 5 V); DS: >= 4 uF effective | C612 22u 0805 (~6.5 uF) + C613 100n; DS 4.7 rec., >= 2 min | C625 10u 0805 (~7 uF) |
 | COUT (derated) | C604 22u 0805 (~12 uF) + +3V3 plane 7 x 10u (~42 uF) = ~54 uF; DS table 8-3 proven 10-2x22 uF nominal | C605 22u (~18 uF at 1.2 V) + C608 1u + C503 10u; DS 22 uF | C610 + C611 22u 0805 (~13 uF); DS >= 7 uF eff., 2 x 22 rec. above 3.6 V | CCP C626 10u 0805 (~5 uF, DS >= 2 uF); C1 C618 1u 0603 25 V; OUT+ C617 10u, OUT- C621 10u (~5 uF each, DS 2.2 uF) | CCP C619 4.7u 0603 (~2.5 uF); C1 C624 1u 0402; OUT+ new 10u 0805, OUT- C628 10u (~8 uF each) |
@@ -67,7 +67,7 @@ PH strobe at nominal frequency, recheck RP-7: free-running, slow beats possible;
 5 uV by the chain above, so an aliased beat stays far under the floor. TLV62569 (1.5 MHz, 2nd harmonic 3.0 MHz) was avoided for that reason.
 Ripple at the hold node from all paths: a few uV, << 0.35 mV. Accuracy of -2V5: FB- 1.5 % + 1 % divider = +/-2.5 % (+/-61 mV at -2.44 V, section 12) vs LM337 +/-3 %;
 calibrated as before (trigger +/-8.5 mV, pedestal +/-5.5 mV). TLV3801 VCC-GND >= 2.52 x 0.975 - 7 mV bead - 9 mV track = 2.44 V >= 2.4 V min.
-BUF802: VS >= 4.65 + 4.66 = 9.31 V >= 9 V (ROC 5.3), each side >= 4.5 V (section 12; was 9.30 V). GVA Vd = 5.334..5.466 - 2.49 R feed - tee = **4.82-5.20 V** (spec 4.8-5.2; section 12),
+BUF802: VS = 9.13-9.70 V at the pins (ROC 9-13 V total; asymmetric +4.908 / -4.514 V, section 12). GVA Vd = 5.054..5.177 - tee 0.03..0.20 = **4.85-5.17 V** (spec 4.8-5.2),
 independent of USB voltage. LM27762 output is PFM at light load (DS 7.2.2.4.1): CCP kept >= 2 uF effective to avoid toggling.
 
 ## 5. USB budget (4.75 V at the connector)
@@ -153,47 +153,58 @@ are estimates; XR0420-R47M stock 65 (2nd source listed, its land not checked); b
   had 0 LCSC stock. C616 / C620 2.2u 0402 10 V -> CL05A225KP5NSNC C107369. FB601 -> BLM21PG221SH1D C88994.
 - 0.1 % 25 ppm/K dividers: see `docs/bom.md` (LCSC column) and `kicad/gen/common.py` `LCSC_R01`.
 
-## 12. 1 % dividers, +/-4.8 V and +5V1 5.40 V (24 Nov 2026, SPEC decisions 25 and 26)
+## 12. 1 % dividers, asymmetric BUF802 rails, +5V1 5.115 V (24 Nov 2026, SPEC decisions 25 and 26)
 
-User instructions: no 0.1 % resistors unless unavoidable, JLC basic parts for R / C, BOM consolidation; then (approved
-change) +5V1 raised to about 5.35 V, both U604 outputs at +/-4.8 V nominal, OUT- worst-case headroom > 0.15 V with
-41 mA x 4.5 ohm pump resistance, GVA-84+ drain kept in 4.8-5.2 V with a series drop. Datasheets re-read for this
-(TI SLVSEU9D TPS63802, SNVSAF7C LM27762): TPS63802 VFB 500 mV +/-1 % (PWM), IFB <= 100 nA, R2 <= 100k, VO recommended
-1.8-5.2 V, **VOUT OVP threshold 5.5 / 5.7 / 5.9 V**, abs max 6 V; LM27762 VFB+ 1.2 V +/-1.5 %, VFB- -1.22 V +/-1.48 %,
-**R2 and R4 >= 50 kohm**, VIN 2.7-5.5 V (abs max 5.8 V), RNEG 2.5 ohm at 5.5 V / 100 mA, LDO- 30 mV at 100 mA.
-Worst case below = reference tolerance + 2 x 1 % x R1 / (R1 + R2) for a 1 % divider (0.2 % for 0.1 %).
+User instructions: no 0.1 % resistors unless unavoidable, JLC basic parts for R / C, BOM consolidation. An interim
+version of this section raised +5V1 to 5.40 V for symmetric +/-4.8 V rails with 2.49 R GVA-84+ feed resistors; that is
+**withdrawn**: the TPS63802 output is specified 1.8-5.2 V and its VOUT OVP threshold is 5.5 V minimum. Datasheets read for
+this (TI SLVSEU9D TPS63802, SNVSAF7C LM27762, SBOS998E BUF802): TPS63802 VFB 500 mV +/-1 % (PWM), IFB <= 100 nA, R2 <= 100k,
+VO 1.8-5.2 V, VOUT OVP 5.5 / 5.7 / 5.9 V, abs max 6 V; LM27762 VFB+ 1.2 V +/-1.5 %, VFB- -1.22 V +/-1.48 %, **R2 and R4 >=
+50 kohm**, VIN 2.7-5.5 V (abs max 5.8 V), LDO+ 45 mV / LDO- 30 mV dropout at 100 mA; BUF802 supply 9-13 V total
+(ROC; "can be used with any possible combination of VS+ and VS-", 8.3: split supplies "symmetrically balanced around GND
+or asymmetric", best ac performance with the signal centred at mid-supply), CLH from mid-supply to VS+, CLL from VS- to
+mid-supply, output swing VS- + 3.4 V to VS+ - 2.0 V (-40..85 C), In_Aux default VS- + 2.3..3.8 V, In_Aux range at
+crossover VS- + 1.0..VS- + 5.0 V. Worst case below = reference tolerance + 2 x 1 % x R1 / (R1 + R2) for a 1 % divider
+(0.2 % for 0.1 %), plus IFB x R1 for the TPS63802.
 
 | Rail | Divider (was) | Nominal | Worst case | Requirement, margin |
 |---|---|---|---|---|
-| +5V1 (U603) | R603 / R604 19.6k / 2.0k **0.1 %** (499k / 54.2k 0.1 %) | 5.400 V (5.103) | 5.334-5.466 V (incl. IFB x R1 = 2 mV) | U604 headroom needs >= 5.326 V (below); <= 5.5 V (LM27762 ROC, TPS63802 OVP min): 34 mV. A 1 % divider gives +/-2.8 % = +/-0.15 V > the +/-0.087 V window: 0.1 % unavoidable |
-| U604 VIN | after FB602 (82.5 mA x 0.15 ohm) and 3 mV track | 5.385 V | 5.319-5.466 V | <= 5.5 V ROC: OK |
-| +5V (U604 OUT+) | R613 / R614 300k / 100k 1 % (0.1 %) | +4.800 V | 4.656-4.944 V | BUF802 >= 4.5 V after FB604 (6 mV): 4.650 V; LDO+ headroom 5.319 - 4.944 - 0.020 = 0.355 V |
-| -5V (U604 OUT-) | R605 / R606 150k / 51k 1 % (280k / 100k 0.1 %) | -4.808 V (-4.636) | -4.664 ... -4.952 V | BUF802 >= 4.5 V: 4.658 V; headroom 5.319 - 0.041 x 4.5 - 0.026 - 4.952 = **0.156 V** (> 0.15 V; typ 5.385 - 0.185 - 0.013 - 4.808 = 0.38 V) |
-| BUF802 total | | 9.61 V | 9.31-9.89 V | 9-10.5 V |
+| +5V1 (U603) | R603 / R604 12k / 1.3k **0.1 %** (499k / 54.2k 0.1 %) | 5.115 V (5.103) | 5.054-5.177 V | <= 5.20 V (VO max): 23 mV; GVA drain >= 4.8 V (below). 1 % would spread +/-2.8 %: max 5.20 V forces min 4.90 V and a 4.70 V drain, so 0.1 % is unavoidable |
+| U604 VIN | after FB602 (82.5 mA x 0.15 ohm) and 3 mV track | 5.100 V | 5.039-5.177 V | <= 5.5 V ROC |
+| +5V (U604 OUT+) | R613 / R614 309k / 100k 1 % (300k / 100k 0.1 %) | +4.908 V (4.800) | 4.760-5.056 V | regulates for OUT+ <= VIN - 20 mV: in dropout by up to 37 mV at the worst corner (FB+ +1.5 %, divider high, +5V1 at 5.054 V), where OUT+ = 5.019 V; typ headroom 0.19 V |
+| -5V (U604 OUT-) | R605 / R606 270k / 100k 1 % (280k / 100k 0.1 %) | -4.514 V (-4.636) | -4.381 ... -4.647 V | headroom 5.039 - 0.041 x 4.5 - 0.026 - 4.647 = **0.181 V** (> 0.15 V; typ 5.100 - 0.185 - 0.013 - 4.514 = 0.39 V) |
+| BUF802 total | | 9.42 V | 9.14-9.70 V (9.13 at the pins after FB603 / FB604) | 9-13 V: >= 9.1 V target met; mid-supply +0.20 V |
 | +2V5 (U605 OUT+) | R615 / R616 110k / 100k 1 % (130k / 120k 0.1 %) | +2.520 V (2.500) | 2.456-2.584 V | TLV3801 VCC-GND >= 2.4 V after 16 mV: 2.44 V; headroom 0.66 V |
 | -2V5 (U605 OUT-) | R607 / R608 100k / 100k 1 % (105k / 100k 0.1 %) | -2.440 V (-2.501) | -2.380 ... -2.500 V | headroom 3.24 - 0.01 - 0.25 - 0.03 - 2.50 = 0.45 V; +2V5 + abs(-2V5) <= 5.08 V (TPH2501 / TLV9001 / TLV3801 5.5 V) |
 | +3V3 (U601) | R609 / R610 100k / 22k 1 % (100k / 22.1k 1 %) | 3.327 V (3.315) | 3.224-3.433 V | TRF37D73 <= 3.45 V, GW1NZ VCCIO 3.3 V +/-5 % |
 | +1V2 (U602) | 100k / 100k 1 % (unchanged) | 1.200 V | 1.17-1.23 V | unchanged |
 
-R2 / R4 >= 50k leaves 51k, 100k, 200k and 1M as JLC basic bottom resistors; 300k, 150k and 110k (tops) are extended
-(300k is shared with the input divider string). -2V5 at -2.44 V (+/-2.5 %) moves TRIG_LEVEL by 0.139 V/V and VBIAS_A by
-0.607 V/V: both calibrated / trimmed per board (kicad/README.md control-voltage table).
+Choices: 11k / 1.2k (5.083 V) for U603 would leave only 0.149 V OUT- headroom, so 12k / 1.3k. OUT+ 309k / 100k is the
+"about +4.95 V" option that accepts LDO+ dropout at the worst corner; the highest always-regulating choice (154k / 51k,
+4.824 V) gives only 9.06 V total minimum, below the 9.1 V target. In the dropout corner OUT+ follows VIN - 20 mV: the
++5V1 ripple (about 2.5 mV pp) then reaches +5V through FB604 / C617 only, against 49 dB BUF802 PSRR on VS+. R2 / R4 >=
+50k leaves 51k, 100k, 200k and 1M as JLC basic bottom resistors; 300k, 309k, 270k and 110k (tops) are extended.
 
-**GVA-84+ drain** (DS 4.8-5.2 V, 85-125 mA used): per chain +5V1 -> 10 uF -> R419 / R420 2.49 ohm 1 % 0402 (Vishay
-CRCW04022R49FKED, C2085509) -> 100 nF / 1 nF -> 2.2 uH (LQM21PN2R2, DCR 0.125 ohm max, 0.07 assumed min) -> BLM15HD102
-bead (1.25 ohm max, 0.6 ohm assumed min; Murata gives only the maximum) -> pin 3; trunk drop 0-30 mV. Vd max = 5.466 -
-0.085 x (2.49 + 0.67) = **5.198 V**; Vd min = 5.334 - 0.03 - 0.125 x (2.51 + 1.375) = **4.82 V**; nominal (110 mA, 1.0 /
-0.1 ohm) 4.99 V. If the bead's DCR were near 0, the maximum would be 5.25 V at 85 mA: measure Vd at TP404 / TP406 on the
-first board. Dissipation 30 mW typ / 39 mW max in a 62.5 mW 0402. No existing footprint could be reused (the feed is
-choke + RF bead only, both stay), so R419 / R420 were added: B side, below C419 / C429, fed from the C420 / C430 pad;
-the old +5V1 via pair beside C419 / C429 was removed (layout/board/blocks/pstrobe/README.md).
+**Consequences of the asymmetric rails (loads on +5V: BUF802 U101 VS+ / VSO+, OPA197 U102 V+, C108-C111, C616; on -5V:
+U101 VS- / VSO- / Aux_Bias, R_Bias R107, U102 V-, C112-C116, C614, C627; nothing else):**
+- BUF802 output swing VS- + 3.4 V ... VS+ - 2.0 V: -1.11 V nominal / **-0.975 V worst case** (VS- -4.375 V at the pins) to
+  +2.75 V worst case. The sampler needs +/-0.5 V at the output (VOFS moves the input window, not the output range):
+  0.475 V margin on the negative side. CLL -1.5 V lies beyond the negative swing limit, so a negative overload saturates
+  the output at about -1.0 V instead of clamping (already the case before: -4.64 + 3.4 = -1.24 V); this only lowers the
+  bridge reverse-voltage stress of RF2-7. CLH +1.5 V stays active (swing limit +2.75 V). CLH +1.5 V >= mid-supply
+  +0.20 V and CLL -1.5 V <= mid-supply: within the absolute ratings. The CLH / CLL dividers run from +/-2V5: unchanged.
+- BUF802 input: abs max (VS-) - 0.5 V = -4.88 V worst case; the 5:1 divider and the internal clamp diodes (100 mA) handle
+  overloads as before, with the negative clamp level 0.3 V nearer to 0 V.
+- In_Aux (OPA197 servo output via 1k): default VS- + 2.3..3.8 V = -2.2..-0.7 V, crossover range -3.5..+0.5 V; OPA197
+  (RRIO, 4.5-36 V) on +4.9 / -4.5 V swings to about +/-4.4 V: inside. The 0.20 V mid-supply shift needs only
+  0.20 V / GAUX (6.15-20) = 10-33 mV more In_Aux, absorbed by the integrator.
+- OPA197 input common mode: TAP = 0.1 x input, +/-0.25 V for +/-2.5 V: far inside the rails. VOFS / servo network values
+  (Rf1 10k, Rf2 22k + RV101, Rofs 24.9k, Rmid 33k, VNEG_REF) are referenced to GND, not to the rails: unchanged.
+- BUF802 Iq is set by R_Bias to VS- (pin voltage relative to VS-): unchanged; dissipation 9.42 V x 36 mA = 0.34 W (was
+  0.34 W). Decoupling ratings: +5V caps 16 V / 25 V, C616 4.7 uF 10 V at <= 5.06 V: OK.
 
-**Other +5V1 loads at 5.466 V:** C610 / C611 / C612 22 uF 25 V 0805 (about 6 uF each at 5.4 V; TPS63802 CO >= 7 uF
-effective: about 12 uF), C613 / C419 / C429 100 nF 16 V, C418 / C428 1 nF 50 V, C420 / C430 / C626 / C617 / C621 10 uF
-25 V, C618 1 uF 50 V (now C15849); FB602 1.3 A. C632 (47 uF 10 V tantalum) and D601 (SMAJ5.0A) sit on VBUS, unchanged.
-U604 dissipation (5.39 - 4.80) x 41 mA x 2 = 0.05 W. **USB budget** (section 5 updated): +5V1 5.40 V x 0.294 A / 0.92 =
-1.73 W typ (2.02 W max), total 3.61 W -> **0.78 A typ** at 4.63 V, 0.98 A max (was 0.75 / 0.97 A).
-
-**Open:** +5V1 is above the TPS63802 recommended VO maximum (5.2 V; the datasheet footnote puts the accuracy and load-step
-margin into the 6 V abs max) and 34 mV under the minimum VOUT OVP threshold (5.5 V): a load step or start-up overshoot
-could trip the OVP; check on the first board, fallback: a lower +5V1 set-point with correspondingly less U604 OUT- headroom.
+**GVA-84+ drain** (DS 4.8-5.2 V, 85-125 mA): +5V1 -> 1 nF / 100 nF / 10 uF -> 2.2 uH (LQM21PN2R2, DCR <= 0.125 ohm) ->
+BLM15HD102 bead (DCR <= 1.25 ohm) -> pin 3; trunk 0-30 mV. Vd min = 5.054 - 0.03 - 0.125 x 1.375 = **4.85 V**; Vd max =
+5.177 - 0.085 x 0.07 = **5.17 V** (bead DCR taken as 0); nominal 5.115 - 0.015 - 0.110 x 1.1 = 4.98 V. No series
+resistor needed: R419 / R420 of the withdrawn 5.40 V version are removed, the pstrobe block is back to its previous
+layout. USB budget unchanged from section 5 (0.75 A typ / 0.97 A max).

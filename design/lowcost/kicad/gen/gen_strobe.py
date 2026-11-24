@@ -17,8 +17,8 @@ Bias tees (sim/bias_tee/RESULT.md): every TRF37D73 output: BLM15HD102SN1D bead w
 -> 47 uH LQH32CN470K23L (1210) with 1 k 0402 across it (kills the bead-L / 47 uH self-C resonance near 70 MHz,
 -0.5 -> -0.28 dB) -> cold end 100 nF (own cap, GND via at its pad, supply via beyond it). GVA-84+: bead + 2.2 uH
 LQM21PN2R2MGHL (its 80 ps shorted launch stub shorts everything below ~300 MHz, so the 2.2 uH is enough; DCR
-budget 0.06-0.18 V at 108-130 mA), cold end = 1 nF / 100 nF, fed from +5V1 (5.40 V, 5.334-5.466 V, TPS63802) through
-R419 / R420 2.49 R per chain (SPEC decision 26; +5V1 10 uF on the supply side): Vd 4.82-5.20 V at any USB voltage.
+budget 0.06-0.18 V at 108-130 mA), cold end = the +5V1 1 nF / 100 nF / 10 uF. +5V1 (5.115 V, 5.054-5.177 V) comes from
+the TPS63802 buck-boost on the power sheet (24 Nov 2026; was VBUS): Vd 4.85-5.17 V at any USB voltage (BIASTEE-1, PDN-8).
 Pad input shunts R402 / R408 / R412 are 0603 (100 mW; 44-65 mW with the saturated square, validation PARTS-1); the
 series and output resistors stay 0402 (<= 35 mW).
 
@@ -58,8 +58,6 @@ L47 = ("Device:L", "Inductor_SMD:L_1210_3225Metric", "LQH32CN470K23L",
 L22 = ("Device:L", "Inductor_SMD:L_0805_2012Metric", "LQM21PN2R2MGHL",
        {"LCSC": "C341781", "Price": "0.3667 USD (LCSC 5+)",
         "Note": "2.2 uH 0805, Isat 450 mA, DCR 125 mR, SRF 40 MHz; abuts the bead"})
-RFEED_F = {"Note": "GVA-84+ drain feed: 2.49 R 1 %, 39 mW at 125 mA (0402 62.5 mW); one per chain (A / K isolation); "
-                   "Vd 4.82-5.20 V over +5V1 5.334-5.466 V, 85-125 mA, DCR spread (power-tree.md section 12)"}
 RDAMP_F = {"Note": "damps the 47 uH (bias tee): 0402 beside the 1210, same two pads; sim/bias_tee/RESULT.md"}
 CCOLD_F = {"Note": "47 uH cold end: abuts the 1210 cold pad, GND via at its pad, +3V3 plane vias beyond it"}
 # explicit references for the parts added by the bias-tee revision (no renumbering of existing parts)
@@ -276,16 +274,12 @@ def main():
         gv = sh.add(GVA, "U", "GVA-84+", P(110, Y), fp=SOT89, lcsc="C5445191", mpn="GVA-84+", fields=GVA_F)
         sh.wire(c3["2"], gv["1"])
         sh.gnd(gv["2"])
-        # +5V1 bias (TPS63802 on the power sheet, 5.40 V): +5V1 -> 10u -> R419 / R420 2.49 R (drain window 4.8-5.2 V,
-        # SPEC decision 26) -> cold-end node with 1n (nearest the choke) and 100n -> 2.2 uH -> bead -> GVA pin 3
+        # +5V1 bias (TPS63802 on the power sheet): rail at Y-22 from 120 to 146, caps 1n (nearest), 100n, 10u
         Yr = Y - 22
-        sh.path([P(120, Yr), P(143, Yr)])
-        rail_caps(sh, [134, 140], Yr, ["1n", "100n"])
-        rs = R(sh, "2.49", P(146, Yr), rot=90, ref=("R419" if n == 1 else "R420"), fields=RFEED_F)
-        assert abs(rs["1"][0] - g(143)) < 1e-6, rs["1"]
-        sh.path([rs["2"], P(156, Yr)])
-        rail_caps(sh, [152], Yr, ["10u"])
-        sh.hlabel("+5V1", P(156, Yr), shapes["+5V1"], side="right")
+        sh.path([P(120, Yr), P(146, Yr)])
+        rail_caps(sh, [134, 140, 146], Yr, ["1n", "100n", "10u"])
+        sh.wire(P(120, Yr), P(116, Yr))
+        sh.hlabel("+5V1", P(116, Yr), shapes["+5V1"], side="left")
         bias_tee(sh, 120, Y, Yr, L22, "+5V1", (), f"GVA{n}_VD")
         sh.wire(gv["3"], P(120, Y))
         c4 = C(sh, "100n", P(140, Y), rot=90)
@@ -317,8 +311,8 @@ def main():
             P(78, Y2 + 12), size=T)
     sh.text("GVA-84+ (SOT-89): 1 IN, 3 OUT+DC, 2/4 GND.\n"
             "Vd 4.8-5.2 V, 108 mA; no Rbias at 5 V (datasheet\n"
-            "Fig. 2): pin 3 -> bead -> 2.2 uH -> 2.49 R -> +5V1 (5.40 V),\n"
-            "Vd 4.82-5.20 V (nom. 4.99 V at 110 mA). Pin 3 max 5.8 V.\n"
+            "Fig. 2): pin 3 -> bead -> 2.2 uH -> +5V1 (5.115 V),\n"
+            "Vd 4.85-5.17 V (tee 0.06-0.18 V). Pin 3 max 5.8 V.\n"
             "2.2 uH is enough: the launch stub shorts < 300 MHz.\n"
             "Step 7.2 V into 50 R (sim, nominal).", P(102, Y2 + 12), size=T)
     sh.text("LAUNCH STUB: 80 ps one-way = 13.2 mm 50 R\n"
@@ -405,9 +399,7 @@ def check(outdir):
       | {(u, p) for u in ("U401", "U402", "U403", "U405") for p in ("3", "4", "5", "6", "8", "9")})
     A(n, "+3V3", {(u, "1") for u in ("U401", "U402", "U403", "U405")} |
       {("L401", "2"), ("L402", "2"), ("L403", "2"), ("L405", "2")})
-    A(n, "+5V1", {("R419", "2"), ("R420", "2"), ("C420", "1"), ("C430", "1")})
-    on(("L404", "2"), ("R419", "1"), ("C418", "1"), ("C419", "1"))
-    on(("L406", "2"), ("R420", "1"), ("C428", "1"), ("C429", "1"))
+    A(n, "+5V1", {("L404", "2"), ("L406", "2")})
     # bias tees (sim/bias_tee/RESULT.md): RF pin -> bead -> 47 uH || 1 k (TRF) / 2.2 uH (GVA) -> rail, own 100 nF
     for u, fb, l, rd, cc in (("U401", "FB401", "L401", "R415", "C432"), ("U402", "FB402", "L402", "R416", "C433"),
                              ("U403", "FB403", "L403", "R417", "C434"), ("U405", "FB405", "L405", "R418", "C435")):
@@ -418,6 +410,7 @@ def check(outdir):
     for g_, fb, l in (("U404", "FB404", "L404"), ("U406", "FB406", "L406")):
         on((g_, "3"), (fb, "1"))
         on((fb, "2"), (l, "1"))
+        A(n, "+5V1", {(l, "2")})
     # phase chains
     for r, c, u, fb, cp, rs, rr, c3, g, fg, c4 in (("R407", "C412", "U403", "FB403", "C416", "R408", "R410", "C417",
                                                    "U404", "FB404", "C421"),

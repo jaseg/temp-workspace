@@ -193,8 +193,8 @@ def write_md(rows, total, first, est, nparts):
         "parts, 26 basic / 74 extended, 20 resistors at 0.1 % (13 part numbers), 73.13 USD. Remaining extended "
         "passives are RF-impedance or simulated values (24.9 / 43 / 47 / 68 / 82 / 91 R, 0.5 / 1.5 / 2.2 / 3.3 pF, "
         "C0G 220 p / 470 p / 1 n, the 0402 RF beads), values with no basic part under the LM27762 R2 >= 50k rule "
-        "(300k, 150k, 110k), the BUF802 bias / input network (17.8k, 4.99M), the trigger level and switch-ground "
-        "dividers (8.87k, 2.7k), Rofs 24.9k (keeps the RV101 trim range symmetric), the GVA feed resistors (2.49 R) "
+        "(300k, 309k, 270k, 110k), the BUF802 bias / input network (17.8k, 4.99M), the trigger level and switch-ground "
+        "dividers (8.87k, 2.7k), Rofs 24.9k (keeps the RV101 trim range symmetric) "
         "and the U603 0.1 % pair. Details: `docs/research/power-tree.md` section 12.", "",
         "## LCSC verification", "",
         f"- Date: {VERIFIED}. Every line with a part carries an LCSC number (column LCSC); PCB features are `n/a`.",
@@ -205,8 +205,8 @@ def write_md(rows, total, first, est, nparts):
         "one number per value / package / rating (`kicad/gen/common.py`).",
         "- New numbers of the BOM optimisation (24 Nov 2026), each read on lcsc.com (MPN, value, tolerance, rating, "
         "package, stock): C25774 300k, C25874 24.9k, C25768 22k, C25779 33k, C25756 15k, C25890 3.3k, C25123 510 R, "
-        "C25755 150k, C25794 51k, C25745 110k (UNI-ROYAL 0402WGF 1 %), C852589 19.6k / C852711 2.0k (YAGEO "
-        "RT0402BRD07 0.1 %), C2085509 2.49 R (Vishay CRCW0402 1 %), C2286 red LED KT-0603R, C15849 1 uF 50 V X5R "
+        "C122546 309k, C25770 270k, C25745 110k (UNI-ROYAL 0402WGF 1 %), C784579 12k / C852609 1.3k (YAGEO "
+        "RT0402BRD07 0.1 %; C784579 0 at LCSC, 6.7k at JLC), C2286 red LED KT-0603R, C15849 1 uF 50 V X5R "
         "0603, C19666 4.7 uF 16 V X5R 0603, C23733 4.7 uF 10 V X5R 0402 (the last three: 0 at LCSC, 0.76-11.8 M at "
         "JLC). Same-footprint cheaper SMA edge connector: none found (JLC / LCSC list only the Samtec SMA-J-P-H "
         "family; generic edge SMAs use other lands).",

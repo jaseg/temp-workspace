@@ -4,11 +4,12 @@ Tree (24 Nov 2026; replaces AMS1117, AP2112K, MT3608, LP2985, LM27761, LP5907, L
   USB-C VBUS -> F601 PTC 1.5 A -> D601 SMAJ5.0A -> FB601 -> VBUS (global, 4.60-5.25 V at the converters)
   VBUS -> U601 TPS62A01A buck 2.4 MHz FPWM -> +3V3 3.327 V (TRF37D73 x5, COS3502, FPGA I/O, MCU, LVDS rx)  0.51 A
   +3V3 -> U602 TPS62A01A -> +1V2 (FPGA core, 1 ms soft start)                                              0.02 A
-  VBUS -> U603 TPS63802 buck-boost FPWM -> +5V1 5.40 V (GVA-84+ x2 via 2.49 R each on the strobe sheet; U604) 0.30 A
-  +5V1 -> FB602 -> +5V1F -> U604 LM27762 (pump + 2 LDOs) -> +4.80 V -> FB604 -> +5V ; -4.81 V -> FB603 -> -5V
+  VBUS -> U603 TPS63802 buck-boost FPWM -> +5V1 5.115 V (GVA-84+ x2 on the strobe sheet; U604)            0.29 A
+  +5V1 -> FB602 -> +5V1F -> U604 LM27762 (pump + 2 LDOs) -> +4.908 V -> FB604 -> +5V ; -4.514 V -> FB603 -> -5V
   +3V3 -> FB605 -> +3V3_CP -> U605 LM27762 -> +2.52 V -> FB606 -> +2V5 ; -2.44 V -> FB607 -> -2V5
-Set-points and tolerances (24 Nov 2026, SPEC decision 25 / 26): 1 % thick-film JLC dividers except U603 (0.1 %, the
-+5V1 window between the U604 OUT- headroom and 5.5 V is only +/-1.6 %); docs/research/power-tree.md section 12.
+Set-points and tolerances (24 Nov 2026, SPEC decisions 25 / 26): 1 % thick-film dividers except U603 (0.1 %: +5V1 must
+stay <= 5.20 V and keep the GVA-84+ drain >= 4.8 V; a 1 % divider spreads +/-2.8 %); asymmetric BUF802 rails
+(+4.908 / -4.514 V, total >= 9.13 V); docs/research/power-tree.md section 12.
 U605 is enabled by the U603 power-good (PG_5V1): +/-2V5 rise after the BUF802 rails.
 Existing capacitors are re-used (moved) wherever possible; refs are kept so the board keeps its parts.
 Decoupling capacitors that belong at a load pin on another sheet are drawn here at the bottom (box "at the loads")
@@ -47,7 +48,7 @@ BEAD = ("Device:FerriteBead_Small", FP["FB0603"], "BLM18KG601SN1D", "C85833")
 BEAD_F = {"Price": "0.0166 USD (LCSC 50+)", "Note": "600 R @ 100 MHz, 1.3 A, 0.15 R DC"}
 L1U = {"Price": "0.0763 USD (LCSC 10+)", "Note": "1 uH 2.5 A 1008 (FHD252010S-1R0MT); TI table 8-3: 1 uH"}
 PCT = {"Note": "1 % (LM27762 R2 / R4 >= 50k; power-tree.md section 12)"}
-PCT01 = {"Note": "0.1 % thin film: the +5V1 window (power-tree.md section 12)"}
+PCT01 = {"Note": "0.1 % thin film: +5V1 <= 5.20 V and GVA-84+ drain >= 4.8 V (power-tree.md section 12)"}
 
 
 def place(sym, pin, pt):
@@ -329,10 +330,10 @@ def main():
     sh.gnd((a[0], yb))
     vo, fb = u3["6"], u3["4"]
     xd = vo[0] + g(4)
-    rt = vpart(sh, "R", "R603", "19.6k 0.1%", (xd, vo[1]), gnd=False,
-               fields={"Note": "0.1 %: VOUT = 0.5 V x (1 + 19.6k/2.0k) = 5.40 V (5.334-5.466 V incl. FB +/-1 % "
-                               "and 100 nA FB bias; was 499k/54.2k = 5.10 V)"})
-    vpart(sh, "R", "R604", "2.0k 0.1%", rt["2"], fields=PCT01)
+    rt = vpart(sh, "R", "R603", "12k 0.1%", (xd, vo[1]), gnd=False,
+               fields={"Note": "0.1 %: VOUT = 0.5 V x (1 + 12k/1.3k) = 5.115 V (5.054-5.177 V incl. FB +/-1 % "
+                               "and 100 nA FB bias; was 499k/54.2k = 5.103 V)"})
+    vpart(sh, "R", "R604", "1.3k 0.1%", rt["2"], fields=PCT01)
     sh.path([fb, (fb[0] + g(2), fb[1]), (fb[0] + g(2), rt["2"][1]), rt["2"]])
     for k, ref in enumerate(("C610", "C611")):
         vpart(sh, "C", ref, "22u", (xd + g(6 + 6 * k), vo[1]),
@@ -341,8 +342,8 @@ def main():
     rail(sh, vo, (xh + g(8), vo[1]))
     sh.hlabel("+5V1", (xh, vo[1] - g(3)), "output")
     sh.wire((xh, vo[1]), (xh, vo[1] - g(3)))
-    sh.text("+5V1 = 5.40 V (5.334-5.466 V; OVP 5.5 V min): GVA-84+ x2 bias tees\n"
-            "on the strobe sheet via R419 / R420 2.49 R, own track from C610/C611.\n"
+    sh.text("+5V1 = 5.115 V (5.054-5.177 V, <= 5.2 V VO max): GVA-84+ x2 bias tees\n"
+            "on the strobe sheet, own track from C610/C611 (not through FB602).\n"
             "EN, MODE = VIN: always on, forced PWM 1.4-2.1 MHz.", (X3 - g(22), Y3 + g(19)), size=T)
     fb2 = bead(sh, "FB602", (xh + g(8), vo[1]))
 
@@ -358,10 +359,11 @@ def main():
             ccp=("C626", "10u", {"fields": {"Note": "CCP at pin 5 (moved from the LM337 ADJ)"}}),
             outp=("+5V_LDO", [("C617", "10u", {"fields": {"Note": "OUT+ at pin 11 (moved)"}})], "FB604", "+5V"),
             outn=("-5V_LDO", [("C621", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB603", "-5V"),
-            rpos=("R613", "300k", "R614", "100k"), rneg=("R605", "150k", "R606", "51k"))
-    sh.text("U604: OUT+ = 1.2 V x (300k + 100k)/100k = +4.800 V (4.656-4.944); OUT- = -1.22 V x (150k + 51k)/51k\n"
-            "= -4.808 V (4.664-4.952), 1 % dividers. BUF802 each side >= 4.65 V. VIN 5.319-5.466 V (<= 5.5 V).\n"
-            "Headroom OUT- 0.156 V min (RNEG 4.5 R, 41 mA, 26 mV LDO). EN+/EN- = VIN, PGOOD to GND.", (g(185), g(78)), size=T)
+            rpos=("R613", "309k", "R614", "100k"), rneg=("R605", "270k", "R606", "100k"))
+    sh.text("U604 (asymmetric, SPEC 26): OUT+ = 1.2 V x 409k/100k = +4.908 V (4.760-5.056); OUT- = -1.22 V x 370k/100k\n"
+            "= -4.514 V (4.381-4.647), 1 % dividers. BUF802 total >= 9.13 V (9-13 V). VIN 5.039-5.177 V (<= 5.5 V).\n"
+            "OUT- headroom 0.181 V min (RNEG 4.5 R, 41 mA, 26 mV LDO); OUT+ in dropout by <= 37 mV at the worst corner.\n"
+            "EN+/EN- = VIN, PGOOD to GND.", (g(185), g(78)), size=T)
 
     # ------------------------------------------------------------------ U601 +3V3, U602 +1V2
     Yb = g(130)

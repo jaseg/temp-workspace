@@ -364,7 +364,7 @@ the falling edge, RF2-8 the first-validation items still open (above), RF2-9 DNP
 | Id | Status | How / where, or why open |
 |---|---|---|
 | RP-1 | fixed | C617 / C621 / C628 / C630 on F at OUT+ / OUT- of U604 / U605, 1.13 / 0.63 / 0.75 / 0.66 mm pad to pin, no via between (board) |
-| RP-2 | fixed (24 Nov 2026, SPEC decision 26) | +5V1 raised to 5.40 V (0.1 % divider), U604 at +/-4.8 V with 1 % dividers: OUT- worst-case headroom 0.156 V (5.319 V - 41 mA x 4.5 R - 26 mV - 4.952 V), typ 0.38 V; GVA-84+ drain kept at 4.82-5.20 V by R419 / R420 2.49 R; new open point: +5V1 above the TPS63802 VO 5.2 V and 34 mV under its OVP minimum (power-tree.md section 12) |
+| RP-2 | fixed (24 Nov 2026, SPEC decision 26) | U604 asymmetric: OUT- -4.514 V (1 %), worst-case headroom 0.181 V (5.039 V - 41 mA x 4.5 R - 26 mV - 4.647 V), typ 0.39 V; OUT+ +4.908 V; BUF802 total >= 9.13 V; +5V1 5.115 V (<= 5.177 V, within the TPS63802 5.2 V); the interim 5.40 V +5V1 was withdrawn (out of the TPS63802 specification) |
 | RP-3 | fixed | C632 47u tantalum fitted (netlist, BOM C22036); plug-in transient to be measured |
 | RP-4 | open | CC pins not sensed (needs MCU pins and a schematic change); 1.5 A source requirement documented |
 | RP-5 | open | U603 PGND return 3.6 mm and LM27762 pump-capacitor returns 3.6-4.0 mm (C626 GND via 2.1 mm from its pad centre); rotating the capacitor would move it off CP |

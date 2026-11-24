@@ -144,18 +144,23 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
 25. **BOM optimisation: 1 % JLC basic passives** (user instruction, 24 Nov 2026: "Don't use 0.1% resistors unless you
     *really* can't avoid it. Try to map as many of the parts as possible to JLCPCB's basic parts catalog, especially the
     caps and resistors. For the rest, apply some BOM optimization, trying to combine parts where possible."). All
-    resistors are 1 % thick film except the U603 divider R603 / R604 (19.6k / 2.0k, 0.1 %: the +5V1 window of decision 26
-    is only +/-1.6 % wide and the TPS63802 reference alone takes +/-1 %). Tolerance errors of the former 0.1 % parts go to
-    the RV101 LF/HF trim (input servo), the firmware offset / gain calibration (VOFS mid-scale, VNEG_REF -1.933 V) or to
-    the regulator margins (decision 26). Values moved to JLC basic parts where the circuit allows (Rf2 22k, Rmid 33k,
-    VNEG_REF 10k / 15k, VBIAS_A 5.1k / 3.3k, VTAP_TH 33k / 1k, ADC_REF_MID 10k / 3.3k = 0.720 V, hold gain 1.00k / 510 =
-    2.96, +3V3 100k / 22k = 3.327 V, 2.2 uF 0402 -> 4.7 uF 10 V, 1 uF X7R -> X5R 25 V, green LED -> red); RF impedances,
-    pads, the bridge, tap readout, terminations, divider-compensation and C0G capacitors are unchanged. BOM: 103 -> 95
-    fitted lines, 26 -> 36 basic and 74 -> 58 extended part numbers, 73.13 -> 70.45 USD. Footprints and layout unchanged
-    except decision 26. Details: `docs/research/power-tree.md` section 12, `docs/bom.md`.
-26. **Rails +/-4.8 V, +5V1 5.40 V, GVA-84+ series feed** (user approval, 24 Nov 2026; nets keep their names +5V / -5V /
-    +5V1 / +2V5 / -2V5): U603 TPS63802 +5V1 = 5.40 V (5.334-5.466 V; above the datasheet recommended 5.2 V, 34 mV under
-    the 5.5 V minimum OVP threshold: open point); U604 LM27762 +4.800 / -4.808 V (1 %: 4.656-4.944 / 4.664-4.952 V), OUT-
-    headroom 0.156 V worst case; U605 +2.520 / -2.440 V (1 %, +/-2.5 %). Each GVA-84+ drain is fed from +5V1 through its own
-    2.49 R 0402 (R419 / R420, added in the pstrobe block between the 10 uF and the 100 nF / 1 nF cold-end capacitors):
-    Vd 4.82-5.20 V. Numbers: `docs/research/power-tree.md` section 12.
+    resistors are 1 % thick film except the U603 divider R603 / R604 (12k / 1.3k, 0.1 %): +5V1 must stay <= 5.20 V (TPS63802
+    VO maximum) and keep the GVA-84+ drain >= 4.8 V; a 1 % divider spreads +5V1 by +/-2.8 % (4.90-5.20 V at best), which
+    puts the drain at 4.70 V in the worst corner. Tolerance errors of the former 0.1 % parts go to the RV101 LF/HF trim
+    (input servo), the firmware offset / gain calibration (VOFS mid-scale, VNEG_REF -1.933 V) or to the regulator
+    margins (decision 26). Values moved to JLC basic parts where the circuit allows (Rf2 22k, Rmid 33k, VNEG_REF
+    10k / 15k, VBIAS_A 5.1k / 3.3k, VTAP_TH 33k / 1k, ADC_REF_MID 10k / 3.3k = 0.720 V, hold gain 1.00k / 510 = 2.96,
+    +3V3 100k / 22k = 3.327 V, 2.2 uF 0402 -> 4.7 uF 10 V, 1 uF X7R -> X5R 25 V, green LED -> red); RF impedances, pads,
+    the bridge, tap readout, terminations, divider-compensation and C0G capacitors are unchanged. BOM: 103 -> 94 fitted
+    lines, 26 -> 35 basic and 74 -> 58 extended part numbers, 0.1 % resistors 20 -> 2, 73.13 -> 70.45 USD. Footprints
+    and layout unchanged (values only). Details: `docs/research/power-tree.md` section 12, `docs/bom.md`.
+26. **Asymmetric BUF802 rails, +5V1 5.115 V** (24 Nov 2026; net names +5V / -5V / +5V1 / +2V5 / -2V5 kept). A first
+    version of this decision raised +5V1 to 5.40 V for symmetric +/-4.8 V rails; it is **withdrawn**: the TPS63802 output
+    is specified 1.8-5.2 V and its VOUT overvoltage threshold is 5.5 V minimum, so 5.40 V (5.47 V worst case) was out of
+    specification; the 2.49 R GVA-84+ feed resistors it needed (R419 / R420) are removed again and the pstrobe layout is
+    back as before. Now: U603 +5V1 = 5.115 V (5.054-5.177 V, 0.1 % divider); GVA-84+ drain 4.85-5.17 V. U604 runs
+    asymmetric rails, which the BUF802 datasheet allows (SBOS998E 8.3: split supplies "symmetrically balanced around GND
+    or asymmetric"; ROC total 9-13 V): OUT+ +4.908 V (4.760-5.056 V; in LDO dropout by up to 37 mV at the worst corner),
+    OUT- -4.514 V (4.381-4.647 V), both 1 % dividers (309k / 100k, 270k / 100k); total 9.14-9.70 V (>= 9.13 V at the pins),
+    OUT- headroom 0.181 V worst case (41 mA x 4.5 ohm, 26 mV dropout). Mid-supply sits +0.20 V above GND. U605
+    +2.520 / -2.440 V (1 %, +/-2.5 %). Consequences and numbers: `docs/research/power-tree.md` section 12.

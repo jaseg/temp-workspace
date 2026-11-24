@@ -132,22 +132,22 @@ DS841-2.8E table 3-20, LV C6/I5), CLKDIV /5 -> PCLK 76.8 MHz. OSER10 (strobes) a
 
 | Rail | Regulator | From | Vout | Load typ / max | VIN at the part, dropout margin | Price |
 |---|---|---|---|---|---|---|
-| VBUS | USB-C 16P, F601 PTC 1.5 A, D601 SMAJ5.0A, FB601 220R 2 A, C632 47u tantalum damper (fitted) | USB | 4.60-5.25 V | 0.78 / 0.98 A | - | ~0.3 |
+| VBUS | USB-C 16P, F601 PTC 1.5 A, D601 SMAJ5.0A, FB601 220R 2 A, C632 47u tantalum damper (fitted) | USB | 4.60-5.25 V | 0.75 / 0.97 A | - | ~0.3 |
 | +3V3 | U601 TPS62A01ADRLR buck 2.4 MHz FPWM, L602 1 uH, R609 100k / R610 22k (1 %, JLC basic; was 22.1k) | VBUS | 3.327 V (3.224-3.433 incl. FB and 1 % divider) | 0.51 / 0.67 A | 4.60-5.25 V; 100 % mode needs 3.53 V: >= 1.07 V | 0.197 |
 | +1V2 | U602 TPS62A01ADRLR, L603 1 uH, R611 / R612 100k | +3V3 | 1.200 V (1.17-1.23) | 20 / 30 mA | 3.22-3.43 V: 2.0 V | 0.197 |
-| +5V1 | U603 TPS63802DLAR buck-boost FPWM, L601 0.47 uH, R603 19.6k / R604 2.0k (0.1 %, the only 0.1 % pair; SPEC 25 / 26) | VBUS | 5.400 V (5.334-5.466; above the DS VO 5.2 V, OVP 5.5 V min) | 0.30 / 0.33 A | regulates above and below VOUT | 0.951 |
-| +5V / -5V | U604 LM27762DSSR (pump + LDOs) via FB602; FB604 / FB603 at the outputs; R613 / R614 300k / 100k, R605 / R606 150k / 51k (1 %) | +5V1 | +4.800 / -4.808 V (4.656-4.944 / 4.664-4.952) | 37 / 41 mA each | 5.319-5.466 V (<= 5.5 V); OUT+ >= 0.355 V; OUT- worst case 0.156 V (41 mA x 4.5 R, 26 mV LDO), typ 0.38 V | 0.960 |
+| +5V1 | U603 TPS63802DLAR buck-boost FPWM, L601 0.47 uH, R603 12k / R604 1.3k (0.1 %, the only 0.1 % pair; SPEC 25 / 26) | VBUS | 5.115 V (5.054-5.177; DS VO max 5.2 V) | 0.29 / 0.34 A | regulates above and below VOUT | 0.951 |
+| +5V / -5V | U604 LM27762DSSR (pump + LDOs) via FB602; FB604 / FB603 at the outputs; R613 / R614 309k / 100k, R605 / R606 270k / 100k (1 %) | +5V1 | +4.908 / -4.514 V, asymmetric (4.760-5.056 / 4.381-4.647; total 9.14-9.70) | 37 / 41 mA each | 5.039-5.177 V (<= 5.5 V); OUT+ typ 0.19 V, in dropout by <= 37 mV at the worst corner; OUT- worst case 0.181 V (41 mA x 4.5 R, 26 mV LDO), typ 0.39 V | 0.960 |
 | +2V5 / -2V5 | U605 LM27762DSSR via FB605; FB606 / FB607 at the outputs; EN = PG_5V1; R615 / R616 110k / 100k, R607 / R608 100k / 100k (1 %) | +3V3 | +2.520 / -2.440 V (+/-2.5 %) | 40-48 / 42-50 mA | 3.24-3.37 V; OUT+ 0.66 V, OUT- 0.45 V (RNEG 5 R assumed) | 0.960 |
 
-Totals: 3 regulator types, 5 ICs. +5V / -5V keep their net names (+4.800 / -4.808 V since 24 Nov 2026, SPEC decision 26):
-BUF802 each side >= 4.65 V, VS 9.31-9.89 V. GVA-84+ drain 4.82-5.20 V at any USB voltage (+5V1 own track from C610 / C611,
-then per chain R419 / R420 2.49 R between the 10 uF C420 / C430 and the 100 nF / 1 nF cold-end capacitors).
+Totals: 3 regulator types, 5 ICs. +5V / -5V keep their net names (+4.908 / -4.514 V since 24 Nov 2026, SPEC decision 26,
+asymmetric: the BUF802 datasheet allows any split with 9-13 V total; mid-supply +0.20 V): BUF802 total >= 9.13 V at the
+pins. GVA-84+ drain 4.85-5.17 V at any USB voltage (+5V1, own track from C610 / C611).
 Tolerance table and the 0.1 % justification: `docs/research/power-tree.md` section 12.
 Sequencing: +3V3 1 ms soft start, +1V2 from +3V3 (1.2 mV/us), +/-5V with +5V1, +/-2V5 after the TPS63802 power good.
 Hottest part U601: 0.19 / 0.30 W, +27 / +45 K. USB hot plug: C632 47u tantalum damper now FITTED (recheck RP-3: SMAJ5.0A
 clamps at about 9 V, U603 abs max 6.0 V); measure the plug-in transient on the first board. -5V headroom: check OUT- on a
-cold board at the low +5V1 corner (worst-case margin 0.156 V since the 5.40 V +5V1); measure the GVA-84+ drain at TP404 /
-TP406 (4.82-5.20 V expected) and check that the TPS63802 OVP (5.5 V min) never trips at start-up or load steps. Open:
+cold board at the low +5V1 corner (worst-case margin 0.181 V); BUF802 negative output swing limit about -1.0 V worst
+case (VS- + 3.4 V): enough for the +/-0.5 V sampler range, CLL -1.5 V is not reached. Open:
 TMUX136 supply ramp, LM27762 RNEG at 3.3 V, XR0420 stock 65 (second source C49232844, land not checked).
 
 ## MCU (STM32G474CBT6, LQFP-48, U704; on board since 21 Nov 2026)
@@ -285,7 +285,7 @@ no part is added. Only new capacitor: C630. DNP footprint: C631 120 pF (U601 Cff
 
 `docs/bom.md` (generated): **70.45 USD for one board** (24 Nov 2026; was 73.14 before the BOM optimisation of SPEC
 decision 25), MCU included, PCB excluded, against the 80 USD budget; every line has an LCSC number verified on lcsc.com
-and a JLC class column. 95 fitted part lines (was 103), 94 part numbers: 36 JLCPCB basic (287 parts placed) and 58
+and a JLC class column. 94 fitted part lines (was 103), 93 part numbers: 35 JLCPCB basic (287 parts placed) and 58
 extended (was 26 / 74). Only R603 / R604 (U603 divider) are 0.1 % (was 20 resistors). JLC basic list: jlcpcb.com parts
 API, library type `base`, 351 parts on 24 Nov 2026. Remaining extended passives are RF / simulated values, values with no
 basic part under the LM27762 R2 >= 50k rule, or networks whose ratio has no basic equivalent (list in `docs/bom.md`).
@@ -295,13 +295,12 @@ LCSC numbers live in the symbol field `LCSC` (generators; generic passives in `g
 `LCSC_R0603`, `LCSC_R01` (0.1 %, U603 only), `LCSC_C`, `LCSC_C0603`, `LCSC_C_C0G`); the verified stock / price data
 and the JLC class are in `gen/lcsc_parts.py`. Verification method and the parts changed by it: `docs/bom.md`.
 
-Value changes of the BOM optimisation and SPEC decision 26 (24 Nov 2026; footprints and layout unchanged except R419 /
-R420): R117 / R118 / R614 / R616 / R606 etc. 1 % (were 0.1 %); R120 / R610 22.1k -> 22k; R123 34.0k -> 33k; R731 / R732
+Value changes of the BOM optimisation and SPEC decision 26 (24 Nov 2026; footprints and layout unchanged): R117 / R118 / R614 / R616 / R606 etc. 1 % (were 0.1 %); R120 / R610 22.1k -> 22k; R123 34.0k -> 33k; R731 / R732
 14.7k / 10.0k -> 15k / 10k; R733 / R734 7.5k / 4.7k -> 5.1k / 3.3k; R703 / R704 30k / 10k -> 10k / 3.3k; R723 30k -> 33k;
-R208 499 -> 510; R303 18k -> 17.8k (shares the R107 line); R603 / R604 499k / 54.2k -> 19.6k / 2.0k (0.1 %);
-R605 / R606 280k / 100k -> 150k / 51k; R607 105k -> 100k; R615 / R616 130k / 120k -> 110k / 100k; C616 / C620 2.2u ->
+R208 499 -> 510; R303 18k -> 17.8k (shares the R107 line); R603 / R604 499k / 54.2k -> 12k / 1.3k (0.1 %);
+R605 280k -> 270k, R613 300k -> 309k (asymmetric +/-5V); R607 105k -> 100k; R615 / R616 130k / 120k -> 110k / 100k; C616 / C620 2.2u ->
 4.7u 10 V 0402; C308 / C311 / C312 1u X7R 16 V -> X5R 25 V; C618 / C619 -> C15849 / C19666 (same ratings, basic);
-D701 green -> red; new R419 / R420 2.49 R (GVA-84+ drain feed).
+D701 green -> red. (The interim 5.40 V +5V1 and its R419 / R420 2.49 R GVA feed resistors are withdrawn.)
 
 ## Open points
 
@@ -324,10 +323,9 @@ Integration (21 Nov 2026):
   (-1.46..-0.50 / +0.10..+1.40 V, firmware limit 1.30 V) cover the strobe_arms trim span +/-0.9..1.3 V; the re-simulation
   of the as-built 39.4 / 69.4 ps phase lines is still open.
 - Tap hold caps are 0.5 pF (nearest stocked C0G value, LCSC C1544) instead of 0.47 pF.
-- Power tree (24 Nov 2026, revised the same day by SPEC decisions 25 / 26): 1 % dividers except R603 / R604 19.6k / 2.0k
-  0.1 % (+5V1 5.40 V); C618 / C619 C15849 / C19666 (0 at LCSC, millions at JLC: assembled from JLC stock).
-- +5V1 at 5.40 V is above the TPS63802 recommended VO (5.2 V) and 34 mV below its minimum OVP threshold (5.5 V): verify on
-  the first board (no OVP trips at start-up / load steps); GVA-84+ drain 4.82-5.20 V assumes the BLM15HD102 DCR >= 0.6 R.
+- Power tree (24 Nov 2026, revised the same day by SPEC decisions 25 / 26): 1 % dividers except R603 / R604 12k / 1.3k
+  0.1 % (+5V1 5.115 V); C618 / C619 C15849 / C19666 and R603 C784579 (0 at LCSC, thousands to millions at JLC: assembled
+  from JLC stock). The interim 5.40 V +5V1 (out of the TPS63802 specification) is withdrawn.
 - Sampler ADC must sample before the S_STROBE falling edge (+167 ns at 3.0 MHz) - FPGA/MCU firmware timing.
 - Phase strobe stubs 80 ps (13.503 mm at 5.925 ps/mm on the six-layer board) per sim/phase_array. Six-layer tap
   lines: signal 69.4 ps, strobe 39.4 ps per tap (pitch 4.514 mm), about 30 ps effective, not re-simulated.

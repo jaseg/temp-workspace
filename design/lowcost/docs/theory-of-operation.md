@@ -56,8 +56,8 @@ Key figures (simulated, behavioural amplifier models; see section 10):
 | Sample rate | 3.0 MS/s (S_STROBE = PH_STROBE / 16) as a burst rate into MCU SRAM; sustained over USB FS about 0.25 MS/s (section 6); 2.4 MS/s in the two-ADC variant |
 | Phase detector | 16 taps; as built about 30 ps per tap (39.4 ps strobe, 69.4 ps signal per tap), window about 480 ps; not re-simulated. The simulated 35 / 70 ps line gave 34.7 +/- 3.1 ps (31-44 ps), window 58-579 ps, 19 ps rms per snapshot (22 ps with 6.5 mV comparator offsets) |
 | Trigger | down to 200 mVpp at the tip (+/-20 mV at the comparator); TRIG_LEVEL +/-0.30 V at the comparator |
-| Power | USB-C 5 V, 0.78 A typical / 0.98 A maximum: needs a 1.5 A USB-C source |
-| Parts cost | 70.45 USD per board (MCU included, PCB excluded; `bom.md`); 36 JLC basic / 58 extended part numbers |
+| Power | USB-C 5 V, 0.75 A typical / 0.97 A maximum: needs a 1.5 A USB-C source |
+| Parts cost | 70.45 USD per board (MCU included, PCB excluded; `bom.md`); 35 JLC basic / 58 extended part numbers |
 
 ## 2. Input stage
 
@@ -324,7 +324,7 @@ equivalent-time record. ADC_REF_MID (0.720 V) is VREF+ x 3.3k / 13.3k by divider
 
 ## 7. Power
 
-Input is USB-C 5 V (PTC 1.5 A, SMAJ5.0A, ferrite, 47 uF tantalum hot-plug damper C632) = VBUS, 0.78 A typical / 0.98 A
+Input is USB-C 5 V (PTC 1.5 A, SMAJ5.0A, ferrite, 47 uF tantalum hot-plug damper C632) = VBUS, 0.75 A typical / 0.97 A
 maximum: a 1.5 A USB-C supply is needed (no PD negotiation; CC1 / CC2 carry only the 5.1k pull-downs and are not sensed).
 Power tree of 24 Nov 2026 (`docs/research/power-tree.md`, `kicad/README.md`):
 
@@ -332,8 +332,8 @@ Power tree of 24 Nov 2026 (`docs/research/power-tree.md`, `kicad/README.md`):
 |---|---|---|
 | +3V3 | U601 TPS62A01A buck from VBUS, 2.4 MHz FPWM; 3.327 V (3.22-3.43 V with the 1 % divider) | 0.51 / 0.67 A: TRF37D73 x5, FPGA IO, MS5351M (via FB608, +3V3_CLK), COS3502, MCU |
 | +1V2 | U602 TPS62A01A buck from +3V3 | FPGA core, 30 mA |
-| +5V1 | U603 TPS63802 buck-boost from VBUS, 5.40 V (5.334-5.466 V, 0.1 % divider) | GVA-84+ x2 (own chokes, each through a 2.49 ohm series resistor: drain 4.82-5.20 V), U604 input; 0.33 A |
-| +5V / -5V | U604 LM27762 (charge pump + LDOs) from +5V1 via FB602; +4.800 / -4.808 V (4.66-4.95 V each side) | BUF802, OPA197 |
+| +5V1 | U603 TPS63802 buck-boost from VBUS, 5.115 V (5.054-5.177 V, 0.1 % divider) | GVA-84+ x2 (own chokes, drain 4.85-5.17 V), U604 input; 0.34 A |
+| +5V / -5V | U604 LM27762 (charge pump + LDOs) from +5V1 via FB602; asymmetric +4.908 / -4.514 V (total 9.14-9.70 V) | BUF802, OPA197 |
 | +2V5 / -2V5 | U605 LM27762 from +3V3 via FB605, enabled by the TPS63802 power good; +2.520 / -2.440 V (+/-2.5 %) | TLV3801, TMUX136, hold amp, TLV9001, VTAP rails (12.5 mA each), TRIG_LEVEL and VBIAS_A networks |
 
 All regulators are in the power block (top right). Layout rule for every converter and IC: the decoupling capacitor
@@ -352,11 +352,13 @@ down to 0.3 mm on short parts of +/-2V5 (50 mA; IPC-2221 allows 0.27 A for 0.3 m
 at least 0.33 mm from fast, clock and strobe nets; the FPGA +1V2 is an L4 island. Widths per rail:
 `layout/board/README.md`.
 
-The buck-boost makes the GVA-84+ drain voltage independent of the USB voltage and, at 5.40 V since 24 Nov 2026 (SPEC
-decision 26), gives the LM27762 enough input for +/-4.8 V: worst-case OUT- headroom 0.156 V (VIN 5.319 V - 41 mA x 4.5 ohm
-pump resistance - 26 mV LDO dropout - 4.952 V), typical 0.38 V. Each GVA-84+ is fed through its own 2.49 ohm resistor
-(R419 / R420, 30-39 mW) so its drain stays at 4.82-5.20 V (nominal 4.99 V) over the +5V1 tolerance, 85-125 mA and the
-bead / choke resistance spread. The -2V5
+The buck-boost makes the GVA-84+ drain voltage independent of the USB voltage (4.85-5.17 V at the chokes, +5V1 5.115 V
+held below the TPS63802's 5.2 V output limit by a 0.1 % divider) and feeds the LM27762 that makes the BUF802 rails. Since
+24 Nov 2026 (SPEC decision 26) these are asymmetric, +4.908 / -4.514 V: the BUF802 needs only 9-13 V in total and
+allows any split, and the negative LDO is the one short of headroom (worst case 0.181 V: 5.039 V - 41 mA x 4.5 ohm pump
+resistance - 26 mV dropout - 4.647 V; typical 0.39 V). The total stays >= 9.13 V at the pins; the positive LDO may drop
+out by up to 37 mV in the worst corner. Mid-supply sits 0.2 V above ground; the BUF802 output still swings from about
+-1.0 V (worst case) to +2.75 V, enough for the +/-0.5 V sampler range. The -2V5
 rail feeds VTAP_N and the passive TRIG_LEVEL and VBIAS_A networks: its initial tolerance is calibrated, its drift moves
 the trigger level by 0.14 V/V and the bridge pedestal by about 0.09 V/V. Switching frequencies are free-running: the
 TPS62A01A's 20th and the LM27762's 24th harmonic fall on 48.0 MHz at nominal frequency, so slow beat spurs against the
@@ -465,7 +467,7 @@ Open risks, most severe first:
 8. **No firmware or FPGA logic exists**; frame alignment, the fine sweep, aiming, the tracking loop and the data path
    (burst rate only, section 6) are arithmetic only, and the 1152-LUT budget is tight.
 9. **Power**: 0.75 / 0.97 A needs a 1.5 A USB-C supply (CC pins not sensed); USB hot-plug transient against the 6.0 V
-   abs max of U603 (damper fitted, measure); U604 OUT- headroom 0.156 V worst case (0.38 V typ); +5V1 5.40 V is above the TPS63802 recommended 5.2 V and 34 mV under its 5.5 V minimum OVP threshold (SPEC decision 26); buck and pump harmonics on
+   abs max of U603 (damper fitted, measure); U604 OUT- headroom 0.181 V worst case (0.39 V typ), OUT+ LDO in dropout by up to 37 mV at the worst corner (SPEC decision 26); buck and pump harmonics on
    48 MHz; LM27762 pump-capacitor ground returns 3.6-4.0 mm; minor rails are tracks (+/-2V5 down to 0.3 mm).
 10. **Assembly**: 32 small open vias inside the listed exposed pads (BUF802, TRF37D73, GVA-84+, FPGA) take some solder;
    no other via touches a soldered pad; T401 on a Coilcraft 0805USB land
@@ -507,7 +509,7 @@ Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and the integrated bo
 ## 11. Bring-up order
 
 1. **Power, no RF parts powered**: from a 1.5 A USB-C source; check every rail, ripple, the -2V5 noise, the TMUX136
-   ramp and the VBUS plug-in transient at U603; total current against 0.78 A typical.
+   ramp and the VBUS plug-in transient at U603; total current against 0.75 A typical.
 2. **Clock, MCU and FPGA**: flash the STM32 over SWD (or USB DFU / USART1 with JP701 closed), MS5351M over I2C, FPGA
    configuration (DONE), JTAG; check FPGA_CLK and MCU_CLK.
 3. **DAC stages**: all five DAC outputs over their range, VNEG_REF (-1.97 V); confirm VBIAS_A negative and VBIAS_K
