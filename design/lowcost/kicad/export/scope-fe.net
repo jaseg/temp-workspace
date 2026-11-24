@@ -1,7 +1,7 @@
 (export (version "E")
   (design
     (source "/home/user/temp-workspace/design/lowcost/kicad/scope-fe.kicad_sch")
-    (date "Tue Nov 24 20:04:43 2026")
+    (date "Tue Nov 24 23:29:46 2026")
     (tool "Eeschema 7.0.11+dfsg-1build4")
     (sheet (number "1") (name "/") (tstamps "/")
       (title_block
