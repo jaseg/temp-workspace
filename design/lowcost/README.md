@@ -15,7 +15,7 @@ recovery, GW1NZ-1 FPGA, on-board STM32G474CBT6, USB-C), one six-layer 100 x 57 m
 | `layout/board/` | the integrated six-layer board (JLC06161H-3313, 100 x 57 mm): `scope-fe.kicad_pcb` / `.kicad_pro`, generator `gen_board.py` with `board_slow.py`, `board_power.py`, `board_stitch.py`, `board_finish.py`, six blocks under `blocks/<name>/gen_<name>.py` on `boardlib.py`; `RULES.md` (layout rules), `TOPOLOGY.md` (routing plan), README (as built, check results, review), renders `scope-fe-L1..L6.png`, `scope-fe-all.png`, `scope-fe-detail-*.png` |
 | `layout/input_stage/`, `layout/sampler/`, `layout/phase_trigger/` | the three old four-layer fragments, superseded by `layout/board/`; left at their git-tag state for reference (refs and nets do not match the schematic) |
 | `tools/` | KiCad nightly DRC / ERC wrappers (`run_drc.sh --rules jlc4 --parity`, `run_erc.sh`) |
-| `docs/` | `theory-of-operation.md`, `bom.md` / `bom.csv` (generated, 64.01 USD per board), `research/power-tree.md` (TPS62A01A x2, TPS63802, LM27762 x2), `VALIDATION.md` + `validation/*.md` (review findings, re-checks) |
+| `docs/` | `theory-of-operation.md`, `bom.md` / `bom.csv` (generated, 70.45 USD per board, JLC class per line), `research/power-tree.md` (TPS62A01A x2, TPS63802, LM27762 x2), `VALIDATION.md` + `validation/*.md` (review findings, re-checks) |
 
 ## Regenerate
 

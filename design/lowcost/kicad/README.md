@@ -132,19 +132,22 @@ DS841-2.8E table 3-20, LV C6/I5), CLKDIV /5 -> PCLK 76.8 MHz. OSER10 (strobes) a
 
 | Rail | Regulator | From | Vout | Load typ / max | VIN at the part, dropout margin | Price |
 |---|---|---|---|---|---|---|
-| VBUS | USB-C 16P, F601 PTC 1.5 A, D601 SMAJ5.0A, FB601 220R 2 A, C632 47u tantalum damper (fitted) | USB | 4.60-5.25 V | 0.75 / 0.97 A | - | ~0.3 |
-| +3V3 | U601 TPS62A01ADRLR buck 2.4 MHz FPWM, L602 1 uH, R609 100k / R610 22.1k | VBUS | 3.315 V (3.21-3.42 incl. 1 % divider; 3.25-3.38 reference only) | 0.51 / 0.67 A | 4.60-5.25 V; 100 % mode needs 3.53 V: >= 1.07 V | 0.197 |
-| +1V2 | U602 TPS62A01ADRLR, L603 1 uH, R611 / R612 100k | +3V3 | 1.200 V (1.17-1.23) | 20 / 30 mA | 3.21-3.42 V: 2.0 V | 0.197 |
-| +5V1 | U603 TPS63802DLAR buck-boost FPWM, L601 0.47 uH, R603 499k / R604 54.2k (0.1 %; was 459k / 49.9k, no stocked 459k 0.1 % 0402) | VBUS | 5.10 V (5.04-5.16) | 0.29 / 0.34 A | regulates above and below VOUT | 0.951 |
-| +5V / -5V | U604 LM27762DSSR (pump + LDOs) via FB602; FB604 / FB603 at the outputs | +5V1 | +4.80 / -4.64 V | 37 / 41 mA each | 5.02-5.15 V (<= 5.5 V); OUT+ >= 0.14 V; OUT- worst case 0.06-0.11 V (typ 0.26 V; RCP 4.5-5.5 R at 41 mA, recheck RP-2) | 0.960 |
-| +2V5 / -2V5 | U605 LM27762DSSR via FB605; FB606 / FB607 at the outputs; EN = PG_5V1 | +3V3 | +2.500 / -2.501 V (0.1 % dividers) | 40-48 / 42-50 mA | 3.24-3.37 V; OUT+ 0.70 V, OUT- 0.42 V (RNEG 5 R assumed) | 0.960 |
+| VBUS | USB-C 16P, F601 PTC 1.5 A, D601 SMAJ5.0A, FB601 220R 2 A, C632 47u tantalum damper (fitted) | USB | 4.60-5.25 V | 0.78 / 0.98 A | - | ~0.3 |
+| +3V3 | U601 TPS62A01ADRLR buck 2.4 MHz FPWM, L602 1 uH, R609 100k / R610 22k (1 %, JLC basic; was 22.1k) | VBUS | 3.327 V (3.224-3.433 incl. FB and 1 % divider) | 0.51 / 0.67 A | 4.60-5.25 V; 100 % mode needs 3.53 V: >= 1.07 V | 0.197 |
+| +1V2 | U602 TPS62A01ADRLR, L603 1 uH, R611 / R612 100k | +3V3 | 1.200 V (1.17-1.23) | 20 / 30 mA | 3.22-3.43 V: 2.0 V | 0.197 |
+| +5V1 | U603 TPS63802DLAR buck-boost FPWM, L601 0.47 uH, R603 19.6k / R604 2.0k (0.1 %, the only 0.1 % pair; SPEC 25 / 26) | VBUS | 5.400 V (5.334-5.466; above the DS VO 5.2 V, OVP 5.5 V min) | 0.30 / 0.33 A | regulates above and below VOUT | 0.951 |
+| +5V / -5V | U604 LM27762DSSR (pump + LDOs) via FB602; FB604 / FB603 at the outputs; R613 / R614 300k / 100k, R605 / R606 150k / 51k (1 %) | +5V1 | +4.800 / -4.808 V (4.656-4.944 / 4.664-4.952) | 37 / 41 mA each | 5.319-5.466 V (<= 5.5 V); OUT+ >= 0.355 V; OUT- worst case 0.156 V (41 mA x 4.5 R, 26 mV LDO), typ 0.38 V | 0.960 |
+| +2V5 / -2V5 | U605 LM27762DSSR via FB605; FB606 / FB607 at the outputs; EN = PG_5V1; R615 / R616 110k / 100k, R607 / R608 100k / 100k (1 %) | +3V3 | +2.520 / -2.440 V (+/-2.5 %) | 40-48 / 42-50 mA | 3.24-3.37 V; OUT+ 0.66 V, OUT- 0.45 V (RNEG 5 R assumed) | 0.960 |
 
-Totals: 3 regulator types, 5 ICs, BOM +0.9 USD against the 7-type tree. +5V / -5V keep their net names (4.80 / -4.64 V):
-BUF802 VS >= 9.30 V (min 9 V). GVA-84+ drain 4.86-5.10 V at any USB voltage (+5V1, own track from C610 / C611).
+Totals: 3 regulator types, 5 ICs. +5V / -5V keep their net names (+4.800 / -4.808 V since 24 Nov 2026, SPEC decision 26):
+BUF802 each side >= 4.65 V, VS 9.31-9.89 V. GVA-84+ drain 4.82-5.20 V at any USB voltage (+5V1 own track from C610 / C611,
+then per chain R419 / R420 2.49 R between the 10 uF C420 / C430 and the 100 nF / 1 nF cold-end capacitors).
+Tolerance table and the 0.1 % justification: `docs/research/power-tree.md` section 12.
 Sequencing: +3V3 1 ms soft start, +1V2 from +3V3 (1.2 mV/us), +/-5V with +5V1, +/-2V5 after the TPS63802 power good.
 Hottest part U601: 0.19 / 0.30 W, +27 / +45 K. USB hot plug: C632 47u tantalum damper now FITTED (recheck RP-3: SMAJ5.0A
 clamps at about 9 V, U603 abs max 6.0 V); measure the plug-in transient on the first board. -5V headroom: check OUT- on a
-cold board at the low +5V1 corner; if short, a lower-DCR FB602 (do not lower |OUT-|: BUF802 VS- margin 55 mV). Open:
+cold board at the low +5V1 corner (worst-case margin 0.156 V since the 5.40 V +5V1); measure the GVA-84+ drain at TP404 /
+TP406 (4.82-5.20 V expected) and check that the TPS63802 OVP (5.5 V min) never trips at start-up or load steps. Open:
 TMUX136 supply ramp, LM27762 RNEG at 3.3 V, XR0420 stock 65 (second source C49232844, land not checked).
 
 ## MCU (STM32G474CBT6, LQFP-48, U704; on board since 21 Nov 2026)
@@ -188,20 +191,23 @@ outputs on LQFP-48 are OPAMP1 PA2, OPAMP2 PA6, OPAMP3 PB1, OPAMP4 PB12, OPAMP5 P
 Limits used (DS12288 values from `docs/research/adc.md` and the task brief; st.com refused the PDF download): buffered
 DAC RL >= 5k, CL <= 50 pF, output 0.2..VREF+ - 0.2 V; OPAMP follower <= 500 uA, CL <= 50 pF. Vdac below = 0.2..2.7 V.
 Only VOFS keeps an op-amp: U701 TLV9001IDBVR (LCSC C398363, 0.080 USD) on +/-2V5 makes VNEG_REF = -VREF+ x
-R732/R731 = -1.973 V (10.0k/14.7k, 0.1 % 25 ppm/K, 100 nF C722 across R732: 160 Hz), which drives only Rmid.
+R732/R731 = -1.933 V (10k/15k, 1 % JLC basic since 24 Nov 2026, SPEC decision 25: the +/-2 % ratio error moves the VOFS
+mid-scale by up to +/-12 mV at OUT and is removed by the firmware offset calibration; 100 nF C722 across R732: 160 Hz),
+which drives only Rmid. Thick-film tracking (100 ppm/K worst case per part) can add up to about 0.24 mV/K at OUT
+(1.2 mV/K at the input) of offset drift: re-run the offset calibration after warm-up.
 
 | Voltage | Source pin | Network | Transfer | Range | Resolution | Reset state (DAC/OPAMP off, VREFBUF off) |
 |---|---|---|---|---|---|---|
-| TRIG_LEVEL | PA4 DAC1_OUT1 | trigger_phase: R383 5.1k from DAC_TRIG, R384 8.87k from -2V5, R385 2.0k shunt, C304 10 nF at U302.4 (Rpar 1.24k, 13 kHz) | 0.242 Vdac - 0.139 x 2.5 V | -0.30..+0.31 V | 0.17 mV/LSB | -0.34 V (PA4 high-Z) |
-| VOFS | PA5 DAC1_OUT2 | input: Rofs R119 24.9k into FB, Rmid R123 34.0k from VNEG_REF, Rf2 22.1k + RV101 | OUT offset = 0.580 - 0.402 Vdac (sim) | +/-0.50 V at OUT = +/-2.5 V input | 0.28 mV/LSB at OUT, 1.4 mV at the input | 0 (VNEG_REF 0 V, PA5 high-Z) |
-| VBIAS_A | PA6 DAC2_OUT1 | R733 7.5k from DAC, R734 4.7k to -2V5 (Thevenin 2.89k) + sampler 1k / 10 nF (5.5 kHz) | 0.385 Vdac - 0.615 x 2.5 V | -1.46..-0.50 V (-1.54..-0.42 V at 0..2.9 V) | 0.27 mV/LSB | about -1.7 V (PA6 clamped near -0.4 V by its substrate diode, 0.17 mA): reverse bias |
+| TRIG_LEVEL | PA4 DAC1_OUT1 | trigger_phase: R383 5.1k from DAC_TRIG, R384 8.87k from -2V5, R385 2.0k shunt, C304 10 nF at U302.4 (Rpar 1.24k, 13 kHz) | 0.242 Vdac - 0.139 x 2.44 V | -0.29..+0.31 V | 0.17 mV/LSB | -0.33 V (PA4 high-Z) |
+| VOFS | PA5 DAC1_OUT2 | input: Rofs R119 24.9k into FB, Rmid R123 33k from VNEG_REF, Rf2 22k + RV101 (1 %, 24 Nov 2026) | OUT offset = 0.586 - 0.402 Vdac (computed; sim with the earlier 34.0k / 22.1k / -1.973 V) | +0.51..-0.50 V at OUT = +/-2.5 V input | 0.28 mV/LSB at OUT, 1.4 mV at the input | 0 (VNEG_REF 0 V, PA5 high-Z) |
+| VBIAS_A | PA6 DAC2_OUT1 | R733 5.1k from DAC, R734 3.3k to -2V5 (Thevenin 2.00k; was 7.5k / 4.7k) + sampler 1k / 10 nF (8 kHz) | 0.393 Vdac - 0.607 x 2.44 V | -1.40..-0.42 V (-1.48..-0.34 V at 0..2.9 V) | 0.28 mV/LSB | about -1.64 V (PA6 clamped near -0.4 V by its substrate diode, 0.25 mA): reverse bias |
 | VBIAS_K | PB1 OPAMP3 (DAC3_CH2) | R735 4.7k series, R736 5.1k VBIAS_K to GND (+ sampler 1k / 10 nF); 24 Nov 2026, PARTS-4 | 0.520 Vdac | +0.10..+1.40 V | 0.37 mV/LSB | 0 V (R736) |
-| VTAP_TH | PA2 OPAMP1 (DAC3_CH1) | R723 30k / R724 1k, C709 100 nF (unchanged) | Vdac / 31 | 3..90 mV | 0.02 mV/LSB | 0 V |
-| VNEG_REF | VREF+ | U701 inverter (see above) | -0.680 VREF+ | -1.973 V fixed | - | 0 V |
+| VTAP_TH | PA2 OPAMP1 (DAC3_CH1) | R723 33k / R724 1k, C709 100 nF (was 30k) | Vdac / 34 | 6..79 mV | 0.02 mV/LSB | 0 V |
+| VNEG_REF | VREF+ | U701 inverter (see above) | -0.667 VREF+ | -1.933 V fixed | - | 0 V |
 
-DAC loads: TRIG 5.1k + 8.87k||2.0k = 6.7k (>= 5k, max 0.47 mA); VOFS 24.9k to a virtual ground; VBIAS_A 12.2k to -2V5
-(max 0.43 mA at 2.7 V); VBIAS_K 9.8k (OPAMP3 <= 0.28 mA at 2.7 V); VTAP_TH 31k. Bridge at reset: anode rail about -1.7 V,
-cathode rail 0 V, never forward-biased; with the DACs at code 0 -1.54 V / +0.0 V (OPAMP3 low limit). Nominal bias
+DAC loads: TRIG 5.1k + 8.87k||2.0k = 6.7k (>= 5k, max 0.47 mA); VOFS 24.9k to a virtual ground; VBIAS_A 8.4k to -2V5
+(max 0.61 mA at 2.7 V); VBIAS_K 9.8k (OPAMP3 <= 0.28 mA at 2.7 V); VTAP_TH 34k. Bridge at reset: anode rail about -1.64 V,
+cathode rail 0 V, never forward-biased; with the DACs at code 0 -1.48 V / +0.0 V (OPAMP3 low limit). Nominal bias
 +/-1.3 V (VBIAS_A DAC 0.62 V, VBIAS_K DAC 2.50 V; sim/strobe_arms), trimmed per board for efficiency ~100 %; the
 VBIAS_K limit 1.40 V keeps the BAT15-04W reverse voltage <= 2.9 V at the -1.5 V input clamp (VR 4 V) for the static
 and sampling-edge case only; the S_STROBE falling edge adds about 1.1 V (sim/strobe_arms: 3.93 V at +/-1.3 V bias,
@@ -209,14 +215,14 @@ and sampling-edge case only; the S_STROBE falling edge adds about 1.1 V (sim/str
 (3.93 V at a full +/-1.5 V input overload, 160 ps pulse); larger bias only for strobe amplitudes below nominal. Firmware: enable VREFBUF, DAC1/2/3 and OPAMP1/3 (with their self-calibration)
 before the strobes; DAC_TRIG and VNEG_REF also before trusting the trigger.
 
-**-2V5 rail dependence** (24 Nov 2026: U605 LM27762, FB- reference -1.22 V +/-1.5 % with a 0.1 % divider: +/-1.7 % =
-+/-43 mV; noise 22 uV rms 10 Hz-100 kHz; pump ripple 1-2.5 mV pp at 1.7-2.3 MHz, below 1 uV after FB607 + 2.2 uF; was LM337
-+/-4 % and 75 uV rms). Sensitivities as before: TRIG_LEVEL 0.139 V/V -> +/-6 mV initial (calibrated), 3 uV rms;
-VBIAS_A 0.615 V/V -> +/-26 mV, pedestal 0.089 V/V -> +/-4 mV (calibrated), 2 uV rms at the hold node (0.6 % of the
-0.35 mV floor). Strobe-rectified charge at 3.0 MHz: 5.3 uA through 2.89k + 1k on VBIAS_A (20 mV), 4.3 uA x 3.45k on
+**-2V5 rail dependence** (24 Nov 2026: U605 LM27762, -2.440 V, FB- reference -1.22 V +/-1.5 % with a 1 % divider:
++/-2.5 % = +/-61 mV; noise 22 uV rms 10 Hz-100 kHz; pump ripple 1-2.5 mV pp at 1.7-2.3 MHz, below 1 uV after FB607 + 2.2 uF; was LM337
++/-4 % and 75 uV rms). Sensitivities: TRIG_LEVEL 0.139 V/V -> +/-8.5 mV initial (calibrated), 3 uV rms;
+VBIAS_A 0.607 V/V -> +/-37 mV (trimmed per board), pedestal 0.089 V/V -> +/-5.5 mV (calibrated), 2 uV rms at the hold node (0.6 % of the
+0.35 mV floor). Strobe-rectified charge at 3.0 MHz: 5.3 uA through 2.00k + 1k on VBIAS_A (16 mV), 4.3 uA x 3.45k on
 VBIAS_K (15 mV), calibrated per strobe setting. VOFS: VNEG_REF (U701) as before, independent of -2V5.
-VTAP_TH = DAC/31. VTAP_P/N = +2V5/-2V5 through 0 R links.
-ADC_REF_MID = VREF+ x 1/4 = 0.725 V.
+VTAP_TH = DAC/34. VTAP_P/N = +2V5/-2V5 through 0 R links.
+ADC_REF_MID = VREF+ x 3.3k/13.3k = 0.720 V (R703 10k / R704 3.3k, JLC basic; was 30k / 10k = 0.725 V).
 
 USB: J601 is now a 16-pin USB 2.0 Type-C receptacle (HRO TYPE-C-31-M-12, LCSC C165948, price estimate) with both
 D+/D- pairs tied, 5.1k CC pull-downs as before, and a USBLC6-2SC6 ESD array U608 (LCSC C7519, may be left unfitted).
@@ -267,7 +273,7 @@ Reference changes for the layout (24 Nov 2026, against `layout/board/scope-fe.ki
 - New footprint / part on an existing ref: U601, U602 SOT-563 (TPS62A01A); U603 `scope-fe:Texas_DLA0010A_VSON-HR-10_2x3mm_P0.5mm`;
   U604, U605 WSON-12-1EP_3x2mm_P0.5mm_EP1x2.65 (LM27762); L601 `scope-fe:L_XR0420_4.4x4.2mm`; FB602, FB603 0805 -> 0603;
   R402, R408, R412 0402 -> 0603.
-- Value / net only: R603-R608 (0.1 % dividers), R378 / R379 43 R, R735 4.7k, R736 5.1k now VBIAS_K to GND (was at
+- Value / net only: R603-R608 (dividers; values changed again by the BOM optimisation, below), R378 / R379 43 R, R735 4.7k, R736 5.1k now VBIAS_K to GND (was at
   PB1), U502 pins 1 / 7 on +3V3_CLK, L404 / L406 and C418-C420 / C428-C430 on +5V1 (was VBUS), plus the moved
   capacitors above.
 
@@ -277,15 +283,25 @@ no part is added. Only new capacitor: C630. DNP footprint: C631 120 pF (U601 Cff
 
 ## BOM
 
-`docs/bom.md` (generated): **73.14 USD for one board** (24 Nov 2026, every line with an LCSC number verified on
-lcsc.com, prices from the LCSC price ladders; 64.01 with the earlier estimates) (MCU included, PCB excluded) against the
-80 USD budget. The rise is mostly the SMA connectors (now the stocked Samtec SMA-J-P-H-ST-EM1 C5199907 that matches the
-footprint, 2 x 5.34 instead of 2 x 1.99 estimated for an out-of-stock generic part) and the 0.1 % thin-film dividers.
+`docs/bom.md` (generated): **70.45 USD for one board** (24 Nov 2026; was 73.14 before the BOM optimisation of SPEC
+decision 25), MCU included, PCB excluded, against the 80 USD budget; every line has an LCSC number verified on lcsc.com
+and a JLC class column. 95 fitted part lines (was 103), 94 part numbers: 36 JLCPCB basic (287 parts placed) and 58
+extended (was 26 / 74). Only R603 / R604 (U603 divider) are 0.1 % (was 20 resistors). JLC basic list: jlcpcb.com parts
+API, library type `base`, 351 parts on 24 Nov 2026. Remaining extended passives are RF / simulated values, values with no
+basic part under the LM27762 R2 >= 50k rule, or networks whose ratio has no basic equivalent (list in `docs/bom.md`).
 Largest lines: TRF37D73 x5 7.51, GW1NZ-1 6.68, BAT15-04W x18 6.58, GVA-84+ x2 5.98 (Mouser), BUF802 5.89, SMA x2 10.68,
 TLV3801 5.13 (Mouser), STM32G474CBT6 4.63. J501 (WR-WST footprint, not on LCSC) is a 0 USD footprint-only line.
 LCSC numbers live in the symbol field `LCSC` (generators; generic passives in `gen/common.py` tables `LCSC_R`,
-`LCSC_R0603`, `LCSC_R01` (0.1 %), `LCSC_C`, `LCSC_C0603`, `LCSC_C_C0G`, `LCSC_C_X7R`); the verified stock / price data
-is `gen/lcsc_parts.py`. Verification method and the parts changed by it: `docs/bom.md` section "LCSC verification".
+`LCSC_R0603`, `LCSC_R01` (0.1 %, U603 only), `LCSC_C`, `LCSC_C0603`, `LCSC_C_C0G`); the verified stock / price data
+and the JLC class are in `gen/lcsc_parts.py`. Verification method and the parts changed by it: `docs/bom.md`.
+
+Value changes of the BOM optimisation and SPEC decision 26 (24 Nov 2026; footprints and layout unchanged except R419 /
+R420): R117 / R118 / R614 / R616 / R606 etc. 1 % (were 0.1 %); R120 / R610 22.1k -> 22k; R123 34.0k -> 33k; R731 / R732
+14.7k / 10.0k -> 15k / 10k; R733 / R734 7.5k / 4.7k -> 5.1k / 3.3k; R703 / R704 30k / 10k -> 10k / 3.3k; R723 30k -> 33k;
+R208 499 -> 510; R303 18k -> 17.8k (shares the R107 line); R603 / R604 499k / 54.2k -> 19.6k / 2.0k (0.1 %);
+R605 / R606 280k / 100k -> 150k / 51k; R607 105k -> 100k; R615 / R616 130k / 120k -> 110k / 100k; C616 / C620 2.2u ->
+4.7u 10 V 0402; C308 / C311 / C312 1u X7R 16 V -> X5R 25 V; C618 / C619 -> C15849 / C19666 (same ratings, basic);
+D701 green -> red; new R419 / R420 2.49 R (GVA-84+ drain feed).
 
 ## Open points
 
@@ -298,8 +314,8 @@ Integration (21 Nov 2026):
   mapping is from the ST HAL OPAMP header (stm32g4xx_hal_opamp.h). PB4 (SPI1_MISO) and PB6 (FPGA_DONE, an input) carry the UCPD dead-battery pull-downs until
   firmware sets PWR_CR3.UCPD_DBDIS. USB-C 16P, USBLC6-2SC6, the LED and the STM32G474CBT6 prices are now from the LCSC product pages (24 Nov 2026).
 - Stock (24 Nov 2026): BAT15-03W (C5310874) 0 at LCSC and JLC: order DigiKey BAT1503WE6327HTSA1CT-ND; TRF37D73 25 at
-  LCSC (5 needed), TMUX136 32, BUF802 54, TLV3801 43, STM32G474CBT6 20, 300k 0.1 % (C4262495) 139, 280k 0.1 %
-  (C4091415) 48, C101 1.5 pF 100 V (C2179899) 45: low, re-check at order. TP2272 no longer used.
+  LCSC (5 needed), TMUX136 32, BUF802 54, TLV3801 43, STM32G474CBT6 20, 19.6k 0.1 % (C852589) 1000,
+  C101 1.5 pF 100 V (C2179899) 45: low, re-check at order (the low-stock 300k / 280k 0.1 % parts are gone). TP2272 no longer used.
 - LCSC numbers: all assigned and verified (24 Nov 2026); J501 Würth 490107671612 is not on LCSC (footprint only).
 - Control voltages (21 Nov 2026): DS12288 DAC/OPAMP load limits and the VREFBUF reset state (high-Z) taken from
   adc.md / the brief, PDF not re-read; PA6 sees about -0.4 V / 0.17 mA substrate injection while the DAC is off
@@ -308,8 +324,10 @@ Integration (21 Nov 2026):
   (-1.46..-0.50 / +0.10..+1.40 V, firmware limit 1.30 V) cover the strobe_arms trim span +/-0.9..1.3 V; the re-simulation
   of the as-built 39.4 / 69.4 ps phase lines is still open.
 - Tap hold caps are 0.5 pF (nearest stocked C0G value, LCSC C1544) instead of 0.47 pF.
-- Power tree (24 Nov 2026): 0.1 % dividers, C616 / C620 (C107369 10 V) and C618 / C619 (C29936 25 V X7R, C99229 16 V
-  X5R; C15849 / C19666 had 0 LCSC stock) assigned and verified; R603 / R604 now 499k / 54.2k (VOUT 5.103 V).
+- Power tree (24 Nov 2026, revised the same day by SPEC decisions 25 / 26): 1 % dividers except R603 / R604 19.6k / 2.0k
+  0.1 % (+5V1 5.40 V); C618 / C619 C15849 / C19666 (0 at LCSC, millions at JLC: assembled from JLC stock).
+- +5V1 at 5.40 V is above the TPS63802 recommended VO (5.2 V) and 34 mV below its minimum OVP threshold (5.5 V): verify on
+  the first board (no OVP trips at start-up / load steps); GVA-84+ drain 4.82-5.20 V assumes the BLM15HD102 DCR >= 0.6 R.
 - Sampler ADC must sample before the S_STROBE falling edge (+167 ns at 3.0 MHz) - FPGA/MCU firmware timing.
 - Phase strobe stubs 80 ps (13.503 mm at 5.925 ps/mm on the six-layer board) per sim/phase_array. Six-layer tap
   lines: signal 69.4 ps, strobe 39.4 ps per tap (pitch 4.514 mm), about 30 ps effective, not re-simulated.

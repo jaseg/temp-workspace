@@ -223,7 +223,7 @@ Most of the theory of operation checks out. I recomputed the control-voltage net
 
 - TRIG_LEVEL network 0.2424 Vdac - 0.139x2.5 V, -0.300..+0.306 V, 0.172 mV/LSB
 - VBIAS_A -1.46..-0.50 V, 0.273 mV/LSB; VBIAS_K = Vdac; VTAP_TH Vdac/31 6.5-87 mV
-- VNEG_REF -1.973 V, ADC_REF_MID 0.725 V, VOFS 0.580-0.402 Vdac
+- VNEG_REF -1.973 V, ADC_REF_MID 0.725 V, VOFS 0.580-0.402 Vdac (24 Nov 2026, SPEC decision 25: -1.933 V, 0.720 V, 0.586 - 0.402 Vdac)
 - TMUX136 local GND -0.893 V, SEL +1.23 / -0.89 V
 - Hold chain G=3, 0.415-2.485 V at PA0
 - Efficiency correction x=(v_k-0.31v_k-1)/0.476 consistent with RESULT
@@ -364,7 +364,7 @@ the falling edge, RF2-8 the first-validation items still open (above), RF2-9 DNP
 | Id | Status | How / where, or why open |
 |---|---|---|
 | RP-1 | fixed | C617 / C621 / C628 / C630 on F at OUT+ / OUT- of U604 / U605, 1.13 / 0.63 / 0.75 / 0.66 mm pad to pin, no via between (board) |
-| RP-2 | documented | OUT- worst-case headroom 0.06-0.11 V in kicad/README, power-tree.md, ToO section 7 |
+| RP-2 | fixed (24 Nov 2026, SPEC decision 26) | +5V1 raised to 5.40 V (0.1 % divider), U604 at +/-4.8 V with 1 % dividers: OUT- worst-case headroom 0.156 V (5.319 V - 41 mA x 4.5 R - 26 mV - 4.952 V), typ 0.38 V; GVA-84+ drain kept at 4.82-5.20 V by R419 / R420 2.49 R; new open point: +5V1 above the TPS63802 VO 5.2 V and 34 mV under its OVP minimum (power-tree.md section 12) |
 | RP-3 | fixed | C632 47u tantalum fitted (netlist, BOM C22036); plug-in transient to be measured |
 | RP-4 | open | CC pins not sensed (needs MCU pins and a schematic change); 1.5 A source requirement documented |
 | RP-5 | open | U603 PGND return 3.6 mm and LM27762 pump-capacitor returns 3.6-4.0 mm (C626 GND via 2.1 mm from its pad centre); rotating the capacitor would move it off CP |

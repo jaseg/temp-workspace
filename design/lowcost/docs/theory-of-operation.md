@@ -56,8 +56,8 @@ Key figures (simulated, behavioural amplifier models; see section 10):
 | Sample rate | 3.0 MS/s (S_STROBE = PH_STROBE / 16) as a burst rate into MCU SRAM; sustained over USB FS about 0.25 MS/s (section 6); 2.4 MS/s in the two-ADC variant |
 | Phase detector | 16 taps; as built about 30 ps per tap (39.4 ps strobe, 69.4 ps signal per tap), window about 480 ps; not re-simulated. The simulated 35 / 70 ps line gave 34.7 +/- 3.1 ps (31-44 ps), window 58-579 ps, 19 ps rms per snapshot (22 ps with 6.5 mV comparator offsets) |
 | Trigger | down to 200 mVpp at the tip (+/-20 mV at the comparator); TRIG_LEVEL +/-0.30 V at the comparator |
-| Power | USB-C 5 V, 0.75 A typical / 0.97 A maximum: needs a 1.5 A USB-C source |
-| Parts cost | 64.01 USD per board (MCU included, PCB excluded), 6.08 USD of it estimates (`bom.md`) |
+| Power | USB-C 5 V, 0.78 A typical / 0.98 A maximum: needs a 1.5 A USB-C source |
+| Parts cost | 70.45 USD per board (MCU included, PCB excluded; `bom.md`); 36 JLC basic / 58 extended part numbers |
 
 ## 2. Input stage
 
@@ -73,14 +73,17 @@ BUF802. With the BUF802 input capacitance (2.4 pF typical) the ratio is 0.206 an
 BUF802 auxiliary input (composite-loop mode). The servo sums the BUF802 output, the offset voltage VOFS and a feedback
 network so that the LF gain is also 0.200; its loop bandwidth is 8.8 kHz and does not depend on the op-amp GBW. An 18
 pF capacitor at the divider tap cancels the integrator feed-through. The 50k trimmer RV101 in Rf2 matches LF and HF
-gain (trim range about -8 % to +7.6 %); a +/-0.3 pF spread of the BUF802 input capacitance alone moves the HF gain by
+gain (trim range about -7.8 % to +8.0 % with Rf2 = 22k + RV101); a +/-0.3 pF spread of the BUF802 input capacitance alone moves the HF gain by
 +/-4 %. Trimmed, the crossover is flat to -0.25 % ... +0.67 % from 1 Hz to 100 MHz.
 
 VOFS is the raw STM32 DAC1_OUT2 (0.2-2.7 V) through Rofs 24.9k into the servo summing node; the mid-scale is
-cancelled by Rmid 34.0k from VNEG_REF (-1.973 V, -0.680 x VREF+, made by the one remaining op-amp U701 on mcu_if), and
-Rf2 = 22.1k + RV101 keeps the LF gain at 0.200. Simulated (`sim/input`, 21 Nov 2026): VOFS 0.2 / 1.45 / 2.7 V gives
-+0.500 / -0.002 / -0.504 V at the BUF802 output, i.e. +/-2.5 V at the input; trim range -8.1 % ... +7.6 %; flatness
-unchanged. VNEG_REF is ratiometric to the DAC reference, so the mid-scale offset does not move with VREF+ or the -2V5
+cancelled by Rmid 33k from VNEG_REF (-1.933 V, -0.667 x VREF+, made by the one remaining op-amp U701 on mcu_if), and
+Rf2 = 22k + RV101 keeps the LF gain at 0.200. Simulated (`sim/input`, 21 Nov 2026, with the earlier 34.0k / -1.973 V /
+22.1k values): VOFS 0.2 / 1.45 / 2.7 V gives +0.500 / -0.002 / -0.504 V at the BUF802 output, i.e. +/-2.5 V at the
+input; trim range -8.1 % ... +7.6 %; flatness unchanged. With the JLC basic values of 24 Nov 2026 (SPEC decision 25,
+computed, not re-simulated): OUT offset = 0.586 - 0.402 Vdac = +0.506 ... -0.498 V, trim range -7.8 % ... +8.0 %. All
+servo and offset resistors are 1 % thick film now: the LF / HF gain error (up to about +/-2.8 %) is inside the RV101
+trim, and the offset scale and mid-scale errors (up to +/-12 mV at OUT) go into the firmware offset calibration. VNEG_REF is ratiometric to the DAC reference, so the mid-scale offset does not move with VREF+ or the -2V5
 regulator.
 
 CLH/CLL = +/-1.5 V limit the BUF802 output and so the bridge input. Protection is the BUF802's internal clamps; Ctop
@@ -97,8 +100,8 @@ over two uncoupled 50 ohm arms of 17.8 mm (105.6 ps) each, then 47 pF C0G and 24
 on the bridge axis, at the same distance from the balun on both. VBIAS_A and VBIAS_K (nominal -1.3 / +1.3 V, trimmed per
 board) reverse-bias the bridge through 1 k. A strobe pulse forward-biases all four diodes for about 100 ps and the input
 charges the 2.2 pF hold capacitor. The hold node
-drives U201 (TPH2501, non-inverting, G = +3, 1.00 k / 499 ohm, +/-2.5 V). U202 (TPH2501 on 3.3 V) inverts and shifts:
-Vadc = 1.45 V - U201out, giving 0.41-2.49 V at PA0 for +/-0.5 V at the bridge. 33 ohm + 220 pF C0G at the pin absorb
+drives U201 (TPH2501, non-inverting, G = +2.96, 1.00 k / 510 ohm, +/-2.5 V; was 499 ohm, the gain is calibrated). U202 (TPH2501 on 3.3 V) inverts and shifts:
+Vadc = 1.44 V - U201out, giving 0.40-2.48 V at PA0 for +/-0.5 V at the bridge. 33 ohm + 220 pF C0G at the pin absorb
 the ADC kick-back.
 
 With the as-built strobe chain and arms (`sim/strobe_arms/RESULT.md`) the bias sets the operating point:
@@ -295,20 +298,20 @@ about 2 pF.
 
 **MCU (STM32G474CBT6, LQFP-48, on board, U704; pin table in `kicad/README.md`).** ADC12_IN1 on PA0, 6.5-cycle sampling
 (108 ns) at 60 MHz with the synchronous ADC clock, VREFBUF 2.9 V, triggered internally by the frame timer; DMA into SRAM. Five DAC outputs (since 21 Nov 2026 without difference
-amplifiers: the DACs drive passive networks, and one op-amp, U701 TLV9001, makes VNEG_REF = -0.680 x VREF+ for the
+amplifiers: the DACs drive passive networks, and one op-amp, U701 TLV9001, makes VNEG_REF = -0.667 x VREF+ for the
 offset network only). Vdac usable 0.2-2.7 V on the buffered pins:
 
 | DAC | Network | Net | Range, resolution |
 |---|---|---|---|
-| PA4 DAC1_OUT1 | 5.1k from DAC, 8.87k from -2V5, 2.0k shunt, 10 nF at the TLV3801 pin | TRIG_LEVEL = 0.242 Vdac - 0.139 x 2.5 V | -0.30 ... +0.31 V, 0.17 mV/LSB |
-| PA5 DAC1_OUT2 | Rofs 24.9k into the servo node, Rmid 34.0k from VNEG_REF | VOFS (raw DAC) | +/-0.50 V at OUT = +/-2.5 V input, 1.4 mV/LSB at the input |
-| PA2 OPAMP1 (DAC3_CH1) | 30k / 1k divider, 100 nF | VTAP_TH = Vdac / 31 | 3-90 mV, 0.02 mV/LSB |
-| PA6 DAC2_OUT1 | 7.5k from DAC, 4.7k to -2V5 | VBIAS_A = 0.385 Vdac - 0.615 x 2.5 V | -1.46 ... -0.50 V, 0.27 mV/LSB |
+| PA4 DAC1_OUT1 | 5.1k from DAC, 8.87k from -2V5, 2.0k shunt, 10 nF at the TLV3801 pin | TRIG_LEVEL = 0.242 Vdac - 0.139 x 2.44 V | -0.29 ... +0.31 V, 0.17 mV/LSB |
+| PA5 DAC1_OUT2 | Rofs 24.9k into the servo node, Rmid 33k from VNEG_REF | VOFS (raw DAC) | +0.51 ... -0.50 V at OUT = +/-2.5 V input, 1.4 mV/LSB at the input |
+| PA2 OPAMP1 (DAC3_CH1) | 33k / 1k divider, 100 nF | VTAP_TH = Vdac / 34 | 6-79 mV, 0.02 mV/LSB |
+| PA6 DAC2_OUT1 | 5.1k from DAC, 3.3k to -2V5 | VBIAS_A = 0.393 Vdac - 0.607 x 2.44 V | -1.40 ... -0.42 V, 0.28 mV/LSB |
 | PB1 OPAMP3 (DAC3_CH2) | R735 4.7k series, R736 5.1k to GND (24 Nov, PARTS-4) | VBIAS_K = 0.520 Vdac | +0.10 ... +1.40 V, 0.37 mV/LSB |
 
-TRIG_LEVEL and VBIAS_A follow the -2V5 rail (0.139 and 0.615 V/V); the effects (LM27762 -2V5 tolerance, drift, noise) are
+TRIG_LEVEL and VBIAS_A follow the -2V5 rail (0.139 and 0.607 V/V; -2V5 is -2.44 V +/-2.5 % since 24 Nov 2026); the effects (LM27762 -2V5 tolerance, drift, noise) are
 listed in `kicad/README.md` and are calibrated or negligible. Reset state (DACs and OPAMPs off, pins high-Z, VREFBUF
-off): VBIAS_K 0 V (pull-down), VBIAS_A about -1.7 V (PA6 clamps at about -0.4 V), so the bridge is reverse-biased;
+off): VBIAS_K 0 V (pull-down), VBIAS_A about -1.64 V (PA6 clamps at about -0.4 V), so the bridge is reverse-biased;
 VNEG_REF 0 V; TRIG_LEVEL about -0.46 V (PA4 high-Z; -0.34 V with PA4 at 0 V). Firmware should enable VREFBUF, the DACs
 and the OPAMPs together, keep |VBIAS_A| and |VBIAS_K| at or below 1.30 V (section 4), and set UCPD_DBDIS before
 enabling USART1 (the UCPD dead-battery pull-down on PB6 would otherwise load FPGA_DONE).
@@ -317,21 +320,21 @@ GPIOs drive TRIG_SEL (PA1, 2.0k reset pull-down R737), read FPGA_DONE (PB6) and 
 PB3/PB4/PB5 with CS on PB9, I2C1 on PA15/PB7, MCU_CLK into PF0 (HSE bypass), ADC_TRIG out on PB11 (frame mark), USB FS on
 PA11/PA12 to the USB-C receptacle (USBLC6-2SC6 ESD). The MCU pairs ADC results
 with FPGA records by count, applies the efficiency correction and all calibration tables, and builds the
-equivalent-time record. ADC_REF_MID (0.725 V) is VREF+ / 4 by divider.
+equivalent-time record. ADC_REF_MID (0.720 V) is VREF+ x 3.3k / 13.3k by divider.
 
 ## 7. Power
 
-Input is USB-C 5 V (PTC 1.5 A, SMAJ5.0A, ferrite, 47 uF tantalum hot-plug damper C632) = VBUS, 0.75 A typical / 0.97 A
+Input is USB-C 5 V (PTC 1.5 A, SMAJ5.0A, ferrite, 47 uF tantalum hot-plug damper C632) = VBUS, 0.78 A typical / 0.98 A
 maximum: a 1.5 A USB-C supply is needed (no PD negotiation; CC1 / CC2 carry only the 5.1k pull-downs and are not sensed).
 Power tree of 24 Nov 2026 (`docs/research/power-tree.md`, `kicad/README.md`):
 
 | Rail | Regulator | Load |
 |---|---|---|
-| +3V3 | U601 TPS62A01A buck from VBUS, 2.4 MHz FPWM; 3.315 V (3.21-3.42 V with the 1 % divider) | 0.51 / 0.67 A: TRF37D73 x5, FPGA IO, MS5351M (via FB608, +3V3_CLK), COS3502, MCU |
+| +3V3 | U601 TPS62A01A buck from VBUS, 2.4 MHz FPWM; 3.327 V (3.22-3.43 V with the 1 % divider) | 0.51 / 0.67 A: TRF37D73 x5, FPGA IO, MS5351M (via FB608, +3V3_CLK), COS3502, MCU |
 | +1V2 | U602 TPS62A01A buck from +3V3 | FPGA core, 30 mA |
-| +5V1 | U603 TPS63802 buck-boost from VBUS, 5.10 V (5.04-5.16 V) | GVA-84+ x2 (own chokes), U604 input; 0.34 A |
-| +5V / -5V | U604 LM27762 (charge pump + LDOs) from +5V1 via FB602; +4.80 / -4.64 V | BUF802, OPA197 |
-| +2V5 / -2V5 | U605 LM27762 from +3V3 via FB605, enabled by the TPS63802 power good; +/-2.50 V | TLV3801, TMUX136, hold amp, TLV9001, VTAP rails (12.5 mA each), TRIG_LEVEL and VBIAS_A networks |
+| +5V1 | U603 TPS63802 buck-boost from VBUS, 5.40 V (5.334-5.466 V, 0.1 % divider) | GVA-84+ x2 (own chokes, each through a 2.49 ohm series resistor: drain 4.82-5.20 V), U604 input; 0.33 A |
+| +5V / -5V | U604 LM27762 (charge pump + LDOs) from +5V1 via FB602; +4.800 / -4.808 V (4.66-4.95 V each side) | BUF802, OPA197 |
+| +2V5 / -2V5 | U605 LM27762 from +3V3 via FB605, enabled by the TPS63802 power good; +2.520 / -2.440 V (+/-2.5 %) | TLV3801, TMUX136, hold amp, TLV9001, VTAP rails (12.5 mA each), TRIG_LEVEL and VBIAS_A networks |
 
 All regulators are in the power block (top right). Layout rule for every converter and IC: the decoupling capacitor
 sits at its pin on the IC's side, and the plane or rail vias sit behind the capacitor, not at the pin. The TPS63802
@@ -349,8 +352,11 @@ down to 0.3 mm on short parts of +/-2V5 (50 mA; IPC-2221 allows 0.27 A for 0.3 m
 at least 0.33 mm from fast, clock and strobe nets; the FPGA +1V2 is an L4 island. Widths per rail:
 `layout/board/README.md`.
 
-The buck-boost makes the GVA-84+ drain voltage independent of the USB voltage (4.84-5.09 V at the chokes) and gives the
-LM27762 enough input for the BUF802's -4.5 V minimum (worst-case OUT- headroom 0.06-0.11 V, typical 0.26 V). The -2V5
+The buck-boost makes the GVA-84+ drain voltage independent of the USB voltage and, at 5.40 V since 24 Nov 2026 (SPEC
+decision 26), gives the LM27762 enough input for +/-4.8 V: worst-case OUT- headroom 0.156 V (VIN 5.319 V - 41 mA x 4.5 ohm
+pump resistance - 26 mV LDO dropout - 4.952 V), typical 0.38 V. Each GVA-84+ is fed through its own 2.49 ohm resistor
+(R419 / R420, 30-39 mW) so its drain stays at 4.82-5.20 V (nominal 4.99 V) over the +5V1 tolerance, 85-125 mA and the
+bead / choke resistance spread. The -2V5
 rail feeds VTAP_N and the passive TRIG_LEVEL and VBIAS_A networks: its initial tolerance is calibrated, its drift moves
 the trigger level by 0.14 V/V and the bridge pedestal by about 0.09 V/V. Switching frequencies are free-running: the
 TPS62A01A's 20th and the LM27762's 24th harmonic fall on 48.0 MHz at nominal frequency, so slow beat spurs against the
@@ -459,13 +465,13 @@ Open risks, most severe first:
 8. **No firmware or FPGA logic exists**; frame alignment, the fine sweep, aiming, the tracking loop and the data path
    (burst rate only, section 6) are arithmetic only, and the 1152-LUT budget is tight.
 9. **Power**: 0.75 / 0.97 A needs a 1.5 A USB-C supply (CC pins not sensed); USB hot-plug transient against the 6.0 V
-   abs max of U603 (damper fitted, measure); U604 OUT- headroom 0.06-0.11 V worst case; buck and pump harmonics on
+   abs max of U603 (damper fitted, measure); U604 OUT- headroom 0.156 V worst case (0.38 V typ); +5V1 5.40 V is above the TPS63802 recommended 5.2 V and 34 mV under its 5.5 V minimum OVP threshold (SPEC decision 26); buck and pump harmonics on
    48 MHz; LM27762 pump-capacitor ground returns 3.6-4.0 mm; minor rails are tracks (+/-2V5 down to 0.3 mm).
 10. **Assembly**: 32 small open vias inside the listed exposed pads (BUF802, TRF37D73, GVA-84+, FPGA) take some solder;
    no other via touches a soldered pad; T401 on a Coilcraft 0805USB land
    outside Murata's DLW21SN limits; DNP status only in the placement file, not in the board.
 11. **Sourcing**: BAT15-03W out of stock at LCSC; TRF37D73 25 pcs at LCSC (Mouser has stock); GVA-84+ and the SMA
-   connectors off LCSC; about 40 fitted BOM lines (mostly 0402 passives and the 0.1 % dividers) have no LCSC number.
+   connector off LCSC (Samtec, the footprint's own part, on LCSC at 5.34 USD); every fitted line has a verified LCSC number and a JLC class (36 basic, 58 extended part numbers).
 
 Simulation plots:
 
@@ -501,7 +507,7 @@ Schematic sheets (`../kicad/export/`, PDF: `scope-fe.pdf`) and the integrated bo
 ## 11. Bring-up order
 
 1. **Power, no RF parts powered**: from a 1.5 A USB-C source; check every rail, ripple, the -2V5 noise, the TMUX136
-   ramp and the VBUS plug-in transient at U603; total current against 0.75 A typical.
+   ramp and the VBUS plug-in transient at U603; total current against 0.78 A typical.
 2. **Clock, MCU and FPGA**: flash the STM32 over SWD (or USB DFU / USART1 with JP701 closed), MS5351M over I2C, FPGA
    configuration (DONE), JTAG; check FPGA_CLK and MCU_CLK.
 3. **DAC stages**: all five DAC outputs over their range, VNEG_REF (-1.97 V); confirm VBIAS_A negative and VBIAS_K

@@ -107,10 +107,14 @@ Net-tie pads NT401-NT403 keep their GND via: copper only, no mask and no paste o
 TP201, TP304, TP401, TP402; not soldered) keep vias in their pads.
 
 **Checks (last run)**
+- Last run 24 Nov 2026 after the BOM optimisation and the +5V1 / +/-4.8 V change (SPEC decisions 25 / 26): values carried
+  from the netlist into the analog, phase, power and mcuif blocks (footprints, positions and tracks unchanged, compared
+  with the previous block files); pstrobe gained R419 / R420 (2.49 R GVA-84+ drain feed, B side below C419 / C429, fed
+  from the C420 / C430 10 uF pad; the +5V1 via pair beside C419 / C429 is gone).
 - check_board: missing 0, extra 4 (H1-H4), footprint / value / pad-net 0, unrouted 0, clearance 0, corners > 45 deg 0,
-  off-axis pad exits 0, RF width / pour gap 0, courtyard 0, unconnected 0.
+  off-axis pad exits 0, RF width / pour gap 0, courtyard 0, unconnected 0 (479 footprints, 3360 tracks, 998 vias).
 - gen_board checks: fast-net segments on L3 0; 372 L1 / L6 samples without L2 / L5 = 342 via antipads + 25 PTH antipads +
-  5 deliberate windows, 0 real holes; L4 +3V3 one polygon; via-in-pad FAIL 0 (999 vias, 32 in listed exposed pads).
+  5 deliberate windows, 0 real holes; L4 +3V3 one polygon; via-in-pad FAIL 0 (998 vias, 32 in listed exposed pads).
 - decap_audit: unchanged (D1 1, D2s 8, D2g 3, D2p 10).
 - DRC jlc4 + parity: `total 450: warning 450`, 0 errors, 0 unconnected: 199 field mismatch, 199 lib_footprint_mismatch,
   31 attribute (4 'Do not populate': the KiCad 7 board format has no footprint DNP flag; C632 is fitted now; 27
