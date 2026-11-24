@@ -113,3 +113,8 @@ Checks (6-layer geometry): check_board 0 in every class except unrouted +3V3 (10
 3 lib_footprint_issues, 1 invalid_outline. Renders `phase.png`, `phase_detail.png`, `front_chain_detail.png` looked at.
 Strobe terminations R378 / R379 are 43 R since 24 Nov (|G| 0.02). PH_LINE launch from the 50 R pad
 into 50.45 R loaded line fine. 40 / 70 ps re-simulation still open.
+
+## Integration changes (24 Nov 2026)
+- C306 moved 0.12 mm south; the +2V5 via at x 10.45 (under the board PH_STROBE_N run x 10.60) removed; C306's own GND via
+  removed (it sat on the board's DAC_TRIG / TRIG_SEL L3 lines): its GND pad is fed by the board's B pour.
+- The phase L4 VTAP_P / VTAP_N strips are removed on the board (L4 = +3V3 only); board_power.py joins the tap-row vias on L3.

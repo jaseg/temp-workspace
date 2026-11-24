@@ -141,7 +141,7 @@ def buck_routes(X, cy, side, vin, vout, sw, fb, cff, hf=True):
         T(fb, xs([(0.6, 2.95), (1.55, 2.95)]), WS, L_)
     # PDN-2 (24 Nov): U601 (0.30 W, the hottest regulator) gets 8 GND vias in its GND polygon (was 5), tying it to
     # L2 / L5 and to U602's B GND polygon below
-    for x, y in xs([(5.0, 4.9), (6.0, 4.9), (5.0, 6.0), (6.0, 6.0), (5.4, 7.3), (5.5, 4.35), (4.5, 5.45), (4.6, 7.0)]):
+    for x, y in xs([(5.0, 4.9), (6.0, 4.9), (5.0, 6.0), (6.0, 6.0), (5.4, 7.3), (5.5, 4.35), (4.5, 5.45), (6.2, 5.45)]):
         G(x, y)
     if hf:
         T("GND", xs([(3.87, 0.75), (3.25, 0.75), (3.25, 1.0)]), WS, L_)   # CIN_hf ground

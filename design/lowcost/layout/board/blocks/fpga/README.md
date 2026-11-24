@@ -31,3 +31,16 @@ Checks: check_board (24 refs) all 0 (unrouted, clearance, corners, off-axis, RF 
 DRC nightly jlc4: total 61: error 1 (invalid_outline), warning 60 = 36 track_dangling (the 36 iface stubs) + 24 lib_footprint_mismatch.
 Notes: The S_STROBE_N L6 hop and the TAP / clock vias have no dedicated GND via beside them (only the plane vias nearby).
 The IDES / OSER10 placement on the new pins (COARSE on 27) is not yet checked in Gowin EDA.
+
+## Integration changes (24 Nov 2026)
+- +3V3_CLK (power tree): FB608 (F, local 15.84 / 10.6) from a +3V3 via, C510 10u (now +3V3_CLK) straight above it, C623 1u
+  beside C509 at U502 pin 1; pin 7 joined to pin 1 under the U502 body (via, B, via).
+- DECOUPLING-5: C508 on F at pin 7 (VDDO), C509 straight below pin 1, C623 beside it; each GND pad has its own via within
+  0.45 mm. R510 moved above pin 34, R508 east (CLK0 drops from pin 10), the CLK1 via sits under the U502 body, R509 (B) east.
+- DECOUPLING-6: C505 has its own GND via (0.4 mm); C506 / C502 keep the shared via (no free spot: L6 west-bundle lanes north,
+  S_STROBE_P south, L3 configuration lines west). C507 moved to B under C510.
+- ZONES-3: east-pin vias in two staggered columns (x 12.2 / 13.15, >= 1.03 mm apart, MOSI-SCK 0.8 mm); TAP8-15 via rows at
+  y 20.35 / 21.45 (1.21 mm diagonal, 1.0 mm in a row). The COARSE / TAP0-4 via stair (0.57 mm pitch) is unchanged: a wider
+  stair collides with the U502 / configuration area.
+- ZONES-4: S_STROBE_N runs west at y 6.6 to its via at (0.4, 6.6); GND vias 0.65 mm from both S_STROBE_N vias.
+- Checks: check_board (26 refs) all 0.

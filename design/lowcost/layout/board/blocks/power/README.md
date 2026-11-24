@@ -9,7 +9,7 @@ F601, D601, FB601, R601 / R602 and the USB pair are unchanged. M3 hole (97, 3): 
 |---|---|---|---|
 | U601 TPS62A01A VBUS -> +3V3 | F | x 0-9.5, y 0-8 | C603 10u straddles VIN (3) / GND (1) on the IC layer; SW (2) leaves between the C603 pads (0.9 mm gap, 0.35 mm track, 3.9 mm) to L602; C604 GND returns to C603 / pin 1 in one GND polygon (5 vias); R609 / R610 / C631 at FB (5) on the side away from SW |
 | U602 TPS62A01A +3V3 -> +1V2 | B | mirror image of U601, under it | C609 / C607 at VIN, L603, C605 + C608 at the output |
-| U603 TPS63802 VBUS -> +5V1 | F | x 9.5-19.5, y 0-10 (east-most free area, 17 mm from the analog block) | C601 at VIN (10), C610 / C611 at VOUT (6); L601 east between L1 (9) / L2 (7) on two polygons; GND (8) runs between them under L601 to 3 vias; AGND (3) by its own track to pin 8; FB divider R603 / R604 south-west, away from L1 / L2 |
+| U603 TPS63802 VBUS -> +5V1 | F | x 9.5-17.5, y 0-12 | (24 Nov, user review) L601 against the L1 (9) / L2 (7) pins (courtyards touching, centre 14.95 / 4.9); 45-degree flares pin -> pad, switch nodes 1.9 mm pin-to-pad (were 3.9 mm). C601 (CIN) / C610 + C611 (COUT) turned 90 deg: horizontal north / south of L601, VBUS / +5V1 pad at x 11.7 on the IC's east pin column, GND pads east with own vias; PGND (8) runs between the L601 pads to 3 vias; AGND (3) by its own track to pin 8; FB divider R603 / R604 south-west |
 | U604 LM27762 +5V1F -> +5V / -5V | F | x 0-8, y 9-16 | C613 100n + C612 22u at VIN (3) / GND (4) on the IC layer (DECOUPLING-4); C626 CCP at CP (5); C618 C1 at pins 10 / 9; R613 / R614 at FB+ (north), R605 / R606 at FB- (south); EP 2 vias |
 | U605 LM27762 +3V3_CP -> +/-2V5 | F | x 0-8, y 16-22.5 | same cell; C625 CIN, C619 CCP, C624 C1 |
 | beads, LDO output caps | B / F | under the LM27762 cells and east of them | FB602 / C617 / C621 / FB603 / C627 / FB605 / R617 / C629 / FB607 / C628 / C630 / FB606 on B; FB604 on F |
@@ -63,6 +63,14 @@ Not placed here: C606, C614, C615, C616, C620, C622 (power sheet, placed at thei
 - Nightly DRC jlc4: 72 = 56 lib_footprint_mismatch + 2 lib_footprint_issues (library version / project library),
   9 via_dangling (supply interface vias, plane-fed), 2 track_dangling (USB pair ends at the S edge), 2 unconnected_items
   (+3V3, plane-fed), 1 invalid_outline (no Edge.Cuts in a block). 0 clearance, courtyard, hole, track-width, silk errors.
+
+## Integration changes (24 Nov 2026)
+- U603 / L601 compacted (table above).  U601 / U602: the switch node stays 2.6 mm pin-to-pad (3.95 mm to the pad centre):
+  CIN (C603 / C609, 0805) straddles the VIN / GND pins with SW between its pads and L602 / L603 courtyards already touch it;
+  turning CIN 90 deg would move it off the VIN / GND pins and lengthen the input hot loop, so it was not done.
+- PDN-2 (thermal): U601 (0.30 W, the hottest regulator) has 8 GND vias in its GND polygon (was 5), mirrored by U602's.
+- DECOUPLING-8: C602 100n moved from U601 (2 mm from its pins, C603 straddles them) to the B side under U608 pin 5
+  (VBUS pad on the B VBUS strip, GND pad into the B pour); nets unchanged (VBUS / GND).
 
 ## Open points
 - Thermal: U601 0.30 W max into its GND polygon (about 8 mm2 on F) + 5 vias + In1 / L4; U603 0.20 W; not simulated.

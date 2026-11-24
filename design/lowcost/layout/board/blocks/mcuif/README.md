@@ -38,3 +38,7 @@ TRIG_SEL PB6->PA1 (9), FPGA_DONE PB0->PB6 (43), SPI_CS PB10->PB9 (46), DBG1 PB9-
 - TRIG_SEL reset pull-down R737 2.0k (schematic gen_mcu_if.py): on B under the TRIG_SEL column (local 43.3, 3.35), GND pad into the B pour. Floating PA1 -> pin -0.17 V, SEL -1.00 V (switch ground -0.89 V). 5.1k as first asked would leave the pin at -0.39 V (beyond the -0.3 V limit) and SEL at -1.14 V. Its TRIG_SEL pad is entered at 45 deg for the last 0.2 mm (1 off-axis exit; no room between R729 / JP701).
 - C721 moved 0.88 mm east of its two vias (B tracks, no via-in-pad). Pour islands: island removal 'always' (0 isolated copper). C719 GND reaches its via through a 0.3 mm F track.
 - VNEG_REF / ADC_REF_MID moved west (36.95 / 55.29), RECONFIG / ADC_TRIG / USB / VTAP moved east. The integrator routes to these.
+
+## Integration changes (24 Nov 2026)
+- VBIAS_K divider: R735 4.7k inline (U704.17 -> VBIAS_K), R736 5.1k now from VBIAS_K to GND at the output node (B row y 2.05,
+  GND via at 36.75). check_board: 0 apart from the plane-fed supplies and the known R737.1 entry (fixed on the board).

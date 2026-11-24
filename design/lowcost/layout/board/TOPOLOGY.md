@@ -156,3 +156,15 @@ slow lines need reserved gaps. One owner now handles both modules, with this all
 - Order in gen_board.py: signals -> apply_trunks (respecting A, B, C) -> slow lines (using A, B, C) -> pours,
   stitching, silkscreen -> apply_rest (also respecting A, B, C; +2V5 / -2V5 reach the analog interfaces and
   the front end by passing strip A / area B on L6, or at their far west / east ends).
+
+## 10. Revision of 24 Nov 2026 (new power tree; supersedes the corridor / trunk parts of sections 8 and 9)
+- Sources (power block, board mm): +3V3 (82.7, 6.05) into L4; +1V2 (75.0, 7.9); +5V (83.05, 8.77); -5V (74.45, 14.0);
+  +2V5 (84.45, 15.3); -2V5 (74.6, 20.75); /+5V1 (86.3, 20.9 / 21.7, GVA-84+ chokes, replaces the old VBUS run);
+  VBUS (88.0, 17.4 / 18.3) feeds J501 pin 1 only.
+- L4: +3V3 plane plus the FPGA +1V2 island, joined to the +1V2 source by an L4 finger at x 73.2-75.65 (the power block's
+  In2 sense / PG lines wall the L3 exits there).
+- Order: signals -> slow lines (explicit, section 9 geometry) -> supplies. The keep-free areas A / B / C are no longer
+  needed: the supplies are routed after the slow lines and keep 0.3 mm from them.
+- Minor rails: grid-routed tracks on L3 (L6 where L3 is not planar), widest that fits, guided: /+5V1 along y 25-27
+  then the pstrobe choke column; +5V around the PG line's south end, up the power block's west edge and along the top
+  edge (outer); -5V west at y 13-14 (inner); VTAP_P / VTAP_N along their tap-row via rows.
