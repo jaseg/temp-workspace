@@ -62,3 +62,5 @@ Nightly DRC jlc4 (24 Nov): `total 70: error 8, warning 62`: 7 unconnected (plane
 - The spare 100 nF C432 / C433 is on B under C434 / C435, with its own GND via, to free the west L6 strip.
 - K's via pair at y 24.6 lies 0.18 mm inside the S edge. The PH_STROBE pair arrives at y ~23 through the phase block's strip (board y 22.5..25), which is the integrator's job.
 - Unchanged open points: the GVA-84+ land was not checked against the datasheet. The stub keep-out reaches 0.18 mm into the corridor. Phase C346 touches the NE corner.
+
+**Vias out of pads (24 Nov, RULES rule 12):** C413 / C423 (10 uF, B) lie horizontal off the 0402 GND vias, their +3V3 via pairs north of them; K-chain GVA tab vias in one column west of C430; C420 / C430 and C434 / C435 GND vias, R408 / R412 GND vias off their pads. `python3 ../../via_in_pad.py pstrobe.kicad_pcb`: FAIL 0.

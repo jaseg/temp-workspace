@@ -9,7 +9,7 @@ For every (through) via and every soldered SMD pad on F or B:
   e_cu   = distance from the via COPPER (annular ring) edge to the mask opening (tent web between them)
   FAIL   e_hole < HOLE_MIN (0.15 mm) or e_cu < 0 (via copper inside the mask opening: not tented)
   NEAR   HOLE_MIN <= e_hole < HOLE_TARGET (0.2 mm): legal, listed
-A pad is 'soldered' when it is SMD copper with paste on its side, or when a paste-only aperture of the same footprint
+A pad is 'soldered' when it is SMD copper with paste on its side or a solder-jumper (JP*) pad, or when a paste-only aperture of the same footprint
 overlaps it (exposed pads with windowed paste).  Exposed SMD pads WITHOUT paste (test points) are reported separately
 (not soldered: a tented via beside them is harmless) and do not fail the check.  Net-tie / copper-only pads (no mask,
 no paste) are not pads in this sense and are listed only as a cross-check that they have neither opening.
@@ -115,7 +115,7 @@ def pad_sets(b):
                     pst = pst + o
                 d = dict(ref=f.GetReference(), pad=p.GetNumber(), net=p.GetNetname(), side="F" if cu == pcbnew.F_Cu else "B",
                          cu=c, mask=m, paste=pst, bb=bb)
-                if m and pst:
+                if m and (pst or f.GetReference().startswith("JP")):     # solder jumpers get solder by hand
                     sold.append(d)
                 elif m:
                     expo.append(d)
@@ -143,7 +143,7 @@ def check(path_or_board, verbose=False):
                 allo = d["cu"] + d["mask"] + d["paste"]
                 e_hole = sdist((x, y), allo) - rh
                 e_cu = sdist((x, y), d["mask"]) - rc if d["mask"] else 9.0
-                if e_hole >= HOLE_TARGET and e_cu >= 0:
+                if e_hole >= HOLE_TARGET - 1e-3 and e_cu >= 0:
                     continue
                 row = (d["ref"], d["pad"], d["side"], d["net"], v.GetNetname(), round(x - 100, 3), round(y - 100, 3),
                        round(mm(v.GetDrillValue()), 2), round(e_hole, 3), round(e_cu, 3))

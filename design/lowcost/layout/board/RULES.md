@@ -57,6 +57,13 @@ User-set rules (all mandatory)
     resistor at the source, short, on L6 over L5 ground (or L1), away from the analog block. ADC_TRIG (FPGA pin 41 to
     MCU PB11) is a timing-critical line that firmware may drive in either direction: route it like a clock.
 
+12. **No via in a soldered pad** (user decision 24 Nov 2026: no plugged / capped / filled vias, ordinary tented vias
+    only). No via may lie inside or touch a soldered SMD pad (copper, solder-mask opening or paste opening) on either
+    side: via hole edge >= 0.15 mm (target 0.2 mm) outside the pad, joined to it by a short wide track or pour neck.
+    Exposed thermal pads only where the datasheet asks for vias in the pad (list in `README.md`, `EP_ALLOW` in
+    `via_in_pad.py`): 0.2 mm drill, the whole via inside the pad, tented on the other side. Net-tie pads (no mask,
+    no paste) may carry their via. Check: `python3 via_in_pad.py <board>` (FAIL must be 0; also run by gen_board.py).
+
 Checks (the authority is KiCad's own DRC)
 - `design/lowcost/tools/run_drc.sh --rules jlc4 <board.kicad_pcb>` (KiCad nightly CLI; runs on a scratch copy;
   never open or save project files with the nightly). For a block the DRC must end with 0 violations other
@@ -65,6 +72,7 @@ Checks (the authority is KiCad's own DRC)
   (lib_footprint_mismatch / lib_footprint_issues). In particular 0 courtyards_overlap, 0 clearance,
   0 track-width, 0 hole, 0 silkscreen violations. Footprints that carry their own larger pad clearance
   (for example the MS5351M U502, 0.2 mm) must be respected.
+- `python3 via_in_pad.py <file.kicad_pcb>`: FAIL 0 (rule 12) for every block and the board.
 - `boardlib.check_board` on the block: 0 missing / extra / footprint / value / pad-net mismatches,
   0 clearance, 0 sharp corners, 0 off-axis pad exits, 0 RF width or pour-gap faults.
 - Render, look at the PNG, iterate. A layout that has not been looked at is not finished.

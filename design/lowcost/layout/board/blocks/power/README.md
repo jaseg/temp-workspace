@@ -105,3 +105,5 @@ kicad/README.md; `floorplan.PLACED_IN` now maps them to those blocks.
   6 via_dangling + 2 track_dangling (interfaces) + 1 invalid_outline; decap_audit: U604 / U605 all output and input
   capacitors pass (C613 flagged only by its EN+ tie via, a signal via). Review render: `power_netview_lm27762.png` (F),
   `power_netview_lm27762_b.png` (B).
+
+**Vias out of pads (24 Nov, RULES rule 12):** LM27762 EP vias removed (EP tied to GND pins 1 / 4), U608 GND via 0.25 mm off its pad, U605 EN- via 0.35 / 0.15. `python3 ../../via_in_pad.py power.kicad_pcb`: FAIL 0.

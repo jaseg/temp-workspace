@@ -382,8 +382,10 @@ under the comparators and up a reserved channel to the analog block's south edge
 the minor rails are maze-routed around them on L3 / L6. KiCad DRC (jlc4 rules, schematic parity): 0 errors, 0 unconnected
 (450 library, field and parity warnings).
 
-Fabrication note: about ten open vias touch soldered passive pads (list in `layout/board/README.md`); order with
-resin-plugged, capped vias (via-in-pad process) or at least tented and plugged vias. The KiCad 7 board format has no
+Fabrication: a standard JLCPCB six-layer order with ordinary tented vias (no plugged or filled vias). No via lies in or
+touches a soldered pad (layout rule 12, checked on every board run); only the exposed pads of the BUF802, the TRF37D73s,
+the GVA-84+ tabs and the FPGA keep small 0.2 mm vias inside the pad, as their datasheets ask (list in
+`layout/board/README.md`). The KiCad 7 board format has no
 DNP flag: the four DNP parts (C631, D402, D403, R122) are excluded from the placement file by the generator.
 
 Renders: [L1](../layout/board/scope-fe-L1.png), [L2](../layout/board/scope-fe-L2.png), [L3](../layout/board/scope-fe-L3.png),
@@ -459,7 +461,8 @@ Open risks, most severe first:
 9. **Power**: 0.75 / 0.97 A needs a 1.5 A USB-C supply (CC pins not sensed); USB hot-plug transient against the 6.0 V
    abs max of U603 (damper fitted, measure); U604 OUT- headroom 0.06-0.11 V worst case; buck and pump harmonics on
    48 MHz; LM27762 pump-capacitor ground returns 3.6-4.0 mm; minor rails are tracks (+/-2V5 down to 0.3 mm).
-10. **Assembly**: open vias in about ten soldered pads (needs the plugged-via process); T401 on a Coilcraft 0805USB land
+10. **Assembly**: 32 small open vias inside the listed exposed pads (BUF802, TRF37D73, GVA-84+, FPGA) take some solder;
+   no other via touches a soldered pad; T401 on a Coilcraft 0805USB land
    outside Murata's DLW21SN limits; DNP status only in the placement file, not in the board.
 11. **Sourcing**: BAT15-03W out of stock at LCSC; TRF37D73 25 pcs at LCSC (Mouser has stock); GVA-84+ and the SMA
    connectors off LCSC; about 40 fitted BOM lines (mostly 0402 passives and the 0.1 % dividers) have no LCSC number.

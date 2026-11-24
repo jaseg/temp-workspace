@@ -70,7 +70,7 @@ bplace("C623", 12.3, 5.0, 270)        # 1u +3V3_CLK beside C509, GND via (12.3, 
 bplace("C507", 16.0, 9.2, 0, "B")     # 10u +3V3 (moved to B under C510, 24 Nov: FB608 takes its F spot)
 bplace("C510", 16.0, 8.75, 0)         # 10u +3V3_CLK
 bplace("FB608", 15.8375, 10.6, 180)   # +3V3 (pad 1, via to L4) -> +3V3_CLK (pad 2, straight up to C510.1)
-bplace("C506", 4.05, 7.65, 180)      # pin 36 +3V3 (VCCX)
+bplace("C506", 4.05, 7.45, 180)      # pin 36 +3V3 (VCCX); 24 Nov 0.2 mm north: GND via between the GND pads
 bplace("C502", 4.05, 8.65, 180)      # pin 37 +1V2
 bplace("C505", 12.3, 6.9, 0)         # pin 25 +3V3
 bplace("C504", 6.4, 15.7, 270)       # pin 1 +3V3
@@ -346,17 +346,22 @@ V(c10g[0], 7.7, "GND")
 # ---------------- supply necks (pad-wide 0.2 mm, then 0.4 mm) and the decoupling capacitors at the pins
 p36, p37, p25, p1, p12 = up(36), up(37), up(25), up(1), up(12)
 c506 = blk.pad("C506", "@+3V3")
-T("+3V3", 0.2, [p36, (p36[0], 7.75), (p36[0] - 0.1, c506[1]), c506], ch=0.0001)
-V(5.55, c506[1], "+3V3")
+T("+3V3", 0.2, [p36, (p36[0], c506[1] + 0.1), (p36[0] - 0.1, c506[1]), c506], ch=0.0001)
+V(5.55, 7.65, "+3V3")                                    # (stays clear of the B TAP4 lane y 7.25)
+T("+3V3", 0.2, [(5.55, c506[1]), (5.55, 7.65)])
 c502 = blk.pad("C502", "@+1V2")
 T("+1V2", 0.2, [p37, (5.15, p37[1]), (5.15 - (p37[1] - c502[1]), c502[1]), c502], ch=0.0001)
 V(5.05, 8.3, "+1V2")
 T("+1V2", 0.25, [(5.05, 8.3), (5.05, 8.865)])
 # DECOUPLING-6: C506 / C502 keep the shared via between their GND pads (no other spot: the L6 west-bundle lanes
 # y 5.25-7.25 north, S_STROBE_P y 9.37 south, the L3 configuration lines x 1.15-2.95 west)
-V(3.55, 8.15, "GND")
-T("GND", 0.3, [blk.pad("C506", "@GND"), (blk.pad("C506", "@GND")[0], 8.15)])
-T("GND", 0.3, [blk.pad("C502", "@GND"), (blk.pad("C502", "@GND")[0], 8.15)])
+# VIAS-OUT-OF-PADS (24 Nov): the gap between the two GND pads was 0.38 mm and the via touched both; C506 moved
+# 0.2 mm north, so the via sits in a 0.58 mm gap (hole edge 0.19 mm off each pad; west of it run the L3
+# configuration lines, x <= 2.95)
+YGV = (blk.pad("C506", "@GND")[1] + blk.pad("C502", "@GND")[1]) / 2
+V(blk.pad("C506", "@GND")[0], YGV, "GND")
+T("GND", 0.3, [blk.pad("C506", "@GND"), (blk.pad("C506", "@GND")[0], YGV)])
+T("GND", 0.3, [blk.pad("C502", "@GND"), (blk.pad("C502", "@GND")[0], YGV)])
 T("+3V3", 0.2, [p25, (p25[0], 7.45)])
 V(p25[0], 7.45, "+3V3")
 c504 = blk.pad("C504", "@+3V3")
@@ -453,6 +458,16 @@ def free_maps(code, w):
     via_ok &= edge >= bl.VIA_D / 2 + 0.15
     via_ok &= ~((abs(gx - CX) < 3.35 + 0.5) & (abs(gy - CY) < 3.35 + 0.5))   # no vias in the U501 pin fan-out ring
     via_ok &= ~((abs(gx - U502X) < 2.9 + 0.35) & (abs(gy - U502Y) < 1.15 + 0.3))  # nor at the U502 pin ends
+    # VIAS-OUT-OF-PADS (24 Nov): no via in or at ANY soldered pad, same net included (tented vias only): the via
+    # centre stays >= pad bbox + 0.31 mm, i.e. hole edge >= 0.21 mm outside the pad (RULES.md rule 12)
+    for fp_ in blk.b.GetFootprints():
+        for p_ in fp_.Pads():
+            if p_.GetAttribute() != pcbnew.PAD_ATTRIB_SMD:
+                continue
+            px_, py_ = blk.loc(p_.GetPosition())
+            bb_ = p_.GetBoundingBox()
+            via_ok &= ~((abs(gx - px_) < pcbnew.ToMM(bb_.GetWidth()) / 2 + 0.31) &
+                        (abs(gy - py_) < pcbnew.ToMM(bb_.GetHeight()) / 2 + 0.31))
     for t in blk.b.GetTracks():                    # via-to-via (also same net) >= 0.5 mm centre distance
         if isinstance(t, pcbnew.PCB_VIA):
             vx, vy = blk.loc(t.GetPosition())
@@ -747,12 +762,20 @@ job("c505g", _c505g)
 job("c505v", lambda: route("+3V3", ("C505", "@+3V3"), [("VIA", up(25)[0], 7.45)], 0.3, layer_pref=FPREF, via_cost=30))
 # configuration resistors (F, NW): net pad -> its L3 via, other pad -> own GND / +3V3 via; JP501 to R504
 CFGR = {42: "R506", 43: "R505", 44: "R504", 45: "R503", 46: "R502"}
+# VIAS-OUT-OF-PADS (24 Nov): the three +3V3 pull-up pads (R502-R504, x 0.69 column at the block's west edge) share
+# one +3V3 via below the column (their own vias sat at the pads: no room west of the column or between the rows)
+def _cfg3v3():
+    pts = [blk.pad(r_, "@+3V3") for r_ in ("R502", "R503", "R504")]
+    T("+3V3", 0.4, pts + [(pts[0][0], 3.45)], ch=0.0001)
+    V(pts[0][0], 3.45, "+3V3")
+job("cfg3v3", _cfg3v3)
 for pin, r_ in CFGR.items():
     def f(pin=pin, r_=r_):
         net = NL.net_of("U501", str(pin))
         route(net, (r_, "@" + net), [("VIA",) + L3V[pin]], WS, layer_pref=FPREF, via_cost=30)
         other = [p.GetNumber() for p in blk.fps[r_].Pads() if p.GetNetname() != net][0]
-        tie(r_, other)
+        if blk.fps[r_].Pads()[0].GetNetname() != "+3V3" and blk.fps[r_].Pads()[1].GetNetname() != "+3V3":
+            tie(r_, other)
     job("cfg%d" % pin, f)
 job("jsel", lambda: route("/fpga_clock/JTAGSEL_N", ("JP501", "@JTAGSEL_N"), [("R504", "@JTAGSEL_N")], WS, layer_pref=FPREF, via_cost=30))
 job("jpg", lambda: tie("JP501", "@GND"))

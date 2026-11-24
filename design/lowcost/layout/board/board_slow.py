@@ -217,7 +217,9 @@ TAIL = {
     "/DAC_TRIG": [(14.77, 24.97), (14.57, 24.77), (14.57, 23.55), (14.07, 23.05), (9.0, 23.05), (8.3, 23.75),
                   (8.3, 24.6)],
     "/TRIG_SEL": [(14.42, 25.27), (14.12, 24.97), (14.12, 23.85), (13.62, 23.35), (9.3, 23.35), (8.6, 24.05),
-                  (8.6, 24.6)],
+                  (8.6, 25.1), (10.7, 27.2), (10.7, 31.2), (10.2, 31.7)],
+    # (24 Nov, vias out of pads: the U302 EP vias that used to fence the x 8 corridor are gone; the line keeps its
+    #  east route past U301 / U302 explicitly, so the +2V5 rail keeps its L3 access to C301 / C305 from the south)
 }
 GRID_ORDER = ["/TRIG_SEL", "/DAC_TRIG"]      # area B: grid search from the end of TAIL to the target
 # L3 targets (existing vias of the blocks, or a via placed on the block's B stub by gen_board)

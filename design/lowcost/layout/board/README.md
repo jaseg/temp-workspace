@@ -1,6 +1,6 @@
 # layout/board: scope-fe integrated board (six layers), as built 24 Nov 2026
 
-One full run of `python3 gen_board.py` (about 80 s; `--prepower` stops before the supplies, `--powonly` after them; `--fast`
+One full run of `python3 gen_board.py` (about 115 s; `--prepower` stops before the supplies, `--powonly` after them; `--fast`
 is still broken) builds `scope-fe.kicad_pcb` / `.kicad_pro` / `routes.json`. Renders: `python3 render_board.py` (boardlib `render`, refilled
 copy): `scope-fe-L1.png` ... `L6`, `scope-fe-all.png`, `scope-fe-detail-{analog,fpga-south,mcu,power}.png`.
 
@@ -78,17 +78,40 @@ VBIAS_A's analog via moved to (15.4, 15.9) (the analog block's BUF_OUT_T moved).
 - RF2-9: schematic DNP parts (C631, D402, D403, R122) are excluded from the pos file by gen_board.
 - floorplan.PLACED_IN: C606 / C614 / C616 / C622 / C402-C409 -> analog, C615 / C620 / J102 / R122 -> phase, J501 / R511 /
   R512 -> mcuif.
-- Order note (RF2-4): open vias touch soldered pads at R107.2, C413.2, C423.2, C430.2, C420.2, C310, R377.1, R334.2 and
-  overlap R503-R505, U301.5, U304.5, C508.2: order with resin-plugged, capped vias (POFV / via-in-pad process) for
-  those, or tent-and-plug at least; not moved in this round.
+- RF2-4: superseded by 'Vias out of pads' below (no plugged vias are ordered).
 - Net-view crops: blocks/power/power_netview_lm27762*.png, blocks/phase/phase_netview_u301.png,
   blocks/analog/analog_netview_u101.png, blocks/mcuif/mcuif_netview_u704.png, blocks/fpga/fpga_netview_{u502,tap5}.png.
+
+**Vias out of pads (24 Nov, user decision: no plugged / capped / filled vias; RULES.md rule 12)**
+Standard JLCPCB six-layer order, ordinary tented vias. `via_in_pad.py` (run by gen_board.py, also per block) lists every
+via whose hole is < 0.15 mm from a soldered SMD pad (copper, mask or paste opening; JP solder jumpers count as soldered)
+or whose ring reaches into a mask opening: board FAIL 0 (was 88 pad hits), 30 legal at 0.15-0.2 mm. Fixed in the
+generators: pstrobe (C413 / C423 10 uF re-placed off the 0402 GND vias, their +3V3 via pairs moved north; C430 / C420 bulk
+and C434 / C435 GND vias, K-chain GVA tab vias clear of C430; 19 vias), phase (J102 GND rows moved out of the pads to
+the pad edges, 12 vias; U302 EP vias -> one via at the EP end; VSW via, C310, U304 pins 4 / 5, TP304 off R377 pad 1;
+16 vias), fpga (C502 / C506 GND via, one shared +3V3 via for R502-R504, router vias kept 0.31 mm off every SMD pad: 6),
+power (LM27762 EP vias, U608 GND, U605 EN-: 6), mcuif (U701 pins 2 / 3, R728: 3), analog (C209 moved, 0 vias), board
+(rail router: no via within 0.33 mm of an SMD pad, e.g. +5V at FB604, VTAP_P at R334; board_slow keeps TRIG_SEL on its
+east route past U301 / U302). Exposed pads, decided per part (allowed list `EP_ALLOW`, 32 vias, all 0.45 / 0.2 mm,
+wholly inside the pad, tented on the far side; solder fills some of the 0.2 mm holes, the paste windows cover this):
+| part | decision |
+|---|---|
+| BUF802 U101 (RGT) | 4 vias in the EP kept: datasheet layout has thermal vias in the pad; 0.4 W and the GHz ground return |
+| TRF37D73 U303, U401-U403, U405 (DSG) | 3 vias each kept: TI asks for ground vias in the thermal pad (RF ground at 2 GHz) |
+| GVA-84+ U404 / U406 (SOT-89 tab) | 5 / 3 vias kept, moved wholly inside the tab: Mini-Circuits mounting layout has holes in the tab |
+| GW1NZ U501 (QN48) | 5 vias kept: the EP is the die's only GND |
+| TLV3801 U302 (DSG, EP = VEE) | vias removed from the EP (< 50 mW): 0.4 mm neck to one via 0.2 mm beyond the EP end |
+| LM27762 U604 / U605 (WSON) | vias removed (a few mW): EP tied on L1 to GND pins 1 and 4, which reach the CIN GND via |
+| TPS63802 U603, TMUX136 U301 | none in a pad (U603 grounded through its PGND pads and the capacitor vias; U301 has no EP) |
+Net-tie pads NT401-NT403 keep their GND via: copper only, no mask and no paste opening (checked). Test points (TP104,
+TP201, TP304, TP401, TP402; not soldered) keep vias in their pads.
 
 **Checks (last run)**
 - check_board: missing 0, extra 4 (H1-H4), footprint / value / pad-net 0, unrouted 0, clearance 0, corners > 45 deg 0,
   off-axis pad exits 0, RF width / pour gap 0, courtyard 0, unconnected 0.
-- gen_board checks: fast-net segments on L3 0; 371 L1 / L6 samples without L2 / L5 = 341 via antipads + 25 PTH antipads +
-  5 deliberate windows, 0 real holes; L4 +3V3 one polygon.
+- gen_board checks: fast-net segments on L3 0; 372 L1 / L6 samples without L2 / L5 = 342 via antipads + 25 PTH antipads +
+  5 deliberate windows, 0 real holes; L4 +3V3 one polygon; via-in-pad FAIL 0 (999 vias, 32 in listed exposed pads).
+- decap_audit: unchanged (D1 1, D2s 8, D2g 3, D2p 10).
 - DRC jlc4 + parity: `total 450: warning 450`, 0 errors, 0 unconnected: 199 field mismatch, 199 lib_footprint_mismatch,
   31 attribute (4 'Do not populate': the KiCad 7 board format has no footprint DNP flag; C632 is fitted now; 27
   exclude-from-BOM of TP / JP / NT footprints), 11 lib_footprint_issues, 10 net_conflict (TL401-403 / J601 shell).

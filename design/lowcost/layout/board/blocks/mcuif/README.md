@@ -49,3 +49,5 @@ TRIG_SEL PB6->PA1 (9), FPGA_DONE PB0->PB6 (43), SPI_CS PB10->PB9 (46), DBG1 PB9-
 - U704 pin 24: the +3V3 plane via moved from the pin's inner end to just north of C712's +3V3 pad (pin -> C712 -> via).
   Pins 48 / 1: the inner via stays (it is C710's via on B; no room behind C713). Pin 36: the nearest +3V3 via is R727's
   pull-up feed, not a decoupling via. Render: `mcuif_netview_u704.png`.
+
+**Vias out of pads (24 Nov, RULES rule 12):** U701 pin 2 / 3 vias 0.05 mm further east, R728 0.15 mm east. `python3 ../../via_in_pad.py mcuif.kicad_pcb`: FAIL 0.

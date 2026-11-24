@@ -52,7 +52,7 @@ Existing capacitors moved; no part added. Outline and every interface position u
 - Pitch 4.514 mm (kept), strobes 0.10 mm (62 R), PH_LINE 0.10 mm S meander 9.707 mm (gaps 0.632 / 0.932 mm), summing jumper midpoint tap A = B = 3.849 mm.
 - **Line moved 0.29 mm west** (tap 0 at local 29.467, tap 15 at 97.177). The pstrobe interface stays at x 26.5; the first strobe half-section is 0.29 mm shorter for A and K alike (common delay, 1.7 ps). 0.29 mm is the limit: the tap-0 summing via must stay off the pstrobe rectangle.
 - Tap cells: node chamfers 0.1 mm so tracks enter the resistor pads on-axis (was 74 off-axis exits).
-- Far end: R377 horizontal below D316 (x 97.64-99.5), PH_LINE end 45° jog into pad 1; TP304 on B under R377 pad 1 (0.35 / 0.15 via in pad, stub behind the termination).
+- Far end: R377 horizontal below D316 (x 97.64-99.5), PH_LINE end 45° jog into pad 1; TP304 on B on a 0.35 / 0.15 via in the straight line section 0.6 mm before the jog into R377 pad 1 (24 Nov: no via in a soldered pad, RULES rule 12).
 - Comparator 100 n caps raised 0.5 mm (U305's cap was inside the pstrobe rectangle); all 8 identical.
 
 ## Interfaces (local; board = local + (0, 22.5)) - changed vs. the previous version
@@ -126,3 +126,5 @@ into 50.45 R loaded line fine. 40 / 70 ps re-simulation still open.
   C301's +2V5 pad and north (x 9.03, under the old F track) to C306 / its via. The F track at x 9.20 beside BUF_OUT_T and
   its two vias (0.105 mm via edge to the trace, antipads under it) are gone; L2 is solid under BUF_OUT_T. The pstrobe
   cut-out (x >= 9.5) forbids a feed further east. Render: `phase_netview_u301.png`.
+
+**Vias out of pads (24 Nov, RULES rule 12):** J102 GND via rows at the pad edges (inner rows + south outer row, F / B necks), U302 EP via -> one via 0.2 mm beyond the EP end, VSW via 0.18 mm off U301 pin 5, C310 east of its via, U304 pin 4 / 5 vias, TP304 off R377. `python3 ../../via_in_pad.py phase.kicad_pcb`: FAIL 0.

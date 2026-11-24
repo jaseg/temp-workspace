@@ -238,8 +238,12 @@ T("Net-(D301-common)", W_LIN, [d3, (d3[0], YR377 - 0.47 - dxe), (r1[0], YR377 - 
 g = P("R377", "@GND")
 gv(g[0], g[1] - 0.68)
 T("GND", W_GND, [g, (g[0], g[1] - 0.68)], ch=0)
-blk.via(r1[0], r1[1], "Net-(D301-common)", 0.35, 0.15)   # TP304 (LINE_IN) on B under R377 pad 1 (via in pad)
-bplace("TP304", r1[0], r1[1], 0, side="B")
+# VIAS-OUT-OF-PADS (24 Nov): the TP304 via left R377 pad 1 (was a via in a soldered pad); it now sits on the
+# straight line section 0.6 mm before the 45-degree jog into the pad (hole edge 0.8 mm from the pad), TP304 (B,
+# unsoldered test pad) centred on it
+YTP4 = YR377 - 0.47 - dxe - 0.6
+blk.via(d3[0], YTP4, "Net-(D301-common)", 0.35, 0.15)
+bplace("TP304", d3[0], YTP4, 0, side="B")
 
 # ============================================================================= comparators COS3502 U305-U312
 YC = AX - (YL + 7.0)
@@ -374,9 +378,17 @@ for net in ("VTAP_N", "VTAP_P"):
 YJ = 4.0
 blk.place("J102", 2.1, YJ, 270)
 jx, jy = P("J102", "1")
-for s_ in (-1, 1):                          # J102 ground pads (F + B): via rows into In1
-    for xg_ in (0.7, 1.7, 2.7, 3.6):
-        gv(xg_, YJ + 2.825 * s_)
+# J102 ground pads (F + B): VIAS-OUT-OF-PADS (24 Nov) the via rows moved from inside the soldered pads to just
+# outside them (hole edge 0.2 mm, as J101), each joined to the pad on F and B by a 0.45 mm neck: a row on the
+# inner edge of both pads (towards the centre pin, 1.1 mm from it) and a row on the outer edge of the south pad
+# (the north outer edge is the block edge, where the board's L3 slow lines run)
+JGX = (0.7, 1.65, 2.6, 3.55)
+for s_, side_ in ((-1, -1), (1, -1), (1, 1)):
+    yv_ = YJ + s_ * (2.825 + side_ * (0.675 + 0.30))
+    for xg_ in JGX:
+        gv(xg_, yv_)
+        for ly_ in ("F.Cu", "B.Cu"):
+            T("GND", 0.45, [(xg_, YJ + 2.825 * s_), (xg_, yv_)], layer=ly_, ch=0)
 for ref, xs in (("R301", 5.17), ("R122", 6.11)):
     place2(ref, xs, YJ - 0.51, "v", "GND")
     g = P(ref, "@GND")
@@ -397,12 +409,13 @@ q2, q4, q5, q6, q7 = (P("U301", k) for k in "24567")
 T(VSW, 0.5, [q5, (8.25, YU1)], ch=0)
 for q, w_ in ((q2, 0.2), (q4, 0.25), (q6, 0.25), (q7, 0.2)):
     T(VSW, w_, [q, (q[0], YU1)], ch=0)
-XVV = 7.55                                          # VSW via under the body
+XVV = 7.72                                          # VSW via under the body (24 Nov: 0.18 mm off pin 5,
+                                                    # 0.22 mm off C301's pad on B: no via in a pad)
 V(XVV, YU1, VSW)
 place2("C303", 5.68, YU1, "h", "GND")                # top, VSW pad 0.4 mm from pin 5 (courtyards touch)
 T(VSW, 0.5, [P("C303", "@" + VSW), q5], ch=0)
 place2("C302", 6.5, YU1, "h", "GND", side="B")       # B under the west pins
-place2("C301", 8.55, YU1, "h", VSW, side="B")        # B under the body, +2V5 pad below pin 10
+place2("C301", 8.74, YU1, "h", VSW, side="B")        # B under the body, +2V5 pad below pin 10
 T(VSW, 0.5, [P("C302", "@" + VSW), P("C301", "@" + VSW)], layer="B.Cu", ch=0)
 YG3 = YU1 + 0.65                                     # shared GND via of C303 (F) and C302 (B)
 g3, g2b = P("C303", "@GND"), P("C302", "@GND")
@@ -483,12 +496,19 @@ T("GND", 0.4, [g, (g[0] + 0.65, g[1])], layer="B.Cu", ch=0)
 # -2V5 pad straight below one EP via, GND pads joined, one GND via south of them that also takes GND pin 2
 q3 = P("U302", "3")
 T("-2V5", 0.25, [q3, (q3[0], YU2 + 0.4)], ch=0)
+# VIAS-OUT-OF-PADS (24 Nov): TLV3801 dissipates < 50 mW, so its EP (VEE) is not a thermal pad: the two vias left
+# the EP and stand 0.2 mm (hole edge) beyond its ends on the pad axis, joined by 0.4 mm necks; C620 / C307 stay
+# under the package on B and are fed from those vias by short B tracks.
+# (one via only, east: the board's +2V5 L3 rail passes the west end of the EP)
 XEP = (XU2 - 0.4, XU2 + 0.54)
-for x_ in XEP:
-    V(x_, YU2, "-2V5")
-for x_, ref in zip(XEP, ("C620", "C307")):
+XEV = XU2 + 1.21
+V(XEV, YU2, "-2V5")
+T("-2V5", 0.4, [(XU2 + 0.5, YU2), (XEV, YU2)], ch=0)
+x0_ = XEV
+for x_, ref in zip(XEP[::-1], ("C307", "C620")):          # east to west: via -> C307 branch -> C620 branch
     place2(ref, x_, YU2 + 1.03, "v", "-2V5", side="B")
-    T("-2V5", 0.4, [(x_, YU2), P(ref, "@-2V5")], layer="B.Cu", ch=0)
+    T("-2V5", 0.4, [(x0_, YU2), (x_ + 0.25, YU2), (x_, YU2 + 0.25), P(ref, "@-2V5")], layer="B.Cu", ch=0)
+    x0_ = x_ + 0.25
 ga, gb = P("C620", "@GND"), P("C307", "@GND")
 XG2 = (ga[0] + gb[0]) / 2
 YG2 = ga[1] + 0.54
@@ -650,22 +670,25 @@ T("Net-(U304-A)", W_SIG, [ra_, (ra_[0] - 0.55, ra_[1]), (ra_[0] - 0.85, ya), (pa
 rb_ = P("R312", "@Net-(U304-B)")
 V(rb_[0] + 0.55, rb_[1], "Net-(U304-B)")
 T("Net-(U304-B)", W_SIG, [rb_, (rb_[0] + 0.55, rb_[1])], ch=0)
-XVB = pb[0] + 0.9
+XVB = pb[0] + 0.97                          # hole edge 0.21 mm off the SOT-23 pad
 V(XVB, pb[1], "Net-(U304-B)")
 T("Net-(U304-B)", W_SIG, [pb, (XVB, pb[1])], ch=0)
 YB4 = rb_[1] - 0.16                          # 24 Nov: lane 0.5 mm lower, clear of the U302 decoupling GND via
 T("Net-(U304-B)", W_SIG, [(XVB, pb[1]), (XVB + YB4 - pb[1], YB4), (rb_[0] + 0.55 - 0.16, YB4), (rb_[0] + 0.55, rb_[1])],
   layer="B.Cu", ch=0)
-YV4 = pv[1] - 0.55
+# VIAS-OUT-OF-PADS (24 Nov): C310 used to sit on its own +3V3 via; it now stands east of it on B (pad 0.4 mm off
+# the via hole), its GND pad straight below one of J102's outer GND vias (short B neck)
+YV4 = pv[1] - 0.58                           # C310 courtyard touches J102's (y 8.0)
 V(pv[0], YV4, "+3V3")
 T("+3V3", 0.5, [pv, (pv[0], YV4)], ch=0)
-place2("C310", pv[0] + 0.48, YV4, "h", "+3V3", side="B")
+place2("C310", JGX[2] - 0.96 / 2, YV4, "h", "+3V3", side="B")
 g = P("C310", "@GND")
-gv(g[0] + 0.43, g[1])
-T("GND", 0.3, [g, (g[0] + 0.43, g[1])], layer="B.Cu", ch=0)
+assert abs(g[0] - JGX[2]) < 1e-6
+T("GND", 0.3, [g, (g[0], YJ + 2.825 + 0.675 + 0.30)], layer="B.Cu", ch=0)
+T("+3V3", 0.4, [(pv[0], YV4), P("C310", "@+3V3")], layer="B.Cu", ch=0)
 gv(XU4, YU4)
 T("GND", 0.4, [pg, (XU4, YU4)], ch=0)
-XCV = pc[0] + 0.76
+XCV = pc[0] + 0.97
 V(XCV, pc[1], "/COARSE")
 T("/COARSE", W_SIG, [pc, (XCV, pc[1])], ch=0)
 XCO = 4.45

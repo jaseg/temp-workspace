@@ -324,7 +324,7 @@ documentation-only finding corrected in the documents).
 | BIASTEE-3 | open | six-layer tee parasitics not re-simulated; measure S21 on the first board |
 | BIASTEE-4 | fixed | C419 / C429 100n B beside the L404 / L406 cold pads, own GND vias, both placed alike (board) |
 | BIASTEE-5 | open | FB301 cut not added; not re-measured |
-| BIASTEE-6 | partly | no via inside any inductor pad (board); open vias remain in other soldered pads, see RF2-4 |
+| BIASTEE-6 | fixed | no via inside any inductor pad, and none in any other soldered pad (layout rule 12, `via_in_pad.py` FAIL 0, 24 Nov); no plugged vias needed |
 | ZONES-1 | fixed | L3 GND at most 6.0 mm from a GND via anywhere in the tap row (board, 0.25 mm raster; was 23.2 mm) |
 | ZONES-2 | fixed | L6 GND at most 6.1 mm from a GND via inside the board (board; 7.6 mm only at the board corner; fingers were 13-19 mm) |
 | ZONES-3 | mitigated | FPGA fan-out vias staggered: slots at most 3.25 x 1.95 mm (recheck-fixes); COARSE / TAP0-4 via stair and mcuif row remain (no room) |
@@ -375,7 +375,7 @@ the falling edge, RF2-8 the first-validation items still open (above), RF2-9 DNP
 | RF2-1 | fixed | as RF-7: no +2V5 copper beside BUF_OUT_T (board) |
 | RF2-2 | documented | ToO (clock, power, sampler, phase detector, risks) and root README updated |
 | RF2-3 | partly | U704.24, U101.8 fixed (capacitor nearer the pin than the via, board). U502.1: the via now abuts C623's pad (0.2 mm) but is still on the pin side. Kept by design: U101.1 / .12, U501.1 (capacitor first in the copper path), U704.36 (pull-up feed). Open, no room: U704.1 / .48, U502.7, U310.8; the audit also flags U501.25 / .36 and U502.1 (D2s / D2p). Current `decap_audit.py`: D1 1 (U101.6, pins 5 / 6 share C112), D2s 8, D2g 3, D2p 10 |
-| RF2-4 | open | order note for resin-plugged, capped vias (SPEC decision 24, board README); vias not moved |
+| RF2-4 | fixed | fixed by layout (24 Nov): every via moved out of the soldered pads (88 hits -> 0, `via_in_pad.py` run by gen_board.py); SPEC decision 24 (plugged vias) withdrawn; only listed exposed pads keep 0.2 mm vias (board README) |
 | RF2-5 | fixed | TAP5 via 0.40 mm, 0.385 mm from the PH_STROBE_N edge; antipad clear of the trace (board) |
 | RF2-6 | partly | rail router keeps 0.15 mm extra from fast nets (rail edge >= 0.33 mm); FPGA pin necks 0.155-0.22 mm remain (0.5 mm pin pitch) |
 | RF2-7 | mitigated | firmware limit of 1.30 V on both bias magnitudes (SPEC decision 21, kicad/README, ToO): 3.93 V at overload against 4 V; CLH/CLL +/-1.2 V would add 0.3 V of margin (not done) |

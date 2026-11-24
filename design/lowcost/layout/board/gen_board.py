@@ -584,3 +584,13 @@ json.dump({"log": LOG, "not_placed": NOT_PLACED, "rf": RF, "rule10_classes": dic
 c = bl.check_board(OUT, rf_widths=RF, verbose=8)
 json.dump({k: v for k, v in c.items() if k != "details"}, open(os.path.join(SCR, "check.json"), "w"), indent=1)
 json.dump(c["details"], open(os.path.join(SCR, "check_details.json"), "w"), indent=1, default=str)
+# VIAS-OUT-OF-PADS (24 Nov, RULES.md rule 12): ordinary tented vias only (no plugged / capped / filled vias), so no
+# via may lie in or touch a soldered SMD pad (copper, mask or paste opening) on either side; exposed pads only as
+# listed in via_in_pad.EP_ALLOW (0.2 mm drill, wholly inside the pad).  Must report FAIL 0.
+import via_in_pad
+VIP = via_in_pad.check(OUT)
+via_in_pad.report(VIP, verbose=True)
+json.dump({k: (v if isinstance(v, int) else len(v)) for k, v in VIP.items()}, open(os.path.join(SCR, "via_in_pad.json"), "w"),
+          indent=1)
+if VIP["fail"] or VIP["bare_with_opening"]:
+    print("VIA-IN-PAD CHECK FAILED:", len(VIP["fail"]), "vias in soldered pads")

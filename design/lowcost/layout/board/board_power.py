@@ -41,6 +41,7 @@ VIA_D, VIA_DRILL = bl.VIA_D, bl.VIA_DRILL
 L6_FACTOR = 3.0                           # step cost on L6 relative to L3
 VIA_COST = 4.0                            # mm-equivalent per layer change
 CLR_TIGHT = 0.15                          # fallback clearance where nothing fits at CLR (= Power netclass)
+VIP = 0.33                                 # via centre to SMD pad edge: hole edge >= 0.23 mm (tented vias)
 CUT_MARGIN = 0.6                          # L3 power copper to L3 cut-outs (node windows, pad cuts)
 EXTRA = {"/ADC_IN": 0.35, "/VBIAS_A": 0.15, "/VBIAS_K": 0.15, "/VOFS": 0.15, "/VNEG_REF": 0.15, "/DAC_TRIG": 0.15,
          "/VTAP_TH": 0.15, "/ADC_REF_MID": 0.15, "/TRIG_SEL": 0.15}     # extra clearance (slow lines 0.3, ADC_IN 0.5)
@@ -204,6 +205,8 @@ class Model:
                 n = p.GetNetname()
                 x0, y0, x1, y1 = _pad_shape(p)
                 tht = p.GetAttribute() in (pcbnew.PAD_ATTRIB_PTH, pcbnew.PAD_ATTRIB_NPTH)
+                if VIP > 0 and p.GetAttribute() == pcbnew.PAD_ATTRIB_SMD:   # VIAS-OUT-OF-PADS (24 Nov, RULES rule 12): no rail
+                    draw_rect(novia, x0 - VIP, y0 - VIP, x1 + VIP, y1 + VIP)   # via in / at any SMD pad, own net too
                 for L_, ln in lid.items():
                     if not (tht or p.IsOnLayer(L_)):
                         continue

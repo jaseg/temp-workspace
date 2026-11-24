@@ -138,7 +138,7 @@ place("C715", 51.85, 10.5, "h", "/mcu_if/VDDA", "B")
 place("FB701", 49.95, 10.5, "h", "+3V3", "B")
 # I2C pull-ups on B beside their lanes (fpga bus, top)
 place("R727", 56.1, 3.3, "h", "/I2C_SCL", "B")    # SCL: east of its inner via, B under the E pads
-place("R728", 52.2, 6.0, "h", "/I2C_SDA", "B")    # SDA: under the body (F drop from the pin-44 via)
+place("R728", 52.35, 6.0, "h", "/I2C_SDA", "B")   # SDA: under the body (F drop from the pin-44 via); 24 Nov: 0.15 east, pad 0.22 mm off the via hole
 # BOOT0 (B, north of the bus lanes)
 place("JP701", 45.5, 3.0, "h", "/mcu_if/BOOT0", "B")
 place("R729", 42.1, 2.9, "v", "GND", "B")
@@ -421,10 +421,10 @@ T("GND", WP, [c20g, (c20g[0], 4.3)])
 V("GND", (c20g[0], 4.3))
 T("GND", WP, [u(3), (u(3)[0] + 0.0, 0.85)]) if False else None
 # U701 pin 3 (GND, +IN) and pin 2 (-2V5): vias east of the pads; C721 on B between them
-v3 = (u(3)[0] + 0.9, u(3)[1])
+v3 = (u(3)[0] + 0.95, u(3)[1])                   # 24 Nov: hole edge 0.19 mm off the SOT-23 pad
 T("GND", WP, [u(3), v3])
 V("GND", v3)
-v2 = (u(2)[0] + 0.9, u(2)[1])
+v2 = (u(2)[0] + 0.95, u(2)[1])
 T("-2V5", WP, [u(2), v2])
 V("-2V5", v2)
 T("GND", WP, [v3, P("C721", "@GND")], "B.Cu")

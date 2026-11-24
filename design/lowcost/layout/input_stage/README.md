@@ -46,7 +46,7 @@ Excess pad C: Ctop pad 1 0.046 pF, R114 pad 0.048 pF, R112 + R118 0.13 pF, R113 
 - Neck: U101 OUT pad is 0.25 mm wide; the 0.36 mm line starts at the pad centre (0.41 mm neck).
 - BUF_OUT_S edge pad 2.89 mm from the OUT pin: the sampler 10R must sit right at the edge.
 - CPWG estimate at the 0.75 mm gap is 47.9 R (within JLC +-10 %); widen to 1 mm if needed.
-- U101 EP has 4 GND vias in the pad (QFN): tent or plug them. Two-sided assembly (C112, C113, C115, C116 on B.Cu).
+- U101 EP has 4 GND vias in the pad (QFN): kept as 0.2 mm vias tented on B (no plugging; board README 'Vias out of pads'). Two-sided assembly (C112, C113, C115, C116 on B.Cu).
 - The BUF_IN trace (1.66 mm) kept the old pin 3 / pin 4 fan-out room; it lies over the all-layer cut-out.
 
 ## Interfaces / open

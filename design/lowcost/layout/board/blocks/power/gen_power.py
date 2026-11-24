@@ -265,8 +265,8 @@ T(DM, [(17.81, 14.25), (15.2, 14.25)], W_FO, name="DM fanout")
 T(DM, [(15.2, 14.25), (15.0, 14.45), (14.14, 14.45)], W_FO, name="DM fanout")
 T(DP, [(14.14, 12.55), (11.86, 12.55)], W_USB, name="DP esd")
 T(DM, [(14.14, 14.45), (11.86, 14.45)], W_USB, name="DM esd")
-T("GND", [(11.86, 13.5), (11.1, 13.5)], WS)
-G(11.1, 13.5)
+T("GND", [(11.86, 13.5), (10.85, 13.5)], WS)                 # 24 Nov: via 0.25 mm (hole edge) off the pad
+G(10.85, 13.5)
 T("VBUS", [(14.14, 13.5), (15.1, 13.5)], WS)
 blk.via(15.1, 13.5, "VBUS")
 T(DP, [(11.86, 12.55), (11.0, 12.55), (10.25, 13.3), (9.4, 13.3), (8.6, 14.1), (8.6, BH)], W_USB, name="DP pair")
@@ -404,7 +404,10 @@ def lm_common(u, cin, cin_hf, ccp, c1, cx, cy):
     xw, xe = cx - 0.95, cx + 0.95
     W2 = 0.25
     T("GND", [(xw, y(1) + 0.05), (cx - 0.3, y(1) + 0.05)], 0.2)                # PGOOD (GND) into the EP
-    G(cx, cy - 0.6); G(cx, cy + 0.6)                                         # EP vias
+    # VIAS-OUT-OF-PADS (24 Nov): no vias in the exposed pad (LM27762 dissipates a few mW; the datasheet only asks
+    # for the EP on GND).  The EP is tied on L1 to GND pin 1 (above) and GND pin 4, whose copper reaches the CIN
+    # GND pad and its plane via just outside the package (U604: also the C617 GND neck north).
+    T("GND", [(xw, y(4)), (cx - 0.3, y(4))], 0.25)                           # GND pin 4 into the EP
     xc = blk.pad(cin_hf or cin, "@" + bl.canon(n("3")))[0]
     if cin_hf:                                                               # CIN 0402 straight at pins 3 / 4
         T(n("3"), [(xw, y(3)), (xc, y(3))], W2)
@@ -511,8 +514,8 @@ T("GND", [(3.45, cy - 2.31), (4.5, cy - 2.31)], 0.3)                       # R61
 T(N5("12"), [(xe, ye(12)), (xe, cy - 1.7)], 0.2)
 V(xe, cy - 1.7, N5("12"), bl.VIA_D, bl.VIA_DRILL)
 # EN- (8): short east to its via (0.4 mm)
-T(N5("8"), [(xe, ye(8)), (6.2, ye(8))], 0.2)
-V(6.2, ye(8), N5("8"), 0.4, 0.2)
+T(N5("8"), [(xe, ye(8)), (6.24, ye(8))], 0.2)                  # 24 Nov: 0.35 / 0.15 via, hole edge 0.165 mm off pin 8 (C624 east)
+V(6.24, ye(8), N5("8"), 0.35, 0.15)
 # FB- (7): east, via; B: R608 (vertical) / R607
 T(N5("7"), [(xe, ye(7)), (6.15, ye(7)), (6.4, ye(7) + 0.25)], 0.2)
 V(6.4, ye(7) + 0.25, N5("7"), bl.VIA_D, bl.VIA_DRILL)
@@ -535,9 +538,9 @@ T("/power/+3V3_CP", [(1.89, 19.2), (1.89, cy - 0.26), (1.21, cy - 0.94)], 0.25, 
 T("+3V3", [(4.5, 16.9), (3.9, 16.9)], 0.3, "B.Cu")                       # L4 +3V3 via east of FB605
 V(4.5, 16.9, "+3V3", bl.VIA_D, bl.VIA_DRILL)
 # PG network (B): R617 -> EN- via -> EN+ via, In2 via from U603 PG
-T("/power/PG_5V1", [(2.91, 19.2), (3.5, 19.2), (3.9, 19.6), (5.9, 19.6), (6.2, ye(8))], 0.2, "B.Cu")
-T("/power/PG_5V1", [(6.2, ye(8)), (6.6, 18.9), (7.6, 18.9), (7.9, 18.6)], 0.2, "B.Cu")
-T("/power/PG_5V1", [(xe, cy - 1.7), (6.4, cy - 1.05), (6.4, 18.7), (6.6, 18.9)], 0.2, "B.Cu")
+T("/power/PG_5V1", [(2.91, 19.2), (3.5, 19.2), (3.9, 19.6), (5.94, 19.6), (6.24, ye(8))], 0.2, "B.Cu")
+T("/power/PG_5V1", [(6.24, ye(8)), (6.64, ye(8) - 0.4), (7.6, 18.9), (7.9, 18.6)], 0.2, "B.Cu")
+T("/power/PG_5V1", [(xe, cy - 1.7), (6.4, cy - 1.05), (6.4, 18.7), (6.6, 18.9), (6.64, 18.9)], 0.2, "B.Cu")
 # -2V5: FB607 -> C629 + via
 T("-2V5", [(0.6, 20.18), (0.6, 20.75)], 0.4, "B.Cu")
 T("-2V5", [(0.6, 20.75), (0.6, 21.25), (0.75, 21.4), (1.21, 21.4)], 0.4, "B.Cu")

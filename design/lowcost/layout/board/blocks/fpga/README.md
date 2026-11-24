@@ -50,3 +50,5 @@ The IDES / OSER10 placement on the new pins (COARSE on 27) is not yet checked in
   from a via at the pin. Pin 7's link via stays at the pin (C508 is boxed in by the CLK2 track; +3V3_CLK has no plane).
 - TAP5 via 0.15 mm east and 0.4 mm: centre 0.46 mm from the board's PH_STROBE_N run, antipad clear of the strobe edge.
   Renders: `fpga_netview_u502.png`, `fpga_netview_tap5.png`.
+
+**Vias out of pads (24 Nov, RULES rule 12):** C506 0.2 mm north (GND via between the GND pads), R502-R504 share one +3V3 via, router vias kept 0.31 mm off every SMD pad. `python3 ../../via_in_pad.py fpga.kicad_pcb`: FAIL 0.

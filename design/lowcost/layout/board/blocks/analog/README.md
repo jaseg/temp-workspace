@@ -93,3 +93,5 @@ Pad compensation (RF-6, 24 Nov): every in-line RF pad whose excess C over L2 (pa
 - U101 pin 8 (VS-): the -5V polygon now starts at C113's pad and carries its two vias east of C113 (were at the pin end,
   0.6 mm from pin 8): pin 8 -> C113 -> vias. check_board / DRC as before (plane-fed supply nets only). Render:
   `analog_netview_u101.png`.
+
+**Vias out of pads (24 Nov, RULES rule 12):** C209 0.07 mm north (pad 0.2 mm off the -2V5 via); U101 / U401 / U402 EP vias kept (allowed exposed pads). `python3 ../../via_in_pad.py analog.kicad_pcb`: FAIL 0.

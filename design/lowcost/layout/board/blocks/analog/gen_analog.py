@@ -550,7 +550,7 @@ FS.via(UX1, -1.9, "HOLD_OUT")
 p2u = FS.pad("U201", "2")
 FS.track("-2V5", 0.5, [p2u, (3.3, p2u[1])])
 FS.via(3.3, p2u[1], "-2V5")
-FS.two("C209", 3.3, -1.95, "v", "GND", side="B")
+FS.two("C209", 3.3, -2.02, "v", "GND", side="B")   # 24 Nov: pad 0.2 mm (hole edge) off the -2V5 via
 FS.track("-2V5", W_PWR, [(3.3, p2u[1]), ("C209", "@-2V5")], layer="B.Cu")
 x9, y9 = FS.pad("C209", "@-2V5")
 gx, gy = FS.pad("C209", "@GND")

@@ -136,5 +136,8 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
     side with the shortest loop, and the plane or rail vias sit at the capacitor (behind it), not at the IC pin. Converter
     hot loops are closed on L1 (TPS63802 input / output 1.9 x 2.8 mm). `layout/board/decap_audit.py` checks the rule;
     the exceptions without room are listed in `docs/VALIDATION.md` (RF2-3).
-24. **Plugged vias** (validation BIASTEE-6 / recheck RF2-4, 24 Nov 2026): the board is ordered with resin-plugged, capped
-    vias for the open vias that touch soldered pads (list in `layout/board/README.md`); the vias are not moved.
+24. ~~**Plugged vias**~~ **WITHDRAWN (24 Nov 2026, user decision):** plugged / capped / resin-filled vias are not ordered
+    for this board (cost). Instead no via lies in or touches a soldered pad (layout rule 12, `layout/board/RULES.md`,
+    enforced by `layout/board/via_in_pad.py` on every `gen_board.py` run); the board is a standard JLCPCB six-layer
+    order with ordinary tented vias. Only the exposed pads listed in `layout/board/README.md` ('Vias out of pads')
+    keep small 0.2 mm vias in the pad, by datasheet, tented on the far side.
