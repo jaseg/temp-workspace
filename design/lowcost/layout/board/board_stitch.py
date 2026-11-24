@@ -132,13 +132,19 @@ def stitch(B, m, rf_tracks, sig_vias):
         i, j, k = int(round(x / G)), int(round(y / G)), int(r / G) + 1
         occ[max(0, i - k):i + k + 1, max(0, j - k):j + k + 1] = True
 
+    gnd = [(pcbnew.ToMM(v.GetPosition().x) - 100.0, pcbnew.ToMM(v.GetPosition().y) - 100.0) for v in B.GetTracks()
+           if v.GetClass() == "PCB_VIA" and v.GetNetname() == "GND"]
     for sx, sy in sig_vias:
+        if any(math.hypot(gx - sx, gy - sy) <= 1.0 for gx, gy in gnd):     # ZONES-4: one within 1 mm already
+            cnt["already within 1 mm"] = cnt.get("already within 1 mm", 0) + 1
+            continue
         done = False
-        for rad in [0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5] + [round(0.6 + 0.05 * k, 2) for k in range(19)]:
+        for rad in [0.6, 0.7, 0.8, 0.9, 1.0] + [round(0.55 + 0.05 * k, 2) for k in range(10)] + [1.15, 1.3, 1.5]:
             for a in range(0, 360, 15 if rad in (0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5) else 5):
                 x, y = sx + rad * math.cos(math.radians(a)), sy + rad * math.sin(math.radians(a))
                 if ok(x, y):
                     place(x, y)
+                    gnd.append((x, y))
                     done = True
                     break
             if done:

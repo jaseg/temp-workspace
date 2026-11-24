@@ -121,11 +121,12 @@ def buck(u, cin, cin_hf, lx, cout, rtop, rbot, cff, cx, cy, side, vin, vout, sw)
     two(rbot, X(-1.85), cy + 1.33, "S", "GND", side)
     if cff:
         two(cff, X(-2.8), cy - 0.55, "N", vout, side)
-    two(cin_hf, X(0.95), cy - 2.25, E, vin, side)
+    if cin_hf:
+        two(cin_hf, X(0.95), cy - 2.25, E, vin, side)
     return X
 
 
-def buck_routes(X, cy, side, vin, vout, sw, fb, cff):
+def buck_routes(X, cy, side, vin, vout, sw, fb, cff, hf=True):
     """copper of one buck cell (mirror-image on B): SW track, VIN / GND / VOUT polygons, EN, FB divider"""
     L_ = "F.Cu" if side == "F" else "B.Cu"
     xs = lambda pts: [(X(x - 3.4), y) for x, y in pts]          # cell geometry drawn for the F cell at cx = 3.4
@@ -138,16 +139,19 @@ def buck_routes(X, cy, side, vin, vout, sw, fb, cff):
     if cff:
         T(vout, xs([(0.6, 1.95), (1.55, 1.95)]), WS, L_)
         T(fb, xs([(0.6, 2.95), (1.55, 2.95)]), WS, L_)
-    for x, y in xs([(5.0, 4.9), (6.0, 4.9), (5.0, 6.0), (6.0, 6.0), (5.4, 7.3)]):
+    # PDN-2 (24 Nov): U601 (0.30 W, the hottest regulator) gets 8 GND vias in its GND polygon (was 5), tying it to
+    # L2 / L5 and to U602's B GND polygon below
+    for x, y in xs([(5.0, 4.9), (6.0, 4.9), (5.0, 6.0), (6.0, 6.0), (5.4, 7.3), (5.5, 4.35), (4.5, 5.45), (4.6, 7.0)]):
         G(x, y)
-    T("GND", xs([(3.87, 0.75), (3.25, 0.75), (3.25, 1.0)]), WS, L_)   # CIN_hf ground
-    G(*xs([(3.25, 1.0)])[0])
+    if hf:
+        T("GND", xs([(3.87, 0.75), (3.25, 0.75), (3.25, 1.0)]), WS, L_)   # CIN_hf ground
+        G(*xs([(3.25, 1.0)])[0])
     for x, y in xs([(8.35, 6.05), (8.95, 6.05)]):                  # VOUT vias (L4 +3V3 / B +3V3 for U602)
         if side == "F":
             V(x, y, vout, bl.VIA_D, bl.VIA_DRILL)
 
 
-XB1 = buck("U601", "C603", "C602", "L602", "C604", "R609", "R610", "C631", 3.4, 3.0, "F",
+XB1 = buck("U601", "C603", None, "L602", "C604", "R609", "R610", "C631", 3.4, 3.0, "F",
            "VBUS", "+3V3", "Net-(U601-SW)")
 XB2 = buck("U602", "C609", "C607", "L603", "C605", "R611", "R612", None, 6.15, 3.0, "B",
            "+3V3", "+1V2", "Net-(U602-SW)")
@@ -164,6 +168,9 @@ two("C611", 12.65, 10.76, "W", "/+5V1")
 two("R603", 10.0, 7.65, "N", "/+5V1")    # FB divider south of the chip, away from L1 / L2
 two("R604", 10.0, 9.53, "S", "GND")
 two("C632", 11.8, 1.7, "W", "VBUS", "B")  # DNP VBUS damper (tantalum) under the converters' input
+# DECOUPLING-8 (24 Nov): C602 100n (was 2 mm from U601, whose C603 straddles its pins) moved to the USBLC6 VBUS pin:
+# B side under U608 pin 5, VBUS pad on the B VBUS strip, GND pad into the B pour
+two("C602", 14.65, 14.3, "W", "VBUS", "B")
 
 # ============================================================================= LM27762 cell (WSON-12, F)
 CY4, CY5, CXL = 11.95, 19.0, 4.8
@@ -347,7 +354,7 @@ Z("VBUS", "B.Cu", [(9.6, 0.5), (10.95, 0.5), (10.95, 3.05), (14.2, 3.05), (14.2,
 T("VBUS", [(10.05, 4.4), (9.45, 4.4), (9.45, 3.8)], 0.2)                    # U603 MODE (2) = VIN; EN (1) in the polygon
 
 # ============================================================================= routing: U601 (+3V3, F) / U602 (+1V2, B)
-buck_routes(XB1, 3.0, "F", "VBUS", "+3V3", "Net-(U601-SW)", "Net-(U601-FB)", True)
+buck_routes(XB1, 3.0, "F", "VBUS", "+3V3", "Net-(U601-SW)", "Net-(U601-FB)", True, hf=False)
 buck_routes(XB2, 3.0, "B", "+3V3", "+1V2", "Net-(U602-SW)", "Net-(U602-FB)", False)
 # U601 VOUT sense: R609 / C631 top pads -> +3V3 via (L4 plane)
 T("+3V3", [(1.05, 1.95), (1.05, 1.2)], WS)

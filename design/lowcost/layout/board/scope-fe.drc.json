@@ -1,7 +1,7 @@
 {
     "$schema": "https://schemas.kicad.org/drc.v1.json",
     "coordinate_units": "mm",
-    "date": "2026-11-24T11:46:01",
+    "date": "2026-11-24T12:05:15",
     "ignored_checks": [
         {
             "description": "Footprint has no courtyard defined",
@@ -4612,139 +4612,8 @@
         }
     ],
     "source": "scope-fe.kicad_pcb",
-    "unconnected_items": [
-        {
-            "description": "Missing connection between items",
-            "items": [
-                {
-                    "description": "Pad 1 [+2V5] of C615 on B.Cu",
-                    "pos": {
-                        "x": 108.15,
-                        "y": 128.82
-                    },
-                    "uuid": "48f2d3cb-2f98-4275-b2a9-b7955bc2d199"
-                },
-                {
-                    "description": "Track [+2V5] on F.Cu, length 0.2600 mm",
-                    "pos": {
-                        "x": 108.939999,
-                        "y": 127.8
-                    },
-                    "uuid": "d4afeff9-cf08-4f2f-b14f-b53a53b1910e"
-                }
-            ],
-            "pos": {
-                "x": 108.15,
-                "y": 128.82
-            },
-            "severity": "error",
-            "type": "unconnected_items"
-        },
-        {
-            "description": "Missing connection between items",
-            "items": [
-                {
-                    "description": "Track [+2V5] on B.Cu, length 0.1414 mm",
-                    "pos": {
-                        "x": 109.2,
-                        "y": 124.7
-                    },
-                    "uuid": "f3c5d48e-61a0-4878-bb85-ab5d803af8ad"
-                },
-                {
-                    "description": "Pad 2 [+2V5] of C306 on B.Cu",
-                    "pos": {
-                        "x": 111.8,
-                        "y": 124.6
-                    },
-                    "uuid": "dfe278d1-3694-4ac3-934c-78aa1900dccc"
-                }
-            ],
-            "pos": {
-                "x": 109.3,
-                "y": 124.6
-            },
-            "severity": "error",
-            "type": "unconnected_items"
-        }
-    ],
+    "unconnected_items": [],
     "violations": [
-        {
-            "description": "Clearance violation (netclass 'Power' clearance 0.1500 mm; actual 0.1450 mm)",
-            "items": [
-                {
-                    "description": "Track [-5V] on In2.Cu, length 3.9000 mm",
-                    "pos": {
-                        "x": 116.6,
-                        "y": 113.5
-                    },
-                    "uuid": "428c0c2f-0bbd-48ed-9c56-ffa4dfb14f83"
-                },
-                {
-                    "description": "Via [GND] on F.Cu - B.Cu",
-                    "pos": {
-                        "x": 115.85,
-                        "y": 114.17
-                    },
-                    "uuid": "d05a1efe-fd08-4be7-b04d-3f581736e894"
-                }
-            ],
-            "layer": "In2.Cu",
-            "pos": {
-                "x": 115.85,
-                "y": 113.5
-            },
-            "severity": "error",
-            "type": "clearance"
-        },
-        {
-            "description": "Items shorting two nets (nets <no net> and +2V5)",
-            "items": [
-                {
-                    "description": "Segment [<no net>] of TL401 on F.Cu",
-                    "pos": {
-                        "x": 135.81,
-                        "y": 115.2
-                    },
-                    "uuid": "d1a1394c-bea0-47dd-84ce-bff5bc24dafc"
-                },
-                {
-                    "description": "Via [+2V5] on F.Cu - B.Cu",
-                    "pos": {
-                        "x": 141.8,
-                        "y": 115.5
-                    },
-                    "uuid": "f3c1d48e-8e74-4bc6-b769-3d0461b81a0f"
-                }
-            ],
-            "layer": "F.Cu",
-            "pos": {
-                "x": 141.8,
-                "y": 115.2
-            },
-            "severity": "error",
-            "type": "shorting_items"
-        },
-        {
-            "description": "Track has unconnected end",
-            "items": [
-                {
-                    "description": "Track [-2V5] on In2.Cu, length 0.1000 mm",
-                    "pos": {
-                        "x": 123.5,
-                        "y": 109.6
-                    },
-                    "uuid": "e2bcb906-f996-4b38-9e64-f9605d2a24f0"
-                }
-            ],
-            "layer": "In2.Cu",
-            "pos": {
-                "x": 123.5,
-                "y": 109.6
-            },
-            "severity": "warning",
-            "type": "track_dangling"
-        },
         {
             "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
             "items": [

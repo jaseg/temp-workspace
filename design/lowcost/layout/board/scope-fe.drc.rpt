@@ -1,19 +1,8 @@
 ** Drc report for scope-fe.kicad_pcb **
-** Created on 2026-11-24T11:45:46 **
+** Created on 2026-11-24T12:04:59 **
 ** Report includes: Errors, Warnings, Exclusions **
 
-** Found 213 DRC violations **
-[clearance]: Clearance violation (netclass 'Power' clearance 0.1500 mm; actual 0.1450 mm)
-    Rule: netclass 'Power'; error
-    @(116.6000 mm, 113.5000 mm): Track [-5V] on In2.Cu, length 3.9000 mm
-    @(115.8500 mm, 114.1700 mm): Via [GND] on F.Cu - B.Cu
-[shorting_items]: Items shorting two nets (nets <no net> and +2V5)
-    Local override; error
-    @(135.8100 mm, 115.2000 mm): Segment [<no net>] of TL401 on F.Cu
-    @(141.8000 mm, 115.5000 mm): Via [+2V5] on F.Cu - B.Cu
-[track_dangling]: Track has unconnected end
-    Local override; warning
-    @(123.5000 mm, 109.6000 mm): Track [-2V5] on In2.Cu, length 0.1000 mm
+** Found 210 DRC violations **
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
     @(106.1100 mm, 125.9900 mm): Footprint R122
@@ -645,15 +634,7 @@
     Local override; warning
     @(124.1000 mm, 140.7500 mm): Footprint TL403
 
-** Found 2 unconnected pads **
-[unconnected_items]: Missing connection between items
-    Local override; error
-    @(108.1500 mm, 128.8200 mm): Pad 1 [+2V5] of C615 on B.Cu
-    @(108.9400 mm, 127.8000 mm): Track [+2V5] on F.Cu, length 0.2600 mm
-[unconnected_items]: Missing connection between items
-    Local override; error
-    @(109.2000 mm, 124.7000 mm): Track [+2V5] on B.Cu, length 0.1414 mm
-    @(111.8000 mm, 124.6000 mm): Pad 2 [+2V5] of C306 on B.Cu
+** Found 0 unconnected pads **
 
 ** Found 241 Footprint errors **
 [footprint_symbol_field_mismatch]: Missing symbol field 'Note' in footprint

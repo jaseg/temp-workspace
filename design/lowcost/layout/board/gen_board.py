@@ -424,7 +424,7 @@ if "--prepower" in sys.argv:
     bl.save_board(B, os.path.join(SCR, "prepower.kicad_pcb"))
     sys.exit(0)
 _rp = board_power.apply(B, m)
-print("power: failed", _rp.get("failed"), "| no landing", _rp.get("no_landing"), "| vias", _rp.get("vias"), "| dangling", _rp.get("dangling"), "| tight", _rp.get("tight"), "| pruned", _rp.get("pruned"))
+print("power: failed", _rp.get("failed"), "| no landing", _rp.get("no_landing"), "| vias", _rp.get("vias"), "| dangling", _rp.get("dangling"), "| tight", _rp.get("tight"), "| pruned", _rp.get("pruned"), "| snapped", _rp.get("snapped"), "| corners", _rp.get("corners"))
 pcbnew.ZONE_FILLER(B).Fill(B.Zones())
 print("rail widening [mm widened]:", board_power.widen(B, m))
 import board_stitch
@@ -436,6 +436,10 @@ SIGV = [(86.4, 27.2), (86.9, 26.7), (86.4, 29.4), (86.9, 29.9), (86.4, 31.06), (
     [loc(v.GetPosition()) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
      v.GetNetname() in ("/VBIAS_A", "/VBIAS_K", "/ADC_IN", "/ADC_REF_MID", "/VOFS", "/VNEG_REF", "/DAC_TRIG",
                         "/TRIG_SEL")]
+# ZONES-4 (24 Nov): every via of a fast / RF net (board and block fan-outs) gets a GND via within 1 mm where room
+_fastv = [loc(v.GetPosition()) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and
+          (FAST_RX.match(v.GetNetname()) or v.GetNetname() in RF)]
+SIGV += [p_ for p_ in _fastv if not any(abs(p_[0] - q[0]) < 0.01 and abs(p_[1] - q[1]) < 0.01 for q in SIGV)]
 RFT = [(loc(t.GetStart()), loc(t.GetEnd()), pcbnew.ToMM(t.GetWidth())) for t in B.GetTracks()
        if t.GetClass() == "PCB_TRACK" and t.GetNetname() in ("/BUF_OUT_T", "/PH_STROBE_P", "/PH_STROBE_N")]
 NST = board_stitch.stitch(B, m, RFT, SIGV)
@@ -443,7 +447,7 @@ NST = board_stitch.stitch(B, m, RFT, SIGV)
 # instead of the stitching margin 0.2), every spot within 1.5 mm (0.05 mm steps)
 if NST.get("lacking"):
     _clr0 = board_stitch.CLR
-    board_stitch.CLR = 0.17                      # >= the Power netclass clearance 0.15
+    board_stitch.CLR = 0.2                       # >= the Power netclass clearance 0.15 + raster margin
     _occ = board_stitch.build_mask(B)
     board_stitch.CLR = _clr0
     _still = []
@@ -471,6 +475,11 @@ if NST.get("lacking"):
         else:
             _still.append((sx, sy))
     NST["lacking"] = _still
+_gv = [loc(v.GetPosition()) for v in B.GetTracks() if isinstance(v, pcbnew.PCB_VIA) and v.GetNetname() == "GND"]
+_far = [(p_, round(min(math.hypot(p_[0] - g[0], p_[1] - g[1]) for g in _gv), 2)) for p_ in _fastv]
+NST["fast vias"] = len(_far)
+NST["fast vias with a GND via <= 1 mm"] = sum(1 for _, d in _far if d <= 1.0)
+NST["fast vias > 1 mm"] = sorted([(p_, d) for p_, d in _far if d > 1.0], key=lambda r: -r[1])
 print("GND stitching:", NST)
 bf.silk(B, m)
 # routes.json first (board_power.py reads it), then the power module as the LAST copper step

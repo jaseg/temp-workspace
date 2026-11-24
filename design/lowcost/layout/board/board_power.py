@@ -40,7 +40,7 @@ EDGE = 0.5                                # copper to board edge
 VIA_D, VIA_DRILL = bl.VIA_D, bl.VIA_DRILL
 L6_FACTOR = 3.0                           # step cost on L6 relative to L3
 VIA_COST = 4.0                            # mm-equivalent per layer change
-CLR_TIGHT = 0.16                          # fallback clearance where nothing fits at CLR
+CLR_TIGHT = 0.15                          # fallback clearance where nothing fits at CLR (= Power netclass)
 CUT_MARGIN = 0.6                          # L3 power copper to L3 cut-outs (node windows, pad cuts)
 EXTRA = {"/ADC_IN": 0.35, "/VBIAS_A": 0.15, "/VBIAS_K": 0.15, "/VOFS": 0.15, "/VNEG_REF": 0.15, "/DAC_TRIG": 0.15,
          "/VTAP_TH": 0.15, "/ADC_REF_MID": 0.15, "/TRIG_SEL": 0.15}     # extra clearance (slow lines 0.3, ADC_IN 0.5)
@@ -178,7 +178,7 @@ class Model:
                 draw_seg(obs[ln], a, e, r + EXTRA.get(n, 0.0))
         for fp in b.GetFootprints():
             for gi in fp.GraphicalItems():           # copper drawn in footprints (TL401-TL403 lines, net ties)
-                if gi.GetClass() not in ("PCB_SHAPE", "FP_SHAPE"):
+                if gi.GetClass() not in ("PCB_SHAPE", "FP_SHAPE", "MGRAPHIC"):
                     continue
                 ln = lid.get(gi.GetLayer())
                 if ln is None:
@@ -667,8 +667,38 @@ def fix_dangling(board, m, nets):
 
 
 def prune_tracks(board, nets):
-    """remove rail tracks on L3 / L6 with an end that touches nothing of their net (router leftovers)"""
+    """remove rail tracks on L3 / L6 with an end that touches nothing of their net (router leftovers), and tiny
+    (< 0.25 mm) chamfer remnants whose both ends lie inside other copper of the net (DRC track_dangling)"""
     gone = []
+    for _ in range(5):                           # tiny spurs: < 0.25 mm with one end shared by nothing (KiCad
+        hit = False                              # counts only end-to-end / via / pad anchors as connections)
+        for t in list(board.GetTracks()):
+            if t.GetClass() != "PCB_TRACK" or t.GetNetname() not in nets or t.GetLayerName() not in LNAMES:
+                continue
+            a, e = _loc(t.GetStart()), _loc(t.GetEnd())
+            if math.hypot(e[0] - a[0], e[1] - a[1]) >= 0.25:
+                continue
+
+            def anchored(pt):
+                for u in board.GetTracks():
+                    if u is t or u.GetNetname() != t.GetNetname():
+                        continue
+                    if u.GetClass() == "PCB_VIA":
+                        if math.hypot(*np.subtract(_loc(u.GetPosition()), pt)) <= pcbnew.ToMM(u.GetWidth()) / 2:
+                            return True
+                    elif u.GetLayer() == t.GetLayer() and (
+                            math.hypot(*np.subtract(_loc(u.GetStart()), pt)) < 0.01 or
+                            math.hypot(*np.subtract(_loc(u.GetEnd()), pt)) < 0.01):
+                        return True
+                P_ = pcbnew.VECTOR2I(pcbnew.FromMM(pt[0] + OX), pcbnew.FromMM(pt[1] + OY))
+                return any(pd.GetNetname() == t.GetNetname() and pd.IsOnLayer(t.GetLayer()) and pd.HitTest(P_)
+                           for fp in board.GetFootprints() for pd in fp.Pads())
+            if not (anchored(a) and anchored(e)):
+                gone.append((t.GetNetname(), t.GetLayerName(), a, e, "tiny spur"))
+                board.Remove(t)
+                hit = True
+        if not hit:
+            break
     for _ in range(10):
         hit = False
         for t in list(board.GetTracks()):
@@ -707,6 +737,94 @@ def prune_tracks(board, nets):
     return gone
 
 
+def _proj(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dy * dy
+    t = 0 if L2 < 1e-12 else max(0, min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
+    return (a[0] + t * dx, a[1] + t * dy)
+
+
+def snap_ends(board, nets):
+    """a rail track end that is no anchor (no other track end, via or pad there) but lies inside another track of its
+    net (a T-join onto the track body) is moved onto that track's centre line, so KiCad sees the T-junction"""
+    P = lambda q: pcbnew.VECTOR2I(pcbnew.FromMM(q[0] + OX), pcbnew.FromMM(q[1] + OY))
+    out = []
+    trs = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() in nets]
+    vias = [v for v in board.GetTracks() if v.GetClass() == "PCB_VIA" and v.GetNetname() in nets]
+    for t in trs:
+        for k, e in ((0, _loc(t.GetStart())), (1, _loc(t.GetEnd()))):
+            same = [u for u in trs if u is not t and u.GetNetname() == t.GetNetname() and u.GetLayer() == t.GetLayer()]
+            if any(math.hypot(*np.subtract(_loc(u.GetStart()), e)) < 0.005 or
+                   math.hypot(*np.subtract(_loc(u.GetEnd()), e)) < 0.005 for u in same):
+                continue
+            if any(v.GetNetname() == t.GetNetname() and math.hypot(*np.subtract(_loc(v.GetPosition()), e)) < 0.005
+                   for v in vias):
+                continue
+            if any(pd.GetNetname() == t.GetNetname() and pd.IsOnLayer(t.GetLayer()) and pd.HitTest(P(e))
+                   for fp in board.GetFootprints() for pd in fp.Pads()):
+                continue
+            if any(v.GetNetname() == t.GetNetname() and
+                   math.hypot(*np.subtract(_loc(v.GetPosition()), e)) < pcbnew.ToMM(v.GetWidth()) / 2 for v in vias):
+                continue                         # inside a via: connected as it is
+            hosts = [u for u in same if _pt_seg(e, _loc(u.GetStart()), _loc(u.GetEnd())) <
+                     pcbnew.ToMM(u.GetWidth()) / 2]
+            if not hosts:
+                continue
+            q = _proj(e, _loc(hosts[0].GetStart()), _loc(hosts[0].GetEnd()))
+            (t.SetStart if k == 0 else t.SetEnd)(P(q))
+            out.append((t.GetNetname(), tuple(round(v, 3) for v in e), tuple(round(v, 3) for v in q)))
+    return out
+
+
+def fix_corners(board, nets, c=0.15):
+    """degree-2 joints of rail tracks sharper than 45 deg (where two routes meet): a 45-degree chamfer of leg c"""
+    from collections import defaultdict
+    P = lambda q: pcbnew.VECTOR2I(pcbnew.FromMM(q[0] + OX), pcbnew.FromMM(q[1] + OY))
+    out = []
+    for _ in range(3):
+        ends = defaultdict(list)
+        for t in board.GetTracks():
+            if t.GetClass() == "PCB_TRACK" and t.GetNetname() in nets:
+                for k, e in ((0, t.GetStart()), (1, t.GetEnd())):
+                    ends[(t.GetNetname(), t.GetLayer(), e.x, e.y)].append((t, k))
+        done = 0
+        for (net, lay, x, y), lst in ends.items():
+            if len(lst) != 2:
+                continue
+            (t1, k1), (t2, k2) = lst
+            j = _loc(pcbnew.VECTOR2I(x, y))
+            if any(pd.GetNetname() == net and pd.IsOnLayer(lay) and pd.HitTest(pcbnew.VECTOR2I(x, y))
+                   for fp in board.GetFootprints() for pd in fp.Pads()):
+                continue                         # joints inside a pad are the pad's business
+            o1 = _loc(t1.GetEnd() if k1 == 0 else t1.GetStart())
+            o2 = _loc(t2.GetEnd() if k2 == 0 else t2.GetStart())
+            l1, l2 = math.hypot(o1[0] - j[0], o1[1] - j[1]), math.hypot(o2[0] - j[0], o2[1] - j[1])
+            if l1 < 1e-6 or l2 < 1e-6:
+                continue
+            v1 = ((j[0] - o1[0]) / l1, (j[1] - o1[1]) / l1)
+            v2 = ((o2[0] - j[0]) / l2, (o2[1] - j[1]) / l2)
+            ang = math.degrees(math.acos(max(-1, min(1, v1[0] * v2[0] + v1[1] * v2[1]))))
+            if ang <= 45.5:
+                continue
+            cc = min(c, l1 / 2.01, l2 / 2.01)
+            a_ = (j[0] - v1[0] * cc, j[1] - v1[1] * cc)
+            b_ = (j[0] + v2[0] * cc, j[1] + v2[1] * cc)
+            (t1.SetStart if k1 == 0 else t1.SetEnd)(P(a_))
+            (t2.SetStart if k2 == 0 else t2.SetEnd)(P(b_))
+            nt = pcbnew.PCB_TRACK(board)
+            nt.SetStart(P(a_))
+            nt.SetEnd(P(b_))
+            nt.SetWidth(min(t1.GetWidth(), t2.GetWidth()))
+            nt.SetLayer(lay)
+            nt.SetNet(t1.GetNet())
+            board.Add(nt)
+            out.append((net, tuple(round(v, 2) for v in j), round(ang)))
+            done += 1
+        if not done:
+            break
+    return out
+
+
 def apply(board, m):
     """route every rail; returns a report dict"""
     report = {}
@@ -720,6 +838,14 @@ def apply(board, m):
     report["dangling"] = fix_dangling(board, m, [r[0] for r in RAILS] + [r[0] for r in STRIPS])
     report["dangling"] += fix_dangling(board, m, [r[0] for r in RAILS] + [r[0] for r in STRIPS])
     report["pruned"] = prune_tracks(board, [r[0] for r in RAILS] + [r[0] for r in STRIPS])
+    rails_ = [r[0] for r in RAILS] + [r[0] for r in STRIPS]
+    report["snapped"] = []
+    for _ in range(3):                           # snap T-joins onto the host centre line, drop zero-length remnants
+        report["snapped"] += snap_ends(board, rails_)
+        for t in list(board.GetTracks()):
+            if t.GetClass() == "PCB_TRACK" and t.GetNetname() in rails_ and t.GetLength() < pcbnew.FromMM(0.005):
+                board.Remove(t)
+    report["corners"] = fix_corners(board, [r[0] for r in RAILS] + [r[0] for r in STRIPS])
     return report
 
 
