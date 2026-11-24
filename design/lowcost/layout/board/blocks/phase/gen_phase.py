@@ -411,18 +411,18 @@ T("GND", 0.4, [g3, (g3[0], YG3)], ch=0)
 T("GND", 0.4, [g2b, (g2b[0], YG3), (g3[0], YG3)], layer="B.Cu")
 c1v = P("C301", "@" + VSW)
 T(VSW, 0.3, [c1v, (c1v[0], 0.45), (18.65, 0.45), (18.9, 0.7), (18.9, 1.25)], layer="B.Cu", ch=0.3)
-# VCC pin 10 -> east, north beside BUF_OUT_T to the +2V5 via in the north strip; a via at (XVC, 4.68) on the way
-# lands on C301's +2V5 pad (B)
-XVC = 9.20                                  # corner inside the pin-10 pad
-T("+2V5", 0.3, [p10, (XVC, p10[1]), (XVC, 2.2)], ch=0)
-V(XVC, 2.2, "+2V5")
-YV10 = 4.15                                 # 0.1 mm off the pin-1 pad corner
-V(XVC, YV10, "+2V5")
+# VCC pin 10 (REPAIR 24 Nov, recheck RF2-1 / RF-7): no +2V5 copper beside BUF_OUT_T any more.  Pin 10 -> east,
+# south to a 0.4 mm via beside pin 9 (1.5 mm from BUF_OUT_T's end at pin 1, so L2 stays solid under the trace; the
+# pstrobe cut-out x >= 9.5 forbids anything further east) -> B: C301's +2V5 pad, and on B north (x 9.03, under the old
+# F track's place) to C306 / its via
+XVC, YVC = 9.30, YU1 + 0.7
+T("+2V5", 0.2, [p10, (XVC + 0.1, p10[1]), (XVC + 0.1, YVC - 0.1), (XVC, YVC)], ch=0.1)
+blk.via(XVC, YVC, "+2V5", 0.4, 0.2)
 c1p = P("C301", "@+2V5")
-T("+2V5", 0.4, [c1p, (c1p[0], YV10 + XVC - c1p[0]), (XVC, YV10)], layer="B.Cu", ch=0)
+T("+2V5", 0.3, [(XVC, YVC), (c1p[0] + 0.07, YVC - 0.2), (c1p[0] + 0.07, c1p[1])], layer="B.Cu", ch=0)
 place2("C306", 11.8, 1.62, "v", "GND", side="B")   # second U302 100 n at the north +2V5 via pair; GND pad into the B pour
 c6p = P("C306", "@+2V5")
-T("+2V5", 0.4, [(XVC, 2.2), (XVC + 2.2 - c6p[1], c6p[1]), c6p], layer="B.Cu", ch=0)
+T("+2V5", 0.4, [c1p, (c1p[0], c6p[1] + 0.25), (c1p[0] + 0.25, c6p[1]), c6p], layer="B.Cu", ch=0)
 # (24 Nov, board integration: the +2V5 via at x 10.45 sat under the board PH_STROBE_N run x 10.60; C306 moved
 # 0.12 mm south so its GND via clears the PH_STROBE_N run at board y 23.21)
 # (24 Nov, integration: C306's GND pad is fed by the board's B pour again; its own via sat on the board's L3

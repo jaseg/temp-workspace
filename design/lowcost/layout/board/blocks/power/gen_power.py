@@ -163,7 +163,7 @@ XB1 = buck("U601", "C603", None, "L602", "C604", "R609", "R610", "C631", 3.4, 3.
            "VBUS", "+3V3", "Net-(U601-SW)")
 XB2 = buck("U602", "C609", "C607", "L603", "C605", "R611", "R612", None, 6.15, 3.0, "B",
            "+3V3", "+1V2", "Net-(U602-SW)")
-two("C608", 1.0, 8.95, "N", "+1V2", "B")     # 1u at the +1V2 output (U602 COUT HF)
+two("C608", 0.6, 8.85, "N", "+1V2", "B")     # 1u at the +1V2 output (U602 COUT HF); 0.4 mm west of the U604 VIN via
 
 # ============================================================================= U603 TPS63802 buck-boost (F, top-middle)
 UX = 11.35                               # U603 centre x (TIGHTEN: +0.4 so C601 fits between L602 and L601)
@@ -184,13 +184,21 @@ two("C632", 15.2, 6.0, "W", "VBUS", "B")  # DNP VBUS damper (tantalum): VBUS pad
 # B side under U608 pin 5, VBUS pad on the B VBUS strip, GND pad into the B pour
 two("C602", 14.65, 14.3, "W", "VBUS", "B")
 
-# ============================================================================= LM27762 cell (WSON-12, F)
-CY4, CY5, CXL = 11.95, 19.0, 4.8
+# ============================================================================= LM27762 cells (WSON-12, F)
+# REPAIR (24 Nov, recheck RP-1; datasheet SNVSAF7C 7.4.1: COUT+ / COUT- on the IC's layer next to OUT+ / OUT-, no vias
+# between pin and capacitor; user rule: plane vias at the capacitors, not at the IC pins).  The four 10u LDO output
+# capacitors moved from B to F (moved, not added): C617 north of U604 (OUT+ pad 1.3 mm from pin 11), C621 under U604
+# (OUT- pad 0.4 mm from pin 6, vertical), C630 east of the gap U604 / U605 (U605 OUT+), C628 under U605 (OUT-).  Each
+# capacitor's GND pad returns to the EP / pour on L1 and carries its own plane via; the rail vias (bead side, sense
+# taps) sit behind the capacitors.  To make room the FB+ / FB- dividers of U604 and the FB- divider of U605 went to
+# B (slow parts, RULES rule 8) right under the cell, U605's FB+ divider into the free F strip north of C625, U604
+# moved up 0.30 mm and U605 up 0.45 mm.
+CY4, CY5, CXL = 11.65, 18.55, 4.8
 
 
-def lm(u, cin, cin_hf, ccp, c1, rp_top, rp_bot, rn_top, rn_bot, cx, cy):
+def lm(u, cin, cin_hf, ccp, c1, cx, cy):
     """rot 0: W column PGOOD FB+ VIN GND CP OUT- (1-6), E column EN+ OUT+ C1+ C1- EN- FB- (12-7).
-    CIN at pins 3 / 4 (W), CCP south-west, C1 at pins 10 / 9 (E), FB+ divider north, FB- divider south."""
+    CIN at pins 3 / 4 (W), CCP south-west, C1 at pins 10 / 9 (E)."""
     bplace(u, cx, cy, 0)
     n = lambda p: nl.net_of(u, p)
     if cin_hf:
@@ -203,96 +211,42 @@ def lm(u, cin, cin_hf, ccp, c1, rp_top, rp_bot, rn_top, rn_bot, cx, cy):
     else:
         two(ccp, cx - 2.65, cy + 3.0, "E", n("5"))
     two(c1, cx + (2.2 if c1 == "C618" else 2.05), cy, "N", n("10"))
-    two(rp_top, cx, cy - 2.55, "W", n("2"))        # FB+ <-> OUT+
-    two(rp_bot, cx - 1.88, cy - 2.55, "E", n("2"))  # GND <-> FB+
-    two(rn_top, cx, cy + 2.5, "E", n("7"))         # OUT- <-> FB-
-    two(rn_bot, cx + 1.88, cy + 2.5, "W", n("7"))   # FB- <-> GND
 
 
-def lm_routes(u, cin, cin_hf, ccp, c1, cx, cy):
-    n = lambda p: nl.net_of(u, p)
-    y = lambda k: cy + (-1.25, -0.75, -0.25, 0.25, 0.75, 1.25)[k - 1]      # W pins 1-6
-    ye = lambda k: cy + {12: -1.25, 11: -0.75, 10: -0.25, 9: 0.25, 8: 0.75, 7: 1.25}[k]
-    xw, xe = cx - 0.95, cx + 0.95
-    W2 = 0.25
-    T("GND", [(xw, y(1)), (cx - 0.3, y(1))], W2)                              # PGOOD (GND) into the EP
-    G(cx, cy - 0.6); G(cx, cy + 0.6)                                         # EP vias
-    # FB+ (pin 2) west, north to the divider
-    T(n("2"), [(xw, y(2)), (cx - 1.45, y(2)), (cx - 1.45, cy - 2.55)], 0.2)
-    T(n("2"), [(cx - 1.37, cy - 2.55), (cx - 0.51, cy - 2.55)], 0.2)
-    xc = blk.pad(cin_hf or cin, "@" + bl.canon(n("3")))[0]
-    if cin_hf:                                                               # CIN 0402 straight at pins 3 / 4
-        T(n("3"), [(xw, y(3)), (xc, y(3))], W2)
-        T("GND", [(xw, y(4)), (xc, y(4))], W2)
-        xb = blk.pad(cin, "1")[0]
-        T(n("3"), [(xc, cy - 0.6), (xb, cy - 0.6)], 0.4)
-        T("GND", [(xc, cy + 0.6), (xb, cy + 0.6)], 0.4)
-    else:                                                                    # CIN 0805: jog into the pads
-        T(n("3"), [(xw, y(3)), (cx - 1.75, y(3)), (cx - 1.95, y(3) - 0.2), (cx - 1.95, y(3) - 0.4)], W2)
-        T("GND", [(xw, y(4)), (cx - 1.75, y(4)), (cx - 1.95, y(4) + 0.2), (cx - 1.95, y(4) + 0.4)], W2)
-    ycp = blk.pad(ccp, "1")[1]
-    T(n("5"), [(xw, y(5)), (cx - 1.45, y(5)), (cx - 1.45, ycp - 0.25)], W2)     # CP south into CCP
-    yr = cy + 2.5
-    T(n("6"), [(xw, y(6)), (xw, yr - 0.15), (xw + 0.15, yr), (cx - 0.51, yr)], W2)   # OUT- to R(top)
-    V(xw, cy + 1.8, n("6"), bl.VIA_D, bl.VIA_DRILL)                          # OUT- to the B output capacitor
-    # east
-    T(n("12"), [(xe, ye(12)), (xe, cy - 1.85)], 0.2)
-    V(xe, cy - 1.85, n("12"), bl.VIA_D, bl.VIA_DRILL)                        # EN+ via (B)
-    return xe, ye
+lm("U604", "C612", "C613", "C626", "C618", CXL, CY4)
+lm("U605", "C625", None, "C619", "C624", CXL, CY5)
+N4 = lambda p: nl.net_of("U604", p)
+N5 = lambda p: nl.net_of("U605", p)
+# U604 outputs (F): C617 OUT+ north (courtyard on the chip's), C621 OUT- vertical under pin 6; FB604 vertical north-east
+two("C617", 5.6, CY4 - 2.73, "E", "/power/+5V_LDO")
+two("C621", 4.85, CY4 + 3.45, "N", "/power/-5V_LDO")
+two("FB604", 8.05, CY4 - 3.0, "S", "/power/+5V_LDO")
+# U605 outputs (F): C630 OUT+ vertical east of C621 (pad 0.55 mm from pin 11's track), C628 OUT- under the chip
+two("C630", 7.3, CY4 + 4.25, "S", "/power/+2V5_LDO")
+two("C628", 5.58, CY5 + 2.85, "W", "/power/-2V5_LDO")
+# feedback dividers: U604 on B under the cell; U605 FB+ on F north of C625, FB- on B under the cell
+two("R614", 2.6, CY4 - 2.9, "E", N4("2"), "B")      # GND <-> FB+
+two("R613", 4.6, CY4 - 2.9, "W", N4("2"), "B")      # FB+ <-> OUT+
+two("R605", 4.9, CY4 + 1.95, "E", N4("7"), "B")     # OUT- <-> FB-
+two("R606", 6.75, CY4 + 2.7, "N", N4("7"), "B")     # FB- <-> GND
+two("R615", 1.07, CY5 - 2.31, "W", "/power/+2V5_LDO")  # OUT+ <-> FB+ (F)
+two("R616", 2.94, CY5 - 2.31, "E", "GND")              # FB+ <-> GND (F)
+two("R607", 4.7, CY5 + 3.1, "W", "/power/-2V5_LDO", "B")  # OUT- <-> FB-
+two("R608", 6.4, CY5 + 2.6, "N", N5("7"), "B")            # FB- <-> GND
 
-
-def lm_east(u, c1, cx, cy, xe, ye, ytop):
-    n = lambda p: nl.net_of(u, p)
-    W2 = 0.25
-    # OUT+ (pin 11) east, north at x + 1.5
-    if abs(ytop - (cy - 2.55)) < 1e-6:
-        T(n("11"), [(xe, ye(11)), (cx + 1.5, ye(11)), (cx + 1.5, ytop), (cx + 0.51, ytop)], W2)
-    else:
-        T(n("11"), [(xe, ye(11)), (cx + 1.5, ye(11)), (cx + 1.5, ytop)], W2)
-        T(n("11"), [(cx + 1.5, cy - 2.55), (cx + 0.51, cy - 2.55)], W2)
-    T(n("11"), [(cx + 1.5, cy - 1.95), (cx + 1.95, cy - 1.95)], W2)
-    V(cx + 1.95, cy - 1.95, n("11"), bl.VIA_D, bl.VIA_DRILL)                 # OUT+ to the B output capacitor
-    x1, y1 = blk.pad(c1, "1")
-    x2, y2 = blk.pad(c1, "2")
-    xi = x1 - 0.25 if c1 == "C618" else x1
-    if c1 == "C618":                                                         # 0603: jog into the pads
-        T(n("10"), [(xe, ye(10)), (cx + 1.5, ye(10)), (cx + 1.6, ye(10) - 0.1), (x1 - 0.1, ye(10) - 0.1)], W2)
-        T(n("9"), [(xe, ye(9)), (cx + 1.5, ye(9)), (cx + 1.6, ye(9) + 0.1), (x1 - 0.1, ye(9) + 0.1)], W2)
-    else:                                                                    # 0402: pads in line with pins 10 / 9
-        T(n("10"), [(xe, ye(10)), (x1 - 0.05, ye(10))], W2)
-        T(n("9"), [(xe, ye(9)), (x1 - 0.05, ye(9))], W2)
-    # EN- (pin 8) east, south to its via
-    T(n("8"), [(xe, ye(8)), (cx + 1.45, ye(8)), (cx + 1.45, ye(8) + 0.4), (cx + 1.85, ye(8) + 0.8),
-               (cx + 1.95, ye(8) + 0.8)], 0.2)
-    V(cx + 1.95, ye(8) + 0.8, n("8"), bl.VIA_D, bl.VIA_DRILL)
-    # FB- (pin 7) south to the divider
-    yr = cy + 2.5
-    T(n("7"), [(xe, ye(7)), (xe, yr)], 0.2)
-    T(n("7"), [(cx + 0.51, yr), (cx + 1.37, yr)], 0.2)
-
-
-lm("U604", "C612", "C613", "C626", "C618", "R613", "R614", "R605", "R606", CXL, CY4)
-lm("U605", "C625", None, "C619", "C624", "R615", "R616", "R607", "R608", CXL, CY5)
-two("FB604", 7.45, 8.77, "W", "/power/+5V_LDO")        # OUT+ bead on F north-east of U604
-
-# ============================================================================= B side: beads, LDO output capacitors
+# ============================================================================= B side: beads, slow parts
 PLACE_B = [  # ref, x, y, first-side, net
     ("FB602", 11.7, 9.3, "N", "/+5V1"),             # +5V1 -> +5V1F (U604 input)
-    ("C617", 8.6, 10.0, "W", "/power/+5V_LDO"),      # U604 OUT+
-    ("C621", 2.0, 12.0, "E", "/power/-5V_LDO"),      # U604 OUT-
     ("FB603", 2.0, 14.25, "E", "/power/-5V_LDO"),
     ("C627", 1.6, 15.5, "W", "-5V"),
-    ("FB605", 2.0, 16.95, "W", "/power/+3V3_CP"),    # +3V3 -> U605 input
+    ("FB605", 2.9, 16.95, "W", "/power/+3V3_CP"),    # +3V3 -> U605 input
     ("R617", 2.4, 19.2, "W", "/power/+3V3_CP"),      # PG pull-up
     ("C629", 0.6, 19.7, "S", "-2V5"),
     ("FB607", 2.0, 21.4, "E", "/power/-2V5_LDO"),
-    ("C628", 6.9, 21.4, "W", "/power/-2V5_LDO"),     # U605 OUT-
-    ("C630", 8.6, 17.05, "W", "/power/+2V5_LDO"),    # U605 OUT+
     ("FB606", 8.75, 15.3, "W", "/power/+2V5_LDO"),
 ]
 for ref, x, y, f, n_ in PLACE_B:
     two(ref, x, y, f, n_, "B")
-
 placed = set(blk.fps)
 mine = sorted(r for r, c in nl.comps.items() if c["sheet"].startswith("/power") and r not in MOVED)
 print("not placed:", sorted(set(mine) - placed))
@@ -385,7 +339,7 @@ V(3.6, 0.9, "+3V3", bl.VIA_D, bl.VIA_DRILL)
 Z("+3V3", "B.Cu", [(2.95, 0.45), (5.15, 0.45), (5.15, 1.25), (4.65, 1.25), (4.65, 1.95), (5.85, 1.95), (5.85, 2.62),
                    (2.95, 2.62)], prio=5)
 # U602 output: L603 -> C605 -> C608 -> +1V2 via (1.0, 7.9); VOUT sense R611 via In2 (slow / static layer) to that via
-T("+1V2", [(2.4, 7.15), (1.65, 7.9), (1.0, 7.9), (1.0, 8.47)], 0.5, "B.Cu")
+blk.track("+1V2", 0.5, [(2.4, 7.15), (1.65, 7.9), (0.6, 7.9), (0.6, 8.4)], "B.Cu", ch=0.15)
 blk.via(1.0, 7.9, "+1V2")
 T("+1V2", [(8.0, 1.94), (8.0, 1.2)], WS, "B.Cu")
 blk.via(8.0, 1.2, "+1V2")
@@ -442,65 +396,157 @@ blk.iface("/+5V1", 12.3, 21.3, "In3.Cu", "S", "supply", None,
           "NEW: via pair, +5V1 (TPS63802 output, 0.29 / 0.34 A) to the GVA-84+ chokes L404.2 / L406.2 (pstrobe); "
           "replaces the old VBUS strip along the S edge")
 
+# ============================================================================= routing: LM27762 cells (common F part)
+def lm_common(u, cin, cin_hf, ccp, c1, cx, cy):
+    n = lambda p: nl.net_of(u, p)
+    y = lambda k: cy + (-1.25, -0.75, -0.25, 0.25, 0.75, 1.25)[k - 1]      # W pins 1-6
+    ye = lambda k: cy + {12: -1.25, 11: -0.75, 10: -0.25, 9: 0.25, 8: 0.75, 7: 1.25}[k]
+    xw, xe = cx - 0.95, cx + 0.95
+    W2 = 0.25
+    T("GND", [(xw, y(1) + 0.05), (cx - 0.3, y(1) + 0.05)], 0.2)                # PGOOD (GND) into the EP
+    G(cx, cy - 0.6); G(cx, cy + 0.6)                                         # EP vias
+    xc = blk.pad(cin_hf or cin, "@" + bl.canon(n("3")))[0]
+    if cin_hf:                                                               # CIN 0402 straight at pins 3 / 4
+        T(n("3"), [(xw, y(3)), (xc, y(3))], W2)
+        T("GND", [(xw, y(4)), (xc, y(4))], W2)
+        xb = blk.pad(cin, "1")[0]
+        T(n("3"), [(xc, cy - 0.6), (xb, cy - 0.6)], 0.4)
+        T("GND", [(xc, cy + 0.6), (xb, cy + 0.6)], 0.4)
+    else:                                                                    # CIN 0805: jog into the pads
+        T(n("3"), [(xw, y(3)), (cx - 1.75, y(3)), (cx - 1.95, y(3) - 0.2), (cx - 1.95, y(3) - 0.4)], W2)
+        T("GND", [(xw, y(4)), (cx - 1.75, y(4)), (cx - 1.95, y(4) + 0.2), (cx - 1.95, y(4) + 0.4)], W2)
+    ycp = blk.pad(ccp, "1")[1]
+    T(n("5"), [(xw, y(5)), (cx - 1.45, y(5)), (cx - 1.45, ycp - 0.25)], W2)     # CP south into CCP
+    x1 = blk.pad(c1, "1")[0]
+    if c1 == "C618":                                                         # 0603: jog into the pads
+        T(n("10"), [(xe, ye(10)), (cx + 1.5, ye(10)), (cx + 1.6, ye(10) - 0.1), (x1 - 0.1, ye(10) - 0.1)], W2)
+        T(n("9"), [(xe, ye(9)), (cx + 1.5, ye(9)), (cx + 1.6, ye(9) + 0.1), (x1 - 0.1, ye(9) + 0.1)], W2)
+    else:                                                                    # 0402: pads in line with pins 10 / 9
+        T(n("10"), [(xe, ye(10)), (x1 - 0.05, ye(10))], W2)
+        T(n("9"), [(xe, ye(9)), (x1 - 0.05, ye(9))], W2)
+    return xw, xe, y, ye
+
+
 # ============================================================================= routing: U604 (+5V / -5V)
-xe, ye = lm_routes("U604", "C612", "C613", "C626", "C618", CXL, CY4)
-lm_east("U604", "C618", CXL, CY4, xe, ye, 8.77)
-T("/power/+5V1F", [(1.25, 11.0), (1.25, 10.1)], 0.4)
-V(1.25, 10.1, "/power/+5V1F", bl.VIA_D, bl.VIA_DRILL)
-T("+5V", [("FB604", "2"), (9.05, 8.77)], 0.4)
-V(9.05, 8.77, "+5V", bl.VIA_D, bl.VIA_DRILL)
-blk.iface("+5V", 9.05, 8.77, "In3.Cu", "W", "supply", None, "via at FB604 (U604 OUT+ 4.80 V, 41 mA)")
-# B: +5V1F from FB602 to U604 VIN / EN+ / EN-
-T("/power/+5V1F", [("FB602", "2"), (11.7, 11.6), (6.2, 11.6)], 0.4, "B.Cu")
-T("/power/+5V1F", [(CXL + 1.95, CY4 + 1.55), (CXL + 1.95, 12.15), (6.2, 11.6), (6.2, 10.55),
-                   (5.75, 10.1), (1.25, 10.1)], 0.4, "B.Cu")
-# B: OUT+ via -> C617;  OUT- via -> C621 / FB603 -> C627 / -5V via
-T("/power/+5V_LDO", [(CXL + 1.95, CY4 - 1.95), (blk.pad("C617", "1")[0], CY4 - 1.95)], 0.4, "B.Cu")
-T("/power/-5V_LDO", [(2.95, 12.0), (3.85, 12.0), (3.85, CY4 + 1.8)], 0.4, "B.Cu")
-T("/power/-5V_LDO", [(3.85, CY4 + 1.8), (3.85, 14.0)], 0.4, "B.Cu")
-T("/power/-5V_LDO", [(3.85, 14.0), (3.6, 14.25), (2.79, 14.25)], 0.4, "B.Cu")
+xw, xe, y, ye = lm_common("U604", "C612", "C613", "C626", "C618", CXL, CY4)
+cy, cx = CY4, CXL
+# OUT+ (11): east, north straight into C617's OUT+ pad; C617 -> FB604 (pad 1) -> +5V via behind the bead
+T("/power/+5V_LDO", [(xe, ye(11)), (6.25, ye(11)), (6.25, cy - 2.3)], 0.25)
+T("/power/+5V_LDO", [(6.7, cy - 2.2), (7.8, cy - 2.2)], 0.4)
+T("+5V", [(8.05, blk.pad("FB604", "@+5V")[1]), (8.05, 7.0)], 0.4)
+V(8.05, 7.0, "+5V", bl.VIA_D, bl.VIA_DRILL)
+blk.iface("+5V", 8.05, 7.0, "In3.Cu", "W", "supply", None, "via behind FB604 (U604 OUT+ 4.80 V, 41 mA)")
+T("/power/+5V_LDO", [(8.3, cy - 2.2), (8.95, cy - 2.2)], 0.25)              # FB+ sense tap behind the bead
+V(8.95, cy - 2.2, "/power/+5V_LDO", bl.VIA_D, bl.VIA_DRILL)
+# C617 GND pad -> EP (L1) and its plane via (west)
+T("GND", [(4.65, cy - 2.3), (4.65, cy - 1.15)], 0.4)
+T("GND", [(4.5, cy - 2.5), (4.5, 7.85), (4.3, 7.65)], 0.3)           # -> U601 cell GND via 0.55 mm north of the pad
+# EN+ (12) = VIN: via straight north of the pin (B +5V1F strip)
+T(N4("12"), [(xe, ye(12)), (xe, cy - 1.7)], 0.2)
+V(xe, cy - 1.7, N4("12"), bl.VIA_D, bl.VIA_DRILL)
+# FB+ (2): west, north to its via; divider R614 / R613 on B
+T(N4("2"), [(xw, y(2)), (cx - 1.5, y(2)), (cx - 1.5, cy - 2.05)], 0.2)
+V(cx - 1.5, cy - 2.05, N4("2"), bl.VIA_D, bl.VIA_DRILL)
+T(N4("2"), [(cx - 1.5, cy - 2.05), (3.11, cy - 2.24), (3.11, cy - 2.62)], 0.2, "B.Cu")
+T(N4("2"), [(3.11, cy - 2.9), (4.09, cy - 2.9)], 0.2, "B.Cu")
+T("/power/+5V_LDO", [(8.95, cy - 2.2), (8.25, cy - 2.9), (5.11, cy - 2.9)], 0.2, "B.Cu")
+T("GND", [(2.09, cy - 2.9), (2.09, cy - 2.05)], 0.25, "B.Cu")
+G(2.09, cy - 2.05)
+# OUT- (6): south into C621's OUT- pad; via behind it (east) to the B divider / FB603
+T(N4("6"), [(xw, y(6)), (xw, cy + 1.5), (4.25, cy + 1.9), (4.25, cy + 2.25)], 0.25)
+T(N4("6"), [(5.4, cy + 2.85), (5.95, cy + 2.85)], 0.4)
+V(5.95, cy + 2.85, N4("6"), bl.VIA_D, bl.VIA_DRILL)
+T(N4("6"), [(5.95, cy + 2.85), (3.0, cy + 2.85)], 0.4, "B.Cu")              # -> FB603 (B)
+T(N4("6"), [(4.39, cy + 2.85), (4.39, cy + 2.2)], 0.25, "B.Cu")           # -> R605
+# FB- (7): south to its via; B: R605 / R606
+T(N4("7"), [(xe, ye(7)), (xe, cy + 1.7), (6.0, cy + 1.95)], 0.2)
+V(6.0, cy + 1.95, N4("7"), bl.VIA_D, bl.VIA_DRILL)
+T(N4("7"), [(6.0, cy + 1.95), (5.41, cy + 1.95)], 0.2, "B.Cu")
+T(N4("7"), [(6.0, cy + 1.95), (6.24, cy + 2.19), (6.6, cy + 2.19)], 0.2, "B.Cu")
+T("GND", [(6.75, cy + 3.21), (7.2, cy + 3.21), (7.65, cy + 2.76), (7.65, cy + 2.5)], 0.25, "B.Cu")
+# EN- (8) = VIN: east, south to its via (B +5V1F)
+T(N4("8"), [(xe, ye(8)), (cx + 1.45, ye(8)), (cx + 1.45, ye(8) + 0.4), (cx + 1.85, ye(8) + 0.8),
+            (cx + 1.95, ye(8) + 0.8)], 0.2)
+V(cx + 1.95, ye(8) + 0.8, N4("8"), bl.VIA_D, bl.VIA_DRILL)
+# C621 GND pad -> plane via east; C630 GND via north of its pad
+T("GND", [(5.4, cy + 4.55), (6.0, cy + 4.55)], 0.3)
+G(6.0, cy + 4.55)
+G(7.65, cy + 2.5)
+# CIN feed: B +5V1F from FB602 to U604 VIN (via behind C612), EN+ and EN-
+T("/power/+5V1F", [(1.25, cy - 0.95), (1.25, cy - 1.85)], 0.4)
+V(1.25, cy - 1.85, "/power/+5V1F", bl.VIA_D, bl.VIA_DRILL)
+T("/power/+5V1F", [("FB602", "2"), (11.7, 11.6), (6.2, 11.6), (6.2, cy - 1.25), (xe, cy - 1.7)], 0.4, "B.Cu")
+T("/power/+5V1F", [(6.2, cy - 1.25), (1.7, cy - 1.25), (1.25, cy - 1.7), (1.25, cy - 1.85)], 0.4, "B.Cu")
+T("/power/+5V1F", [(CXL + 1.95, ye(8) + 0.8), (CXL + 1.95, 12.15), (6.2, 11.6)], 0.4, "B.Cu")
+# B: FB603 -> C627 / -5V via
 T("-5V", [(1.12, 15.5), (1.12, 14.25)], 0.4, "B.Cu")
-T("-5V", [(1.21, 14.25), (0.7, 14.25), (0.45, 14.0)], 0.4, "B.Cu")
-V(0.45, 14.0, "-5V", bl.VIA_D, bl.VIA_DRILL)
-blk.iface("-5V", 0.45, 14.0, "In3.Cu", "W", "supply", None, "via at FB603 / C627 (U604 OUT- -4.64 V, 41 mA)")
+T("-5V", [(1.21, 14.25), (0.75, 14.25), (0.4, 13.9), (0.4, 13.6)], 0.4, "B.Cu")
+V(0.4, 13.6, "-5V", bl.VIA_D, bl.VIA_DRILL)
+blk.iface("-5V", 0.4, 13.6, "In3.Cu", "W", "supply", None, "via at FB603 / C627 (U604 OUT- -4.64 V, 41 mA)")
+# U604 CIN ground via (C613 / C612 GND pads)
+T("GND", [(2.7, cy + 0.65), (2.7, cy + 1.2), (2.55, cy + 1.35)], 0.4)
+G(2.55, cy + 1.35)
 
 # ============================================================================= routing: U605 (+2V5 / -2V5)
-xe, ye = lm_routes("U605", "C625", None, "C619", "C624", CXL, CY5)
-lm_east("U605", "C624", CXL, CY5, xe, ye, 16.45)
-T("/power/+3V3_CP", [(2.35, 18.05), (1.21, 18.05)], 0.4)
-V(1.21, 18.05, "/power/+3V3_CP", bl.VIA_D, bl.VIA_DRILL)
-T("/power/+3V3_CP", [(1.21, 16.95), (1.21, 18.05)], 0.4, "B.Cu")
-T("/power/+3V3_CP", [(1.89, 19.2), (1.89, 18.74), (1.22, 18.07)], 0.25, "B.Cu")
-T("+3V3", [(0.45, 16.1), (2.79, 16.1), (2.79, 16.95)], 0.3, "B.Cu")
-V(0.45, 16.1, "+3V3", bl.VIA_D, bl.VIA_DRILL)
-# PG network (B): R617 -> EN+ / EN- vias, In2 via from U603 PG
-T("/power/PG_5V1", [(2.91, 19.2), (3.3, 19.2), (3.5, 19.0), (6.0, 19.0), (6.75, 19.75), (CXL + 1.95, CY5 + 1.55)],
-  0.2, "B.Cu")
-T("/power/PG_5V1", [(6.0, 19.0), (6.0, 17.4), (CXL + 0.95, CY5 - 1.85)], 0.2, "B.Cu")
-T("/power/PG_5V1", [(6.0, 19.0), (7.5, 19.0), (7.9, 18.6)], 0.2, "B.Cu")
-# OUT+ via -> C630 -> FB606 -> +2V5 via
-T("/power/+2V5_LDO", [(CXL + 1.95, CY5 - 1.95), (7.65, CY5 - 1.95)], 0.4, "B.Cu")
-T("/power/+2V5_LDO", [(7.8, 16.4), (7.8, 15.5)], 0.4, "B.Cu")
+xw, xe, y, ye = lm_common("U605", "C625", None, "C619", "C624", CXL, CY5)
+cy, cx = CY5, CXL
+# OUT+ (11): east, north into C630's OUT+ pad; via behind it to FB606 (B) and the FB+ sense line (In2)
+T("/power/+2V5_LDO", [(xe, ye(11)), (6.3, ye(11)), (6.3, cy - 1.1), (6.55, cy - 1.35), (6.8, cy - 1.35)], 0.25)
+T("/power/+2V5_LDO", [(7.6, cy - 1.35), (7.6, cy - 0.8)], 0.4)
+V(7.6, cy - 0.8, "/power/+2V5_LDO", bl.VIA_D, bl.VIA_DRILL)
+T("/power/+2V5_LDO", [(7.6, cy - 0.8), (7.6, 15.3)], 0.4, "B.Cu")
 T("+2V5", [(9.54, 15.3), (10.45, 15.3)], 0.4, "B.Cu")
 V(10.45, 15.3, "+2V5", bl.VIA_D, bl.VIA_DRILL)
 blk.iface("+2V5", 10.45, 15.3, "In3.Cu", "W", "supply", None, "via at FB606 (U605 OUT+ 2.50 V, 48 mA)")
-# OUT- via -> FB607 / C628;  -2V5: C629 + via
-T("/power/-2V5_LDO", [(2.79, 21.4), (5.95, 21.4)], 0.4, "B.Cu")
-T("/power/-2V5_LDO", [(3.85, CY5 + 1.8), (3.85, 21.4)], 0.4, "B.Cu")
+T("/power/+2V5_LDO", [(7.6, cy - 0.8), (7.2, cy - 1.2), (4.25, cy - 1.2), (4.0, cy - 1.45), (0.75, cy - 1.45),
+                      (0.56, cy - 1.64)], 0.2, "In2.Cu")                    # FB+ sense to R615 (F)
+V(0.56, cy - 1.64, "/power/+2V5_LDO", bl.VIA_D, bl.VIA_DRILL)
+T("/power/+2V5_LDO", [(0.56, cy - 1.64), (0.56, cy - 2.31)], 0.25)
+# FB+ (2): west, north to R616 / R615 (F, north of C625)
+T(N5("2"), [(xw, y(2)), (3.35, y(2)), (3.35, cy - 1.55), (3.18, cy - 1.72), (2.43, cy - 1.72), (2.43, cy - 2.1)],
+  0.2)
+T(N5("2"), [(1.58, cy - 2.31), (2.43, cy - 2.31)], 0.2)
+T("GND", [(3.45, cy - 2.31), (4.5, cy - 2.31)], 0.3)                       # R616 GND -> C621 GND pad
+# EN+ (12) = PG_5V1: via north of the pin
+T(N5("12"), [(xe, ye(12)), (xe, cy - 1.7)], 0.2)
+V(xe, cy - 1.7, N5("12"), bl.VIA_D, bl.VIA_DRILL)
+# EN- (8): short east to its via (0.4 mm)
+T(N5("8"), [(xe, ye(8)), (6.2, ye(8))], 0.2)
+V(6.2, ye(8), N5("8"), 0.4, 0.2)
+# FB- (7): east, via; B: R608 (vertical) / R607
+T(N5("7"), [(xe, ye(7)), (6.15, ye(7)), (6.4, ye(7) + 0.25)], 0.2)
+V(6.4, ye(7) + 0.25, N5("7"), bl.VIA_D, bl.VIA_DRILL)
+T(N5("7"), [(6.4, ye(7) + 0.25), (6.4, cy + 2.05)], 0.2, "B.Cu")
+T(N5("7"), [(5.21, cy + 3.1), (5.7, cy + 3.1), (5.7, cy + 2.5), (6.06, cy + 2.14), (6.25, cy + 2.14)], 0.2, "B.Cu")
+# OUT- (6): south into C628's OUT- pad; via behind it (north-east) -> B: R607, FB607
+T(N5("6"), [(xw, y(6)), (xw, cy + 1.7), (4.25, cy + 2.1), (4.25, cy + 2.35)], 0.25)
+T(N5("6"), [(5.55, cy + 1.9), (5.0, cy + 1.9), (5.0, cy + 2.35)], 0.4)
+V(5.55, cy + 1.9, N5("6"), bl.VIA_D, bl.VIA_DRILL)
+T(N5("6"), [(5.55, cy + 1.9), (4.55, cy + 1.9), (3.9, cy + 2.55), (3.0, cy + 2.55)], 0.4, "B.Cu")
+T(N5("6"), [(4.19, cy + 2.26), (4.19, cy + 2.95)], 0.25, "B.Cu")
+# C628 GND plane via (east of its pad)
+T("GND", [(7.0, cy + 2.85), (7.45, cy + 2.85)], 0.4)
+G(7.45, cy + 2.85)
+# CIN: +3V3_CP via west of C625 (B: FB605 / R617)
+T("/power/+3V3_CP", [(2.35, cy - 0.95), (1.21, cy - 0.95)], 0.4)
+V(1.21, cy - 0.95, "/power/+3V3_CP", bl.VIA_D, bl.VIA_DRILL)
+T("/power/+3V3_CP", [(2.11, 16.95), (2.11, 17.5), (2.01, cy - 0.95), (1.21, cy - 0.95)], 0.4, "B.Cu")
+T("/power/+3V3_CP", [(1.89, 19.2), (1.89, cy - 0.26), (1.21, cy - 0.94)], 0.25, "B.Cu")
+T("+3V3", [(4.5, 16.9), (3.9, 16.9)], 0.3, "B.Cu")                       # L4 +3V3 via east of FB605
+V(4.5, 16.9, "+3V3", bl.VIA_D, bl.VIA_DRILL)
+# PG network (B): R617 -> EN- via -> EN+ via, In2 via from U603 PG
+T("/power/PG_5V1", [(2.91, 19.2), (3.5, 19.2), (3.9, 19.6), (5.9, 19.6), (6.2, ye(8))], 0.2, "B.Cu")
+T("/power/PG_5V1", [(6.2, ye(8)), (6.6, 18.9), (7.6, 18.9), (7.9, 18.6)], 0.2, "B.Cu")
+T("/power/PG_5V1", [(xe, cy - 1.7), (6.4, cy - 1.05), (6.4, 18.7), (6.6, 18.9)], 0.2, "B.Cu")
+# -2V5: FB607 -> C629 + via
 T("-2V5", [(0.6, 20.18), (0.6, 20.75)], 0.4, "B.Cu")
 T("-2V5", [(0.6, 20.75), (0.6, 21.25), (0.75, 21.4), (1.21, 21.4)], 0.4, "B.Cu")
 V(0.6, 20.75, "-2V5", bl.VIA_D, bl.VIA_DRILL)
 blk.iface("-2V5", 0.6, 20.75, "In3.Cu", "W", "supply", None, "via at FB607 / C629 (U605 OUT- -2.50 V, 50 mA)")
-# TIGHTEN (24 Nov): GND vias at the LM27762 input capacitor GND pads (were only the EP vias, 1.7-2.8 mm away)
-T("GND", [(2.7, 12.6), (2.7, 13.15), (2.55, 13.3)], 0.4)
-G(2.55, 13.3)                                                            # C613 / C612 (U604 CIN), also C621 (B)
-T("GND", [(2.35, 20.3), (2.35, 20.55), (2.0, 20.9)], 0.4)
-G(2.0, 20.9, 0.4, 0.2)                                                   # C625 (U605 CIN) / C619
-G(10.45, 17.05)                                                          # C630 (U605 OUT+, B) GND pad, east
+# U605 CIN ground via (C625 / C619)
+T("GND", [(2.35, cy + 1.3), (2.35, cy + 1.55), (2.0, cy + 1.9)], 0.4)
+G(2.0, cy + 1.9, 0.4, 0.2)
 G(17.75, 6.0)                                                            # C632 (B) GND pad, east
-G(7.75, CY4 + 2.5)                                                       # R606 ground
-T("GND", [(7.19, CY5 + 2.5), (7.19, 20.81), (7.75, 20.25)], 0.25)
-G(7.75, 20.25)                                                           # R608 ground
 
 # ============================================================================= grounds: F / B pours, In1 plane of the block
 # L4 +3V3 stand-in for the board's background plane (removed at merge, gen_board): joins U601's output vias, U602's

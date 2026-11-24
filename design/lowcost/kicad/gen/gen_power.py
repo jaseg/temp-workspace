@@ -266,14 +266,15 @@ def main():
     place(fb1, "1", (xt + g(5), yv))
     sh.wire(f["2"], fb1["1"])
     sh.label("VBUS_F", (xt, yv - 0.0))
-    # VBUS rail: C602 / C603 (U601 input) are drawn at U601; C632 DNP damper here
+    # VBUS rail: C602 / C603 (U601 input) are drawn at U601; C632 damper (fitted) here
     xv = fb1["2"][0] + g(4)
     sh.wire(fb1["2"], (xv + g(6), yv))
     sh.power("VBUS", (xv + g(6), yv), dy=-2.54)
     damp = sh.add("Device:C_Polarized", "C632", "47u 10V", (0, 0), fp="Capacitor_Tantalum_SMD:CP_EIA-3528-21_Kemet-B",
-                  lcsc="C22036", mpn="TAJB476K010RNJ", dnp=True,
-                  fields={"Note": "DNP: VBUS hot-plug damper (tantalum ESR ~1 R); fit if the plug-in ringing "
-                                  "exceeds 6 V at U601/U603 (power-tree.md section 7)"})
+                  lcsc="C22036", mpn="TAJB476K010RNJ",
+                  fields={"Note": "FITTED (recheck RP-3, 24 Nov): VBUS hot-plug damper, tantalum ESR ~1 R damps the "
+                                  "cable-L / ceramic-C ringing that the SMAJ5.0A (clamp ~9 V) cannot keep under the "
+                                  "U603 6.0 V abs max; measure the plug-in transient on the first board"})
     place(damp, "1", (xv, yv))
     sh.gnd(damp["2"])
     sh.text("USB-C sink, 5.1k CC pull-downs (default USB power, no PD).\n"
@@ -347,7 +348,9 @@ def main():
     lm27762(sh, "U604", (X4, Y3), "+5V1F", vin_y=vo[1],
             cin=[("C613", "100n", {"fields": {"Note": "U604 pin 3, closest"}}),
                  ("C612", "22u", {"fields": {"Note": "U604 CIN on the IC layer at pin 3 (moved; DECOUPLING-4)"}})],
-            c1=("C618", "1u", {"size": "0603", "lcsc": "", "fields": {"Note": "flying cap C1, 25 V (moved)"}}),
+            c1=("C618", "1u", {"size": "0603", "lcsc": "C15849", "mpn": "CL10A105KB8NNNC",
+                                 "fields": {"Note": "flying cap C1, 50 V X5R 0603 (recheck RP-9; LCSC # from the "
+                                                    "basic-parts list, stock to confirm at order)"}}),
             ccp=("C626", "10u", {"fields": {"Note": "CCP at pin 5 (moved from the LM337 ADJ)"}}),
             outp=("+5V_LDO", [("C617", "10u", {"fields": {"Note": "OUT+ at pin 11 (moved)"}})], "FB604", "+5V"),
             outn=("-5V_LDO", [("C621", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB603", "-5V"),
@@ -385,7 +388,9 @@ def main():
     lm27762(sh, "U605", (xu5, yu5), "+3V3_CP",
             cin=[("C625", "10u", {"fields": {"Note": "U605 CIN on the IC layer at pin 3 (moved from +2V5)"}})],
             c1=("C624", "1u", {"fields": {"Note": "flying cap C1 (moved from +2V5)"}}),
-            ccp=("C619", "4.7u", {"size": "0603", "fields": {"Note": "CCP at pin 5 (moved; >= 2 uF effective)"}}),
+            ccp=("C619", "4.7u", {"size": "0603", "lcsc": "C19666", "mpn": "CL10A475KO8NNNC",
+                                    "fields": {"Note": "CCP at pin 5, 16 V X5R 0603: about 3 uF at 3.3 V (>= 2 uF "
+                                                       "effective, DS 7.2.2.4.1; recheck RP-9, stock to confirm)"}}),
             outp=("+2V5_LDO", [("C630", "10u", {"fields": {"Note": "NEW: OUT+ at pin 11 (DS: >= 2.2 uF)"}})],
                   "FB606", "+2V5"),
             outn=("-2V5_LDO", [("C628", "10u", {"fields": {"Note": "OUT- at pin 6 (moved)"}})], "FB607", "-2V5"),

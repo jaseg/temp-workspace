@@ -321,9 +321,11 @@ FL.zone("-5V", ["F.Cu"], [(p5[0] - 0.13, 12.0), (p6[0] + 0.13, 12.0), (p6[0] + 0
 for y in (12.80, 13.45):
     FL.via(9.0, y, "-5V")
 FL.track("-5V", 0.25, [p8, (p8[0], YP), c113])
-FL.zone("-5V", ["F.Cu"], [(p8[0] - 0.13, 12.0), (12.80, 12.0), (12.80, 12.95), (12.05, 12.95), (12.05, 13.45),
-                          (11.37, 13.45), (11.37, 12.55), (p8[0] - 0.13, 12.55)])
-for xy in ((12.25, 12.0), (12.5, 12.65)):
+# REPAIR (24 Nov, recheck RF2-3): the pin-8 polygon no longer reaches the pin row; it starts at C113's -5V pad and
+# carries the two plane vias east of the pad, so pin 8 -> C113 -> vias (were at the pin end, 0.6 mm from pin 8)
+FL.zone("-5V", ["F.Cu"], [(c113[0] - 0.3, c113[1] - 0.28), (12.85, c113[1] - 0.28), (12.85, c113[1] + 0.75),
+                          (12.3, c113[1] + 0.75), (12.3, c113[1] + 0.28), (c113[0] - 0.3, c113[1] + 0.28)])
+for xy in ((12.55, c113[1] - 0.05), (12.55, c113[1] + 0.5)):
     FL.via(*xy, "-5V")
 # TIGHTEN (24 Nov): no plane via between the VS- pins (5 / 6 / 8) and their capacitors: the board's -5V rail router
 # had landed a via between pins 5 and 6 (current reached the pins before C112).  Via-only rule area (pours allowed)
@@ -1079,9 +1081,9 @@ print(f"vias in / touching soldered pads: {len(in_pad)}", in_pad[:12])
 # ============================================================================= checks
 import floorplan as fpl
 mem = fpl.membership(nl)
-REFS = sorted([r for r, b_ in mem.items() if b_ == "analog" and r not in ("J102", "R122")] +
+REFS = sorted(set([r for r, b_ in mem.items() if b_ == "analog" and r not in ("J102", "R122")] +
               ["C402", "C403", "C404", "C407", "C408", "C409"] +
-              ["C606", "C614", "C616", "C622"])         # power-sheet capacitors moved to the loads (24 Nov schematic)
+              ["C606", "C614", "C616", "C622"]))        # power-sheet capacitors moved to the loads (24 Nov schematic)
 RF = {A(n): W for n in ("VIN", "BUF_OUT_S", "BUF_OUT_T", "BRG_IN", "BRG_A", "BRG_K", "STRB_A", "STRB_K", "CLIP",
                         "TRF2_OUT", "TRF2_RFIN", "TRF2_IN", "PADN", "TRF1_OUT", "TRF1_RFIN", "TRF1_IN",
                         "S_STROBE_P", "S_STROBE_N")}

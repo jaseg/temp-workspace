@@ -492,6 +492,19 @@ print(board_power.table(PWR))
 if "--powonly" in sys.argv:
     bl.save_board(B, os.path.join(SCR, "powonly.kicad_pcb"))
     sys.exit(0)
+# REPAIR (24 Nov, recheck RF2-9 / PARTS-9): DNP parts of the schematic (symbol 'dnp yes') are excluded from the BOM
+# and the placement file on the board.  The KiCad 7 board format has no footprint DNP flag, so the nightly parity
+# check still lists 'Do not populate' for these (4 warnings: C631, D402, D403, R122); assembly output is right.
+import re as _re, glob as _glob
+_DNP = set()
+for _f in _glob.glob(os.path.join(HERE, "../../kicad/*.kicad_sch")):
+    for _m in _re.finditer(r'\(symbol \(lib_id "[^"]+"\)(.*?)\(property "Reference" "([^"]+)"', open(_f).read(), _re.S):
+        if _re.search(r'\(dnp yes\)', _m.group(1)):
+            _DNP.add(_m.group(2))
+for _fp in B.GetFootprints():
+    if _fp.GetReference() in _DNP:
+        _fp.SetAttributes(_fp.GetAttributes() | pcbnew.FP_EXCLUDE_FROM_BOM | pcbnew.FP_EXCLUDE_FROM_POS_FILES)
+print("DNP (excluded from BOM / pos):", sorted(_DNP))
 bl.save_board(B, OUT)
 bf.write_pro(OUT.replace(".kicad_pcb", ".kicad_pro"), sorted(RF))
 

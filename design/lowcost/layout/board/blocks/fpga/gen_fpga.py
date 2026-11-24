@@ -179,9 +179,12 @@ for k, (pin, net) in enumerate(TOPP):
     edge(net, f"U501.{pin}; west bundle on L6")
 # TAP5 (pin 41) / TAP6 (pin 47): via west of the pin, L6 down inside the bundle
 p41, p47 = up(41), up(47)
-T("/TAP5", WS, [p41, (3.75, p41[1])])                # over the configuration column to a via west of it
-V(3.75, p41[1], "/TAP5")
-T("/TAP5", WS, [(3.75, p41[1]), (DX["/TAP5"], p41[1])] + fan("/TAP5", DX["/TAP5"], p41[1])[1:], "B.Cu", ch=0.3)
+# REPAIR (24 Nov, recheck RF2-5): TAP5 via 0.15 mm east and 0.4 mm, so its L2 / L5 antipad stays clear of the
+# board PH_STROBE_N run (centre 0.46 mm away, was 0.42; antipad 0.35 < 0.38 to the strobe edge: L2 solid under it)
+YT5 = p41[1] + 0.02
+T("/TAP5", WS, [p41, (3.92, p41[1]), (3.9, YT5)])
+blk.via(3.9, YT5, "/TAP5", 0.4, 0.2)
+T("/TAP5", WS, [(3.9, YT5), (DX["/TAP5"], YT5)] + fan("/TAP5", DX["/TAP5"], YT5)[1:], "B.Cu", ch=0.3)
 edge("/TAP5", "U501.41; west bundle on L6")
 T("/TAP6", WS, [p47, (3.75, p47[1])])
 V(3.75, p47[1], "/TAP6")
@@ -316,11 +319,15 @@ T("GND", 0.3, [c8g, (c8g[0], 3.45)])
 V(c8g[0], 3.45, "GND")
 T(CK3, 0.25, [u7, (10.1, u7[1])])                        # pin 7 -> via under the body -> B -> via -> F -> pin 1
 V(10.1, u7[1], CK3)
-T(CK3, 0.3, [(10.1, u7[1]), (12.1, u7[1])], "B.Cu")
-V(12.1, u7[1], CK3)
-T(CK3, 0.25, [(12.1, u7[1]), (12.1, u1[1]), u1], ch=0.0001)
+T(CK3, 0.3, [(10.1, u7[1]), (12.1, u7[1])], "B.Cu")    # continues below (REPAIR)
 c9v, c9g = blk.pad("C509", "@" + CK3), blk.pad("C509", "@GND")
 c23v, c23g = blk.pad("C623", "@" + CK3), blk.pad("C623", "@GND")
+# REPAIR (24 Nov, recheck RF2-3): the B link from pin 7 comes up at C623 (north of its pad), so pin 1 is fed through
+# C509 / C623 and not straight from the via
+XL1 = c23v[0]
+T(CK3, 0.3, [(12.1, u7[1]), (12.6, u7[1] + 0.5), (12.6, c23v[1] - 1.05), (XL1, c23v[1] - 0.75)], "B.Cu")
+V(XL1, c23v[1] - 0.75, CK3)
+T(CK3, 0.25, [(XL1, c23v[1] - 0.75), c23v])
 T(CK3, 0.25, [u1, c9v])
 T(CK3, 0.25, [c23v, c9v])
 for g_ in (c9g, c23g):

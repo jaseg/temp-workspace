@@ -54,7 +54,17 @@ def membership(nl):
                 blk[r] = "analog"
                 todo += list(by_ref[r])
     # bias / decoupling parts of the sampler-strobe TRFs hang on supply nets: follow their private nets
+    # as built (24 Nov): parts placed in another block than their sheet's (decoupling moved to the loads, J501 group)
+    for r, b_ in PLACED_IN.items():
+        if r in blk:
+            blk[r] = b_
     return blk
+
+
+PLACED_IN = {**{r: "analog" for r in ("C402", "C403", "C404", "C407", "C408", "C409",   # TRF supply caps (pstrobe sheet)
+                                      "C606", "C614", "C616", "C622")},               # power-sheet caps at U101 / TRFs
+             **{r: "phase" for r in ("C615", "C620", "J102", "R122")},                  # U302 caps; EXT_CLK input
+             **{r: "mcuif" for r in ("J501", "R511", "R512")}}                          # programming header group
 
 
 def fp_area(fpid, cache={}):

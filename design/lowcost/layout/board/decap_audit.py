@@ -12,6 +12,8 @@ Defects:
   D2s (same side only) a supply via sits between pin and capacitor or at the pin: nearest supply via closer to the pin than the
       capacitor pad is (d(via, pin) < d_cu - 0.1) - current reaches the pin before the capacitor
   D2g capacitor GND pad without a GND via within 1.0 mm
+  D2p (primary capacitor, same side) the supply via nearest the pin is nearer the pin than the capacitor supply pad
+      (the plane via sits at the IC pin instead of behind the capacitor; user rule, recheck RF2-3)
 Run: python3 decap_audit.py [board.kicad_pcb] [--refs U603,U601] [--all]"""
 import sys, math, re
 import pcbnew
@@ -100,27 +102,43 @@ def audit(path, refs=None, show_all=False):
         d1 = (cg_ is not None and cg_ > 0.3 and d > 1.0) or (cg_ is None and d > 1.5)
         d2s = cg_ is not None and vs is not None and vs[0] < d - 0.1     # same side only (B caps need a via)
         d2g = vg is None or vg > 1.0
+        d2p = None
+        if cg_ is not None and sv and sv[0][0] < 4.0:
+            d2p = (sv[0][1], sv[0][2], vs[0])
         rows.append(dict(cap=r, side="F" if c.GetLayer() == pcbnew.F_Cu else "B", ic=u.GetReference(),
                          pin=p.GetNumber(), net=sn, d_cu=round(d, 2), crt=None if cg_ is None else round(cg_, 2),
-                         vS=vs, vG=vg, D1=d1, D2s=d2s, D2g=d2g, pos=(round(mm(c.GetPosition().x), 2),
+                         vS=vs, vG=vg, D1=d1, D2s=d2s, D2g=d2g, D2p=d2p, pos=(round(mm(c.GetPosition().x), 2),
                                                                      round(mm(c.GetPosition().y), 2))))
     # D1 only for the primary capacitor of each IC / net (nearest); bulk / secondary capacitors are reported, not flagged
     prim = {}
     for q in rows:
-        k = (q["ic"], q["net"])
+        k = (q["ic"], q["pin"], q["net"])
         rank = lambda q_: q_["d_cu"] + (0.0 if q_["crt"] is not None else 1.0)     # same-side capacitor preferred
         if k not in prim or rank(q) < rank(prim[k]):
             prim[k] = q
+    capS = {}                                                    # supply pads of every decoupling capacitor, by net
+    for c in b.GetFootprints():
+        if c.GetReference().startswith("C") and len(c.Pads()) == 2 and "GND" in [p.GetNetname() for p in c.Pads()]:
+            for p in c.Pads():
+                if p.GetNetname() != "GND":
+                    capS.setdefault(p.GetNetname(), []).append(bbox(p))
     for q in rows:
-        q["prim"] = prim[(q["ic"], q["net"])] is q
+        if q["D2p"]:
+            x, y, dpin = q["D2p"]
+            q["D2p"] = dpin < min(pt_rect((x, y), r) for r in capS.get(q["net"], [])) - 0.05
+        else:
+            q["D2p"] = False
+    for q in rows:
+        q["prim"] = prim[(q["ic"], q["pin"], q["net"])] is q
         if not q["prim"]:
             q["D1"] = False
+            q["D2p"] = False
     rows.sort(key=lambda q: (q["ic"], q["cap"]))
     return rows
 
 
 def fmt(q):
-    fl = " ".join(k for k in ("D1", "D2s", "D2g") if q[k]) + ("" if q["prim"] else " (2nd)")
+    fl = " ".join(k for k in ("D1", "D2s", "D2g", "D2p") if q[k]) + ("" if q["prim"] else " (2nd)")
     return (f"{q['ic']:6s} {q['pin']:>4s} {q['cap']:6s} {q['side']} {q['net'][:16]:16s} d_cu {q['d_cu']:5.2f} "
             f"crt {'  -  ' if q['crt'] is None else f'{q[chr(99)+chr(114)+chr(116)]:5.2f}'} "
             f"vS(pin/cap) {str(q['vS']):14s} vG {str(q['vG']):5s} {q['pos']} {fl}")
@@ -132,8 +150,8 @@ if __name__ == "__main__":
     if "--refs" in sys.argv:
         refs = set(sys.argv[sys.argv.index("--refs") + 1].split(","))
     rows = audit(path, refs)
-    bad = [q for q in rows if q["D1"] or q["D2s"] or q["D2g"]]
+    bad = [q for q in rows if q["D1"] or q["D2s"] or q["D2g"] or q["D2p"]]
     for q in (rows if "--all" in sys.argv else bad):
         print(fmt(q))
     print(f"capacitors {len(rows)}; D1 {sum(q['D1'] for q in rows)}; D2s {sum(q['D2s'] for q in rows)}; "
-          f"D2g {sum(q['D2g'] for q in rows)}")
+          f"D2g {sum(q['D2g'] for q in rows)}; D2p {sum(q['D2p'] for q in rows)}")

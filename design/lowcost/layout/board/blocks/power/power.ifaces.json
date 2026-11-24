@@ -64,18 +64,18 @@
   },
   {
    "net": "+5V",
-   "x": 9.05,
-   "y": 8.77,
+   "x": 8.05,
+   "y": 7.0,
    "layer": "In3.Cu",
    "side": "W",
    "class": "supply",
    "width": null,
-   "note": "via at FB604 (U604 OUT+ 4.80 V, 41 mA)"
+   "note": "via behind FB604 (U604 OUT+ 4.80 V, 41 mA)"
   },
   {
    "net": "-5V",
-   "x": 0.45,
-   "y": 14.0,
+   "x": 0.4,
+   "y": 13.6,
    "layer": "In3.Cu",
    "side": "W",
    "class": "supply",

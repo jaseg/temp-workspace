@@ -201,8 +201,10 @@ V("GND", (57.4, ey(35)))
 # SE: pin 24 east into C712.1, inner +3V3 via; C712.2 -> GND via pair -> C714
 c1, c2 = P("C712", "@+3V3"), P("C712", "@GND")
 T("+3V3", WP, [(sx(24), c1[1]), c1])
-T("+3V3", 0.25, [UP(24), (sx(24), YS_IN - 0.45)])
-V("+3V3", (sx(24), YS_IN - 0.45))
+# REPAIR (24 Nov, recheck RF2-3): the plane via sits at C712, north of its +3V3 pad (pin 24 -> C712 -> via), not at
+# the pin's inner end
+T("+3V3", WP, [c1, (c1[0], c1[1] - 0.75)])
+V("+3V3", (c1[0], c1[1] - 0.75))
 T("GND", WP, [c2, (58.0, c2[1])])
 V("GND", (57.3, c2[1]), (58.0, c2[1]))
 b1, b2 = P("C714", "@GND"), P("C714", "@+3V3")
