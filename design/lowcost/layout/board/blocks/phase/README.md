@@ -190,3 +190,8 @@ into 50.45 R loaded line fine. 40 / 70 ps re-simulation still open.
 - **TRIG_SEL lane:** the board removes the x 9.25 B lane. TRIG_SEL reaches R386.1 from a board via at (11.3, 23.85),
   and the lane now carries -2V5. The `TRIG_SEL` iface entry is kept, but the board does not use it.
 - **Checks:** check_board 0 clearance / corner / courtyard; the unrouted nets are the plane-fed supplies only.
+
+## BOM-2 repair (25 Nov 2026)
+`silk_fix()` also moves footprint silkscreen within 0.3 mm of the block's west edge (the board edge) to F.Fab: D319's
+outline was clipped by the board edge (DRC silk_edge_clearance, re-check B2-11). Copper and placement unchanged.
+`phase_netview_u301.png` shows the removed TMUX136 area (24 Nov board) and is kept only as history.

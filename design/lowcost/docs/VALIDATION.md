@@ -381,3 +381,40 @@ the falling edge, RF2-8 the first-validation items still open (above), RF2-9 DNP
 | RF2-7 | mitigated | firmware limit of 1.30 V on both bias magnitudes (SPEC decision 21, kicad/README, ToO): 3.93 V at overload against 4 V; CLH/CLL +/-1.2 V would add 0.3 V of margin (not done) |
 | RF2-8 | open | see the open rows above (RF-5, DECOUPLING-2, BIASTEE-3 / -5, IO-2 / -3 / -5, PARTS-2 / -3 / -5 / -8, THEORY-6) |
 | RF2-9 | partly | DNP parts off the placement file; 43 fitted BOM lines still without an LCSC number (docs/bom.md) |
+
+## Status after the BOM reduction round (25 Nov 2026)
+
+**What changed** (user review of the JLC extended-part list; SPEC decisions 27-35; studies `research/bom2-trigger.md`,
+`research/bom2-input-taps.md`, `research/bom2-power-passives.md`; re-check `validation/recheck-bom2.md`):
+- Trigger selector: TMUX136 -> two BAT15-04W four-diode bridges steered by SS8550 / MMBT3904 from TRIG_SEL
+  (`sim/trig_switch`); SN65LVDS2 -> a ninth COS3502 (U313) for COARSE; C303 removed (decision 27).
+- Input servo: RV101 trimmer removed, LF/HF mismatch corrected in firmware; R118 / R119 / R123 / R120 4.7k / 10k / 15k /
+  22k, C106 1 nF C0G; C101 1.5 pF +/-0.05 pF 50 V; C207 / C631 100 pF (decision 28); R106 10 M 0603 on B.Cu (decision 35).
+- Tap capacitors C314-C345 stay fitted, now 0.5 pF +/-0.05 pF (decision 29; DNP would leave no strobe path).
+- Power: +5V1 and LM27762 dividers 1 % basic (no 0.1 % part left); inductors 4 -> 3 types, beads 3 -> 2; PTC -> 0 R,
+  TVS DNP, tantalum -> 4 x (1 R + 47 uF) MLCC damper (decisions 30-32).
+- Resistor / pad values moved to basic parts, U701 TPH2501, D401 half a BAT15-04W, R114-R116 300k 0603, R737 3.3k
+  (decisions 33-34).
+- BOM: extended part numbers 58 -> 27, fitted lines 94 -> 81 (53 basic / 28 extended lines), 0 resistors at 0.1 %
+  (was 2), 450 parts, 70.45 -> 70.39 USD. Stock of all 80 part numbers re-read 25 Nov 2026, JLC class unchanged.
+- Checks (25 Nov 2026): netlist 275 nets, 0 failed; ERC 0 errors (18 warnings); board check_board 0 (extra H1-H4 only),
+  via_in_pad FAIL 0, DRC jlc4 + parity 0 errors / 0 unconnected (450 warnings), decap_audit D1 1 / D2s 8 / D2g 1 / D2p 10.
+
+**Re-check findings** (`validation/recheck-bom2.md`):
+
+| Id | Sev | Status | How / where, or why open |
+|---|---|---|---|
+| B2-1 | medium | fixed | `theory-of-operation.md` rewritten for decisions 27-35: selector, COARSE, input servo and LF/HF calibration, as-built phase-array numbers, USB input, rails, calibration items 1 / 7 / 9, risks, bring-up |
+| B2-2 | medium | fixed (documented) | stock re-read for every part (`kicad/gen/lcsc_parts.py`, `bom.csv` / `bom.md`): BAT15-04W 865 = 37 boards, TRF37D73 25 = 5 boards; buy ahead or consign (bom.md, ToO risk 12) |
+| B2-3 | low | accepted, documented | own re-run: 5.33 V (18 uF effective per damper cap) / 5.78 V (12 uF) for 5.25 V; 5.58 / 6.05 V for a 5.5 V step. Accepted for the coincident worst corner; measure on the first board, a fifth 1 R + 47 uF branch (5.89 V) is the fallback (SPEC 32) |
+| B2-4 | low | documented | OUT+ LDO dropout on about 1 board in 6, total >= 9.0 V either way (SPEC 30, power-tree.md section 13, ToO section 7) |
+| B2-5 | low | documented | 8 mV margin: FB603 / FB604 0.05 R and the rail tracks kept as built (SPEC 30) |
+| B2-6 | low | accepted | GVA-84+ drain 4.71 V at the worst corner (SPEC 30, ToO sections 4 / 7) |
+| B2-7 | low | accepted, documented | off-bridge diode up to 3.9 V vs 4.0 V in overload only; CLH/CLL +/-1.3 V named as the margin option (ToO risk 4) |
+| B2-8 | low | open (hardware) | COS3502 COARSE toggle / delay drift at 3.3 V: firmware ignores COARSE above 60 MHz; measure on the first board, calibration item 7 at operating temperature |
+| B2-9 | low | fixed | confirmed (2 x 1 M left 1.6-2.8 % after the two-term fit); R106 -> 10 M 0603 basic on B.Cu, firmware fit -> six fixed time constants, applied only above 1 %: 0.29-0.55 % flat, step 0.13-0.26 % (`sim/bom2_input/RESULT.md`, SPEC 35) |
+| B2-10 | nit | fixed | `layout/board/README.md`: +2V5 column feed about 40 mA, 5 mV drop |
+| B2-11 | nit | fixed | D319 silk moved to Fab (`gen_phase.py` silk_fix); DRC silk_edge_clearance 0 |
+| B2-12 | nit | fixed | SPEC header, parts list and decisions 6 / 18 / 25 / 26 marked superseded |
+
+Still open from earlier rounds: see the rows above (RF2-8 list); the block `*_netview_*.png` crops show the 24 Nov board.

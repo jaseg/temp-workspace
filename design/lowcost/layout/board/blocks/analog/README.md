@@ -5,6 +5,14 @@
 check_board (25 Nov, bom2 netlist, 105 refs): 0 missing / extra / footprint / value / pad-net / no-net, 0 clearance, 0 corners, 0 off-axis pad exits, 0 RF width / gap, 0 courtyard overlaps; unrouted only the plane-fed +5V, -5V, +2V5, -2V5, +3V3. Script checks: 0 vias in node windows or near RF copper, 0 vias in or touching a soldered pad. `via_in_pad.py`: FAIL 0 (105 vias, 8 near 0.15-0.2 mm, 10 EP-allowed).
 DRC (`tools/run_drc.sh --rules jlc4`, KiCad 10.99, 6 layers): `total 135: error 14, warning 121` = 13 unconnected_items (only the 5 plane-fed supplies) + 1 invalid_outline (no Edge.Cuts in a block); 89 lib_footprint_mismatch + 4 lib_footprint_issues + 19 via_dangling (supply vias waiting for L4) + 9 track_dangling (the 9 interface stubs). 0 courtyard, clearance, width, hole, silk.
 
+## Changes 25 Nov 2026, BOM-2 repair (SPEC decision 35)
+- **R106 10 M 0603 on B.Cu** (horizontal, centre 7.50 / 14.90; pad 1 IN_BIAS_MID west, pad 2 IN_BIAS east). An 0603 does
+  not fit the R105 / C107 0402 column. IN_BIAS_MID: R105.2 -> 0.3 mm top track down to y 13.0, 45 degrees west -> via
+  (6.675, 13.95) -> B track into R106.1 (via hole edge 0.37 mm from the pad). IN_BIAS: B.Cu from the channel via
+  (8.52, p3) straight down, 45-degree jog onto R106.2; the old IN_BIAS via (7.0, 14.07) is removed.
+- check_board (105 refs): 0 in every class; script checks 0 vias in node windows / in soldered pads; via_in_pad FAIL 0.
+  Interfaces unchanged.
+
 ## Changes 25 Nov 2026 (bom2 netlist: SPEC decisions 28, 31, 33, 34)
 Generator only; `analog.kicad_pcb` regenerated. Values (C101, C106, C207, R105, R106, R118, R119, R123, R202, R203, R401-R405) come from the netlist with no layout change.
 - **RV101 removed, R120 22k pin 2 to GND:** the trimmer area (6.5 x 5 mm, x 8.8-15.3, y 16.4-21.4) is no longer used for parts. R120 GND goes up to one GND via (8.36, 18.75), shared with R117 / C105.
