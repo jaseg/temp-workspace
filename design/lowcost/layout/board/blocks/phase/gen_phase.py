@@ -370,142 +370,139 @@ for net in ("VTAP_N", "VTAP_P"):
     blk.iface(net, 0, 0, "In3.Cu", "-", "supply", None, "L4 strip under the taps (drawn by this block), fed on L4")
 
 # ============================================================================= front chain
-# Column x 0-9.5 (full height): J102, shunts, U301 TMUX136, U302 TLV3801, CMP_P / CMP_N network, U304.
-# Axis corridor x 9.5-26.5, y 12-18: U303 TRF37D73 -> bias tee (bead on top, choke / 1 k / cold cap on B
-# straight below through a via pair) -> C311 -> 12 dB pi pad -> PH_LINE launch.  North strip y 0-2.5
-# (x 9.5-26.5, above pstrobe): C301 and the VSW_GND network (B).
-# --- J102 EXT_CLK edge SMA, R301 / R122 49.9 R shunts (staggered, both north of the line), U301 (rot 270)
+# BOM review 2 (SPEC decision 27, docs/research/bom2-trigger.md): the TMUX136 (U301, its local ground and SEL
+# shifter) and the SN65LVDS2 (U304) are gone.  The trigger selector is two four-diode bridges (2 x BAT15-04W
+# SOT-323 each), the COARSE receiver a ninth COS3502 (U313, on B: a slow logic-level receiver, < 100 MHz).
+# Column x 0-9.5 (full height):
+#   north   J102 (unchanged), EXT_CLK east along y 4 -> down x 5.15 through the R301 / R122 shunt pads -> west along
+#           y 7.9 below the SMA ground pad -> D319 pin 3 from the north; BUF_OUT_T straight down to D317 pin 3
+#   y 8-11  the four SOT-323: D320 (EXT b, rot 0) | Y node | D318 (signal b, rot 180) side by side, their pins 3
+#           facing across a 1.4 mm Y bar; D319 (EXT a) west of D320, D317 (signal a) above D318.  Copper of the two
+#           b packages is a mirror image about the Y node (x 6.09); pins 1 / 2 (T / B) by short 0.16 mm traces.
+#   y 10-18 U302 TLV3801 (rot 90, IN+ pin 5 straight below the Y node) with the CMP_P / CMP_N network of the
+#           previous layout (same relative geometry, moved 2.2 mm west and 3.6 mm south); RFIN runs east under
+#           it and climbs 45 degrees into U303 pin 2.
+#   y 18-22.5 F: TRIG_LEVEL network (R383-R385, C304, TP302).  B: U313 COS3502 + C313.
+# B north (x 4.9-9.5, y 0-7.4): Q301 / Q302 and R386, R388, R389; feeds R391-R394 on B on vias in the T / B traces;
+# SW_S / SW_SB on L3 (block In2: slow, static bias lines, as bom2-trigger.md asks); COARSE on B (x 0.4 west lane).
 YJ = 4.0
 blk.place("J102", 2.1, YJ, 270)
 jx, jy = P("J102", "1")
-# J102 ground pads (F + B): VIAS-OUT-OF-PADS (24 Nov) the via rows moved from inside the soldered pads to just
-# outside them (hole edge 0.2 mm, as J101), each joined to the pad on F and B by a 0.45 mm neck: a row on the
-# inner edge of both pads (towards the centre pin, 1.1 mm from it) and a row on the outer edge of the south pad
-# (the north outer edge is the block edge, where the board's L3 slow lines run)
+# J102 ground pads (F + B): via rows just outside the pads (hole edge 0.2 mm, F / B 0.45 mm necks) on the inner edge
+# of both pads.  BOM review 2: the outer row of the south pad is gone (EXT_CLK now passes below that pad, 0.32 mm)
 JGX = (0.7, 1.65, 2.6, 3.55)
-for s_, side_ in ((-1, -1), (1, -1), (1, 1)):
+for s_, side_ in ((-1, -1), (1, -1)):
     yv_ = YJ + s_ * (2.825 + side_ * (0.675 + 0.30))
     for xg_ in JGX:
         gv(xg_, yv_)
         for ly_ in ("F.Cu", "B.Cu"):
             T("GND", 0.45, [(xg_, YJ + 2.825 * s_), (xg_, yv_)], layer=ly_, ch=0)
-for ref, xs in (("R301", 5.17), ("R122", 6.11)):
-    place2(ref, xs, YJ - 0.51, "v", "GND")
-    g = P(ref, "@GND")
-    gv(g[0], g[1] - 0.62)
-    T("GND", 0.4, [g, (g[0], g[1] - 0.62)], ch=0)
-XU1, YU1 = 8.04, 5.3
-place_cond("U301", XU1, YU1, lambda pp: pp["1"][1] < -0.5 and pp["1"][0] > 0.5 and pp["3"][1] < -0.5)
-p1, p3, p8, p9, p10 = (P("U301", k) for k in ("1", "3", "8", "9", "10"))
-assert abs(p3[0] - 7.79) < 1e-4 and abs(p1[0] - 8.79) < 1e-4 and abs(p8[0] - 8.29) < 1e-4, (p1, p3, p8)
-T("/EXT_CLK", W50, [P("J102", "1"), (p3[0], YJ), p3], name="EXT_CLK: J102 -> U301.3", z=50, rf=True)
-T("/BUF_OUT_T", W50, [(p1[0], 0.0), p1], name="BUF_OUT_T: N edge -> U301.1", z=50, rf=True)
-blk.iface("/BUF_OUT_T", p1[0], 0.0, "F.Cu", "N", "rf50", W50, "from the input stage (BUF802 trigger output)")
-# VSW_GND pins 2, 4, 5, 6, 7 (DECOUPLING-3, 24 Nov): 0.5 mm bar under the body from pin 5 to x 8.35, every VSW pin
-# joined pad-wide; C303 (1 n C0G, VSW -> GND) on top at pin 5; C302 (100 n VSW -> GND) and C301 (100 n +2V5 -> VSW)
-# on B directly under U301, joined by a 0.5 mm B bar through the VSW via; C301's +2V5 pad on a via at pin 10
-VSW = "/trigger_phase/VSW_GND"
-q2, q4, q5, q6, q7 = (P("U301", k) for k in "24567")
-T(VSW, 0.5, [q5, (8.25, YU1)], ch=0)
-for q, w_ in ((q2, 0.2), (q4, 0.25), (q6, 0.25), (q7, 0.2)):
-    T(VSW, w_, [q, (q[0], YU1)], ch=0)
-XVV = 7.72                                          # VSW via under the body (24 Nov: 0.18 mm off pin 5,
-                                                    # 0.22 mm off C301's pad on B: no via in a pad)
-V(XVV, YU1, VSW)
-place2("C303", 5.68, YU1, "h", "GND")                # top, VSW pad 0.4 mm from pin 5 (courtyards touch)
-T(VSW, 0.5, [P("C303", "@" + VSW), q5], ch=0)
-place2("C302", 6.5, YU1, "h", "GND", side="B")       # B under the west pins
-place2("C301", 8.74, YU1, "h", VSW, side="B")        # B under the body, +2V5 pad below pin 10
-T(VSW, 0.5, [P("C302", "@" + VSW), P("C301", "@" + VSW)], layer="B.Cu", ch=0)
-YG3 = YU1 + 0.65                                     # shared GND via of C303 (F) and C302 (B)
-g3, g2b = P("C303", "@GND"), P("C302", "@GND")
-gv(g3[0], YG3)
-T("GND", 0.4, [g3, (g3[0], YG3)], ch=0)
-T("GND", 0.4, [g2b, (g2b[0], YG3), (g3[0], YG3)], layer="B.Cu")
-c1v = P("C301", "@" + VSW)
-T(VSW, 0.3, [c1v, (c1v[0], 0.45), (18.65, 0.45), (18.9, 0.7), (18.9, 1.25)], layer="B.Cu", ch=0.3)
-# VCC pin 10 (REPAIR 24 Nov, recheck RF2-1 / RF-7): no +2V5 copper beside BUF_OUT_T any more.  Pin 10 -> east,
-# south to a 0.4 mm via beside pin 9 (1.5 mm from BUF_OUT_T's end at pin 1, so L2 stays solid under the trace; the
-# pstrobe cut-out x >= 9.5 forbids anything further east) -> B: C301's +2V5 pad, and on B north (x 9.03, under the old
-# F track's place) to C306 / its via
-XVC, YVC = 9.30, YU1 + 0.7
-T("+2V5", 0.2, [p10, (XVC + 0.1, p10[1]), (XVC + 0.1, YVC - 0.1), (XVC, YVC)], ch=0.1)
-blk.via(XVC, YVC, "+2V5", 0.4, 0.2)
-c1p = P("C301", "@+2V5")
-T("+2V5", 0.3, [(XVC, YVC), (c1p[0] + 0.07, YVC - 0.2), (c1p[0] + 0.07, c1p[1])], layer="B.Cu", ch=0)
-place2("C306", 11.8, 1.62, "v", "GND", side="B")   # second U302 100 n at the north +2V5 via pair; GND pad into the B pour
-c6p = P("C306", "@+2V5")
-T("+2V5", 0.4, [c1p, (c1p[0], c6p[1] + 0.25), (c1p[0] + 0.25, c6p[1]), c6p], layer="B.Cu", ch=0)
-# (24 Nov, board integration: the +2V5 via at x 10.45 sat under the board PH_STROBE_N run x 10.60; C306 moved
-# 0.12 mm south so its GND via clears the PH_STROBE_N run at board y 23.21)
-# (24 Nov, integration: C306's GND pad is fed by the board's B pour again; its own via sat on the board's L3
-# DAC_TRIG / TRIG_SEL slow lines at y 23.05 / 23.35)
-V(11.1, c6p[1], "+2V5")
-# VSW network on B in the north strip: R304 (GND), R305 (-2V5), TP301
-for x, ref in ((15.8, "R304"), (17.2, "R305")):
-    place2(ref, x, 1.5, "v", VSW, side="B")
-    o = [p for p in ("1", "2") if nn(ref, p) != VSW][0]
-    op = P(ref, o)
-    T(VSW, 0.3, [(x, 0.45), P(ref, "@" + VSW)], layer="B.Cu", ch=0)
-    V(op[0] + 0.65, op[1], nn(ref, o))
-    T(nn(ref, o), 0.3, [op, (op[0] + 0.65, op[1])], layer="B.Cu", ch=0)
-bplace("TP301", 18.9, 1.25, 0, side="B")
-# SEL pin 9: via, B.Cu lane x 9.25 down to R303 (-2V5) / R302 (TRIG_SEL) near the south edge
-XS = 9.25
-T("Net-(U301-SEL)", W_SIG, [p9, (p9[0], 6.3), (p9[0] + 0.13, 6.43), (p9[0] + 0.13, 6.65)], ch=0)
-V(p9[0] + 0.13, 6.65, "Net-(U301-SEL)")
-place2("R303", 7.9, 19.0, "v", "Net-(U301-SEL)", side="B")
-place2("R302", 9.0, 20.5, "v", "Net-(U301-SEL)", side="B")
-T("Net-(U301-SEL)", W_SIG, [(p9[0] + 0.13, 6.65), (XS, 6.98), (XS, 19.4), (9.0, 19.65), P("R302", "@Net-(U301-SEL)")],
-  layer="B.Cu", ch=0)
-T("Net-(U301-SEL)", W_SIG, [P("R303", "@Net-(U301-SEL)"), (XS, P("R303", "@Net-(U301-SEL)")[1])], layer="B.Cu", ch=0)
-q = P("R303", "@-2V5")
-V(q[0], q[1] + 0.62, "-2V5")
-T("-2V5", 0.3, [q, (q[0], q[1] + 0.62)], layer="B.Cu", ch=0)
-q = P("R302", "@/TRIG_SEL")
-T("/TRIG_SEL", W_SIG, [q, (q[0], q[1] + 0.4), (XS, q[1] + 0.65), (XS, BH)], layer="B.Cu", ch=0)
-blk.iface("/TRIG_SEL", XS, BH, "B.Cu", "S", "slow", W_SIG, "R302 10 k to U301 SEL")
 
-# --- U302 TLV3801 (rot 90): IN+ pin 5 straight below U301.8, CMP_P pin 8 / CMP_N pin 1 on the west column
-XU2, YU2 = 7.54, 8.6
+# --- geometry of the switch (local mm)
+TX, TY = 6.09, 9.30                         # Y node (TRIG_IN) between the two b packages
+XU2, YU2 = TX - 0.75, TY + 1.30 + 1.60      # U302 centre: courtyard top = b-package courtyard bottom (10.6)
+XA2 = 1.39                                  # D319 centre x (courtyard 0.09-2.69)
+D_REFS = {}
+
+
+def dplace(ref, x, y, rot, want):
+    """SOT-323 at (x, y) rot; `want` = {pin: (dx, dy)} offsets asserted (local frame)"""
+    fp = blk.place(ref, x, y, rot)
+    for pn, (dx, dy) in want.items():
+        px, py = P(ref, pn)
+        assert abs(px - x - dx) < 1e-4 and abs(py - y - dy) < 1e-4, (ref, pn, px - x, py - y)
+    return fp
+
+
+dplace("D320", TX - 1.7, TY, 0, {"3": (1.0, 0.0), "1": (-1.0, -0.65), "2": (-1.0, 0.65)})       # EXT b
+dplace("D318", TX + 1.7, TY, 180, {"3": (-1.0, 0.0), "1": (1.0, 0.65), "2": (1.0, -0.65)})     # signal b
+dplace("D317", TX + 2.05, TY - 3.0, 90, {"3": (0.0, -1.0), "1": (-0.65, 1.0), "2": (0.65, 1.0)})  # signal a
+dplace("D319", XA2, TY + 0.40, 90, {"3": (0.0, -1.0), "1": (-0.65, 1.0), "2": (0.65, 1.0)})       # EXT a
+TRIG_IN = "/trigger_phase/TRIG_IN"
+T1, B1, T2, B2 = (nn("D317", "1"), nn("D317", "2"), nn("D319", "1"), nn("D319", "2"))
+# Y node: bar between the two pins 3, stub straight down into U302 pin 5 (no via)
+T(TRIG_IN, W50, [P("D320", "3"), P("D318", "3")], name="Y bar D320.3 - D318.3", z=50, rf=True)
 place_cond("U302", XU2, YU2, lambda pp: pp["5"][1] < -0.5 and pp["5"][0] > 0.5 and pp["8"][0] < -0.5)
 i5 = P("U302", "5")
-assert abs(i5[0] - p8[0]) < 1e-4
-T("Net-(U301-COM1)", W50, [p8, i5], name="COM1: U301.8 -> U302.5", z=50, rf=True)
+assert abs(i5[0] - TX) < 1e-4, i5
+T(TRIG_IN, W50, [(TX, TY), i5], name="Y stub -> U302.5", z=50, rf=True)
+# bridge 1 (signal): B1 straight down D317.2 -> D318.2; T1 down the D318 body channel into D318.1 from the west
+p17_1, p17_2, p18_1, p18_2 = P("D317", "1"), P("D317", "2"), P("D318", "1"), P("D318", "2")
+assert abs(p17_2[0] - p18_2[0]) < 1e-6
+T(B1, W50, [p17_2, p18_2], name="B1", z=50, rf=True)
+T(T1, W50, [p17_1, (p17_1[0], p18_1[1] - 0.45), (p17_1[0] + 0.45, p18_1[1]), p18_1], name="T1", z=50, rf=True, ch=0)
+# bridge 2 (EXT): T2 through the D319 body channel, B2 by a 45-degree jog
+p19_1, p19_2, p20_1, p20_2 = P("D319", "1"), P("D319", "2"), P("D320", "1"), P("D320", "2")
+YCH2 = p19_1[1] - 1.0                                   # D319 channel (between pin 3 and the pin row)
+T(T2, W50, [p19_1, (p19_1[0], YCH2 + 0.25), (p19_1[0] + 0.25, YCH2), (2.0, YCH2), (2.55, YCH2 - 0.55), (2.55, p20_1[1] + 0.25), (2.8, p20_1[1]), p20_1],
+  name="T2", z=50, rf=True, ch=0)
+T(B2, W50, [p19_2, (p19_2[0], p20_2[1] + 0.25), (p19_2[0] + 0.25, p20_2[1]), p20_2], name="B2",
+  z=50, rf=True, ch=0)
+# inputs: BUF_OUT_T straight down to D317 pin 3; EXT_CLK from the SMA (shunts on its down leg) to D319 pin 3
+p17_3, p19_3 = P("D317", "3"), P("D319", "3")
+XBO = 8.79
+T("/BUF_OUT_T", W50, [(XBO, 0.0), (XBO, p17_3[1] - 1.0 - (XBO - p17_3[0])), (p17_3[0], p17_3[1] - 1.0), p17_3],
+  name="BUF_OUT_T: N edge -> D317.3", z=50, rf=True, ch=0)
+blk.iface("/BUF_OUT_T", XBO, 0.0, "F.Cu", "N", "rf50", W50, "from the input stage (BUF802 trigger output)")
+XE1, YE2 = 5.15, 7.90                       # EXT_CLK down leg (R301 / R122 pads on it) and return row
+T("/EXT_CLK", W50, [P("J102", "1"), (XE1 - 0.35, YJ), (XE1, YJ + 0.35), (XE1, YE2 - 0.35), (XE1 - 0.35, YE2), (p19_3[0] + 0.35, YE2),
+                    (p19_3[0], YE2 + 0.35), p19_3], name="EXT_CLK: J102 -> D319.3", z=50, rf=True, ch=0)
+GVR = (6.70, 6.57)                          # one GND via for both shunts (between the B transistor pads)
+gv(*GVR)
+for ref, ys in (("R301", 6.10), ("R122", 7.04)):     # 49.9 R shunts, pad ON the line (body east)
+    place2(ref, XE1 + 0.48, ys, "h", "/EXT_CLK")
+    g = P(ref, "@GND")
+    s_ = 1 if g[1] < GVR[1] else -1
+    T("GND", 0.4, [g, (GVR[0] - 0.25, g[1]), (GVR[0], g[1] + 0.25 * s_), GVR], ch=0)
+# feeds R391-R394 (1 k) on B, each on a via in its T / B trace (hole edge >= 0.15 mm from every pad)
+SW_S, SW_SB = "/trigger_phase/SW_S", "/trigger_phase/SW_SB"
+FEED = (("R391", T1, (p17_1[0], 8.30), (p17_1[0], 9.40)),
+        ("R392", B1, (p17_2[0], 8.04), (p17_2[0] - 0.29, 9.50)),
+        ("R393", T2, (XA2, YCH2), (XA2, YCH2 + 1.20)),
+        ("R394", B2, (2.70, p20_2[1]), (2.70, p20_2[1] + 1.15)))
+FEED_END = {}
+for ref, net, v, c in FEED:
+    V(*v, net)
+    place2(ref, c[0], c[1], "v", net, side="B")
+    q = P(ref, "@" + net)
+    T(net, W50, [v, (q[0], v[1] + abs(q[0] - v[0])) if abs(q[0] - v[0]) > 1e-6 else v, q] if abs(q[0] - v[0]) > 1e-6
+      else [v, q], layer="B.Cu", ch=0)
+    o = [p for p in ("1", "2") if nn(ref, p) != net][0]
+    FEED_END[ref] = (nn(ref, o), P(ref, o))
+
+# --- U302 TLV3801 (rot 90): IN+ pin 5 below the Y node, CMP_P pin 8 / CMP_N pin 1 on the west column
 r6, r7 = P("U302", "6"), P("U302", "7")
 for q in (r6, r7):
     T("+2V5", 0.25, [q, (q[0], q[1] - 0.35), (XU2, q[1] - 0.6)], ch=0)
-YV6 = r6[1] - 0.85                          # +2V5 via of pins 6 / 7 (between U301 and U302)
+YV6 = r6[1] - 0.85                          # +2V5 via of pins 6 / 7 (below the b packages)
 V(XU2, YV6, "+2V5")
 T("+2V5", 0.3, [(XU2, r6[1] - 0.6), (XU2, YV6)], ch=0)
-# DECOUPLING-2 / PDN-6 (24 Nov): no top-side room between U301 and U302 (COM1, SEL, CMP_P and the pin rows), so the
-# caps sit on B in line with the via: C305 (100 n) west of it, C615 (1 u, power sheet, moved here) east of it; each
-# pad beside the via (not on it), own GND via
-place2("C305", XU2 - 1.04, YV6, "h", "GND", side="B")
-T("+2V5", 0.4, [P("C305", "@+2V5"), (XU2, YV6)], layer="B.Cu", ch=0)
-g = P("C305", "@GND")
-gv(g[0] - 0.6, g[1])
-T("GND", 0.4, [g, (g[0] - 0.6, g[1])], layer="B.Cu", ch=0)
-place2("C615", XU2 + 0.61, YV6, "v", "+2V5", side="B")
-c615 = P("C615", "@+2V5")
-T("+2V5", 0.3, [(XU2, YV6), (XU2 + 0.21, YV6 - 0.21), (c615[0], YV6 - 0.21)], layer="B.Cu", ch=0)
+# B at that via: C615 (1 u) north of it, C305 (100 n) east, C306 (100 n) west; each with its own GND via
+place2("C615", XU2, YV6 - 1.10, "v", "GND", side="B")
+T("+2V5", 0.4, [P("C615", "@+2V5"), (XU2, YV6)], layer="B.Cu", ch=0)
 g = P("C615", "@GND")
-gv(g[0] + 0.65, g[1])
-T("GND", 0.4, [g, (g[0] + 0.65, g[1])], layer="B.Cu", ch=0)
-# VEE: pin 3 into the EP, 2 EP vias (-2V5); C620 (2.2 u, power sheet, moved here) and C307 (100 n) on B, each
-# -2V5 pad straight below one EP via, GND pads joined, one GND via south of them that also takes GND pin 2
+gv(g[0] - 0.64, g[1])
+T("GND", 0.4, [g, (g[0] - 0.64, g[1])], layer="B.Cu", ch=0)
+place2("C305", XU2 + 0.96, YV6 + 0.40, "h", "+2V5", side="B")
+T("+2V5", 0.4, [(XU2, YV6), (XU2, YV6 + 0.22), (XU2 + 0.18, YV6 + 0.40), P("C305", "@+2V5")], layer="B.Cu", ch=0)
+g = P("C305", "@GND")
+gv(g[0], g[1] + 0.65)
+T("GND", 0.4, [g, (g[0], g[1] + 0.65)], layer="B.Cu", ch=0)
+place2("C306", XU2 - 0.91, YV6 + 0.95, "h", "GND", side="B")
+T("+2V5", 0.4, [P("C306", "@+2V5"), (XU2 - 0.10, YV6 + 0.95), (XU2, YV6 + 0.85), (XU2, YV6)], layer="B.Cu", ch=0)
+g = P("C306", "@GND")
+gv(g[0] + 0.05, g[1] + 0.65)
+T("GND", 0.4, [g, (g[0], g[1] + 0.6), (g[0] + 0.05, g[1] + 0.65)], layer="B.Cu", ch=0)
+# VEE: pin 3 into the EP, one via 0.2 mm (hole edge) beyond the EP end (no via in the EP, < 50 mW); C620 (4.7 u) /
+# C307 (100 n) on B under the package, fed from that via; GND pads joined, one GND via that also takes GND pin 2
 q3 = P("U302", "3")
 T("-2V5", 0.25, [q3, (q3[0], YU2 + 0.4)], ch=0)
-# VIAS-OUT-OF-PADS (24 Nov): TLV3801 dissipates < 50 mW, so its EP (VEE) is not a thermal pad: the two vias left
-# the EP and stand 0.2 mm (hole edge) beyond its ends on the pad axis, joined by 0.4 mm necks; C620 / C307 stay
-# under the package on B and are fed from those vias by short B tracks.
-# (one via only, east: the board's +2V5 L3 rail passes the west end of the EP)
 XEP = (XU2 - 0.4, XU2 + 0.54)
 XEV = XU2 + 1.21
 V(XEV, YU2, "-2V5")
 T("-2V5", 0.4, [(XU2 + 0.5, YU2), (XEV, YU2)], ch=0)
 x0_ = XEV
-for x_, ref in zip(XEP[::-1], ("C307", "C620")):          # east to west: via -> C307 branch -> C620 branch
+for x_, ref in zip(XEP[::-1], ("C307", "C620")):
     place2(ref, x_, YU2 + 1.03, "v", "-2V5", side="B")
     T("-2V5", 0.4, [(x0_, YU2), (x_ + 0.25, YU2), (x_, YU2 + 0.25), P(ref, "@-2V5")], layer="B.Cu", ch=0)
     x0_ = x_ + 0.25
@@ -517,32 +514,15 @@ T("GND", 0.4, [(XG2, ga[1]), (XG2, YG2)], layer="B.Cu", ch=0)
 gv(XG2, YG2)
 q2_ = P("U302", "2")
 T("GND", 0.25, [q2_, (q2_[0], YG2 - 0.45), (XG2, YG2 - 0.45 + XG2 - q2_[0]), (XG2, YG2)], ch=0)
-# TRIG_LEVEL pin 4: 45-degree stub to a via east of the caps, B.Cu lane x 8.8 to the passive level network
+# TRIG_LEVEL pin 4: 45-degree stub to a via east of the caps; L3 (block In2) south to the level network
 q4_ = P("U302", "4")
-XTL, YTB = 8.8, 12.4
+XTL = XU2 + 1.26
 YVT = q4_[1] + 0.4 + XTL - q4_[0]
-V(XTL, YVT, "/TRIG_LEVEL")
-T("/TRIG_LEVEL", W_SIG, [q4_, (q4_[0], q4_[1] + 0.4), (XTL, YVT)], ch=0)
-T("/TRIG_LEVEL", W_SIG, [(XTL, YVT), (XTL, YTB - 0.4), (XTL - 0.4, YTB), (1.4, YTB)], layer="B.Cu", ch=0)
-for ref, xr, other in (("R383", 4.6, "/DAC_TRIG"), ("R384", 3.0, "-2V5"), ("R385", 1.4, "GND")):
-    place2(ref, xr, YTB + 0.51, "v", "/trigger_phase/TRIG_LEVEL", side="B")
-    op = P(ref, "@" + other)
-    if other == "/DAC_TRIG":
-        T(other, W_SIG, [op, (op[0], BH)], layer="B.Cu", ch=0)
-        blk.iface("/DAC_TRIG", op[0], BH, "B.Cu", "S", "slow", W_SIG,
-                  "R383 5.1 k to TRIG_LEVEL (passive level network: R384 8.87 k to -2V5, R385 2 k to GND, C304)")
-    else:
-        V(op[0] + 0.8, op[1], other)
-        T(other, 0.3, [op, (op[0] + 0.8, op[1])], layer="B.Cu", ch=0)
-place2("C304", 6.6, YTB + 0.48, "v", "/trigger_phase/TRIG_LEVEL", side="B")
-g = P("C304", "@GND")
-gv(g[0], 14.3)
-T("GND", 0.3, [g, (g[0], 14.3)], layer="B.Cu", ch=0)
-bplace("TP302", 7.6, 15.6, 0, side="B")
-T("/TRIG_LEVEL", W_SIG, [(7.6, YTB), (7.6, 15.6)], layer="B.Cu", ch=0)
+V(XTL, YVT, "/trigger_phase/TRIG_LEVEL")
+T("/trigger_phase/TRIG_LEVEL", W_SIG, [q4_, (q4_[0], q4_[1] + 0.4), (XTL, YVT)], ch=0)
 
-# --- outputs: CMP_P (west line) and CMP_N (east line) straight down through the R306 bridge, the R311 / R312
-#     470 R taps and the C308 / C312 coupling caps; R310 49.9 R terminates CMP_N
+# --- outputs: CMP_P (west line) / CMP_N (east line) straight down through R306, the R311 / R312 470 R taps and the
+#     C308 / C312 coupling caps (relative geometry as before); R310 49.9 R terminates CMP_N
 q8_, q1_ = P("U302", "8"), P("U302", "1")
 XN = q1_[0]
 XP = XN - 1.02
@@ -550,7 +530,7 @@ YR306 = YU2 + 1.6 + 0.47
 Y_TAP = YR306 + 0.94
 Y_CC = Y_TAP + 0.47 + 0.91
 place2("R306", XP + 0.51, YR306, "h", "/trigger_phase/CMP_P")
-place2("R311", XP - 0.51, Y_TAP, "h", "Net-(U304-A)")
+place2("R311", XP - 0.51, Y_TAP, "h", "Net-(U313A-+)")
 place2("R312", XN + 0.51, Y_TAP, "h", "/trigger_phase/CMP_N")
 place2("C308", XP, Y_CC, "v", "/trigger_phase/CMP_P")
 place2("C312", XN, Y_CC, "v", "/trigger_phase/CMP_N")
@@ -563,8 +543,8 @@ c12 = P("C312", "@Net-(C312-Pad2)")
 place2("R310", XN + 1.39, c12[1], "h", "Net-(C312-Pad2)")
 T("Net-(C312-Pad2)", W50, [c12, P("R310", "@Net-(C312-Pad2)")], ch=0, rf=True)
 g = P("R310", "@GND")
-gv(g[0], g[1] - 0.62)
-T("GND", W_GND, [g, (g[0], g[1] - 0.62)], ch=0)
+gv(g[0], g[1] - 0.77)                        # (0.77: clear of the U313 input lane on B)
+T("GND", W_GND, [g, (g[0], g[1] - 0.77)], ch=0)
 
 # --- U303 TRF37D73 on the axis in the corridor: RFIN pin 2 from the west, RFOUT pin 7 to the east
 XU3, YU3 = 11.0, AX + 0.25
@@ -572,7 +552,10 @@ blk.place("U303", XU3, YU3, 0)
 assert abs(P("U303", "7")[1] - AX) < 1e-6 and P("U303", "7")[0] > XU3
 rin = P("U303", "2")
 c8p = P("C308", "@Net-(U303-RFIN)")
-T("Net-(U303-RFIN)", W50, [c8p, (XP, AX - 0.4), (XP + 0.4, AX), rin], name="RFIN: C308 -> U303.2", z=50, rf=True)
+YRF = c8p[1] + 0.58                         # RFIN row under C312 / R310 (0.19 mm from their pads)
+XRF = rin[0] - 0.45 - (YRF - rin[1])        # start of the 45-degree climb into pin 2
+T("Net-(U303-RFIN)", W50, [c8p, (XP, YRF - 0.3), (XP + 0.3, YRF), (XRF, YRF), (rin[0] - 0.45, rin[1]), rin],
+  name="RFIN: C308 -> U303.2", z=50, rf=True, ch=0)
 for pn in ("3", "4", "5", "6", "8"):
     x, y = P("U303", pn)
     T("GND", 0.2, [(x, y), (XU3 + (0.3 if x > XU3 else -0.3), y)], ch=0)
@@ -591,7 +574,7 @@ T("+3V3", 0.45, [c9p, (11.30, c9p[1])], ch=0)
 gv(10.75, c9g[1])
 T("GND", 0.4, [c9g, (10.75, c9g[1])], ch=0)
 # --- bias tee (sim/bias_tee/RESULT.md): FB301 pad ON the line; pad 2 -> via pair -> L302 47 uH (B, along the
-#     axis) with R382 1 k beside it (B) -> C313 100 n at the cold pad (B) -> +3V3 via pair beyond C313
+#     axis) with R382 1 k beside it (B) -> C310 100 n at the cold pad (B) -> +3V3 via pair beyond C310
 XFB = 13.08
 place2("FB301", XFB, AX + 0.485, "v", "Net-(U303-RFOUT)")
 fb2 = P("FB301", "@Net-(FB301-Pad2)")
@@ -615,10 +598,10 @@ for net_, sgn in (("Net-(FB301-Pad2)", -1), ("+3V3", 1)):
     lx, ly = P("L302", "@" + net_)
     T(net_, 0.3, [(rx, ry), (lx - sgn * 0.32, ry), (lx, ry + 0.32), (lx, YLB - 1.0)], layer="B.Cu", ch=0)
 lp = P("L302", "@+3V3")
-place2("C313", lp[0] + 1.8, YLB, "h", "+3V3", side="B")
-cpx, cpy = P("C313", "@+3V3")
+place2("C310", lp[0] + 1.8, YLB, "h", "+3V3", side="B")
+cpx, cpy = P("C310", "@+3V3")
 T("+3V3", 0.5, [lp, (cpx, cpy)], layer="B.Cu", ch=0)
-gx_, gy_ = P("C313", "@GND")
+gx_, gy_ = P("C310", "@GND")
 gv(gx_, gy_ + 0.65)
 T("GND", W_GND, [(gx_, gy_), (gx_, gy_ + 0.65)], layer="B.Cu", ch=0)
 for yv in (cpy + 0.65, cpy + 1.25):
@@ -652,6 +635,20 @@ for ref, pn in (("FB301", "1"), ("C311", "1"), ("C311", "2")):
         blk.keepout(r_, ("In1.Cu",))
         blk.keepout(r_, ("In2.Cu",), tracks=True, vias=True).SetDoNotAllowCopperPour(False)
     PADCOMP.append((f"{ref}.{pn}", across, along, exc * 1e3, exc > 0.030))
+# BOM review 2: the same rule for the switch: the pins 3 of D317-D320 (the X inputs and the Y node) are in-line pads
+# of the 0.16 mm lines; the T / B pads keep solid L2 (bom2-trigger.md: ground continuous under the bridge block)
+for ref, ax_ in (("D317", 1), ("D319", 1), ("D318", 0), ("D320", 0)):
+    pd = blk.fps[ref].FindPadByNumber("3")
+    bb_ = pd.GetBoundingBox()
+    wx, wy = pcbnew.ToMM(bb_.GetWidth()), pcbnew.ToMM(bb_.GetHeight())
+    cx_, cy_ = blk.loc(pd.GetPosition())
+    along, across = (wx, wy) if ax_ == 0 else (wy, wx)
+    exc = (c6(across) - c6(W50)) * along
+    if exc > 0.030:
+        r_ = bl.rect_pts(cx_ - wx / 2, cy_ - wy / 2, cx_ + wx / 2, cy_ + wy / 2)
+        blk.keepout(r_, ("In1.Cu",))
+        blk.keepout(r_, ("In2.Cu",), tracks=True, vias=True).SetDoNotAllowCopperPour(False)
+    PADCOMP.append((f"{ref}.3", across, along, exc * 1e3, exc > 0.030))
 for ref in ("R307", "R309"):
     g = P(ref, "@GND")
     gv(g[0], g[1] - 0.65)
@@ -660,43 +657,163 @@ X_STEP = X0 - 1.6
 T("Net-(D301-common)", W50, [P("R308", "@Net-(D301-common)"), (X_STEP, AX)], name="PH_LINE launch 50 R", z=50, rf=True)
 T("Net-(D301-common)", W_LIN, [(X_STEP, AX), (X0 + X_P3, AX)], name=f"PH_LINE launch {W_LIN}", z=round(Z_LIN), rf=True)
 
-# --- U304 SN65LVDS2 (COARSE) west of the network, R311 / R312 470 R taps
-XU4, YU4 = 2.0, 10.0
-place_cond("U304", XU4, YU4, lambda pp: pp["3"][0] < -0.5 and pp["3"][1] > 0.5)     # rot 0: A bottom-left
-pa, pb, pv, pc, pg = (P("U304", k) for k in "34152")
-ra_ = P("R311", "@Net-(U304-A)")
-ya = ra_[1] + 0.3
-T("Net-(U304-A)", W_SIG, [ra_, (ra_[0] - 0.55, ra_[1]), (ra_[0] - 0.85, ya), (pa[0] + 0.3, ya), (pa[0], ya - 0.3), pa], ch=0)
-rb_ = P("R312", "@Net-(U304-B)")
-V(rb_[0] + 0.55, rb_[1], "Net-(U304-B)")
-T("Net-(U304-B)", W_SIG, [rb_, (rb_[0] + 0.55, rb_[1])], ch=0)
-XVB = pb[0] + 0.97                          # hole edge 0.21 mm off the SOT-23 pad
-V(XVB, pb[1], "Net-(U304-B)")
-T("Net-(U304-B)", W_SIG, [pb, (XVB, pb[1])], ch=0)
-YB4 = rb_[1] - 0.16                          # 24 Nov: lane 0.5 mm lower, clear of the U302 decoupling GND via
-T("Net-(U304-B)", W_SIG, [(XVB, pb[1]), (XVB + YB4 - pb[1], YB4), (rb_[0] + 0.55 - 0.16, YB4), (rb_[0] + 0.55, rb_[1])],
-  layer="B.Cu", ch=0)
-# VIAS-OUT-OF-PADS (24 Nov): C310 used to sit on its own +3V3 via; it now stands east of it on B (pad 0.4 mm off
-# the via hole), its GND pad straight below one of J102's outer GND vias (short B neck)
-YV4 = pv[1] - 0.58                           # C310 courtyard touches J102's (y 8.0)
-V(pv[0], YV4, "+3V3")
-T("+3V3", 0.5, [pv, (pv[0], YV4)], ch=0)
-place2("C310", JGX[2] - 0.96 / 2, YV4, "h", "+3V3", side="B")
-g = P("C310", "@GND")
-assert abs(g[0] - JGX[2]) < 1e-6
-T("GND", 0.3, [g, (g[0], YJ + 2.825 + 0.675 + 0.30)], layer="B.Cu", ch=0)
-T("+3V3", 0.4, [(pv[0], YV4), P("C310", "@+3V3")], layer="B.Cu", ch=0)
-gv(XU4, YU4)
-T("GND", 0.4, [pg, (XU4, YU4)], ch=0)
-XCV = pc[0] + 0.97
-V(XCV, pc[1], "/COARSE")
-T("/COARSE", W_SIG, [pc, (XCV, pc[1])], ch=0)
-XCO = 4.45
-XTP3 = 5.6
-bplace("TP303", XTP3, pc[1], 0, side="B")
-T("/COARSE", W_SIG, [(XCV, pc[1]), (XTP3, pc[1])], layer="B.Cu", ch=0)
-T("/COARSE", W_SIG, [(XTP3, pc[1]), (XTP3, pc[1] - 1.05), (XCO, pc[1] - 1.05 - (XTP3 - XCO)), (XCO, 0.0)], layer="B.Cu", ch=0)
-blk.iface("/COARSE", XCO, 0.0, "B.Cu", "N", "slow", W_SIG, "SN65LVDS2 output to the FPGA")
+# --- U313 COS3502 (COARSE receiver, unit A; unit B tied off) on B under the south of the column.  Its inputs come from
+#     the R311 / R312 470 R taps (top, at the U302 lines) through a via each and two B lanes; COARSE leaves pin 7 west
+#     and runs up the west edge (x 0.4) and under the SMA's south pad to the unchanged interface (4.45, 0).
+def bplace_at(ref, x, y, rot, want):
+    fp = bplace(ref, x, y, rot, side="B")
+    for pn, (dx, dy) in want.items():
+        px, py = P(ref, pn)
+        assert abs(px - x - dx) < 1e-3 and abs(py - y - dy) < 1e-3, (ref, pn, round(px - x, 3), round(py - y, 3))
+    return fp
+
+
+XU13, YU13 = 4.20, 19.65
+bplace_at("U313", XU13, YU13, 0, {"1": (2.475, -1.905), "8": (-2.475, -1.905), "7": (-2.475, -0.635)})
+u = {k: P("U313", k) for k in "12345678"}
+ra_ = P("R311", "@Net-(U313A-+)")
+rb_ = P("R312", "@Net-(U313A--)")
+VIN1, VIN2 = (ra_[0], ra_[1] + 0.69), (rb_[0], rb_[1] + 0.69)
+for v, q, net in ((VIN1, ra_, "Net-(U313A-+)"), (VIN2, rb_, "Net-(U313A--)")):
+    V(*v, net)
+    T(net, W_SIG, [q, v], ch=0)
+XL1, XL2 = u["1"][0] + 1.28, u["1"][0] + 1.63          # east lanes into pins 1 / 2 from the east
+T("Net-(U313A-+)", W_SIG, [VIN1, (VIN1[0], VIN1[1] + 0.6), (VIN1[0] + 0.25, VIN1[1] + 0.85), (XL1 - 0.3, VIN1[1] + 0.85),
+                           (XL1, VIN1[1] + 1.15), (XL1, u["1"][1] - 0.2), (XL1 - 0.2, u["1"][1]), u["1"]], layer="B.Cu", ch=0)
+T("Net-(U313A--)", W_SIG, [VIN2, (VIN2[0] + 0.3, VIN2[1] - 0.3), (XL2 - 0.6, VIN2[1] - 0.3), (XL2, VIN2[1] + 0.3), (XL2, u["2"][1] - 0.2), (XL2 - 0.2, u["2"][1]),
+                           u["2"]], layer="B.Cu", ch=0)
+# unit B and supplies: pin 3 (+INB) GND, pin 4 (-INB) +3V3, pin 5 GND, pin 8 +3V3 with C313 (100 n) at the pin
+gv(XL1, u["3"][1])
+T("GND", 0.3, [u["3"], (XL1, u["3"][1])], layer="B.Cu", ch=0)
+V(7.0, u["4"][1] + 0.70, "+3V3")
+T("+3V3", 0.3, [u["4"], (7.0, u["4"][1]), (7.0, u["4"][1] + 0.70)], layer="B.Cu", ch=0)
+place2("C313", u["8"][0] - 0.28, u["8"][1] - 1.30, "h", "+3V3", side="B")
+c13p, c13g = P("C313", "@+3V3"), P("C313", "@GND")
+T("+3V3", 0.3, [c13p, (c13p[0], u["8"][1])], layer="B.Cu", ch=0)
+for v_, n_ in (((c13p[0], c13p[1] - 0.62), "+3V3"), ((c13g[0], c13g[1] - 0.62), "GND")):
+    V(*v_, n_)
+    T(n_, 0.3, [c13p if n_ == "+3V3" else c13g, v_], layer="B.Cu", ch=0)
+GV5 = (1.40, BH - 0.30)
+gv(*GV5)
+T("GND", 0.3, [u["5"], (GV5[0], u["5"][1]), GV5], layer="B.Cu", ch=0)
+# COARSE: pin 7 -> west lane x 0.4 -> north -> under the SMA's south pad (y 7.95) -> x 4.45 -> interface
+XCW, YCN, XCO = 0.40, 7.95, 4.45
+T("/COARSE", W_SIG, [u["7"], (XCW + 0.2, u["7"][1]), (XCW, u["7"][1] - 0.2), (XCW, YCN + 0.35), (XCW + 0.35, YCN),
+                     (XCO - 0.35, YCN), (XCO, YCN - 0.35), (XCO, 0.0)], layer="B.Cu", ch=0)
+blk.iface("/COARSE", XCO, 0.0, "B.Cu", "N", "slow", W_SIG, "U313 COS3502 output to the FPGA")
+bplace("TP303", 1.0, 14.95, 0, side="B")
+T("/COARSE", W_SIG, [(XCW, 14.95), P("TP303", "1")], layer="B.Cu", ch=0)
+
+# --- trigger level network (top, south of RFIN): R383 5.1 k DAC_TRIG, R384 10 k -2V5, R385 3.3 k GND, C304 10 n,
+#     TP302; TRIG_LEVEL comes from the U302 pin-4 via on L3 (block In2, a slow line), DAC_TRIG from the S interface
+TL = "/trigger_phase/TRIG_LEVEL"
+YLV, YBAR = 21.10, 19.75
+XTL2, YTL2 = 8.75, 19.30
+V(XTL2, YTL2, TL)
+T(TL, 0.25, [(XTL, YVT), (XTL + 0.7, YVT + 0.7), (XTL + 0.7, YTL2 - 1.0), (XTL + 1.7, YTL2), (XTL2, YTL2)],
+  layer="In2.Cu", ch=0)
+for ref, xr, other in (("R385", 1.4, "GND"), ("R384", 3.0, "-2V5"), ("R383", 4.6, "/DAC_TRIG"), ("C304", 6.2, "GND")):
+    place2(ref, xr, YLV, "v", TL)
+    tp = P(ref, "@" + TL)
+    T(TL, W_SIG, [tp, (xr, YBAR + 0.25), (xr + 0.25, YBAR)] if ref == "R385" else [tp, (xr, YBAR)], ch=0)
+    op = P(ref, "@" + other)
+    if other == "/DAC_TRIG":
+        V(xr, BH - 0.30, other)
+        T(other, W_SIG, [op, (xr, BH - 0.30)], ch=0)
+        T(other, W_SIG, [(xr, BH - 0.30), (xr, BH)], layer="B.Cu", ch=0)
+        blk.iface("/DAC_TRIG", xr, BH, "B.Cu", "S", "slow", W_SIG,
+                  "R383 5.1 k to TRIG_LEVEL (passive level network: R384 10 k to -2V5, R385 3.3 k to GND, C304)")
+    elif ref != "R385":
+        V(xr, BH - 0.30, other)
+        T(other, 0.3, [op, (xr, BH - 0.30)], ch=0)
+    else:                                   # R385 shares U313's pin-5 GND via
+        T(other, 0.3, [op, GV5], ch=0)
+T(TL, W_SIG, [(1.65, YBAR), (XTL2 - 0.25, YBAR), (XTL2, YBAR - 0.25), (XTL2, YTL2)], ch=0)
+bplace("TP302", XTL2 - 0.30, 21.45, 0)
+T(TL, W_SIG, [(XTL2 - 0.30, YBAR), P("TP302", "1")], ch=0)
+
+# --- bridge drive (B, north of the column, x 4.7-9.5): Q301 SS8550 (+2V5 -> SW_S) and Q302 MMBT3904 (-2V5 -> SW_SB),
+#     both rot 90 (collector north), stacked; R386 10 k (base), R389 3.3 k / R388 10 k (Q302 base divider) in a
+#     column east of them, at the end of the TRIG_SEL B lane (x 9.25, as before).  R387 1 k SW_S -> -2V5 and R390
+#     1 k +2V5 -> SW_SB sit at the west feeds.  SW_S / SW_SB run on L3 (block In2): static bias lines without
+#     capacitors (bom2-trigger.md).  No via within reach of BUF_OUT_T (the north-east of the column).
+bplace_at("Q301", 6.40, 1.92, 90, {"3": (0.0, -0.9375), "1": (0.95, 0.9375), "2": (-0.95, 0.9375)})
+bplace_at("Q302", 6.40, 5.80, 90, {"3": (0.0, -0.9375), "1": (0.95, 0.9375), "2": (-0.95, 0.9375)})
+q1b, q1e, q1c = P("Q301", "1"), P("Q301", "2"), P("Q301", "3")
+q2b, q2e, q2c = P("Q302", "1"), P("Q302", "2"), P("Q302", "3")
+XRC = 8.57
+place2("R386", XRC, 2.90, "v", "Net-(Q301-B)", side="B")
+place2("R389", XRC, 4.80, "v", "-2V5", side="B")
+place2("R388", XRC, 6.70, "v", "Net-(Q302-B)", side="B")
+r86b, r86t = P("R386", "@Net-(Q301-B)"), P("R386", "@/TRIG_SEL")
+T("Net-(Q301-B)", W_SIG, [(q1b[0], r86b[1]), r86b], layer="B.Cu", ch=0)
+XS = 9.25
+T("/TRIG_SEL", W_SIG, [(XS, BH), (XS, r86t[1] + 0.3), (XS - 0.3, r86t[1]), r86t], layer="B.Cu", ch=0)
+blk.iface("/TRIG_SEL", XS, BH, "B.Cu", "S", "slow", W_SIG, "R386 10 k to the Q301 base (trigger selector drive)")
+r89b, r88t = P("R389", "@Net-(Q302-B)"), P("R388", "@Net-(Q302-B)")
+T("Net-(Q302-B)", W_SIG, [(q2b[0], r88t[1]), r88t], layer="B.Cu", ch=0)
+T("Net-(Q302-B)", W_SIG, [r89b, r88t], layer="B.Cu", ch=0)
+# -2V5: R389 top -> via VMN (clear of BUF_OUT_T); Q302 emitter -> via VM below the transistor
+r89t = P("R389", "@-2V5")
+VMN = (7.40, r89t[1] + 0.20)
+V(*VMN, "-2V5")
+T("-2V5", 0.3, [r89t, (VMN[0] + 0.20, r89t[1]), VMN], layer="B.Cu", ch=0)
+VM = (6.85, 8.30)
+V(*VM, "-2V5")
+T("-2V5", 0.3, [q2e, (q2e[0], 7.65), (q2e[0] + 0.2, 7.85), (VM[0] - 0.45, 7.85), VM], layer="B.Cu", ch=0)
+# +2V5: Q301 emitter -> via north of it, west of the collector
+VP1 = (5.30, 1.20)
+V(*VP1, "+2V5")
+T("+2V5", 0.3, [q1e, (q1e[0], VP1[1] + 0.15), VP1], layer="B.Cu", ch=0)
+# SW_S: Q301 collector -> VS_N; R388 bottom -> VS_R.  SW_SB: Q302 collector -> VSB_N (west of it)
+VS_N = (7.25, 0.60)
+V(*VS_N, SW_S)
+T(SW_S, W_SIG, [q1c, (VS_N[0] - 0.38, q1c[1]), VS_N], layer="B.Cu", ch=0)
+r88b = P("R388", "@" + SW_S)
+VS_R = (8.05, 8.10)
+V(*VS_R, SW_S)
+T(SW_S, W_SIG, [r88b, (r88b[0], VS_R[1] - (r88b[0] - VS_R[0])), VS_R], layer="B.Cu", ch=0)
+VSB_N = (5.65, 4.50)
+V(*VSB_N, SW_SB)
+T(SW_SB, W_SIG, [(q2c[0], VSB_N[1]), VSB_N], layer="B.Cu", ch=0)
+# feeds: far ends.  West: R394 (SW_S) with R387 (SW_S -> -2V5) below it, R393 (SW_SB) with R390 (+2V5 -> SW_SB)
+# below it; east: R391 (SW_S), R392 (SW_SB).  One L3 via per group.
+f94, f93 = FEED_END["R394"][1], FEED_END["R393"][1]
+place2("R387", f94[0], f94[1] + 1.38, "v", SW_S, side="B")
+T(SW_S, 0.3, [f94, P("R387", "@" + SW_S)], layer="B.Cu", ch=0)
+q = P("R387", "@-2V5")
+V(q[0], q[1] + 0.62, "-2V5")
+T("-2V5", 0.3, [q, (q[0], q[1] + 0.62)], layer="B.Cu", ch=0)
+place2("R390", f93[0], f93[1] + 1.42, "v", SW_SB, side="B")
+T(SW_SB, 0.3, [f93, P("R390", "@" + SW_SB)], layer="B.Cu", ch=0)
+q = P("R390", "@+2V5")
+V(q[0], q[1] + 0.67, "+2V5")
+T("+2V5", 0.3, [q, (q[0], q[1] + 0.67)], layer="B.Cu", ch=0)
+VSB_W = (2.05, (f93[1] + P("R390", "@" + SW_SB)[1]) / 2)
+V(*VSB_W, SW_SB)
+T(SW_SB, 0.25, [(f93[0], VSB_W[1]), VSB_W], layer="B.Cu", ch=0)
+VS_W = (2.05, VSB_W[1] + 0.58)
+V(*VS_W, SW_S)
+T(SW_S, 0.25, [VS_W, (f94[0], VS_W[1])], layer="B.Cu", ch=0)
+f91, f92 = FEED_END["R391"][1], FEED_END["R392"][1]
+VS_E = (f91[0], f91[1] + 0.62)
+V(*VS_E, SW_S)
+T(SW_S, 0.25, [f91, VS_E], layer="B.Cu", ch=0)
+VSB_E = (f92[0], f92[1] + 0.88)
+V(*VSB_E, SW_SB)
+T(SW_SB, 0.25, [f92, VSB_E], layer="B.Cu", ch=0)
+# L3 (block In2) lanes, planar:
+#   SW_S : VS_N -> east y 0.6 -> down x 9.3 (branch y 7.45 -> VS_R) -> y 11.45 -> x 7.49 (VS_E) -> y 12.75 -> VS_W
+#   SW_SB: VSB_N -> x 6.1 down -> y 9.9 east -> VSB_E;  x 6.1 -> y 7.6 west -> x 3.3 down -> VSB_W
+W_L3 = 0.25
+XE3, YS3, YE3 = 9.30, 12.75, 11.45
+T(SW_S, W_L3, [VS_N, (XE3 - 0.35, VS_N[1]), (XE3, VS_N[1] + 0.35), (XE3, YE3 - 0.4), (XE3 - 0.4, YE3), (VS_E[0], YE3)],
+  layer="In2.Cu", ch=0)
+T(SW_S, W_L3, [(XE3, 7.15), (XE3 - 0.3, 7.45), (VS_R[0] + 0.35, 7.45), (VS_R[0], 7.80), VS_R], layer="In2.Cu", ch=0)
+T(SW_S, W_L3, [VS_E, (VS_E[0], YS3 - 0.4), (VS_E[0] - 0.4, YS3), (VS_W[0] + YS3 - VS_W[1], YS3), VS_W], layer="In2.Cu", ch=0)
+T(SW_SB, W_L3, [VSB_N, (6.1, VSB_N[1] + 0.45), (6.1, 9.7), (6.3, 9.9), (VSB_E[0] - 0.4, 9.9), (VSB_E[0], 10.3), VSB_E],
+  layer="In2.Cu", ch=0)
+T(SW_SB, W_L3, [(6.1, 7.6), (4.0, 7.6), (3.3, 8.3), (3.3, VSB_W[1] - 0.4), (2.9, VSB_W[1]), VSB_W], layer="In2.Cu", ch=0)
 
 # ============================================================================= ground stitching (ZONES-1 / -2, 24 Nov)
 # The board's L3 GND webs between the hold-node windows and the L6 GND fingers between the tap-row lanes had no via
@@ -708,7 +825,7 @@ blk.iface("/COARSE", XCO, 0.0, "B.Cu", "N", "slow", W_SIG, "SN65LVDS2 output to 
 # the north ends of the L6 fingers x 40-44 and 80.8-84.4, the far end of the L3 island under the front column and the
 # B island east of the VSW network.
 STITCH = [(XT[n] + 1.9, AX + 1.95) for n in range(NT - 1)]
-STITCH += [(26.85, AX + 1.1), (42.0, 3.75), (42.0, 10.75), (82.7, 10.0), (6.5, 17.3), (20.1, 1.5)]
+STITCH += [(26.85, AX + 1.1), (42.0, 3.75), (42.0, 10.75), (82.7, 10.0), (20.1, 1.5)]
 for xy in STITCH:
     gv(*xy)
 
@@ -814,7 +931,7 @@ print("pad compensation (excess C vs. the 0.16 mm line; L2 cut + L3 no-track/no-
 for row in PADCOMP:
     print(f"  {row[0]:8s} across {row[1]:.2f} along {row[2]:.2f} excess {row[3]:6.1f} fF  {'L2 cut' if row[4] else '-'}")
 print("ground stitching vias:", len(STITCH))
-RFC = {"/EXT_CLK": W50, "/BUF_OUT_T": W50, "Net-(U301-COM1)": W50, "/trigger_phase/CMP_P": W50,
+RFC = {"/EXT_CLK": W50, "/BUF_OUT_T": W50, "/trigger_phase/TRIG_IN": W50, T1: W50, B1: W50, T2: W50, B2: W50, "/trigger_phase/CMP_P": W50,
        "/trigger_phase/CMP_N": W50, "Net-(U303-RFIN)": W50, "Net-(U303-RFOUT)": W50, "Net-(C311-Pad2)": W50,
        "Net-(C312-Pad2)": W50}
 res = bl.check_board(path, refs=REFS, rf_widths=RFC)

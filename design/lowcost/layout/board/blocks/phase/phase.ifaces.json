@@ -223,14 +223,14 @@
    "note": "from the input stage (BUF802 trigger output)"
   },
   {
-   "net": "/TRIG_SEL",
-   "x": 9.25,
-   "y": 22.5,
+   "net": "/COARSE",
+   "x": 4.45,
+   "y": 0.0,
    "layer": "B.Cu",
-   "side": "S",
+   "side": "N",
    "class": "slow",
    "width": 0.2,
-   "note": "R302 10 k to U301 SEL"
+   "note": "U313 COS3502 output to the FPGA"
   },
   {
    "net": "/DAC_TRIG",
@@ -240,17 +240,17 @@
    "side": "S",
    "class": "slow",
    "width": 0.2,
-   "note": "R383 5.1 k to TRIG_LEVEL (passive level network: R384 8.87 k to -2V5, R385 2 k to GND, C304)"
+   "note": "R383 5.1 k to TRIG_LEVEL (passive level network: R384 10 k to -2V5, R385 3.3 k to GND, C304)"
   },
   {
-   "net": "/COARSE",
-   "x": 4.45,
-   "y": 0.0,
+   "net": "/TRIG_SEL",
+   "x": 9.25,
+   "y": 22.5,
    "layer": "B.Cu",
-   "side": "N",
+   "side": "S",
    "class": "slow",
    "width": 0.2,
-   "note": "SN65LVDS2 output to the FPGA"
+   "note": "R386 10 k to the Q301 base (trigger selector drive)"
   }
  ]
 }
