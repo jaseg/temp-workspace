@@ -283,6 +283,36 @@
    8.742
   ],
   [
+   "/TRIG_SEL",
+   "B.Cu",
+   "L6 from the L3 via (11.3, 23.85) to R386.1 (BOM-2)",
+   4.263
+  ],
+  [
+   "-2V5",
+   "B.Cu",
+   "-2V5 L6 R389.2 -> x 9.4 -> XEV (BOM-2)",
+   11.239
+  ],
+  [
+   "-2V5",
+   "In2.Cu",
+   "-2V5 L3 VMN -> VM (BOM-2)",
+   4.038
+  ],
+  [
+   "+2V5",
+   "In2.Cu",
+   "+2V5 L3 VP1 -> x 9.85 lane (BOM-2)",
+   15.906
+  ],
+  [
+   "+2V5",
+   "In2.Cu",
+   "+2V5 L3 VP1 -> U302 via (west of the GND via 4.7 / 31.32 and the U302 L3 cut-out) (BOM-2)",
+   10.586
+  ],
+  [
    "/ADC_REF_MID",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
@@ -292,7 +322,7 @@
    "/DAC_TRIG",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   97.62
+   92.48
   ],
   [
    "/VOFS",
@@ -322,7 +352,7 @@
    "/TRIG_SEL",
    "B.Cu+In2.Cu",
    "slow line (board_slow.py): L6 tap-row lane, L3 north",
-   104.48
+   81.56
   ],
   [
    "/ADC_IN",
@@ -351,10 +381,10 @@
   "deliberate cut-out (listed L2 / L5 window)": 7
  },
  "stitch": {
-  "beside signal vias": 49,
+  "beside signal vias": 51,
   "RF fences": 16,
-  "grid": 253,
-  "signal vias without a ground via": 42,
+  "grid": 250,
+  "signal vias without a ground via": 41,
   "lacking": [
    [
     86.4,
@@ -375,10 +405,6 @@
    [
     66.3,
     32.0
-   ],
-   [
-    59.5,
-    46.5
    ],
    [
     71.0,
@@ -525,7 +551,7 @@
     23.93
    ]
   ],
-  "already within 1 mm": 20,
+  "already within 1 mm": 19,
   "fast vias": 81,
   "fast vias with a GND via <= 1 mm": 44,
   "fast vias > 1 mm": [
@@ -622,13 +648,6 @@
    ],
    [
     [
-     86.4,
-     29.4
-    ],
-    2.46
-   ],
-   [
-    [
      64.0,
      15.5
     ],
@@ -640,6 +659,13 @@
      7.75
     ],
     2.37
+   ],
+   [
+    [
+     86.4,
+     29.4
+    ],
+    2.34
    ],
    [
     [

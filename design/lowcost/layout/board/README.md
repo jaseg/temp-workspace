@@ -1,8 +1,43 @@
-# layout/board: scope-fe integrated board (six layers), as built 24 Nov 2026
+# layout/board: scope-fe integrated board (six layers), as built 25 Nov 2026 (BOM-2)
 
 One full run of `python3 gen_board.py` (about 115 s; `--prepower` stops before the supplies, `--powonly` after them; `--fast`
 is still broken) builds `scope-fe.kicad_pcb` / `.kicad_pro` / `routes.json`. Renders: `python3 render_board.py` (boardlib `render`, refilled
 copy): `scope-fe-L1.png` ... `L6`, `scope-fe-all.png`, `scope-fe-detail-{analog,fpga-south,mcu,power}.png`.
+
+## As built 25 Nov 2026 (BOM-2 integration)
+All six blocks were regenerated against the BOM-2 netlist, and the board was rebuilt with a full `gen_board.py` run.
+The outline is unchanged (100.0 x 57.0 mm), and so are every block position and every interface.
+
+**Front column fix.** The new diode-bridge switch first left the phase column's +2V5 / -2V5 vias unreachable by the
+rail router (5 islands failed). Changes (TOPOLOGY.md section 11):
+- **TRIG_SEL:** L3 via at (11.3, 23.85), then a 4.3 mm L6 piece to R386. The block's full-height L6 lane is removed.
+- **DAC_TRIG:** swaps places with TRIG_SEL in the slow bundle. It is grid-routed east of a fence and enters only
+  the column's south end.
+- **-2V5:** L6 along x 9.4 (11.2 mm) and an L3 link (4.0 mm).
+- **+2V5:** L3 from the Q301 via down the x 9.85 lane (15.9 mm) and to U302's via (10.6 mm). `widen()` grows these
+  where room allows.
+- **Phase block:** SW_SB now branches south of the U302 +2V5 via (gen_phase.py).
+
+Slow lines: DAC_TRIG 92.5 mm, TRIG_SEL 81.6 mm (incl. the L6 piece 4.3).
+Rails: +2V5 is 202 mm on L3 and 33 mm on L6, narrowest 0.25 mm over 15 mm (the explicit column feed, a few mA).
+-2V5 is 206 / 31 mm, narrowest 0.3 mm over 8 mm. The minimum rail-to-signal gap in the column is 0.20 mm, to SW_S;
+PH_STROBE is more than 0.3 mm away.
+
+**Checks (25 Nov):**
+- **check_board:** 0 missing, extra 4 (H1-H4), 0 footprint / value / pad-net, 0 unrouted, 0 clearance, 0 corner,
+  0 off-axis, 0 RF width / gap, 0 courtyard, 0 unconnected (486 footprints, 3467 tracks, 1018 vias).
+- **gen_board:** fast-net segments on L3 0; 370 L1 / L6 samples without L2 / L5, all antipads or listed windows
+  (0 real holes); L4 +3V3 is one polygon.
+- **via_in_pad:** FAIL 0 (23 near, 31 in listed exposed pads).
+- **DRC jlc4 + parity:** 451 warnings, 0 errors, 0 unconnected.
+  - New since 24 Nov: 1 silk_edge_clearance (D319 silk at the west edge, x 0.25).
+  - Otherwise as before: field / library mismatches, 31 attribute (5 DNP: C631, D402, D403, D601, R122),
+    10 net_conflict.
+- **decap_audit:** 77 capacitors; D1 1, D2s 8, D2g 1 (was 3; C301 / C306 are gone), D2p 10.
+- **GND stitching:** 44 of 81 fast vias have a GND via within 1 mm.
+
+**Not redone:** the block `*_netview_*.png` crops (they show the 24 Nov board) and `phase_netview_u301.png`
+(U301 no longer exists).
 
 ## As built (24 Nov 2026, new power tree)
 Board 100.0 x 57.0 mm (unchanged), JLC06161H-3313: L1 RF / parts, L2 GND, L3 slow lines + minor rails, L4 +3V3, L5 GND, L6 buses.

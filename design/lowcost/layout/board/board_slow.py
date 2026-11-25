@@ -180,7 +180,7 @@ def leg(B, m, net, layer, a, b, clr=0.2, w=W_SLOW, margin=3.0, extra=(), d0=-1):
 # Strip levels nest so that no two lines cross (south -> north in source order).
 EAST = [  # net, strip y, lane x, via (None = ends on L6 at the given point)
     ("/ADC_REF_MID", 44.6, 52.7, (52.7, 29.15)),
-    ("/DAC_TRIG", 44.2, 53.3, (53.3, 32.0)),
+    ("/DAC_TRIG", 44.2, 53.3, (53.3, 32.85)),       # BOM-2: band y 32.85 (DAC_TRIG / TRIG_SEL swapped)
     ("/VOFS", 43.8, 57.3, (57.3, 32.0)),
     ("/VBIAS_A", 43.4, 57.85, (59.5, 30.5)),       # L6 jog east past U308.3's input trace (JOG6)
     ("/VBIAS_K", 43.0, 61.8, (61.8, 29.75)),
@@ -200,8 +200,8 @@ EXPL = [
     ("/VBIAS_A", 30.05, 28.2, 22.0),
     ("/VNEG_REF", 30.5, 27.9, 22.3),
     ("/VOFS", 30.95, 27.6, 22.6),
-    ("/DAC_TRIG", 32.0, 27.3, 24.97),
-    ("/TRIG_SEL", 32.45, 27.0, 25.27),
+    ("/TRIG_SEL", 32.45, 27.3, 24.97),             # BOM-2 (25 Nov): TRIG_SEL / DAC_TRIG swapped (TRIG_SEL now ends
+    ("/DAC_TRIG", 32.85, 27.0, 25.27),            # north-west of the front column, DAC_TRIG goes south-west)
 ]
 CH = 0.5                            # 45-degree chamfer leg of the two bundle turns
 # west of channel C (x < 26): explicit runs through strip A (and its northern access to the analog vias) to the
@@ -216,19 +216,23 @@ TAIL = {
     "/VOFS": [(8.15, 22.6), (8.0, 22.75), (1.6, 22.75), (1.0, 22.15), (1.0, 19.2)],
     # BOM-2 (25 Nov): the phase front column now has block L3 lines (SW_S / SW_SB, x 2-9.4, board y 23.75-35.25,
     # TRIG_LEVEL) and its +-2V5 rail vias inside them.  Neither slow line enters the column: TRIG_SEL ends at a via
-    # (11.0, 23.35) east of it (gen_board draws a short L6 piece to R386; the block's x 9.25 B lane is removed), and
-    # DAC_TRIG runs down the L3 lane east of SW_S (x 9.8, the old TRIG_SEL corridor) to the column's south end, so the
+    # (11.3, 23.85) east of PH_STROBE_N's L1 drop (gen_board draws a short L6 piece to R386; the block's x 9.25 B lane
+    # is removed), and DAC_TRIG is grid-routed from the pstrobe edge, east of a fence, to the column's south end, so the
     # column's L3 stays one area for the +2V5 / -2V5 rails (TOPOLOGY.md section 9)
-    "/DAC_TRIG": [(14.77, 24.97), (14.57, 24.77), (14.57, 23.55), (14.07, 23.05), (10.3, 23.05), (9.8, 23.55),
-                  (9.8, 41.0)],
-    "/TRIG_SEL": [(14.42, 25.27), (14.12, 24.97), (14.12, 23.85), (13.62, 23.35), (11.0, 23.35)],
+    "/TRIG_SEL": [(14.77, 24.97), (14.57, 24.77), (14.57, 23.55), (14.07, 23.05), (11.6, 23.05), (11.3, 23.35),
+                  (11.3, 23.85)],
+    "/DAC_TRIG": [(14.42, 25.27)],
     # (24 Nov, vias out of pads: the U302 EP vias that used to fence the x 8 corridor are gone; the line keeps its
     #  east route past U301 / U302 explicitly, so the +2V5 rail keeps its L3 access to C301 / C305 from the south)
 }
 GRID_ORDER = ["/DAC_TRIG"]                   # (TRIG_SEL: explicit to its via, 25 Nov)      # area B: grid search from the end of TAIL to the target
 # L3 targets (existing vias of the blocks, or a via placed on the block's B stub by gen_board)
 TARGET = {"/ADC_REF_MID": (21.65, 20.8), "/ADC_IN": (19.06, 20.0), "/VBIAS_K": (16.4, 20.3), "/VBIAS_A": (15.4, 15.9),
-          "/VOFS": (1.0, 19.2), "/VNEG_REF": (1.94, 19.2), "/DAC_TRIG": (4.6, 44.7), "/TRIG_SEL": (11.0, 23.35)}
+          "/VOFS": (1.0, 19.2), "/VNEG_REF": (1.94, 19.2), "/DAC_TRIG": (4.6, 44.7), "/TRIG_SEL": (11.3, 23.85)}
+# BOM-2: DAC_TRIG stays out of the L3 corridor east of SW_S (x 9.4-13.1, y 22-39.5) and the column's NE strip: the
+# +2V5 rail reaches the block's +2V5 vias inside the column (Q301 emitter, U302) only through them
+# (fences x 10.2-12.6: the corridor must pass east of the pstrobe L3 cut-outs at x 9.6-11.2, y 29.6-31.6)
+FENCE = {"/DAC_TRIG": [((x_, 22.0), (x_, 39.0)) for x_ in (10.2, 11.0, 11.8, 12.6)]}
 
 
 def plen(q):
@@ -291,7 +295,7 @@ def draw(B, m, ifs, vtap_th_end, log=print):
             res[net][2] += 1
     for net in GRID_ORDER:                             # area B: grid search
         a, b = TAIL[net][-1], TARGET[net]
-        q = leg(B, m, net, "L3", a, b, clr=0.15, margin=3.0, d0=2)     # DAC_TRIG tail ends heading south
+        q = leg(B, m, net, "L3", a, b, clr=0.15, margin=6.0, d0=4, extra=FENCE.get(net, ()))     # DAC_TRIG tail ends heading west
         if q is None:
             res[net][0] = False
             log(f"slow line {net}: no L3 path {a} -> {b}")

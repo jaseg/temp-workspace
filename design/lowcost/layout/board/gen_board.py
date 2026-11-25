@@ -361,17 +361,36 @@ if not FAST:
             m.via(x, yc, net)
     # BOM-2 integration (25 Nov): TRIG_SEL no longer uses the phase block's x 9.25 B lane (it ran the full height of
     # the front column and, with the board's L3 line beside it, walled the column's +-2V5 rail vias off): the lane is
-    # removed; the slow line ends on L3 at a via (11.0, 23.35) east of the column and a short L6 piece runs to R386.1
+    # removed; the slow line ends on L3 at a via (11.3, 23.85) east of PH_STROBE_N's L1 drop (x 10.6) and a short L6
+    # piece runs west north of the PH_STROBE L6 vias (y 24.3) and south along x 9.4 to R386.1
     for t in segs("/TRIG_SEL", "B.Cu"):
         a_, b_ = loc(t.GetStart()), loc(t.GetEnd())
         if max(a_[0], b_[0]) < 9.4 and min(a_[1], b_[1]) > 25.0:
             B.Remove(t)
     pr = [p for f in B.GetFootprints() if f.GetReference() == "R386" for p in f.Pads() if p.GetNetname() == "/TRIG_SEL"][0]
     px, py = loc(pr.GetPosition())
-    XT = 9.85
-    T("/TRIG_SEL", 0.15, [(11.0, 23.35), (XT + 0.3, 23.35), (XT, 23.65), (XT, py - 0.3), (XT - 0.3, py), (px, py)], "B.Cu",
-      "L6 from the L3 via (11.0, 23.35) to R386.1 (BOM-2)", ch=0.0001)
-    m.via(11.0, 23.35, "/TRIG_SEL")
+    XT = 9.4
+    T("/TRIG_SEL", 0.15, [(11.3, 23.85), (11.3, 24.0), (11.0, 24.3), (XT + 0.3, 24.3), (XT, 24.6), (XT, py - 0.3),
+                          (XT - 0.3, py), (px, py)], "B.Cu", "L6 from the L3 via (11.3, 23.85) to R386.1 (BOM-2)", ch=0.0001)
+    m.via(11.3, 23.85, "/TRIG_SEL")
+    # -2V5 into the front column (BOM-2): the column's L3 is fenced by the block's SW_S / SW_SB lines, so the bias
+    # transistors' -2V5 (R389 top, Q302 emitter) is fed explicitly: L6 from R389.2 down the freed TRIG_SEL lane (x 9.4,
+    # 0.32 mm from PH_STROBE_N's L6 run) to the U302 -2V5 via XEV (6.55, 34.7), and L3 between the block vias VMN
+    # (7.4, 26.99) and VM (6.85, 30.8)
+    pr = [p for f in B.GetFootprints() if f.GetReference() == "R389" for p in f.Pads() if p.GetNetname() == "-2V5"][0]
+    qx, qy = loc(pr.GetPosition())
+    T("-2V5", 0.3, [(qx, qy), (9.1, qy), (9.4, qy + 0.3), (9.4, 34.4), (9.1, 34.7), (6.55, 34.7)], "B.Cu",
+      "-2V5 L6 R389.2 -> x 9.4 -> XEV (BOM-2)", ch=0.0001)
+    T("-2V5", 0.3, [(7.4, 26.99), (7.4, 29.9), (6.85, 30.45), (6.85, 30.8)], "In2.Cu", "-2V5 L3 VMN -> VM (BOM-2)",
+      ch=0.0001)
+    # +2V5 likewise (the rail router's netclass + fast-net clearance leaves no grid path into the column's north): L3
+    # from the Q301 emitter via VP1 (5.3, 23.7) east along y 23.2 (between VOFS and SW_S), down the lane east of SW_S
+    # (x 9.85, 0.3 mm from SW_S and the PH_STROBE vias), around the pstrobe L3 cut-outs (x 10.67) to (9.94, 34.0),
+    # where the router joins it; U302's +2V5 via joins VP1 through the opened SW_SB pocket (west of x 6.1)
+    T("+2V5", 0.25, [(5.3, 23.7), (5.8, 23.2), (9.35, 23.2), (9.85, 23.7), (9.85, 28.6), (10.67, 29.42), (10.67, 31.9),
+                     (9.94, 32.63), (9.94, 34.0)], "In2.Cu", "+2V5 L3 VP1 -> x 9.85 lane (BOM-2)", ch=0.0001)
+    T("+2V5", 0.25, [(5.3, 23.7), (4.6, 24.4), (4.6, 30.1), (4.1, 30.6), (4.1, 32.3), (4.7, 32.9), (5.34, 32.9)],
+      "In2.Cu", "+2V5 L3 VP1 -> U302 via (west of the GND via 4.7 / 31.32 and the U302 L3 cut-out) (BOM-2)", ch=0.0001)
 
     bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
     print("NOT PLACED:")

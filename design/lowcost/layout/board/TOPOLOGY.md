@@ -176,3 +176,21 @@ slow lines need reserved gaps. One owner now handles both modules, with this all
   +2V5_LDO (81.6, 17.75) -> y 17.4 / 17.1 -> (74.56, 16.91) (U605 FB+ divider on top). U301 +2V5 now joins at C306's via
   (11.1, 24.6) only (the vias beside BUF_OUT_T are gone). widen() checks foreign copper exactly.
 
+
+## 11. As built 25 Nov 2026 (BOM-2: diode-bridge trigger switch in the phase front column)
+- No inter-block nets were added or removed. TRIG_SEL and DAC_TRIG keep their mcuif-to-phase role; the trimmer
+  (RV101) is gone and no MCU pin replaces it, so the input stage got no new slow line.
+- The phase front column (x 0-9.5, y 22.5-45) now holds the block's L3 lines SW_S / SW_SB (static switch bias) and
+  its +-2V5 rail vias (Q301 / Q302 emitters, R389, R390, R387, U302). Planarity rules:
+  - **TRIG_SEL** ends on L3 at a via (11.3, 23.85), east of PH_STROBE_N's L1 drop. From there a 4.3 mm L6 piece runs
+    along y 24.3 and x 9.4 to R386.1. The block's x 9.25 L6 lane is removed, so that lane carries -2V5.
+  - **DAC_TRIG / TRIG_SEL** swap places in the section 9 bundle (band y 32.85 / 32.45, channel C x 27.0 / 27.3,
+    pstrobe edge y 25.27 / 24.97; the DAC_TRIG via moved to (53.3, 32.85)). TRIG_SEL turns north-west, and
+    DAC_TRIG is grid-routed from the pstrobe edge, fenced east of x 13.1 down to y 39.5, then south-west to R383
+    (4.6, 44.7). Neither line enters the column.
+  - **-2V5** reaches the column on L6, down the old TRIG_SEL lane (x 9.4, 0.32 mm from PH_STROBE_N's L6 run), from
+    R389.2 to U302's -2V5 via. An L3 link joins the Q302 emitter via to R389's via.
+  - **+2V5** reaches the column on L3. It runs from Q301's emitter via (5.3, 23.7) along y 23.2 between VOFS and
+    SW_S, down the x 9.85 lane, around the pstrobe L3 cut-outs at x 10.67, and to the router at (9.94, 34.0).
+    A second branch runs down x 4.6 / 4.1 to U302's +2V5 via. The phase block's SW_SB now branches south of that
+    via (gen_phase.py, y 11.3 local), so the via is no longer sealed in an L3 pocket.

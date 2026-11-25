@@ -814,10 +814,10 @@ T(SW_S, W_L3, [VS_E, (VS_E[0], YS3 - 0.4), (VS_E[0] - 0.4, YS3), (VS_W[0] + YS3 
 # board integration (25 Nov): SW_SB branches SOUTH of the U302 +2V5 via (junction y 11.3, between that via and the -2V5
 # via XEV), so the L3 area around U302's +2V5 via opens north to the column's west / north L3 area, where the board's
 # +2V5 / -2V5 rails reach this block's rail vias (the old y 7.6 / x 3.3 branch closed a pocket with SW_S's y 12.75 run)
-YJ = 11.30
-T(SW_SB, W_L3, [VSB_N, (6.1, VSB_N[1] + 0.45), (6.1, YJ - 0.3), (5.8, YJ)], layer="In2.Cu", ch=0)
+YSB = 11.30
+T(SW_SB, W_L3, [VSB_N, (6.1, VSB_N[1] + 0.45), (6.1, 9.7), (6.1, YSB - 0.3), (5.8, YSB)], layer="In2.Cu", ch=0)
 T(SW_SB, W_L3, [(6.1, 9.7), (6.3, 9.9), (VSB_E[0] - 0.4, 9.9), (VSB_E[0], 10.3), VSB_E], layer="In2.Cu", ch=0)
-T(SW_SB, W_L3, [(5.8, YJ), (VSB_W[0] + 0.78 + (VSB_W[1] - YJ), YJ), (VSB_W[0] + 0.78, VSB_W[1]), VSB_W], layer="In2.Cu",
+T(SW_SB, W_L3, [(5.8, YSB), (VSB_W[0] + 0.78 + (VSB_W[1] - YSB), YSB), (VSB_W[0] + 0.78, VSB_W[1]), VSB_W], layer="In2.Cu",
   ch=0)
 
 # ============================================================================= ground stitching (ZONES-1 / -2, 24 Nov)

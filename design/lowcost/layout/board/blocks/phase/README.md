@@ -181,3 +181,12 @@ into 50.45 R loaded line fine. 40 / 70 ps re-simulation still open.
   cut-out (x >= 9.5) forbids a feed further east. Render: `phase_netview_u301.png`.
 
 **Vias out of pads (24 Nov, RULES rule 12):** J102 GND via rows at the pad edges (inner rows + south outer row, F / B necks), U302 EP via -> one via 0.2 mm beyond the EP end, VSW via 0.18 mm off U301 pin 5, C310 east of its via, U304 pin 4 / 5 vias, TP304 off R377. `python3 ../../via_in_pad.py phase.kicad_pcb`: FAIL 0.
+
+## Board integration (25 Nov 2026)
+- **SW_SB L3 route:** the trunk runs x 6.1 from VSB_N down to y 11.3, with the east branch at y 9.9 as before. The
+  west branch now leaves at y 11.3, south of U302's +2V5 via (5.34, 10.4) and north of the -2V5 via XEV, and runs
+  to VSB_W. The old y 7.6 / x 3.3 branch is removed: with SW_S's y 12.75 run it sealed the U302 +2V5 via in an L3
+  pocket that no rail could reach.
+- **TRIG_SEL lane:** the board removes the x 9.25 B lane. TRIG_SEL reaches R386.1 from a board via at (11.3, 23.85),
+  and the lane now carries -2V5. The `TRIG_SEL` iface entry is kept, but the board does not use it.
+- **Checks:** check_board 0 clearance / corner / courtyard; the unrouted nets are the plane-fed supplies only.
