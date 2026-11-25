@@ -13,13 +13,15 @@ from scipy.optimize import curve_fit
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import input_stage_bom2 as ist  # noqa: E402
+RB1 = float(os.environ.get("RB1", "1e6"))     # R105 (gate side), as built 1 M 0402
+RB2 = float(os.environ.get("RB2", "10e6"))    # R106 (In_Bias side), as built 10 M 0603 (SPEC 35)
 
 # as built (24 Nov 2026): Ctop 1.5p, Rf1 10k, Rf2 22k + RV101, Rofs 24.9k, Rmid 33k, Cint 470p, VNEG_REF -1.933 V
 OLD = dict(ctop_mode="single", Ctop=1.5e-12, Rf1=10e3, Rf2=33.9e3, Rofs=24.9e3, Rmid=33e3, Cint=470e-12,
            vmid=-1.933, vofs=1.45)
 # proposed: C101 1.5p 50 V +/-0.05 pF, R118 4.7k, R120 22k (no RV101), R119 10k, R123 15k, C106 1n C0G
 NEW = dict(ctop_mode="single", Ctop=1.5e-12, Rf1=4.7e3, Rf2=22e3, Rofs=10e3, Rmid=15e3, Cint=1e-9,
-           vmid=-1.933, vofs=1.289)
+           vmid=-1.933, vofs=1.289, Rb1=RB1, Rb2=RB2)   # R105 1 M / R106 10 M as built (SPEC 35); RB1=RB2=4.99e6: the study
 # alternative: C101 as 2 x 3.3p in series on a shared-pad footprint (one line less), Rf2 15k re-centres LF = HF
 PAIR = dict(NEW, ctop_mode="pair", Ct1=3.3e-12, Ct2=3.3e-12, Lmid=0.1e-9, Cmid=0.06e-12, Rf2=15e3)
 R = {}
@@ -176,13 +178,17 @@ if __name__ == "__main__":
     fig2, ax2 = plt.subplots(1, 2, figsize=(14, 5))
     res5 = []
 
-    def model(t, a, e1, t1, e2, t2):
-        return a * (1 + e1 * (1 - np.exp(-t / t1)) + e2 * (1 - np.exp(-t / t2)))
+    # BOM-2 repair (25 Nov 2026): the free two-term fit is ill-conditioned and fails with the as-built bias resistors
+    # (a third time constant). Fixed basis instead: six first-order terms at fixed time constants 2-300 us, amplitudes
+    # by linear least squares with a small ridge; correction C(s) = (1 + sum e_k) / (1 + sum e_k / (1 + s tau_k)).
+    TAUS = np.geomspace(2e-6, 300e-6, 6)
+    LAM = 1e-4
+    EPS_MIN = 0.01          # apply the correction only when the fitted |LF/HF - 1| exceeds 1 %
 
-    def corr2(f, e1, t1, e2, t2):
+    def corrk(f, ek):
         s_ = 2j * np.pi * f
-        h = 1 + e1 / (1 + s_ * t1) + e2 / (1 + s_ * t2)
-        return (1 + e1 + e2) / h
+        h = 1 + sum(ek[k] / (1 + s_ * TAUS[k]) for k in range(len(TAUS)))
+        return (1 + np.sum(ek)) / h
 
     for j, r in enumerate(picks):
         d = ist.tran(dict(r["p"], term="none"), f"tcal{j}", src_lf, 520e-6, 20e-9, 50e-9)
@@ -193,9 +199,14 @@ if __name__ == "__main__":
         yn = ys + rng.normal(0, noise, ys.size)
         m = ts > 20.4e-6
         tt = ts[m] - 20e-6
-        popt, _ = curve_fit(model, tt, yn[m], p0=(0.2, 0.0, 15e-6, 0.0, 60e-6),
-                            bounds=([0.1, -0.3, 1e-6, -0.3, 20e-6], [0.3, 0.3, 40e-6, 0.3, 400e-6]))
-        a_hf, e1, t1, e2, t2 = popt
+        A = np.column_stack([np.ones_like(tt)] + [1 - np.exp(-tt / tk) for tk in TAUS])
+        reg = LAM * np.eye(A.shape[1]) * len(tt); reg[0, 0] = 0
+        c = np.linalg.solve(A.T @ A + reg, A.T @ yn[m])
+        a_hf, ek = c[0], c[1:] / c[0]
+        eps_fit = float(np.sum(ek))
+        applied = abs(eps_fit) > EPS_MIN
+        corr2 = (lambda f, *_: corrk(f, ek)) if applied else (lambda f, *_: np.ones_like(f, dtype=complex))
+        e1 = t1 = e2 = t2 = 0.0
         hc = r["g"] * np.abs(corr2(r["f"], e1, t1, e2, t2)) / r["lf"]
         mm = (r["f"] >= 1) & (r["f"] <= 1e8)
         unc = r["g"] / r["lf"]
@@ -208,7 +219,8 @@ if __name__ == "__main__":
         fin = r["lf"] * 1.0
         tsx = np.arange(n) / fs
         mt = tsx > 1e-6
-        res5.append(dict(eps_true_pct=100 * r["eps"], fit=dict(a=a_hf, e1_pct=100 * e1, tau1_us=t1 * 1e6, e2_pct=100 * e2, tau2_us=t2 * 1e6),
+        res5.append(dict(eps_true_pct=100 * r["eps"], fit=dict(a=float(a_hf), eps_fit_pct=100 * eps_fit, e_k_pct=[float(100 * x) for x in ek],
+                                                                 tau_k_us=[float(x * 1e6) for x in TAUS], applied=bool(applied)),
                          flat_uncorr_pct=float(100 * np.max(np.abs(unc[mm] - 1))),
                          flat_corr_pct=float(100 * np.max(np.abs(hc[mm] - 1))),
                          step_dev_uncorr_pct=float(100 * np.max(np.abs(x[mt] / fin - 1))),

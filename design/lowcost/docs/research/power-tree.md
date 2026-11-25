@@ -218,7 +218,7 @@ Source: `docs/research/bom2-power-passives.md` (calculations and part checks), a
 | VBUS | F601 PTC -> 0 R 1206 (C17888); D601 SMAJ5.0A DNP; FB601 BLM21PG221SH1D 0805 -> BLM18PG121SN1D 0603 (2 A, 0.05 R, 48 mV at 0.97 A); C632 tantalum -> damper 4 x (1 R 1206 + 47 uF 10 V X5R 1206), R618-R621 / C632-C635 | plug-in peak 5.27 V (5.57 V with strong derating), TPS63802 abs max 6.0 V |
 | +5V1 | R603 / R604 12k / 1.3k 0.1 % -> 20k / 2.2k 1 % (basic) | 4.904 / 5.045 / 5.191 V |
 | GVA-84+ drain | +5V1 minus 30 mV trunk and 125 mA x (1 uH DFE252012F 0.048 R + bead 1.25 R) | 4.71 / 4.92 / 5.19 V |
-| +5V (U604 OUT+) | R613 / R614 470k / 150k 0603 (were 309k / 100k); FB602-FB604 BLM18PG121SN1D 0.05 R | 4.812 / 4.960 / 5.111 V, regulating at every corner |
+| +5V (U604 OUT+) | R613 / R614 470k / 150k 0603 (were 309k / 100k); FB602-FB604 BLM18PG121SN1D 0.05 R | 4.812 / 4.960 / 5.111 V set point; regulates at the low corner, but the high set points exceed +5V1F min 4.877 V: LDO dropout on about 1 board in 6 (re-check B2-4), total still >= 9.0 V |
 | -5V (U604 OUT-) | R605 510k 0603 / R606 200k (were 270k / 100k) | -4.206 / -4.331 / -4.459 V, OUT- headroom >= 0.227 V |
 | BUF802 total | at the pins | 9.008 / 9.29 / 9.57 V (>= 9.0 V), mid-supply +0.31 V |
 | +2V5 (U605 OUT+) | R615 220k 0603 / R616 200k (were 110k / 100k) | 2.456 / 2.520 / 2.585 V |

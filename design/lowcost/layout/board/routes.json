@@ -381,10 +381,10 @@
   "deliberate cut-out (listed L2 / L5 window)": 7
  },
  "stitch": {
-  "beside signal vias": 51,
+  "beside signal vias": 53,
   "RF fences": 16,
-  "grid": 250,
-  "signal vias without a ground via": 41,
+  "grid": 251,
+  "signal vias without a ground via": 39,
   "lacking": [
    [
     86.4,
@@ -409,10 +409,6 @@
    [
     71.0,
     47.1
-   ],
-   [
-    71.5,
-    46.5
    ],
    [
     16.4,
@@ -441,10 +437,6 @@
    [
     80.25,
     48.9
-   ],
-   [
-    73.35,
-    46.5
    ],
    [
     69.0,
@@ -648,6 +640,13 @@
    ],
    [
     [
+     86.4,
+     29.4
+    ],
+    2.46
+   ],
+   [
+    [
      64.0,
      15.5
     ],
@@ -659,13 +658,6 @@
      7.75
     ],
     2.37
-   ],
-   [
-    [
-     86.4,
-     29.4
-    ],
-    2.34
    ],
    [
     [

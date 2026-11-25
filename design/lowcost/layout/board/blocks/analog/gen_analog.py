@@ -209,7 +209,10 @@ VL("R116", XA, YA0 + 2 * P06, "S2")
 HL("R104", X_RG, YL0, "GA")
 VL("C102", x_ga, YL0 + 1.40, "GA")
 VL("R105", X_BI, YL0 + 1.40, "BUF_IN")
-VL("R106", X_BI, YL0 + 3.26, "IN_BIAS_MID")
+# BOM-2 repair (SPEC 35): R106 is 10M 0603 (no 0402 basic above 1M). It does not fit the 0402 column between R105
+# and C107, so it goes to B.Cu (static bias resistor, RULES rule 8, like R107): R105.2 -> top track -> via -> R106 (B)
+XR106, YR106 = 7.50, 14.90
+HL("R106", XR106, YR106, "IN_BIAS_MID", side="B")
 FL.place("U101", XU, YU, 0)
 X_P11 = XU + 1.875
 XTAPR = XTAPF = 14.27                      # R112 (down) / R118 (up) taps on BUF_OUT_S, one column (DECOUPLING-1:
@@ -282,15 +285,20 @@ FL.track("BUF_IN", W_HZ, [("R104", "@BUF_IN"), p2])
 rb = FL.pad("R104", "@BUF_IN")
 r105 = FL.pad("R105", "@BUF_IN")
 FL.track("BUF_IN", 0.3, [rb, (rb[0], rb[1] + 0.35), (r105[0], r105[1] - 0.45), r105])
-FL.track("IN_BIAS_MID", 0.3, [("R105", "@IN_BIAS_MID"), ("R106", "@IN_BIAS_MID")])
-# IN_BIAS: pin 3 -> via in the channel -> B.Cu -> via left of R106 -> R106
+# IN_BIAS_MID: R105.2 -> down -> 45 degrees west -> via north of R106's B pad (hole edge 0.37 mm from it) -> pad
+r105m = FL.pad("R105", "@IN_BIAS_MID")
+r106m = FL.pad("R106", "@IN_BIAS_MID")
+YMV = r106m[1] - 0.95
+FL.track("IN_BIAS_MID", 0.3, [r105m, (r105m[0], 13.0), (r105m[0] - (YMV - 13.0), YMV), (r106m[0], YMV)])
+FL.via(r106m[0], YMV, "IN_BIAS_MID")
+FL.track("IN_BIAS_MID", 0.3, [(r106m[0], YMV), r106m], layer="B.Cu")
+# IN_BIAS: pin 3 -> via in the channel -> B.Cu straight down -> 45-degree jog onto R106's B pad axis
 XCH = 8.52
 FL.track("IN_BIAS", W_HZ, [p3, (XCH, p3[1])])
 FL.via(XCH, p3[1], "IN_BIAS")
 r106 = FL.pad("R106", "@IN_BIAS")
-FL.via(7.0, r106[1], "IN_BIAS")
-FL.track("IN_BIAS", W_HZ, [(7.0, r106[1]), r106])
-FL.track("IN_BIAS", W_HZ, [(XCH, p3[1]), (XCH, 13.3), (XCH - 0.77, 14.07), (7.0, r106[1])], layer="B.Cu")
+FL.track("IN_BIAS", W_HZ, [(XCH, p3[1]), (XCH, r106[1] - 0.70 - (XCH - r106[0])), (r106[0], r106[1] - 0.70), r106],
+         layer="B.Cu")
 # IN_AUX: pin 4 -> channel x 8.55 -> C107 (100p at the pin) -> R121
 XIA = 8.55
 c107 = FL.pad("C107", "@IN_AUX")

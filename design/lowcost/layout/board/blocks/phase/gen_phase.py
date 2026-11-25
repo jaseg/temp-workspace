@@ -896,6 +896,12 @@ def silk_fix():
             if lay not in fab:
                 continue
             bb = it.GetBoundingBox()
+            # B2-11 (recheck BOM-2): silk within 0.3 mm of the block's west edge (= board edge, x 0) is clipped by
+            # the board outline (D319): move it to Fab as well
+            if pcbnew.ToMM(bb.GetLeft()) - bl.ORG[0] < 0.3:
+                it.SetLayer(fab[lay])
+                n += 1
+                continue
             bb.Inflate(mm_(0.12))
             if any(p.IsOnLayer(cu[lay]) and bb.Intersects(pb) for p, pb in pads):
                 it.SetLayer(fab[lay])

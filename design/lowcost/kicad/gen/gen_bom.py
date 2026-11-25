@@ -27,7 +27,8 @@ ALT = {
     "TRF37D73": (1.53, "Mouser (prices.md, 7.3k stock)"),
 }
 NOTE = {
-    "BAT15-04W": "LCSC / JLC stock 1465 (24 Nov 2026) = about 63 boards at 23 per board",
+    "BAT15-04W": "LCSC / JLC stock 865 (25 Nov 2026, was 1465 on 24 Nov) = 37 boards at 23 per board: buy ahead of the order",
+    "TRF37D73": "LCSC / JLC stock 25 (25 Nov 2026) = 5 boards; Mouser 7.3k (prices.md): buy ahead or consign",
     "red": "red KT-0603R (JLC basic) instead of the green KT-0603G (extended): colour only, R730 1k gives 1.3 mA",
     "STM32G474CBT6": "CET6 C730125 as 2nd choice",
     "0.47u": "FXL0420-R47-M = XR0420 land (a 2.2 / b 5.2 / c 2.5 mm); alt. XR0420-R47M C5307593 (low stock)",
@@ -235,6 +236,11 @@ def write_md(rows, total, first, est, nparts):
         "C22787 120 R / C22807 150k / C22961 220k / C23024 300k / C23178 470k / C23192 510k (0603), C17888 0 R 1206, "
         "C17928 1 R 1206, C96123 47 uF 10 V 1206, C14709 BLM18PG121SN1D, C435392 DFE252012F-1R0M; all basic except "
         "C76912, C76901 and C435392. Part numbers no longer used were removed from `kicad/gen/lcsc_parts.py`.", "",
+        "- BOM-2 repair (25 Nov 2026): LCSC and JLC stock of every part re-read (columns Stock / JLC stock), JLC class "
+        "unchanged for all 80 numbers. New: C7250 10 M 0603 (R106, basic; SPEC 35). Low stock against the board "
+        "quantity: BAT15-04W 865 = 37 boards (23 per board), TRF37D73 25 = 5 boards, GVA-84+ 99, TLV3801 113 (JLC), "
+        "BUF802 146 (JLC), MS5351M 122, STM32G474CBT6 192 (JLC): buy the diodes and the TRF37D73 before the order "
+        "(Mouser for TRF37D73) or consign them to JLC.", "",
         "## Ten most expensive lines", "",
         "| Line USD | Qty | Part | Source | Status |", "|---|---|---|---|---|"]
     for r in top:

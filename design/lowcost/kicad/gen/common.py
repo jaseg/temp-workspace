@@ -89,7 +89,7 @@ LCSC_R = {"0": "C17168", "10": "C25077", "22": "C25092", "33": "C25105", "49.9":
           "33k": "C25779", "100k": "C25741", "200k": "C25764", "1M": "C26083"}
 # 0603 (power or voltage rating, or no 0402 basic value): all JLC basic (BOM review 2, 24 Nov 2026)
 LCSC_R0603 = {"0": "C21189", "100": "C22775", "120": "C22787", "18k": "C25810", "150k": "C22807", "220k": "C22961",
-              "300k": "C23024", "470k": "C23178", "510k": "C23192"}
+              "300k": "C23024", "470k": "C23178", "510k": "C23192", "10M": "C7250"}
 LCSC_R1206 = {"0": "C17888", "1": "C17928"}
 # 0.1 % thin film: none left on the board (BOM review 2: the U603 divider is 1 %, SPEC decision 30)
 LCSC_R01 = {}

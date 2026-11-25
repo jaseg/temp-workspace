@@ -40,6 +40,7 @@ NOM = dict(
     Copen=0.5e-12,    # term="relay" only: K1 open-contact capacitance (assumed)
     Ltune=0.0,        # term="relay" only: series inductor in the termination leg
     Ctop=1.5e-12, Cbot=3.3e-12, Cin=2.4e-12, Rg=10.0,
+    Rb=4.99e6,        # R105 / R106 (IN -> In_Bias), each; BOM-2 as built: 1 M
     Cp=18e-12,        # C0G at the alpha tap: tap RC (90k x 26 pF) = Rpar x Cint -> differential integrator
     G0=0.983,          # BUF802 unloaded main-path gain -> 0.971 into 101R
     Ga=0.26, fbuf=3.1e9, faux=800e6,
@@ -109,7 +110,7 @@ def deck(p, analysis, src):
         L += cap("top", "vin", "ga", q["Ctop"], q["esl"]) + ["Cst vin ga 0.03p", f"Cpga ga 0 {q['pad']}"]
     L += cap("bot", "ga", "0", q["Cbot"], q["esl"])
     L += [f"Rg ga gp {q['Rg']}", f"Cpgp gp 0 {q['pad']}", "Lin gp gd 0.5n", f"Cin gd 0 {q['Cin']:.4g}",
-          "Rb1 gp gb 4.99Meg", "Cb1 gp gb 0.06p", "Rb2 gb inb 4.99Meg", "Cb2 gb inb 0.06p", "Cpgb gb 0 0.05p",
+          f"Rb1 gp gb {q.get('Rb1', q['Rb']):.4g}", "Cb1 gp gb 0.06p", f"Rb2 gb inb {q.get('Rb2', q['Rb']):.4g}", "Cb2 gb inb 0.06p", "Cpgb gb 0 0.05p",
           "Rhf inb s 100k",
           f"Vclh clh 0 {q['vclh']}", f"Vcll cll 0 {q['vcll']}", "Vneg vneg 0 -5",
           "Dh gd clh dcl", "Dl vneg gd dcl",

@@ -79,6 +79,27 @@ Kept at 2.2 pF.
 220p: -11.04 LSB at the end of the window (pin -10.83); 100p: -10.87 (-10.66); 47p: -10.80 (-10.59). The error is the
 modelled hold droop. Pin-to-sample-cap settling is 0.21 LSB in all three cases. **100p (basic) is equivalent.**
 
+## As built after the BOM-2 repair (25 Nov 2026, SPEC decision 35)
+`bom2_input.py` now runs the as-built bias resistors (R105 1 M gate side, R106 10 M; env `RB1` / `RB2`,
+`RB1=RB2=4.99e6` reproduces the tables above apart from the new fit) and a fixed-basis firmware fit; `results.json`,
+`bom2_ac.png`, `bom2_steps.png` are from this run.
+- Why: with R105 = R106 = 1 M (decision 33) the gate bias network adds a third time constant (about 12 us) next to the
+  servo doublet. The free two-term fit then hits its bounds; corrected flatness was 1.6-2.8 % (re-check B2-9; a 6-term
+  fixed basis still left 1.4 %). R106 = 2 M gives 0.9 %, 10 M (2 x 10 M or 1 M + 10 M) 0.1-0.4 %.
+- Fit: y = a [1 + sum e_k (1 - exp(-t / tau_k))], tau_k = 2, 5.4, 14.6, 39.6, 108, 300 us; linear least squares with a
+  ridge of 1e-4; C(s) = (1 + sum e_k) / (1 + sum e_k / (1 + s tau_k)). Applied only when |sum e_k| > 1 %.
+
+| Board eps | fitted | applied | raw flatness | corrected | raw step dev. | corrected |
+|---|---|---|---|---|---|---|
+| -7.09 % | -6.83 % | yes | 7.64 % | **0.54 %** | 6.81 % | 0.25 % |
+| -6.82 % | -6.56 % | yes | 7.32 % | 0.55 % | 6.64 % | 0.26 % |
+| -2.90 % | -2.62 % | yes | 3.22 % | 0.29 % | 2.75 % | 0.13 % |
+| +0.09 % | +0.40 % | no | 0.46 % | 0.46 % (raw) | 0.25 % | 0.25 % |
+
+Unchanged by the repair: LF / HF gain 0.1997 (eps +0.003 %), -3 dB 3.29 / 1.71 GHz, 20 ps step 130 ps / 12.7 %, VOFS
+0.2 / 1.289 / 2.7 V -> +0.512 / 0.000 / -0.663 V. Overload recovery (+20 V, 10 us) 49.9 us (48.3 us with 4.99 M).
+Mismatch spread (60 boards) -7.1 ... +6.0 %, as before. BUF802 bias current (pA) x 11 M: negligible offset.
+
 ## Open points
 BUF802 Cin spread is assumed (+/-0.3 pF), not specified. The correction was checked on 4 simulated boards. Calibration
 needs one square-wave connection in production (as RV101 did). Firmware for the fit and the correction does not exist yet.

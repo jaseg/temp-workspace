@@ -117,7 +117,8 @@ def main():
     XN = g(110)
     sh.wire(rg["2"], u1["2"])
     rb1 = R(sh, "1M", (XN, Y0 + g(3)), fields={"Note": "1 % JLC basic (was 4.99M; SPEC 33)"})
-    rb2 = R(sh, "1M", (XN, Y0 + g(9)), fields={"Note": "1 % JLC basic (was 4.99M; SPEC 33)"})
+    rb2 = R(sh, "10M", (XN, Y0 + g(9)), size="0603",
+            fields={"Note": "1 % 0603 JLC basic, B side (1M + 10M: LF/HF correction 0.3 %; SPEC 35)"})
     sh.wire(rb1["2"], rb2["1"])
     sh.path([rb2["2"], u1["3"]])
     sh.text("HF 5:1: Ctop 1.5p / Cbot 3.3p, k = 1.53/(1.53+3.3+2.4+0.3) = 0.206,\n"
