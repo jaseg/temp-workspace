@@ -3,7 +3,7 @@
 pads (solid, labelled ref.pad), vias (circles: GND black ring, supplies coloured), courtyards (thin grey) -- so that
 decoupling loops and via positions can be read at a glance.  Zones must be filled in the file (the generators save a
 filled copy in their scratch directory).
-Run: python3 net_view.py <filled.kicad_pcb> <out.png> <F|B> x0 y0 x1 y1 [--org ox oy]   (crop in local mm, origin org)"""
+Run: python3 net_view.py <filled.kicad_pcb> <out.png> <F|B|L3> x0 y0 x1 y1 [--org ox oy]   (crop in local mm, origin org)"""
 import sys
 import matplotlib
 matplotlib.use("Agg")
@@ -31,8 +31,8 @@ def main():
     x0, y0, x1, y1 = map(float, a[4:8])
     ox, oy = (float(a[a.index("--org") + 1]), float(a[a.index("--org") + 2])) if "--org" in a else (100.0, 100.0)
     b = pcbnew.LoadBoard(path)
-    L = pcbnew.F_Cu if side == "F" else pcbnew.B_Cu
-    CY = pcbnew.F_CrtYd if side == "F" else pcbnew.B_CrtYd
+    L = {"F": pcbnew.F_Cu, "B": pcbnew.B_Cu, "L3": pcbnew.In2_Cu}[side]      # L3: inner layer In2 (BOM-2)
+    CY = pcbnew.B_CrtYd if side == "B" else pcbnew.F_CrtYd
     mm = lambda v: pcbnew.ToMM(v)
     P = lambda p: (mm(p.x) - ox, mm(p.y) - oy)
     fig, ax = plt.subplots(figsize=(10, 10 * (y1 - y0) / (x1 - x0)), dpi=200)

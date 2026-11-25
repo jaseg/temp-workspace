@@ -348,7 +348,7 @@ if not FAST:
         for t, e, o in seg_at(net, (x, 22.5), "B.Cu"):
             B.Remove(t)
     # BOM-2 (25 Nov): DAC_TRIG ends on the block's own via (4.6, 44.7) (R383 on top), only its 0.3 mm B stub goes
-    for net, (x, yc) in (("/DAC_TRIG", (4.6, 44.7)), ("/TRIG_SEL", (9.25, 44.6))):
+    for net, (x, yc) in (("/DAC_TRIG", (4.6, 44.7)),):
         for t in segs(net, "B.Cu"):
             a_, b_ = loc(t.GetStart()), loc(t.GetEnd())
             if abs(a_[0] - x) < 0.02 and abs(b_[0] - x) < 0.02 and max(a_[1], b_[1]) > yc:
@@ -359,6 +359,19 @@ if not FAST:
                     t.SetStart(m.P(x, lo)); t.SetEnd(m.P(x, yc))
         if not any(near(loc(v.GetPosition()), (x, yc)) for v in vias(net)):
             m.via(x, yc, net)
+    # BOM-2 integration (25 Nov): TRIG_SEL no longer uses the phase block's x 9.25 B lane (it ran the full height of
+    # the front column and, with the board's L3 line beside it, walled the column's +-2V5 rail vias off): the lane is
+    # removed; the slow line ends on L3 at a via (11.0, 23.35) east of the column and a short L6 piece runs to R386.1
+    for t in segs("/TRIG_SEL", "B.Cu"):
+        a_, b_ = loc(t.GetStart()), loc(t.GetEnd())
+        if max(a_[0], b_[0]) < 9.4 and min(a_[1], b_[1]) > 25.0:
+            B.Remove(t)
+    pr = [p for f in B.GetFootprints() if f.GetReference() == "R386" for p in f.Pads() if p.GetNetname() == "/TRIG_SEL"][0]
+    px, py = loc(pr.GetPosition())
+    XT = 9.85
+    T("/TRIG_SEL", 0.15, [(11.0, 23.35), (XT + 0.3, 23.35), (XT, 23.65), (XT, py - 0.3), (XT - 0.3, py), (px, py)], "B.Cu",
+      "L6 from the L3 via (11.0, 23.35) to R386.1 (BOM-2)", ch=0.0001)
+    m.via(11.0, 23.35, "/TRIG_SEL")
 
     bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
     print("NOT PLACED:")

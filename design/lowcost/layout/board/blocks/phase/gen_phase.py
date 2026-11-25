@@ -804,16 +804,21 @@ V(*VSB_E, SW_SB)
 T(SW_SB, 0.25, [f92, VSB_E], layer="B.Cu", ch=0)
 # L3 (block In2) lanes, planar:
 #   SW_S : VS_N -> east y 0.6 -> down x 9.3 (branch y 7.45 -> VS_R) -> y 11.45 -> x 7.49 (VS_E) -> y 12.75 -> VS_W
-#   SW_SB: VSB_N -> x 6.1 down -> y 9.9 east -> VSB_E;  x 6.1 -> y 7.6 west -> x 3.3 down -> VSB_W
+#   SW_SB: VSB_N -> x 6.1 down to y 11.3 (branch y 9.9 east -> VSB_E) -> y 11.3 west -> VSB_W
 W_L3 = 0.25
 XE3, YS3, YE3 = 9.30, 12.75, 11.45
 T(SW_S, W_L3, [VS_N, (XE3 - 0.35, VS_N[1]), (XE3, VS_N[1] + 0.35), (XE3, YE3 - 0.4), (XE3 - 0.4, YE3), (VS_E[0], YE3)],
   layer="In2.Cu", ch=0)
 T(SW_S, W_L3, [(XE3, 7.15), (XE3 - 0.3, 7.45), (VS_R[0] + 0.35, 7.45), (VS_R[0], 7.80), VS_R], layer="In2.Cu", ch=0)
 T(SW_S, W_L3, [VS_E, (VS_E[0], YS3 - 0.4), (VS_E[0] - 0.4, YS3), (VS_W[0] + YS3 - VS_W[1], YS3), VS_W], layer="In2.Cu", ch=0)
-T(SW_SB, W_L3, [VSB_N, (6.1, VSB_N[1] + 0.45), (6.1, 9.7), (6.3, 9.9), (VSB_E[0] - 0.4, 9.9), (VSB_E[0], 10.3), VSB_E],
-  layer="In2.Cu", ch=0)
-T(SW_SB, W_L3, [(6.1, 7.6), (4.0, 7.6), (3.3, 8.3), (3.3, VSB_W[1] - 0.4), (2.9, VSB_W[1]), VSB_W], layer="In2.Cu", ch=0)
+# board integration (25 Nov): SW_SB branches SOUTH of the U302 +2V5 via (junction y 11.3, between that via and the -2V5
+# via XEV), so the L3 area around U302's +2V5 via opens north to the column's west / north L3 area, where the board's
+# +2V5 / -2V5 rails reach this block's rail vias (the old y 7.6 / x 3.3 branch closed a pocket with SW_S's y 12.75 run)
+YJ = 11.30
+T(SW_SB, W_L3, [VSB_N, (6.1, VSB_N[1] + 0.45), (6.1, YJ - 0.3), (5.8, YJ)], layer="In2.Cu", ch=0)
+T(SW_SB, W_L3, [(6.1, 9.7), (6.3, 9.9), (VSB_E[0] - 0.4, 9.9), (VSB_E[0], 10.3), VSB_E], layer="In2.Cu", ch=0)
+T(SW_SB, W_L3, [(5.8, YJ), (VSB_W[0] + 0.78 + (VSB_W[1] - YJ), YJ), (VSB_W[0] + 0.78, VSB_W[1]), VSB_W], layer="In2.Cu",
+  ch=0)
 
 # ============================================================================= ground stitching (ZONES-1 / -2, 24 Nov)
 # The board's L3 GND webs between the hold-node windows and the L6 GND fingers between the tap-row lanes had no via
