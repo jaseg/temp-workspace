@@ -164,3 +164,59 @@ COS3502SR 0.36; GW1NZ-LV1QN48 6.68; MS5351M 0.91; LM27761 1.23.
     OUT- -4.514 V (4.381-4.647 V), both 1 % dividers (309k / 100k, 270k / 100k); total 9.14-9.70 V (>= 9.13 V at the pins),
     OUT- headroom 0.181 V worst case (41 mA x 4.5 ohm, 26 mV dropout). Mid-supply sits +0.20 V above GND. U605
     +2.520 / -2.440 V (1 %, +/-2.5 %). Consequences and numbers: `docs/research/power-tree.md` section 12.
+27. **Trigger front end without TMUX136 and SN65LVDS2** (BOM review 2, 24 Nov 2026; `docs/research/bom2-trigger.md`,
+    `sim/trig_switch/RESULT.md`): the input selector is two four-diode bridges (D317 / D318 signal, D319 / D320 EXT_CLK,
+    2 x BAT15-04W each; feeds R391-R394 1k) steered by Q301 SS8550 / Q302 MMBT3904 (R386 / R388 10k, R389 3.3k, R387 /
+    R390 1k) from TRIG_SEL; TRIG_SEL low (reset) = signal, as before. Simulated -3 dB 1.26 GHz (signal) / 1.13 GHz (EXT),
+    isolation 48.8 / 45.8 dB at 100 MHz, about 22 dB at 1 GHz (TMUX136 model 24-29 dB): operating rule "remove EXT_CLK when
+    triggering on small signals"; offset +6.4 mV (calibrated); EXT_CLK range -0.9..+1.0 V (was +/-0.5 V). The COARSE
+    receiver is a 9th COS3502 (U313 unit A, unit B tied off; COARSE valid to about 60 MHz, firmware ignores it above).
+    Removed: U301, U304, R302-R305, C301-C303, TP301, net VSW_GND. Reason: TMUX136 32 pcs world stock, two open datasheet
+    points, 3 extended lines; SN65LVDS2 extended. +0.30 USD parts, 7 more placements, cheaper below about 30 boards.
+28. **Input servo without trimmer, C101 50 V, capacitors below 1 nF** (`docs/research/bom2-input-taps.md` A / B,
+    `sim/bom2_input/RESULT.md`): RV101 removed; R118 Rf1 4.7k, R119 Rofs 10k, R123 Rmid 15k, R120 22k to GND, C106 Cint
+    1 nF C0G (LF gain 0.1997 = HF gain; VOFS 0.2 / 1.289 / 2.7 V -> OUT +0.512 / 0 / -0.663 V). The LF/HF mismatch (BUF802
+    Cin spread, up to +/-15 %, no part tolerance can remove it) is measured once with any 0.2-2 kHz square wave and
+    corrected in firmware (two-term IIR, unity at DC): residual flatness 0.34-0.78 % (trimmed analog 0.67 %). C101 = 1.5 pF
+    +/-0.05 pF 50 V Murata (C76901; sees <= 47.7 V at the +/-50 V input rating, below 50 V/ns); C207 220p -> 100p, C631
+    (DNP) 120p -> 100p (basic). C106 must stay C0G (X7R would make the servo time constant voltage dependent).
+29. **Tap coupling capacitors C314-C345** (coordinator decision, overrides the printed-capacitor recommendation of
+    bom2-input-taps.md C): the parts cannot be DNP (they are the only strobe path into each gate: no capture without them).
+    The printed L1/L2 capacitor is **not** used: an L2 strobe island under every tap would cut the ground plane under the
+    tap row and is not field-verified. The 0402 parts stay fitted, changed from the FH +/-0.25 pF part (its low corner
+    0.25 pF fails, 60 ps rms) to Murata GJM1555C1HR50WB01D 0.5 pF +/-0.05 pF C0G (C76912, extended, JLC stock 121k,
+    32 per board; 0.45 pF corner 17.1 ps rms). No layout change.
+30. **+5V1 and the LM27762 dividers with 1 % JLC basic resistors** (replaces the 0.1 % U603 pair of decisions 25 / 26;
+    `docs/research/bom2-power-passives.md` A, `docs/research/power-tree.md` section 13): R603 / R604 20k / 2.2k -> +5V1
+    4.904 / 5.045 / 5.191 V (<= 5.20 V); GVA-84+ drain 4.71-5.19 V (P1dB about -1.2 dB at the low corner, phase gates
+    still >= 2.4 V for 2.0 V needed). U604: R613 / R614 470k / 150k (0603), R605 510k (0603) / R606 200k -> +4.960 / -4.331 V,
+    BUF802 total at the pins 9.008 / 9.29 / 9.57 V (9.0 V minimum met with all tolerances stacked, 8 mV;
+    0.29 V typical), OUT- headroom 0.227 V. U605: R615 220k (0603) / R616 200k, +2.520 V unchanged. TPS63002 (fixed 5 V) rejected:
+    no better accuracy, 1.99 USD, harmonic next to the strobe. No 0.1 % part remains on the board.
+31. **Inductors 4 -> 3 types, beads 3 -> 2 types** (bom2-power-passives.md B): 47 uH 1210 kept only where a stage drives a
+    50 R pad with <= 3 MHz content (L401, L302); L402, L403, L405 (47 uH 1210) and L404, L406 (2.2 uH 0805) -> 1 uH
+    DFE252012F-1R0M 1008 (bias-tee rerun identical in the stub-loaded band, 48 MHz train 6.82 V vs 6.73 V); the 1k dampers
+    R416-R418 are removed (R415 across L401 stays); L602 / L603 FHD252010S (262 in stock) -> the same DFE252012F-1R0M;
+    L601 0.47 uH unchanged (TPS63802 needs 0.37-0.57 uH). Beads: FB601-FB607 -> BLM18PG121SN1D (basic, 2 A, 0.05 R;
+    FB601 0805 -> 0603); FB608 -> BLM15HD102SN1D 0402 (the RF-bead line).
+32. **USB input** (user review): F601 PTC -> 0 R 1206 (C17888, basic, same land); D601 SMAJ5.0A DNP (land kept);
+    the 47 uF tantalum C632 -> RC damper 4 x (1 R 1206 R618-R621 + 47 uF 10 V X5R 1206 C632-C635), all basic: plug-in
+    peak 5.27 V (5.57 V with strong MLCC derating) against the TPS63802 6.0 V abs max (8.6 V undamped).
+33. **Resistor defragmentation and small parts** (bom2-power-passives.md D, all values JLC basic): pads sampler
+    R402 / R404 / R403 100 / 120 / 100 (12.46 dB), line R307-R309 100 / 100 / 100 (11.48 dB), phase R408 / R410 / R409 and
+    R412 / R414 / R413 120 / 100 / 120 (10.69 dB, edge about 10 ps slower); R202 / R203 24.9 -> 22 R (103 ps, 107.6 %
+    efficiency, inside the bias trim); R378 / R379 43 -> 49.9 R (last tap 3.59 V vs 3.36 V, supersedes decision 22 for
+    these two); R401 / R405 / R407 / R411 47 -> 49.9 R; TRIG_LEVEL R384 / R385 10k / 3.3k (-0.332..+0.466 V guaranteed;
+    the old network did not guarantee +/-0.30 V); R107 17.8k -> 18k 0603; R105 / R106 4.99M -> 1M (overload re-bias 5x
+    faster, 22 uV rms extra noise vs 0.35 mV floor); U701 TLV9001 -> TPH2501 (same pinout, U201 / U202 line, Vos 0.33 mV
+    at OUT, +6.5 mA on +/-2V5); D401 BAT15-03W (0 stock) -> half a BAT15-04W (pin 2 on the stub node, pins 1 and 3 to GND;
+    never pin 2 to GND with pin 3 on the node), D402 / D403 (DNP) alike with the polarity of their line (D403: pin 1 on
+    PSTRB_K, pins 2 / 3 to GND).
+34. **Final consolidation pass** (this review, after applying 27-33): R114-R116 300k 0402 (extended) -> 300k 0603 (C23024,
+    basic, 75 V: more margin at the +/-50 V input; the string sits on VIN before Ctop, so the larger pads do not change
+    the HF divider); R737 TRIG_SEL pull-down 2.0k -> 3.3k (the 2.0k line was single-use after R385; reset still selects
+    the signal: pin +0.45 V, Q301 base 0.14 mA). Considered and not done: Cint 1 nF C0G -> 100 pF basic with a 10x servo
+    network (no re-simulation), C618 / C619 0603 -> 0402 and the 0 R / 100 R / 120 R 0603 vs 0402 pairs (ratings / layout;
+    basic lines cost no fee), DNP of the USBLC6-2SC6 (not asked). Study overlap resolved here: C303 (the 1 nF C0G line
+    the input study meant to share) goes with the TMUX136, so the C0G line stays for C106 alone. Result of decisions 27-34: extended part numbers
+    58 -> 27, fitted part lines 94 -> 80, no 0.1 % resistor, BOM 70.45 -> 70.39 USD (`docs/bom.md`).

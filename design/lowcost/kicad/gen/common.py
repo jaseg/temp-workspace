@@ -73,30 +73,32 @@ FP = {
     "R0402": "Resistor_SMD:R_0402_1005Metric", "R0603": "Resistor_SMD:R_0603_1608Metric",
     "C0402": "Capacitor_SMD:C_0402_1005Metric", "C0603": "Capacitor_SMD:C_0603_1608Metric",
     "C0805": "Capacitor_SMD:C_0805_2012Metric", "C1206": "Capacitor_SMD:C_1206_3216Metric",
+    "R1206": "Resistor_SMD:R_1206_3216Metric",
     "FB0603": "Inductor_SMD:L_0603_1608Metric", "FB0805": "Inductor_SMD:L_0805_2012Metric",
 }
 # LCSC numbers, all verified on lcsc.com (product-detail JSON) on 24 Nov 2026: part number, value, tolerance,
 # rating, package and stock; data and stock/prices in lcsc_parts.py (docs/bom.md "LCSC verification").
-# JLC class (24 Nov 2026, BOM optimisation): JLCPCB basic parts wherever one exists in the same package with an adequate
-# rating (basic list from the jlcpcb.com parts API, componentLibraryType "base"); 1 % thick film everywhere except the
-# U603 divider (0.1 %, docs/research/power-tree.md section 12). Generic passives: UNI-ROYAL 0402WGF 1 % 0402; FH 0402CG
+# JLC class (24 Nov 2026, BOM optimisation and BOM review 2): JLCPCB basic parts wherever one exists with an adequate
+# rating (class per part from the jlcpcb.com parts API, componentLibraryType "base"); 1 % thick film everywhere, no
+# 0.1 % part left (SPEC decisions 25, 30). Generic passives: UNI-ROYAL 0402WGF 1 % 0402; FH 0402CG
 # C0G; Samsung X5R/X7R. One number per value / package / rating.
-LCSC_R = {"0": "C17168", "10": "C25077", "22": "C25092", "24.9": "C5099", "33": "C25105",
-          "43": "C270600", "47": "C25118", "49.9": "C25120", "68": "C25131", "82": "C25136", "91": "C270574",
+LCSC_R = {"0": "C17168", "10": "C25077", "22": "C25092", "33": "C25105", "49.9": "C25120",
           "100": "C25076", "120": "C25079", "470": "C25117", "510": "C25123", "1k": "C11702", "1.00k": "C11702",
-          "1.5k": "C25867", "2.0k": "C4109", "2.2k": "C25879", "2.7k": "C25885", "3.3k": "C25890", "4.7k": "C25900",
-          "5.1k": "C25905", "8.87k": "C36953", "10k": "C25744", "10.0k": "C25744", "15k": "C25756",
-          "17.8k": "C129766", "20k": "C25765", "22k": "C25768", "24.9k": "C25874", "33k": "C25779",
-          "51k": "C25794", "100k": "C25741", "110k": "C25745", "270k": "C25770", "300k": "C25774", "309k": "C122546",
-          "4.99M": "C137963"}
-LCSC_R0603 = {"0": "C21189", "82": "C23255", "100": "C22775"}
-# 0.1 % 25 ppm/K thin film 0402 (value without the " 0.1%" suffix): only the U603 TPS63802 divider
-LCSC_R01 = {"12k": "C784579", "1.3k": "C852609"}
+          "1.5k": "C25867", "2.0k": "C4109", "2.2k": "C25879", "3.3k": "C25890", "4.7k": "C25900",
+          "5.1k": "C25905", "10k": "C25744", "10.0k": "C25744", "15k": "C25756", "20k": "C25765", "22k": "C25768",
+          "33k": "C25779", "100k": "C25741", "200k": "C25764", "1M": "C26083"}
+# 0603 (power or voltage rating, or no 0402 basic value): all JLC basic (BOM review 2, 24 Nov 2026)
+LCSC_R0603 = {"0": "C21189", "100": "C22775", "120": "C22787", "18k": "C25810", "150k": "C22807", "220k": "C22961",
+              "300k": "C23024", "470k": "C23178", "510k": "C23192"}
+LCSC_R1206 = {"0": "C17888", "1": "C17928"}
+# 0.1 % thin film: none left on the board (BOM review 2: the U603 divider is 1 %, SPEC decision 30)
+LCSC_R01 = {}
 # 0402 unless noted by the size rule in C(): pF/nF and 1u/2.2u/4.7u 0402, 10u/22u 0805
-LCSC_C = {"0.5p": "C1544", "1.5p": "C2179899", "2.2p": "C1559", "3.3p": "C76906", "18p": "C1549", "47p": "C1567",
-          "100p": "C1546", "120p": "C40059", "220p": "C39122", "470p": "C75274", "1n": "C1523", "10n": "C15195",
+LCSC_C = {"0.5p": "C76912", "1.5p": "C76901", "2.2p": "C1559", "3.3p": "C76906", "18p": "C1549", "47p": "C1567",
+          "100p": "C1546", "1n": "C1523", "10n": "C15195",
           "100n": "C1525", "1u": "C52923", "4.7u": "C23733", "10u": "C15850", "22u": "C45783"}
 LCSC_C0603 = {"1u": "C15849", "4.7u": "C19666"}
+LCSC_C1206 = {"47u": "C96123"}
 LCSC_C_C0G = {"1n": "C53547"}          # parts whose Note asks for C0G where the default is X7R
 
 
@@ -118,7 +120,7 @@ def R(sh: Sheet, value: str, at, rot: int = 0, size: str = "0402", ref: str = "R
     if value.endswith("0.1%") or "0.1 %" in _note(kw):
         table = LCSC_R01
     else:
-        table = LCSC_R0603 if size == "0603" else LCSC_R
+        table = {"0603": LCSC_R0603, "1206": LCSC_R1206}.get(size, LCSC_R)
     lcsc = kw.pop("lcsc", "") or table.get(base, "")
     if lcsc and not kw.get("mpn"):
         kw["mpn"] = _mpn(lcsc)
@@ -132,6 +134,8 @@ def C(sh: Sheet, value: str, at, rot: int = 0, size: str | None = None, ref: str
     note = _note(kw)
     if size == "0603":
         table = LCSC_C0603
+    elif size == "1206":
+        table = LCSC_C1206
     elif "C0G" in note and value in LCSC_C_C0G:
         table = LCSC_C_C0G
     else:

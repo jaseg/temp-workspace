@@ -4,8 +4,8 @@ Signal path, left to right:
   BUF_OUT_S (BUF802 OUT pin, input sheet) -> R201 10 R -> 4-diode bridge (D201, D202 = 2x BAT15-04W)
   -> hold node: C205 2.2 pF C0G -> U201 TPH2501 G = +3.0 (1.00 k / 499 R, +/-2.5 V)
   -> U202 TPH2501 inverting level shift on +3V3/GND (1 k / 1 k, +in = ADC_REF_MID 0.720 V)
-  -> R211 33 R + C207 220 pF -> ADC_IN (J701 pin 3 on mcu_if, STM32G474 PA0).
-Bridge rails: STRB_A / STRB_K (balun outputs, strobe sheet) -> 47 pF C0G -> node -> 24.9 R -> diodes;
+  -> R211 33 R + C207 100 pF -> ADC_IN (J701 pin 3 on mcu_if, STM32G474 PA0).
+Bridge rails: STRB_A / STRB_K (balun outputs, strobe sheet) -> 47 pF C0G -> node -> 22 R -> diodes;
 bias VBIAS_A / VBIAS_K (nominal -1.3 / +1.3 V with the as-built 99 ps arms, trimmed per board for efficiency
 ~100 %, sim/strobe_arms/RESULT.md) through 1 k into the node; 1 k across the balun outputs.
 
@@ -51,11 +51,11 @@ def main():
     sh.wire(r10["2"], d1["3"])                                   # bridge input node
     # anode rail (top)
     sh.path([d1["1"], P(75, 80), P(91, 80), d2["1"]])
-    ra = R(sh, "24.9", P(83, 75), fields={"Note": "rail resistor at the diodes (sim 25 R)"})
+    ra = R(sh, "22", P(83, 75), fields={"Note": "rail resistor at the diodes (sim 25 R; 22 R JLC basic, strobe_arms rerun 103 ps / 107.6 %, SPEC 33)"})
     sh.wire(ra["2"], P(83, 80))
     # cathode rail (bottom)
     sh.path([d1["2"], P(75, 100), P(91, 100), d2["2"]])
-    rk = R(sh, "24.9", P(83, 105), fields={"Note": "rail resistor at the diodes (sim 25 R)"})
+    rk = R(sh, "22", P(83, 105), fields={"Note": "rail resistor at the diodes (sim 25 R; 22 R JLC basic, SPEC 33)"})
     sh.wire(rk["1"], P(83, 100))
 
     # strobe coupling: STRB_A / STRB_K -> 47 pF C0G -> rail node
@@ -124,7 +124,7 @@ def main():
     sh.add(TP, "TP", "SHIFT_OUT", P(168, 90), fp=TP_FP)
     rs = R(sh, "33", P(176, 90), rot=90)
     sh.wire(P(173, 90), rs["1"])
-    cad = C(sh, "220p", P(186, 93), fields={"Note": "C0G, at J701 pin 3"})
+    cad = C(sh, "100p", P(186, 93), fields={"Note": "C0G, at the ADC pin (100p JLC basic, was 220p: settling 0.21 LSB, sim/bom2_input; SPEC 28)"})
     sh.gnd(cad["2"])
     sh.wire(rs["2"], P(194, 90))
     sh.hlabel("ADC_IN", P(194, 90), "output", side="right")
@@ -187,7 +187,7 @@ def main():
     sh.text("LEVEL SHIFT U202 (+3V3/GND):\n"
             "Vadc = 2 x 0.720 V - V(U201) = 1.44 V - V(U201)\n"
             "-> 0.40..2.48 V at PA0. U201+U202 settle ~20 ns.", P(158, 112), size=T)
-    sh.text("ADC PIN: R211 33 R + C207 220 pF C0G placed at\n"
+    sh.text("ADC PIN: R211 33 R + C207 100 pF C0G placed at\n"
             "J701 pin 3 (mcu_if), PA0 ADC12_IN1, 6.5-cycle\n"
             "(108 ns) sampling at 60 MHz.", P(174, 70), size=T)
 

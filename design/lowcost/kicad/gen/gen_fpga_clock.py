@@ -203,10 +203,11 @@ def main():
     xb, yb = g(22), g(85)
     sh.power("+3V3", (xb - g(4), yb), dy=-2.54)
     sh.wire((xb - g(4), yb), (xb, yb))
-    fbc = sh.add("Device:FerriteBead_Small", "FB608", "600R@100MHz", (xb, yb), rot=90,
-                 fp="Inductor_SMD:L_0603_1608Metric", lcsc="C85833", mpn="BLM18KG601SN1D",
-                 fields={"Price": "0.0166 USD (LCSC 50+)",
-                         "Note": "MS5351M supply filter (power-tree.md): 600 R @ 100 MHz, 0.15 R, 31-55 mA"})
+    fbc = sh.add("Device:FerriteBead_Small", "FB608", "1k", (xb, yb), rot=90,
+                 fp="Inductor_SMD:L_0402_1005Metric", lcsc="C21516", mpn="BLM15HD102SN1D",
+                 fields={"Price": "0.0197 USD (LCSC 50+)",
+                         "Note": "MS5351M supply filter: BLM15HD102SN1D (the RF-bead line, SPEC 31), >= 600 R "
+                                 "100 MHz-3 GHz, 1.25 R max: 55 mA -> VDD >= 3.155 V"})
     dxy = (xb - fbc["1"][0], yb - fbc["1"][1])
     fbc.at = (fbc.at[0] + dxy[0], fbc.at[1] + dxy[1])
     xr = xb + g(36)

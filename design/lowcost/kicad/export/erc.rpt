@@ -1,4 +1,4 @@
-ERC report (2026-11-24T20:05:33, Encoding UTF8)
+ERC report (2026-11-24T23:53:13, Encoding UTF8)
 Report includes: Errors, Warnings, Exclusions
 
 ***** Sheet /
@@ -26,6 +26,12 @@ Report includes: Errors, Warnings, Exclusions
 [footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
     ; warning
     @(177.80 mm, 48.26 mm): Symbol U303 [TRF37D73]
+[lib_symbol_issues]: Symbol 'Q_PNP_BEC' not found in symbol library 'Device'
+    ; warning
+    @(321.31 mm, 88.90 mm): Symbol Q301 [Q_PNP_BEC]
+[lib_symbol_issues]: Symbol 'Q_NPN_BEC' not found in symbol library 'Device'
+    ; warning
+    @(361.95 mm, 93.98 mm): Symbol Q302 [Q_NPN_BEC]
 
 ***** Sheet /strobe/
 [footprint_link_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
@@ -65,7 +71,7 @@ Report includes: Errors, Warnings, Exclusions
     ; warning
     @(134.62 mm, 232.41 mm): Symbol JP701 [SolderJumper_2_Open]
 
- ** ERC messages: 16  Errors 0  Warnings 16
+ ** ERC messages: 18  Errors 0  Warnings 18
 
  ** Ignored checks:
     - Global label only appears once in the schematic

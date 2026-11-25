@@ -24,15 +24,13 @@ FOOT = "footprint only"
 ALT = {
     "GVA-84+": (2.99, "Mouser (prices.md)"),
     "TLV3801": (5.13, "Mouser (prices.md)"),
-    "TMUX136": (1.22, "DigiKey (prices.md)"),
     "TRF37D73": (1.53, "Mouser (prices.md, 7.3k stock)"),
 }
 NOTE = {
-    "BAT15-03W": "0 at LCSC and JLC (24 Nov 2026): order DigiKey BAT1503WE6327HTSA1CT-ND",
+    "BAT15-04W": "LCSC / JLC stock 1465 (24 Nov 2026) = about 63 boards at 23 per board",
     "red": "red KT-0603R (JLC basic) instead of the green KT-0603G (extended): colour only, R730 1k gives 1.3 mA",
     "STM32G474CBT6": "CET6 C730125 as 2nd choice",
     "0.47u": "FXL0420-R47-M = XR0420 land (a 2.2 / b 5.2 / c 2.5 mm); alt. XR0420-R47M C5307593 (low stock)",
-    "220R@100MHz 2A": "BLM21PG221SH1D (SN1D C85840 0 stock)",
     "SIG_IN": "Samtec SMA-J-P-H-ST-EM1 = footprint SMA_Samtec_SMA-J-P-X-ST-EM1",
     "EXT_CLK": "Samtec SMA-J-P-H-ST-EM1 = footprint SMA_Samtec_SMA-J-P-X-ST-EM1",
     "WR-WST 490107671612": "footprint only (Würth Redfit IDC, yanartas J3 pinout), no part; not on LCSC: RS 197-3364",
@@ -188,14 +186,18 @@ def write_md(rows, total, first, est, nparts):
         f"| extended | {jl['extended'][0]} | {jl['extended'][1]} | {jl['extended'][2]} |",
         f"| fitted part lines / unique LCSC parts | {jl['basic'][0] + jl['extended'][0]} | "
         f"{jl['basic'][1] + jl['extended'][1]} | {jl['basic'][2] + jl['extended'][2]} |", "",
-        "BOM optimisation of 24 Nov 2026 (user instruction: no 0.1 % resistors unless unavoidable, JLC basic parts "
-        "for caps and resistors, combine lines; SPEC decisions 25 and 26): before 103 fitted part lines / 100 unique "
-        "parts, 26 basic / 74 extended, 20 resistors at 0.1 % (13 part numbers), 73.13 USD. Remaining extended "
-        "passives are RF-impedance or simulated values (24.9 / 43 / 47 / 68 / 82 / 91 R, 0.5 / 1.5 / 2.2 / 3.3 pF, "
-        "C0G 220 p / 470 p / 1 n, the 0402 RF beads), values with no basic part under the LM27762 R2 >= 50k rule "
-        "(300k, 309k, 270k, 110k), the BUF802 bias / input network (17.8k, 4.99M), the trigger level and switch-ground "
-        "dividers (8.87k, 2.7k), Rofs 24.9k (keeps the RV101 trim range symmetric) "
-        "and the U603 0.1 % pair. Details: `docs/research/power-tree.md` section 12.", "",
+        "BOM optimisation of 24 Nov 2026 (SPEC decisions 25 and 26): 103 -> 94 fitted part lines, 74 -> 58 extended "
+        "part numbers, 20 -> 2 resistors at 0.1 %, 73.13 -> 70.45 USD. **BOM review 2 (24 Nov 2026, SPEC decisions "
+        "27-34**, user review of the extended-part list; studies `docs/research/bom2-trigger.md`, `bom2-input-taps.md`, "
+        "`bom2-power-passives.md`): TMUX136 -> two BAT15-04W diode bridges, SN65LVDS2 -> 9th COS3502, RV101 trimmer "
+        "removed (firmware LF/HF correction), C101 50 V +/-0.05 pF, tap coupling caps 0.5 pF +/-0.05 pF (Murata), "
+        "+5V1 divider 1 % (no 0.1 % part left), inductors 4 -> 3 types, beads 3 -> 2 types, PTC -> 0 R, TVS DNP, "
+        "tantalum -> 4 x (1 R + 47 uF) MLCC damper, TLV9001 -> TPH2501, BAT15-03W -> half a BAT15-04W, resistor and "
+        "sub-1 nF capacitor values moved to JLC basic parts: 94 -> " + str(jl['basic'][0] + jl['extended'][0]) +
+        " fitted part lines, 58 -> " + str(jl['extended'][1]) + " extended part numbers, 0 resistors at 0.1 %, 70.45 -> "
+        + f"{total:.2f}" + " USD. Remaining extended passives: 1.5 / 2.2 / 3.3 / 0.5 pF (no basic C0G below 10 pF), "
+        "1 nF C0G servo Cint (no basic C0G above 100 pF), the 0402 GHz beads BLM15HD102SN1D, the inductors (no basic "
+        "power inductor) and the DLW21SN900HQ2L balun.", "",
         "## LCSC verification", "",
         f"- Date: {VERIFIED}. Every line with a part carries an LCSC number (column LCSC); PCB features are `n/a`.",
         f"- How: {METHOD}. Checked per part: MPN, value, tolerance, dielectric / voltage rating, package against the "
@@ -216,9 +218,9 @@ def write_md(rows, total, first, est, nparts):
                                                        f"(stock {r['lcsc_stock']}): {r['note']}" for r in nostock)
                                              or "none") + ".",
         "- Listed in the task as possibly missing but found on LCSC: GVA-84+ C5445191, BUF802 C4370628, TRF37D73 "
-        "C2151367, TLV3801 C3658765, TMUX136 C2673277, TPS63802 C2845237, LM27762 C473398, TPS62A01A C5181455, "
+        "C2151367, TLV3801 C3658765, TPS63802 C2845237, LM27762 C473398, TPS62A01A C5181455, "
         "GW1NZ-LV1QN48 C5799569, MS5351M C1509083, TPH2501 C126713, COS3502 C49304672, BAT15-04W C5380972, "
-        "BAT15-03W C5310874 (0 stock), DLW21SN900HQ2L C97855, SMA Samtec SMA-J-P-H-ST-EM1 C5199907, "
+        "DLW21SN900HQ2L C97855, SMA Samtec SMA-J-P-H-ST-EM1 C5199907, "
         "USB-C HRO TYPE-C-31-M-12 C165948, STM32G474CBT6 C730123.",
         "- Changes made by the verification (24 Nov 2026), footprints unchanged except where noted (none): "
         "R603 459k -> **499k** and R604 49.9k -> **54.2k** (0.1 %, no stocked 459k 0.1 % 0402; VOUT 5.103 V); "
@@ -227,6 +229,12 @@ def write_md(rows, total, first, est, nparts):
         "C619 -> C99229 16 V X5R (C15849 / C19666 had 0 LCSC stock); 0.1 % resistors R117 / R118 / R732 carried "
         "1 % numbers, now 0.1 % parts; R725 / R726 (0603) carried an 0402 number; L601 FXL0420-R47-M (same land as "
         "XR0420); FB601 BLM21PG221SH1D; J101 / J102 Samtec SMA-J-P-H-ST-EM1 (the footprint's own part).", "",
+        "- BOM review 2 (24 Nov 2026): new part numbers read the same way (LCSC detail JSON, JLC class and stock from "
+        "the jlcpcb.com search per number): C8542 SS8550, C20526 MMBT3904, C76912 0.5 pF +/-0.05 pF (Murata "
+        "GJM1555C1HR50WB01D, 121k at JLC), C76901 1.5 pF +/-0.05 pF 50 V, C26083 1 M, C25764 200k, C25810 18k / "
+        "C22787 120 R / C22807 150k / C22961 220k / C23024 300k / C23178 470k / C23192 510k (0603), C17888 0 R 1206, "
+        "C17928 1 R 1206, C96123 47 uF 10 V 1206, C14709 BLM18PG121SN1D, C435392 DFE252012F-1R0M; all basic except "
+        "C76912, C76901 and C435392. Part numbers no longer used were removed from `kicad/gen/lcsc_parts.py`.", "",
         "## Ten most expensive lines", "",
         "| Line USD | Qty | Part | Source | Status |", "|---|---|---|---|---|"]
     for r in top:
@@ -242,8 +250,7 @@ def write_md(rows, total, first, est, nparts):
             "Not recommended.",
             "3. **TLV3801 -> TLV3601** (single-ended output): saves ~0.5, needs a redesign of the "
             "LVDS split. Not worth it.",
-            "4. **50k trimmer -> fixed 33.2k** (RV101): saves ~0.5 if the VOFS/LF-gain trim is done in software.",
-            "5. (Done 24 Nov 2026) the 0.1 % resistors are 1 % JLC parts except the U603 pair.",
+            "4. (Done, BOM review 2) RV101 trimmer removed, no 0.1 % resistors, TMUX136 / SN65LVDS2 / TLV9001 replaced.",
             "", "## All lines", "",
             "| Qty | Refs | Value | Footprint | MPN | LCSC | JLC class | Stock | JLC stock | P~10 | Unit | Line | Source "
             "| Status | Note |",

@@ -208,3 +208,26 @@ BLM15HD102 bead (DCR <= 1.25 ohm) -> pin 3; trunk 0-30 mV. Vd min = 5.054 - 0.03
 5.177 - 0.085 x 0.07 = **5.17 V** (bead DCR taken as 0); nominal 5.115 - 0.015 - 0.110 x 1.1 = 4.98 V. No series
 resistor needed: R419 / R420 of the withdrawn 5.40 V version are removed, the pstrobe block is back to its previous
 layout. USB budget unchanged from section 5 (0.75 A typ / 0.97 A max).
+
+## 13. BOM review 2 (24 Nov 2026, SPEC decisions 27-34; replaces the 0.1 % divider of section 12)
+Source: `docs/research/bom2-power-passives.md` (calculations and part checks), applied in `kicad/gen/gen_power.py`,
+`gen_strobe.py`, `gen_fpga_clock.py`, `gen_mcu_if.py`, `gen_trigger_phase.py`.
+
+| Rail | Change | Set point min / nom / max |
+|---|---|---|
+| VBUS | F601 PTC -> 0 R 1206 (C17888); D601 SMAJ5.0A DNP; FB601 BLM21PG221SH1D 0805 -> BLM18PG121SN1D 0603 (2 A, 0.05 R, 48 mV at 0.97 A); C632 tantalum -> damper 4 x (1 R 1206 + 47 uF 10 V X5R 1206), R618-R621 / C632-C635 | plug-in peak 5.27 V (5.57 V with strong derating), TPS63802 abs max 6.0 V |
+| +5V1 | R603 / R604 12k / 1.3k 0.1 % -> 20k / 2.2k 1 % (basic) | 4.904 / 5.045 / 5.191 V |
+| GVA-84+ drain | +5V1 minus 30 mV trunk and 125 mA x (1 uH DFE252012F 0.048 R + bead 1.25 R) | 4.71 / 4.92 / 5.19 V |
+| +5V (U604 OUT+) | R613 / R614 470k / 150k 0603 (were 309k / 100k); FB602-FB604 BLM18PG121SN1D 0.05 R | 4.812 / 4.960 / 5.111 V, regulating at every corner |
+| -5V (U604 OUT-) | R605 510k 0603 / R606 200k (were 270k / 100k) | -4.206 / -4.331 / -4.459 V, OUT- headroom >= 0.227 V |
+| BUF802 total | at the pins | 9.008 / 9.29 / 9.57 V (>= 9.0 V), mid-supply +0.31 V |
+| +2V5 (U605 OUT+) | R615 220k 0603 / R616 200k (were 110k / 100k) | 2.456 / 2.520 / 2.585 V |
+| -2V5 | unchanged R607 / R608 100k / 100k | -2.380 / -2.440 / -2.500 V |
+| +3V3_CLK | FB608 BLM18KG601SN1D 0603 -> BLM15HD102SN1D 0402 (1.25 R max) | VDD >= 3.155 V at 55 mA |
+| +3V3 / +1V2 | L602 / L603 FHD252010S-1R0MT -> DFE252012F-1R0M (1 uH, Isat 3.3 A, 40 mR) | unchanged |
+
+Load changes (section 1): +3V3 loses the SN65LVDS2 (4 / 7 mA) and gains a 9th COS3502 (about 6.6 / 8.6 mA: net +3 mA).
++/-2V5: the TMUX136 (< 1 mA) goes; the diode-bridge switch draws 12.5 mA (signal mode) / 1.1 mA (EXT) from +2V5 to -2V5;
+U701 TPH2501 6.5 mA (was TLV9001 0.06 mA). New loads about +2V5 59 / 68 mA, -2V5 62 / 70 mA typ / max (LM27762 250 mA);
+-2V5 LDO headroom drops by about 20 mA x 5 R = 0.1 V to about 0.35 V (RNEG at 3.3 V still assumed 5 R): measure on the
+first board. U605 input power +0.13 W at most from +3V3 (U601 load +40 mA max: inside the 0.67 A budget).

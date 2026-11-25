@@ -2,23 +2,24 @@
 
 Signal paths, left to right (all 50 R, 50 % duty square waves from complementary LVCMOS33 FPGA pins):
   Sampler strobe (3.0 MHz, SPEC decision 18):
-    S_STROBE_P -> 47 R -> 100 nF -> TRF37D73 #1 -> 100 nF -> 12 dB pi pad (82/91/82 R) -> 100 nF
-    -> TRF37D73 #2 -> 100 nF -> clip node with shorted stub TL (80 ps one-way, 13.2 mm) and a fitted BAT15-03W clamp
+    S_STROBE_P -> 49.9 R -> 100 nF -> TRF37D73 #1 -> 100 nF -> 12.5 dB pi pad (100/120/100 R) -> 100 nF
+    -> TRF37D73 #2 -> 100 nF -> clip node with shorted stub TL (80 ps one-way, 13.2 mm) and a fitted half-BAT15-04W clamp
     -> T401 common-mode-choke balun (Murata DLW21SN900HQ2L) -> STRB_A / STRB_K (floating rails;
     47 pF blocks, 1 k termination and bias feeds are on the sampler sheet).
-    S_STROBE_N: unused complement, AC dummy load 47 R + 100 nF + 49.9 R (keeps pin currents equal).
+    S_STROBE_N: unused complement, AC dummy load 49.9 R + 100 nF + 49.9 R (keeps pin currents equal).
   Phase strobe (48 MHz), one chain per polarity, identical layout:
-    PH_STROBE_P/N -> 47 R -> 100 nF -> TRF37D73 -> 100 nF -> 10 dB pi pad (100/68/100 R) -> 100 nF
-    -> GVA-84+ (+5V1 via bead + 2.2 uH) -> 100 nF -> launch node with shorted stub
+    PH_STROBE_P/N -> 49.9 R -> 100 nF -> TRF37D73 -> 100 nF -> 10.7 dB pi pad (120/100/120 R) -> 100 nF
+    -> GVA-84+ (+5V1 via bead + 1 uH) -> 100 nF -> launch node with shorted stub
     (80 ps, 13.2 mm, sim/phase_array/RESULT.md)
-    and a DNP BAT15-03W clamp -> PSTRB_A / PSTRB_K (strobe lines along the taps, trigger_phase sheet).
+    and a DNP half-BAT15-04W clamp -> PSTRB_A / PSTRB_K (strobe lines along the taps, trigger_phase sheet).
 
 Bias tees (sim/bias_tee/RESULT.md): every TRF37D73 output: BLM15HD102SN1D bead with its pad on the 50 R line
--> 47 uH LQH32CN470K23L (1210) with 1 k 0402 across it (kills the bead-L / 47 uH self-C resonance near 70 MHz,
--0.5 -> -0.28 dB) -> cold end 100 nF (own cap, GND via at its pad, supply via beyond it). GVA-84+: bead + 2.2 uH
-LQM21PN2R2MGHL (its 80 ps shorted launch stub shorts everything below ~300 MHz, so the 2.2 uH is enough; DCR
-budget 0.06-0.18 V at 108-130 mA), cold end = the +5V1 1 nF / 100 nF / 10 uF. +5V1 (5.115 V, 5.054-5.177 V) comes from
-the TPS63802 buck-boost on the power sheet (24 Nov 2026; was VBUS): Vd 4.85-5.17 V at any USB voltage (BIASTEE-1, PDN-8).
+-> U401 (3.0 MHz square into a 50 R pad): 47 uH LQH32CN470K23L (1210) with 1 k 0402 across it; U402 / U403 / U405 and
+the two GVA-84+ (stub-loaded stages or 48 MHz content): 1 uH Murata DFE252012F-1R0M (1008), no damping resistor
+(SPEC 31, docs/research/bom2-power-passives.md B: identical stub-loaded response, 48 MHz train 6.82 V); cold end
+100 nF (own cap, GND via at its pad, supply via beyond it) on the TRF tees, the +5V1 1 nF / 100 nF / 10 uF on the
+GVA tees. +5V1 (5.045 V, 4.904-5.191 V, 1 % divider, SPEC 30) comes from the TPS63802 buck-boost on the power sheet:
+Vd 4.71-5.19 V at any USB voltage.
 Pad input shunts R402 / R408 / R412 are 0603 (100 mW; 44-65 mW with the saturated square, validation PARTS-1); the
 series and output resistors stay 0402 (<= 35 mW).
 
@@ -55,11 +56,26 @@ BEAD = ("Device:FerriteBead_Small", "Inductor_SMD:L_0402_1005Metric", "BLM15HD10
 L47 = ("Device:L", "Inductor_SMD:L_1210_3225Metric", "LQH32CN470K23L",
        {"LCSC": "C701189", "Price": "0.1632 USD (LCSC 5+)",
         "Note": "47 uH 1210, 170 mA, DCR 1.3 R (1.69 max), SRF >= 15 MHz; 1 k across it; abuts the bead"})
-L22 = ("Device:L", "Inductor_SMD:L_0805_2012Metric", "LQM21PN2R2MGHL",
-       {"LCSC": "C341781", "Price": "0.3667 USD (LCSC 5+)",
-        "Note": "2.2 uH 0805, Isat 450 mA, DCR 125 mR, SRF 40 MHz; abuts the bead"})
+L1U = ("Device:L", "Inductor_SMD:L_1008_2520Metric", "DFE252012F-1R0M",
+       {"LCSC": "C435392", "Price": "0.10 USD (LCSC 5+)",
+        "Note": "1 uH 1008, Isat 3.3 A, DCR 40 mR; abuts the bead (stub-loaded / 48 MHz tee, SPEC 31)"})
+DUAL = "Device:D_Schottky_Dual_Series_AKC"
+DUAL_FP = "Package_TO_SOT_SMD:SOT-323_SC-70"
+
+
+def clamp(sh, x, Y, k_to_node, dnp, note):
+    """Half a BAT15-04W (SOT-323: 1 A1, 2 K2, 3 K1/A2) as a shunt clamp at the line node (x, Y), drawn at Y + 12.
+    k_to_node: D2 used, pin 2 (K2) on the node, pins 1 and 3 to GND (D1 shorted). Else D1 used: pin 1 (A1) on the
+    node, pins 2 and 3 to GND (D2 shorted). Never pin 2 to GND with pin 3 on the node (SPEC 33)."""
+    d = sh.add(DUAL, "D", "BAT15-04W", P(x + 6, Y + 12), mirror="y" if k_to_node else None, fp=DUAL_FP,
+               lcsc="C5380972", mpn="BAT1504WH6327XTSA1", dnp=dnp, fields={"Note": note})
+    on_, off = ("2", "1") if k_to_node else ("1", "2")
+    sh.wire(P(x, Y), d[on_])
+    sh.gnd(d[off])
+    sh.gnd(d["3"])
+    return d
 RDAMP_F = {"Note": "damps the 47 uH (bias tee): 0402 beside the 1210, same two pads; sim/bias_tee/RESULT.md"}
-CCOLD_F = {"Note": "47 uH cold end: abuts the 1210 cold pad, GND via at its pad, +3V3 plane vias beyond it"}
+CCOLD_F = {"Note": "choke cold end: abuts the inductor cold pad, GND via at its pad, +3V3 plane vias beyond it"}
 # explicit references for the parts added by the bias-tee revision (no renumbering of existing parts)
 _NEW = {"R": iter(range(415, 430)), "C": iter(range(432, 450))}
 
@@ -109,7 +125,7 @@ def bias_tee(sh, x, Y, Yr, big, rail, cap_xs, tp_name):
     lib, fp, mpn, f = BEAD
     b = sh.add(lib, "FB", "1k", P(x, Y - 4), rot=180, fp=fp, mpn=mpn, fields=f)  # pin 1 at the line
     lib, fp, mpn, f = big
-    val = "47u" if big is L47 else "2.2u"
+    val = "47u" if big is L47 else "1u"
     l = sh.add(lib, "L", val, P(x, Y - 11), rot=180, fp=fp, mpn=mpn, fields=f)
     sh.wire(P(x, Y), b["1"])
     sh.wire(b["2"], l["1"])
@@ -118,6 +134,7 @@ def bias_tee(sh, x, Y, Yr, big, rail, cap_xs, tp_name):
         rd = R(sh, "1k", P(x + 4, Y - 11), rot=180, ref=new_ref("R"), fields=RDAMP_F)
         sh.wire(l["1"], rd["1"])
         sh.wire(l["2"], rd["2"])
+    if rail == "+3V3":
         sh.wire(P(x, Yr), P(x + 8, Yr))
         cc = C(sh, "100n", P(x + 8, Yr + 3), ref=new_ref("C"), fields=CCOLD_F)
         sh.gnd(cc["2"])
@@ -130,7 +147,7 @@ def bias_tee(sh, x, Y, Yr, big, rail, cap_xs, tp_name):
 def pad(sh, x, Y, rs, rp):
     """Pi pad centred at grid x on line Y: shunt rs at x-5 / x+5, series rp at x. Returns (left, right) points.
     The input shunt (first part, driven by the saturated TRF37D73) is 0603 (validation PARTS-1)."""
-    s1 = R(sh, rs, P(x - 5, Y + 3), size="0603", lcsc={"100": "C22775"}.get(rs, ""),
+    s1 = R(sh, rs, P(x - 5, Y + 3), size="0603",
            fields={"Note": "0603 100 mW: input shunt of the pad, 44-65 mW with the saturated square (PARTS-1)"})
     s2 = R(sh, rs, P(x + 5, Y + 3))
     r = R(sh, rp, P(x, Y), rot=90)
@@ -161,7 +178,7 @@ def front(sh, label, shape, Y):
     """hlabel -> 47 R -> 100 nF -> TRF37D73 at x=50 with its 3V3 rail and output bias tee.
     Returns (trf symbol, output point after the 100 nF block at x=74)."""
     sh.hlabel(label, P(22, Y), shape, side="left")
-    rs = R(sh, "47", P(27, Y), rot=90, fields={"Note": "at the FPGA pin (series termination)"})
+    rs = R(sh, "49.9", P(27, Y), rot=90, fields={"Note": "at the FPGA pin (series termination; 49.9 R JLC basic, SPEC 33)"})
     sh.wire(P(22, Y), rs["1"])
     c1 = C(sh, "100n", P(36, Y), rot=90)
     sh.wire(rs["2"], c1["1"])
@@ -170,14 +187,14 @@ def front(sh, label, shape, Y):
     return u
 
 
-def trf_supply(sh, u, X, Y, tap_x, tp_name):
+def trf_supply(sh, u, X, Y, tap_x, tp_name, big):
     """+3V3 rail at Y-16 from X-12 to tap_x: VCC pin, decoupling (10u, 100n, 1n nearest), bias tee."""
     Yr = Y - 22
     sh.path([P(X - 16, Yr), P(tap_x, Yr)])
     sh.wire(u["1"], P(X, Yr))
     rail_caps(sh, [X - 16, X - 10, X - 4], Yr, ["10u", "100n", "1n"])
     sh.power("+3V3", P(X + 4, Yr), dy=-2.54)
-    bias_tee(sh, tap_x, Y, Yr, L47, "+3V3", (), tp_name)
+    bias_tee(sh, tap_x, Y, Yr, big, "+3V3", (), tp_name)
     sh.wire(u["7"], P(tap_x, Y))
 
 
@@ -192,16 +209,16 @@ def main():
     sh.text("SAMPLER STROBE  S_STROBE 3.0 MHz, 50 % duty (167 / 167 ns), FPGA pins 38 (P) / 35 (N)",
             P(12, Y - 30), size=1.5)
     u1 = front(sh, "S_STROBE_P", shapes["S_STROBE_P"], Y)
-    trf_supply(sh, u1, 50, Y, 64, "TRF1_OUT")
+    trf_supply(sh, u1, 50, Y, 64, "TRF1_OUT", L47)
     c2 = C(sh, "100n", P(73, Y), rot=90)
     sh.wire(P(64, Y), c2["1"])
-    a, b = pad(sh, 84, Y, "82", "91")
+    a, b = pad(sh, 84, Y, "100", "120")
     sh.wire(c2["2"], a)
     c3 = C(sh, "100n", P(96, Y), rot=90)
     sh.wire(b, c3["1"])
     u2 = trf(sh, 113, Y)
     sh.wire(c3["2"], u2["2"])
-    trf_supply(sh, u2, 113, Y, 127, "TRF2_OUT")
+    trf_supply(sh, u2, 113, Y, 127, "TRF2_OUT", L1U)
     c4 = C(sh, "100n", P(136, Y), rot=90)
     sh.wire(P(127, Y), c4["1"])
     sh.wire(c4["2"], P(142, Y))
@@ -211,16 +228,7 @@ def main():
                  fields={"Price": "~0.29 USD", "Note": "CM choke as 1:1 TL balun; check pad map vs Murata drawing"})
     sh.wire(P(142, Y), bal["1"])
     # BAT15 shunt clamp at the launch node, fitted (sim/phase_array/RESULT.md (3): bridge reverse 3.27 -> 1.90 V)
-    for rot in (90, 270):
-        dc = sh.add("Device:D_Schottky", "D", "BAT15-03W", P(168, Y + 4), rot=rot, fp="Diode_SMD:D_SOD-323",
-                    mpn="BAT1503WE6327HTSA1", lcsc="C5310874",
-                    fields={"Note": "FITTED: clamps the wrong-polarity pulse of the falling edge (K to node, A to GND)"})
-        if dc["1"][1] < dc["2"][1]:
-            break
-        sh.symbols.remove(dc)
-        sh._refn["D"] -= 1
-    sh.wire(P(168, Y), dc["1"])
-    sh.gnd(dc["2"])
+    clamp(sh, 168, Y, True, False, "FITTED, D2 used: pin 2 (K2) on the stub node, pins 1 and 3 to GND (SPEC 33)")
     sh.gnd(bal["3"])
     sh.wire(bal["2"], P(196, Y))
     sh.hlabel("STRB_A", P(196, Y), shapes["STRB_A"], side="right")
@@ -231,7 +239,7 @@ def main():
     # S_STROBE_N dummy load
     Yn = Y + 14
     sh.hlabel("S_STROBE_N", P(22, Yn), shapes["S_STROBE_N"], side="left")
-    rn = R(sh, "47", P(27, Yn), rot=90)
+    rn = R(sh, "49.9", P(27, Yn), rot=90)
     sh.wire(P(22, Yn), rn["1"])
     cn = C(sh, "100n", P(36, Yn), rot=90)
     sh.wire(rn["2"], cn["1"])
@@ -239,19 +247,19 @@ def main():
     sh.wire(cn["2"], rt["1"])
     sh.gnd(rt["2"])
 
-    sh.text("S_STROBE_N is not used: AC dummy load\n(47 R + 100 nF + 49.9 R) keeps the two\n"
+    sh.text("S_STROBE_N is not used: AC dummy load\n(49.9 R + 100 nF + 49.9 R) keeps the two\n"
             "pin currents and edges symmetric; no DC load.", P(12, Yn + 10), size=T)
     sh.text("TRF37D73 x2: 22 dB, OP1dB 16.5 dBm, 3.3 V 55 mA each.\n"
             "Edge 300-600 ps (FPGA) -> ~250 ps -> 133-152 ps.\n"
             "PWDN and NC pins to GND, EP: >= 5 vias to L2.\n"
-            "Bias tee: bead (pad on the line) -> 47 uH || 1 k\n-> own 100 nF at the cold end (bias_tee RESULT).", P(46, Yn + 10), size=T)
-    sh.text("12 dB pi pad 82 / 91 / 82 R (input shunt 0603):\n"
-            "TRF #2 input ~+8.6 dBm square\n(abs. max +10 dBm).", P(78, Yn + 2), size=T)
+            "Bias tee: bead (pad on the line) -> 47 uH || 1 k (TRF #1),\n1 uH (TRF #2) -> own 100 nF at the cold end.", P(46, Yn + 10), size=T)
+    sh.text("12.5 dB pi pad 100 / 120 / 100 R (input shunt 0603):\n"
+            "TRF #2 input ~+8.1 dBm square\n(abs. max +10 dBm).", P(78, Yn + 2), size=T)
     sh.text("CLIP STUB TL401: 80 ps one-way = 13.2 mm\n"
             "50 R microstrip (6.05 ps/mm). Tap right at\n"
             "C(TRF #2 out); far end via to GND (NT401).\n"
             "Pulse ~160 ps wide; trim 60 ps = 9.9 mm.\n"
-            "D clamp BAT15-03W FITTED (bridge reverse\n3.27 V -> 1.9 V, phase_array RESULT).", P(128, Yn + 6), size=T)
+            "D401 clamp, half BAT15-04W, FITTED (bridge reverse\n3.27 V -> 1.9 V, phase_array RESULT).", P(128, Yn + 6), size=T)
     sh.text("BALUN T401: Murata DLW21SN900HQ2L CMC\n"
             "(0805, 90 R CM @100 MHz, LCSC C97855)\n"
             "as 1:1 TL balun: line 1 = signal -> STRB_A,\n"
@@ -259,15 +267,15 @@ def main():
             "STRB_A/K: 17.83 mm 50 R arms (105.6 ps, as built), equal\n"
             "+/-0.1 mm, uncoupled (sim/strobe_arms RESULT:\n"
             "no second sampling instant; bias +/-1.3 V).\n"
-            "Step at the bridge ~4.3-4.6 V (sim).", P(173, Y + 12), size=T)
+            "Step at the bridge ~4.3-4.6 V (sim).", P(184, Y + 15), size=T)
 
     # ================================================================== phase strobe (rows 2, 3)
     def phase(Y, lab_in, lab_out, n):
         u = front(sh, lab_in, shapes[lab_in], Y)
-        trf_supply(sh, u, 50, Y, 64, f"PTRF{n}_OUT")
+        trf_supply(sh, u, 50, Y, 64, f"PTRF{n}_OUT", L1U)
         c2 = C(sh, "100n", P(73, Y), rot=90)
         sh.wire(P(64, Y), c2["1"])
-        a, b = pad(sh, 84, Y, "100", "68")
+        a, b = pad(sh, 84, Y, "120", "100")
         sh.wire(c2["2"], a)
         c3 = C(sh, "100n", P(96, Y), rot=90)
         sh.wire(b, c3["1"])
@@ -280,26 +288,18 @@ def main():
         rail_caps(sh, [134, 140, 146], Yr, ["1n", "100n", "10u"])
         sh.wire(P(120, Yr), P(116, Yr))
         sh.hlabel("+5V1", P(116, Yr), shapes["+5V1"], side="left")
-        bias_tee(sh, 120, Y, Yr, L22, "+5V1", (), f"GVA{n}_VD")
+        bias_tee(sh, 120, Y, Yr, L1U, "+5V1", (), f"GVA{n}_VD")
         sh.wire(gv["3"], P(120, Y))
         c4 = C(sh, "100n", P(140, Y), rot=90)
         sh.wire(P(120, Y), c4["1"])
         sh.wire(c4["2"], P(148, Y))
         stub(sh, 148, Y, f"TL40{n + 1}", 80, 13.2)   # 80 ps: sim/phase_array/RESULT.md
         # DNP clamp at the launch point
-        want_k_top = lab_out == "PSTRB_A"
-        for rot in (90, 270):
-            d = sh.add("Device:D_Schottky", "D", "BAT15-03W", P(176, Y + 4), rot=rot, fp="Diode_SMD:D_SOD-323",
-                       mpn="BAT1503WE6327HTSA1", lcsc="C5310874", dnp=True,
-                       fields={"Note": "DNP: clamp for the wrong-polarity pulse of the second edge"})
-            top, bot = ("1", "2") if want_k_top else ("2", "1")
-            if d[top][1] < d[bot][1]:
-                break
-            sh.symbols.remove(d)
-            sh._refn["D"] -= 1
+        k_node = lab_out == "PSTRB_A"
         sh.wire(P(148, Y), P(196, Y))
-        sh.wire(P(176, Y), d[top])
-        sh.gnd(d[bot])
+        clamp(sh, 176, Y, k_node, True,
+              "DNP: clamp for the wrong-polarity pulse; " + ("pin 2 (K2) on the node, pins 1/3 GND" if k_node
+                                                             else "pin 1 (A1) on the node, pins 2/3 GND"))
         sh.hlabel(lab_out, P(196, Y), shapes[lab_out], side="right")
         return u, gv
 
@@ -307,19 +307,19 @@ def main():
     sh.text("PHASE STROBE  PH_STROBE 48 MHz, 50 % duty, FPGA pins 39 (P) / 40 (N); one chain per polarity",
             P(12, Y2 - 30), size=1.5)
     phase(Y2, "PH_STROBE_P", "PSTRB_A", 1)
-    sh.text("10 dB pi pad 100 / 68 / 100 R (input shunt\n0603): GVA input ~+10 dBm square\n(abs. max +13 dBm).",
+    sh.text("10.7 dB pi pad 120 / 100 / 120 R (input shunt\n0603): GVA input ~+9 dBm square\n(abs. max +13 dBm).",
             P(78, Y2 + 12), size=T)
     sh.text("GVA-84+ (SOT-89): 1 IN, 3 OUT+DC, 2/4 GND.\n"
             "Vd 4.8-5.2 V, 108 mA; no Rbias at 5 V (datasheet\n"
-            "Fig. 2): pin 3 -> bead -> 2.2 uH -> +5V1 (5.115 V),\n"
-            "Vd 4.85-5.17 V (tee 0.06-0.18 V). Pin 3 max 5.8 V.\n"
-            "2.2 uH is enough: the launch stub shorts < 300 MHz.\n"
+            "Fig. 2): pin 3 -> bead -> 1 uH -> +5V1 (5.045 V),\n"
+            "Vd 4.71-5.19 V (1 % divider, SPEC 30). Pin 3 max 5.8 V.\n"
+            "1 uH is enough: the launch stub shorts < 300 MHz.\n"
             "Step 7.2 V into 50 R (sim, nominal).", P(102, Y2 + 12), size=T)
     sh.text("LAUNCH STUB: 80 ps one-way = 13.2 mm 50 R\n"
             "(phase_array RESULT; was 45 ps), at the start of\n"
             "the tap line; far end via to GND. Launch ~4 V peak,\n"
-            ">= 2.75 V at every tap. BAT15-03W clamp DNP\n"
-            "(reverse 2.95 V < BV 4 V: not needed).", P(150, Y2 + 16), size=T)
+            ">= 2.75 V at every tap. half-BAT15-04W clamp DNP\n"
+            "(reverse 2.95 V < BV 4 V: not needed).", P(150, Y2 + 21), size=T)
     sh.text("PSTRB_A: anode strobe line (positive pulse);\n"
             "0.16 mm / 72.8 R line along the 16 gates, 40 ps/tap\n"
             "loaded, 4.514 mm pitch; "
@@ -339,7 +339,7 @@ def main():
             "  6.057 ps/mm. Gain blocks 0402 DC blocks inline, no stubs, GND vias at every shunt part.\n"
             "- Decoupling per supply node: 1 nF 0402 nearest the pin, then 100 nF, 10 uF.\n"
             "- Bias tees (sim/bias_tee): bead pad ON the 50 R line (no stub), chain perpendicular, compact;\n"
-            "  TRF: 47 uH || 1 k + own 100 nF at the cold pad; supply enters through that cap.\n"
+            "  TRF: 47 uH || 1 k (U401) or 1 uH (U402/U403/U405) + own 100 nF at the cold pad.\n"
             "- Test points TRFx/GVAx: DC bias check only (expect ~3.2 V / ~4.8 V), not RF.\n"
             "- Supplies: +3V3 4 x TRF37D73 here (220 mA); +5V1 2 x GVA-84+ (216 mA), own track from the\n"
             "  TPS63802 output caps C610/C611 (power sheet), not through FB602.\n"
@@ -385,27 +385,28 @@ def check(outdir):
     A(n, "PH_STROBE_N", {("R411", "1")})
     A(n, "STRB_A", {("T401", "2")})
     A(n, "STRB_K", {("T401", "4")})
-    A(n, "PSTRB_A", {("C421", "2"), ("TL402", "1"), ("D402", "1")})
-    A(n, "PSTRB_K", {("C431", "2"), ("TL403", "1"), ("D403", "2")})
+    A(n, "PSTRB_A", {("C421", "2"), ("TL402", "1"), ("D402", "2")})
+    A(n, "PSTRB_K", {("C431", "2"), ("TL403", "1"), ("D403", "1")})
     # sampler chain
     on(("R401", "2"), ("C401", "1")); on(("C401", "2"), ("U401", "2"))
     on(("U401", "7"), ("FB401", "1"), ("C405", "1")); on(("FB401", "2"), ("L401", "1"), ("TP401", "1"))
     on(("C405", "2"), ("R402", "1"), ("R404", "1")); on(("R404", "2"), ("R403", "1"), ("C406", "1"))
     on(("C406", "2"), ("U402", "2")); on(("U402", "7"), ("FB402", "1"), ("C410", "1"))
-    on(("C410", "2"), ("TL401", "1"), ("T401", "1"), ("D401", "1")); on(("TL401", "3"), ("NT401", "1"))
+    on(("C410", "2"), ("TL401", "1"), ("T401", "1"), ("D401", "2")); on(("TL401", "3"), ("NT401", "1"))
     on(("R405", "2"), ("C411", "1")); on(("C411", "2"), ("R406", "1"))
     A(n, "GND", {("T401", "3"), ("NT401", "2"), ("TL401", "2"), ("TL401", "4"), ("R406", "2"),
-                 ("D401", "2"), ("D402", "2"), ("D403", "1"), ("U404", "2"), ("U406", "2")}
+                 ("D401", "1"), ("D401", "3"), ("D402", "1"), ("D402", "3"), ("D403", "2"), ("D403", "3"),
+                 ("U404", "2"), ("U406", "2")}
       | {(u, p) for u in ("U401", "U402", "U403", "U405") for p in ("3", "4", "5", "6", "8", "9")})
     A(n, "+3V3", {(u, "1") for u in ("U401", "U402", "U403", "U405")} |
       {("L401", "2"), ("L402", "2"), ("L403", "2"), ("L405", "2")})
     A(n, "+5V1", {("L404", "2"), ("L406", "2")})
     # bias tees (sim/bias_tee/RESULT.md): RF pin -> bead -> 47 uH || 1 k (TRF) / 2.2 uH (GVA) -> rail, own 100 nF
-    for u, fb, l, rd, cc in (("U401", "FB401", "L401", "R415", "C432"), ("U402", "FB402", "L402", "R416", "C433"),
-                             ("U403", "FB403", "L403", "R417", "C434"), ("U405", "FB405", "L405", "R418", "C435")):
+    for u, fb, l, rd, cc in (("U401", "FB401", "L401", "R415", "C432"), ("U402", "FB402", "L402", None, "C433"),
+                             ("U403", "FB403", "L403", None, "C434"), ("U405", "FB405", "L405", None, "C435")):
         on((u, "7"), (fb, "1"))
-        on((fb, "2"), (l, "1"), (rd, "1"))
-        A(n, "+3V3", {(l, "2"), (rd, "2"), (cc, "1")})
+        on(*((fb, "2"), (l, "1")) + (((rd, "1"),) if rd else ()))
+        A(n, "+3V3", {(l, "2"), (cc, "1")} | ({(rd, "2")} if rd else set()))
         A(n, "GND", {(cc, "2")})
     for g_, fb, l in (("U404", "FB404", "L404"), ("U406", "FB406", "L406")):
         on((g_, "3"), (fb, "1"))

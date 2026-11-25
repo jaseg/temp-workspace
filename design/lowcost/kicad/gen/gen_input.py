@@ -4,12 +4,11 @@ EXT_CLK SMA.
 
 Values: design/lowcost/sim/input/RESULT.md (final network) and SPEC decisions 1 and 7.
 VOFS (21 Nov 2026): the directly driven summing node of sim/input again. VOFS is the raw STM32 DAC1_OUT2
-(0.2..2.7 V) through Rofs 24.9k; the mid-scale is cancelled by Rmid 33k (R123) from VNEG_REF (-1.933 V =
--0.667 x VREF+, U701 on mcu_if, ratiometric to the DAC) instead of from the -2V5 rail. Gsum = 1/Rf1 + 1/Rf2 +
-1/Rofs + 1/Rmid = 2/Rf1 with Rf2 nominal 33.9k = 22k + RV101 ~11.9k (LF gain 0.200, trim -7.8 %..+8.0 %).
-Resistors 1 % thick film (24 Nov 2026, BOM optimisation; were 0.1 %): the LF/HF gain match is trimmed with RV101
-(1 % parts: up to +/-2.8 % LF gain error, inside the trim range), the offset scale and mid-scale by the
-firmware offset calibration (SPEC decision 25).
+(0.2..2.7 V) through Rofs (R119 10k); the mid-scale is cancelled by Rmid (R123 15k) from VNEG_REF (-1.933 V =
+-0.667 x VREF+, U701 on mcu_if, ratiometric to the DAC) instead of from the -2V5 rail. Rf1 R118 4.7k, Rf2 R120 22k
+to GND, Cint C106 1 nF C0G (LF gain 0.1997 = HF gain). No trimmer (SPEC 28, sim/bom2_input): the LF/HF mismatch
+(BUF802 Cin spread dominates, up to +/-15 %) is calibrated once and corrected in firmware; the offset scale and
+mid-scale by the firmware offset calibration (SPEC decision 25). RV101 is an unused reference now.
 
 BUF802 pinout (TI SBOS998E, Table 4-1, RGT VQFN-16 3x3, EP 1.68 mm isolated from the die):
 1 VS+, 2 IN, 3 In_Bias, 4 In_Aux, 5 VS-, 6 Aux_Bias, 7 R_Bias, 8 VS-, 9 NC, 10 VSO-, 11 OUT,
@@ -106,7 +105,7 @@ def main():
     u1 = sh.add(buf, "U", "BUF802IRGTR", (Bx, By), fp=BUF_FP, lcsc="C4370628", mpn="BUF802IRGTR",
                 fields={"Price": "5.89 USD (LCSC)"})
     ctop = C(sh, "1.5p", (g(90), Y0), rot=90, size="0402",
-             fields={"Note": "C0G +/-0.1 pF 100 V (KEMET CBR04C159B1GAC; +/-0.05 pF 100 V 0402 not stocked on LCSC, 24 Nov 2026)"})
+             fields={"Note": "C0G +/-0.05 pF 50 V (Murata GJM1555C1H1R5WB01D); sees <= 47.7 V at +50 V input (SPEC 28)"})
     GA = (g(96), Y0)
     sh.wire(ctop["2"], GA)
     cbot = C(sh, "3.3p", (g(96), Y0 + g(6)), size="0402", fields={"Note": "C0G +/-0.1 pF"})
@@ -117,8 +116,8 @@ def main():
     sh.label("GA", (g(96), Y0))
     XN = g(110)
     sh.wire(rg["2"], u1["2"])
-    rb1 = R(sh, "4.99M", (XN, Y0 + g(3)))
-    rb2 = R(sh, "4.99M", (XN, Y0 + g(9)))
+    rb1 = R(sh, "1M", (XN, Y0 + g(3)), fields={"Note": "1 % JLC basic (was 4.99M; SPEC 33)"})
+    rb2 = R(sh, "1M", (XN, Y0 + g(9)), fields={"Note": "1 % JLC basic (was 4.99M; SPEC 33)"})
     sh.wire(rb1["2"], rb2["1"])
     sh.path([rb2["2"], u1["3"]])
     sh.text("HF 5:1: Ctop 1.5p / Cbot 3.3p, k = 1.53/(1.53+3.3+2.4+0.3) = 0.206,\n"
@@ -128,7 +127,8 @@ def main():
 
     # R_Bias, Aux_Bias, supplies
     pr = u1["7"]
-    rbias = R(sh, "17.8k", (g(106), pr[1] + g(3) + g(2)), fields={"Note": "1 %"})
+    rbias = R(sh, "18k", (g(106), pr[1] + g(3) + g(2)), size="0603",
+              fields={"Note": "1 % 0603 JLC basic (datasheet point 17.8k, +1.1 %; SPEC 33)"})
     sh.path([pr, (g(106), pr[1]), rbias["1"]])
     sh.power("-5V", rbias["2"], dy=5.08)
     yb = u1["6"][1] + g(3)
@@ -141,7 +141,7 @@ def main():
         sh.stub(u1, pin, "+5V", kind="power")
     for pin in ("9", "13", "16"):
         sh.nc(u1[pin])
-    sh.text("U101 CL mode: Aux_Bias = VS-,\nR_Bias 17.8k (wide-BW mode).\nEP isolated -> GND plane.",
+    sh.text("U101 CL mode: Aux_Bias = VS-,\nR_Bias 18k 0603 (wide-BW mode,\ndatasheet point 17.8k).\nEP isolated -> GND plane.",
             (g(160), Y0 + g(8)), size=TS)
 
     # CLH divider (+1.5 V from +2V5)
@@ -197,7 +197,7 @@ def main():
     sh.text("BUF_OUT_S = U101 OUT node: 10R + sampler bridge on the sampler\n"
             "sheet, bridge within 3 mm of the OUT pin (Zout 1.2R + 0.3 nH).\n"
             "49.9R directly at the OUT pin, then 0R/ferrite/100R position.\n"
-            "BUF_OUT_T: 50R microstrip (0.36 mm, 6.06 ps/mm) to TMUX136\n"
+            "BUF_OUT_T: 50R microstrip (0.36 mm, 6.06 ps/mm) to the D317 bridge\n"
             "(high-impedance end, trigger_phase): no termination at the far\n"
             "end, keep it short (< 30 mm, ~180 ps), no stubs.",
             (g(156), Y0 - g(22)), size=TS)
@@ -208,7 +208,7 @@ def main():
     x = TX
     prev = (TX, Ys)
     for cx in (g(28), g(36), g(44)):
-        r = R(sh, "300k", (cx, Ys), rot=90, fields={"Note": "1 %, 0402 50 V"})
+        r = R(sh, "300k", (cx, Ys), rot=90, size="0603", fields={"Note": "1 %, 0603 75 V, JLC basic (SPEC 34)"})
         sh.wire(prev, r["1"])
         prev = r["2"]
     TAP = (g(52), Ys)
@@ -236,33 +236,27 @@ def main():
     po2 = u2["1"]
     OX2 = g(86)
     # Cint OUT -> FB
-    cint = C(sh, "470p", (Ox, Ys + g(16)), rot=90, size="0402", fields={"Note": "C0G"})
+    cint = C(sh, "1n", (Ox, Ys + g(16)), rot=90, size="0402", fields={"Note": "C0G (servo Cint; must stay C0G)"})
     sh.wire((FBX, cint["1"][1]), cint["1"])
     sh.path([cint["2"], (OX2, cint["2"][1]), (OX2, po2[1])])
     # Rf1 from BUF802 OUT
-    rf1 = R(sh, "10k", (Ox, Ys + g(21)), rot=90, fields={"Note": "1 %"})
+    rf1 = R(sh, "4.7k", (Ox, Ys + g(21)), rot=90, fields={"Note": "1 % (Rf1 x Cint = 4.7 us)"})
     sh.wire((FBX, rf1["1"][1]), rf1["1"])
     sh.path([rf1["2"], (FBT[0], rf1["2"][1]), FBT])
     # Rofs from VOFS
-    rofs = R(sh, "24.9k", (g(58), Ys + g(24)), rot=90, fields={"Note": "1 %"})
+    rofs = R(sh, "10k", (g(58), Ys + g(24)), rot=90, fields={"Note": "1 %"})
     sh.wire(rofs["2"], (FBX, rofs["2"][1]))
     sh.wire(rofs["1"], (g(50), rofs["1"][1]))
     sh.hlabel("VOFS", (g(50), rofs["1"][1]), "input", side="left")
     # Rmid from VNEG_REF (explicit ref: the auto-numbered refs after it stay as they were)
-    rmid = R(sh, "33k", (g(58), Ys + g(27)), rot=90, ref="R123", fields={"Note": "1 %"})
+    rmid = R(sh, "15k", (g(58), Ys + g(27)), rot=90, ref="R123", fields={"Note": "1 %"})
     sh.wire(rmid["2"], (FBX, rmid["2"][1]))
     sh.wire(rmid["1"], (g(50), rmid["1"][1]))
     sh.hlabel("VNEG_REF", (g(50), rmid["1"][1]), "input", side="left")
-    # Rf2 = 22k + 50k trimmer (rheostat) to GND
+    # Rf2 = 22k fixed to GND (RV101 trimmer removed, SPEC 28: LF/HF match corrected in firmware)
     rf2 = R(sh, "22k", (FBX, Ys + g(31)), fields={"Note": "1 %"})
     sh.wire((FBX, Ys + g(28)), rf2["1"])
-    rv = sh.add("Device:R_Potentiometer_Trim", "RV", "50k", (FBX, Ys + g(40)),
-                fp="Potentiometer_SMD:Potentiometer_Bourns_3314J_Vertical", lcsc="C50895", mpn="3314J-1-503E")
-    sh.wire(rf2["2"], rv["1"])
-    sh.path([rv["2"], (rv["2"][0] + g(2), rv["2"][1]), (rv["2"][0] + g(2), rv["3"][1] + g(2)),
-             (rv["3"][0], rv["3"][1] + g(2))])
-    sh.wire(rv["3"], (rv["3"][0], rv["3"][1] + g(2)))
-    sh.gnd((rv["3"][0], rv["3"][1] + g(2)))
+    sh.gnd(rf2["2"])
     # OPA out -> Raux -> In_Aux, Caux
     raux = R(sh, "1k", (g(100), po2[1]), rot=90, lcsc="C11702")
     sh.wire(po2, raux["1"])
@@ -276,20 +270,20 @@ def main():
 
     sh.text("Servo (differential integrator, OPA197 on +/-5 V):\n"
             "LF 5:1 alpha = 100k/(3x300k+100k) = 0.100, Rin 1.000 Mohm,\n"
-            "1 % 0402 string (3 x 50 V: +/-50 V peak). Tap the string at\n"
+            "1 % 0603 string (3 x 75 V: +/-50 V peak). Tap the string at\n"
             "the VIN pad with the first 300k, keep it off the 50R line.\n"
             "Cp 18p: tap RC 90k x 26 pF = Rpar x Cint, cancels feed-through.\n"
             "Loop BW = Ga/(2 pi Rf1 Cint) = 8.8 kHz.",
             (g(4), Ys + g(31)), size=TS)
-    sh.text("FB node: Gsum = 1/Rf1 + 1/Rf2 + 1/Rofs + 1/Rmid = 2/Rf1\n"
-            "-> LF gain alpha x Rf1 x Gsum = 0.200 (= HF gain).\n"
-            "Rf2 nominal 33.9k = 22k + RV ~11.9k (range -7.8 %..+8.0 %).\n"
-            "Trim once: 1 kHz square wave, flat top LF = HF.\n"
-            "VOFS = DAC1_OUT2 0.2..2.7 V via Rofs 24.9k, mid-scale\n"
-            "cancelled by Rmid 33k from VNEG_REF (-1.933 V, mcu_if):\n"
-            "OUT offset = 0.586 - 0.402 x VOFS = +0.51..-0.50 V\n"
-            "(+/-2.5 V at the input), 0.28 mV/LSB at OUT. VOFS and\n"
-            "VNEG_REF must be quiet below 10 kHz (gain 0.4 / 0.29 to OUT).",
+    sh.text("FB node: Gsum = 1/Rf1 + 1/Rf2 + 1/Rofs + 1/Rmid (4.7k/22k/10k/15k)\n"
+            "-> LF gain alpha x Rf1 x Gsum = 0.1997 (HF gain 0.1997).\n"
+            "No trimmer: residual LF/HF mismatch (+/-15 % worst case, BUF802 Cin)\n"
+            "is measured once with any 0.2-2 kHz square wave and corrected in\n"
+            "firmware (sim/bom2_input, SPEC 28). Rf1 x Cint = 4.7 us.\n"
+            "VOFS = DAC1_OUT2 0.2..2.7 V via Rofs 10k, mid-scale cancelled by\n"
+            "Rmid 15k from VNEG_REF (-1.933 V, mcu_if): VOFS 0.2 / 1.289 / 2.7 V\n"
+            "-> OUT +0.512 / 0 / -0.663 V (+/-2.5 V at the input).\n"
+            "VOFS and VNEG_REF must be quiet below 10 kHz.",
             (g(74), Ys + g(28)), size=TS)
 
     # ------------------------------------------------------------------ decoupling
@@ -311,7 +305,7 @@ def main():
     sh.wire((g(30), YE), rt["1"])
     sh.gnd(rt["2"])
     sh.hlabel("EXT_CLK", (g(44), YE), "output", side="right")
-    sh.text("J102 EXT_CLK: 50R microstrip to TMUX136 B input (trigger_phase).\n"
+    sh.text("J102 EXT_CLK: 50R microstrip to the D319 bridge (trigger_phase).\n"
             "Termination at the far end preferred; R near the SMA only as DNP option.",
             (g(4), YE - g(10)), size=TS)
 
@@ -320,8 +314,8 @@ def main():
     sh.gnd(tg["1"], dy=0)
     sh.text("Protection: no external TVS (0.3-1 pF). U101 input clamp diodes to CLH / VS- (100 mA);\n"
             "Ctop limits the current (100 V/ns -> 150 mA for < 1 ns); 900k string limits servo input current.\n"
-            "Overload recovery > 60 us (servo winds up, gate re-biases through 10 Mohm): RESULT open point 2.\n"
-            "Max input: 1 Mohm +/-50 V peak (with an external 50R terminator: its rating). Linear range +/-2.5 V around the offset.\n"
+            "Overload recovery 48 us (sim/bom2_input; gate re-biases through 2 Mohm, 5x faster than with 10 Mohm).\n"
+            "Max input: 1 Mohm +/-50 V peak, below 50 V/ns (C101 50 V: sees <= 47.7 V; with an external 50R terminator: its rating). Linear range +/-2.5 V around the offset.\n"
             "Noise (sim): 0.57 mV rms referred to the input, 10 Hz-2 GHz. -3 dB ~2 GHz, 50R source + external terminator (real BUF802).",
             (g(100), g(186)), size=TS)
 

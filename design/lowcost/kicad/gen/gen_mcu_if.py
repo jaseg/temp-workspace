@@ -14,8 +14,8 @@ VMID buffer are gone; the DAC outputs drive passive networks, one op-amp section
         (24 Nov 2026, validation PARTS-4: 0.520 x Vdac = +0.10..+1.40 V, so the BAT15-04W reverse voltage stays
         <= 2.9 V at the -1.5 V input clamp; R735 isolates the 10 nF on the sampler sheet, DAC/OPAMP CL <= 50 pF).
   PA2 OPAMP1_VOUT (DAC3_CH1 follower) -> DAC_TAPTH -> 33k/1k divider -> VTAP_TH.
-  U701 TLV9001 on +/-2V5: VNEG_REF = -VREF+ x 10k/15k = -1.933 V (ratiometric to the DAC reference, so the
-        VOFS mid-scale cancellation does not drift with the -2V5 regulator); drives only Rmid (33k).
+  U701 TPH2501 on +/-2V5: VNEG_REF = -VREF+ x 10k/15k = -1.933 V (ratiometric to the DAC reference, so the
+        VOFS mid-scale cancellation does not drift with the -2V5 regulator); drives only Rmid (15k).
   All network resistors 1 % thick film JLC basic parts (24 Nov 2026 BOM optimisation; R731/R732 were 0.1 %): ratio
   errors move the VOFS mid-scale by up to +/-12 mV at OUT, removed by the firmware offset calibration."""
 import sys, os
@@ -23,12 +23,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from schlib import g
 from common import new_sheet, hier_pins, R, C, decoupler
 
-# U701: TLV9001IDBVR (TI, SOT-23-5, 1.8-5.5 V, RRIO, Vos 0.4 mV typ / 1.6 mV max, 0.6 uV/K). KiCad has no DBV
-# symbol for it; OPA197xDBV has the identical DBV pinout: 1 OUT, 2 V-, 3 +IN, 4 -IN, 5 V+.
+# U701: TPH2501-TR (3PEAK, SOT-23-5, 2.5-5.5 V, RRIO, Vos 0.5 mV max, GBW 120 MHz, unity-gain stable; the U201 / U202
+# line, SPEC 33, replaces the TLV9001). KiCad has no symbol for it; OPA197xDBV has the identical pinout:
+# 1 OUT, 2 V-, 3 +IN, 4 -IN, 5 V+.
 OPAMP = "Amplifier_Operational:OPA197xDBV"
 OPA_FP = "Package_TO_SOT_SMD:SOT-23-5"
-OPA_F = {"Price": "0.080 USD (LCSC C398363, 5+)", "MPN": "TLV9001IDBVR (TI), on +/-2V5 (5.0 V total, spec 1.8-5.5 V)",
-         "Note": "VNEG_REF inverter; pinout = OPA197 DBV"}
+OPA_F = {"Price": "0.43 USD (LCSC C126713, 5+)",
+         "Note": "VNEG_REF inverter on +/-2V5 (4.84-5.09 V, spec 2.5-5.5 V), Iq 6.5 mA; pinout = OPA197 DBV"}
 
 # STM32G474CBT6 (LQFP-48) pin plan. Pin numbers: DS12288 LQFP48 pinout = KiCad MCU_ST_STM32G4:STM32G474CBTx.
 # (pin, port, net, how): how h = hierarchical label, l = local label, nc = NC flag
@@ -36,7 +37,7 @@ MCU = "MCU_ST_STM32G4:STM32G474CBTx"
 MCU_FP = "Package_QFP:LQFP-48_7x7mm_P0.5mm"
 PINS = [
     (8, "PA0", "ADC_IN", "h", "ADC12_IN1 (fast channel), sampler output"),
-    (9, "PA1", "TRIG_SEL", "h", "GPIO out (TMUX136 select); moved from PB6 for the layout fan-out"),
+    (9, "PA1", "TRIG_SEL", "h", "GPIO out (trigger switch select, low = signal); moved from PB6 for the layout fan-out"),
     (10, "PA2", "DAC_TAPTH", "l", "OPAMP1_VOUT follower of DAC3_CH1 -> VTAP_TH divider"),
     (11, "PA3", None, "nc", "spare"),
     (12, "PA4", "DAC_TRIG", "h", "DAC1_OUT1 -> TRIG_LEVEL sum at the TLV3801 (trigger_phase)"),
@@ -79,7 +80,7 @@ PINS = [
 
 def main():
     sh = new_sheet("mcu_if", comments=["STM32G474CBT6 on board (USB FS, SWD + UART on J501, SPI/I2C to FPGA/clock).",
-                                       "Control voltages: DAC outputs into passive networks; U701 TLV9001 makes VNEG_REF."])
+                                       "Control voltages: DAC outputs into passive networks; U701 TPH2501 makes VNEG_REF."])
     T = 1.0
     # ---------------------------------------------------------------- ADC_REF_MID divider R703/R704/C702 (JLC basic values)
     r3 = R(sh, "10k", (g(150), g(30)), ref="R703")
@@ -95,9 +96,9 @@ def main():
     sh.text("ADC_REF_MID = VREF+ x 3.3k/13.3k = 0.720 V\n(level-shift reference on the sampler sheet)",
             (g(145), g(20)), size=T)
 
-    # ---------------------------------------------------------------- VNEG_REF: U701 TLV9001 inverter from VREF+
+    # ---------------------------------------------------------------- VNEG_REF: U701 TPH2501 inverter from VREF+
     x, y = g(120), g(80)
-    u = sh.add(OPAMP, "U701", "TLV9001IDBVR", (x, y), fp=OPA_FP, lcsc="C398363", fields=OPA_F)
+    u = sh.add(OPAMP, "U701", "TPH2501", (x, y), fp=OPA_FP, lcsc="C126713", mpn="TPH2501-TR", fields=OPA_F)
     plus, minus, o = u["3"], u["4"], u["1"]
     sh.path([plus, (plus[0] - g(3), plus[1])])
     sh.power("GND", (plus[0] - g(3), plus[1]), dy=-g(3), rot=180)
@@ -128,8 +129,8 @@ def main():
     sh.power("-2V5", cn["2"], dy=5.08)
     sh.text("VNEG_REF = -VREF+ x R732/R731 = -1.933 V, ratiometric to the DACs\n"
             "(mid-scale of VOFS cancels independent of VREF+ and of -2V5).\n"
-            "Load: Rmid 33k on the input sheet only. C722 100n: 160 Hz.\n"
-            "U701 TLV9001IDBVR on +/-2V5; C720/C721 at its pins 5/2.\n"
+            "Load: Rmid 15k on the input sheet only. C722 100n: 160 Hz.\n"
+            "U701 TPH2501 on +/-2V5 (Vos 0.5 mV max -> 0.33 mV at OUT); C720/C721 at its pins 5/2.\n"
             "Reset: VREFBUF off (VREF+ ~0 V) -> VNEG_REF = 0 V.", (g(95), g(102)), size=T)
 
     # ---------------------------------------------------------------- VBIAS_A: divider DAC -> -2V5 (no op-amp)
@@ -199,11 +200,10 @@ def main():
         sh.power("+3V3", r["1"], dy=-2.54)
         sh.stub(r, "2", net)
     sh.text("I2C pull-ups 4.7k (MS5351M at 0x60)", (g(262), g(150)), size=T)
-    # TRIG_SEL reset pull-down (PA1 floats at reset). Without it the TMUX136 SEL network (10k series, 18k to
-    # -2V5) pulls the floating pin towards -2V5 (MCU clamp) and SEL to about -1.6 V below the switch ground.
-    # 2.0k: pin at -0.17 V (inside the -0.3 V limit), SEL at -1.00 V = 0.11 V below VSW_GND (-0.89 V);
-    # 1.65 mA from the GPIO when high. (5.1k would leave the pin at -0.39 V and SEL at -1.14 V.)
-    rts = R(sh, "2.0k", (g(292), g(160)), ref="R737", fields={"Note": "TRIG_SEL reset pull-down"})
+    # TRIG_SEL reset pull-down (PA1 floats at reset): keeps the trigger switch on the signal (Q301 on through R386 10k
+    # from +2V5: pin at +0.45 V, Q301 base 0.14 mA, hFE >= 200). 3.3k (BOM review 2, SPEC 34; was 2.0k for the TMUX136
+    # SEL network): 1.0 mA from the GPIO when high.
+    rts = R(sh, "3.3k", (g(292), g(160)), ref="R737", fields={"Note": "TRIG_SEL reset pull-down (reset = signal)"})
     sh.stub(rts, "1", "TRIG_SEL", kind="hlabel", shape="output")
     sh.gnd(rts["2"])
     sh.text("R737: TRIG_SEL pull-down (PA1 has none at reset)", (g(286), g(172)), size=T)

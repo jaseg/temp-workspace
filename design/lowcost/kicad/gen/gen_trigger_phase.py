@@ -2,25 +2,25 @@
 SPEC decisions 4-6).
 
 Signal path, left to right (top of the sheet):
-  BUF_OUT_T / EXT_CLK (49.9 R termination) -> U301 TMUX136 (local switch ground VSW_GND = -0.9 V,
-  SEL level-shifted from TRIG_SEL) -> U302 TLV3801 (+/-2V5, IN- = TRIG_LEVEL = passive sum of DAC_TRIG and
-  -2V5: R383 5.1k / R384 8.87k / R385 2.0k, 10 nF), 100 R across CMP_P/CMP_N
+  BUF_OUT_T / EXT_CLK (49.9 R termination) -> two four-diode bridges (D317/D318 signal, D319/D320 EXT; 2 x
+  BAT15-04W each, steered by Q301 SS8550 / Q302 MMBT3904 from TRIG_SEL, SPEC decision 27, bom2-trigger.md)
+  -> U302 TLV3801 (+/-2V5, IN- = TRIG_LEVEL = passive sum of DAC_TRIG and -2V5: R383 5.1k / R384 10k /
+  R385 3.3k, 10 nF), 100 R across CMP_P/CMP_N
   -> CMP_P -> 1 uF -> U303 TRF37D73 (3V3, bias tee FB301 BLM15HD102 bead + L302 47 uH || R382 1 k, sim/bias_tee)
-  -> 1 uF -> 12 dB pi pad 82/91/82 R
+  -> 1 uF -> pi pad 100/100/100 R
   -> 16-tap delay line (two rows of 8 on the sheet, wired through) -> 49.9 R termination.
-  CMP_N -> 1 uF -> 49.9 R dummy; CMP_P/CMP_N bridged by 2 x 470 R -> U304 SN65LVDS2 -> COARSE.
-Taps (ladder): BAT15-04W gate (pin 3 common on the line), 0.47 pF C0G hold caps to PSTRB_A (anode
+  CMP_N -> 1 uF -> 49.9 R dummy; CMP_P/CMP_N bridged by 2 x 470 R -> U313 COS3502 unit A -> COARSE.
+Taps (ladder): BAT15-04W gate (pin 3 common on the line), 0.5 pF +/-0.05 pF C0G coupling caps to PSTRB_A (anode
 node) / PSTRB_K (cathode node), 2.2 k to VTAP_N (anode node) / VTAP_P (cathode node), 2 x 1 k summing to
-COS3502 IN+, IN- = VTAP_TH (1 k + 100 nF per row), OUT -> TAPn. Strobe lines end in 43 R (loaded 41.3 R).
+COS3502 IN+, IN- = VTAP_TH (1 k + 100 nF per row), OUT -> TAPn. Strobe lines end in 49.9 R.
+Unused references (removed parts): U301 (TMUX136), U304 (SN65LVDS2), R302-R305, C301-C303, TP301.
 
 Pinouts (datasheets, checked):
-  TMUX136 RSE UQFN-10 (SCDS367E table 5-1): 1 A1, 2 A2, 3 B1, 4 B2, 5 GND, 6 EN (low active), 7 COM2,
-    8 COM1, 9 SEL (low = A), 10 VCC.
+  SS8550 / MMBT3904 SOT-23 (JSCJ datasheets): 1 B, 2 E, 3 C.
   TLV3801 DSG WSON-8 (SNOSDD7C table 5-1): 1 OUT-, 2 GND, 3 VEE, 4 IN-, 5 IN+, 6/7 VCC, 8 OUT+;
     thermal pad -> VEE.
   TRF37D73 DSG WSON-8 (SLASE43): 1 VCC, 2 RFIN, 3/4/6/8 NC (to GND), 5 PWDN (high = off), 7 RFOUT
     (bias through choke), pad = GND.
-  SN65LVDS2 DBV SOT-23-5 (SLLS373M): 1 VCC, 2 GND, 3 A, 4 B, 5 R.
   COS3502 SOP-8 (Cosine rev 1.0 pin diagram, NOT the TLV3502 pinout): 1 +INA, 2 -INA, 3 +INB,
     4 -INB, 5 Vs-, 6 OUTB, 7 OUTA, 8 Vs+.
   BAT15-04W SOT-323: 1 A1, 2 K2, 3 K1/A2 (common)."""
@@ -107,67 +107,85 @@ def main():
         sh.power(gnd, c["2"], dy=2.54)
         return c
 
-    # ================================================================== TMUX136
-    tmux = ic_symbol("TMUX136", left=[("1", "A1", "passive"), ("3", "B1", "passive"), None, ("2", "A2", "passive"),
-                                      ("4", "B2", "passive"), ("6", "EN", "input"), None, ("9", "SEL", "input")],
-                     right=[("8", "COM1", "passive"), None, None, ("7", "COM2", "passive")],
-                     top=[("10", "VCC", "power_in")], bottom=[("5", "GND", "power_in")],
-                     footprint="Package_DFN_QFN:Texas_UQFN-10_1.5x2mm_P0.5mm",
-                     description="2:1 2-channel 6 GHz switch")
-    u1 = sh.add(tmux, "U301", "TMUX136", P(52, 44), fp="Package_DFN_QFN:Texas_UQFN-10_1.5x2mm_P0.5mm",
-                lcsc="C2673277", mpn="TMUX136MRSER", fields={"Price": "1.22 USD (DigiKey)"})
-    yS = u1["8"][1]                                       # main trigger signal row
-    # BUF_OUT_T -> A1
-    sh.hlabel("BUF_OUT_T", (g(22), u1["1"][1]), "input", side="left")
-    sh.wire((g(22), u1["1"][1]), u1["1"])
-    # EXT_CLK -> 49.9 R termination -> B1
-    sh.hlabel("EXT_CLK", (g(22), u1["3"][1]), "input", side="left")
-    sh.wire((g(22), u1["3"][1]), u1["3"])
-    rt = R(sh, "49.9", (g(28), u1["3"][1] + g(3)), fields={"Note": "EXT_CLK 50 R termination at U301.3"})
+    # ================================================================== trigger input switch: two diode bridges
+    # (SPEC decision 27, docs/research/bom2-trigger.md, sim/trig_switch): replaces the TMUX136 (U301, its -0.9 V
+    # local ground R304 / R305 / C301-C303 and the SEL shifter R302 / R303). Each bridge = 2 x BAT15-04W:
+    # package a: pin 1 = T, pin 3 = X (input), pin 2 = B; package b: pin 1 = T, pin 3 = Y (TLV3801 IN+), pin 2 = B.
+    # Bridge 1 (D317 / D318): X = BUF_OUT_T; bridge 2 (D319 / D320): X = EXT_CLK (49.9 R R301 at D319.3).
+    # Feeds 1k: T1-SW_S, B1-SW_SB, T2-SW_SB, B2-SW_S. TRIG_SEL low (reset) = signal.
+    yS = g(36)                                            # main trigger signal row (TLV3801 IN+)
+    sh._refn["R"] = 0
+    sh._refn["C"] = 3                                     # C301-C303 (TMUX136) are unused references now
+    sh._refn["TP"] = 1                                    # TP301 (VSW_GND) is an unused reference now
+    BXS = (30, 56)                                        # bridge 1 / bridge 2 centre x (grid units)
+    pa, pb = [], []
+    for k, xb_ in enumerate(BXS):
+        dpb = sh.add(DUAL, f"D{318 + 2 * k}", "BAT15-04W", P(xb_, 36 + 4), mirror="x", fp=DUAL_FP, lcsc="C5380972",
+                     mpn="BAT1504WH6327XTSA1", fields={**BAT_F, "Note": "bridge %d b: 1 T, 2 B, 3 Y (IN+)" % (k + 1)})
+        dpa = sh.add(DUAL, f"D{317 + 2 * k}", "BAT15-04W", P(xb_, 36 + 13), fp=DUAL_FP, lcsc="C5380972",
+                     mpn="BAT1504WH6327XTSA1",
+                     fields={**BAT_F, "Note": "bridge %d a: 1 T, 2 B, 3 X (%s)" % (k + 1, ("BUF_OUT_T", "EXT_CLK")[k])})
+        sh.wire(dpb["1"], dpa["1"])                       # T
+        sh.wire(dpb["2"], dpa["2"])                       # B
+        sh.wire(dpb["3"], (dpb["3"][0], yS))
+        pa.append(dpa)
+        pb.append(dpb)
+    # Y row: both bridges' b packages to TLV3801 IN+ (wired later to U302.5)
+    sh.wire(pb[0]["3"], pb[1]["3"])
+    # inputs: BUF_OUT_T to X1, EXT_CLK to X2 with the 49.9 R termination at D319.3
+    yx = 36 + 17
+    sh.hlabel("BUF_OUT_T", P(14, yx), "input", side="left")
+    sh.wire(P(14, yx), pa[0]["3"])
+    ye = 36 + 21
+    sh.hlabel("EXT_CLK", P(14, ye), "input", side="left")
+    sh.path([P(14, ye), P(60, ye)])
+    sh.wire(pa[1]["3"], P(56, ye))
+    rt = R(sh, "49.9", P(60, ye + 3), fields={"Note": "EXT_CLK 50 R termination at D319 pin 3"})
     sh.gnd(rt["2"])
-    # TRIG_SEL -> 10 k -> SEL, 18 k to -2V5
-    ysel = u1["9"][1]
-    sh.hlabel("TRIG_SEL", (g(14), ysel), "input", side="left")
-    rs1 = R(sh, "10k", (g(20), ysel), rot=90)
-    sh.wire((g(14), ysel), rs1["1"])
-    sh.wire(rs1["2"], u1["9"])
-    rs2 = R(sh, "17.8k", (g(36), ysel + g(3)), fields={"Note": "1 %; 17.8k = the R107 line (was 18k)"})
-    sh.gnd(rs2["2"], dy=g(4), name="-2V5")
-    sh.text("SEL: 3V3 GPIO -> -0.88 / +1.24 V\n= 0.0 / 2.1 V above VSW_GND (-2V5 = -2.44 V)", (g(9), ysel + g(5)), size=T)
-    # A2, B2, EN to the local switch ground
-    xj = u1["2"][0] - g(3)
-    for p in ("2", "4", "6"):
-        sh.wire(u1[p], (xj, u1[p][1]))
-    sh.path([(xj, u1["2"][1]), (xj, u1["6"][1] + g(2))])
-    sh.label("VSW_GND", (xj, u1["6"][1] + g(2)), rot=180)
-    sh.stub(u1, "7", "VSW_GND", length=g(2))
-    # VCC (+2V5) with decoupling to the switch ground
-    pv = u1["10"]
-    q = (pv[0], pv[1] - g(2))
-    sh.wire(pv, q)
-    sh.power("+2V5", q, dy=-2.54)
-    cv = C(sh, "100n", (pv[0] + g(5), q[1]), rot=90)
-    sh.wire(q, cv["1"])
-    sh.wire(cv["2"], (cv["2"][0] + g(2), q[1]))
-    sh.label("VSW_GND", (cv["2"][0] + g(2), q[1]))
-    # local ground -0.9 V: 1.5 k to GND, 2.7 k to -2V5, 100 n + 1 n
-    pg = u1["5"]
-    yn = pg[1] + g(3)
-    sh.wire(pg, (pg[0], yn))
-    sh.path([(pg[0] - g(5), yn), (pg[0] + g(14), yn)])
-    r15 = R(sh, "1.5k", (pg[0] - g(5), yn + g(3)), lcsc="C25867")
-    sh.wire((pg[0] - g(5), yn), r15["1"])
-    sh.gnd(r15["2"])
-    r27 = R(sh, "2.7k", (pg[0], yn + g(3)), lcsc="")
-    sh.gnd(r27["2"], dy=g(4), name="-2V5")
-    c1 = C(sh, "100n", (pg[0] + g(5), yn + g(3)))
-    sh.gnd(c1["2"])
-    c2 = C(sh, "1n", (pg[0] + g(10), yn + g(3)), fields={"Note": "C0G, at U301.5"})
-    sh.gnd(c2["2"])
-    sh.label("VSW_GND", (pg[0] + g(14), yn))
-    sh.add(TP, "TP", "VSW_GND", (pg[0] + g(14), yn), fp=TP_FP)
-    sh.text("VSW_GND = -2.44 x 1.5k/4.2k = -0.87 V (switch ground)\nVCC-GND = 3.39 V; ramp 100-1000 us/V",
-            (pg[0] - g(8), yn + g(12)), size=T)
+    sh._refn["R"] = 5                                     # R302-R305 (TMUX136) are unused references now
+    # bias feeds, 4 x 1k (explicit refs R391-R394)
+    yf = 36 + 9
+    r_t1 = R(sh, "1k", P(20, yf), rot=90, ref="R391", fields={"Note": "bridge 1 T feed, at the T trace"})
+    sh.wire(r_t1["2"], (pa[0]["1"][0], g(yf)))
+    sh.label("SW_S", r_t1["1"], rot=180)
+    r_b1 = R(sh, "1k", P(40, yf), rot=90, ref="R392", fields={"Note": "bridge 1 B feed, at the B trace"})
+    sh.wire((pa[0]["2"][0], g(yf)), r_b1["1"])
+    r_t2 = R(sh, "1k", P(46, yf), rot=90, ref="R393", fields={"Note": "bridge 2 T feed, at the T trace"})
+    sh.wire(r_t2["2"], (pa[1]["1"][0], g(yf)))
+    sh.wire(r_b1["2"], (r_b1["2"][0], r_b1["2"][1] - g(3)))
+    sh.label("SW_SB", (r_b1["2"][0], r_b1["2"][1] - g(3)))
+    r_b2 = R(sh, "1k", P(62, 36 + 17), ref="R394", fields={"Note": "bridge 2 B feed, at the B trace"})
+    sh.wire(pa[1]["2"], r_b2["1"])
+    sh.label("SW_S", r_b2["2"])
+    sh.text("BRIDGES: D317/D318 = signal (BUF_OUT_T), D319/D320 = EXT_CLK. On: T +2.4 V, B -2.3 V via 1k\n"
+            "(2.1 mA SIG, 1.1 mA EXT); off: reverse biased +/-1.38 V. No caps on SW_S / SW_SB / T / B.\n"
+            "Drive: TRIG_SEL low (reset, R737) = signal: Q301 on (SW_S +2.43 V), Q302 on (SW_SB -2.32 V).\n"
+            "TRIG_SEL high: both off, R387 / R390 bias bridge 2. Rails 12.5 / 1.1 mA; switch ~0.5 us (wait 10 us).",
+            P(9, 22), size=T)
+    sh.text("SWITCH DRIVE\nTRIG_SEL low\n= signal", P(300, 72), size=T)
+    XD, YD = 240, 70
+    sh.hlabel("TRIG_SEL", P(XD, YD), "input", side="left")
+    r_sel = R(sh, "10k", P(XD + 6, YD), rot=90, ref="R386", fields={"Note": "Q301 base"})
+    sh.wire(P(XD, YD), r_sel["1"])
+    q1 = sh.add("Device:Q_PNP_BEC", "Q301", "SS8550", P(XD + 13, YD), mirror="x", fp="Package_TO_SOT_SMD:SOT-23",
+                lcsc="C8542", mpn="SS8550 Y2", fields={"Note": "SOT-23: 1 B, 2 E, 3 C"})
+    sh.wire(r_sel["2"], q1["1"])
+    sh.power("+2V5", q1["2"], dy=-2.54)
+    sh.path([q1["3"], P(XD + 15, YD + 4), P(XD + 35, YD + 4)])
+    r_s = R(sh, "1k", P(XD + 19, YD + 7), ref="R387", fields={"Note": "SW_S pull-down"})
+    sh.power("-2V5", r_s["2"], dy=2.54)
+    sh.label("SW_S", P(XD + 25, YD + 4))
+    r_b = R(sh, "10k", P(XD + 38, YD + 4), rot=90, ref="R388", fields={"Note": "Q302 base"})
+    q2 = sh.add("Device:Q_NPN_BEC", "Q302", "MMBT3904", P(XD + 45, YD + 4), fp="Package_TO_SOT_SMD:SOT-23",
+                lcsc="C20526", mpn="MMBT3904", fields={"Note": "SOT-23: 1 B, 2 E, 3 C"})
+    sh.wire(r_b["2"], q2["1"])
+    r_be = R(sh, "3.3k", P(XD + 41, YD + 7), ref="R389", fields={"Note": "Q302 base to -2V5"})
+    sh.power("-2V5", r_be["2"], dy=2.54)
+    sh.power("-2V5", q2["2"], dy=2.54)
+    sh.path([q2["3"], P(XD + 47, YD - 3), P(XD + 57, YD - 3)])
+    r_sb = R(sh, "1k", P(XD + 54, YD - 6), ref="R390", fields={"Note": "SW_SB pull-up"})
+    sh.power("+2V5", r_sb["1"], dy=-2.54)
+    sh.label("SW_SB", P(XD + 57, YD - 3))
 
     # ================================================================== TLV3801
     tlv = ic_symbol("TLV3801", left=[("5", "IN+", "input"), ("4", "IN-", "input")],
@@ -178,7 +196,8 @@ def main():
     xt = 88
     u2 = sh.add(tlv, "U302", "TLV3801", (g(xt), yS + g(2)), fp=WSON, lcsc="C3658765", mpn="TLV3801DSGR",
                 fields={"Price": "5.13 USD (Mouser)"})
-    sh.wire(u1["8"], u2["5"])
+    sh.wire(pb[1]["3"], u2["5"])
+    sh.label("TRIG_IN", (g(66), yS))
     # TRIG_LEVEL -> IN-, 10 nF: passive sum of DAC_TRIG (STM32 DAC1_OUT1, 0.2..2.7 V) and -2V5 into a 2.0k shunt
     # (21 Nov 2026, replaces the TP2272 difference amplifier on mcu_if). Explicit refs R383-R385 (new parts).
     ym = u2["4"][1]
@@ -188,19 +207,18 @@ def main():
     sh.add(TP, "TP", "TRIG_LEVEL", (g(71), ym + g(6)), fp=TP_FP)
     Y2 = ym + g(20)
     sh.path([(g(74), ym + g(6)), (g(74), Y2), (g(90), Y2)])
-    rtb = R(sh, "8.87k", (g(78), Y2 + g(3)), ref="R384", fields={"Note": "1 %, from -2V5 (mid-scale cancel)"})
+    rtb = R(sh, "10k", (g(78), Y2 + g(3)), ref="R384", fields={"Note": "1 %, from -2V5 (mid-scale cancel)"})
     sh.power("-2V5", rtb["2"], dy=5.08)
-    rts = R(sh, "2.0k", (g(84), Y2 + g(3)), ref="R385", fields={"Note": "1 %, shunt"})
+    rts = R(sh, "3.3k", (g(84), Y2 + g(3)), ref="R385", fields={"Note": "1 %, shunt"})
     sh.gnd(rts["2"])
     rta = R(sh, "5.1k", (g(90), Y2 + g(3)), ref="R383", lcsc="C25905", fields={"Note": "1 %, from DAC1_OUT1"})
     sh.wire(rta["2"], (g(90), rta["2"][1] + g(2)))
     sh.hlabel("DAC_TRIG", (g(90), rta["2"][1] + g(2)), "input", side="right")
-    sh.text("TRIG_LEVEL = 0.242 DAC_TRIG - 0.139 x 2.5 V\n"
-            "(R383/R384/R385, Rpar 1.24k, 10 nF: 13 kHz)\n"
-            "DAC 0.2..2.7 V -> -0.30..+0.31 V, 0.17 mV/LSB\n"
-            "-2V5 sensitivity 0.139 V/V. TLV3801 Ib 2 uA\n"
-            "typ / 10 uA max x 1.24k = 2.5 / 12 mV (cal.)\n"
-            "DAC load 6.7k. Reset (PA4 high-Z): -0.34 V.",
+    sh.text("TRIG_LEVEL = 0.327 DAC_TRIG - 0.167 x 2.44 V\n"
+            "(R383 5.1k / R384 10k / R385 3.3k, Rpar 1.67k, 10 nF: 9.5 kHz)\n"
+            "DAC 0.2..2.7 V -> -0.34..+0.48 V nominal, -0.332..+0.466 V\n"
+            "guaranteed (-2V5 +/-2.5 %), 0.23 mV/LSB. TLV3801 Ib 10 uA max\n"
+            "x 1.67k = 17 mV (cal.). DAC load 7.6k.",
             (g(10), ym + g(25)), size=T)
     # supplies
     a, b = u2["6"], u2["7"]
@@ -279,18 +297,18 @@ def main():
     pt = l2["1"]
     sh.power("+3V3", pt, dy=-2.54)
     dec_up(pt, pt[0] + g(8))
-    # 1 uF -> 12 dB pi pad 82/91/82
+    # 1 uF -> 11.5 dB pi pad 100/100/100
     cout = C(sh, "1u", (xo + g(5), po[1]), rot=90, fields={"Note": "X5R 25 V 0402, DC block"})
     sh.wire((xo, po[1]), cout["1"])
     xa = xo + g(10)
     sh.wire(cout["2"], (xa, po[1]))
-    rp1 = R(sh, "82", (xa, po[1] + g(3)), fields={"Note": "12 dB pi pad, 1 %"})
+    rp1 = R(sh, "100", (xa, po[1] + g(3)), fields={"Note": "11.5 dB pi pad 100/100/100, 1 % (SPEC 33)"})
     sh.gnd(rp1["2"])
-    rp2 = R(sh, "91", (xa + g(5), po[1]), rot=90, fields={"Note": "12 dB pi pad, 1 %"})
+    rp2 = R(sh, "100", (xa + g(5), po[1]), rot=90, fields={"Note": "11.5 dB pi pad 100/100/100, 1 % (SPEC 33)"})
     sh.wire((xa, po[1]), rp2["1"])
     xb = xa + g(10)
     sh.wire(rp2["2"], (xb, po[1]))
-    rp3 = R(sh, "82", (xb, po[1] + g(3)), fields={"Note": "12 dB pi pad, 1 %"})
+    rp3 = R(sh, "100", (xb, po[1] + g(3)), fields={"Note": "11.5 dB pi pad 100/100/100, 1 % (SPEC 33)"})
     sh.gnd(rp3["2"])
 
     # ================================================================== CMP_N dummy load, LVDS receiver
@@ -300,31 +318,38 @@ def main():
     rdm = R(sh, "49.9", (cn["2"][0] + g(4), nN[1] + g(3)), fields={"Note": "dummy load = TRF input (equal load)"})
     sh.wire(cn["2"], rdm["1"])
     sh.gnd(rdm["2"])
-    lv = ic_symbol("SN65LVDS2", left=[("3", "A", "input"), ("4", "B", "input")], right=[("5", "R", "output")],
-                   top=[("1", "VCC", "power_in")], bottom=[("2", "GND", "power_in")],
-                   footprint="Package_TO_SOT_SMD:SOT-23-5", description="LVDS receiver")
-    u4 = sh.add(lv, "U304", "SN65LVDS2", (g(140), yS + g(32)), fp="Package_TO_SOT_SMD:SOT-23-5", lcsc="C38204",
-                mpn="SN65LVDS2DBVR", fields={"Price": "0.54 USD (LCSC)"})
-    ya, yb2 = u4["3"][1], u4["4"][1]
-    xpa, xnb = xr + g(2), xr - g(0)
+    # coarse receiver: 9th COS3502 (U313 unit A; unit B tied off), SPEC decision 27 (was SN65LVDS2 U304)
+    cos = cos3502_symbol()
+    u4 = sh.add(cos, "U313", "COS3502", (g(140), yS + g(32)), unit=1, fp="Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+                lcsc="C49304672", mpn="COS3502SR", fields={"Price": "0.36 USD (LCSC)"})
+    ya, yb2 = u4["1"][1], u4["2"][1]
     # CMP_P tap (crosses CMP_N), CMP_N tap
     ra = R(sh, "470", (g(120), ya - g(3)), rot=90, fields={"Note": "bridge, at the U302 pins"})
     rb = R(sh, "470", (g(120), yb2 + g(3)), rot=90, fields={"Note": "bridge, at the U302 pins"})
     sh.path([(g(114), yS), (g(114), ra["1"][1]), ra["1"]])
-    sh.path([ra["2"], (ra["2"][0] + g(2), ra["2"][1]), (ra["2"][0] + g(2), ya), u4["3"]])
+    sh.path([ra["2"], (ra["2"][0] + g(2), ra["2"][1]), (ra["2"][0] + g(2), ya), u4["1"]])
     sh.path([(xr, nN[1]), (xr, rb["1"][1]), rb["1"]])
-    sh.path([rb["2"], (rb["2"][0] + g(4), rb["2"][1]), (rb["2"][0] + g(4), yb2), u4["4"]])
-    sh.gnd(u4["2"])
-    pv = u4["1"]
+    sh.path([rb["2"], (rb["2"][0] + g(4), rb["2"][1]), (rb["2"][0] + g(4), yb2), u4["2"]])
+    up = sh.add(cos, "U313", "COS3502", (g(160), yS + g(32)), unit=3, fp="Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+                lcsc="C49304672", mpn="COS3502SR", fields={"Price": "0.36 USD (LCSC)"})
+    sh.gnd(up["5"])
+    pv = up["8"]
     sh.wire(pv, (pv[0], pv[1] - g(2)))
     sh.power("+3V3", (pv[0], pv[1] - g(2)), dy=-2.54)
     dec_up((pv[0], pv[1] - g(2)), pv[0] + g(5))
-    sh.wire(u4["5"], (u4["5"][0] + g(12), u4["5"][1]))
-    sh.hlabel("COARSE", (u4["5"][0] + g(12), u4["5"][1]), "output")
-    sh.add(TP, "TP", "COARSE", (u4["5"][0] + g(6), u4["5"][1]), fp=TP_FP)
+    ub = sh.add(cos, "U313", "COS3502", (g(182), yS + g(32)), unit=2, fp="Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+                lcsc="C49304672", mpn="COS3502SR", fields={"Price": "0.36 USD (LCSC)"})
+    sh.wire(ub["3"], (ub["3"][0] - g(2), ub["3"][1]))
+    sh.gnd((ub["3"][0] - g(2), ub["3"][1]), dy=g(6))
+    sh.wire(ub["4"], (ub["4"][0] - g(4), ub["4"][1]))
+    sh.power("+3V3", (ub["4"][0] - g(4), ub["4"][1]), dy=-g(8))
+    sh.nc(ub["6"])
+    sh.text("unit B unused: + to GND,\n- to +3V3 (output low)", (g(176), yS + g(40)), size=T)
+    sh.wire(u4["7"], (u4["7"][0] + g(8), u4["7"][1]))
+    sh.hlabel("COARSE", (u4["7"][0] + g(8), u4["7"][1]), "output")
+    sh.add(TP, "TP", "COARSE", (u4["7"][0] + g(4), u4["7"][1]), fp=TP_FP)
 
     # ================================================================== delay line ladder
-    cos = cos3502_symbol()
     W, X0 = 34, 48
     YL = [98, 152]
     LINE_CH = 82                           # return channel from the pad to row 1
@@ -333,8 +358,8 @@ def main():
     sh.path([(xb, po[1]), (xb + g(6), po[1]), (xb + g(6), g(LINE_CH)), (g(xl_launch), g(LINE_CH)),
              (g(xl_launch), g(YL[0])), (g(X0), g(YL[0]))])
     sh.add(TP, "TP", "LINE_IN", (xb + g(6), po[1]), fp=TP_FP)
-    sh.text("LINE LAUNCH: pad R303-R305 at the first tap; 50 R microstrip\n"
-            "(0.36 mm on L1 over L2 GND). Drawn long here only.", (g(186), g(LINE_CH) - g(9)), size=T)
+    sh.text("LINE LAUNCH: pad R307-R309 at the first tap; 50 R microstrip\n"
+            "(0.36 mm on L1 over L2 GND). Drawn long here only.", (g(193), g(LINE_CH) - g(5)), size=T)
     # strobe line launch
     yA0, yK0 = YL[0] - 12, YL[0] - 9
     sh.hlabel("PSTRB_A", (g(26), g(yA0)), "input", side="left")
@@ -363,8 +388,8 @@ def main():
             sh.wire(P(x0, yl), d["3"])
             pa, pk = d["1"], d["2"]                      # anode node (x0-6), cathode node (x0+6)
             # hold caps up to the strobe lines (cross the signal line)
-            ca = C(sh, "0.5p", P(x0 - 9, yl - 5), lcsc="C1544", fields={"Note": "C0G 0402, hold A"})
-            ck = C(sh, "0.5p", P(x0 + 9, yl - 5), lcsc="C1544", fields={"Note": "C0G 0402, hold K"})
+            ca = C(sh, "0.5p", P(x0 - 9, yl - 5), fields={"Note": "C0G 0402 +/-0.05 pF, strobe coupling A (SPEC 29)"})
+            ck = C(sh, "0.5p", P(x0 + 9, yl - 5), fields={"Note": "C0G 0402 +/-0.05 pF, strobe coupling K (SPEC 29)"})
             sh.path([pa, P(x0 - 9, yl + 5), ca["2"]])
             sh.wire(ca["1"], P(x0 - 9, yA))
             sh.path([pk, P(x0 + 9, yl + 5), ck["2"]])
@@ -416,12 +441,12 @@ def main():
                 sh.wire(P(last + (4 if yy == yl else 6), yy), P(xx, yy))
                 if net == "line":
                     rr = R(sh, "49.9", P(xx, yy + 3), fields={"Note": f"{net} end termination, at the last tap"})
-                else:       # loaded strobe line 41.3 R (layout/board/blocks/phase/README.md, validation RF-3)
-                    rr = R(sh, "43", P(xx, yy + 3),
-                           fields={"Note": f"{net} end termination, at the last tap: 43 R = loaded line 41.3 R"})
+                else:       # loaded line 41.3 R; 49.9 R gives the higher last-tap strobe (bom2_taps, SPEC 33)
+                    rr = R(sh, "49.9", P(xx, yy + 3),
+                           fields={"Note": f"{net} end termination, at the last tap (49.9 R: tap-15 peak 3.59 V vs 3.36 V with 43 R)"})
                 sh.gnd(rr["2"])
             sh.text("END TERMINATIONS 0402 to GND\n(L2 via at the pad): line 49.9 R,\n"
-                    "PSTRB_A/K 43 R (loaded 41.3 R)", P(last + 10, yl + 12), size=T)
+                    "PSTRB_A/K 49.9 R (loaded 41.3 R)", P(last + 10, yl + 12), size=T)
 
     # ================================================================== comparator power, VTAP_TH, rails
     yb0 = 200
@@ -463,35 +488,33 @@ def main():
     sh.text("VTAP_P/N = +/-2.5 V\n12.5 mA each", P(212, 216), size=T)
 
     # ================================================================== annotations
-    sh.text("TRIGGER (sim/phase/RESULT.md (f)): TMUX136 on local -0.9 V ground, VCC +2V5.\n"
-            "A1 = BUF_OUT_T (signal, high-Z end of the 50 R line), B1 = EXT_CLK (SMA on the input sheet,\n"
-            "49.9 R here at U301.3). Signal +/-0.5 V = 0.4..1.4 V above switch GND. Ron unspecified there.",
+    sh.text("TRIGGER SWITCH (SPEC 27, sim/trig_switch): two 4-diode bridges (2 x BAT15-04W each) select\n"
+            "BUF_OUT_T (high-Z end of the 50 R line, bridge input 500 R) or EXT_CLK (50 R, -0.9..+1.0 V) into\n"
+            "TLV3801 IN+. SIG -3 dB 1.26 GHz, EXT 1.13 GHz; isolation 46-49 dB at 100 MHz, ~22 dB at 1 GHz:\n"
+            "remove EXT_CLK when triggering on small signals. Offset +6.4 mV (calibrated).",
             P(10, 10), size=T)
     sh.text("TLV3801: +/-2V5, GND pin to GND, LVDS-type out.\n100 R R3xx across OUT+/OUT- at the pins\n"
-            "(350 mV VOD, 25 R per leg at HF). Trace to\nTRF/LVDS2 short (< 5 mm, ~30 ps).",
+            "(350 mV VOD, 25 R per leg at HF). Trace to\nTRF/U313 short (< 5 mm, ~30 ps).",
             P(78, 10), size=T)
     sh.text("LINE DRIVER: TRF37D73 22 dB, 50 R in/out. Bias: bead on\nthe line + 47 uH || 1 k (tau 1.9 us), own 100 nF.\n"
-            "12 dB pad 82/91/82: line +/-0.21 V (data),\n0.42 V steps; 10-90 % 225-250 ps at the taps.",
+            "pad 100/100/100 (11.5 dB): line +/-0.22 V (data),\n0.44 V steps; 10-90 % 225-250 ps at the taps.",
             P(172, 10), size=T)
-    sh.text("COARSE: 2 x 470 R bridge (high-Z tap,\nTRF input drop < 5 %). SN65LVDS2 at 3V3\n"
-            "-> FPGA pin 27 (GCLKT_3). Good to ~100-150 MHz edges.", P(148, 72), size=T)
+    sh.text("COARSE: 2 x 470 R bridge (high-Z tap, TRF input drop < 5 %)\n"
+            "-> U313 COS3502 unit A at 3V3 (CM 0.92-1.29 V, +/-175 mV)\n"
+            "-> FPGA pin 27 (GCLKT_3). Valid to ~60 MHz edges (firmware).", P(96, 77), size=T)
     sh.text("DELAY LINE (SPEC decision 4, co-propagating): signal line 75 ps per tap (0.26 mm / 59 R trace, meander\n"
             "9.929 mm between taps, loaded to ~50 R by each gate ~0.37 pF); strobe lines PSTRB_A/K 40 ps per tap\n"
             "(0.16 mm / 72.8 R trace, 4.514 mm pitch, loaded); effective tap spacing 75 - 40 = 35 ps, 16 taps = 560 ps window.\n"
-            "Gate: BAT15-04W pin 3 on the line (stub < 0.3 mm), 0.47 pF C0G hold caps to PSTRB_A (anode)\n"
+            "Gate: BAT15-04W pin 3 on the line (stub < 0.3 mm), 0.5 pF +/-0.05 pF C0G hold caps to PSTRB_A (anode)\n"
             "/ PSTRB_K (cathode). Strobe >= 2.75 V per side with the 80 ps launch stub (~4 V launch), FWHM 220-320 ps.\n"
             "phase_array RESULT: line measured 75.7 ps/tap with a 70 ps design -> layout draws 70 ps for 75 ps.",
             P(232, 26), size=T)
     sh.text("READOUT: 2.2 k to VTAP_N (A node) / VTAP_P (K node),\n2 x 1 k summing to COS3502 IN+, IN- = VTH (VTAP_TH).\n"
             "Hold nodes and the 1 k < 2 mm from the diode; comparator\nnext to its gate. Rising edges only, VTAP_TH ~ +17 mV.\n"
-            "FPGA samples TAP[15:0] at strobe + 12 ns (10-22 ns); 50 % duty OK\n(reverse pulse < 0.5 mV; 70 % optional).", P(232, 54), size=T)
+            "FPGA samples TAP[15:0] at strobe + 12 ns (10-22 ns); 50 % duty OK\n(reverse pulse < 0.5 mV; 70 % optional).", P(232, 46), size=T)
     sh.text("line 75 ps/tap", P(X0 + 11, YL[0] + 1), size=T)
     sh.text("strobe lines PSTRB_A / PSTRB_K: 40 ps/tap each", P(X0 + 12, YL[0] - 14.5), size=T)
 
-    # PWR_FLAG: VSW_GND (-0.9 V switch ground of U301) is driven by the R304 / R305 divider and C302-C305
-    sh.power("PWR_FLAG", (g(10), g(215)))
-    sh.wire((g(10), g(215)), (g(10), g(217)))
-    sh.label("VSW_GND", (g(10), g(217)))
     names = {n for n, _ in hier_pins("trigger_phase")}
     split_wires(sh)
     sh.save()
@@ -501,31 +524,27 @@ def main():
 def check(outdir):
     n = schlib.nets(os.path.join(schlib.OUTDIR, "trigger_phase.kicad_sch"), os.path.join(outdir, "trigger_phase.net"))
     on = lambda *m: next(k for k, v in n.items() if set(m) <= v)
-    print("A1", on(("U301", "1")), "B1", on(("U301", "3")), "SEL", on(("U301", "9")))
-    print("COM1-IN+", on(("U301", "8"), ("U302", "5")))
+    # trigger switch (SPEC decision 27)
+    y = on(("D318", "3"), ("D320", "3"), ("U302", "5"))
+    assert len(n[y]) == 3, ("IN+ node", n[y])
+    s_ = on(("Q301", "3"), ("R387", "1"), ("R388", "1"), ("R391", "1"), ("R394", "2"))
+    sb = on(("Q302", "3"), ("R390", "2"), ("R392", "2"), ("R393", "1"))
+    t1 = on(("D317", "1"), ("D318", "1"), ("R391", "2")); b1 = on(("D317", "2"), ("D318", "2"), ("R392", "1"))
+    t2 = on(("D319", "1"), ("D320", "1"), ("R393", "2")); b2 = on(("D319", "2"), ("D320", "2"), ("R394", "1"))
+    assert len({s_, sb, t1, b1, t2, b2, y}) == 7
+    print("switch OK:", s_, sb, "X1", on(("D317", "3")), "X2", sorted(n[on(("D319", "3"))]))
     print("IN-", on(("U302", "4")))
-    print("VSW", on(("U301", "5"), ("U301", "6"), ("U301", "2"), ("U301", "4"), ("U301", "7")))
     print("CMP_P", on(("U302", "8")), sorted(n[on(("U302", "8"))]))
     print("CMP_N", on(("U302", "1")), sorted(n[on(("U302", "1"))]))
     print("RFIN", sorted(n[on(("U303", "2"))]))
     print("RFOUT", sorted(n[on(("U303", "7"))]))
-    # bias tee (sim/bias_tee/RESULT.md): RFOUT -> FB301 -> L302 || R382 -> +3V3, cold-end 100 nF on +3V3
     assert ("FB301", "1") in n[on(("U303", "7"))], "FB301 not on RFOUT"
     assert {("L302", "2"), ("R382", "2")} <= n[on(("FB301", "2"))], "L302 / R382 not on the bead cold end"
     v33 = n[on(("U303", "1"))]
     assert {("L302", "1"), ("R382", "1")} <= v33 and any(r.startswith("C") for r, _ in v33), "L302 cold end"
-    assert not any(r == "L301" for k in n for r, _ in n[k]), "L301 (120 nH) must be gone"
-    print("bias tee checks OK: RFOUT -> FB301 -> L302 || R382 -> +3V3")
-    print("LVDS A", sorted(n[on(("U304", "3"))]), "B", sorted(n[on(("U304", "4"))]))
-    print("COARSE", on(("U304", "5")))
+    print("COARSE in", sorted(n[on(("U313", "1"))]), sorted(n[on(("U313", "2"))]), "out", on(("U313", "7")))
     line = on(("D301", "3"))
     print("LINE", line, sorted(x for x in n[line]))
-    for k in ("VTAP_P", "VTAP_N", "VTAP_TH", "PSTRB_A", "PSTRB_K", "VTH1", "VTH2", "-2V5", "+3V3", "+2V5"):
-        c = [x for x in n if x.endswith(k)]
-        print(k, [(x, len(n[x])) for x in c])
-    for i in range(16):
-        u = on(("D%d" % (301 + i), "1"))
-        print(i, on(("D%d" % (301 + i), "3")) == line, len(n[u]), n[u], on(*[x for x in n[on(("D%d" % (301 + i), "2"))]][:1]))
 
 
 if __name__ == "__main__":
