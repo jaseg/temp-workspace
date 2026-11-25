@@ -214,17 +214,18 @@ TAIL = {
     "/VBIAS_A": [(16.0, 22.0), (15.4, 21.4), (15.4, 15.9)],            # via on the B column south of BUF_OUT_T
     "/VNEG_REF": [(7.9, 22.3), (7.75, 22.45), (2.74, 22.45), (1.94, 21.65), (1.94, 19.2)],
     "/VOFS": [(8.15, 22.6), (8.0, 22.75), (1.6, 22.75), (1.0, 22.15), (1.0, 19.2)],
-    "/DAC_TRIG": [(14.77, 24.97), (14.57, 24.77), (14.57, 23.55), (14.07, 23.05), (9.0, 23.05), (8.3, 23.75),
-                  (8.3, 24.6)],
-    "/TRIG_SEL": [(14.42, 25.27), (14.12, 24.97), (14.12, 23.85), (13.62, 23.35), (9.3, 23.35), (8.6, 24.05),
-                  (8.6, 25.1), (10.7, 27.2), (10.7, 31.2), (10.2, 31.7)],
+    # BOM-2 (25 Nov): the phase front column now has block L3 lines (SW_S / SW_SB from x 2-9.4, board y 23.75-35.25,
+    # TRIG_LEVEL); DAC_TRIG passes north of the SW_S via (7.25, 23.75) and turns south west of it, TRIG_SEL stays
+    # east of the SW_S column (x 9.3) and meets the block's B lane at its S end
+    "/DAC_TRIG": [(14.77, 24.97), (14.57, 24.77), (14.57, 23.55), (14.07, 23.05), (6.5, 23.05)],
+    "/TRIG_SEL": [(14.42, 25.27), (14.12, 24.97), (14.12, 23.85), (13.62, 23.35), (10.4, 23.35)],
     # (24 Nov, vias out of pads: the U302 EP vias that used to fence the x 8 corridor are gone; the line keeps its
     #  east route past U301 / U302 explicitly, so the +2V5 rail keeps its L3 access to C301 / C305 from the south)
 }
 GRID_ORDER = ["/TRIG_SEL", "/DAC_TRIG"]      # area B: grid search from the end of TAIL to the target
 # L3 targets (existing vias of the blocks, or a via placed on the block's B stub by gen_board)
 TARGET = {"/ADC_REF_MID": (21.65, 20.8), "/ADC_IN": (19.06, 20.0), "/VBIAS_K": (16.4, 20.3), "/VBIAS_A": (15.4, 15.9),
-          "/VOFS": (1.0, 19.2), "/VNEG_REF": (1.94, 19.2), "/DAC_TRIG": (4.6, 41.0), "/TRIG_SEL": (9.25, 44.6)}
+          "/VOFS": (1.0, 19.2), "/VNEG_REF": (1.94, 19.2), "/DAC_TRIG": (4.6, 44.7), "/TRIG_SEL": (9.25, 44.6)}
 
 
 def plen(q):
@@ -287,7 +288,7 @@ def draw(B, m, ifs, vtap_th_end, log=print):
             res[net][2] += 1
     for net in GRID_ORDER:                             # area B: grid search
         a, b = TAIL[net][-1], TARGET[net]
-        q = leg(B, m, net, "L3", a, b, clr=0.15, margin=3.0, d0=2)     # leaves heading south
+        q = leg(B, m, net, "L3", a, b, clr=0.15, margin=3.0, d0=4)     # both tails end heading west
         if q is None:
             res[net][0] = False
             log(f"slow line {net}: no L3 path {a} -> {b}")

@@ -347,7 +347,8 @@ if not FAST:
     for net, x in (("/VOFS", 1.0), ("/VNEG_REF", 1.94)):
         for t, e, o in seg_at(net, (x, 22.5), "B.Cu"):
             B.Remove(t)
-    for net, (x, yc) in (("/DAC_TRIG", (4.6, 41.0)), ("/TRIG_SEL", (9.25, 44.6))):
+    # BOM-2 (25 Nov): DAC_TRIG ends on the block's own via (4.6, 44.7) (R383 on top), only its 0.3 mm B stub goes
+    for net, (x, yc) in (("/DAC_TRIG", (4.6, 44.7)), ("/TRIG_SEL", (9.25, 44.6))):
         for t in segs(net, "B.Cu"):
             a_, b_ = loc(t.GetStart()), loc(t.GetEnd())
             if abs(a_[0] - x) < 0.02 and abs(b_[0] - x) < 0.02 and max(a_[1], b_[1]) > yc:
@@ -356,7 +357,8 @@ if not FAST:
                     B.Remove(t)
                 else:
                     t.SetStart(m.P(x, lo)); t.SetEnd(m.P(x, yc))
-        m.via(x, yc, net)
+        if not any(near(loc(v.GetPosition()), (x, yc)) for v in vias(net)):
+            m.via(x, yc, net)
 
     bl.save_board(B, os.path.join(SCR, "routed.kicad_pcb"))
     print("NOT PLACED:")

@@ -1,0 +1,1630 @@
+{
+    "$schema": "https://schemas.kicad.org/drc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-25T01:12:20",
+    "ignored_checks": [
+        {
+            "description": "Footprint has no courtyard defined",
+            "key": "missing_courtyard"
+        },
+        {
+            "description": "Track endpoint not centered on via",
+            "key": "track_not_centered_on_via"
+        },
+        {
+            "description": "Tuning profile track geometries",
+            "key": "tuning_profile_track_geometries"
+        },
+        {
+            "description": "Footprint doesn't match symbol's footprint filters",
+            "key": "footprint_filters_mismatch"
+        },
+        {
+            "description": "Footprint component type doesn't match footprint pads",
+            "key": "footprint_type_mismatch"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "10.99.0",
+    "schematic_parity": [],
+    "source": "pstrobe.kicad_pcb",
+    "unconnected_items": [
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [+3V3] on F.Cu, length 0.6500 mm",
+                    "pos": {
+                        "x": 103.69,
+                        "y": 117.699998
+                    },
+                    "uuid": "9ea5abc2-e044-428b-bad7-e90e5ec33c1b"
+                },
+                {
+                    "description": "Track [+3V3] on F.Cu, length 0.9700 mm",
+                    "pos": {
+                        "x": 101.79,
+                        "y": 103.9
+                    },
+                    "uuid": "90433e26-5860-4e1e-9586-1aa905cf2507"
+                }
+            ],
+            "pos": {
+                "x": 103.69,
+                "y": 117.049999
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [+3V3] on B.Cu, length 1.3700 mm",
+                    "pos": {
+                        "x": 107.96,
+                        "y": 102.6
+                    },
+                    "uuid": "ca42b3a0-6818-4138-93a5-8a4a8f6f7436"
+                },
+                {
+                    "description": "Track [+3V3] on B.Cu, length 1.0500 mm",
+                    "pos": {
+                        "x": 103.69,
+                        "y": 102.55
+                    },
+                    "uuid": "2908ae3f-643e-479c-b727-308ebffe18e7"
+                }
+            ],
+            "pos": {
+                "x": 107.96,
+                "y": 102.6
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [+3V3] on B.Cu, length 1.3700 mm",
+                    "pos": {
+                        "x": 107.96,
+                        "y": 122.4
+                    },
+                    "uuid": "10ddd973-388e-436e-aec2-ca735521faf3"
+                },
+                {
+                    "description": "Track [+3V3] on F.Cu, length 1.2400 mm",
+                    "pos": {
+                        "x": 103.69,
+                        "y": 118.939999
+                    },
+                    "uuid": "74cd0211-2315-4df0-947c-8bc6ad647eae"
+                }
+            ],
+            "pos": {
+                "x": 107.96,
+                "y": 122.4
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [GND] on F.Cu, length 0.6500 mm",
+                    "pos": {
+                        "x": 113.4,
+                        "y": 114.695
+                    },
+                    "uuid": "c042907f-8201-4d41-823e-3018510948c4"
+                },
+                {
+                    "description": "Via [GND] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 111.25,
+                        "y": 117.45
+                    },
+                    "uuid": "660600d6-b6a5-4a60-89bf-a62946d7eee8"
+                }
+            ],
+            "pos": {
+                "x": 112.75,
+                "y": 114.695
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Via [GND] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 113.05,
+                        "y": 107.0
+                    },
+                    "uuid": "55bfb051-6295-44c5-8980-ac4ba1a05433"
+                },
+                {
+                    "description": "Track [GND] on F.Cu, length 0.6500 mm",
+                    "pos": {
+                        "x": 113.4,
+                        "y": 110.305
+                    },
+                    "uuid": "c1de8e5d-d3cb-45db-ae7b-51244233e97a"
+                }
+            ],
+            "pos": {
+                "x": 113.05,
+                "y": 107.0
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [GND] on F.Cu, length 0.6200 mm",
+                    "pos": {
+                        "x": 115.4,
+                        "y": 110.955
+                    },
+                    "uuid": "7ba8ec27-1b0c-4d42-87aa-3f9bfe10d1de"
+                },
+                {
+                    "description": "Track [GND] on F.Cu, length 0.6500 mm",
+                    "pos": {
+                        "x": 113.4,
+                        "y": 110.305
+                    },
+                    "uuid": "c1de8e5d-d3cb-45db-ae7b-51244233e97a"
+                }
+            ],
+            "pos": {
+                "x": 115.4,
+                "y": 110.955
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [GND] on F.Cu, length 0.6200 mm",
+                    "pos": {
+                        "x": 115.4,
+                        "y": 114.045
+                    },
+                    "uuid": "8811c1fe-0636-414a-8500-8bbe050cf762"
+                },
+                {
+                    "description": "Track [GND] on F.Cu, length 0.6200 mm",
+                    "pos": {
+                        "x": 115.4,
+                        "y": 110.955
+                    },
+                    "uuid": "7ba8ec27-1b0c-4d42-87aa-3f9bfe10d1de"
+                }
+            ],
+            "pos": {
+                "x": 115.4,
+                "y": 113.425
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [GND] on F.Cu, length 0.6200 mm",
+                    "pos": {
+                        "x": 115.4,
+                        "y": 114.045
+                    },
+                    "uuid": "8811c1fe-0636-414a-8500-8bbe050cf762"
+                },
+                {
+                    "description": "Track [GND] on F.Cu, length 0.6500 mm",
+                    "pos": {
+                        "x": 113.4,
+                        "y": 114.695
+                    },
+                    "uuid": "c042907f-8201-4d41-823e-3018510948c4"
+                }
+            ],
+            "pos": {
+                "x": 115.4,
+                "y": 114.045
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.399999,
+                        "y": 107.4
+                    },
+                    "uuid": "d60fce69-2dbc-46c9-959c-2f9cb6398e29"
+                },
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.399999,
+                        "y": 117.6
+                    },
+                    "uuid": "433c5716-5bfd-4927-b362-094fa5ab84fb"
+                }
+            ],
+            "pos": {
+                "x": 109.399999,
+                "y": 107.4
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Track [/+5V1] on B.Cu, length 0.9000 mm",
+                    "pos": {
+                        "x": 109.399999,
+                        "y": 107.0
+                    },
+                    "uuid": "9693e2d1-55c3-422c-9f03-e38f31be710f"
+                },
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 112.97,
+                        "y": 102.95
+                    },
+                    "uuid": "4eb01ff7-7c1a-425d-81f0-4628c5d5c627"
+                }
+            ],
+            "pos": {
+                "x": 110.3,
+                "y": 107.0
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        },
+        {
+            "description": "Missing connection between items",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 112.97,
+                        "y": 122.05
+                    },
+                    "uuid": "a4c3e70c-0f45-44fd-a0ed-48f6960b70c3"
+                },
+                {
+                    "description": "Track [/+5V1] on B.Cu, length 0.9000 mm",
+                    "pos": {
+                        "x": 109.399999,
+                        "y": 118.0
+                    },
+                    "uuid": "2708f210-f2f5-4cb5-9fe2-1197297946c3"
+                }
+            ],
+            "pos": {
+                "x": 112.97,
+                "y": 122.05
+            },
+            "severity": "error",
+            "type": "unconnected_items"
+        }
+    ],
+    "violations": [
+        {
+            "description": "Board has malformed outline (no edges found on Edge.Cuts layer)",
+            "items": [
+                {
+                    "description": "PCB",
+                    "pos": {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "uuid": "6a169ee1-fa8f-4cc5-b6de-3279d3aa16e0"
+                }
+            ],
+            "layer": "Edge.Cuts",
+            "pos": {
+                "x": 108.724999,
+                "y": 112.31
+            },
+            "severity": "error",
+            "type": "invalid_outline"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/PH_STROBE_P] on F.Cu, length 0.8500 mm",
+                    "pos": {
+                        "x": 100.5,
+                        "y": 100.0
+                    },
+                    "uuid": "1126b8b8-636b-4e91-8157-90eeedb443c1"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 100.5,
+                "y": 100.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [+3V3] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.329999,
+                        "y": 121.65
+                    },
+                    "uuid": "06d935a5-c6e8-43d7-bb1e-cc92e238f332"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 109.329999,
+                "y": 121.65
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [+3V3] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.329999,
+                        "y": 103.35
+                    },
+                    "uuid": "19aad02b-eb00-4ed7-bfa7-61e8333903bd"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 109.329999,
+                "y": 103.35
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [+3V3] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.329999,
+                        "y": 101.85
+                    },
+                    "uuid": "aed0c680-27ff-47e3-b92c-6e5ec0722dd3"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 109.329999,
+                "y": 101.85
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [+3V3] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.329999,
+                        "y": 123.15
+                    },
+                    "uuid": "e1bb8d7a-4735-4a4d-9127-7b6059ad7568"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 109.329999,
+                "y": 123.15
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [GND] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 112.75,
+                        "y": 110.305
+                    },
+                    "uuid": "25068d88-ef29-46a6-992b-9ea9d43a665e"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 112.75,
+                "y": 110.305
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [GND] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 115.4,
+                        "y": 113.425
+                    },
+                    "uuid": "36a8bb66-ffb8-452a-9fae-f8cb3738a5c1"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 115.4,
+                "y": 113.425
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [GND] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 112.75,
+                        "y": 114.695
+                    },
+                    "uuid": "51b3d976-551b-4bbc-bb2c-6c15ae0c6799"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 112.75,
+                "y": 114.695
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [GND] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 115.4,
+                        "y": 111.575
+                    },
+                    "uuid": "7971e494-1a24-41cb-a6eb-0de3704bf758"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 115.4,
+                "y": 111.575
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/PSTRB_A] on F.Cu, length 0.7071 mm",
+                    "pos": {
+                        "x": 116.5,
+                        "y": 109.25
+                    },
+                    "uuid": "e4bd0f57-136b-485e-b5a3-a577675e37a5"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 117.0,
+                "y": 109.75
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 113.619999,
+                        "y": 102.95
+                    },
+                    "uuid": "2423c8f1-c39a-465a-8a44-c00b5601699d"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 113.619999,
+                "y": 102.95
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.399999,
+                        "y": 118.4
+                    },
+                    "uuid": "40bcc6b8-f9d6-4fde-b321-daaf57ef7259"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 109.399999,
+                "y": 118.4
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.399999,
+                        "y": 117.6
+                    },
+                    "uuid": "433c5716-5bfd-4927-b362-094fa5ab84fb"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 109.399999,
+                "y": 117.6
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 112.97,
+                        "y": 102.95
+                    },
+                    "uuid": "4eb01ff7-7c1a-425d-81f0-4628c5d5c627"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 112.97,
+                "y": 102.95
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 112.97,
+                        "y": 122.05
+                    },
+                    "uuid": "a4c3e70c-0f45-44fd-a0ed-48f6960b70c3"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 112.97,
+                "y": 122.05
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 113.619999,
+                        "y": 122.05
+                    },
+                    "uuid": "b66f3e69-5d6a-4f4d-8253-e1d085a73559"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 113.619999,
+                "y": 122.05
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.399999,
+                        "y": 107.4
+                    },
+                    "uuid": "d60fce69-2dbc-46c9-959c-2f9cb6398e29"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 109.399999,
+                "y": 107.4
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Via is not connected or connected on only one layer",
+            "items": [
+                {
+                    "description": "Via [/+5V1] on F.Cu - B.Cu",
+                    "pos": {
+                        "x": 109.399999,
+                        "y": 106.6
+                    },
+                    "uuid": "e8e3e430-ee4f-4ec6-b3a9-57a0532515a0"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 109.399999,
+                "y": 106.6
+            },
+            "severity": "warning",
+            "type": "via_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/PH_STROBE_N] on F.Cu, length 0.4500 mm",
+                    "pos": {
+                        "x": 101.1,
+                        "y": 100.0
+                    },
+                    "uuid": "db66a7fa-00ac-4c2f-a90d-8578c219f3f0"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 101.1,
+                "y": 100.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/PSTRB_K] on F.Cu, length 0.7071 mm",
+                    "pos": {
+                        "x": 116.5,
+                        "y": 115.75
+                    },
+                    "uuid": "ff027e4b-04d8-4eca-891f-cb7972cca7cb"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 117.0,
+                "y": 115.25
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C415",
+                    "pos": {
+                        "x": 101.79,
+                        "y": 102.45
+                    },
+                    "uuid": "02435fed-62f4-48f0-8dff-71d6afbe6754"
+                }
+            ],
+            "pos": {
+                "x": 101.79,
+                "y": 102.45
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0603_1608Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R412",
+                    "pos": {
+                        "x": 106.1,
+                        "y": 120.0
+                    },
+                    "uuid": "057af253-d0f5-4026-af7d-b67aaa326167"
+                }
+            ],
+            "pos": {
+                "x": 106.1,
+                "y": 120.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C425",
+                    "pos": {
+                        "x": 101.79,
+                        "y": 118.649999
+                    },
+                    "uuid": "0a61770d-b2d6-4fb4-9f55-66bcf050f0f6"
+                }
+            ],
+            "pos": {
+                "x": 101.79,
+                "y": 118.649999
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R407",
+                    "pos": {
+                        "x": 102.3,
+                        "y": 106.4
+                    },
+                    "uuid": "0b2c4ef8-a6bf-4a7a-a21f-cf47fb2cf724"
+                }
+            ],
+            "pos": {
+                "x": 102.3,
+                "y": 106.4
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint FB405",
+                    "pos": {
+                        "x": 104.81,
+                        "y": 121.085
+                    },
+                    "uuid": "0d4fbd0d-18c8-4f57-be9d-c1b692632888"
+                }
+            ],
+            "pos": {
+                "x": 104.81,
+                "y": 121.085
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C416",
+                    "pos": {
+                        "x": 104.81,
+                        "y": 105.8
+                    },
+                    "uuid": "12746b29-5b75-480c-8b59-572708e1a089"
+                }
+            ],
+            "pos": {
+                "x": 104.81,
+                "y": 105.8
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'",
+            "items": [
+                {
+                    "description": "Footprint D402",
+                    "pos": {
+                        "x": 114.4,
+                        "y": 110.305
+                    },
+                    "uuid": "2700be61-fc04-4179-9e32-a7db6af63659"
+                }
+            ],
+            "pos": {
+                "x": 114.4,
+                "y": 110.4075
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C427",
+                    "pos": {
+                        "x": 108.25,
+                        "y": 119.2
+                    },
+                    "uuid": "3b08f10b-d9de-4709-8ca9-ffc884c00e57"
+                }
+            ],
+            "pos": {
+                "x": 108.25,
+                "y": 119.2
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'board'",
+            "items": [
+                {
+                    "description": "Footprint TL402",
+                    "pos": {
+                        "x": 114.6,
+                        "y": 109.25
+                    },
+                    "uuid": "3c58b054-4ff6-45f4-b59a-69bac8bdd4e0"
+                }
+            ],
+            "pos": {
+                "x": 108.276337,
+                "y": 109.25
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "Footprint 'R_0603_1608Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R408",
+                    "pos": {
+                        "x": 106.1,
+                        "y": 105.0
+                    },
+                    "uuid": "4517777e-a9a9-4bab-b91d-83ba7e9a4d72"
+                }
+            ],
+            "pos": {
+                "x": 106.1,
+                "y": 105.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+            "items": [
+                {
+                    "description": "Footprint U403",
+                    "pos": {
+                        "x": 102.74,
+                        "y": 104.65
+                    },
+                    "uuid": "51ddc665-08a9-461b-94dc-2dbc63c3f2fa"
+                }
+            ],
+            "pos": {
+                "x": 102.6975,
+                "y": 104.5825
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'",
+            "items": [
+                {
+                    "description": "Footprint D403",
+                    "pos": {
+                        "x": 114.4,
+                        "y": 114.695
+                    },
+                    "uuid": "54084dc1-89aa-4a1f-a177-18f62ea56acd"
+                }
+            ],
+            "pos": {
+                "x": 114.4,
+                "y": 114.7975
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R410",
+                    "pos": {
+                        "x": 106.61,
+                        "y": 106.95
+                    },
+                    "uuid": "6198fb3e-1f6f-4619-ad40-5ff1219a4913"
+                }
+            ],
+            "pos": {
+                "x": 106.61,
+                "y": 106.95
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C412",
+                    "pos": {
+                        "x": 100.52,
+                        "y": 105.4
+                    },
+                    "uuid": "639acb35-7c2b-48a6-931c-997c8493e5a3"
+                }
+            ],
+            "pos": {
+                "x": 100.52,
+                "y": 105.4
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint FB403",
+                    "pos": {
+                        "x": 104.81,
+                        "y": 103.915
+                    },
+                    "uuid": "6d542432-fd3a-4005-9316-ac6846ce5d6f"
+                }
+            ],
+            "pos": {
+                "x": 104.81,
+                "y": 103.915
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R409",
+                    "pos": {
+                        "x": 107.3,
+                        "y": 105.53
+                    },
+                    "uuid": "70ca5c7a-8daa-4022-b328-f0425a3a0fad"
+                }
+            ],
+            "pos": {
+                "x": 107.3,
+                "y": 105.53
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R413",
+                    "pos": {
+                        "x": 107.3,
+                        "y": 119.47
+                    },
+                    "uuid": "76335ca2-4907-4eab-83bc-2ce20de8a68b"
+                }
+            ],
+            "pos": {
+                "x": 107.3,
+                "y": 119.47
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint FB404",
+                    "pos": {
+                        "x": 114.6,
+                        "y": 103.915
+                    },
+                    "uuid": "88c881e3-afda-4fe4-a19b-5bd92b2b5bc4"
+                }
+            ],
+            "pos": {
+                "x": 114.6,
+                "y": 103.915
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C417",
+                    "pos": {
+                        "x": 108.25,
+                        "y": 105.8
+                    },
+                    "uuid": "8b56b3fc-7d6d-494a-b44b-82939549b3b1"
+                }
+            ],
+            "pos": {
+                "x": 108.25,
+                "y": 105.8
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C431",
+                    "pos": {
+                        "x": 114.6,
+                        "y": 119.2
+                    },
+                    "uuid": "a1441bc8-ae65-485d-8376-134f1118f8dc"
+                }
+            ],
+            "pos": {
+                "x": 114.6,
+                "y": 119.2
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R414",
+                    "pos": {
+                        "x": 106.61,
+                        "y": 118.05
+                    },
+                    "uuid": "a1da9d15-d438-4461-b2e8-b8249121fe77"
+                }
+            ],
+            "pos": {
+                "x": 106.61,
+                "y": 118.05
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'",
+            "items": [
+                {
+                    "description": "Footprint U405",
+                    "pos": {
+                        "x": 102.74,
+                        "y": 120.85
+                    },
+                    "uuid": "ab8820a7-1e81-493e-831e-afb21a764f61"
+                }
+            ],
+            "pos": {
+                "x": 102.6975,
+                "y": 120.7825
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C426",
+                    "pos": {
+                        "x": 104.81,
+                        "y": 119.2
+                    },
+                    "uuid": "b28d4b6a-3d82-4618-b188-bcf7e1d35d99"
+                }
+            ],
+            "pos": {
+                "x": 104.81,
+                "y": 119.2
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C414",
+                    "pos": {
+                        "x": 102.75,
+                        "y": 102.45
+                    },
+                    "uuid": "c3c23f0e-477a-4c76-a8d6-b1a9a1d7e1c2"
+                }
+            ],
+            "pos": {
+                "x": 102.75,
+                "y": 102.45
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C424",
+                    "pos": {
+                        "x": 102.75,
+                        "y": 118.649999
+                    },
+                    "uuid": "c703f85f-0fc1-4197-96d9-60f83a5c7e80"
+                }
+            ],
+            "pos": {
+                "x": 102.75,
+                "y": 118.649999
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint FB406",
+                    "pos": {
+                        "x": 114.6,
+                        "y": 121.085
+                    },
+                    "uuid": "c7547e8d-0191-4df6-923b-dcd6efad9669"
+                }
+            ],
+            "pos": {
+                "x": 114.6,
+                "y": 121.085
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C421",
+                    "pos": {
+                        "x": 114.6,
+                        "y": 105.8
+                    },
+                    "uuid": "cf725d91-e8fb-4354-abfc-3292482550a0"
+                }
+            ],
+            "pos": {
+                "x": 114.6,
+                "y": 105.8
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C422",
+                    "pos": {
+                        "x": 100.52,
+                        "y": 121.6
+                    },
+                    "uuid": "dbd1dac3-a1e9-4f28-91ed-b2558cb76634"
+                }
+            ],
+            "pos": {
+                "x": 100.52,
+                "y": 121.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "The current configuration does not include the footprint library 'board'",
+            "items": [
+                {
+                    "description": "Footprint TL403",
+                    "pos": {
+                        "x": 114.6,
+                        "y": 115.75
+                    },
+                    "uuid": "ea36980d-d91c-4d92-9cc9-1ca576524612"
+                }
+            ],
+            "pos": {
+                "x": 108.276337,
+                "y": 115.75
+            },
+            "severity": "warning",
+            "type": "lib_footprint_issues"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R411",
+                    "pos": {
+                        "x": 100.52,
+                        "y": 123.47
+                    },
+                    "uuid": "fcd0f919-d0a5-4ac1-b19c-cb47de8dc26e"
+                }
+            ],
+            "pos": {
+                "x": 100.52,
+                "y": 123.47
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C430",
+                    "pos": {
+                        "x": 111.25,
+                        "y": 118.0
+                    },
+                    "uuid": "11989cd7-34c3-4172-8e41-aa42542f3ad3"
+                }
+            ],
+            "pos": {
+                "x": 111.25,
+                "y": 118.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C420",
+                    "pos": {
+                        "x": 111.25,
+                        "y": 107.0
+                    },
+                    "uuid": "18882a7e-7387-481e-8130-e8f9368ed882"
+                }
+            ],
+            "pos": {
+                "x": 111.25,
+                "y": 107.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C419",
+                    "pos": {
+                        "x": 113.37,
+                        "y": 102.22
+                    },
+                    "uuid": "1c198308-003d-4437-bd57-a7e63a799762"
+                }
+            ],
+            "pos": {
+                "x": 113.37,
+                "y": 102.22
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_1008_2520Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint L404",
+                    "pos": {
+                        "x": 115.65,
+                        "y": 102.355
+                    },
+                    "uuid": "1eecbd9a-df19-4d08-8013-08dc875e649e"
+                }
+            ],
+            "pos": {
+                "x": 115.65,
+                "y": 102.355
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C435",
+                    "pos": {
+                        "x": 109.809999,
+                        "y": 122.4
+                    },
+                    "uuid": "55030e43-f97c-40ec-8b22-b2c8643edd41"
+                }
+            ],
+            "pos": {
+                "x": 109.809999,
+                "y": 122.4
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C433",
+                    "pos": {
+                        "x": 109.329999,
+                        "y": 120.55
+                    },
+                    "uuid": "618f4f82-047b-4468-bf63-2f6a4ea92489"
+                }
+            ],
+            "pos": {
+                "x": 109.329999,
+                "y": 120.55
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C418",
+                    "pos": {
+                        "x": 113.37,
+                        "y": 101.28
+                    },
+                    "uuid": "6bcbabb5-e32c-4e5a-accc-11b7e87f59a5"
+                }
+            ],
+            "pos": {
+                "x": 113.37,
+                "y": 101.28
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_1008_2520Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint L406",
+                    "pos": {
+                        "x": 115.65,
+                        "y": 122.645
+                    },
+                    "uuid": "6cc4da90-6fa0-4056-8310-eb462eae4a8f"
+                }
+            ],
+            "pos": {
+                "x": 115.65,
+                "y": 122.645
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_1008_2520Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint L405",
+                    "pos": {
+                        "x": 106.885,
+                        "y": 122.4
+                    },
+                    "uuid": "725a8509-c6f4-4932-b2ff-cd399f527002"
+                }
+            ],
+            "pos": {
+                "x": 106.885,
+                "y": 122.4
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_1008_2520Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint L403",
+                    "pos": {
+                        "x": 106.885,
+                        "y": 102.6
+                    },
+                    "uuid": "85a44d03-58e8-4bd1-aea4-c54b0f4e13d5"
+                }
+            ],
+            "pos": {
+                "x": 106.885,
+                "y": 102.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C413",
+                    "pos": {
+                        "x": 102.74,
+                        "y": 102.55
+                    },
+                    "uuid": "89f508f1-fd38-4e73-9e62-5a715aeed30f"
+                }
+            ],
+            "pos": {
+                "x": 102.74,
+                "y": 102.55
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C434",
+                    "pos": {
+                        "x": 109.809999,
+                        "y": 102.6
+                    },
+                    "uuid": "c2957b7d-f40c-4d83-a4dd-d69a81fb13ba"
+                }
+            ],
+            "pos": {
+                "x": 109.809999,
+                "y": 102.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C428",
+                    "pos": {
+                        "x": 113.37,
+                        "y": 123.72
+                    },
+                    "uuid": "ce589fbf-c776-4fc0-9967-bf45a8e645d8"
+                }
+            ],
+            "pos": {
+                "x": 113.37,
+                "y": 123.72
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C429",
+                    "pos": {
+                        "x": 113.37,
+                        "y": 122.78
+                    },
+                    "uuid": "e8d38539-c0ba-47db-86e9-14ca2152b2d2"
+                }
+            ],
+            "pos": {
+                "x": 113.37,
+                "y": 122.78
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C423",
+                    "pos": {
+                        "x": 102.74,
+                        "y": 118.749999
+                    },
+                    "uuid": "ea37497a-67a7-4d43-836c-254ff8adef49"
+                }
+            ],
+            "pos": {
+                "x": 102.74,
+                "y": 118.749999
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C432",
+                    "pos": {
+                        "x": 109.329999,
+                        "y": 104.45
+                    },
+                    "uuid": "f3b99140-cc3e-4c39-aa8d-da5441cbc128"
+                }
+            ],
+            "pos": {
+                "x": 109.329999,
+                "y": 104.45
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        }
+    ]
+}

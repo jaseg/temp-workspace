@@ -80,7 +80,7 @@ XO = 14.60             # output column: GVA bead on the corner, C421 below, laun
 XG = XO - 1.47 - 1.50  # GVA centre x (pin 3 at XO - 1.47: courtyard edge = bead courtyard edge)
 DL = 1.00              # TRF bias-tee choke offset east of the bead via (24 Nov, BIASTEE-6)
 HL = 1.075             # 1008 choke (BOM review 2): pad centres at +/-1.075 mm
-XDC, YDC = 12.83, 7.70 # DNP clamp D402 / D403 (SOT-323, rot 90 / 270) centre, chain-A frame
+XDC, YDC = 14.40, 10.305  # DNP clamp D402 / D403 (SOT-323, rot 180) centre, chain-A frame (corridor side)
 XD = XO + 0.47 + 0.95  # clamp column (vertical SOD-323 beside C421)
 # RF-2 (24 Nov): the shorted end is NT pad 1 -> 1.0 mm net-tie bar (0.5 mm wide over L2) -> GND via IN NT pad 2
 # (net-tie pads carry no paste, so the via is not a solder trap) -> L2.  Its inductance is counted as stub delay
@@ -148,14 +148,16 @@ def chain(s):
     two(FBG, XO, yl - s * 0.48, NS("N"), n_gbias)        # GVA bead: pad 1 centred on the corner, body away
     snap(FBG, n_gout, y=yl)
     two(C_OUT, XO, my(YL + 1.40), NS("N"), n_gout)
-    # DNP clamp, half a BAT15-04W (SOT-323, BOM review 2): signal pin (D402 pin 2 / D403 pin 1) on a 1.1 mm stub
-    # to the output drop 0.55 mm before the launch node, the other two pins to GND.  The SOT-323 is 2.6 mm wide, so it
-    # stands west of the drop (beside C421 and below the GVA) instead of east of it (that strip is 1.9 mm wide)
-    bplace(D, XDC, my(YDC), 90 if A else 270)
+    # DNP clamp, half a BAT15-04W (SOT-323, BOM review 2): D402 pin 2 / D403 pin 1 on a 0.4 mm stub to the output
+    # line 0.8 mm east of the launch node, the other two pins to GND.  The 2.6 x 3.4 mm SOT-323 courtyard does not fit
+    # in the 1.9 x 2.4 mm the SOD-323 used (east of the drop; chain K's GVA tab fills the space west of it), so both
+    # clamps stand on the corridor side of their output line, rot 180 in both chains: a true mirror pair (the
+    # netlist puts the signal on pin 2 in A and pin 1 in K for exactly this), 0.9 mm clear of the PH_LINE launch.
+    bplace(D, XDC, my(YDC), 180)
     pin_sig, pin_g1 = ("2", "1") if A else ("1", "2")
     assert bl.net_of(D, pin_sig) == OUT and bl.net_of(D, pin_g1) == "GND" and bl.net_of(D, "3") == "GND"
     ds = blk.pad(D, pin_sig)
-    assert abs(ds[0] - (XDC + 0.65)) < 1e-6 and abs(ds[1] - my(YDC + 1.0)) < 1e-6, ds
+    assert abs(ds[0] - (XDC + 1.0)) < 1e-6 and abs(ds[1] - my(YDC - 0.65)) < 1e-6, ds
     # ---------------------------------------------------------------- RF tracks
     # L1 return segment of the PH_STROBE input: 47 R pad -> via (L6 -> L1), GND via beside it (mirrored)
     v2, g2 = ((XV2, YR_IN), (XG2, YR_IN)) if A else ((X_IN, BH - 0.40), (1.15, BH - 0.40))
@@ -180,7 +182,7 @@ def chain(s):
     # would leave the 0.16 mm stub start 0.21 mm off the line copper, i.e. disconnected)
     rf(OUT, [(C_OUT, "@" + OUT), (XO, ys)], f"{OUT[1:]} drop")
     rf(OUT, [(XO, ys), (BW - 0.5, ys), (BW, my(YS + 0.5))], f"{OUT[1:]} output", ch=0.3)
-    RFPOLY.append((blk.track(OUT, W, [ds, (XO, ds[1])], name=f"{D} stub"), W))
+    RFPOLY.append((blk.track(OUT, W, [ds, (ds[0], ys)], name=f"{D} stub"), W))
     q_st, l_st = blk.tline(TL, [(XO, ys), (XO - L_STUB, ys)], W)
     RFPOLY.append((q_st, W))
     RF[OUT] = W
@@ -196,11 +198,11 @@ def chain(s):
     gv(gx - 0.6, gy)
     # clamp GND pins -> one via each, beyond the pad (none in a pad)
     x, y = blk.pad(D, pin_g1)
-    blk.track("GND", W_GND, [(x, y), (x - 0.73, y)])
-    gv(x - 0.73, y)
+    blk.track("GND", W_GND, [(x, y), (x, y + s * 0.62)])
+    gv(x, y + s * 0.62)
     x, y = blk.pad(D, "3")
-    blk.track("GND", W_GND, [(x, y), (x, y - s * 0.65)])
-    gv(x, y - s * 0.65)
+    blk.track("GND", W_GND, [(x, y), (x - 0.65, y)])
+    gv(x - 0.65, y)
     # shunt GND vias inside the U at the line level, east of their pads (the bias-tee choke on B is above them)
     x, y = blk.pad(RS2, "@GND")
     blk.track("GND", W_GND, [(x, y), (x, yl), (x + 0.5, yl)])
@@ -297,7 +299,7 @@ def chain(s):
     # vias (they sit right under the cap pads' ends), chain K (whose tab lies on the far side) own vias.
     P5 = "/+5V1"
     pg = blk.pad(FBG, "2")
-    vbg = (pg[0] - 0.55, pg[1])
+    vbg = (pg[0] - 0.62, pg[1])                          # hole edge 0.2 mm from the bead pad
     blk.track(n_gbias, 0.4, [pg, vbg])
     blk.via(*vbg, n_gbias)
     two(LG, XO + 1.05, pg[1] - s * 1.075, NS("S"), n_gbias, side="B")
@@ -497,6 +499,10 @@ for fp_ in blk.fps.values():                 # reference designators hidden on F
         t_.SetLayer(fab)
         t_.SetTextSize(pcbnew.VECTOR2I(bl.mm(0.3), bl.mm(0.3)))
         t_.SetTextThickness(bl.mm(0.05))
+    if fp_.GetReference() in ("D402", "D403"):   # SOT-323 outline lines cross the stub's net-tie pad: silk -> Fab
+        for g_ in fp_.GraphicalItems():
+            if g_.GetLayer() == pcbnew.F_SilkS:
+                g_.SetLayer(pcbnew.F_Fab)
     for g_ in fp_.GraphicalItems():           # the library's ${REFERENCE} copy on Fab
         if g_.GetClass() in ("FP_TEXT", "PCB_TEXT") and g_.GetLayer() in (pcbnew.F_Fab, pcbnew.B_Fab):
             g_.SetTextSize(pcbnew.VECTOR2I(bl.mm(0.3), bl.mm(0.3)))

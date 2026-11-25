@@ -1,6 +1,59 @@
 # Block "phase": trigger front chain and 16-tap phase delay line
 Run `python3 gen_phase.py [--render]` → `phase.kicad_pcb`, `phase.ifaces.json`, `phase.png`, `phase_detail.png` (taps 0-2), `front_chain_detail.png` (local x 0-30).
-**Size**: 99.5 x 22.5 mm at board (0, 22.5). pstrobe rectangle kept free: local x 9.5-26.5, y 2.5-22.5 except the corridor y 12-18. 183 parts (trigger_phase sheet + J102, R122, and C615 / C620 from the power sheet).
+**Size**: 99.5 x 22.5 mm at board (0, 22.5). pstrobe rectangle kept free: local x 9.5-26.5, y 2.5-22.5 except the corridor y 12-18. 189 parts (trigger_phase sheet + J102, R122, and C615 / C620 from the power sheet).
+
+## BOM review 2 (25 Nov 2026, SPEC decisions 27-34; netlist `kicad/export/scope-fe.net` regenerated)
+Netlist changes in this block: U301 TMUX136 (+ R302-R305, C301-C303, TP301, VSW_GND) and U304 SN65LVDS2 removed; added the
+trigger selector D317-D320 (2 x 2 BAT15-04W SOT-323), Q301 SS8550 / Q302 MMBT3904 (SOT-23), R386-R394 and U313 COS3502
+(SOIC-8, COARSE receiver); C313 now decouples U313 pin 8 and C310 is the line-driver bias-tee cold capacitor (roles of the
+two 100 n swapped by the schematic numbering); value changes C314-C345 (C76912), R307-R309 100 R, R378 / R379 49.9 R,
+R384 10k, R385 3.3k (no layout effect). check_board: 0 missing / extra / footprint / value / pad-net.
+
+**Front column re-laid (x 0-9.5; outline, interfaces and the corridor / tap row unchanged):**
+- Switch (RF, all on F.Cu, 0.16 mm = 50.2 R, no via in any signal path): D320 (EXT b, rot 0) and D318 (signal b, rot 180)
+  side by side, pins 3 facing across a 1.40 mm Y bar (TRIG_IN), Y stub 1.95 mm straight down into U302 pin 5 (IN+).
+  The two b packages are a copper mirror about the Y node (x 6.09). D317 (signal a) above D318 takes BUF_OUT_T at pin 3
+  (5.57 mm from the interface, was 4.63 to U301); D319 (EXT a) west of D320 takes EXT_CLK at pin 3 (11.10 mm from J102,
+  was 6.40 to U301). T / B traces: B1 1.35, T1 3.69, T2 4.09, B2 1.95 mm (same-side SOT-323 pairs cannot face each other
+  without a crossing, so one trace of each bridge runs through the other package's body channel; the two branches of a
+  bridge are parallel paths, a 2 mm difference puts the first notch above 40 GHz).
+- Pad compensation (rule as BIASTEE-5 / pstrobe): pins 3 of D317-D320 have 78 fF excess each over the 0.16 mm line ->
+  L2 cut of the pad size + L3 no-track / no-via area. T / B pads keep solid L2 (bom2-trigger.md: ground continuous under
+  the bridges).
+- R301 / R122 (EXT_CLK 49.9 R, R122 DNP) sit with a pad ON the down leg of EXT_CLK (x 5.15, 2.1 / 3.0 mm from the SMA
+  pin), one shared GND via. Decision: the termination stays near the SMA (as with the TMUX136) instead of "at D319 pin 3"
+  (bom2-trigger.md): there is no room for a shunt + GND via at pin 3 between the SMA courtyard and the bridge; the line
+  behind it is doubly matched up to the 500 R bridge as before (11 mm instead of 6.4 mm).
+- Feeds R391-R394 (1 k) on B, each on a via in the middle of its T / B trace (via in a trace, not in a pad; hole edge
+  >= 0.15 mm from every pad). Their far ends, R387 / R390 (west) and the drive meet on L3 (block In2): SW_S / SW_SB are
+  static bias lines with no capacitor (bom2-trigger.md asks for L3). Drive on B in the north of the column: Q301 / Q302
+  rot 90 stacked (x 4.7-8.1), R386 / R389 / R388 in a column east of them, TRIG_SEL keeps its B lane x 9.25 from the S
+  interface. The only via within 1 mm of BUF_OUT_T is the -2V5 via of R389 / Q302 (0.43 mm edge to edge).
+- U302 TLV3801 and its CMP_P / CMP_N network (R306, R311 / R312, C308 / C312, R310) keep their relative geometry,
+  moved 2.2 mm west and 3.6 mm south (U302 at (5.34, 12.2)). RFIN (7.98 mm, was 5.58) runs east under C312 / R310 and
+  climbs at 45 degrees into U303 pin 2. U302 +2V5: pins 6 / 7 -> one via -> C615 1 u (north), C305 100 n (east),
+  C306 100 n (west, moved here from the north strip) on B, each with its own GND via; VEE / C620 / C307 as before.
+- U313 COS3502 on B under the south of the column (x 0.5-7.9, y 17-22.4): a slow logic-level receiver (COARSE valid to
+  60 MHz), so B per rule 8; C313 at pin 8 with its +3V3 / GND vias behind it. Inputs from R311 / R312 (top, at the U302
+  lines) through a via each and two B lanes; COARSE leaves pin 7 west, runs up x 0.4 and under the SMA's south pad to the
+  unchanged interface (4.45, 0) (TP303 on it).
+- Level network (R383-R385, C304, TP302) now on top south of RFIN; TRIG_LEVEL from the U302 pin-4 via on L3, DAC_TRIG
+  from the S interface through one via.
+- J102: the outer via row of the south ground pad is gone (EXT_CLK passes 0.32 mm below that pad); the inner rows of
+  both pads stay. Stitching via (6.5, 17.3) removed (on the new RFIN / U313 lanes).
+
+**Interface changes:** none (positions, layers, widths; `phase.ifaces.json` identical). Board-level notes for the
+integrator: L3 (In2) now carries block tracks in the column (SW_S / SW_SB x 2-9.4, y 0.6-12.75; TRIG_LEVEL x 6.6-8.75,
+y 14-19.3); the +2V5 branch into the column now lands on the U302 / Q301 / R390 vias (no C306 / U301 in the north strip);
+-2V5 islands: U302 EP via, VMN (7.40, 4.52), VM (6.85, 8.30), R384 and R387 vias.
+
+**Checks (25 Nov 2026):** check_board 0 in every class (missing / extra / footprint / value / pad-net / clearance /
+corners / off-axis exits / RF width / RF pour gap / courtyards); unrouted only +3V3 (11), +2V5 (2), -2V5 (4), plane-fed.
+Nightly DRC jlc4: `total 257: error 18, warning 239` = 17 unconnected_items (+3V3 / +2V5 / -2V5 plane-fed), 1
+invalid_outline, 35 via_dangling (supply vias, TAP8-15 interface vias), 15 track_dangling (interface stubs, VTH rails),
+189 lib_footprint_*; 0 courtyard / clearance / track-width / hole / silk. via_in_pad.py: FAIL 0. decap_audit on the
+block: only the known U310 D2p. Renders looked at: `front_chain_detail.png`, `phase.png`, scratch crops of the switch on
+F, B and L3 and of the south of the column.
 
 ## Validation fixes (24 Nov 2026)
 Existing capacitors moved; no part added. Outline and every interface position unchanged.
@@ -41,7 +94,7 @@ Existing capacitors moved; no part added. Outline and every interface position u
 - check_board: 0 missing / extra / footprint / value / pad-net / no-net, 0 clearance, 0 corners, 0 off-axis pad exits, 0 RF width, 0 RF pour gap, 0 courtyard overlaps. Unrouted only +3V3 (10), +2V5 (1), -2V5 (3).
 - Renders `phase.png` and `front_chain_detail.png`, plus scratch close-ups of U301 / U302 and the tap cells, were looked at.
 
-## Front chain (all RF on F.Cu, 50 R = 0.16 mm on the 6-layer stack-up, no vias in the signal path)
+## Front chain (before BOM review 2; superseded by the section above for the column x 0-9.5)
 - Column x 0-9.5: J102 (corner, y 4) → R301 / R122 shunts north of the line (staggered, 0.94 mm) → U301 TMUX136 (rot 270; BUF_OUT_T straight down into pin 1, EXT_CLK into pin 3) → COM1 1.7 mm straight → U302 TLV3801 → CMP_P / CMP_N straight down through R306, R311 / R312 taps, C308 / C312; R310 terminates CMP_N. U304 LVDS2 west of the taps.
 - Corridor on the axis: C308 → RFIN → U303 TRF37D73 → FB301 (pad on the line) → C311 → pi pad R307 / R308 / R309 (shunts north) → 50 R launch (0.16) → 0.10 mm step 1.6 mm before tap 0.
 - Bias tee: FB301 pad 2 → via pair → (B track) L302 47 uH on B (along the axis, 1.1 mm east of the vias) with R382 beside it (B) → C313 at the cold pad (B) → +3V3 via pair beyond C313.

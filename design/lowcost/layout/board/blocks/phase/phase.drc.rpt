@@ -1,8 +1,8 @@
 ** Drc report for phase.kicad_pcb **
-** Created on 2026-11-25T01:04:30 **
+** Created on 2026-11-25T01:11:29 **
 ** Report includes: Errors, Warnings, Exclusions **
 
-** Found 243 DRC violations **
+** Found 240 DRC violations **
 [invalid_outline]: Board has malformed outline (no edges found on Edge.Cuts layer)
     Local override; error
     @(0.0000 mm, 0.0000 mm): PCB
@@ -14,12 +14,6 @@
     @(126.5000 mm, 117.7500 mm): Track [/PSTRB_K] on F.Cu, length 4.2240 mm
 [track_dangling]: Track has unconnected end
     Local override; warning
-    @(101.4000 mm, 121.6100 mm): Track [GND] on F.Cu, length 0.5900 mm
-[track_dangling]: Track has unconnected end
-    Local override; warning
-    @(101.4000 mm, 121.5550 mm): Track [GND] on B.Cu, length 0.6450 mm
-[track_dangling]: Track has unconnected end
-    Local override; warning
     @(128.6840 mm, 105.2500 mm): Track [/trigger_phase/VTH1] on F.Cu, length 30.2240 mm
 [track_dangling]: Track has unconnected end
     Local override; warning
@@ -29,10 +23,49 @@
     @(128.9840 mm, 101.4250 mm): Track [/TAP0] on B.Cu, length 1.4250 mm
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
-    @(172.8540 mm, 104.5000 mm): Via [+3V3] on F.Cu - B.Cu
+    @(118.3000 mm, 116.8500 mm): Via [+3V3] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
     @(107.0000 mm, 122.2550 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(172.8540 mm, 104.5000 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(179.8820 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(188.9100 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(143.7700 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(125.7140 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(111.3000 mm, 113.5500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(118.3000 mm, 117.4500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(134.7420 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(134.7420 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(110.7500 mm, 113.5500 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(125.7140 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(161.8260 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(143.7700 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
     @(161.8260 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
@@ -41,55 +74,16 @@
     @(152.7980 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
-    @(118.3000 mm, 116.8500 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(188.9100 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(125.7140 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(179.8820 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(161.8260 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(100.9650 mm, 115.8250 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(188.9100 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
+    @(179.8820 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
     @(152.7980 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
-    @(118.3000 mm, 117.4500 mm): Via [+3V3] on F.Cu - B.Cu
+    @(188.9100 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
-    @(111.3000 mm, 113.5500 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(134.7420 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(125.7140 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(134.7420 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(143.7700 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(110.7500 mm, 113.5500 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(143.7700 mm, 101.1050 mm): Via [+3V3] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(179.8820 mm, 101.7550 mm): Via [+3V3] on F.Cu - B.Cu
+    @(100.9650 mm, 115.8250 mm): Via [+3V3] on F.Cu - B.Cu
 [track_dangling]: Track has unconnected end
     Local override; warning
     @(139.2820 mm, 101.4250 mm): Track [/TAP3] on B.Cu, length 1.4250 mm
@@ -140,25 +134,22 @@
     @(108.7900 mm, 100.0000 mm): Track [/BUF_OUT_T] on F.Cu, length 3.6500 mm
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
-    @(103.0000 mm, 122.2000 mm): Via [-2V5] on F.Cu - B.Cu
+    @(102.7000 mm, 114.1200 mm): Via [-2V5] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
     @(107.4000 mm, 104.4900 mm): Via [-2V5] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
+    @(103.0000 mm, 122.2000 mm): Via [-2V5] on F.Cu - B.Cu
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
     @(106.8500 mm, 108.3000 mm): Via [-2V5] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
-    @(102.7000 mm, 114.1200 mm): Via [-2V5] on F.Cu - B.Cu
-[track_dangling]: Track has unconnected end
-    Local override; warning
-    @(101.0000 mm, 119.7500 mm): Track [/trigger_phase/TRIG_LEVEL] on F.Cu, length 7.5000 mm
+    @(101.3900 mm, 114.0100 mm): Via [+2V5] on F.Cu - B.Cu
 [via_dangling]: Via is not connected or connected on only one layer
     Local override; warning
     @(105.3000 mm, 101.2000 mm): Via [+2V5] on F.Cu - B.Cu
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(101.3900 mm, 114.0100 mm): Via [+2V5] on F.Cu - B.Cu
 [track_dangling]: Track has unconnected end
     Local override; warning
     @(104.4500 mm, 107.6000 mm): Track [/COARSE] on B.Cu, length 7.6000 mm
@@ -167,581 +158,573 @@
     @(109.2500 mm, 122.5000 mm): Track [/TRIG_SEL] on B.Cu, length 18.7900 mm
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(174.5470 mm, 112.2500 mm): Footprint R353
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(106.2000 mm, 121.1000 mm): Footprint C304
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(188.0890 mm, 117.7500 mm): Footprint R366
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(126.4140 mm, 101.6750 mm): Footprint C346
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(133.9210 mm, 119.9850 mm): Footprint C356
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
     @(103.0000 mm, 121.1000 mm): Footprint R384
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(170.0330 mm, 112.2500 mm): Footprint R349
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(136.5550 mm, 112.2500 mm): Footprint R323
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(146.5230 mm, 112.7300 mm): Footprint C322
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(147.4630 mm, 112.2500 mm): Footprint R329
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(191.6630 mm, 112.7300 mm): Footprint C342
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(186.2090 mm, 117.7500 mm): Footprint R368
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(183.5750 mm, 117.7500 mm): Footprint R362
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(173.6070 mm, 117.2700 mm): Footprint C335
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(173.6070 mm, 112.7300 mm): Footprint C334
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(133.9810 mm, 115.0000 mm): Footprint D302
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(188.0890 mm, 112.2500 mm): Footprint R365
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(163.6390 mm, 117.7500 mm): Footprint R348
-[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
-    Local override; warning
-    @(165.7310 mm, 105.2500 mm): Footprint U309
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(160.0650 mm, 117.2700 mm): Footprint C329
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(192.6030 mm, 112.2500 mm): Footprint R369
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(169.0930 mm, 117.2700 mm): Footprint C333
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(129.4070 mm, 117.7500 mm): Footprint R314
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(192.6030 mm, 117.7500 mm): Footprint R370
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(195.2370 mm, 112.2500 mm): Footprint R375
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(129.4670 mm, 115.0000 mm): Footprint D301
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(128.4670 mm, 117.2700 mm): Footprint C315
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(118.6800 mm, 114.4900 mm): Footprint R309
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(155.5510 mm, 112.7300 mm): Footprint C326
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(138.4950 mm, 115.0000 mm): Footprint D303
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(138.4350 mm, 112.2500 mm): Footprint R321
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(104.5900 mm, 116.5900 mm): Footprint C312
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(141.0690 mm, 117.7500 mm): Footprint R328
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(162.5260 mm, 101.6750 mm): Footprint C350
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(127.5270 mm, 117.7500 mm): Footprint R316
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(177.1810 mm, 117.7500 mm): Footprint R360
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(163.6390 mm, 112.2500 mm): Footprint R347
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(170.0930 mm, 115.0000 mm): Footprint D310
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(142.0090 mm, 117.2700 mm): Footprint C321
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(107.7900 mm, 109.3000 mm): Footprint D318
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(165.5190 mm, 117.7500 mm): Footprint R346
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(135.4420 mm, 101.6750 mm): Footprint C347
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(178.1210 mm, 112.7300 mm): Footprint C336
-[lib_footprint_issues]: Footprint 'SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount' not found in library 'Connector_Coaxial'
-    Local override; warning
-    @(102.1000 mm, 104.0000 mm): Footprint J102
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(178.1210 mm, 117.2700 mm): Footprint C337
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(155.5510 mm, 117.2700 mm): Footprint C327
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(197.1770 mm, 115.0000 mm): Footprint D316
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(195.2370 mm, 117.7500 mm): Footprint R376
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(187.1490 mm, 117.2700 mm): Footprint C341
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(198.4340 mm, 118.2600 mm): Footprint R378
-[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
-    Local override; warning
-    @(174.7590 mm, 105.2500 mm): Footprint U310
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(103.5700 mm, 116.5900 mm): Footprint C308
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(141.0690 mm, 112.2500 mm): Footprint R327
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(128.4670 mm, 112.7300 mm): Footprint C314
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(174.6070 mm, 115.0000 mm): Footprint D311
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(145.5830 mm, 117.7500 mm): Footprint R332
-[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
-    Local override; warning
-    @(147.6750 mm, 105.2500 mm): Footprint U307
+    @(190.7230 mm, 117.7500 mm): Footprint R372
 [lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
     Local override; warning
     @(147.5230 mm, 115.0000 mm): Footprint D305
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(197.1170 mm, 117.7500 mm): Footprint R374
-[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
-    Local override; warning
-    @(129.6190 mm, 105.2500 mm): Footprint U305
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(132.0410 mm, 117.7500 mm): Footprint R320
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(105.6300 mm, 107.0400 mm): Footprint R122
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(156.5510 mm, 115.0000 mm): Footprint D307
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(168.1530 mm, 117.7500 mm): Footprint R352
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(132.9810 mm, 117.2700 mm): Footprint C317
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(181.6950 mm, 117.7500 mm): Footprint R364
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(154.6110 mm, 117.7500 mm): Footprint R340
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(181.6950 mm, 112.2500 mm): Footprint R363
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(101.3900 mm, 109.7000 mm): Footprint D319
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(104.3900 mm, 109.3000 mm): Footprint D320
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(151.0370 mm, 117.2700 mm): Footprint C325
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(117.2700 mm, 115.0000 mm): Footprint R308
-[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
-    Local override; warning
-    @(192.8150 mm, 105.2500 mm): Footprint U312
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(133.9210 mm, 112.2500 mm): Footprint R317
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(137.4950 mm, 112.7300 mm): Footprint C318
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(142.9490 mm, 112.2500 mm): Footprint R325
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(161.0050 mm, 117.7500 mm): Footprint R342
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(110.0500 mm, 113.0700 mm): Footprint C309
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
     @(172.6670 mm, 112.2500 mm): Footprint R355
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(153.4980 mm, 101.6750 mm): Footprint C349
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(171.5540 mm, 101.6750 mm): Footprint C351
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(160.0650 mm, 112.7300 mm): Footprint C328
-[lib_footprint_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
-    Local override; warning
-    @(105.3400 mm, 112.2000 mm): Footprint U302
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(151.9770 mm, 117.7500 mm): Footprint R334
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(150.0970 mm, 117.7500 mm): Footprint R336
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(169.0930 mm, 112.7300 mm): Footprint C332
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(132.9810 mm, 112.7300 mm): Footprint C316
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(136.5550 mm, 117.7500 mm): Footprint R324
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(142.9490 mm, 117.7500 mm): Footprint R326
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(105.9800 mm, 117.0700 mm): Footprint R310
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(164.5790 mm, 112.7300 mm): Footprint C330
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(114.4700 mm, 115.0000 mm): Footprint C311
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(179.0610 mm, 112.2500 mm): Footprint R357
-[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
-    Local override; warning
-    @(138.6470 mm, 105.2500 mm): Footprint U306
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(165.5190 mm, 112.2500 mm): Footprint R345
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(197.1170 mm, 112.2500 mm): Footprint R373
+    @(141.0690 mm, 112.2500 mm): Footprint R327
 [lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
     Local override; warning
-    @(161.0650 mm, 115.0000 mm): Footprint D308
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(137.4950 mm, 117.2700 mm): Footprint C319
+    @(174.6070 mm, 115.0000 mm): Footprint D311
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(168.1530 mm, 112.2500 mm): Footprint R351
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(190.7230 mm, 112.2500 mm): Footprint R371
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(159.1250 mm, 117.7500 mm): Footprint R344
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(196.1770 mm, 112.7300 mm): Footprint C344
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(179.0610 mm, 117.7500 mm): Footprint R358
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(145.5830 mm, 112.2500 mm): Footprint R331
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(164.5790 mm, 117.2700 mm): Footprint C331
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(142.0090 mm, 112.7300 mm): Footprint C320
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(132.0410 mm, 112.2500 mm): Footprint R319
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(151.9770 mm, 112.2500 mm): Footprint R333
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(138.4350 mm, 117.7500 mm): Footprint R322
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(187.1490 mm, 112.7300 mm): Footprint C340
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(156.4910 mm, 117.7500 mm): Footprint R338
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(103.0600 mm, 115.2100 mm): Footprint R311
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(196.1770 mm, 117.2700 mm): Footprint C345
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(188.0890 mm, 119.9850 mm): Footprint C357
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(133.9210 mm, 117.7500 mm): Footprint R318
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(191.6630 mm, 117.2700 mm): Footprint C343
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(147.4630 mm, 117.7500 mm): Footprint R330
-[lib_footprint_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
-    Local override; warning
-    @(111.0000 mm, 115.2500 mm): Footprint U303
+    @(198.4340 mm, 118.2600 mm): Footprint R378
 [lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
     Local override; warning
-    @(179.1210 mm, 115.0000 mm): Footprint D312
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(172.6670 mm, 117.7500 mm): Footprint R356
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(143.0090 mm, 115.0000 mm): Footprint D304
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(127.5270 mm, 112.2500 mm): Footprint R315
+    @(165.5790 mm, 115.0000 mm): Footprint D309
 [lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
     Local override; warning
     @(189.6100 mm, 101.6750 mm): Footprint C353
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(115.8600 mm, 114.4900 mm): Footprint R307
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(129.4070 mm, 112.2500 mm): Footprint R313
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(150.0970 mm, 112.2500 mm): Footprint R335
+    @(177.1810 mm, 117.7500 mm): Footprint R360
 [lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
     Local override; warning
-    @(156.7030 mm, 105.2500 mm): Footprint U308
+    @(192.8150 mm, 105.2500 mm): Footprint U312
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(177.1810 mm, 112.2500 mm): Footprint R359
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(188.1490 mm, 115.0000 mm): Footprint D314
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(182.6350 mm, 112.7300 mm): Footprint C338
+    @(136.5550 mm, 112.2500 mm): Footprint R323
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(198.4340 mm, 111.7400 mm): Footprint R379
-[lib_footprint_mismatch]: Footprint 'TestPoint_Pad_D1.0mm' does not match copy in library 'TestPoint'
-    Local override; warning
-    @(108.4500 mm, 121.4500 mm): Footprint TP302
+    @(129.4070 mm, 117.7500 mm): Footprint R314
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(154.6110 mm, 112.2500 mm): Footprint R339
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(101.4000 mm, 121.1000 mm): Footprint R385
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(108.1400 mm, 106.3000 mm): Footprint D317
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(180.5820 mm, 101.6750 mm): Footprint C352
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(104.6000 mm, 121.1000 mm): Footprint R383
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(151.0370 mm, 112.7300 mm): Footprint C324
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(174.5470 mm, 117.7500 mm): Footprint R354
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(182.6350 mm, 117.2700 mm): Footprint C339
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(146.5230 mm, 117.2700 mm): Footprint C323
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(165.5790 mm, 115.0000 mm): Footprint D309
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(190.7230 mm, 117.7500 mm): Footprint R372
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(159.1250 mm, 112.2500 mm): Footprint R343
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(186.2090 mm, 112.2500 mm): Footprint R367
-[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
-    Local override; warning
-    @(183.7870 mm, 105.2500 mm): Footprint U311
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(188.0890 mm, 110.0150 mm): Footprint C359
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(152.0370 mm, 115.0000 mm): Footprint D306
-[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(192.6630 mm, 115.0000 mm): Footprint D315
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(183.5750 mm, 112.2500 mm): Footprint R361
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(161.0050 mm, 112.2500 mm): Footprint R341
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(170.0330 mm, 117.7500 mm): Footprint R350
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(104.0800 mm, 114.2700 mm): Footprint R306
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(156.4910 mm, 112.2500 mm): Footprint R337
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(133.9210 mm, 110.0150 mm): Footprint C358
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(144.4700 mm, 101.6750 mm): Footprint C348
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(198.5700 mm, 116.8000 mm): Footprint R377
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(105.1000 mm, 115.2100 mm): Footprint R312
+    @(142.9490 mm, 112.2500 mm): Footprint R325
 [lib_footprint_mismatch]: Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'
     Local override; warning
     @(113.0800 mm, 115.4850 mm): Footprint FB301
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(128.4670 mm, 112.7300 mm): Footprint C314
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(170.0330 mm, 112.2500 mm): Footprint R349
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(196.1770 mm, 112.7300 mm): Footprint C344
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(191.6630 mm, 117.2700 mm): Footprint C343
 [lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
     Local override; warning
     @(183.6350 mm, 115.0000 mm): Footprint D313
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
+    @(181.6950 mm, 117.7500 mm): Footprint R364
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(101.3900 mm, 109.7000 mm): Footprint D319
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(133.9210 mm, 119.9850 mm): Footprint C356
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(133.9210 mm, 117.7500 mm): Footprint R318
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(152.0370 mm, 115.0000 mm): Footprint D306
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(180.5820 mm, 101.6750 mm): Footprint C352
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(182.6350 mm, 112.7300 mm): Footprint C338
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(179.1210 mm, 115.0000 mm): Footprint D312
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(127.5270 mm, 112.2500 mm): Footprint R315
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(129.4070 mm, 112.2500 mm): Footprint R313
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(151.0370 mm, 117.2700 mm): Footprint C325
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(146.5230 mm, 117.2700 mm): Footprint C323
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(198.4340 mm, 111.7400 mm): Footprint R379
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(101.4000 mm, 121.1000 mm): Footprint R385
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(182.6350 mm, 117.2700 mm): Footprint C339
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(133.9210 mm, 112.2500 mm): Footprint R317
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(186.2090 mm, 112.2500 mm): Footprint R367
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(188.0890 mm, 110.0150 mm): Footprint C359
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(160.0650 mm, 112.7300 mm): Footprint C328
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(150.0970 mm, 117.7500 mm): Footprint R336
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(105.1000 mm, 115.2100 mm): Footprint R312
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(147.4630 mm, 112.2500 mm): Footprint R329
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(127.5270 mm, 117.7500 mm): Footprint R316
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(141.0690 mm, 117.7500 mm): Footprint R328
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(155.5510 mm, 117.2700 mm): Footprint C327
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(183.5750 mm, 117.7500 mm): Footprint R362
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(164.5790 mm, 117.2700 mm): Footprint C331
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(192.6030 mm, 117.7500 mm): Footprint R370
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(156.4910 mm, 117.7500 mm): Footprint R338
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(170.0330 mm, 117.7500 mm): Footprint R350
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(181.6950 mm, 112.2500 mm): Footprint R363
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(178.1210 mm, 117.2700 mm): Footprint C337
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(198.5700 mm, 116.8000 mm): Footprint R377
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(195.2370 mm, 117.7500 mm): Footprint R376
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(129.4670 mm, 115.0000 mm): Footprint D301
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(138.4350 mm, 117.7500 mm): Footprint R322
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(104.3900 mm, 109.3000 mm): Footprint D320
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(136.5550 mm, 117.7500 mm): Footprint R324
+[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
+    Local override; warning
+    @(183.7870 mm, 105.2500 mm): Footprint U311
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(103.5700 mm, 116.5900 mm): Footprint C308
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(108.1400 mm, 106.3000 mm): Footprint D317
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(156.4910 mm, 112.2500 mm): Footprint R337
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(178.1210 mm, 112.7300 mm): Footprint C336
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(168.1530 mm, 112.2500 mm): Footprint R351
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(105.9800 mm, 117.0700 mm): Footprint R310
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(195.2370 mm, 112.2500 mm): Footprint R375
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(156.5510 mm, 115.0000 mm): Footprint D307
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(142.0090 mm, 112.7300 mm): Footprint C320
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(115.8600 mm, 114.4900 mm): Footprint R307
+[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
+    Local override; warning
+    @(156.7030 mm, 105.2500 mm): Footprint U308
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(186.2090 mm, 117.7500 mm): Footprint R368
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(187.1490 mm, 117.2700 mm): Footprint C341
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(188.0890 mm, 112.2500 mm): Footprint R365
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(147.4630 mm, 117.7500 mm): Footprint R330
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(192.6630 mm, 115.0000 mm): Footprint D315
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(171.5540 mm, 101.6750 mm): Footprint C351
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(133.9210 mm, 110.0150 mm): Footprint C358
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(197.1170 mm, 112.2500 mm): Footprint R373
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(106.2000 mm, 121.1000 mm): Footprint C304
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(110.0500 mm, 113.0700 mm): Footprint C309
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(105.6300 mm, 107.0400 mm): Footprint R122
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(155.5510 mm, 112.7300 mm): Footprint C326
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(169.0930 mm, 117.2700 mm): Footprint C333
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(117.2700 mm, 115.0000 mm): Footprint R308
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(144.4700 mm, 101.6750 mm): Footprint C348
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(142.0090 mm, 117.2700 mm): Footprint C321
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(172.6670 mm, 117.7500 mm): Footprint R356
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(132.9810 mm, 117.2700 mm): Footprint C317
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(138.4350 mm, 112.2500 mm): Footprint R321
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(114.4700 mm, 115.0000 mm): Footprint C311
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(183.5750 mm, 112.2500 mm): Footprint R361
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(143.0090 mm, 115.0000 mm): Footprint D304
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(126.4140 mm, 101.6750 mm): Footprint C346
+[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
+    Local override; warning
+    @(147.6750 mm, 105.2500 mm): Footprint U307
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(179.0610 mm, 112.2500 mm): Footprint R357
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(188.0890 mm, 119.9850 mm): Footprint C357
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(159.1250 mm, 112.2500 mm): Footprint R343
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(160.0650 mm, 117.2700 mm): Footprint C329
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(159.1250 mm, 117.7500 mm): Footprint R344
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(151.9770 mm, 117.7500 mm): Footprint R334
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(151.0370 mm, 112.7300 mm): Footprint C324
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(161.0050 mm, 112.2500 mm): Footprint R341
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(145.5830 mm, 112.2500 mm): Footprint R331
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(170.0930 mm, 115.0000 mm): Footprint D310
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(192.6030 mm, 112.2500 mm): Footprint R369
+[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
+    Local override; warning
+    @(138.6470 mm, 105.2500 mm): Footprint U306
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(142.9490 mm, 117.7500 mm): Footprint R326
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(128.4670 mm, 117.2700 mm): Footprint C315
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(188.0890 mm, 117.7500 mm): Footprint R366
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(197.1770 mm, 115.0000 mm): Footprint D316
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(118.6800 mm, 114.4900 mm): Footprint R309
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(133.9810 mm, 115.0000 mm): Footprint D302
+[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
+    Local override; warning
+    @(174.7590 mm, 105.2500 mm): Footprint U310
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(154.6110 mm, 112.2500 mm): Footprint R339
+[lib_footprint_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    Local override; warning
+    @(111.0000 mm, 115.2500 mm): Footprint U303
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(188.1490 mm, 115.0000 mm): Footprint D314
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(154.6110 mm, 117.7500 mm): Footprint R340
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(153.4980 mm, 101.6750 mm): Footprint C349
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(132.0410 mm, 117.7500 mm): Footprint R320
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(163.6390 mm, 112.2500 mm): Footprint R347
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(165.5190 mm, 117.7500 mm): Footprint R346
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(197.1170 mm, 117.7500 mm): Footprint R374
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(187.1490 mm, 112.7300 mm): Footprint C340
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(191.6630 mm, 112.7300 mm): Footprint C342
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(165.5190 mm, 112.2500 mm): Footprint R345
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(190.7230 mm, 112.2500 mm): Footprint R371
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(174.5470 mm, 117.7500 mm): Footprint R354
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(104.6000 mm, 121.1000 mm): Footprint R383
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(163.6390 mm, 117.7500 mm): Footprint R348
+[lib_footprint_issues]: Footprint 'SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount' not found in library 'Connector_Coaxial'
+    Local override; warning
+    @(102.1000 mm, 104.0000 mm): Footprint J102
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(132.0410 mm, 112.2500 mm): Footprint R319
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(177.1810 mm, 112.2500 mm): Footprint R359
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(137.4950 mm, 117.2700 mm): Footprint C319
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(107.7900 mm, 109.3000 mm): Footprint D318
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(135.4420 mm, 101.6750 mm): Footprint C347
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(137.4950 mm, 112.7300 mm): Footprint C318
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(138.4950 mm, 115.0000 mm): Footprint D303
+[lib_footprint_issues]: Footprint 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm' not found in library 'Package_SON'
+    Local override; warning
+    @(105.3400 mm, 112.2000 mm): Footprint U302
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(161.0050 mm, 117.7500 mm): Footprint R342
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(196.1770 mm, 117.2700 mm): Footprint C345
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(104.5900 mm, 116.5900 mm): Footprint C312
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(151.9770 mm, 112.2500 mm): Footprint R333
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(169.0930 mm, 112.7300 mm): Footprint C332
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(174.5470 mm, 112.2500 mm): Footprint R353
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(104.0800 mm, 114.2700 mm): Footprint R306
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(168.1530 mm, 117.7500 mm): Footprint R352
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(132.9810 mm, 112.7300 mm): Footprint C316
+[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
+    Local override; warning
+    @(129.6190 mm, 105.2500 mm): Footprint U305
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(145.5830 mm, 117.7500 mm): Footprint R332
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(164.5790 mm, 112.7300 mm): Footprint C330
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(173.6070 mm, 117.2700 mm): Footprint C335
+[lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
+    Local override; warning
+    @(165.7310 mm, 105.2500 mm): Footprint U309
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(103.0600 mm, 115.2100 mm): Footprint R311
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(173.6070 mm, 112.7300 mm): Footprint C334
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(146.5230 mm, 112.7300 mm): Footprint C322
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(179.0610 mm, 117.7500 mm): Footprint R358
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
     @(105.6300 mm, 106.1000 mm): Footprint R301
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(104.4300 mm, 111.3500 mm): Footprint C306
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(108.5700 mm, 102.9000 mm): Footprint R386
+    @(150.0970 mm, 112.2500 mm): Footprint R335
+[lib_footprint_mismatch]: Footprint 'TestPoint_Pad_D1.0mm' does not match copy in library 'TestPoint'
+    Local override; warning
+    @(108.4500 mm, 121.4500 mm): Footprint TP302
 [lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
     Local override; warning
-    @(159.7920 mm, 104.9750 mm): Footprint C354
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    @(162.5260 mm, 101.6750 mm): Footprint C350
+[lib_footprint_mismatch]: Footprint 'SOT-323_SC-70' does not match copy in library 'Package_TO_SOT_SMD'
     Local override; warning
-    @(108.5000 mm, 109.5000 mm): Footprint R392
+    @(161.0650 mm, 115.0000 mm): Footprint D308
+[lib_footprint_mismatch]: Footprint 'TestPoint_Pad_D1.0mm' does not match copy in library 'TestPoint'
+    Local override; warning
+    @(198.1770 mm, 115.6130 mm): Footprint TP304
+[lib_footprint_mismatch]: Footprint 'SOT-23' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(106.4000 mm, 101.9200 mm): Footprint Q301
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(105.3400 mm, 109.3000 mm): Footprint C615
 [lib_footprint_mismatch]: Footprint 'SOIC-8_3.9x4.9mm_P1.27mm' does not match copy in library 'Package_SO'
     Local override; warning
     @(104.2000 mm, 119.6500 mm): Footprint U313
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(101.3900 mm, 110.9000 mm): Footprint R393
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(108.5700 mm, 104.8000 mm): Footprint R389
-[lib_footprint_mismatch]: Footprint 'SOT-23' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(106.4000 mm, 101.9200 mm): Footprint Q301
-[lib_footprint_mismatch]: Footprint 'TestPoint_Pad_D1.0mm' does not match copy in library 'TestPoint'
-    Local override; warning
-    @(198.1770 mm, 115.6130 mm): Footprint TP304
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(107.4900 mm, 109.4000 mm): Footprint R391
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(105.3400 mm, 109.3000 mm): Footprint C615
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
     @(102.7000 mm, 112.9900 mm): Footprint R387
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(101.3900 mm, 112.8300 mm): Footprint R390
-[lib_footprint_mismatch]: Footprint 'TestPoint_Pad_D1.0mm' does not match copy in library 'TestPoint'
-    Local override; warning
-    @(161.9290 mm, 104.9050 mm): Footprint TP305
 [lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
     Local override; warning
     @(105.8800 mm, 113.2300 mm): Footprint C307
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(108.5700 mm, 106.7000 mm): Footprint R388
+    @(108.5700 mm, 102.9000 mm): Footprint R386
 [lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
     Local override; warning
-    @(118.7800 mm, 116.2000 mm): Footprint C310
+    @(104.4300 mm, 111.3500 mm): Footprint C306
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(106.3000 mm, 110.8000 mm): Footprint C305
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(101.4450 mm, 116.4450 mm): Footprint C313
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(108.5000 mm, 109.5000 mm): Footprint R392
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(159.7920 mm, 104.9750 mm): Footprint C354
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(160.3020 mm, 106.4250 mm): Footprint R380
+[lib_footprint_mismatch]: Footprint 'SOT-23' does not match copy in library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(106.4000 mm, 105.8000 mm): Footprint Q302
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(101.3900 mm, 112.8300 mm): Footprint R390
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(101.3900 mm, 110.9000 mm): Footprint R393
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(108.5700 mm, 106.7000 mm): Footprint R388
+[lib_footprint_mismatch]: Footprint 'TestPoint_Pad_D1.0mm' does not match copy in library 'TestPoint'
+    Local override; warning
+    @(161.9290 mm, 104.9050 mm): Footprint TP305
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
     @(102.7000 mm, 111.1000 mm): Footprint R394
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
-    @(160.3020 mm, 106.4250 mm): Footprint R380
+    @(107.4900 mm, 109.4000 mm): Footprint R391
+[lib_footprint_mismatch]: Footprint 'TestPoint_Pad_D1.0mm' does not match copy in library 'TestPoint'
+    Local override; warning
+    @(101.0000 mm, 114.9500 mm): Footprint TP303
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(108.5700 mm, 104.8000 mm): Footprint R389
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(163.4020 mm, 106.4250 mm): Footprint R381
+[lib_footprint_mismatch]: Footprint 'L_1210_3225Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(115.5800 mm, 116.2000 mm): Footprint L302
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(118.7800 mm, 116.2000 mm): Footprint C310
 [lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
     Local override; warning
     @(115.5800 mm, 114.1500 mm): Footprint R382
 [lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
     Local override; warning
-    @(104.9400 mm, 113.2300 mm): Footprint C620
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
-    @(101.4450 mm, 116.4450 mm): Footprint C313
-[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
-    Local override; warning
     @(163.9120 mm, 104.9750 mm): Footprint C355
-[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
-    Local override; warning
-    @(163.4020 mm, 106.4250 mm): Footprint R381
-[lib_footprint_mismatch]: Footprint 'SOT-23' does not match copy in library 'Package_TO_SOT_SMD'
-    Local override; warning
-    @(106.4000 mm, 105.8000 mm): Footprint Q302
-[lib_footprint_mismatch]: Footprint 'TestPoint_Pad_D1.0mm' does not match copy in library 'TestPoint'
-    Local override; warning
-    @(101.0000 mm, 114.9500 mm): Footprint TP303
 [lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
     Local override; warning
-    @(106.3000 mm, 110.8000 mm): Footprint C305
-[lib_footprint_mismatch]: Footprint 'L_1210_3225Metric' does not match copy in library 'Inductor_SMD'
-    Local override; warning
-    @(115.5800 mm, 116.2000 mm): Footprint L302
+    @(104.9400 mm, 113.2300 mm): Footprint C620
 
-** Found 19 unconnected pads **
-[unconnected_items]: Missing connection between items
-    Local override; error
-    @(101.4000 mm, 121.6100 mm): Track [GND] on F.Cu, length 0.5900 mm
-    @(101.4000 mm, 121.5550 mm): Track [GND] on B.Cu, length 0.6450 mm
-[unconnected_items]: Missing connection between items
-    Local override; error
-    @(101.7250 mm, 121.5550 mm): Track [GND] on B.Cu, length 0.3250 mm
-    @(106.2000 mm, 121.5800 mm): Track [GND] on F.Cu, length 0.6200 mm
+** Found 17 unconnected pads **
 [unconnected_items]: Missing connection between items
     Local override; error
     @(101.7250 mm, 117.7450 mm): Pad 8 [+3V3] of U313 on B.Cu
@@ -756,23 +739,23 @@
     @(116.0900 mm, 114.1500 mm): Track [+3V3] on B.Cu, length 0.5700 mm
 [unconnected_items]: Missing connection between items
     Local override; error
-    @(126.4140 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 0.4000 mm
-    @(116.0900 mm, 114.1500 mm): Track [+3V3] on B.Cu, length 0.5700 mm
+    @(126.0140 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 0.4243 mm
+    @(116.6600 mm, 114.1500 mm): Track [+3V3] on B.Cu, length 0.4525 mm
 [unconnected_items]: Missing connection between items
     Local override; error
-    @(134.7420 mm, 101.8550 mm): Track [+3V3] on F.Cu, length 0.7500 mm
+    @(135.0420 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 0.4243 mm
     @(127.7140 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 1.3000 mm
 [unconnected_items]: Missing connection between items
     Local override; error
     @(136.7420 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 1.3000 mm
-    @(144.0700 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 0.4243 mm
+    @(143.7700 mm, 101.8550 mm): Track [+3V3] on F.Cu, length 0.7500 mm
 [unconnected_items]: Missing connection between items
     Local override; error
-    @(152.7980 mm, 101.8550 mm): Track [+3V3] on F.Cu, length 0.7500 mm
+    @(153.0980 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 0.4243 mm
     @(145.7700 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 1.3000 mm
 [unconnected_items]: Missing connection between items
     Local override; error
-    @(162.1260 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 0.4243 mm
+    @(161.8260 mm, 101.8550 mm): Track [+3V3] on F.Cu, length 0.7500 mm
     @(154.7980 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 1.3000 mm
 [unconnected_items]: Missing connection between items
     Local override; error
@@ -784,7 +767,7 @@
     @(172.8540 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 1.3000 mm
 [unconnected_items]: Missing connection between items
     Local override; error
-    @(188.9100 mm, 101.8550 mm): Track [+3V3] on F.Cu, length 0.7500 mm
+    @(189.2100 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 0.4243 mm
     @(181.8820 mm, 102.1550 mm): Track [+3V3] on F.Cu, length 1.3000 mm
 [unconnected_items]: Missing connection between items
     Local override; error

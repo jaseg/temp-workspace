@@ -1,6 +1,37 @@
 # Block "pstrobe": chains A (PH_STROBE_P -> R407 -> PSTRB_A) and K (PH_STROBE_N -> R411 -> PSTRB_K), six-layer
 `python3 gen_pstrobe.py [--norender]` (BL_STACKUP=6L, native 6-layer file; merge with `layer_map=None`). Outputs: `pstrobe.kicad_pcb`, `.ifaces.json`, `pstrobe.png`, `pstrobe_detail.png` (L1 red + L6 blue, inputs), `pstrobe_detail_L1L2.png`. Block 17 x 25 mm at board (9.5, 25.0); local = board - (9.5, 25.0); axis y 12.5; corridor y 9.5..15.5 (phase).
-Chain (each): 47 R -> 100 nF -> TRF37D73 + bias tee (bead on line, 47 uH 1210 on B beside the bead via, L4 via pair at cold cap) -> U-folded 10 dB pi pad (first shunt 0603) -> GVA-84+ + bias tee (2.2 uH on B beside the bead via, 1 nF + 100 nF at the cold pad, +5V1 via pair at the 100 nF) -> 100 nF -> launch T: 80 ps shorted stub (NT, GND via in NT pad 2 + one beside), DNP BAT15, output E. L6 under the chokes carries nothing else.
+Chain (each): 49.9 R -> 100 nF -> TRF37D73 + bias tee (bead on line, 1 uH 1008 on B beside the bead via, L4 via pair at cold cap) -> U-folded 10.7 dB pi pad (first shunt 0603) -> GVA-84+ + bias tee (1 uH 1008 on B, fed from the bead via on the bead row, 1 nF + 100 nF at the cold pad, +5V1 via pair at the 100 nF) -> 100 nF -> launch T: 80 ps shorted stub (NT, GND via in NT pad 2 + one beside), DNP half BAT15-04W, output E. L6 under the chokes carries nothing else.
+
+## BOM review 2 (25 Nov 2026, SPEC decisions 31 / 33; netlist regenerated)
+- **Removed:** R417 / R418 (1 k dampers across the TRF chokes): their B parts and tracks are gone.
+- **Chokes 1008 (1 uH DFE252012F-1R0M):** L403 / L405 (TRF tee, were 47 uH 1210) keep the bias pad 0.15 mm (ring)
+  from the bead via, centre 0.325 mm further west, cold-pad 100 nF C434 / C435 follows (courtyards 0.05 mm apart);
+  TP403 / TP405 0.23 mm closer. L404 / L406 (GVA tee, were 2.2 uH 0805): the 2.2 mm wide 1008 pads do not fit beside
+  the bead via as the 0805 did, so the bead pad 2 now goes west on F to its via (hole edge 0.2 mm from the bead pad)
+  and a B track runs east into the choke's bias pad on the bead row; the choke stands vertical in the strip east of the
+  GVA (courtyard x 14.3-17.0), cold pad away from the line -> C418 / C428 1 nF and C419 / C429 100 nF stacked west of it
+  (+5V1 via pair at the 100 nF as before). GND of the two caps: chain A into two GVA tab vias placed under the cap pad
+  ends (tab vias are allowed, EP_ALLOW); chain K (its tab is on the line's other side) own vias.
+- **D402 / D403 (DNP) half a BAT15-04W, SOT-323:** signal pin (D402 pin 2, D403 pin 1) on a 0.4 mm stub to the output
+  line 0.8 mm east of the launch node (the SOD-323 was 1.4 mm east, 0.3 mm stub); the other two pins to GND, one via each.
+  The 2.6 x 3.4 mm SOT-323 courtyard does not fit where the 1.9 x 3.2 mm SOD-323 stood (1.9 x 2.4 mm free east of the drop;
+  chain K's GVA tab fills the space west of it), so both clamps stand on the corridor side of their output line, rot 180
+  in both chains: a true mirror pair (the netlist puts the signal on pin 2 in A and pin 1 in K for this). Their
+  silkscreen outline is moved to Fab (it crossed the stub's net-tie pad).
+- Values only: R407 / R411 49.9 R, R408 / R412 (0603) and R409 / R413 120 R, R410 / R414 100 R.
+
+**Interface changes:** none (`pstrobe.ifaces.json` identical). **Boundary:** D402 / D403 and their GND vias reach into
+the phase corridor: courtyards local x 12.70-16.10, y 9.0-11.6 (A) and 13.4-16.0 (K), i.e. board x 22.2-25.6,
+y 34.0-36.6 / 38.4-41.0; pad and via copper ends at local y 11.80 / 13.20, 0.62 mm from the PH_LINE launch edge (board y
+37.5). The phase block places nothing there (only its F GND pour, which flows around the pads after the merge); their
+GND vias (board (22.25, 35.3), (24.9, 36.55), (22.25, 39.7), (24.9, 38.45)) are joined by the board's L2 / L5.
+
+**Checks (25 Nov 2026):** check_board 0 missing / extra / footprint / value / pad-net / clearance / corners / off-axis /
+RF width / RF pour gap / courtyard; unrouted +3V3 (3), /+5V1 (3) plane-fed, GND (5: the A / K islands and the four clamp
+vias in the corridor, joined by the board planes). Nightly DRC jlc4: `total 78: error 12, warning 66` = 11 unconnected
+(plane-fed / those GND islands), 1 invalid_outline, 16 via_dangling, 4 track_dangling (interface stubs), 46
+lib_footprint_*; 0 courtyard / clearance / width / hole / silk. via_in_pad.py: FAIL 0. Stub 80.00 ps, A/K output and
+input mismatch 0.0 um (unchanged). Renders `pstrobe.png`, `pstrobe_detail.png` looked at.
 
 ## Validation and netlist changes (24 Nov 2026)
 Outline and interface positions are unchanged. The supply interface `VBUS` is renamed **`/+5V1`**: the GVA-84+ tees, C418-C420 and C428-C430 are on +5V1 (TPS63802) in the netlist.
