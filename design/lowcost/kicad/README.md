@@ -228,8 +228,8 @@ ADC_REF_MID = VREF+ x 3.3k/13.3k = 0.720 V (R703 10k / R704 3.3k, JLC basic; was
 
 TRIG_SEL (PA1, unchanged pin): low / reset = signal bridge (D317 / D318) on, high = EXT_CLK bridge (D319 / D320); wait
 10 us after a change (SPEC 27). No MCU pin added by BOM review 2. Input LF/HF match: no trimmer; firmware calibrates it
-once from a 0.2-2 kHz square wave on SIG_IN (or PA9 via a clip lead) and corrects it in software (SPEC 28,
-`docs/research/bom2-input-taps.md` A).
+once from a 0.2-2 kHz square wave on SIG_IN (or PA9 via a clip lead) and corrects it in software (SPEC 28 / 35,
+`docs/research/bom2-input-taps.md` A, `sim/bom2_input/RESULT.md`: six fixed-time-constant terms, 0.29-0.55 % flat).
 
 USB: J601 is now a 16-pin USB 2.0 Type-C receptacle (HRO TYPE-C-31-M-12, LCSC C165948, price estimate) with both
 D+/D- pairs tied, 5.1k CC pull-downs as before, and a USBLC6-2SC6 ESD array U608 (LCSC C7519, may be left unfitted).
@@ -311,12 +311,20 @@ BUF_OUT_T, EXT_CLK keep their blocks); new nets inside phase: TRIG_IN (D318 / D3
 - **fpga** - footprint: FB608 0603 -> 0402 (BLM15HD102SN1D).
 - **mcuif** - value only: U701 TPH2501, R737 3.3k.
 
+## Reference changes of the BOM-2 repair (25 Nov 2026, SPEC decision 35; re-check `docs/validation/recheck-bom2.md`)
+- **analog** - R106 1M 0402 -> **10M 0603 (C7250, basic), on B.Cu** (gate-bias network: with 2 x 1 M a third time
+  constant spoiled the firmware LF/HF correction, B2-9). R105 stays 1M 0402 at the gate. Layout: R105.2 -> top track ->
+  via -> R106 (B, 7.50 / 14.90 block-local); IN_BIAS reaches R106 on B.Cu directly (one via fewer).
+- **phase** - layout only: D319 silkscreen at the board edge moved to F.Fab (B2-11).
+- Stock of all parts re-read (`gen/lcsc_parts.py`, 25 Nov 2026): BAT15-04W 865 (37 boards), TRF37D73 25 (5 boards).
+
 ## BOM
 
-`docs/bom.md` (generated): **70.39 USD for one board** (24 Nov 2026, after BOM review 2; 70.45 before, 73.14 before the
-first optimisation), MCU included, PCB excluded, against the 80 USD budget; every line has an LCSC number verified on
-lcsc.com and a JLC class column. 80 fitted part lines (was 94), 79 part numbers: 52 JLCPCB basic (337 parts placed) and
-27 extended (was 58), no 0.1 % resistor. Remaining extended passives: 0.5 / 1.5 / 2.2 / 3.3 pF and the 1 nF C0G (no basic
+`docs/bom.md` (generated): **70.39 USD for one board** (25 Nov 2026, after BOM review 2 and its repair; 70.45 before,
+73.14 before the first optimisation), MCU included, PCB excluded, against the 80 USD budget; every line has an LCSC
+number verified on lcsc.com and a JLC class column. 81 fitted part lines (was 94), 80 part numbers: 53 JLCPCB basic
+(337 parts placed) and 27 extended (was 58), no 0.1 % resistor. Stock re-read 25 Nov 2026: buy BAT15-04W (865 = 37
+boards) and TRF37D73 (25 = 5 boards) ahead of the order. Remaining extended passives: 0.5 / 1.5 / 2.2 / 3.3 pF and the 1 nF C0G (no basic
 C0G below 10 pF or above 100 pF), BLM15HD102SN1D, the inductors and the DLW21SN900HQ2L balun.
 Largest lines: BAT15-04W x23 8.41, TRF37D73 x5 7.51, GW1NZ-1 6.68, GVA-84+ x2 5.98 (Mouser), BUF802 5.89, SMA x2 10.68,
 TLV3801 5.13 (Mouser), STM32G474CBT6 4.63. J501 (WR-WST footprint, not on LCSC) is a 0 USD footprint-only line.
@@ -338,7 +346,8 @@ Integration (21 Nov 2026):
   9/13/16, FPGA 19/23, STM32 spares PA3/PA7/PA8/PB0/PB2/PB10/PB12/PB15/PC13-15, USB-C SBU1/2, PG of U601/U602).
   ERC (`tools/run_erc.sh`, KiCad nightly): 0 errors, 18 warnings (SMA footprint link, Conn_Coaxial library copy, and
   Q_PNP_BEC not in the KiCad 10 Device library: the symbol is embedded in the sheet). After BOM review 2: 275 nets,
-  21 NC-flagged pins (U313 pin 6 added).
+  21 NC-flagged pins (U313 pin 6 added). After the repair (25 Nov 2026): 275 nets, 0 failed checks, ERC 0 errors /
+  18 warnings.
 - STM32 (21 Nov 2026; ADC trigger revised 24 Nov): ADC1/2 from TIM2_TRGO, PB11 = TIM2_CH4 frame mark (EXTSEL code in
   RM0440 not read, verify); the OPAMP/DAC3-4
   mapping is from the ST HAL OPAMP header (stm32g4xx_hal_opamp.h). PB4 (SPI1_MISO) and PB6 (FPGA_DONE, an input) carry the UCPD dead-battery pull-downs until

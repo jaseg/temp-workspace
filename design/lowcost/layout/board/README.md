@@ -4,6 +4,23 @@ One full run of `python3 gen_board.py` (about 115 s; `--prepower` stops before t
 is still broken) builds `scope-fe.kicad_pcb` / `.kicad_pro` / `routes.json`. Renders: `python3 render_board.py` (boardlib `render`, refilled
 copy): `scope-fe-L1.png` ... `L6`, `scope-fe-all.png`, `scope-fe-detail-{analog,fpga-south,mcu,power}.png`.
 
+## BOM-2 repair, 25 Nov 2026 (SPEC decision 35, re-check `docs/validation/recheck-bom2.md`)
+Full `gen_board.py` run after two block changes; outline, block positions and interfaces unchanged.
+- **analog:** R106 is 10 M 0603 now, on B.Cu at (7.50, 15.90) board (block-local 7.50 / 14.90), horizontal. R105.2 ->
+  0.3 mm top track (down, 45 degrees west) -> via (6.675, 14.95) -> R106.1; IN_BIAS comes down x 8.52 on B.Cu and jogs
+  onto R106.2 (the old IN_BIAS via at x 7.0 is gone). Via hole edge 0.37 mm from the R106 pad; 0.33 mm from R106.2
+  to the -5V B track. The top-side 0402 column R105 / (empty) / C107 is unchanged otherwise.
+- **phase:** silkscreen within 0.3 mm of the west board edge goes to F.Fab (`silk_fix`): D319's clipped outline.
+- **Checks:** check_board 0 missing, extra 4 (H1-H4), 0 footprint / value / pad-net, 0 unrouted, 0 clearance, 0 corner,
+  0 off-axis, 0 RF width / gap, 0 courtyard, 0 unconnected (486 footprints, 3475 tracks, 1019 vias); fast-net segments on
+  L3 0; 370 L1 / L6 samples without L2 / L5, all antipads or listed windows; L4 +3V3 one polygon; via_in_pad FAIL 0
+  (23 near, 31 EP-allowed); DRC jlc4 + parity **0 errors, 0 unconnected, 450 warnings** (the D319 silk_edge_clearance
+  is gone); decap_audit 77 capacitors, D1 1, D2s 8, D2g 1, D2p 10 (unchanged). Renders regenerated and looked at
+  (L1-L6, all, detail-analog; net views of the R106 area on F and B).
+- **Correction (re-check B2-10):** the +2V5 column feed (0.25 mm over 15 mm on L3) carries the trigger selector
+  (12.3 mA in signal mode) plus the TLV3801 (up to 26.6 mA), about 40 mA, not "a few mA"; drop about 5 mV, TLV3801
+  VCC-GND still >= 2.44 V. Q301 / Q302 emitters are 6-7 mm from the nearest +/-2V5 capacitor (static switch).
+
 ## As built 25 Nov 2026 (BOM-2 integration)
 All six blocks were regenerated against the BOM-2 netlist, and the board was rebuilt with a full `gen_board.py` run.
 The outline is unchanged (100.0 x 57.0 mm), and so are every block position and every interface.
@@ -19,7 +36,7 @@ rail router (5 islands failed). Changes (TOPOLOGY.md section 11):
 - **Phase block:** SW_SB now branches south of the U302 +2V5 via (gen_phase.py).
 
 Slow lines: DAC_TRIG 92.5 mm, TRIG_SEL 81.6 mm (incl. the L6 piece 4.3).
-Rails: +2V5 is 202 mm on L3 and 33 mm on L6, narrowest 0.25 mm over 15 mm (the explicit column feed, a few mA).
+Rails: +2V5 is 202 mm on L3 and 33 mm on L6, narrowest 0.25 mm over 15 mm (the explicit column feed, about 40 mA: selector 12.3 mA + TLV3801 up to 26.6 mA, about 5 mV drop).
 -2V5 is 206 / 31 mm, narrowest 0.3 mm over 8 mm. The minimum rail-to-signal gap in the column is 0.20 mm, to SW_S;
 PH_STROBE is more than 0.3 mm away.
 
