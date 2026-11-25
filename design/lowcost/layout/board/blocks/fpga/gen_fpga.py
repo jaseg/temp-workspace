@@ -22,7 +22,7 @@ import pcbnew
 import boardlib as bl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board"
+SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/bom2/block-power-mcu/fpga"
 W, H = 18.0, 22.0
 W50 = bl.W50                         # 0.16 mm = 50 R on L1 / L6 (6L)
 WS = 0.12                            # digital fan-out
@@ -69,7 +69,7 @@ bplace("C509", 13.3, 5.0, 270)        # U502.1 VDD, F, straight below pin 1, GND
 bplace("C623", 12.3, 5.0, 270)        # 1u +3V3_CLK beside C509, GND via (12.3, 6.2)
 bplace("C507", 16.0, 9.2, 0, "B")     # 10u +3V3 (moved to B under C510, 24 Nov: FB608 takes its F spot)
 bplace("C510", 16.0, 8.75, 0)         # 10u +3V3_CLK
-bplace("FB608", 15.8375, 10.6, 180)   # +3V3 (pad 1, via to L4) -> +3V3_CLK (pad 2, straight up to C510.1)
+bplace("FB608", 15.53, 10.6, 180)     # +3V3 (pad 1, via to L4) -> +3V3_CLK (pad 2, straight up to C510.1); BOM-2: 0402 (was 0603), pad 2 kept at x 15.05
 bplace("C506", 4.05, 7.45, 180)      # pin 36 +3V3 (VCCX); 24 Nov 0.2 mm north: GND via between the GND pads
 bplace("C502", 4.05, 8.65, 180)      # pin 37 +1V2
 bplace("C505", 12.3, 6.9, 0)         # pin 25 +3V3

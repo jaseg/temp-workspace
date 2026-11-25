@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """POWER block of the scope-fe board (power sheet, refs 6xx), power tree of docs/research/power-tree.md (24 Nov 2026):
-USB-C J601 (+ USBLC6 U608 on USB_DP / USB_DM), PTC F601, TVS D601, FB601 -> VBUS;
+USB-C J601 (+ USBLC6 U608 on USB_DP / USB_DM), F601 (0 R link since BOM-2), TVS D601 (DNP, land kept), FB601 -> VBUS;
+VBUS damper (BOM-2, replaces the 47 uF tantalum): 4 x (1 R 1206 R618-R621 + 47 uF 1206 C632-C635) on B;
 U601 TPS62A01A buck VBUS -> +3V3 (F, top-left); U602 TPS62A01A buck +3V3 -> +1V2 (B, under U601);
 U603 TPS63802 buck-boost VBUS -> +5V1 (F, top-middle, the block's east-most free area);
 U604 LM27762 +5V1F -> +5V / -5V and U605 LM27762 +3V3_CP -> +2V5 / -2V5 (F, left column, outputs to the W edge).
@@ -15,7 +16,7 @@ import boardlib as bl
 import pcbnew
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/fix/block-power"
+SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/bom2/block-power-mcu/power"
 os.makedirs(SCR, exist_ok=True)
 BW, BH = 26.0, 22.5
 HOLE = (23.0, 3.0)                       # M3 hole at board (97, 3): keep 3.5 mm
@@ -100,7 +101,7 @@ bplace("J601", 21.85, 13.5, 90)          # USB-C on the right board edge, pads f
 bplace("U608", 13.0, 13.5, 0)            # ESD array, flow-through (pins 6-1 DP, 4-3 DM)
 two("F601", 15.45, 20.2, "N", "/power/VBUS_IN")
 two("D601", 21.0, 20.75, "W", "/power/VBUS_F")
-two("FB601", 13.45, 20.54, "S", "/power/VBUS_F")
+two("FB601", 13.45, 20.8125, "S", "/power/VBUS_F")   # BOM-2: 0603 (was 0805), VBUS_F pad in line with F601.2
 two("R602", 15.0, 11.08, "E", "/power/CC2", "B")
 two("R601", 15.0, 15.9, "E", "/power/CC1", "B")
 
@@ -179,10 +180,30 @@ two("C610", UX - 0.2, 7.68, "E", "/+5V1")
 two("C611", UX - 0.2, 9.64, "E", "/+5V1")
 two("R603", 13.78, 9.3, "W", "/+5V1")    # FB divider east of C611, away from L1 / L2 (FB on In2 from the pin)
 two("R604", 15.64, 9.3, "E", "GND")
-two("C632", 15.2, 6.0, "W", "VBUS", "B")  # DNP VBUS damper (tantalum): VBUS pad on the B strip, off the C601 vias
 # DECOUPLING-8 (24 Nov): C602 100n (was 2 mm from U601, whose C603 straddles its pins) moved to the USBLC6 VBUS pin:
 # B side under U608 pin 5, VBUS pad on the B VBUS strip, GND pad into the B pour
 two("C602", 14.65, 14.3, "W", "VBUS", "B")
+
+# ============================================================================= VBUS damper (BOM-2, B side)
+# docs/research/bom2-power-passives.md section C: 4 parallel branches of 1 R (1206) in series with 47 uF X5R (1206),
+# VBUS to GND, replacing the 47 uF tantalum (old C632 on B at (15.2, 6.0)).  Every branch: resistor at VBUS, the
+# capacitor's GND pad on a plane via, the series node a short 0.6 mm track.
+#  - branches 1 / 2 (R618-C632, R619-C633): four rows east of the B VBUS strip (x 13.05-14.2) in the area the tantalum
+#    and its via left, west of the M3 hole keep-out (R618 / R619 VBUS pads on the strip, each branch folded at its east
+#    end; R619 sits 1.4 mm further west so that its node pad clears the J601 shell lug at (17.67, 8.68));
+#  - branch 3 (R620-C634): a row under the J601 south shell lugs (B was empty there), VBUS from a 0.5 mm B track
+#    along y 18.85 from the strip end;
+#  - branch 4 (R621-C635): vertical along the east board edge between the M3 keep-out and the south lug, fed by the
+#    same track.
+DX1 = 16.8
+two("R618", DX1 + 0.0125, 1.545, "W", "VBUS", "B")   # node pad in line with C632's
+two("C632", DX1, 3.865, "E", "Net-(C632-Pad1)", "B")
+two("C633", DX1, 6.215, "E", "Net-(C633-Pad1)", "B")
+two("R619", 15.375, 8.535, "W", "VBUS", "B")
+two("R620", 17.0, 20.4, "W", "VBUS", "B")
+two("C634", 21.63, 20.4, "W", "Net-(C634-Pad1)", "B")
+two("R621", 24.75, 15.1, "S", "VBUS", "B")
+two("C635", 24.75, 10.47, "S", "Net-(C635-Pad1)", "B")
 
 # ============================================================================= LM27762 cells (WSON-12, F)
 # REPAIR (24 Nov, recheck RP-1; datasheet SNVSAF7C 7.4.1: COUT+ / COUT- on the IC's layer next to OUT+ / OUT-, no vias
@@ -209,7 +230,7 @@ def lm(u, cin, cin_hf, ccp, c1, cx, cy):
     if ccp == "C619":
         two(ccp, cx - 2.42, cy + 2.75, "E", n("5"))
     else:
-        two(ccp, cx - 2.65, cy + 3.0, "E", n("5"))
+        two(ccp, cx - 2.65, cy + 2.75, "E", n("5"))     # BOM-2: 0.25 mm north (was cy + 3.0) for the 0603 R615 row
     two(c1, cx + (2.2 if c1 == "C618" else 2.05), cy, "N", n("10"))
 
 
@@ -225,12 +246,12 @@ two("FB604", 8.05, CY4 - 3.0, "S", "/power/+5V_LDO")
 two("C630", 7.3, CY4 + 4.25, "S", "/power/+2V5_LDO")
 two("C628", 5.58, CY5 + 2.85, "W", "/power/-2V5_LDO")
 # feedback dividers: U604 on B under the cell; U605 FB+ on F north of C625, FB- on B under the cell
-two("R614", 2.6, CY4 - 2.9, "E", N4("2"), "B")      # GND <-> FB+
-two("R613", 4.6, CY4 - 2.9, "W", N4("2"), "B")      # FB+ <-> OUT+
-two("R605", 4.9, CY4 + 1.95, "E", N4("7"), "B")     # OUT- <-> FB-
+two("R614", 2.9, CY4 - 2.9, "E", N4("2"), "B")      # GND <-> FB+ (BOM-2: 0603 150k; row R614 / R613 now 6.0 mm, east of C608)
+two("R613", 5.9, CY4 - 2.9, "W", N4("2"), "B")      # FB+ <-> OUT+ (BOM-2: 0603 470k)
+two("R605", 4.7, CY4 + 1.07, "E", N4("7"), "B")     # OUT- <-> FB- (BOM-2: 0603 510k, 0.88 mm north: clear of FB603 / R606)
 two("R606", 6.75, CY4 + 2.7, "N", N4("7"), "B")     # FB- <-> GND
-two("R615", 1.07, CY5 - 2.31, "W", "/power/+2V5_LDO")  # OUT+ <-> FB+ (F)
-two("R616", 2.94, CY5 - 2.31, "E", "GND")              # FB+ <-> GND (F)
+two("R615", 1.53, CY5 - 2.44, "W", "/power/+2V5_LDO")  # OUT+ <-> FB+ (F; BOM-2: 0603 220k fills the row C626 / C625)
+two("R616", 4.46, CY5 - 3.1, "E", "GND", "B")          # FB+ <-> GND (BOM-2: to B under C621, FB+ via beside the pin-2 track)
 two("R607", 4.7, CY5 + 3.1, "W", "/power/-2V5_LDO", "B")  # OUT- <-> FB-
 two("R608", 6.4, CY5 + 2.6, "N", N5("7"), "B")            # FB- <-> GND
 
@@ -309,6 +330,32 @@ blk.iface("VBUS", 14.0, 17.85, "In3.Cu", "S", "supply", None,
           "via pair at FB601; J501 pin 1 only (the GVA-84+ chokes moved to +5V1)")
 T("VBUS", [(15.1, 13.5), (13.6, 13.5)], 0.4, "B.Cu")
 
+# ============================================================================= VBUS damper copper (BOM-2, B)
+WD = 0.6                                  # series node / GND necks (3.4 A, 17 us plug-in pulse per branch)
+for c_, r_, y_ in (("C632", "R618", 3.865), ("C633", "R619", 6.215)):
+    nd = "Net-(%s-Pad1)" % c_
+    pc, pr = P(c_, nd), P(r_, nd)
+    if r_ == "R618":
+        T(nd, [pr, pc], WD, "B.Cu")                                         # fold at the east end
+    else:
+        T(nd, [pc, (pc[0], 7.2), (pc[0] - 0.2, 7.4), (pr[0] + 0.2, 7.4), (pr[0], 7.6), pr], WD, "B.Cu")   # between the pads
+    g_ = P(c_, "GND")
+    T("GND", [g_, (DX1 + 0.4, y_)], WD, "B.Cu")    # plane via under the body (F side: pour east of L601, 0.37 mm off its pad)
+    G(DX1 + 0.4, y_)
+# branches 3 / 4: VBUS track from the strip end along y 18.85 (south of the J601 lugs), north along the east edge
+pv4 = P("R621", "VBUS")
+T("VBUS", [(14.0, 18.85), (24.25, 18.85), (24.75, 18.35), (24.75, pv4[1])], 0.5, "B.Cu")
+pv3 = P("R620", "VBUS")
+T("VBUS", [(pv3[0], 18.85), pv3], WD, "B.Cu")
+for c_, r_ in (("C634", "R620"), ("C635", "R621")):
+    nd = "Net-(%s-Pad1)" % c_
+    T(nd, [P(r_, nd), P(c_, nd)], WD, "B.Cu")
+g3, g4 = P("C634", "GND"), P("C635", "GND")
+T("GND", [g3, (24.75, g3[1])], WD, "B.Cu")         # via east of D601's GND land (F)
+G(24.75, g3[1])
+T("GND", [g4, (g4[0], 7.75)], WD, "B.Cu")
+G(g4[0], 7.75)
+
 # ============================================================================= routing: VBUS input of U601 / U603
 # F polygon: C603 / U601.3 / C602 (top-left) along the top edge to C601 / U603.10 / EN / MODE; fed from the B strip
 # TIGHTEN (24 Nov): F polygon = vias behind C601 (13.0, 0.65-1.95) -> C601 VBUS pad -> U603 VIN (10), and a strip along
@@ -319,7 +366,7 @@ Z("VBUS", "F.Cu", [(5.0, 0.3), (13.45, 0.3), (13.45, 2.25), (12.8, 2.25), (12.8,
                    (8.65, 1.15), (8.65, 2.05), (6.6, 2.05), (6.6, 2.62), (3.9, 2.62), (3.9, 2.2), (5.0, 2.2)], prio=5)
 for y in (0.65, 1.3, 1.95):
     V(13.0, y, "VBUS")
-Z("VBUS", "B.Cu", [(12.65, 0.4), (14.2, 0.4), (14.2, 16.6), (14.4, 16.6), (14.4, 18.9), (13.05, 18.9), (13.05, 2.6),
+Z("VBUS", "B.Cu", [(12.65, 0.4), (15.95, 0.4), (15.95, 2.5), (14.2, 2.5), (14.2, 16.6), (14.4, 16.6), (14.4, 18.9), (13.05, 18.9), (13.05, 2.6),
                    (12.65, 2.6)], prio=4)
 # U603 EN (1) / MODE (2) = VIN: static tie through In2 (slow / static layer) to the VBUS via behind C601
 Z("VBUS", "F.Cu", [(9.4, 3.8), (10.45, 3.8), (10.45, 4.5), (9.4, 4.5)], prio=6, ch=0.1)
@@ -450,21 +497,21 @@ V(xe, cy - 1.7, N4("12"), bl.VIA_D, bl.VIA_DRILL)
 # FB+ (2): west, north to its via; divider R614 / R613 on B
 T(N4("2"), [(xw, y(2)), (cx - 1.5, y(2)), (cx - 1.5, cy - 2.05)], 0.2)
 V(cx - 1.5, cy - 2.05, N4("2"), bl.VIA_D, bl.VIA_DRILL)
-T(N4("2"), [(cx - 1.5, cy - 2.05), (3.11, cy - 2.24), (3.11, cy - 2.62)], 0.2, "B.Cu")
-T(N4("2"), [(3.11, cy - 2.9), (4.09, cy - 2.9)], 0.2, "B.Cu")
-T("/power/+5V_LDO", [(8.95, cy - 2.2), (8.25, cy - 2.9), (5.11, cy - 2.9)], 0.2, "B.Cu")
-T("GND", [(2.09, cy - 2.9), (2.09, cy - 2.05)], 0.25, "B.Cu")
-G(2.09, cy - 2.05)
+T(N4("2"), [(cx - 1.5, cy - 2.05), (3.425, cy - 2.05), (3.725, cy - 2.35), (3.725, cy - 2.9)], 0.2, "B.Cu")
+T(N4("2"), [(3.725, cy - 2.9), (5.075, cy - 2.9)], 0.2, "B.Cu")
+T("/power/+5V_LDO", [(8.95, cy - 2.2), (8.25, cy - 2.9), (6.725, cy - 2.9)], 0.2, "B.Cu")
+T("GND", [(2.075, cy - 2.9), (2.075, cy - 2.05)], 0.25, "B.Cu")
+G(2.075, cy - 2.05)
 # OUT- (6): south into C621's OUT- pad; via behind it (east) to the B divider / FB603
 T(N4("6"), [(xw, y(6)), (xw, cy + 1.5), (4.25, cy + 1.9), (4.25, cy + 2.25)], 0.25)
 T(N4("6"), [(5.4, cy + 2.85), (5.95, cy + 2.85)], 0.4)
 V(5.95, cy + 2.85, N4("6"), bl.VIA_D, bl.VIA_DRILL)
 T(N4("6"), [(5.95, cy + 2.85), (3.0, cy + 2.85)], 0.4, "B.Cu")              # -> FB603 (B)
-T(N4("6"), [(4.39, cy + 2.85), (4.39, cy + 2.2)], 0.25, "B.Cu")           # -> R605
+T(N4("6"), [(3.875, cy + 2.85), (3.875, cy + 1.07)], 0.25, "B.Cu")        # -> R605
 # FB- (7): south to its via; B: R605 / R606
 T(N4("7"), [(xe, ye(7)), (xe, cy + 1.7), (6.0, cy + 1.95)], 0.2)
 V(6.0, cy + 1.95, N4("7"), bl.VIA_D, bl.VIA_DRILL)
-T(N4("7"), [(6.0, cy + 1.95), (5.41, cy + 1.95)], 0.2, "B.Cu")
+T(N4("7"), [(6.0, cy + 1.95), (5.8, cy + 1.95), (5.525, cy + 1.675), (5.525, cy + 1.07)], 0.2, "B.Cu")
 T(N4("7"), [(6.0, cy + 1.95), (6.24, cy + 2.19), (6.6, cy + 2.19)], 0.2, "B.Cu")
 T("GND", [(6.75, cy + 3.21), (7.2, cy + 3.21), (7.65, cy + 2.76), (7.65, cy + 2.5)], 0.25, "B.Cu")
 # EN- (8) = VIN: east, south to its via (B +5V1F)
@@ -501,15 +548,16 @@ T("/power/+2V5_LDO", [(7.6, cy - 0.8), (7.6, 15.3)], 0.4, "B.Cu")
 T("+2V5", [(9.54, 15.3), (10.45, 15.3)], 0.4, "B.Cu")
 V(10.45, 15.3, "+2V5", bl.VIA_D, bl.VIA_DRILL)
 blk.iface("+2V5", 10.45, 15.3, "In3.Cu", "W", "supply", None, "via at FB606 (U605 OUT+ 2.50 V, 48 mA)")
-T("/power/+2V5_LDO", [(7.6, cy - 0.8), (7.25, cy - 1.15), (4.3, cy - 1.15), (4.0, cy - 1.45), (0.75, cy - 1.45),
-                      (0.56, cy - 1.64)], 0.2, "In2.Cu")                    # FB+ sense to R615 (F)
-V(0.56, cy - 1.64, "/power/+2V5_LDO", bl.VIA_D, bl.VIA_DRILL)
-T("/power/+2V5_LDO", [(0.56, cy - 1.64), (0.56, cy - 2.31)], 0.25)
+T("/power/+2V5_LDO", [(7.6, cy - 0.8), (7.25, cy - 1.15), (4.3, cy - 1.15), (4.0, cy - 1.45), (0.705, cy - 1.45)],
+  0.2, "In2.Cu")                                                         # FB+ sense to R615 (F)
+V(0.705, cy - 1.45, "/power/+2V5_LDO", bl.VIA_D, bl.VIA_DRILL)
+T("/power/+2V5_LDO", [(0.705, cy - 1.45), (0.705, cy - 2.44)], 0.25)
 # FB+ (2): west, north to R616 / R615 (F, north of C625)
-T(N5("2"), [(xw, y(2)), (3.35, y(2)), (3.35, cy - 1.55), (3.18, cy - 1.72), (2.43, cy - 1.72), (2.43, cy - 2.1)],
-  0.2)
-T(N5("2"), [(1.58, cy - 2.31), (2.43, cy - 2.31)], 0.2)
-T("GND", [(3.45, cy - 2.31), (4.5, cy - 2.31)], 0.3)                       # R616 GND -> C621 GND pad
+# BOM-2: R615 0603 (F) takes the whole row, R616 on B under C621: FB+ via (0.4 / 0.2) on the pin-2 track
+T(N5("2"), [(xw, y(2)), (3.35, y(2)), (3.35, cy - 2.1), (3.01, cy - 2.44), (2.355, cy - 2.44)], 0.2)
+T(N5("2"), [(3.35, cy - 2.1), (3.35, cy - 2.43)], 0.2)
+V(3.35, cy - 2.43, N5("2"), 0.4, 0.2)
+T(N5("2"), [(3.35, cy - 2.43), (3.35, cy - 2.8), (3.65, cy - 3.1), (3.95, cy - 3.1)], 0.2, "B.Cu")
 # EN+ (12) = PG_5V1: via north of the pin
 T(N5("12"), [(xe, ye(12)), (xe, cy - 1.7)], 0.2)
 V(xe, cy - 1.7, N5("12"), bl.VIA_D, bl.VIA_DRILL)
@@ -549,7 +597,6 @@ blk.iface("-2V5", 0.6, 20.75, "In3.Cu", "W", "supply", None, "via at FB607 / C62
 # U605 CIN ground via (C625 / C619)
 T("GND", [(2.35, cy + 1.3), (2.35, cy + 1.55), (2.0, cy + 1.9)], 0.4)
 G(2.0, cy + 1.9, 0.4, 0.2)
-G(17.75, 6.0)                                                            # C632 (B) GND pad, east
 
 # ============================================================================= grounds: F / B pours, In1 plane of the block
 # L4 +3V3 stand-in for the board's background plane (removed at merge, gen_board): joins U601's output vias, U602's

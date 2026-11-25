@@ -453,7 +453,7 @@ FL.track("+5V", 0.5, [("C110", "@+5V"), (XO, p5o[1])], layer="B.Cu")
 x, y = FL.pad("C110", "@GND")                # GND via west of the TAP column (was 4.40 / 17.90)
 FL.track("GND", 0.4, [(x, y), (x, 17.6), (4.15, 17.77), (4.15, 17.95)], layer="B.Cu")
 gl(4.15, 17.95)
-# bulk (B.Cu): -5V at the R107 via, +5V via pair between the RV101 pads, shared GND via
+# bulk (B.Cu): -5V at the old R107 via spot, +5V via pair (old RV101 area), shared GND via
 x, y = FL.pad("C116", "@-5V")
 FL.track("-5V", 0.6, [(x, y), (x, 14.77)], layer="B.Cu")
 ga, gb = FL.pad("C116", "@GND"), FL.pad("C111", "@GND")

@@ -1,0 +1,207 @@
+** Drc report for fpga.kicad_pcb **
+** Created on 2026-11-25T00:21:06 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 63 DRC violations **
+[invalid_outline]: Board has malformed outline (no edges found on Edge.Cuts layer)
+    Local override; error
+    @(0.0000 mm, 0.0000 mm): PCB
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(107.0000 mm, 115.9500 mm): Track [/fpga_clock/JTAG_TCK] on B.Cu, length 6.0500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(107.5000 mm, 115.8500 mm): Track [/fpga_clock/JTAG_TMS] on B.Cu, length 6.1500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(108.0000 mm, 115.7500 mm): Track [/fpga_clock/JTAG_TDI] on B.Cu, length 6.2500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(106.0000 mm, 117.2000 mm): Track [/TAP7] on B.Cu, length 4.8000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(108.5000 mm, 116.0500 mm): Track [/fpga_clock/JTAG_TDO] on B.Cu, length 5.9500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(106.5000 mm, 117.6000 mm): Track [/fpga_clock/DBG2] on B.Cu, length 4.4000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(114.0000 mm, 120.3500 mm): Track [/TAP15] on B.Cu, length 1.6500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(114.5000 mm, 121.4500 mm): Track [/TAP14] on B.Cu, length 0.5500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(115.0000 mm, 120.3500 mm): Track [/TAP13] on B.Cu, length 1.6500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(115.5000 mm, 121.4500 mm): Track [/TAP12] on B.Cu, length 0.5500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(116.0000 mm, 120.3500 mm): Track [/TAP11] on B.Cu, length 1.6500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(116.5000 mm, 121.4500 mm): Track [/TAP10] on B.Cu, length 0.5500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(117.0000 mm, 120.3500 mm): Track [/TAP9] on B.Cu, length 1.6500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(117.5000 mm, 121.4500 mm): Track [/TAP8] on B.Cu, length 0.5500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(113.5000 mm, 117.9600 mm): Track [/ADC_TRIG] on B.Cu, length 4.0400 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(112.0000 mm, 117.1000 mm): Track [/SPI_SCK] on B.Cu, length 4.9000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(111.5000 mm, 116.9200 mm): Track [/SPI_MISO] on B.Cu, length 5.0800 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(111.0000 mm, 116.7400 mm): Track [/SPI_MOSI] on B.Cu, length 5.2600 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(109.5000 mm, 116.1200 mm): Track [/SPI_CS] on B.Cu, length 5.8800 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(102.0000 mm, 120.0000 mm): Track [/COARSE] on B.Cu, length 2.0000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(102.5000 mm, 120.1500 mm): Track [/TAP0] on B.Cu, length 1.8500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(103.0000 mm, 120.3000 mm): Track [/TAP1] on B.Cu, length 1.7000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(103.5000 mm, 120.4500 mm): Track [/TAP2] on B.Cu, length 1.5500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(104.0000 mm, 120.6000 mm): Track [/TAP3] on B.Cu, length 1.4000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(104.5000 mm, 120.7500 mm): Track [/TAP4] on B.Cu, length 1.2500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(100.4000 mm, 111.3650 mm): Track [/S_STROBE_N] on F.Cu, length 0.4000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(101.9000 mm, 110.3650 mm): Track [/S_STROBE_P] on F.Cu, length 1.9000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(100.5000 mm, 121.3500 mm): Track [/PH_STROBE_P] on F.Cu, length 0.5000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(100.8600 mm, 121.6893 mm): Track [/PH_STROBE_N] on F.Cu, length 0.8600 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(105.0000 mm, 120.7000 mm): Track [/TAP5] on B.Cu, length 1.3000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(110.5000 mm, 118.5000 mm): Track [/FPGA_DONE] on B.Cu, length 3.5000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(105.5000 mm, 120.6500 mm): Track [/TAP6] on B.Cu, length 1.3500 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(113.0000 mm, 118.1000 mm): Track [/FPGA_RECONFIG] on B.Cu, length 3.9000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(112.5000 mm, 117.2800 mm): Track [/I2C_SCL] on B.Cu, length 4.7200 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(110.0000 mm, 116.0600 mm): Track [/I2C_SDA] on B.Cu, length 5.9400 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(109.0000 mm, 116.3000 mm): Track [/MCU_CLK] on B.Cu, length 5.7000 mm
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(111.9000 mm, 115.2500 mm): Footprint C501
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(112.3000 mm, 105.0000 mm): Footprint C623
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(107.4500 mm, 102.1800 mm): Footprint C508
+[lib_footprint_mismatch]: Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'
+    Local override; warning
+    @(115.5300 mm, 110.6000 mm): Footprint FB608
+[lib_footprint_mismatch]: Footprint 'QFN-48-1EP_6x6mm_P0.4mm_EP4.3x4.3mm' does not match copy in library 'Package_DFN_QFN'
+    Local override; warning
+    @(108.6000 mm, 111.1650 mm): Footprint U501
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(113.3000 mm, 105.0000 mm): Footprint C509
+[lib_footprint_mismatch]: Footprint 'SolderJumper-2_P1.3mm_Open_RoundedPad1.0x1.5mm' does not match copy in library 'Jumper'
+    Local override; warning
+    @(104.6000 mm, 101.3000 mm): Footprint JP501
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(101.2000 mm, 101.7500 mm): Footprint R503
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(107.2000 mm, 105.0000 mm): Footprint R510
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(101.2000 mm, 102.7500 mm): Footprint R504
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(104.0500 mm, 108.6500 mm): Footprint C502
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(105.4000 mm, 103.0500 mm): Footprint R506
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(108.5000 mm, 105.0000 mm): Footprint R508
+[lib_footprint_mismatch]: Footprint 'MSOP-10_3x3mm_P0.5mm' does not match copy in library 'Package_SO'
+    Local override; warning
+    @(111.1000 mm, 102.2000 mm): Footprint U502
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(101.2000 mm, 100.7500 mm): Footprint R502
+[lib_footprint_mismatch]: Footprint 'Crystal_SMD_3225-4Pin_3.2x2.5mm' does not match copy in library 'Crystal'
+    Local override; warning
+    @(116.3000 mm, 105.5500 mm): Footprint Y501
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(104.0500 mm, 107.4500 mm): Footprint C506
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(103.3000 mm, 114.3000 mm): Footprint R501
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(106.4000 mm, 115.7000 mm): Footprint C504
+[lib_footprint_mismatch]: Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(112.3000 mm, 106.9000 mm): Footprint C505
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(103.3000 mm, 103.0500 mm): Footprint R505
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(116.0000 mm, 108.7500 mm): Footprint C510
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(116.0000 mm, 109.2000 mm): Footprint C507
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(105.6000 mm, 115.6000 mm): Footprint R507
+[lib_footprint_mismatch]: Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(111.3000 mm, 103.0000 mm): Footprint R509
+[lib_footprint_mismatch]: Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(114.6000 mm, 114.6000 mm): Footprint C503
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

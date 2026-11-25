@@ -2,8 +2,22 @@
 `python3 gen_analog.py` writes `analog.kicad_pcb`, `analog.ifaces.json`, `analog.png`, `analog_detail.png` (input stage, F.Cu) and prints all tables below. `analog_detail_L1L2.png` = F.Cu + In1 (L2) of a zone-filled scratch copy: the node windows and the pad cut-outs.
 
 **Phase two (6-layer, JLC06161H-3313).** The script sets `BL_STACKUP=6L` and is now a native 6-layer file: In1 = L2 GND, In2 = L3 (slow), In3 = L4 (power), In4 = L5. Supply via landings are on In3 (L4); ifaces.json says `In3.Cu`. **Merge it with `layer_map=None`** (LAYER_MAP_4TO6 would move the L3 keep-outs to L4; L4 keep-outs survive either way, L3 is then lost). Placement, references, nets and every interface position are unchanged (no interface moved; only the RF width 0.36 -> 0.16 mm and the supply landing layer In2 -> In3).
-check_board (24 Nov, 107 refs): 0 missing / extra / footprint / value / pad-net / no-net, 0 clearance, 0 corners, 0 off-axis pad exits, 0 RF width / gap, 0 courtyard overlaps; unrouted only the plane-fed +5V, -5V, +2V5, -2V5, +3V3. Script checks: 0 vias in node windows or near RF copper, 0 vias in or touching a soldered pad (net-tie, test-point and IC exposed pads excepted).
-DRC (`tools/run_drc.sh --rules jlc4`, KiCad 10.99, 6 layers): `total 138: error 14, warning 124` = 13 unconnected_items (the 5 plane-fed supplies) + 1 invalid_outline (no Edge.Cuts in a block); 91 lib_footprint_mismatch + 4 lib_footprint_issues + 20 via_dangling (supply vias waiting for L4) + 9 track_dangling (interface stubs). 0 courtyard, clearance, width, hole, silk.
+check_board (25 Nov, bom2 netlist, 105 refs): 0 missing / extra / footprint / value / pad-net / no-net, 0 clearance, 0 corners, 0 off-axis pad exits, 0 RF width / gap, 0 courtyard overlaps; unrouted only the plane-fed +5V, -5V, +2V5, -2V5, +3V3. Script checks: 0 vias in node windows or near RF copper, 0 vias in or touching a soldered pad. `via_in_pad.py`: FAIL 0 (105 vias, 8 near 0.15-0.2 mm, 10 EP-allowed).
+DRC (`tools/run_drc.sh --rules jlc4`, KiCad 10.99, 6 layers): `total 135: error 14, warning 121` = 13 unconnected_items (only the 5 plane-fed supplies) + 1 invalid_outline (no Edge.Cuts in a block); 89 lib_footprint_mismatch + 4 lib_footprint_issues + 19 via_dangling (supply vias waiting for L4) + 9 track_dangling (the 9 interface stubs). 0 courtyard, clearance, width, hole, silk.
+
+## Changes 25 Nov 2026 (bom2 netlist: SPEC decisions 28, 31, 33, 34)
+Generator only; `analog.kicad_pcb` regenerated. Values (C101, C106, C207, R105, R106, R118, R119, R123, R202, R203, R401-R405) come from the netlist with no layout change.
+- **RV101 removed, R120 22k pin 2 to GND:** the trimmer area (6.5 x 5 mm, x 8.8-15.3, y 16.4-21.4) is no longer used for parts. R120 GND goes up to one GND via (8.36, 18.75), shared with R117 / C105.
+- **R114-R116 300k 0603:** column x 5.43 (courtyard on J101's at x 4.70), R114 courtyard on C101's, 2.96 mm pitch (y 12.24 / 15.20 / 18.16). The VIN tap leaves R114 upward and jogs 45 degrees onto C101 pad 1's axis: 1.24 mm of 0.16 mm line (was 0.89 mm). The R114.1 pad cut is now 0.70 mm (0603 pad, +240 fF -> 0). C102 moved +0.13 mm to x 6.63 (courtyard on the column's).
+- **TAP / servo re-placed in the space below the column:** TAP runs 0.2 mm wide from U102 pin 3 down the 0.7 mm gap between the U102 pads and the 0603 column (x 4.62) to R116's bottom pad. R117 / C105 lie horizontal beside that pad, TAP pads on one x. R121 1k now stands in the IN_AUX column (9.30, 17.50; the old RV101 area). OPA_OUT goes pin 1 -> C106 -> via (3.59, 18.05) -> B.Cu row y 19.30 (TP103 on it) -> via under R121. C110's GND via moved from (4.40, 17.90) to (4.15, 17.95) to clear the TAP track.
+- **R107 18k 0603 -> B.Cu** (centre 10.75, 13.30, under the C112 / C113 row). An 0603 does not fit between C112 / C113 under the pin row (0.98 mm gap between their courtyards), and moving it down would put its -5V via in C116's pad. It is a static bias resistor (RULES rule 8 allows slow parts on B). Path: pin 7 -> via between R107's B pads (hole 0.33 mm from each) -> R107 -> B track to C113's -5V plane vias. The old R107 -5V via (10.75, 14.80) stays as the C116 bulk feed.
+- **L402 1 uH 1008, R416 removed:** the TRF #2 bias tee is bead -> 1008 choke -> C408 at the cold pad, with the choke and C408 0.33 mm nearer the line (courtyard pitch for 1008). R416's place (x 40.2-41.1) stays empty. L401 (47 uH 1210 || R415) is unchanged.
+- **D401 = half a BAT15-04W (SOT-323):** rot 90, pin 2 (D2 cathode) on the tap column x 35.36, pin 1 (D1, shorted) and pin 3 (D2 anode) to GND. Pin 3 has two GND vias above it, pin 1 one via west. The SOT-323 courtyard (2.6 x 3.4) sits on T401's, so the clamp tap is 1.205 mm (7.1 ps, was 0.40 mm / 2.4 ps). D401.2 gets a 0.45 mm pad cut (+78 fF -> 0).
+- Unchanged: strobe arms 17.827 / 17.827 mm, TL401 80.0 ps, every RF route of the sampler and strobe chain, and the node windows (hold 268 fF, GA 196 fF, BUF802 input 211 fF). The VIN node copper is 1040 fF windowed (was 824) because of the R114 0603 pad and its longer tap; the pad itself is compensated by its cut.
+- `analog_netview_u101.png` was re-rendered (R_BIAS via). `analog_detail_L1L2.png` is from 24 Nov; the input-stage node windows did not change.
+
+## Interface changes (25 Nov 2026)
+- None. `analog.ifaces.json` has the same positions and layers. Refs leaving the block: RV101, R416. R107 is now on B.Cu.
 
 ## Changes 24 Nov 2026 (validation fixes)
 - **RF-1 / RF-4 (sim/strobe_arms/RESULT.md):** T401 position and the uncoupled 50 R arms kept. R204 now stands on the bridge axis (x 30.54, pads y 9.79 / 10.81) with one pad in each arm. The arms are mirror images about the bridge axis from C201 / C202 through R204 to the T401 centre column. Only the last 0.38 mm into the balun's diagonal output pads differs (pad 2 is entered from the right, pad 4 from the left), so the two lengths are equal by construction: 17.827 / 17.827 mm, 105.6 ps each (was 99.2 ps with an A-side bump and a K-side R204 stub). A strict mirror into the pads is impossible because the TL balun puts its outputs on opposite corners.
@@ -46,7 +60,7 @@ DRC (`tools/run_drc.sh --rules jlc4`, KiCad 10.99, 6 layers): `total 138: error 
 | STRB_A / STRB_K arms (C201/C202 -> R204 -> T401) | equal, mirrored | 17.827 / 17.827 (mismatch 0) | 105.6 / 105.6 |
 | TL401 shorted stub (tap -> NT401 pad 1) + via short | 80.0 ps | 12.838 + 3.9 ps end | 76.1 + 3.9 = 80.0 |
 | BUF_OUT_T R113 -> S boundary | - | 8.513 | 50.4 |
-| CLIP balun -> tap -> C410; clamp tap | short | 2.965; 0.40 | 17.6; 2.4 |
+| CLIP balun -> tap -> C410; clamp tap (D401.2, SOT-323) | short | 2.965; 1.205 | 17.6; 7.1 |
 | TRF2/TRF1 OUT (C -> bead -> pin 7) | short | 2.02 / 2.02 | 12.0 |
 | TRF RFIN pin 2 -> 100 nF | short | 1.08 / 1.08 | 6.4 |
 | 12 dB pad series 1.01 + 1.01, shunt stubs 0.89 (R403) / 1.125 (R402 0603) | short | | 6.0 / 5.3 / 6.7 |
@@ -62,7 +76,7 @@ Node windows, L2 + L3 + L4 cleared (and F.Cu / B.Cu pour), reference L5 at 1.354
 | BUF802 input | 211 fF | 776 fF |
 | SMA centre pad + taper | 824 fF | 2456 fF |
 
-Pad compensation (RF-6, 24 Nov): every in-line RF pad whose excess C over L2 (pad vs. 0.16 mm line over the pad length) exceeds 30 fF gets a cut on L2, L3 and L4 (rule area In1 / In2 / In3). The cut part of the pad sees L5 at 1.354 mm. The cut is the full pad width across the line and is shortened along the line so that the excess is 0 fF (the pad ends stay over L2). Excess before the cut and cut length: 0402 R +99 fF, 0.41 mm; 0402 C +99 fF, 0.42; FB401/402 +105 fF, 0.47; D201/D202 rails +93 fF, 0.36; D201.3 +78 fF, 0.45; T401.1/2/4 +102 fF, 0.52; D401.1 +67 fF, 0.38; R402 (0603) +240 fF, 0.70; C101.1 +95 fF, 0.45. Not cut: U401/U402 pins 2/7 (+18 fF), U101.11 (+29 fF) and NT401.1 (shorted stub end). The model is the microstrip formula per section, without fringing at the cut edges. The script prints the full per-pad table.
+Pad compensation (RF-6, 24 Nov): every in-line RF pad whose excess C over L2 (pad vs. 0.16 mm line over the pad length) exceeds 30 fF gets a cut on L2, L3 and L4 (rule area In1 / In2 / In3). The cut part of the pad sees L5 at 1.354 mm. The cut is the full pad width across the line and is shortened along the line so that the excess is 0 fF (the pad ends stay over L2). Excess before the cut and cut length: 0402 R +99 fF, 0.41 mm; 0402 C +99 fF, 0.42; FB401/402 +105 fF, 0.47; D201/D202 rails +93 fF, 0.36; D201.3 +78 fF, 0.45; T401.1/2/4 +102 fF, 0.52; D401.2 (SOT-323) +78 fF, 0.45; R114.1 (0603) +240 fF, 0.70; R402 (0603) +240 fF, 0.70; C101.1 +95 fF, 0.45. Not cut: U401/U402 pins 2/7 (+18 fF), U101.11 (+29 fF) and NT401.1 (shorted stub end). The model is the microstrip formula per section, without fringing at the cut edges. The script prints the full per-pad table.
 
 ## Interfaces (block-local mm)
 | net | x, y | layer / side | note |
@@ -74,12 +88,13 @@ Pad compensation (RF-6, 24 Nov): every in-line RF pad whose excess C over L2 (pa
 | +5V, -5V, +2V5, -2V5, +3V3 | vias | In3 (L4) | FLOORPLAN partition |
 ## Deviations
 - Courtyard rule: **SMA -> divider grew from 0.89 to 1.16 mm** (C101's courtyard would otherwise overlap J101's). 0402s now sit at courtyard pitch. The pi-pad shunts R403 / R402 hang above the line on 0.89 mm 50 R stubs. C401 -> R401 has 0.85 mm of line. The R405 / C411 / R406 column is at 1.84 mm pitch.
-- The input servo was re-placed: U102 is at the bottom left, the R114-R117 column is beside J101, IN_BIAS uses B.Cu through 2 vias, and FB runs on B.Cu from R118 to R120. TP103 / TP104, C110 / C114 (U102), C115 and the bulk C111 / C116 are on B.Cu. R201 sits 0.16 mm further right, so the sampler and the chain moved +0.16 mm.
+- The input servo was re-placed: U102 is at the bottom left, the R114-R116 0603 column is beside J101 (R117 / C105 at R116's TAP pad), IN_BIAS uses B.Cu through 2 vias, and FB runs on B.Cu from R118 to R120. TP103 / TP104, C110 / C114 (U102), C115, R107 and the bulk C111 / C116 are on B.Cu. R201 sits 0.16 mm further right, so the sampler and the chain moved +0.16 mm.
 - T401 uses the netlist land (Coilcraft 0805USB, 1/4 | 2/3). Since 24 Nov both arms pass R204 on the axis and enter T401 through the 0.91 mm gap between its pad columns. They are mirror images except for the last 0.38 mm (see Changes).
 - Added from membership "pstrobe": C402-C404 and C407-C409 (U401 / U402 decoupling, as in sim/bias_tee). J102 / R122 stay with phase.
 - Local helpers: Frame.place (Block.place side="B" segfaults in pcbnew 7.0.11), pad_escape / split_at_pads (pad-axis exits), strip_silk_over_pads (4 library silk segments over neighbouring pads were removed), courtyard_overlaps, and a render crop offset.
 - Block GND zones are on In1 / F / B with the fragment cut-outs. merge(skip_planes=True) would lose the In1 cut-outs.
 ## Open points
+- bom2: the D401 clamp tap is 1.205 mm (7.1 ps, was 2.4 ps; the bom2 strobe_arms re-run assumed a short tap). Re-run sim/strobe_arms with this tap if the falling-edge clamp level matters.
 - Balun pin map (Murata DLW21SN vs Coilcraft land): fix this in the schematic / footprint. R201 -> D201.3 is 3.12 mm.
 - Integrator: GND stitching, the In2 partition, and the BUF_OUT_T and S_STROBE pair routing. kicad-cli 7 has no DRC / ERC, so the nightly DRC was used.
 - Phase two: the slow interfaces (VOFS, VNEG_REF, VBIAS_A/K, ADC_IN, ADC_REF_MID) still leave on B.Cu (L6) columns at the S edge, as in phase one; rule 10 wants bias on L3 -> integrator via to L3 at the boundary, or a later block change.

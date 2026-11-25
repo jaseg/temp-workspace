@@ -21,7 +21,7 @@ import pcbnew
 import boardlib as bl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/board"
+SCR = "/tmp/claude-0/-home-user/b3209b1f-f7fb-5362-924e-8729f34e30b8/scratchpad/bom2/block-power-mcu/mcuif"
 os.makedirs(SCR, exist_ok=True)
 W, H = 66.5, 12.0
 WS = 0.15                                   # signal width
@@ -168,7 +168,7 @@ place("C720", 2.4, 3.45, "h", "GND")
 place("R732", 8.25, 1.9, "v", "Net-(U701--)")
 place("C722", 9.25, 1.9, "v", "Net-(U701--)")
 place("C721", 8.42, 2.03, "v", "GND", "B")        # pin 2 / 3 decoupling on B, beside the two vias (no via-in-pad)
-# R737 TRIG_SEL reset pull-down (2.0k, PA1 floats at reset): on B under the TRIG_SEL column, TRIG_SEL pad on the
+# R737 TRIG_SEL reset pull-down (3.3k since BOM-2, was 2.0k; PA1 floats at reset): on B under the TRIG_SEL column, TRIG_SEL pad on the
 # column-top via (B stub south, on-axis), GND pad into the B.Cu ground pour
 place("R737", 43.3, 3.35, "v", "/TRIG_SEL", "B")
 for r in REFS:
@@ -349,7 +349,9 @@ for k, xc, yv, note in ((5, 46.35, YIF, "U704.5 PF0 HSE bypass <- MS5351M CLK1 (
     stub(net, xc, yv, WS, note)
     if k == 9:
         pr = P("R737", "@TRIG_SEL")
-        T(net, WS, [(xc, yv), (pr[0], yv + (xc - pr[0])), pr], "B.Cu")
+        # BOM-2 (25 Nov): 45-degree jog west above R737 so that its TRIG_SEL pad is entered straight from the north (was
+        # a diagonal into the pad, the one off-axis exit of the block); JP701 east and the B lane south leave no room to move R737
+        T(net, WS, [(xc, yv), (xc - 0.2, yv + 0.2), (pr[0] + 0.25, yv + 0.2), (pr[0], yv + 0.45), pr], "B.Cu")
 # straight DAC columns from the B lanes
 for key, net, note in (("VOFS", "/VOFS", "U704.13 DAC1_OUT2 -> R119 (input block)"),
                        ("DAC_TRIG", "/DAC_TRIG", "U704.12 DAC1_OUT1 -> R383 (phase)")):

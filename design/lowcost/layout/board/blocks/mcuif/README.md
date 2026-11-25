@@ -35,7 +35,7 @@ TRIG_SEL PB6->PA1 (9), FPGA_DONE PB0->PB6 (43), SPI_CS PB10->PB9 (46), DBG1 PB9-
   28 track_dangling = the 28 interface stubs, 14 via_dangling = supply plane vias, 8 isolated GND fill). 0 hole / clearance / courtyard / width / silk.
 
 ## Open points
-- TRIG_SEL reset pull-down R737 2.0k (schematic gen_mcu_if.py): on B under the TRIG_SEL column (local 43.3, 3.35), GND pad into the B pour. Floating PA1 -> pin -0.17 V, SEL -1.00 V (switch ground -0.89 V). 5.1k as first asked would leave the pin at -0.39 V (beyond the -0.3 V limit) and SEL at -1.14 V. Its TRIG_SEL pad is entered at 45 deg for the last 0.2 mm (1 off-axis exit; no room between R729 / JP701).
+- TRIG_SEL reset pull-down R737 (2.0k then; 3.3k since BOM-2, SPEC 34) (schematic gen_mcu_if.py): on B under the TRIG_SEL column (local 43.3, 3.35), GND pad into the B pour. Floating PA1 -> pin -0.17 V, SEL -1.00 V (switch ground -0.89 V). 5.1k as first asked would leave the pin at -0.39 V (beyond the -0.3 V limit) and SEL at -1.14 V. Its TRIG_SEL pad is entered at 45 deg for the last 0.2 mm (1 off-axis exit; no room between R729 / JP701).
 - C721 moved 0.88 mm east of its two vias (B tracks, no via-in-pad). Pour islands: island removal 'always' (0 isolated copper). C719 GND reaches its via through a 0.3 mm F track.
 - VNEG_REF / ADC_REF_MID moved west (36.95 / 55.29), RECONFIG / ADC_TRIG / USB / VTAP moved east. The integrator routes to these.
 
@@ -51,3 +51,13 @@ TRIG_SEL PB6->PA1 (9), FPGA_DONE PB0->PB6 (43), SPI_CS PB10->PB9 (46), DBG1 PB9-
   pull-up feed, not a decoupling via. Render: `mcuif_netview_u704.png`.
 
 **Vias out of pads (24 Nov, RULES rule 12):** U701 pin 2 / 3 vias 0.05 mm further east, R728 0.15 mm east. `python3 ../../via_in_pad.py mcuif.kicad_pcb`: FAIL 0.
+
+## BOM-2 (25 Nov 2026)
+- Netlist: U701 TLV9001 -> TPH2501 (same SOT-23-5 pinout, value only), R737 2.0k -> 3.3k (value only). No new nets, no MCU
+  pin newly used (the input trimmer RV101 is replaced by a firmware correction, no trim line).
+- R737: the TRIG_SEL B track now jogs west at 45 degrees above R737 and enters its pad straight from the north (was a
+  diagonal into the pad, the one off-axis exit in check_board). R737 cannot move (JP701 east, B lane south).
+- Checks: check_board (40 refs) 0 except the plane-fed supplies (+3V3 8, +2V5 1, -2V5 2); off-axis 0 (was 1);
+  via_in_pad FAIL 0; DRC jlc4 94 = 39 lib_footprint_mismatch + 1 lib_footprint_issues + 28 track_dangling (interface stubs)
+  + 14 via_dangling (supply vias) + 11 unconnected (the plane-fed supplies) + 1 invalid_outline.
+- **Interface changes: none.**

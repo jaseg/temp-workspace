@@ -1,0 +1,1272 @@
+{
+    "$schema": "https://schemas.kicad.org/drc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-25T00:21:10",
+    "ignored_checks": [
+        {
+            "description": "Footprint has no courtyard defined",
+            "key": "missing_courtyard"
+        },
+        {
+            "description": "Track endpoint not centered on via",
+            "key": "track_not_centered_on_via"
+        },
+        {
+            "description": "Tuning profile track geometries",
+            "key": "tuning_profile_track_geometries"
+        },
+        {
+            "description": "Footprint doesn't match symbol's footprint filters",
+            "key": "footprint_filters_mismatch"
+        },
+        {
+            "description": "Footprint component type doesn't match footprint pads",
+            "key": "footprint_type_mismatch"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "10.99.0",
+    "schematic_parity": [],
+    "source": "fpga.kicad_pcb",
+    "unconnected_items": [],
+    "violations": [
+        {
+            "description": "Board has malformed outline (no edges found on Edge.Cuts layer)",
+            "items": [
+                {
+                    "description": "PCB",
+                    "pos": {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "uuid": "2ff18988-e1a0-4170-aac8-3799b8d52d56"
+                }
+            ],
+            "layer": "Edge.Cuts",
+            "pos": {
+                "x": 108.985,
+                "y": 111.005
+            },
+            "severity": "error",
+            "type": "invalid_outline"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/fpga_clock/JTAG_TCK] on B.Cu, length 6.0500 mm",
+                    "pos": {
+                        "x": 107.0,
+                        "y": 115.95
+                    },
+                    "uuid": "bf664f4a-8184-40d1-a9f9-bc4e444594c5"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 107.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/fpga_clock/JTAG_TMS] on B.Cu, length 6.1500 mm",
+                    "pos": {
+                        "x": 107.5,
+                        "y": 115.85
+                    },
+                    "uuid": "c8173102-b508-4739-b68f-09e6203991cd"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 107.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/fpga_clock/JTAG_TDI] on B.Cu, length 6.2500 mm",
+                    "pos": {
+                        "x": 108.0,
+                        "y": 115.75
+                    },
+                    "uuid": "9eb2506f-c0cc-43f6-86da-0cce9b278255"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 108.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP7] on B.Cu, length 4.8000 mm",
+                    "pos": {
+                        "x": 106.0,
+                        "y": 117.2
+                    },
+                    "uuid": "a2e209c8-aa48-4cf2-a65a-5e69f3626e5d"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 106.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/fpga_clock/JTAG_TDO] on B.Cu, length 5.9500 mm",
+                    "pos": {
+                        "x": 108.5,
+                        "y": 116.05
+                    },
+                    "uuid": "ecb2ee8c-96df-4d74-8bae-2f7b9a65b7f7"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 108.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/fpga_clock/DBG2] on B.Cu, length 4.4000 mm",
+                    "pos": {
+                        "x": 106.5,
+                        "y": 117.6
+                    },
+                    "uuid": "744c9935-8ffe-4419-bde0-7fcb2f7772e4"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 106.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP15] on B.Cu, length 1.6500 mm",
+                    "pos": {
+                        "x": 114.0,
+                        "y": 120.35
+                    },
+                    "uuid": "e54b4aad-bdf2-4078-ad71-e2cdaf6fee2e"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 114.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP14] on B.Cu, length 0.5500 mm",
+                    "pos": {
+                        "x": 114.5,
+                        "y": 121.45
+                    },
+                    "uuid": "20bc4f00-f707-4a0c-abf2-5a7c52133ae5"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 114.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP13] on B.Cu, length 1.6500 mm",
+                    "pos": {
+                        "x": 115.0,
+                        "y": 120.35
+                    },
+                    "uuid": "530f689e-a129-4924-bd71-a4fce0c9e838"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 115.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP12] on B.Cu, length 0.5500 mm",
+                    "pos": {
+                        "x": 115.5,
+                        "y": 121.45
+                    },
+                    "uuid": "b56a49ac-dd3b-47fb-bc7c-5ed009c5d31d"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 115.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP11] on B.Cu, length 1.6500 mm",
+                    "pos": {
+                        "x": 116.0,
+                        "y": 120.35
+                    },
+                    "uuid": "f5e1ea5b-2398-42be-92f2-43b7876b51b4"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 116.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP10] on B.Cu, length 0.5500 mm",
+                    "pos": {
+                        "x": 116.5,
+                        "y": 121.45
+                    },
+                    "uuid": "08894de4-48fd-49bd-aa7b-005fc923b4fc"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 116.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP9] on B.Cu, length 1.6500 mm",
+                    "pos": {
+                        "x": 117.0,
+                        "y": 120.35
+                    },
+                    "uuid": "7f28be3d-a98d-4a37-8960-5e01d47d0616"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 117.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP8] on B.Cu, length 0.5500 mm",
+                    "pos": {
+                        "x": 117.5,
+                        "y": 121.45
+                    },
+                    "uuid": "e96f9ebf-8637-4e7d-ac6f-92c14bdf69bf"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 117.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/ADC_TRIG] on B.Cu, length 4.0400 mm",
+                    "pos": {
+                        "x": 113.5,
+                        "y": 117.96
+                    },
+                    "uuid": "928b2ae4-2680-47d8-a9d3-a3249d58e1f5"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 113.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/SPI_SCK] on B.Cu, length 4.9000 mm",
+                    "pos": {
+                        "x": 112.0,
+                        "y": 117.1
+                    },
+                    "uuid": "98f72585-1e31-420e-a438-b8ffada1d0eb"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 112.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/SPI_MISO] on B.Cu, length 5.0800 mm",
+                    "pos": {
+                        "x": 111.5,
+                        "y": 116.92
+                    },
+                    "uuid": "4108186f-830d-42ec-b254-f7e5e102493f"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 111.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/SPI_MOSI] on B.Cu, length 5.2600 mm",
+                    "pos": {
+                        "x": 111.0,
+                        "y": 116.74
+                    },
+                    "uuid": "b30c144a-b1b1-4a35-93f1-f66ee04a8353"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 111.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/SPI_CS] on B.Cu, length 5.8800 mm",
+                    "pos": {
+                        "x": 109.5,
+                        "y": 116.12
+                    },
+                    "uuid": "59b0be71-6000-4685-848e-31e1825b612e"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 109.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/COARSE] on B.Cu, length 2.0000 mm",
+                    "pos": {
+                        "x": 102.0,
+                        "y": 120.0
+                    },
+                    "uuid": "db209152-692e-4da4-ac8b-95277ea4fcc7"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 102.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP0] on B.Cu, length 1.8500 mm",
+                    "pos": {
+                        "x": 102.5,
+                        "y": 120.15
+                    },
+                    "uuid": "dd73c4a5-25fa-423c-b560-fe86610421ae"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 102.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP1] on B.Cu, length 1.7000 mm",
+                    "pos": {
+                        "x": 103.0,
+                        "y": 120.3
+                    },
+                    "uuid": "6dc35d2e-e815-4160-b6dc-597564138aeb"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 103.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP2] on B.Cu, length 1.5500 mm",
+                    "pos": {
+                        "x": 103.5,
+                        "y": 120.45
+                    },
+                    "uuid": "caa2baf3-94b4-4feb-8561-813f50ffe4b8"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 103.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP3] on B.Cu, length 1.4000 mm",
+                    "pos": {
+                        "x": 104.0,
+                        "y": 120.6
+                    },
+                    "uuid": "f3ab48b9-392d-4fd3-8357-f868ab1c66c1"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 104.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP4] on B.Cu, length 1.2500 mm",
+                    "pos": {
+                        "x": 104.5,
+                        "y": 120.75
+                    },
+                    "uuid": "47357369-0ef6-4e92-92fd-b43461568a48"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 104.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/S_STROBE_N] on F.Cu, length 0.4000 mm",
+                    "pos": {
+                        "x": 100.4,
+                        "y": 111.365
+                    },
+                    "uuid": "645a3b2f-ec20-4478-ae6a-c674846c6fab"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 100.0,
+                "y": 111.365
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/S_STROBE_P] on F.Cu, length 1.9000 mm",
+                    "pos": {
+                        "x": 101.9,
+                        "y": 110.364999
+                    },
+                    "uuid": "6d7c07a7-82a7-41ee-aae5-9acd2e1da098"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 100.0,
+                "y": 110.364999
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/PH_STROBE_P] on F.Cu, length 0.5000 mm",
+                    "pos": {
+                        "x": 100.5,
+                        "y": 121.35
+                    },
+                    "uuid": "000f2c58-5cac-4570-af34-99dfb83b148e"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 100.0,
+                "y": 121.35
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/PH_STROBE_N] on F.Cu, length 0.8600 mm",
+                    "pos": {
+                        "x": 100.86,
+                        "y": 121.6893
+                    },
+                    "uuid": "371db381-0b02-45df-9af1-d6885c7d75c2"
+                }
+            ],
+            "layer": "F.Cu",
+            "pos": {
+                "x": 100.0,
+                "y": 121.6893
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP5] on B.Cu, length 1.3000 mm",
+                    "pos": {
+                        "x": 105.0,
+                        "y": 120.7
+                    },
+                    "uuid": "740e4a40-f27b-41ef-bdc1-43534a4edc09"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 105.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/FPGA_DONE] on B.Cu, length 3.5000 mm",
+                    "pos": {
+                        "x": 110.5,
+                        "y": 118.5
+                    },
+                    "uuid": "5ee71b81-2854-4929-a3b1-225715b1cc7b"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 110.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/TAP6] on B.Cu, length 1.3500 mm",
+                    "pos": {
+                        "x": 105.5,
+                        "y": 120.65
+                    },
+                    "uuid": "3a160047-a4fa-4ec8-9794-972e88cee464"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 105.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/FPGA_RECONFIG] on B.Cu, length 3.9000 mm",
+                    "pos": {
+                        "x": 113.0,
+                        "y": 118.1
+                    },
+                    "uuid": "0acf4560-ba23-4cb7-8407-5581c85dcbc3"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 113.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/I2C_SCL] on B.Cu, length 4.7200 mm",
+                    "pos": {
+                        "x": 112.5,
+                        "y": 117.28
+                    },
+                    "uuid": "da205519-fcdb-489f-bb44-75f256c6e603"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 112.5,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/I2C_SDA] on B.Cu, length 5.9400 mm",
+                    "pos": {
+                        "x": 110.0,
+                        "y": 116.06
+                    },
+                    "uuid": "e0d5a3c6-3c22-445b-90b8-755a2490c3e8"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 110.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Track has unconnected end",
+            "items": [
+                {
+                    "description": "Track [/MCU_CLK] on B.Cu, length 5.7000 mm",
+                    "pos": {
+                        "x": 109.0,
+                        "y": 116.3
+                    },
+                    "uuid": "160301b8-ec8b-492b-93ca-c277ccb6b0ce"
+                }
+            ],
+            "layer": "B.Cu",
+            "pos": {
+                "x": 109.0,
+                "y": 122.0
+            },
+            "severity": "warning",
+            "type": "track_dangling"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C501",
+                    "pos": {
+                        "x": 111.9,
+                        "y": 115.25
+                    },
+                    "uuid": "2a4046c3-16db-4b05-81f1-b85c6ebc4aa5"
+                }
+            ],
+            "pos": {
+                "x": 111.9,
+                "y": 115.25
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C623",
+                    "pos": {
+                        "x": 112.3,
+                        "y": 105.0
+                    },
+                    "uuid": "2bde614f-e7b9-407b-9b37-360a845cfe3d"
+                }
+            ],
+            "pos": {
+                "x": 112.3,
+                "y": 105.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C508",
+                    "pos": {
+                        "x": 107.45,
+                        "y": 102.18
+                    },
+                    "uuid": "338edf61-859e-47a5-a0dc-a7378f48a8ed"
+                }
+            ],
+            "pos": {
+                "x": 107.45,
+                "y": 102.18
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'L_0402_1005Metric' does not match copy in library 'Inductor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint FB608",
+                    "pos": {
+                        "x": 115.53,
+                        "y": 110.6
+                    },
+                    "uuid": "384ac7aa-ec5f-4877-ac05-fc5b4d710c3f"
+                }
+            ],
+            "pos": {
+                "x": 115.53,
+                "y": 110.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'QFN-48-1EP_6x6mm_P0.4mm_EP4.3x4.3mm' does not match copy in library 'Package_DFN_QFN'",
+            "items": [
+                {
+                    "description": "Footprint U501",
+                    "pos": {
+                        "x": 108.6,
+                        "y": 111.164999
+                    },
+                    "uuid": "3a221eca-feab-4bae-9caa-e969c911b4ba"
+                }
+            ],
+            "pos": {
+                "x": 108.6,
+                "y": 111.164999
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C509",
+                    "pos": {
+                        "x": 113.3,
+                        "y": 105.0
+                    },
+                    "uuid": "3f3b5555-5a19-4e1f-aca1-ba701a3ddd23"
+                }
+            ],
+            "pos": {
+                "x": 113.3,
+                "y": 105.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'SolderJumper-2_P1.3mm_Open_RoundedPad1.0x1.5mm' does not match copy in library 'Jumper'",
+            "items": [
+                {
+                    "description": "Footprint JP501",
+                    "pos": {
+                        "x": 104.6,
+                        "y": 101.3
+                    },
+                    "uuid": "408cddcf-c0c0-4dd3-97f7-bed8ae5311de"
+                }
+            ],
+            "pos": {
+                "x": 104.6,
+                "y": 101.3
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R503",
+                    "pos": {
+                        "x": 101.2,
+                        "y": 101.75
+                    },
+                    "uuid": "4be69cb3-e548-4727-84ff-48ae8572c224"
+                }
+            ],
+            "pos": {
+                "x": 101.2,
+                "y": 101.75
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R510",
+                    "pos": {
+                        "x": 107.2,
+                        "y": 105.0
+                    },
+                    "uuid": "50ef61d3-f678-443c-b26a-1f6b63ade1d9"
+                }
+            ],
+            "pos": {
+                "x": 107.2,
+                "y": 105.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R504",
+                    "pos": {
+                        "x": 101.2,
+                        "y": 102.75
+                    },
+                    "uuid": "579cba5c-3031-407a-9637-49ad279c2ce9"
+                }
+            ],
+            "pos": {
+                "x": 101.2,
+                "y": 102.75
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C502",
+                    "pos": {
+                        "x": 104.05,
+                        "y": 108.65
+                    },
+                    "uuid": "628f6430-e8f7-44fa-9cd2-fce3e3f2eb15"
+                }
+            ],
+            "pos": {
+                "x": 104.05,
+                "y": 108.65
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R506",
+                    "pos": {
+                        "x": 105.4,
+                        "y": 103.05
+                    },
+                    "uuid": "771b54c1-a043-4be5-9bb6-a32b89fcf7a9"
+                }
+            ],
+            "pos": {
+                "x": 105.4,
+                "y": 103.05
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R508",
+                    "pos": {
+                        "x": 108.5,
+                        "y": 105.0
+                    },
+                    "uuid": "7a58dfc3-4135-4e59-8ad4-e44e367f56b4"
+                }
+            ],
+            "pos": {
+                "x": 108.5,
+                "y": 105.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'MSOP-10_3x3mm_P0.5mm' does not match copy in library 'Package_SO'",
+            "items": [
+                {
+                    "description": "Footprint U502",
+                    "pos": {
+                        "x": 111.1,
+                        "y": 102.2
+                    },
+                    "uuid": "82435d74-7d44-4645-90c6-a261ab01f805"
+                }
+            ],
+            "pos": {
+                "x": 111.1,
+                "y": 102.2
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R502",
+                    "pos": {
+                        "x": 101.2,
+                        "y": 100.75
+                    },
+                    "uuid": "9f5da68a-c61c-4f47-91d4-ae0da9ad7bf2"
+                }
+            ],
+            "pos": {
+                "x": 101.2,
+                "y": 100.75
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'Crystal_SMD_3225-4Pin_3.2x2.5mm' does not match copy in library 'Crystal'",
+            "items": [
+                {
+                    "description": "Footprint Y501",
+                    "pos": {
+                        "x": 116.3,
+                        "y": 105.55
+                    },
+                    "uuid": "a1dcbc43-42a4-49da-b1eb-7215b887c065"
+                }
+            ],
+            "pos": {
+                "x": 116.3,
+                "y": 105.55
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C506",
+                    "pos": {
+                        "x": 104.05,
+                        "y": 107.45
+                    },
+                    "uuid": "aa4da310-41f0-4c55-9b41-60d636f2fd4a"
+                }
+            ],
+            "pos": {
+                "x": 104.05,
+                "y": 107.45
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R501",
+                    "pos": {
+                        "x": 103.3,
+                        "y": 114.3
+                    },
+                    "uuid": "d5e6138d-623a-40b1-83a6-8cae977dbcae"
+                }
+            ],
+            "pos": {
+                "x": 103.3,
+                "y": 114.3
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C504",
+                    "pos": {
+                        "x": 106.4,
+                        "y": 115.7
+                    },
+                    "uuid": "d8b225b2-71be-4573-9e62-0a4cda225640"
+                }
+            ],
+            "pos": {
+                "x": 106.4,
+                "y": 115.7
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0402_1005Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C505",
+                    "pos": {
+                        "x": 112.3,
+                        "y": 106.9
+                    },
+                    "uuid": "df36d284-1037-4376-a823-67a32cb6bee7"
+                }
+            ],
+            "pos": {
+                "x": 112.3,
+                "y": 106.9
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R505",
+                    "pos": {
+                        "x": 103.3,
+                        "y": 103.05
+                    },
+                    "uuid": "e0534a2b-eaeb-4ae0-87a0-2f309db1219a"
+                }
+            ],
+            "pos": {
+                "x": 103.3,
+                "y": 103.05
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C510",
+                    "pos": {
+                        "x": 116.0,
+                        "y": 108.75
+                    },
+                    "uuid": "e837d181-b475-4e3e-bb6c-d5369e8e41fb"
+                }
+            ],
+            "pos": {
+                "x": 116.0,
+                "y": 108.75
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C507",
+                    "pos": {
+                        "x": 116.0,
+                        "y": 109.2
+                    },
+                    "uuid": "3d52601d-eead-432c-af86-102e316fab51"
+                }
+            ],
+            "pos": {
+                "x": 116.0,
+                "y": 109.2
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R507",
+                    "pos": {
+                        "x": 105.6,
+                        "y": 115.6
+                    },
+                    "uuid": "6661953b-2936-4ad4-a914-93d0b8787263"
+                }
+            ],
+            "pos": {
+                "x": 105.6,
+                "y": 115.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'R_0402_1005Metric' does not match copy in library 'Resistor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint R509",
+                    "pos": {
+                        "x": 111.3,
+                        "y": 103.0
+                    },
+                    "uuid": "acc64185-1a40-4c92-8867-64312f2e0126"
+                }
+            ],
+            "pos": {
+                "x": 111.3,
+                "y": 103.0
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Footprint 'C_0805_2012Metric' does not match copy in library 'Capacitor_SMD'",
+            "items": [
+                {
+                    "description": "Footprint C503",
+                    "pos": {
+                        "x": 114.6,
+                        "y": 114.6
+                    },
+                    "uuid": "dc3962e4-fe5b-4e07-967a-80d21f700a79"
+                }
+            ],
+            "pos": {
+                "x": 114.6,
+                "y": 114.6
+            },
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        }
+    ]
+}

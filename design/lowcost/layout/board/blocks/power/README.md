@@ -1,4 +1,4 @@
-# Block "power": USB-C, protection, TPS62A01A x2, TPS63802, LM27762 x2 (refs 6xx, 61 parts, both sides)
+# Block "power": USB-C, protection, TPS62A01A x2, TPS63802, LM27762 x2, VBUS damper (refs 6xx, 68 parts, both sides)
 Run `python3 gen_power.py [--norender]` -> `power.kicad_pcb`, `power.ifaces.json`, `power.png` (F), `power_b.png` (B),
 `power_detail.png` (U603 / L601). KiCad 7.0.11; DRC with the nightly (`tools/run_drc.sh --rules jlc4`).
 Power tree: `docs/research/power-tree.md` (24 Nov 2026). **Size 26.0 x 22.5 mm at board (74, 0), unchanged.** J601, U608,
@@ -13,7 +13,7 @@ F601, D601, FB601, R601 / R602 and the USB pair are unchanged. M3 hole (97, 3): 
 | U604 LM27762 +5V1F -> +5V / -5V | F | x 0-8, y 7.9-15.6, chip (4.8, 11.65) | C613 100n + C612 22u at VIN (3) / GND (4) on the IC layer (DECOUPLING-4); C626 CCP at CP (5); C618 C1 at pins 10 / 9; **C617 COUT+ north (courtyard on the chip's, OUT+ pad 1.13 mm from pin 11) -> FB604 (vertical, NE) -> +5V via behind the bead; C621 COUT- vertical under the chip (OUT- pad 0.63 mm from pin 6), rail via east of its pad**; FB dividers R613 / R614 (FB+) and R605 / R606 (FB-) on **B** under the cell (FB vias at the pins: signal ties, no current); EP 2 vias |
 | U605 LM27762 +3V3_CP -> +/-2V5 | F | x 0-8, y 15.6-22.4, chip (4.8, 18.55) | C625 CIN, C619 CCP, C624 C1; **C630 COUT+ vertical east of C621 (pad 0.66 mm from pin 11), C628 COUT- under the chip (0.75 mm from pin 6)**, rail vias behind both; R615 / R616 (FB+) on F north of C625 (OUT+ sense from behind C630 through In2), R607 / R608 (FB-) on B |
 | beads | B / F | under the LM27762 cells | FB602 / FB603 / C627 / FB605 / R617 / C629 / FB607 / FB606 on B; FB604 on F |
-| C632 47u (damper, **fitted** since recheck RP-3) | B | (15.2, 6.0), VBUS pad on the B VBUS strip (moved off the C601 via area), GND via east | |
+| VBUS damper R618-R621 / C632-C635 (BOM-2) | B | see 'BOM-2' below | 4 x (1 R 1206 + 47 uF 1206), replaces the tantalum C632 |
 Not placed here: C606, C614, C616, C622 (analog block) and C615, C620 (phase block), placed at their loads per
 kicad/README.md; `floorplan.PLACED_IN` now maps them to those blocks.
 
@@ -107,3 +107,39 @@ kicad/README.md; `floorplan.PLACED_IN` now maps them to those blocks.
   `power_netview_lm27762_b.png` (B).
 
 **Vias out of pads (24 Nov, RULES rule 12):** LM27762 EP vias removed (EP tied to GND pins 1 / 4), U608 GND via 0.25 mm off its pad, U605 EN- via 0.35 / 0.15. `python3 ../../via_in_pad.py power.kicad_pcb`: FAIL 0.
+
+## BOM-2 (25 Nov 2026, netlist after SPEC decisions 27-34; docs/research/bom2-power-passives.md)
+Block outline, interfaces and every converter cell (U601 / U602 / U603 hot loops, L601 / L602 / L603 positions, U603
+capacitor pads 0.93 mm from VIN / VOUT, vias only behind the capacitors) unchanged.  Changes, all in `gen_power.py`:
+| ref | netlist change | layout |
+|---|---|---|
+| F601 | PTC -> 0 R 1206 | value only, same land |
+| D601 | SMAJ5.0A DNP | land and its GND vias kept (gen_board drops DNP parts from the pos file) |
+| FB601 | 0805 -> 0603 (BLM18PG121) | same place, 0.27 mm south so its VBUS_F pad is in line with F601.2 (straight track) |
+| L602 / L603, FB602-FB607, R603 / R604, R606 / R616 | values | unchanged positions |
+| C632 + C633-C635, R618-R621 (new) | tantalum -> 4 x (1 R 1206 + 47 uF X5R 1206), VBUS to GND | B side, below |
+| R613 / R614 (B) | 0402 -> 0603 | row y 8.75 re-spaced: R614 2.9 / R613 5.9 (was 2.6 / 4.6), courtyards touching, east of C608 |
+| R605 (B) | 0402 -> 0603 | (4.7, 12.72) (was (4.9, 13.6)): the 0603 would overlap FB603 / sit on the FB- via; FB- via unchanged, 45-degree entries |
+| R615 (F) | 0402 -> 0603 | fills the row between C626 and C625 alone: (1.53, 16.11); C626 (U604 CCP) 0.25 mm north to make room |
+| R616 (F -> B) | 200k 0402 | no room for both in that row: R616 on B at (4.46, 15.45) under C621, FB+ reaches it through a 0.4 / 0.2 via on the pin-2 track at (3.35, 16.12); the old R616 GND track to C621 is gone; R615's +2V5_LDO sense via moved to (0.705, 17.1) (In2 end shortened) |
+Damper placement (B, decided: the 1206 pairs need about 85 mm2; B is the only side with room and RULES rule 8 allows bulk
+parts there; the area is what the tantalum C632 and its via freed plus three empty B areas around J601):
+| branch | parts | where (local mm) | VBUS / GND |
+|---|---|---|---|
+| 1 | R618 / C632 | rows y 1.55 / 3.87 at x 16.8, folded at the east end (node track 0.6 mm, 2.3 mm) | R618 VBUS pad on the B VBUS strip (strip widened to x 15.95 above y 2.5); C632 GND pad -> 0.6 mm neck -> plane via (17.2, 3.87) under the body (F side: pour east of L601, 0.37 mm off its pad) |
+| 2 | C633 / R619 | rows y 6.22 / 8.54; R619 at x 15.38 (VBUS pad on the strip, node pad 0.3 mm clear of the J601 north lug) | GND via (17.2, 6.22) |
+| 3 | R620 / C634 | row y 20.4, x 15-23.7 under the J601 south lugs | VBUS: 0.5 mm B track along y 18.85 from the strip end (14.0, 18.85); GND via (24.75, 20.4) east of D601's land |
+| 4 | C635 / R621 | vertical at x 24.75, y 8.1-17.4 along the east board edge (pads 0.35 mm from it), between the M3 keep-out and the south lug | the y 18.85 track continues north to R621; GND via (24.75, 7.75) |
+Every branch: R at VBUS, C to GND, node <= 2.3 mm of 0.6 mm track, GND via at the capacitor. The damper sits at VBUS
+between FB601 and the converters (it damps the cable / input-capacitor resonance, a few hundred kHz; position on VBUS is
+not critical, the series R dominates the branch impedance: track resistance < 10 mohm against 1 R).
+Not changed (no area freed that would tighten a hot loop): converter cells, LM27762 cells (outputs at the pins as in REPAIR).
+
+**Interface changes: none.**
+
+Checks (25 Nov 2026): check_board (68 refs) 0 in every class (missing / extra / footprint / value / pad-net / unrouted /
+clearance / corners / off-axis / RF / courtyard); `via_in_pad.py power.kicad_pcb` FAIL 0 (3 near 0.15-0.2 mm); nightly
+DRC jlc4: 74 = 63 lib_footprint_mismatch + 2 lib_footprint_issues + 6 via_dangling (supply interface vias) +
+2 track_dangling (USB pair ends) + 1 invalid_outline; 0 clearance / courtyard / hole / width / silk / unconnected.
+Renders: power.png (F), power_b.png (B), power_detail*.png regenerated; the power_netview_*.png are from the integrated
+board and still show the pre-BOM-2 parts.

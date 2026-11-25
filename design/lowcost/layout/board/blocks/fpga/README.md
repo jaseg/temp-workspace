@@ -52,3 +52,10 @@ The IDES / OSER10 placement on the new pins (COARSE on 27) is not yet checked in
   Renders: `fpga_netview_u502.png`, `fpga_netview_tap5.png`.
 
 **Vias out of pads (24 Nov, RULES rule 12):** C506 0.2 mm north (GND via between the GND pads), R502-R504 share one +3V3 via, router vias kept 0.31 mm off every SMD pad. `python3 ../../via_in_pad.py fpga.kicad_pcb`: FAIL 0.
+
+## BOM-2 (25 Nov 2026)
+- FB608 BLM18KG601 0603 -> BLM15HD102SN1D 0402 (netlist): placed at (15.53, 10.6) rot 180 (was 15.8375), so its
+  +3V3_CLK pad stays at x 15.05 straight below C510; the +3V3 input via at (16.01, 11.35). Nothing else changed.
+- Checks: check_board (26 refs) all 0; via_in_pad FAIL 0; DRC jlc4 63 = 36 track_dangling (interface stubs) +
+  26 lib_footprint_mismatch + 1 invalid_outline.
+- **Interface changes: none.**
